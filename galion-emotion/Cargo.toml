@@ -1,0 +1,10 @@
+[package]
+name = "galion-emotion"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Galion Voice emotion pipeline (both directions): caller affect detection, Galion prosody expression, consent gate, duplex emotion band. Stubs only; no models."
+publish = false
+
+[dependencies]
+# Intentionally zero dependencies. No model downloads, safetensors + .gq only.

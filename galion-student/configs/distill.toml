@@ -1,0 +1,37 @@
+# Distillation stages (stub)
+[teacher]
+id = "nvidia/personaplex-7b"       # verify exact id + license (risk R1)
+fallback = "kyutai/moshi"          # CC-BY fallback teacher
+ships = false
+
+[stage0_profile]
+calib_hours = 50
+metrics = ["block_influence", "head_importance", "ffn_activation"]
+
+[stage1_prune]
+target_params = "3B"
+keep_first_layers = 2
+keep_last_layers = 2
+heal_tokens = "2B"
+
+[stage2_kd]
+target_variant = "S1"
+init = "pruned"
+tokens = "20B-40B"
+temperature = 2.0
+loss = { text_kl = 1.0, codebook_kl = 1.0, hidden_mse = 0.1, gt_ce = 0.2 }
+codebook_weights = [1.0, 0.8, 0.6, 0.5, 0.4, 0.3, 0.25, 0.2]
+hidden_tap_layers = "4 evenly spaced"
+
+[stage3_duplex_kd]
+mode = "sequence_level"
+scenarios = ["pause", "backchannel", "barge_in", "overlap", "side_talk"]
+
+[stage4_persona_kd]
+personas_per_turn = 4
+voice_prompt = true
+emotion_conditioning = true
+
+[stage5_qat]
+tokens = "0.5B-1B"
+reference = "bf16_student"

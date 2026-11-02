@@ -1,0 +1,17 @@
+# Galion Voice — Perpetual Open MIT License
+[package]
+name = "galion-presence"
+description = "Galion Voice presence harness (agent A13): presence.json schema + deterministic CPU replay runner against a Mock backend. Harness before model."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version = "1.85"
+publish = false
+
+[[bin]]
+name = "galion-presence"
+path = "src/main.rs"
+
+[dependencies]
+# Intentionally zero dependencies: builds with `cargo --offline`, no serde, no weights.

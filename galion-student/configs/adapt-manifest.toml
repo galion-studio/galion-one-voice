@@ -1,0 +1,25 @@
+# Galion Voice — adapt-not-train slot manifest (W20-08, 2026-11-02 CET)
+# NO training, NO distillation, NO weights in git. Files are placed by the owner after A21.
+# sha256 left empty on purpose: never invent pins. Mirrors crates/galion-student-backend ADAPT_MANIFEST.
+schema = "galion.adapt.v1"
+slot = "openmind-slot.toml"
+mode = "adapt"                    # adapt | (later, parked) distill
+quantisation = "int8_ptq_only"
+counsel_gate = "A21"
+weights_dir = "$GALION_WEIGHTS_DIR"   # outside repo
+
+[[artifact]]
+role = "codec";       upstream = "kyutai/mimi";    file = "mimi.safetensors";  licence = "UNKNOWN (A21)"; sha256 = ""
+[[artifact]]
+role = "dialogue";    upstream = "kyutai/moshiko"; file = "model.gq";          licence = "CC-BY-4.0 (A21 confirm)"; sha256 = ""; note = "converted locally to .gq from published safetensors"
+[[artifact]]
+role = "tokenizer";   upstream = "kyutai/moshiko"; file = "tokenizer.model";   licence = "UNKNOWN (A21)"; sha256 = ""
+[[artifact]]
+role = "ser_inbound"; upstream = "FunAudioLLM/SenseVoiceSmall"; file = "sensevoice-small.safetensors"; licence = "UNKNOWN (A21)"; sha256 = ""; note = "adapter, no fine-tune"
+
+[eval_only]
+personaplex = "outputs as eval data only, never weights"
+
+[parked]
+H6_gpu_budget = "parked"
+s0_s1_kd = "configs/s0.toml, s1.toml — plan only"

@@ -1,0 +1,48 @@
+# Student architecture variants (stub)
+[codec]
+name = "mimi"
+sample_rate = 24000
+frame_hz = 12.5
+codebooks = 8            # verify against PersonaPlex
+
+[variant.S1]             # primary
+temporal_layers = 20
+d_model = 2048
+ffn_dim = 5632
+n_heads = 16
+n_kv_heads = 4
+attn = "sliding"
+window_frames = 3000
+persona_sink_tokens = 16
+depth_layers = 4
+depth_d_model = 768
+depth_shared_across_codebooks = true
+tie_text_embeddings = true
+aux_heads = ["turn_state", "affect"]
+
+[variant.S2]
+temporal_layers = 24
+d_model = 2560
+ffn_dim = 6912
+n_heads = 20
+n_kv_heads = 4
+depth_layers = 4
+depth_d_model = 1024
+
+[variant.S0]
+temporal_layers = 16
+d_model = 1536
+ffn_dim = 4096
+n_heads = 12
+n_kv_heads = 4
+depth_layers = 3
+depth_d_model = 512
+
+[quant]
+format = "safetensors"   # primary path: safetensors + .gq only
+ffn = "int8_per_channel"
+attn = "int8_per_channel"
+embeddings = "int8"      # "int4_g64" allowed only if bandwidth gate fails
+lm_head = "int8"
+activations = "int8_dynamic_per_token"
+kv_cache = "int8"

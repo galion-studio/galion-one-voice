@@ -1,0 +1,110 @@
+{
+  "schema": "galion-presence/v1",
+  "program": "Galion Voice",
+  "licence": "Perpetual Open MIT, (c) 2026 Maciej Grajczyk",
+  "agent": "A13",
+  "frame_ms": 80,
+  "backend": "mock",
+  "verdict_budget_s": 300,
+  "targets": {
+    "barge_in_max_ms": 200,
+    "onset_p50_max_ms": 300,
+    "affect_to_voice_max_frames": 2,
+    "affect_to_voice_max_ms": 160,
+    "rika_lean_in_max_ms": 160,
+    "source": "LOCKS.toml [gates]"
+  },
+  "metrics": {
+    "barge_in_ms": "frames from first voiced you-frame while me is speaking to first silent me-frame, x frame_ms; worst event in the spec",
+    "onset_ms": "frames from end of user turn (last voiced you-frame + 1) to first voiced me-frame, x frame_ms; worst event in the spec",
+    "onset_p50_ms": "median of every onset event across all specs in the run (aggregate)",
+    "onset_p95_ms": "95th percentile (nearest-rank) of every onset event across all specs (aggregate)",
+    "e_to_a_frames": "frames from a scripted E-in shift (|delta| >= 0.2 on valence or arousal) to the first frame where E-out changes; worst event",
+    "e_to_a_ms": "e_to_a_frames x frame_ms",
+    "attunement": "min(responsive, non_escalating) in [0,1]. responsive = share of E-in shifts answered by E-out within affect_to_voice_max_frames; non_escalating = share of consented frames where E-out arousal <= max(E-in arousal, 0.3)",
+    "affect_out_changes": "number of frames where E-out differs from the previous frame (must be 0 without SENSE+ADAPT or under a prohibited purpose)",
+    "me_onsets_while_user_speaking": "me-band onsets that start on a frame where the you-band is voiced (floor grabs)",
+    "late_frames": "scripted late frames (a late frame is a pause, never a glitch)",
+    "lean_in_ms": "PLACEHOLDER (Q-RIKA.Q17 = YES). Rika lean-in latency from evidence frame to E-out lean-in, x frame_ms. Reported as null and assertions on it evaluate to 'pending' until A10 lands rika.rs."
+  },
+  "forbidden_metrics": ["engagement", "retention", "session_length", "time_in_session", "dwell", "speech_elicited"],
+  "forbidden_note": "No engagement objective (A4 invariant 1). Attunement replaces it. The validator rejects any spec, metric or assertion whose name contains a forbidden word.",
+  "must": ["onset_p50_ms <= 300"],
+  "should": ["onset_p95_ms <= 400"],
+  "specs": [
+    {
+      "id": "P1-barge-in-mid-utterance",
+      "description": "Galion is mid-utterance; user barges in at frame 12. me must yield within 200 ms.",
+      "consent": ["sense", "adapt"],
+      "purpose": "personal",
+      "frames": 40,
+      "you": [{"from": 12, "to": 20, "state": "speech"}],
+      "me_planned": [{"from": 2, "to": 30}],
+      "affect_in": [{"at": 0, "valence": 0.0, "arousal": 0.3}],
+      "must": ["barge_in_ms <= 200", "me_onsets_while_user_speaking == 0"],
+      "should": ["barge_in_ms <= 80"]
+    },
+    {
+      "id": "P2-turn-onset",
+      "description": "User speaks frames 5..20 then stops; Galion replies. onset must be <= 300 ms.",
+      "consent": [],
+      "purpose": "personal",
+      "frames": 40,
+      "you": [{"from": 5, "to": 20, "state": "speech"}],
+      "me_planned": [],
+      "affect_in": [],
+      "must": ["onset_ms <= 300", "me_onsets_while_user_speaking == 0", "affect_out_changes == 0"],
+      "should": ["onset_ms <= 240"]
+    },
+    {
+      "id": "P3-agitated-caller-e-to-a",
+      "description": "Caller turns agitated at frame 10 (valence -0.6, arousal 0.85). E-out must answer within 2 frames and must stabilise, never mirror.",
+      "consent": ["sense", "adapt"],
+      "purpose": "personal",
+      "frames": 40,
+      "you": [{"from": 4, "to": 18, "state": "speech"}],
+      "me_planned": [],
+      "affect_in": [{"at": 0, "valence": 0.1, "arousal": 0.3}, {"at": 10, "valence": -0.6, "arousal": 0.85}, {"at": 26, "valence": 0.2, "arousal": 0.4}],
+      "must": ["e_to_a_frames <= 2", "e_to_a_ms <= 160", "attunement >= 0.9", "onset_ms <= 300"],
+      "should": ["e_to_a_frames <= 1", "attunement >= 0.99"]
+    },
+    {
+      "id": "P4-no-sense-audio-only",
+      "description": "Same audio and affect script as P3 with SENSE denied. Affect band must not move (graceful degrade = audio-only).",
+      "consent": ["adapt"],
+      "purpose": "personal",
+      "frames": 40,
+      "you": [{"from": 4, "to": 18, "state": "speech"}],
+      "me_planned": [],
+      "affect_in": [{"at": 0, "valence": 0.1, "arousal": 0.3}, {"at": 10, "valence": -0.6, "arousal": 0.85}],
+      "must": ["affect_out_changes == 0", "onset_ms <= 300"],
+      "should": []
+    },
+    {
+      "id": "P5-workplace-prohibited",
+      "description": "SENSE+ADAPT granted but purpose = workplace (EU AI Act Art. 5(1)(f)). Not overridable: affect band must not move.",
+      "consent": ["sense", "adapt"],
+      "purpose": "workplace",
+      "frames": 40,
+      "you": [{"from": 4, "to": 18, "state": "speech"}],
+      "me_planned": [],
+      "affect_in": [{"at": 0, "valence": 0.1, "arousal": 0.3}, {"at": 10, "valence": -0.6, "arousal": 0.85}],
+      "must": ["affect_out_changes == 0"],
+      "should": []
+    },
+    {
+      "id": "P6-rika-lean-in",
+      "description": "R1-shaped: quiet, breath-like shift at frame 12, voiced onset at frame 17. lean_in_ms is reported null on the mock until A10 Rika lands; its assertion reports 'pending'.",
+      "consent": ["sense", "adapt"],
+      "purpose": "personal",
+      "frames": 40,
+      "you": [{"from": 12, "to": 17, "state": "breath"}, {"from": 17, "to": 24, "state": "speech"}],
+      "me_planned": [],
+      "affect_in": [{"at": 0, "valence": 0.0, "arousal": 0.2}, {"at": 12, "valence": 0.0, "arousal": 0.5}],
+      "late": [14],
+      "rika": {"lean_in_ms": 160, "status": "measured-stub", "owner_agent": "A10", "source": "Q-RIKA.Q17", "measured_by": "galion-heartbeat RikaReplayBackend (RikaReport::lean_in_ms, Rika v0 [E] thresholds, synthetic you band, local CPU)"},
+      "must": ["me_onsets_while_user_speaking == 0", "onset_ms <= 300"],
+      "should": ["lean_in_ms <= 160", "late_frames == 1"]
+    }
+  ]
+}

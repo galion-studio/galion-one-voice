@@ -1,0 +1,46 @@
+# Galion Voice — Perpetual Open MIT License
+[package]
+name = "galion-console"
+description = "Galion Voice console: terminal-default ratatui TUI (SSH-friendly) for bench history, tensor activity and job status."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version = "1.85"
+
+[[bin]]
+name = "galion-console"
+path = "src/main.rs"
+
+[features]
+# A11 follow-up: real live feeds. Both on by default; `--no-default-features`
+# builds the stub-only console (no galion-tensor / galion-emotion code compiled).
+default = ["real-feeds"]
+real-feeds = ["tensor-feed", "emotion-feed", "wav-mic"]
+# THINK/CAPTURE/SPEAK timing + op counters from real galion-tensor kernels.
+tensor-feed = ["dep:galion-tensor"]
+# SENSE affect via galion-emotion AffectDetector -> A9 AffectStore<Consented>.
+emotion-feed = ["dep:galion-emotion"]
+# CAPTURE from a WAV/PCM fixture via the galion-presence std-only loader (shared code).
+wav-mic = ["dep:galion-presence"]
+# W21-04: heartbeat FrameOut -> galion-render one dot + live bars (src/dotviz.rs,
+# examples/dot_console_demo.rs). Off by default; workspace path deps only, no new crates.
+dot-viz = ["dep:galion-render", "dep:galion-heartbeat", "dep:galion-emotion"]
+# Also serve the dot over the std-only galion-render web surface (127.0.0.1 only).
+dot-viz-web = ["dot-viz", "galion-render/web"]
+# FP-02: `dot-viz-window` (stub window surface, open() -> Unsupported) deleted — one dot, one web page.
+
+[dependencies]
+galion-tensor = { path = "../galion-tensor", optional = true, default-features = false }
+galion-emotion = { path = "../../galion-emotion", optional = true }
+# Zero-dependency crate; only `galion_presence::wav` is used.
+galion-presence = { path = "../galion-presence", optional = true }
+# W21-04 dot-viz only (both are workspace crates; galion-render is std-only).
+galion-render = { path = "../../galion-render", optional = true }
+galion-heartbeat = { path = "../galion-heartbeat", optional = true, default-features = false }
+# Pinned to 0.29 (MSRV 1.74) — box toolchain is rustc 1.85. ratatui re-exports crossterm.
+ratatui = { version = "0.29", default-features = false, features = ["crossterm"] }
+
+[[example]]
+name = "dot_console_demo"
+required-features = ["dot-viz"]

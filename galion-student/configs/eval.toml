@@ -1,0 +1,27 @@
+# Eval gates, relative to teacher T (stub)
+[fdb_v1]
+pause_takeover_max_delta = 0.05
+backchannel_jsd_max_delta = 0.05
+turn_taking_tor_min_delta = -0.05
+turn_latency_ms_p50_max = 300
+interrupt_yield_min = 0.9
+interrupt_time_to_yield_ms_max = 400
+
+[fdb_v1_5]
+overlap_per_category_within = 0.10
+
+[content]
+wer_max = 0.08
+judge_rel_min = 0.85
+
+[persona]
+adherence_rel_min = 0.90
+speaker_sim_rel_min = 0.90
+
+[audio]
+utmos_max_drop = 0.3
+
+[cpu]
+vps_4vcpu = { model = "S1", rtf_max = 1.0, p95_frame_ms = 80, rss_gb_max = 2.0, soak_min = 30 }
+vps_4vcpu_s0 = { model = "S0", rtf_max = 0.6, p95_frame_ms = 60 }
+laptop_8c = { model = "S1", rtf_max = 0.5, p95_frame_ms = 45 }

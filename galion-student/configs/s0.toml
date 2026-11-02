@@ -1,0 +1,56 @@
+# Galion student S0 (≈0.5B) — plan stub, A8, no weights. See DOCS A08-student-kd-plan.md
+[model]
+name = "s0"
+target_params_b = 0.5
+temporal_layers = 16
+d_model = 1536
+ffn_dim = 4096
+n_heads = 12
+n_kv_heads = 4
+attn = "sliding"
+window_frames = 3000
+persona_sink_tokens = 16
+tie_text_embeddings = true
+
+[codec]
+name = "mimi"
+frozen = true
+sample_rate = 24000
+frame_hz = 12.5
+frame_ms = 80
+
+[audio_head]
+kind = "calm"            # continuous latent head
+params_m = 20
+steps = 2
+fallback = "depth_shared_4x768"
+
+[dialogue_state]
+tokens = ["LISTEN","SPEAK","BACKCHANNEL","YIELD","INTERRUPTED","HOLD"]
+feed_back = true
+
+[teacher]
+logit_teacher = "kyutai/moshiko (CC-BY-4.0)"
+personaplex = "outputs_only"   # pending legal review (A21)
+
+[distill]
+recipe = "pocket_tts_shrink"
+tokens_b = "10-20"
+loss = { kl_text = 1.0, audio_latent = 1.0, hidden_mse = 0.5, state_ce = 0.3, gt_ce = 0.2, temperature = 2.0 }
+rl = "mfia"
+
+[accept]
+full_duplex_bench_vs_teacher = 0.90
+teacher_state_agreement = 0.90
+step_p99_ms = 80
+
+[quant]
+format = "safetensors"
+export = "gq"
+ggml_container = false   # no llama.cpp/GGML-family export, ever
+floor = "int8"
+ffn = "int8_per_channel"
+attn = "int8_per_channel"
+embeddings = "int8"
+lm_head = "int8"
+kv_cache = "int8"

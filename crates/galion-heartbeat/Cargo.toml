@@ -1,0 +1,25 @@
+# Galion Voice — Perpetual Open MIT License
+[package]
+name = "galion-heartbeat"
+description = "Galion Voice 80 ms heartbeat: the one per-frame step() that carries you/me/feeling, with Rika on the feeling band (agent A10). No weights, no threads, no I/O in the hot path."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version = "1.85"
+publish = false
+
+[features]
+# `presence` adds a galion-presence ReplayBackend driven by the heartbeat (harness only, not runtime).
+# Runtime builds use `default-features = false`.
+default = ["presence"]
+presence = ["dep:galion-presence"]
+
+[dependencies]
+galion-emotion = { path = "../../galion-emotion" }
+galion-presence = { path = "../galion-presence", optional = true }
+
+[[bin]]
+name = "galion-heartbeat-presence"
+path = "src/bin/presence.rs"
+required-features = ["presence"]

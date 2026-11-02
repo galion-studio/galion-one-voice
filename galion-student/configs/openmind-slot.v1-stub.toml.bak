@@ -1,0 +1,27 @@
+# Obsidian Open Mind — Galion Voice v1 model slot (stub)
+[slot]
+name = "galion-voice"
+version = "1"
+format = "safetensors"          # primary path: safetensors + .gq only
+files = ["model.safetensors", "mimi.safetensors", "tokenizer.model", "SHA256SUMS"]
+license_file = "LICENSE-WEIGHTS"
+model_card = "MODEL_CARD.md"
+data_manifest = "DATA_MANIFEST.toml"
+
+[io.in]
+audio = { sample_rate = 24000, channels = 1 }
+persona = { text_prompt = true, voice_prompt_clip = "optional" }
+emotion_tag = "optional"
+
+[io.out]
+audio = { sample_rate = 24000, channels = 1 }
+text_stream = true              # feeds Open Mind memory/retrieval
+turn_state_events = ["listen", "speak", "backchannel", "yield"]
+affect = ["user", "model"]
+
+[hooks]
+retrieval_injection = "turn_boundary"   # MoshiRAG-style, rate limited
+
+[min_eval]
+gate_file = "eval.toml"
+required = ["fdb_v1", "content", "cpu.vps_4vcpu"]
