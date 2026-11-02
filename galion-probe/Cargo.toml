@@ -1,0 +1,18 @@
+# Galion Voice — Perpetual Open MIT License
+# Standalone (own [workspace]) so it builds on a bare VPS with zero crates.io access.
+[package]
+name = "galion-probe"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "CPU readiness probe for Galion Voice (lscpu/meminfo + STREAM triad + f32 GEMV)"
+
+[dependencies]
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+
+[workspace]

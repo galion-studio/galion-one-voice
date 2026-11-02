@@ -1,0 +1,89 @@
+# Obsidian Open Mind — Galion Voice student slot (V4, A3)
+# StudentBackend = 4th Open Mind VoiceBackend (Mock, CpuPipeline, Relay/PersonaPlex, Student).
+# Slot is a contract, not a model. Type names verified 2026-11-02 against code on box;
+# see [abi] below and v4/agents/A03-STATUS.md. Open Mind `galion-voice-core` is NOT on box:
+# every `oom:` name is UNVERIFIED (sourced from D19 / 04-INTEGRATION only).
+schema = "galion.slot.v2"
+
+[slot]
+name = "galion-voice"
+version = "2"
+backend = "StudentBackend"
+variant = "S1"                  # S1 ~1.0B | S0 ~0.5B (CALM head)
+duplex = "full"                 # oom: Capabilities{ duplex: DuplexMode::Full } (UNVERIFIED)
+runtime = "galion-tensor"       # Rust CPU, zero llama.cpp/GGML-family containers (gate G2/G5)
+format = ["safetensors", "gq"]  # .gq = packed, mmap read-only
+forbidden_formats = ["ggml", "ggml-family-container"]   # any llama.cpp/GGML-family weight container; allowlist is `format` above
+weights_vendored = false        # fetched, sha256-pinned, never in git
+files = ["model.gq", "mimi.safetensors", "tokenizer.model", "SHA256SUMS"]
+license_file = "LICENSE-WEIGHTS"   # UNKNOWN until A21 memo (X6/L2)
+model_card = "MODEL_CARD.md"
+data_manifest = "DATA_MANIFEST.toml"
+
+[frame]
+sample_rate = 24000
+channels = 1
+frame_ms = 80                   # 12.5 Hz, frozen (Mimi)
+step = "galion_presence::backend::ReplayBackend::step(&mut self, &FrameIn) -> FrameOut"   # verified; per-frame, causal, zero-alloc
+hot_path_alloc = false
+
+[io.in]
+audio = { sample_rate = 24000, channels = 1, pcm = "f32" }
+persona = { source = "oom:PersonaSource", verified = false, once_per_session = true, voice_prompt_clip = "optional" }
+hermes_text = "galion_sideband::FromHermes"   # Knowledge{turn,text,source} | NoKnowledge{turn,reason}; mid-session, never on critical path
+affect_in = { type = "galion_emotion::EmotionWire", bytes = 8, dims = ["valence", "arousal", "dominance", "confidence"], hz = 12.5, optional = true, label = "galion.affect.v1" }   # 8 BYTES (seq,flags,V,A,D,conf,consent), not 8 dims; label is doc-only, not in code
+
+[io.out]
+audio = { sample_rate = 24000, channels = 1, pcm = "f32" }
+text_stream = "optional"        # inner monologue, never critical path
+turn_events = ["start", "yield", "barge_in", "end"]   # UNVERIFIED: no enum on box; nearest real = galion_sideband::ToHermes{SessionStart,Turn,Intent,Affect,SessionEnd}
+intent = { type = "galion_sideband::Intent", variants = ["Chat", "Lookup{query}", "Action{name,tier}"], tier = "galion_sideband::ActionTier" }   # verified; no args/capability_id in code
+affect_out = { event = "oom:BackendEvent::Emotion", event_verified = false, payload = "galion_emotion::EmotionFrame", type = "galion_emotion::EmotionWire", bytes = 8, replay_type = "galion_presence::backend::AffectOut" }
+
+[consent]                       # enforced in runtime, not guest-configurable
+bits = ["sense", "adapt", "remember", "share"]   # verified: galion_emotion::consent_bits::{SENSE,ADAPT,REMEMBER,SHARE} (u8, wire byte 7)
+gate = "galion_emotion::ConsentGate"   # default impl DefaultConsentGate = deny
+default = { sense = false, adapt = false, remember = false, share = false }
+sense_off_equals_audio_only = true
+
+[latency]
+interrupt_yield_frames_max = 2
+barge_in_ms_max = 200
+onset_ms_p50_max = 300
+affect_e_to_a_frames_max = 2    # <=160 ms (G4)
+hermes_timeout_action = "filler_or_backchannel"
+hermes_cap_ms = 3000            # verified: galion_sideband::RETRIEVAL_CAP
+
+[registry]                      # openmind-provider schema v2 proposal
+provider_schema = 2
+capability = "v2v"
+kind = "cpu_local"
+need = "Need::V2v"
+selection = "local_first"       # v2v only: cpu_local -> lan -> gpu(relay); remote never
+fallback = ["cpu_local:student", "lan:student", "gpu:persona-plex-relay", "cascade:parakeet-llm-pocket-tts"]
+approved_required = true
+
+[hooks]
+retrieval_injection = "turn_boundary"   # MoshiRAG-style, rate limited
+nerve_kinds = ["voice.frame_miss", "voice.fallback", "voice.backend_up"]
+
+[gates]                         # all MUST pass before slot admits a model
+gate_file = "eval.toml"
+required = ["G1_canned_demo", "G2_no_foreign_container_rtf", "G3_overlap_bargein", "G4_affect_latency", "G5_forbidden_scan", "G6_rika_oom_checks", "S8_presence_replay"]
+numbers_in_readme_only_if_measured = true
+
+[policy]
+licence_keys = "never"          # X1: Galion Voice free, no keys
+
+[abi]                           # verified 2026-11-02 (A3 follow-up); see A03-STATUS.md
+today = "galion_presence::backend::ReplayBackend"        # fn name, supports_rika, reset, step(&FrameIn) -> FrameOut
+today_types = ["galion_presence::backend::FrameIn", "galion_presence::backend::FrameOut", "galion_presence::backend::AffectIn", "galion_presence::backend::AffectOut"]
+reference_impl = "galion_presence::backend::MockBackend"
+frame_ms_const = "galion_mimi::config::FRAME_MS"         # = 80
+rika_step = "galion_emotion::Rika::step(ctx: RikaCtx, gate: &impl ConsentGate, features: FnOnce -> FrameFeatures) -> RikaOutput"
+target = "oom:galion_voice_core::VoiceBackend"           # UNVERIFIED: crate not on box
+target_methods = ["start", "send_audio", "end_of_user_turn", "interrupt", "poll", "close"]   # per D19 sec 2 / 04-INTEGRATION; UNVERIFIED
+target_other = ["oom:FrameSpec", "oom:Capabilities", "oom:DuplexMode::{Full,HalfWithBargeIn}", "oom:PersonaSource", "oom:Session<B>::tick"]
+target_verified = false
+student_crate = "crates/galion-student-backend"          # created W20-08: stub ReplayBackend + load_slot, no weights; see adapt-manifest.toml
+

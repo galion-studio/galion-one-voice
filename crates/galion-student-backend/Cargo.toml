@@ -1,0 +1,19 @@
+# Galion Voice — Perpetual Open MIT License
+[package]
+name = "galion-student-backend"
+description = "Galion Voice student slot (sector 09, W20-08): adapt-not-train ReplayBackend stub + weight-slot load path + W21-02 Mimi synthetic passthrough lane. No weights, no training."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version = "1.85"
+publish = false
+
+[dependencies]
+galion-presence = { path = "../galion-presence" }
+# W21-02: Mimi streaming codec (A6). Still IS_STUB; only ZeroWeights / no-kernel paths are used here.
+galion-mimi = { path = "../galion-mimi" }
+
+[[example]]
+name = "mimi_passthrough"
+path = "examples/mimi_passthrough.rs"

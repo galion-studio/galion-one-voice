@@ -1,0 +1,10 @@
+# Offline reference label track — format fixture for ReferenceEstimator.
+# HAND-WRITTEN SYNTHETIC DATA. NOT model output. No SenseVoice-Small run, no download.
+# A real track would come from an off-box dev-oracle run on a licensed clip (A9 §6, A21 licence first).
+# Format: t_ms LABEL posterior   (label from t_ms on; SenseVoice-style tags <|HAPPY|> accepted)
+0      NEUTRAL      0.85
+480    <|HAPPY|>    0.72
+1200   SAD          0.64
+1920   <|ANGRY|>    0.70
+2640   EMO_UNKNOWN  0.30
+3200   NEUTRAL      0.90

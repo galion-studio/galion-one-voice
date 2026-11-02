@@ -1,0 +1,25 @@
+# Galion Voice — Perpetual Open MIT License
+[package]
+name = "galion-cascade"
+description = "Galion Voice cascade fallback lane (W20-10, sector 11): ASR -> small LLM -> TTS trait stubs. EN only, no weights, .gq only."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version = "1.85"
+publish = false
+
+[features]
+# Fallback lane is never default (A18).
+# W21-03: `cascade` also enables the EN demo lane (adapters onto galion-ml-voice stubs).
+cascade = ["dep:galion-ml-voice", "galion-ml-voice/speech"]
+# V1-03: the EN lane speaks real words (A21 weight slot -> interim libflite via runtime dlopen).
+
+[dependencies]
+# Default build: zero dependencies, builds with `cargo --offline`, no weights.
+# W21-03: optional path dep (workspace-local, offline, zero transitive deps).
+galion-ml-voice = { path = "../galion-ml-voice", optional = true }
+
+[[example]]
+name = "en_cascade"
+required-features = ["cascade"]

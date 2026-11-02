@@ -1,0 +1,22 @@
+# Data manifest + license gate (stub)
+[policy]
+allow = ["CC0", "CC-BY-4.0", "CC-BY-SA-4.0", "MIT", "Apache-2.0", "self-generated"]
+deny  = ["CC-BY-NC*", "NC", "GPL-data", "unknown"]
+deny_sources = ["meta-seamless-interaction", "emilia-original-nc"]
+
+[[shard]]
+name = "teacher_selfplay"
+license = "self-generated"   # subject to teacher license R1
+[[shard]]
+name = "librispeech"
+license = "CC-BY-4.0"
+[[shard]]
+name = "common_voice"
+license = "CC0"
+langs = ["hr", "en"]
+[[shard]]
+name = "emilia_yodas"
+license = "CC-BY-4.0"
+[[shard]]
+name = "pocket_tts_synthetic_users"
+license = "self-generated"

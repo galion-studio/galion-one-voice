@@ -1,0 +1,37 @@
+# LEDGER — Galion Voice V4 (A20)
+*Seeded 2026-11-02 00:40 CET; refreshed 2026-11-02 ~00:55 CET; 2nd refresh ~01:05 CET (Europe/Zagreb, UTC+1) from every v4/agents/A*-STATUS.md. Not a git repo: "commit/path" = file path.*
+
+| Agent | Wave | Task | Status | Commit / path | Gate result | Wave-2 job in flight |
+|---|---|---|---|---|---|---|
+| A1 | W0 | Locks | landed + verified; G2 forbid strings reworded (W2-G2 DONE) | LOCKS.toml, scripts/check-locks.sh, v4/agents/W2-G2-STATUS.md | LK PASS; G2 PASS (0 refs) | J1 DONE |
+| A2 | W1 | OS Voice image spec | landed (doc); X4 README merged LOCALLY | v4/agents/A02-galion-os-voice-image.md, v4/docs/GALION-OS-README.md | n/a | J9 local DONE; public-repo push pending / in flight |
+| A3 | W1 | VoiceBackend slot | landed (doc + slot v2 toml); trait names [verify] | galion-student/configs/openmind-slot.toml | n/a; configs/*.toml carry forbid strings → G2 | J10 verify traits vs galion-voice-core |
+| A4 | W1 | SIMD/int8 GEMV | landed | crates/galion-tensor/src/{simd,gemv_i8}.rs, benches/gemv.rs | G1 bit-exact vs scalar PASS | — |
+| A5 | W2 | Conv stream / attention / KV ring | landed + verified incl. strided + transposed conv | crates/galion-tensor/src/{conv_stream,attention,kv}.rs (+ resample conv) | 60 unit + 5 integration pass; workspace green | J6 DONE |
+| A6 | W2 | Mimi stub | landed (stub, IS_STUB=true); real kernels not yet reported | crates/galion-mimi/ | 6 tests pass | J7 IN FLIGHT (no W2 update in A06-STATUS.md) |
+| A7 | W1 | .gq reader + spec | landed (reader); writer BLOCKED | crates/galion-tensor/src/gq.rs, v4/agents/W2-A07-STATUS.md | 8 gq tests pass; G5 undefined (no writer) | J8 BLOCKED — weights URIs/sha256 TBD (A21) |
+| A8 | W1 | Student KD plan | landed (doc + s0/s1 toml) | v4/agents/A08-student-kd-plan.md | n/a | — (blocked: H6 GPU budget, A21 legal, A15 R0) |
+| A9 | W2 | AffectStore / FiLM | landed | galion-emotion/src/{store,film}.rs | 46 unit + 2 doc pass | — (demo mirror fix → A14) |
+| A10 | W3 | Rika + G6 + heartbeat | landed; real heartbeat step() wired | galion-emotion/src/rika.rs, galion-heartbeat, galion-gates/g6-rika.sh, specs/presence.json P6 | G6 PASS 9/9; heartbeat 14 tests; lean_in_ms=160 (stub-measured); VPS latency PENDING | J3 DONE |
+| A11 | W2 | Live console | landed; real tensor/emotion feeds | crates/galion-console/src/live.rs | crate tests pass | J5 DONE (mic/loudness stubs = separate job) |
+| A12 | W1 | One-dot render + NullSurface | landed | galion-render/src/{palette,dot}.rs | 17 / 21(full) pass; G4 golden blessed | — |
+| A13 | W1 | Presence harness | landed; PS gate in runner + WAV loader | specs/presence*.json, crates/galion-presence/src/wav.rs | PS PASS (6+2 specs); 22 tests pass | J4 DONE |
+| A14 | W2 | Canned demo golden | landed; re-pin not yet reported | galion-demo/golden.sh, galion-gates/golden/demo.sha256 (d21cad79…) | golden stable; not in runner | J2 IN FLIGHT (no W2 update in A14-STATUS.md) |
+| A15 | W1 | Probe v0.1.0 | landed (local) | galion-probe/, LOCKS.toml [probe] | G0 PASS(warn) G1 PASS G3 PASS; R0 PENDING (no SSH) | — |
+| A16 | W2 | Gates + runner | landed + verified (local) | galion-gates/{g4-render.sh,g6-rika.sh,run-gates.sh} | latest run 00:57: all PASS | J12 IN FLIGHT (A16-STATUS.md not yet updated) |
+| A17 | W2 | Hermes sideband types | landed (docs + types) | crates/galion-sideband/ | 1 test pass | — (C5/C6 owner decisions) |
+| A18 | W2 | Cascade lane | landed (design doc) | v4/agents/A18-cascade-lane.md | n/a | — (A21 licence, E9/K15/K16 owner) |
+| A19 | W1 | Branding | not in this wave (PR #3 assets) | PR #3, NOT touched | — | — |
+| A20 | W3 | Ledger + integration | landed; 2nd refresh | LEDGER.md, v4/agents/A20-* | see gates line | J11 DONE |
+| A21 | W0 | Licence/weights memo | landed (draft, needs counsel) | v4/agents/A21-licence-weights.md | n/a | — (A5/A4/K8/W4 owner/counsel) |
+| A22 | W0 | Deploy posture | landed (dry-run scripts); VPS deploy BLOCKED | scripts/deploy/{harden,release}-dryrun.sh | --execute exits 2 | — (no SSH; root pw rotation + key install need a human) |
+
+**Gates (latest run `galion-gates/results/20261102T005720+0100.json`, 00:57 CET):** G0 PASS · G1 PASS · G2 PASS · G3 PASS · G4 PASS · G6 PASS · PS PASS · LK PASS · G5 not in runner (writer blocked) · **R0–R3 PENDING (no SSH)**.
+**PR #3 not touched. No GitHub writes. No VPS.**
+
+**2026-11-02 16:10 CET · FP-03 · owner decision t123u: A21 = Piper (CPU, MIT).** The A21 TTS slot now speaks via the Piper VITS `en_US-ljspeech-medium` voice.
+- The pack is `.onnx`, sha256 `6f52a751…7f22`. The runtime is piper 2023.11.14-2 with onnxruntime 1.14.1, run out of process on CPU.
+- This is a scoped exception to `formats.foreign_runtime_allowed=false` and `weight_formats`. LOCKS.toml is **not** amended (pending ratification).
+- espeak-ng is GPL-3, pending counsel.
+- Flite is the fallback only. Weights are not vendored (`scripts/a21/fetch-a21.sh`).
+- See docs/agent-v1-demo/A21-BLOCKERS.md and FP-03-STATUS.md.

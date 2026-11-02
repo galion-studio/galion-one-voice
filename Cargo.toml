@@ -1,0 +1,10 @@
+# Galion Voice — Perpetual Open MIT License
+[workspace]
+resolver = "2"
+members = ["crates/galion-tensor", "crates/galion-sideband", "crates/galion-console", "galion-render", "galion-emotion", "crates/galion-mimi", "crates/galion-presence", "crates/galion-heartbeat", "crates/galion-cascade", "crates/galion-student-backend", "crates/galion-ml-voice", "crates/galion-live-demo"]
+
+[workspace.package]
+version = "0.0.1"
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/galion-studio/Galion-Voice-"

@@ -1,0 +1,17 @@
+# Galion Voice — Perpetual Open MIT License
+[package]
+name = "galion-ml-voice"
+description = "Galion Voice multilingual voice scaffold (agent W20-19). ENGLISH-ONLY prototype: LanguageId (En), <|en|> token helper, AsrEngine/TtsEngine/LangRouter stub traits. No weights, no I/O."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version = "1.85"
+publish = false
+
+[features]
+# V1-03: real-speech path (A21 weight slot + interim system TTS via runtime dlopen of
+# libflite). Off by default: the default build stays no-I/O, no FFI.
+speech = []
+
+[dependencies]

@@ -1,0 +1,28 @@
+# Galion Voice — Perpetual Open MIT License
+[package]
+name = "galion-render"
+description = "Galion Voice hybrid rendering: one RenderSurface trait, terminal by default, optional window and web console."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[features]
+# Terminal (ANSI, std-only) is the default and the only surface on a cheap headless VPS.
+default = ["terminal"]
+terminal = []
+# Native window surface. Stub today: zero deps. A real backend (softbuffer+winit or minifb)
+# lands later as an *optional* dependency gated behind this feature only.
+window = []
+# Web console surface. std-only: renders frames to JSON and can serve the latest frame
+# over a tiny blocking HTTP endpoint (no tokio/axum). Browser UI lives in galion-console.
+web = []
+# Convenience: everything.
+full = ["terminal", "window", "web"]
+
+[dependencies]
+# Intentionally empty. Heavy GUI/web deps are only ever allowed as optional deps behind
+# `window` / `web`.
+
+[[example]]
+name = "demo"

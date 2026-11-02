@@ -1,0 +1,10 @@
+# Galion Voice — Perpetual Open MIT License
+[package]
+name = "galion-sideband"
+description = "Types-only Hermes knowledge side-band contract (MoshiRAG pattern). No transport, no Hermes dependency."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]

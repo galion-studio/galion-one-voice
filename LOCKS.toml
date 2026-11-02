@@ -1,0 +1,121 @@
+# Galion Voice — Perpetual Open MIT License
+# Copyright (c) 2026 Maciej Grajczyk. Code only; weights keep their own licences.
+#
+# LOCKS.toml — Eureka locks (agent A1, Galion Voice V4).
+# Machine-checked by scripts/check-locks.sh. Every lock is YES-locked per
+# galion-voice-20/v4/ANSWERS-ALL-YES.md (229 × YES) plus the one-dot UI rule
+# (BRANDING.md, set 2026-11-02, strictest, final).
+# `sources` = Q-<PACK>.Q<n> ids from galion-voice-20/questions/. Changing any value
+# below requires an owner decision and a ledger entry (A20).
+
+[meta]
+schema = 1
+program = "Galion Voice"          # not Galion One
+version = "V4"
+licence = "Perpetual Open MIT"
+owner = "Maciej Grajczyk"
+locked_at = "2026-11-02"
+answers = "ANSWERS-ALL-YES.md"
+
+# ---------------------------------------------------------------- clock
+[clock]
+frame_ms = 80                     # the heartbeat; no configurable alternative
+frame_hz = 12.5
+configurable = false
+shared_by = ["audio", "emotion", "console", "render", "rika", "os-scheduler"]
+frame_budget_p95_ms = 60          # compute budget inside the 80 ms frame
+sources = ["Q-EUREKA.Q4", "Q-EMOTION.Q3", "Q-RENDER.Q11", "Q-RIKA.Q6", "Q-GATES.Q11"]
+
+# ---------------------------------------------------------------- bands
+[bands]
+names = ["you", "me", "feeling"]  # official names in code, docs and console
+count = 3
+duplex = "full"
+feeling_wire = "EmotionWire-v1-8B"  # 8-byte EmotionWire per frame per direction
+rika_reads_transcript = false       # Rika lives on the feeling band only
+sources = ["Q-EUREKA.Q5", "Q-EMOTION.Q1", "Q-EMOTION.Q3", "Q-RIKA.Q7"]
+
+# ---------------------------------------------------------------- gates
+[gates]
+barge_in_max_ms = 200             # yield on user barge-in
+onset_p50_max_ms = 300            # hard blocking gate, not a warning
+affect_to_voice_max_ms = 160      # E-in -> A-out
+affect_to_voice_max_frames = 2
+rika_yield_max_frames = 1         # inhale -> yield floor
+rika_land_max_ms = 160            # affect change -> audible cue
+affect_overhead_max_pct = 3
+present_max_ms = 1                # render present() per frame
+probe_cv_max_pct = 5              # G0 bandwidth CV
+verdict_budget_s = 300            # commit verdict > 5 min = gate fail
+teacher_agreement_min_pct = 90
+zero_tests_is_fail = true
+no_green_gate_no_done = true
+blocking = true
+sources = ["Q-EUREKA.Q6", "Q-EUREKA.Q7", "Q-EUREKA.Q8", "Q-EUREKA.Q9", "Q-EUREKA.Q11",
+           "Q-EMOTION.Q19", "Q-RIKA.Q4", "Q-RIKA.Q8", "Q-RENDER.Q13", "Q-GATES.Q1",
+           "Q-GATES.Q2", "Q-GATES.Q12", "Q-GATES.Q17"]
+
+# ---------------------------------------------------------------- probe (A15)
+[probe]
+schema_version = 1                # galion-probe/schema/probe-result.schema.json
+bw_runs = 3                       # G0/R0 triad repeated N times; CV over runs
+bw_cv_max_pct = 5                 # mirrors gates.probe_cv_max_pct
+bw_min_gbs_nt = 8.0               # below this: decode cannot hold 12.5 Hz at any useful size
+frame_hz = 12.5                   # Mimi frame cadence; decode steps/s floor
+realtime_headroom = 2.0           # need est tps >= frame_hz * headroom
+student_sizes_b = [0.3, 0.6, 1.0, 1.5, 3.0]   # candidate params (billions)
+bytes_per_param_q8 = 1.07         # incl. scales
+bytes_per_param_q4 = 0.57
+sources = ["CURSOR-20-AGENTS.A15", "FINAL-BUILD-SPEC.S2"]
+
+# ---------------------------------------------------------------- consent
+[consent]
+bits = ["sense", "adapt", "remember", "share"]
+default = "deny"                  # every bit off at session start
+sense = "deny"
+adapt = "deny"
+remember = "deny"
+share = "deny"
+in_band = true                    # travels in every EmotionWire frame
+withdraw_wipes_ram_history = true # no grace period
+prohibited_purposes = ["workplace", "education"]   # EU AI Act Art. 5(1)(f)
+prohibited_overridable = false    # not even by an operator flag
+rika_requires = ["sense", "adapt"]
+persist_requires = "AffectStore<Consented>"
+sources = ["Q-EMOTION.Q4", "Q-EUREKA.Q15", "Q-EMOTION.Q7", "Q-EMOTION.Q9",
+           "Q-EMOTION.Q10", "Q-RIKA.Q10", "Q-RIKA.Q12", "Q-BUILD.Q14"]
+
+# ---------------------------------------------------------------- formats / runtimes
+[formats]
+ggml_container_allowed = false    # zero llama.cpp/GGML-family weight containers anywhere, cascade lane included
+foreign_runtime_allowed = false   # primary path + cascade lane
+forbidden_runtimes = ["candle", "ort", "tract", "burn", "llama", "ggml"]
+dev_oracle_only = ["candle"]
+weight_formats = ["safetensors"]  # .gq later, reader only until a student exists
+weights_vendored = false
+sources = ["Q-RESEARCH.Q12", "Q-BUILD.Q7", "Q-BUILD.Q9", "Q-GATES.Q6", "Q-BRANDING.Q14", "Q-STUDENT.Q13"]
+
+# ---------------------------------------------------------------- UI
+[ui]
+rule = "one-dot"                  # the interface is one dot; nothing else on screen
+dot_count = 1
+dot_color = "#F5F5F7"
+dot_fill = "solid"
+dot_states = ["idle", "listening", "speaking"]
+dot_varies = ["size", "brightness"]
+background = "#0A0A0C"
+gradient_from = "#F5A524"         # amber
+gradient_to = "#7C3AED"           # violet
+gradient_scope = "background"     # gradient never touches the dot
+chrome_allowed = false            # no menus, buttons, text, orbs, faces, waveforms, logos
+console_is_user_ui = false        # galion-console = developer tool (black-console look)
+sources = ["BRANDING.md#one-dot (2026-11-02)", "ANSWERS-ALL-YES.md#collision-1",
+           "Q-BRANDING.Q1", "Q-RENDER.Q17", "Q-RENDER.Q14"]
+
+# ---------------------------------------------------------------- licence
+[licence]
+code = "Perpetual Open MIT"
+copyright = "(c) 2026 Maciej Grajczyk"
+free_forever = true
+paid_tiers = false
+sources = ["Q-BRANDING.Q9", "Q-BRANDING.Q10", "Q-BRANDING.Q13"]

@@ -1,0 +1,26 @@
+# Galion Voice — Perpetual Open MIT License
+[package]
+name = "galion-tensor"
+description = "Galion Voice CPU-first tensor runtime skeleton (scalar reference path + optional rayon)."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[features]
+default = ["parallel"]
+# Rayon thread-pool hook. Disable with --no-default-features for the pure scalar reference path.
+parallel = ["dep:rayon"]
+# SIMD gates (opt-in). Real kernels: AVX2+FMA (x86), AVX-512 (x86_64, stable asm), NEON (aarch64).
+# Runtime CPU detection is also required before a level is selected (see src/features.rs).
+simd-avx2 = []
+simd-avx512 = []
+simd-neon = []
+
+[dependencies]
+rayon = { version = "1", optional = true }
+
+# A4: std-only GEMV bench (no criterion). `cargo bench -p galion-tensor --bench gemv [--features simd-avx2,simd-avx512]`
+[[bench]]
+name = "gemv"
+harness = false

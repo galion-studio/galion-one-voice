@@ -1,0 +1,30 @@
+# Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+[package]
+name = "galion-live-demo"
+description = "Galion Voice live demo (W21-01): WAV -> 80 ms Heartbeat::step + RikaReplayBackend per frame -> stereo WAV (L=you, R=me) + console capture + SHA256SUMS. Std only, no weights, builds --offline."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version = "1.85"
+publish = false
+
+[dependencies]
+galion-heartbeat = { path = "../galion-heartbeat", features = ["presence"] }
+galion-presence = { path = "../galion-presence" }
+galion-emotion = { path = "../../galion-emotion" }
+# W21-02 Mimi lane (synthetic, IS_STUB). Me band is routed through it per frame.
+galion-student-backend = { path = "../galion-student-backend" }
+# W21-04 one-dot visualizer (optional; `--features dot-viz`, then `--dot`).
+galion-console = { path = "../galion-console", default-features = false, features = ["dot-viz"], optional = true }
+galion-render = { path = "../../galion-render", optional = true }
+
+[features]
+default = []
+dot-viz = ["dep:galion-console", "dep:galion-render"]
+# V1-02 single-screen feed: `--web 127.0.0.1:7878` serves / + /dot + /health from the live loop.
+dot-viz-web = ["dot-viz", "galion-console/dot-viz-web", "galion-render/web"]
+
+[[bin]]
+name = "galion-live-demo"
+path = "src/main.rs"

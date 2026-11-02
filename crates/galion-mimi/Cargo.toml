@@ -1,0 +1,14 @@
+# Galion Voice — Perpetual Open MIT License
+[package]
+name = "galion-mimi"
+description = "Galion Voice Mimi codec path — real streaming conv/RVQ kernels on galion-tensor, NO weights (IS_STUB). Agent A6."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+# Only in-workspace dependency: galion-tensor (A5 streaming conv kernels, Tensor). No runtime, no
+# model hub client, no weight bytes. `default-features = false` keeps the scalar oracle path
+# (no rayon); weights will arrive via A7's `.gq` reader once A21 clears the licence.
+[dependencies]
+galion-tensor = { path = "../galion-tensor", default-features = false }
