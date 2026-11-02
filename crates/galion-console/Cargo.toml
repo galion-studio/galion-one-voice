@@ -27,7 +27,10 @@ wav-mic = ["dep:galion-presence"]
 # examples/dot_console_demo.rs). Off by default; workspace path deps only, no new crates.
 dot-viz = ["dep:galion-render", "dep:galion-heartbeat", "dep:galion-emotion"]
 # Also serve the dot over the std-only galion-render web surface (127.0.0.1 only).
-dot-viz-web = ["dot-viz", "galion-render/web"]
+# Phone path (POST /turn, PhoneLane, turn worker) rides along so the screen demo matches the working loop.
+dot-viz-web = ["dot-viz", "galion-render/web", "phone-turn"]
+# S7: utterance worker off the 80 ms thread. Cascade feature pulls the EN speech stack.
+phone-turn = ["dot-viz", "galion-render/web", "dep:galion-cascade", "galion-cascade/cascade"]
 # FP-02: `dot-viz-window` (stub window surface, open() -> Unsupported) deleted — one dot, one web page.
 
 [dependencies]
@@ -38,6 +41,8 @@ galion-presence = { path = "../galion-presence", optional = true }
 # W21-04 dot-viz only (both are workspace crates; galion-render is std-only).
 galion-render = { path = "../../galion-render", optional = true }
 galion-heartbeat = { path = "../galion-heartbeat", optional = true, default-features = false }
+# Phone lane only (feature `phone-turn`). Not in the default console build.
+galion-cascade = { path = "../galion-cascade", optional = true, default-features = false }
 # Pinned to 0.29 (MSRV 1.74) — box toolchain is rustc 1.85. ratatui re-exports crossterm.
 ratatui = { version = "0.29", default-features = false, features = ["crossterm"] }
 

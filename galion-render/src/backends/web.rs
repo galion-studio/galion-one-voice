@@ -5,12 +5,49 @@
 //! on its own thread that answers:
 //!   GET /dot    -> the one dot for the latest frame ([`crate::dot::DotParams::to_json`])
 //!   GET /health -> "ok"
+//!   POST /mic   -> browser mic level JSON (rms); GET /mic -> last posted. The parsed
+//!                  level is also exposed to the host loop via [`WebSurface::mic_tap`]
+//!                  (UX-01: the browser mic drives the you band; no audio leaves the page)
+//!   POST /turn  -> one finished user utterance (WAV or raw PCM16LE). Stored in a bounded
+//!                  [`TurnInbox`]; the host polls it with [`TurnInbox::take`] (never blocks).
+//!                  Answers `202 {"id":N,"bytes":B,"format":"wav"|"pcm16"}`.
+//!   GET /reply/<id>.wav -> reply audio the host published with [`ReplyBox::set_reply`];
+//!                  `audio/wav`, 404 when unknown/evicted.
 //!   GET / , /screen -> the caller's single-screen HTML page, only when one was set with
 //!                      [`WebSurface::with_page`] (V1-01; the page itself is owned by
 //!                      galion-console, this crate only serves the bytes); 404 otherwise
-//! `/dot` also carries `"mode"` (idle|listening|speaking|rika) and `"lean"` (Rika lean-in 0..1).
-//! FP-02: the old `/frame` (full VizFrame JSON for a web console that never existed) is gone;
-//! `/` + `/dot` + `/health` is the whole surface. `VizFrame::to_json` stays for other callers.
+//! `/dot` also carries `"mode"` (idle|listening|speaking|rika), `"lean"` (Rika lean-in 0..1)
+//! and `"level"` (0..1, the band driving the state) so the page can animate on its own clock.
+//! When the host has published a reply, `/dot` additionally carries
+//! `"reply":{"id":"<id>","url":"/reply/<id>.wav","ms":<duration ms>}` (latest reply only;
+//! the page should play it once per new `id`). Absent when no reply was set / after
+//! [`ReplyBox::clear_latest`].
+//!
+//! ## HTTP contract for hosts (e.g. `dot_console_demo`)
+//! ```text
+//! let web   = WebSurface::serve(addr).with_page(SCREEN_HTML);
+//! let mic   = web.mic_tap();      // POST /mic   -> RMS level
+//! let turns = web.turn_inbox();   // POST /turn  -> queued Turn (take() is non-blocking)
+//! let reply = web.reply_box();    // GET /reply/<id>.wav + /dot "reply"
+//! // host loop, each tick:
+//! if let Some(t) = turns.take() {           // oldest pending turn, or None
+//!     let pcm = t.pcm16();                  // Option<(rate, channels, Vec<i16>)>
+//!     /* ASR/LLM/TTS live elsewhere */
+//!     reply.set_reply(t.id.to_string(), encode_wav_pcm16(24_000, 1, &tts), ms);
+//! }
+//! ```
+//! `POST /turn` body: either a RIFF/WAVE file (detected by magic, any Content-Type) or raw
+//! little-endian mono PCM16 (`Content-Type: audio/L16` / `application/octet-stream`;
+//! sample rate from `?rate=N`, `X-Sample-Rate: N` or `audio/L16;rate=N` (that precedence), default 16000; channels from
+//! `?channels=N` / `;channels=N`, default 1). Max body [`MAX_BODY_BYTES`]; larger -> 413,
+//! empty -> 400, missing Content-Length on POST /turn -> 411. `Expect: 100-continue` is honored.
+//! The inbox keeps at most [`MAX_PENDING_TURNS`] (oldest dropped). Turn ids are a
+//! per-surface counter starting at 1.
+//!
+//! UX-01: one short-lived thread per connection (capped), so one slow client (e.g. a
+//! stalled tunnel socket) can no longer stall `/dot` for everyone else.
+//! FP-02: the old `/frame` (full VizFrame JSON for a web console that never existed) is gone.
+//! `VizFrame::to_json` stays for other callers.
 //! **Localhost only.** `serve` refuses any non-loopback address at `open()`
 //! (`RenderError::Unsupported`); reach it over an SSH tunnel on the VPS. There is no
 //! public-bind switch in this crate by design (FINAL-BUILD-SPEC / A12).
@@ -18,25 +55,370 @@
 
 use crate::frame::VizFrame;
 use crate::surface::{RenderError, RenderSurface, SurfaceCaps, SurfaceKind};
+use std::collections::VecDeque;
 use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpListener};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
+use std::time::{Duration, Instant};
+
+/// Max concurrent connection threads; beyond this a request is answered inline.
+pub const MAX_CONN_THREADS: usize = 32;
+/// Max accepted request body (POST /turn audio). 4 MiB ≈ 131 s of 16 kHz mono PCM16.
+pub const MAX_BODY_BYTES: usize = 4 * 1024 * 1024;
+/// Max request head (request line + headers).
+pub const MAX_HEAD_BYTES: usize = 16 * 1024;
+/// Pending turns kept in the inbox; when full the oldest is dropped.
+pub const MAX_PENDING_TURNS: usize = 8;
+/// Reply WAVs kept addressable under `/reply/<id>.wav` (oldest evicted).
+pub const MAX_STORED_REPLIES: usize = 8;
+/// CORS `Access-Control-Allow-Headers` sent on every response (incl. OPTIONS preflight).
+pub const CORS_ALLOW_HEADERS: &str = "Content-Type, X-Turn-Id, X-Sample-Rate, X-Barge-In, ngrok-skip-browser-warning";
+/// Whole-request read deadline (head + body).
+const REQ_DEADLINE: Duration = Duration::from_secs(10);
+
+/// Read side of the browser mic level (`POST /mic {"rms":x}`), for the host loop.
+#[derive(Clone, Debug, Default)]
+pub struct MicTap(Arc<Mutex<Option<(f32, Instant)>>>);
+
+impl MicTap {
+    /// Latest posted RMS (0..=1) if it arrived within `max_age`, else `None` (mic off,
+    /// page closed, tunnel down). Never blocks for long; never panics on poison.
+    pub fn latest(&self, max_age: Duration) -> Option<f32> {
+        let g = self.0.lock().ok()?;
+        let (rms, at) = (*g)?;
+        (at.elapsed() <= max_age).then_some(rms)
+    }
+    /// Store a level (tests / embedding).
+    pub fn set(&self, rms: f32) {
+        if let Ok(mut g) = self.0.lock() { *g = Some((rms, Instant::now())); }
+    }
+}
+
+/// `{"rms":0.0123,...}` -> 0.0123 (finite, clamped to 0..=1). Tiny parser, no serde.
+pub fn parse_rms(body: &str) -> Option<f32> {
+    let i = body.find("\"rms\"")? + 5;
+    let rest = body[i..].trim_start().strip_prefix(':')?.trim_start();
+    let end = rest.find(|c: char| !(c.is_ascii_digit() || matches!(c, '.' | '-' | '+' | 'e' | 'E'))).unwrap_or(rest.len());
+    let v: f32 = rest[..end].parse().ok()?;
+    v.is_finite().then(|| v.clamp(0.0, 1.0))
+}
+
+// ---------------------------------------------------------------------------------------
+// Turns (POST /turn) — audio in, host polls.
+// ---------------------------------------------------------------------------------------
+
+/// How the bytes of a [`Turn`] are encoded. This crate does no ASR; it only labels bytes.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TurnFormat {
+    /// A complete RIFF/WAVE file (detected by magic). Use [`decode_wav_pcm16`] / [`Turn::pcm16`].
+    Wav,
+    /// Raw little-endian signed 16-bit PCM, interleaved when `channels > 1`.
+    Pcm16 { rate: u32, channels: u16 },
+}
+
+/// One user utterance posted by the page.
+#[derive(Clone, Debug)]
+pub struct Turn {
+    /// Per-surface id, starting at 1. Use it (as a string) for the matching reply id.
+    pub id: u64,
+    pub format: TurnFormat,
+    /// Exact request body bytes.
+    pub bytes: Vec<u8>,
+    pub received_at: Instant,
+}
+
+impl Turn {
+    /// Decode to `(sample_rate, channels, samples)` for PCM16 WAV or raw PCM16; `None` for
+    /// unsupported WAV encodings (float, 24-bit, compressed) or malformed bodies.
+    pub fn pcm16(&self) -> Option<(u32, u16, Vec<i16>)> {
+        match self.format {
+            TurnFormat::Wav => decode_wav_pcm16(&self.bytes),
+            TurnFormat::Pcm16 { rate, channels } => Some((rate, channels, le_i16(&self.bytes))),
+        }
+    }
+}
+
+#[derive(Debug, Default)]
+struct InboxState { q: VecDeque<Turn>, dropped: u64 }
+
+/// Bounded FIFO of posted turns shared between the HTTP threads (push) and the host loop
+/// (take). Every method takes a short mutex only; none waits for new data.
+#[derive(Clone, Debug, Default)]
+pub struct TurnInbox { st: Arc<Mutex<InboxState>>, next_id: Arc<AtomicU64> }
+
+impl TurnInbox {
+    /// Enqueue bytes as a new turn and return its id (also used by tests / embedding).
+    /// When [`MAX_PENDING_TURNS`] are already pending the oldest is dropped.
+    pub fn push(&self, format: TurnFormat, bytes: Vec<u8>) -> u64 {
+        let id = self.next_id.fetch_add(1, Ordering::SeqCst) + 1;
+        if let Ok(mut g) = self.st.lock() {
+            while g.q.len() >= MAX_PENDING_TURNS { g.q.pop_front(); g.dropped += 1; }
+            g.q.push_back(Turn { id, format, bytes, received_at: Instant::now() });
+        }
+        id
+    }
+    /// Oldest pending turn, removing it. Non-blocking; `None` when nothing is pending.
+    pub fn take(&self) -> Option<Turn> { self.st.lock().ok()?.q.pop_front() }
+    /// Newest pending turn, discarding any older ones (for "only answer the last thing said").
+    pub fn take_latest(&self) -> Option<Turn> {
+        let mut g = self.st.lock().ok()?;
+        let t = g.q.pop_back();
+        let n = g.q.len() as u64;
+        g.q.clear();
+        g.dropped += n;
+        t
+    }
+    /// Number of turns waiting.
+    pub fn pending(&self) -> usize { self.st.lock().map(|g| g.q.len()).unwrap_or(0) }
+    /// Turns dropped because the inbox overflowed (or by `take_latest`).
+    pub fn dropped(&self) -> u64 { self.st.lock().map(|g| g.dropped).unwrap_or(0) }
+}
+
+// ---------------------------------------------------------------------------------------
+// Replies (GET /reply/<id>.wav + /dot "reply").
+// ---------------------------------------------------------------------------------------
+
+#[derive(Debug, Default)]
+struct ReplyState { store: VecDeque<(String, Arc<Vec<u8>>, u32)>, latest: Option<(String, u32)> }
+
+/// Host-published reply audio. Clone freely; the HTTP threads read it.
+#[derive(Clone, Debug, Default)]
+pub struct ReplyBox(Arc<Mutex<ReplyState>>);
+
+/// Reply ids are URL-safe tokens: 1..=64 chars of `[A-Za-z0-9_-]`.
+pub fn valid_reply_id(id: &str) -> bool {
+    !id.is_empty() && id.len() <= 64 && id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
+}
+
+impl ReplyBox {
+    /// Publish `wav` (a complete WAV file, served verbatim) under `id`, make it the
+    /// latest reply advertised in `/dot`, and keep the last [`MAX_STORED_REPLIES`]
+    /// addressable. Re-using an id replaces it. Returns `false` (and stores nothing) if
+    /// `id` fails [`valid_reply_id`]. `ms` is the duration hint shown in `/dot`
+    /// (see [`wav_duration_ms`]).
+    pub fn set_reply(&self, id: impl Into<String>, wav: Vec<u8>, ms: u32) -> bool {
+        let id = id.into();
+        if !valid_reply_id(&id) { return false; }
+        let Ok(mut g) = self.0.lock() else { return false };
+        g.store.retain(|(k, _, _)| *k != id);
+        while g.store.len() >= MAX_STORED_REPLIES { g.store.pop_front(); }
+        g.store.push_back((id.clone(), Arc::new(wav), ms));
+        g.latest = Some((id, ms));
+        true
+    }
+    /// Stop advertising a reply in `/dot` (stored WAVs stay fetchable until evicted).
+    pub fn clear_latest(&self) { if let Ok(mut g) = self.0.lock() { g.latest = None; } }
+    /// Stored WAV bytes for `id`.
+    pub fn get(&self, id: &str) -> Option<Arc<Vec<u8>>> {
+        self.0.lock().ok()?.store.iter().find(|(k, _, _)| k == id).map(|(_, w, _)| w.clone())
+    }
+    /// `{"id":"..","url":"/reply/...wav","ms":N}` for the latest reply, if any.
+    pub fn latest_json(&self) -> Option<String> {
+        let g = self.0.lock().ok()?;
+        let (id, ms) = g.latest.as_ref()?;
+        Some(format!("{{\"id\":\"{id}\",\"url\":\"/reply/{id}.wav\",\"ms\":{ms}}}"))
+    }
+}
+
+/// Insert `"reply":{..}` into a `/dot` JSON object (no-op when `reply` is `None`).
+pub fn dot_with_reply(dot: &str, reply: Option<&str>) -> String {
+    let Some(r) = reply else { return dot.to_string() };
+    let t = dot.trim_end();
+    let Some(inner) = t.strip_suffix('}') else { return dot.to_string() };
+    let sep = if inner.trim_end().ends_with('{') { "" } else { "," };
+    format!("{inner}{sep}\"reply\":{r}}}")
+}
+
+// ---------------------------------------------------------------------------------------
+// WAV helpers (PCM16 only; std-only, no deps). Multichannel-aware minimal set used by the
+// HTTP surface. For mono decode / 16→24 kHz resampling / reply encoding see [`crate::wav`].
+// ---------------------------------------------------------------------------------------
+
+fn le_i16(b: &[u8]) -> Vec<i16> { b.chunks_exact(2).map(|c| i16::from_le_bytes([c[0], c[1]])).collect() }
+
+/// `true` when `b` starts with a RIFF/WAVE header.
+pub fn is_wav(b: &[u8]) -> bool { b.len() >= 12 && &b[0..4] == b"RIFF" && &b[8..12] == b"WAVE" }
+
+fn wav_fmt_and_data(b: &[u8]) -> Option<(u16, u16, u32, u16, &[u8])> {
+    if !is_wav(b) { return None; }
+    let (mut i, mut fmt) = (12usize, None);
+    while i + 8 <= b.len() {
+        let id = &b[i..i + 4];
+        let len = u32::from_le_bytes(b[i + 4..i + 8].try_into().ok()?) as usize;
+        let start = i + 8;
+        // Streaming writers may leave the data size as 0 / 0xFFFFFFFF: clamp to what we have.
+        let end = start.saturating_add(len).min(b.len());
+        if id == b"fmt " && end - start >= 16 {
+            let f = &b[start..end];
+            let tag = u16::from_le_bytes([f[0], f[1]]);
+            let ch = u16::from_le_bytes([f[2], f[3]]);
+            let rate = u32::from_le_bytes([f[4], f[5], f[6], f[7]]);
+            let bits = u16::from_le_bytes([f[14], f[15]]);
+            fmt = Some((tag, ch, rate, bits));
+        } else if id == b"data" {
+            let (tag, ch, rate, bits) = fmt?;
+            let data = if len == 0 { &b[start..] } else { &b[start..end] };
+            return Some((tag, ch, rate, bits, data));
+        }
+        i = start.saturating_add(len).saturating_add(len & 1);
+    }
+    None
+}
+
+/// Decode a PCM16 WAV (format tag 1 or WAVE_FORMAT_EXTENSIBLE) to
+/// `(sample_rate, channels, interleaved samples)`.
+pub fn decode_wav_pcm16(b: &[u8]) -> Option<(u32, u16, Vec<i16>)> {
+    let (tag, ch, rate, bits, data) = wav_fmt_and_data(b)?;
+    ((tag == 1 || tag == 0xFFFE) && bits == 16 && ch > 0 && rate > 0).then(|| (rate, ch, le_i16(data)))
+}
+
+/// Duration of a WAV's data chunk in ms (any PCM bit depth), for the `/dot` hint.
+pub fn wav_duration_ms(b: &[u8]) -> Option<u32> {
+    let (_, ch, rate, bits, data) = wav_fmt_and_data(b)?;
+    let bytes_per_s = rate as u64 * ch as u64 * (bits as u64 / 8).max(1);
+    (bytes_per_s > 0).then(|| (data.len() as u64 * 1000 / bytes_per_s) as u32)
+}
+
+/// Encode interleaved PCM16 samples as a canonical 44-byte-header WAV.
+pub fn encode_wav_pcm16(rate: u32, channels: u16, samples: &[i16]) -> Vec<u8> {
+    let data_len = (samples.len() * 2) as u32;
+    let mut v = Vec::with_capacity(44 + data_len as usize);
+    v.extend_from_slice(b"RIFF");
+    v.extend_from_slice(&(36 + data_len).to_le_bytes());
+    v.extend_from_slice(b"WAVEfmt ");
+    v.extend_from_slice(&16u32.to_le_bytes());
+    v.extend_from_slice(&1u16.to_le_bytes());
+    v.extend_from_slice(&channels.to_le_bytes());
+    v.extend_from_slice(&rate.to_le_bytes());
+    v.extend_from_slice(&(rate * channels as u32 * 2).to_le_bytes());
+    v.extend_from_slice(&(channels * 2).to_le_bytes());
+    v.extend_from_slice(&16u16.to_le_bytes());
+    v.extend_from_slice(b"data");
+    v.extend_from_slice(&data_len.to_le_bytes());
+    for s in samples { v.extend_from_slice(&s.to_le_bytes()); }
+    v
+}
+
+// ---------------------------------------------------------------------------------------
+// HTTP request reading.
+// ---------------------------------------------------------------------------------------
+
+struct Request { method: String, path: String, query: String, headers: Vec<(String, String)>, body: Vec<u8> }
+
+impl Request {
+    fn header(&self, name: &str) -> Option<&str> {
+        self.headers.iter().find(|(k, _)| k.eq_ignore_ascii_case(name)).map(|(_, v)| v.as_str())
+    }
+}
+
+type HttpErr = (&'static str, &'static str);
+
+fn find_head_end(b: &[u8]) -> Option<usize> { b.windows(4).position(|w| w == b"\r\n\r\n") }
+
+/// Read one request: head until CRLFCRLF (<= [`MAX_HEAD_BYTES`]), then exactly
+/// `Content-Length` body bytes (<= `max_body`) with looped reads and an overall deadline.
+fn read_request<S: Read + Write>(s: &mut S, max_body: usize) -> Result<Request, HttpErr> {
+    let deadline = Instant::now() + REQ_DEADLINE;
+    let mut buf = Vec::with_capacity(4096);
+    let mut chunk = [0u8; 16 * 1024];
+    let head_end = loop {
+        if let Some(i) = find_head_end(&buf) { break i; }
+        if buf.len() > MAX_HEAD_BYTES { return Err(("431 Request Header Fields Too Large", "head too large")); }
+        if Instant::now() > deadline { return Err(("408 Request Timeout", "timeout")); }
+        match s.read(&mut chunk) {
+            Ok(0) => return Err(("400 Bad Request", "incomplete head")),
+            Ok(n) => buf.extend_from_slice(&chunk[..n]),
+            Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+            Err(_) => return Err(("408 Request Timeout", "timeout")),
+        }
+    };
+    let head = String::from_utf8_lossy(&buf[..head_end]).into_owned();
+    let mut lines = head.split("\r\n");
+    let mut parts = lines.next().unwrap_or("").split_whitespace();
+    let method = parts.next().unwrap_or("GET").to_string();
+    let target = parts.next().unwrap_or("/");
+    let (path, query) = match target.split_once('?') { Some((p, q)) => (p.to_string(), q.to_string()), None => (target.to_string(), String::new()) };
+    let headers: Vec<(String, String)> = lines.filter_map(|l| l.split_once(':')).map(|(k, v)| (k.trim().to_string(), v.trim().to_string())).collect();
+    let mut req = Request { method, path, query, headers, body: Vec::new() };
+    if req.header("transfer-encoding").is_some_and(|v| v.to_ascii_lowercase().contains("chunked")) {
+        return Err(("411 Length Required", "chunked bodies unsupported; send Content-Length"));
+    }
+    let len = match req.header("content-length") {
+        Some(v) => v.parse::<usize>().map_err(|_| ("400 Bad Request", "bad content-length"))?,
+        None => 0,
+    };
+    if len > max_body { return Err(("413 Payload Too Large", "body too large")); }
+    let mut body = buf.split_off(head_end + 4);
+    if len > 0 && body.len() < len && req.header("expect").is_some_and(|v| v.eq_ignore_ascii_case("100-continue")) {
+        let _ = s.write_all(b"HTTP/1.1 100 Continue\r\n\r\n");
+    }
+    body.reserve(len.saturating_sub(body.len()));
+    while body.len() < len {
+        if Instant::now() > deadline { return Err(("408 Request Timeout", "timeout")); }
+        let want = (len - body.len()).min(chunk.len());
+        match s.read(&mut chunk[..want]) {
+            Ok(0) => return Err(("400 Bad Request", "incomplete body")),
+            Ok(n) => body.extend_from_slice(&chunk[..n]),
+            Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
+            Err(_) => return Err(("408 Request Timeout", "timeout")),
+        }
+    }
+    body.truncate(len);
+    req.body = body;
+    Ok(req)
+}
+
+/// `rate=24000` / `channels=2` from a query string or a `audio/L16;rate=..` content type.
+fn param_u32(src: &str, key: &str) -> Option<u32> {
+    src.split(['&', ';']).filter_map(|kv| kv.trim().split_once('=')).find(|(k, _)| k.trim().eq_ignore_ascii_case(key)).and_then(|(_, v)| v.trim().parse().ok())
+}
+
+fn classify_turn(req: &Request) -> TurnFormat {
+    if is_wav(&req.body) { return TurnFormat::Wav; }
+    let ct = req.header("content-type").unwrap_or("");
+    let hdr_rate = req.header("x-sample-rate").and_then(|v| v.trim().parse().ok());
+    let rate = param_u32(&req.query, "rate").or(hdr_rate).or_else(|| param_u32(ct, "rate")).filter(|r| (1..=384_000).contains(r)).unwrap_or(16_000);
+    let ch = param_u32(&req.query, "channels").or_else(|| param_u32(ct, "channels")).filter(|c| (1..=8).contains(c)).unwrap_or(1) as u16;
+    TurnFormat::Pcm16 { rate, channels: ch }
+}
+
+// ---------------------------------------------------------------------------------------
+// Surface.
+// ---------------------------------------------------------------------------------------
+
+/// Everything the connection threads share.
+#[derive(Clone)]
+struct Shared {
+    latest_dot: Arc<Mutex<String>>,
+    latest_mic: Arc<Mutex<String>>,
+    mic: MicTap,
+    turns: TurnInbox,
+    replies: ReplyBox,
+    page: Option<&'static str>,
+}
 
 pub struct WebSurface {
     bind: Option<SocketAddr>,
-    latest_dot: Arc<Mutex<String>>,
+    sh: Shared,
     stop: Arc<AtomicBool>,
     local_addr: Option<SocketAddr>,
     worker: Option<JoinHandle<()>>,
-    page: Option<&'static str>,
 }
 
 impl WebSurface {
     /// Mailbox only (no socket) — for embedding into another server or for tests.
     pub fn mailbox() -> Self {
-        Self { bind: None, latest_dot: Arc::new(Mutex::new("{}".into())), stop: Arc::new(AtomicBool::new(false)), local_addr: None, worker: None, page: None }
+        let sh = Shared {
+            latest_dot: Arc::new(Mutex::new("{}".into())),
+            latest_mic: Arc::new(Mutex::new("{\"rms\":0}".into())),
+            mic: MicTap::default(),
+            turns: TurnInbox::default(),
+            replies: ReplyBox::default(),
+            page: None,
+        };
+        Self { bind: None, sh, stop: Arc::new(AtomicBool::new(false)), local_addr: None, worker: None }
     }
     /// Serve on `addr` (use "127.0.0.1:0" for an ephemeral port).
     pub fn serve(addr: SocketAddr) -> Self {
@@ -46,31 +428,112 @@ impl WebSurface {
     }
     /// Serve `html` at `/` and `/screen` (set before `open()`).
     pub fn with_page(mut self, html: &'static str) -> Self {
-        self.page = Some(html);
+        self.sh.page = Some(html);
         self
     }
-    pub fn latest_dot_json(&self) -> String { self.latest_dot.lock().map(|g| g.clone()).unwrap_or_default() }
+    /// Latest `/dot` JSON exactly as served (includes `"reply"` when one is published).
+    pub fn latest_dot_json(&self) -> String {
+        let d = self.sh.latest_dot.lock().map(|g| g.clone()).unwrap_or_default();
+        dot_with_reply(&d, self.sh.replies.latest_json().as_deref())
+    }
     pub fn local_addr(&self) -> Option<SocketAddr> { self.local_addr }
+    /// Shared handle to the browser mic level; take it before boxing the surface.
+    pub fn mic_tap(&self) -> MicTap { self.sh.mic.clone() }
+    /// Shared handle to posted turns (`POST /turn`); take it before boxing the surface.
+    pub fn turn_inbox(&self) -> TurnInbox { self.sh.turns.clone() }
+    /// Shared handle for publishing reply audio; take it before boxing the surface.
+    pub fn reply_box(&self) -> ReplyBox { self.sh.replies.clone() }
 }
 
-fn handle(mut stream: std::net::TcpStream, latest_dot: &Mutex<String>, page: Option<&'static str>) {
-    let _ = stream.set_read_timeout(Some(std::time::Duration::from_millis(500)));
-    let mut buf = [0u8; 1024];
-    let n = stream.read(&mut buf).unwrap_or(0);
-    let req = String::from_utf8_lossy(&buf[..n]);
-    let path = req.split_whitespace().nth(1).unwrap_or("/");
-    let path = path.split('?').next().unwrap_or("/");
-    let (status, ctype, body) = match path {
-        "/" | "/screen" if page.is_some() => ("200 OK", "text/html; charset=utf-8", page.unwrap_or_default().to_string()),
-        "/dot" => ("200 OK", "application/json", latest_dot.lock().map(|g| g.clone()).unwrap_or_default()),
-        "/health" => ("200 OK", "text/plain", "ok".to_string()),
-        _ => ("404 Not Found", "text/plain", "not found".to_string()),
+/// `GALION_CORS_ORIGINS` is a comma-separated allowlist. Unset or `*` keeps the V1
+/// phone default (`*`), because the ngrok hostname changes. A non-empty list echoes
+/// `Origin` only on an exact match and omits the header otherwise.
+pub fn cors_allow_origin(origin: Option<&str>, configured: &str) -> Option<String> {
+    let configured = configured.trim();
+    if configured.is_empty() || configured == "*" {
+        return Some("*".to_string());
+    }
+    let origin = origin.unwrap_or("").trim();
+    if origin.is_empty() {
+        return None;
+    }
+    configured.split(',').map(str::trim).any(|a| a == origin).then(|| origin.to_string())
+}
+
+const SECURITY_HEADERS: &str = concat!(
+    "X-Content-Type-Options: nosniff\r\n",
+    "Referrer-Policy: no-referrer\r\n",
+    "Permissions-Policy: microphone=(self)\r\n",
+    "Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' blob:; style-src 'self' 'unsafe-inline'; connect-src 'self'; worker-src 'self' blob:; img-src 'self' data: blob:; media-src 'self' blob:; base-uri 'none'; frame-ancestors 'none'\r\n",
+);
+
+fn handle(mut stream: std::net::TcpStream, sh: &Shared) {
+    let _ = stream.set_read_timeout(Some(Duration::from_millis(2000)));
+    let (status, ctype, body, origin): (&str, &str, Vec<u8>, Option<String>) = match read_request(&mut stream, MAX_BODY_BYTES) {
+        Err((st, msg)) => (st, "text/plain", msg.as_bytes().to_vec(), None),
+        Ok(req) => {
+            let origin = req.header("origin").map(str::to_string);
+            let (st, ct, body) = route(&req, sh);
+            (st, ct, body, origin)
+        }
     };
-    let resp = format!(
-        "HTTP/1.1 {status}\r\nContent-Type: {ctype}\r\nContent-Length: {}\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n{body}",
+    let configured = std::env::var("GALION_CORS_ORIGINS").unwrap_or_default();
+    let cors = match cors_allow_origin(origin.as_deref(), &configured) {
+        Some(o) => format!("Access-Control-Allow-Origin: {o}\r\nVary: Origin\r\n"),
+        None => String::new(),
+    };
+    let head = format!(
+        "HTTP/1.1 {status}\r\nContent-Type: {ctype}\r\nContent-Length: {}\r\nCache-Control: no-store\r\n{cors}Access-Control-Allow-Methods: GET, POST, OPTIONS\r\nAccess-Control-Allow-Headers: {CORS_ALLOW_HEADERS}\r\n{SECURITY_HEADERS}Connection: close\r\n\r\n",
         body.len()
     );
-    let _ = stream.write_all(resp.as_bytes());
+    let _ = stream.write_all(head.as_bytes());
+    let _ = stream.write_all(&body);
+    let _ = stream.flush();
+}
+
+fn route(req: &Request, sh: &Shared) -> (&'static str, &'static str, Vec<u8>) {
+    let head = req.method == "HEAD";
+    let method = if head { "GET" } else { req.method.as_str() };
+    let txt = |s: &str| s.as_bytes().to_vec();
+    let (st, ct, body) = match (method, req.path.as_str()) {
+        ("OPTIONS", _) => ("204 No Content", "text/plain", Vec::new()),
+        ("POST", "/mic") => {
+            let s = String::from_utf8_lossy(&req.body);
+            let cleaned = s.trim();
+            let store = if cleaned.starts_with('{') && cleaned.len() <= 512 { cleaned.to_string() } else { "{\"raw\":true}".to_string() };
+            if let Some(r) = parse_rms(cleaned) { sh.mic.set(r); }
+            if let Ok(mut g) = sh.latest_mic.lock() { *g = store; }
+            ("204 No Content", "text/plain", Vec::new())
+        }
+        ("POST", "/turn") => {
+            if req.header("content-length").is_none() { return ("411 Length Required", "text/plain", txt("Content-Length required")); }
+            if req.body.is_empty() { return ("400 Bad Request", "text/plain", txt("empty body")); }
+            let fmt = classify_turn(req);
+            let n = req.body.len();
+            let id = sh.turns.push(fmt, req.body.clone());
+            let f = match fmt { TurnFormat::Wav => "wav", TurnFormat::Pcm16 { .. } => "pcm16" };
+            ("202 Accepted", "application/json", format!("{{\"id\":{id},\"bytes\":{n},\"format\":\"{f}\"}}").into_bytes())
+        }
+        ("GET", p) => {
+            if let Some(id) = p.strip_prefix("/reply/").and_then(|r| r.strip_suffix(".wav")) {
+                match sh.replies.get(id) {
+                    Some(w) if valid_reply_id(id) => ("200 OK", "audio/wav", w.as_ref().clone()),
+                    _ => ("404 Not Found", "text/plain", txt("not found")),
+                }
+            } else { match p {
+                "/" | "/screen" if sh.page.is_some() => ("200 OK", "text/html; charset=utf-8", txt(sh.page.unwrap_or_default())),
+                "/dot" => {
+                    let d = sh.latest_dot.lock().map(|g| g.clone()).unwrap_or_default();
+                    ("200 OK", "application/json", dot_with_reply(&d, sh.replies.latest_json().as_deref()).into_bytes())
+                }
+                "/mic" => ("200 OK", "application/json", sh.latest_mic.lock().map(|g| g.clone()).unwrap_or_else(|_| "{\"rms\":0}".into()).into_bytes()),
+                "/health" => ("200 OK", "text/plain", txt("ok")),
+                _ => ("404 Not Found", "text/plain", txt("not found")),
+            } }
+        }
+        _ => ("404 Not Found", "text/plain", txt("not found")),
+    };
+    if head { (st, ct, Vec::new()) } else { (st, ct, body) }
 }
 
 impl RenderSurface for WebSurface {
@@ -86,15 +549,31 @@ impl RenderSurface for WebSurface {
         listener.set_nonblocking(true)?;
         self.local_addr = Some(listener.local_addr()?);
         self.stop.store(false, Ordering::SeqCst);
-        let (latest_dot, stop, page) = (self.latest_dot.clone(), self.stop.clone(), self.page);
+        let (sh, stop) = (self.sh.clone(), self.stop.clone());
         self.worker = Some(std::thread::spawn(move || {
+            let live = Arc::new(AtomicUsize::new(0));
             while !stop.load(Ordering::SeqCst) {
                 match listener.accept() {
-                    Ok((s, _)) => { let _ = s.set_nonblocking(false); handle(s, &latest_dot, page) }
-                    Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                        std::thread::sleep(std::time::Duration::from_millis(20))
+                    Ok((s, _)) => {
+                        let _ = s.set_nonblocking(false);
+                        let _ = s.set_nodelay(true);
+                        let _ = s.set_write_timeout(Some(Duration::from_millis(1000)));
+                        if live.load(Ordering::SeqCst) >= MAX_CONN_THREADS {
+                            handle(s, &sh);
+                            continue;
+                        }
+                        live.fetch_add(1, Ordering::SeqCst);
+                        let (c, l) = (sh.clone(), live.clone());
+                        let spawned = std::thread::Builder::new().name("galion-web-conn".into()).spawn(move || {
+                            handle(s, &c);
+                            l.fetch_sub(1, Ordering::SeqCst);
+                        });
+                        if spawned.is_err() { live.fetch_sub(1, Ordering::SeqCst); }
                     }
-                    Err(_) => std::thread::sleep(std::time::Duration::from_millis(100)),
+                    Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                        std::thread::sleep(Duration::from_millis(4))
+                    }
+                    Err(_) => std::thread::sleep(Duration::from_millis(100)),
                 }
             }
         }));
@@ -104,9 +583,15 @@ impl RenderSurface for WebSurface {
         let mut d = crate::dot::DotParams::from_frame(f).to_json(f.t_ms);
         if d.ends_with('}') {
             d.pop();
-            d.push_str(&format!(",\"mode\":\"{}\",\"lean\":{:.3}}}", crate::dot::screen_mode(f), crate::dot::lean_in_of(f)));
+            let level = match crate::dot::DotState::from_frame(f) {
+                crate::dot::DotState::Speaking => f.speak.level,
+                crate::dot::DotState::Listening => f.listen.level,
+                crate::dot::DotState::Idle => 0.0,
+            };
+            let level = if level.is_finite() { level.clamp(0.0, 1.0) } else { 0.0 };
+            d.push_str(&format!(",\"mode\":\"{}\",\"lean\":{:.3},\"level\":{:.3}}}", crate::dot::screen_mode(f), crate::dot::lean_in_of(f), level));
         }
-        if let Ok(mut g) = self.latest_dot.lock() { *g = d; }
+        if let Ok(mut g) = self.sh.latest_dot.lock() { *g = d; }
         Ok(())
     }
     fn close(&mut self) -> Result<(), RenderError> {
@@ -173,6 +658,42 @@ mod tests {
     }
 
     #[test]
+    fn mic_post_reaches_tap_and_parser_is_strict() {
+        assert_eq!(parse_rms("{\"rms\":0.0420,\"t\":1}"), Some(0.042));
+        assert_eq!(parse_rms("{\"rms\": 3}"), Some(1.0));
+        assert_eq!(parse_rms("{\"rms\":\"x\"}"), None);
+        assert_eq!(parse_rms("{\"lvl\":0.1}"), None);
+        let mut w = WebSurface::serve("127.0.0.1:0".parse().unwrap());
+        let tap = w.mic_tap();
+        assert_eq!(tap.latest(Duration::from_secs(1)), None);
+        w.open().unwrap();
+        let body = "{\"rms\":0.0500,\"t\":1}";
+        let mut s = std::net::TcpStream::connect(w.local_addr().unwrap()).unwrap();
+        s.write_all(format!("POST /mic HTTP/1.1\r\nHost: x\r\nContent-Length: {}\r\n\r\n{body}", body.len()).as_bytes()).unwrap();
+        let mut out = String::new();
+        s.read_to_string(&mut out).unwrap();
+        assert!(out.starts_with("HTTP/1.1 204"), "{out}");
+        assert_eq!(tap.latest(Duration::from_secs(1)), Some(0.05));
+        assert_eq!(tap.latest(Duration::from_nanos(0)), None, "stale level is dropped");
+        w.close().unwrap();
+    }
+
+    #[test]
+    fn slow_client_does_not_block_dot() {
+        let mut w = WebSurface::serve("127.0.0.1:0".parse().unwrap());
+        w.open().unwrap();
+        let a = w.local_addr().unwrap();
+        // Open a socket and send nothing (a stalled tunnel connection).
+        let _stall = std::net::TcpStream::connect(a).unwrap();
+        std::thread::sleep(Duration::from_millis(30));
+        let t = Instant::now();
+        let r = get(a, "/health");
+        assert!(r.contains("ok"));
+        assert!(t.elapsed() < Duration::from_millis(300), "health took {:?}", t.elapsed());
+        w.close().unwrap();
+    }
+
+    #[test]
     fn serves_dot() {
         let mut w = WebSurface::serve("127.0.0.1:0".parse().unwrap());
         w.open().unwrap();
@@ -183,7 +704,195 @@ mod tests {
         s.write_all(b"GET /dot HTTP/1.1\r\nHost: x\r\n\r\n").unwrap();
         let mut out = String::new();
         s.read_to_string(&mut out).unwrap();
-        assert!(out.contains("\"state\":\"speaking\""), "{out}");
+        assert!(out.contains("\"state\":\"speaking\"") && out.contains("\"level\":"), "{out}");
+        w.close().unwrap();
+    }
+
+    fn raw(addr: SocketAddr, req: &[u8]) -> Vec<u8> {
+        let mut s = std::net::TcpStream::connect(addr).unwrap();
+        s.write_all(req).unwrap();
+        let mut out = Vec::new();
+        s.read_to_end(&mut out).unwrap();
+        out
+    }
+    fn split_resp(r: &[u8]) -> (String, Vec<u8>) {
+        let i = find_head_end(r).expect("head");
+        (String::from_utf8_lossy(&r[..i]).into_owned(), r[i + 4..].to_vec())
+    }
+
+    #[test]
+    fn mic_body_split_across_writes_is_read_fully() {
+        let mut w = WebSurface::serve("127.0.0.1:0".parse().unwrap());
+        let tap = w.mic_tap();
+        w.open().unwrap();
+        let body = "{\"rms\":0.2500}";
+        let mut s = std::net::TcpStream::connect(w.local_addr().unwrap()).unwrap();
+        s.write_all(format!("POST /mic HTTP/1.1\r\nHost: x\r\nContent-Length: {}\r\n\r\n", body.len()).as_bytes()).unwrap();
+        s.flush().unwrap();
+        std::thread::sleep(Duration::from_millis(50));
+        s.write_all(&body.as_bytes()[..6]).unwrap();
+        std::thread::sleep(Duration::from_millis(50));
+        s.write_all(&body.as_bytes()[6..]).unwrap();
+        let mut out = String::new();
+        s.read_to_string(&mut out).unwrap();
+        assert!(out.starts_with("HTTP/1.1 204"), "{out}");
+        assert_eq!(tap.latest(Duration::from_secs(1)), Some(0.25));
+        w.close().unwrap();
+    }
+
+    #[test]
+    fn turn_wav_large_body_chunked_writes() {
+        let mut w = WebSurface::serve("127.0.0.1:0".parse().unwrap());
+        let inbox = w.turn_inbox();
+        w.open().unwrap();
+        let samples: Vec<i16> = (0..160_000).map(|i| ((i * 37) % 20000 - 10000) as i16).collect(); // 10 s @16k
+        let wav = encode_wav_pcm16(16_000, 1, &samples);
+        assert!(wav.len() > 300_000);
+        let mut s = std::net::TcpStream::connect(w.local_addr().unwrap()).unwrap();
+        s.write_all(format!("POST /turn HTTP/1.1\r\nHost: x\r\nContent-Type: audio/wav\r\nContent-Length: {}\r\n\r\n", wav.len()).as_bytes()).unwrap();
+        for c in wav.chunks(7_001) { s.write_all(c).unwrap(); }
+        let mut out = String::new();
+        s.read_to_string(&mut out).unwrap();
+        assert!(out.starts_with("HTTP/1.1 202") && out.contains("\"id\":1") && out.contains("\"format\":\"wav\""), "{out}");
+        assert_eq!(inbox.pending(), 1);
+        let t = inbox.take().unwrap();
+        assert_eq!((t.id, t.format, t.bytes.len()), (1, TurnFormat::Wav, wav.len()));
+        let (rate, ch, pcm) = t.pcm16().unwrap();
+        assert_eq!((rate, ch), (16_000, 1));
+        assert_eq!(pcm, samples);
+        assert!(inbox.take().is_none(), "take is non-blocking and empties the inbox");
+        w.close().unwrap();
+    }
+
+    #[test]
+    fn turn_raw_pcm_with_rate_and_expect_continue() {
+        let mut w = WebSurface::serve("127.0.0.1:0".parse().unwrap());
+        let inbox = w.turn_inbox();
+        w.open().unwrap();
+        let pcm: Vec<u8> = [1i16, -2, 300, -32768].iter().flat_map(|s| s.to_le_bytes()).collect();
+        let mut s = std::net::TcpStream::connect(w.local_addr().unwrap()).unwrap();
+        s.write_all(format!("POST /turn?rate=24000 HTTP/1.1\r\nHost: x\r\nContent-Type: application/octet-stream\r\nExpect: 100-continue\r\nContent-Length: {}\r\n\r\n", pcm.len()).as_bytes()).unwrap();
+        let mut first = [0u8; 25];
+        s.read_exact(&mut first).unwrap();
+        assert_eq!(&first, b"HTTP/1.1 100 Continue\r\n\r\n");
+        s.write_all(&pcm).unwrap();
+        let mut out = String::new();
+        s.read_to_string(&mut out).unwrap();
+        assert!(out.starts_with("HTTP/1.1 202") && out.contains("\"format\":\"pcm16\""), "{out}");
+        let t = inbox.take().unwrap();
+        assert_eq!(t.format, TurnFormat::Pcm16 { rate: 24_000, channels: 1 });
+        assert_eq!(t.pcm16().unwrap().2, vec![1, -2, 300, -32768]);
+        // audio/L16 params in the content type
+        let r = raw(w.local_addr().unwrap(), b"POST /turn HTTP/1.1\r\nContent-Type: audio/L16; rate=8000; channels=2\r\nContent-Length: 4\r\n\r\n\x01\x00\x02\x00");
+        assert!(split_resp(&r).0.starts_with("HTTP/1.1 202"));
+        assert_eq!(inbox.take().unwrap().format, TurnFormat::Pcm16 { rate: 8_000, channels: 2 });
+        w.close().unwrap();
+    }
+
+    #[test]
+    fn turn_rejects_oversize_empty_and_missing_length() {
+        let mut w = WebSurface::serve("127.0.0.1:0".parse().unwrap());
+        let inbox = w.turn_inbox();
+        w.open().unwrap();
+        let a = w.local_addr().unwrap();
+        let big = format!("POST /turn HTTP/1.1\r\nContent-Length: {}\r\n\r\n", MAX_BODY_BYTES + 1);
+        assert!(split_resp(&raw(a, big.as_bytes())).0.starts_with("HTTP/1.1 413"));
+        assert!(split_resp(&raw(a, b"POST /turn HTTP/1.1\r\nContent-Length: 0\r\n\r\n")).0.starts_with("HTTP/1.1 400"));
+        assert!(split_resp(&raw(a, b"POST /turn HTTP/1.1\r\n\r\n")).0.starts_with("HTTP/1.1 411"));
+        assert!(split_resp(&raw(a, b"POST /turn HTTP/1.1\r\nTransfer-Encoding: chunked\r\n\r\n")).0.starts_with("HTTP/1.1 411"));
+        assert_eq!(inbox.pending(), 0);
+        w.close().unwrap();
+    }
+
+    #[test]
+    fn cors_preflight_and_x_sample_rate() {
+        let mut w = WebSurface::serve("127.0.0.1:0".parse().unwrap());
+        let inbox = w.turn_inbox();
+        w.open().unwrap();
+        let a = w.local_addr().unwrap();
+        let (h, _) = split_resp(&raw(a, b"OPTIONS /turn HTTP/1.1\r\nOrigin: https://x.ngrok.app\r\n\r\n"));
+        assert!(h.starts_with("HTTP/1.1 204"), "{h}");
+        for k in ["Content-Type", "X-Turn-Id", "X-Sample-Rate", "X-Barge-In", "ngrok-skip-browser-warning"] { assert!(h.contains(k), "{k} missing: {h}"); }
+        let r = raw(a, b"POST /turn HTTP/1.1\r\nX-Sample-Rate: 48000\r\nContent-Length: 2\r\n\r\n\x00\x00");
+        assert!(split_resp(&r).0.starts_with("HTTP/1.1 202"));
+        assert_eq!(inbox.take().unwrap().format, TurnFormat::Pcm16 { rate: 48_000, channels: 1 });
+        w.close().unwrap();
+    }
+
+    #[test]
+    fn inbox_is_bounded_and_ids_increase() {
+        let ib = TurnInbox::default();
+        for _ in 0..(MAX_PENDING_TURNS + 3) { ib.push(TurnFormat::Wav, vec![0]); }
+        assert_eq!(ib.pending(), MAX_PENDING_TURNS);
+        assert_eq!(ib.dropped(), 3);
+        assert_eq!(ib.take().unwrap().id, 4);
+        let last = ib.take_latest().unwrap();
+        assert_eq!(last.id, (MAX_PENDING_TURNS + 3) as u64);
+        assert_eq!(ib.pending(), 0);
+    }
+
+    #[test]
+    fn reply_served_and_advertised_in_dot() {
+        let mut w = WebSurface::serve("127.0.0.1:0".parse().unwrap());
+        let rb = w.reply_box();
+        w.open().unwrap();
+        let a = w.local_addr().unwrap();
+        w.present(&VizFrame::default()).unwrap();
+        assert!(get(a, "/reply/7.wav").starts_with("HTTP/1.1 404"));
+        assert!(!get(a, "/dot").contains("\"reply\""));
+        let wav = encode_wav_pcm16(24_000, 1, &vec![0i16; 12_000]);
+        assert_eq!(wav_duration_ms(&wav), Some(500));
+        assert!(!rb.set_reply("../x", wav.clone(), 1), "unsafe id rejected");
+        assert!(rb.set_reply("7", wav.clone(), 500));
+        let (h, b) = split_resp(&raw(a, b"GET /reply/7.wav HTTP/1.1\r\n\r\n"));
+        assert!(h.starts_with("HTTP/1.1 200") && h.contains("Content-Type: audio/wav"), "{h}");
+        assert_eq!(b, wav);
+        let d = get(a, "/dot");
+        assert!(d.contains(",\"reply\":{\"id\":\"7\",\"url\":\"/reply/7.wav\",\"ms\":500}}"), "{d}");
+        assert!(d.contains("\"mode\":"));
+        rb.clear_latest();
+        assert!(!get(a, "/dot").contains("\"reply\""));
+        assert!(split_resp(&raw(a, b"GET /reply/7.wav HTTP/1.1\r\n\r\n")).0.starts_with("HTTP/1.1 200"), "still fetchable after clear_latest");
+        for i in 0..MAX_STORED_REPLIES { rb.set_reply(format!("r{i}"), vec![1], 0); }
+        assert!(get(a, "/reply/7.wav").starts_with("HTTP/1.1 404"), "evicted");
+        w.close().unwrap();
+    }
+
+    #[test]
+    fn dot_reply_splice_and_wav_helpers() {
+        assert_eq!(dot_with_reply("{}", Some("{\"id\":\"1\"}")), "{\"reply\":{\"id\":\"1\"}}");
+        assert_eq!(dot_with_reply("{\"a\":1}", Some("{}")), "{\"a\":1,\"reply\":{}}");
+        assert_eq!(dot_with_reply("{\"a\":1}", None), "{\"a\":1}");
+        assert!(decode_wav_pcm16(b"RIFF\0\0\0\0WAVE").is_none());
+        assert!(decode_wav_pcm16(b"not a wav").is_none());
+        let w = encode_wav_pcm16(8_000, 2, &[1, 2, 3, 4]);
+        assert_eq!(decode_wav_pcm16(&w), Some((8_000, 2, vec![1, 2, 3, 4])));
+        assert_eq!(param_u32("rate=48000&channels=1", "rate"), Some(48_000));
+        assert_eq!(param_u32("audio/L16; rate=8000", "rate"), Some(8_000));
+    }
+
+    #[test]
+    fn cors_allowlist_is_exact_and_star_is_default() {
+        assert_eq!(cors_allow_origin(None, ""), Some("*".into()));
+        assert_eq!(cors_allow_origin(Some("https://a.ngrok-free.dev"), "*"), Some("*".into()));
+        assert_eq!(
+            cors_allow_origin(Some("https://voice.example"), "https://voice.example, http://127.0.0.1:7878"),
+            Some("https://voice.example".into())
+        );
+        assert_eq!(cors_allow_origin(Some("https://evil.example"), "https://voice.example"), None);
+        assert_eq!(cors_allow_origin(None, "https://voice.example"), None);
+    }
+
+    #[test]
+    fn responses_carry_edge_security_headers() {
+        let mut w = WebSurface::serve("127.0.0.1:0".parse().unwrap());
+        w.open().unwrap();
+        let r = get(w.local_addr().unwrap(), "/health");
+        assert!(r.contains("X-Content-Type-Options: nosniff"), "{r}");
+        assert!(r.contains("Referrer-Policy: no-referrer"), "{r}");
+        assert!(r.contains("Permissions-Policy: microphone=(self)"), "{r}");
+        assert!(r.contains("Content-Security-Policy:"), "{r}");
+        assert!(r.contains("Access-Control-Allow-Origin: *"), "{r}");
         w.close().unwrap();
     }
 }

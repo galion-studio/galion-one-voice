@@ -1,27 +1,83 @@
 <!doctype html>
 <!-- Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
-     V1-01 single screen: the one dot on the Galion OS background. Nothing else.
-     Polls /dot every 80 ms (one heartbeat frame); draws exactly what the heartbeat says.
-     Click / double-click / F / Enter = fullscreen (no visible control). -->
+     V1-01 single screen: one dot. Mobile-safe. Tap the dot → mic permission + levels.
+     UX-01: the page animates on its own 60 fps clock from /dot {mode,level} (no 80 ms stutter),
+     listening = larger + full bright + still; speaking = smaller base, pulsing; idle = slow breath;
+     server unreachable = small dim still dot (never mistaken for idle).
+     V2 orb foundation: the same one mark, driven by a spring-damper (idle / listen / think / speak).
+     Speak radius tracks the reply WAV envelope (AnalyserNode on the playback graph) so the orb is heard.
+     V1 voice pipeline (supersedes the UX-01 "no raw audio leaves the page" note, per Maciej):
+       mic level  → POST /mic  {rms,t[,playing]} every ~80 ms (drives the dot, unchanged)
+       utterance  → POST /turn  audio/wav (16 kHz mono 16-bit PCM), cut on-device by VAD
+                    (~640 ms quiet after speech). Headers: X-Turn-Id, X-Sample-Rate, X-Barge-In.
+       reply      ← /dot JSON gains reply:{id,url,ms}; page fetches the WAV and plays it through
+                    the AudioContext unlocked by the tap. User speech during playback = barge-in:
+                    playback stops at once and the new utterance is captured. -->
 <html lang="en"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#0A0A0C"><title>Galion Voice</title>
-<style>html,body{margin:0;width:100%;height:100%;background:#0A0A0C;overflow:hidden;cursor:none;user-select:none}
-canvas{display:block;position:fixed;inset:0;width:100vw;height:100vh}</style></head>
-<body><canvas id="s"></canvas><script>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#0A0A0C" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#0A0A0C">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="format-detection" content="telephone=no">
+<title>Galion Voice</title>
+<style>
+html,body{margin:0;width:100%;height:100%;height:100dvh;background:#0A0A0C;overflow:hidden;
+  touch-action:manipulation;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;
+  overscroll-behavior:none;cursor:default}
+canvas{display:block;position:fixed;inset:0;width:100%;height:100%;width:100dvw;height:100dvh;
+  padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  box-sizing:border-box}
+#hint{position:fixed;left:0;right:0;bottom:max(24px,env(safe-area-inset-bottom));
+  text-align:center;font:500 14px/1.3 -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+  color:rgba(245,245,247,.55);pointer-events:none;opacity:1;transition:opacity .6s ease;padding:0 16px}
+#hint.hide{opacity:0}
+#err{position:fixed;left:16px;right:16px;top:max(16px,env(safe-area-inset-top));
+  text-align:center;font:500 13px/1.35 -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+  color:#F5A524;pointer-events:none;opacity:0;transition:opacity .3s}
+#err.show{opacity:1}
+</style></head>
+<body>
+<canvas id="s"></canvas>
+<div id="hint">Tap the dot to talk</div>
+<div id="err" role="status" aria-live="polite"></div>
+<script>
 "use strict";
-// Brand tokens (BRANDING.md V4 / LOCKS [ui]); /dot overrides them per frame.
 const TOK={dot:"#F5F5F7",base:"#0A0A0C",from:"#F5A524",to:"#7C3AED"};
 const WASH=0.38, WASH_MS=24000, IDLE_MS=1600, BW=96, BH=54;
+// Mirrors galion-render/src/dot.rs (UX-01). Keep in sync.
+const R={idle:0.100, listen:0.135, speak:0.105, speakDepth:0.050, off:0.060};
+const B={idle:0.84, listen:1.00, off:0.30};
+const POLL_MS=80, MAX_INFLIGHT=3, FETCH_TIMEOUT_MS=1200, OFFLINE_MS=1500;
+const HOLD_IDLE_MS=300, HOLD_LEAVE_SPEAK_MS=160, LOCAL_VOICE=0.02;
 const hex=h=>[1,3,5].map(i=>parseInt(h.slice(i,i+2),16));
 const okHex=h=>typeof h==="string"&&/^#[0-9A-Fa-f]{6}$/.test(h);
 const lerp=(a,b,t)=>a.map((x,i)=>Math.round(x+(b[i]-x)*t));
+const clamp=(x,a,b)=>Math.min(b,Math.max(a,x));
 const cv=document.getElementById("s"), cx=cv.getContext("2d",{alpha:false});
 const bg=document.createElement("canvas"); bg.width=BW; bg.height=BH;
 const bx=bg.getContext("2d"), img=bx.createImageData(BW,BH);
-let latest=null, lastOk=0, t0=performance.now();
+const hint=document.getElementById("hint"), errEl=document.getElementById("err");
+const t0=performance.now();
+let latest=null, lastOk=0, lastT=-1, inflight=0, everOk=false;
+let shown="idle", cand="idle", candSince=0;          // displayed mode + hysteresis
+let lastFrame=performance.now();
+let micState="off"; // off | pending | on | denied
+let micStream=null, micCtx=null, micAnalyser=null, micData=null, micRms=0, micFloor=0.004, micPosting=false;
+// Capture / VAD / playback state (see voice pipeline section below).
+const CAP_SR=16000, VAD_FRAME=320;                     // 20 ms frames at 16 kHz
+const VAD_START_MS=80, VAD_BARGE_MS=200, VAD_END_MS=640, PREROLL_MS=300;
+const MIN_SPEECH_MS=240, MAX_UTT_MS=15000, VAD_ABS=0.012, VAD_FLOOR_X=3.0, VAD_PLAY_X=2.0;
+let capNode=null, capSink=null, capRatio=1, capPos=0, capFrame=new Float32Array(VAD_FRAME), capFill=0;
+let vadFloor=0.003, vadOn=false, vadRun=0, vadQuiet=0, vadSpeechMs=0, uttMs=0, uttBarge=false;
+let preroll=[], utt=[], turnSeq=0;
+let playSrc=null, playId=null, playing=false, seenReplies=new Set();
+// V2 orb: spring state (position + velocity), mic energy, playback envelope, in-flight turns.
+const SPRING={idle:{w:2.4,z:0.86},listening:{w:11,z:0.70},thinking:{w:6.5,z:0.48},speaking:{w:18,z:0.58},offline:{w:3.2,z:1.05}};
+let rP=R.idle, rV=0, bP=B.idle, bV=0, aspect=1, micEnv=0, playEnv=0, turnsInFlight=0;
+let playAn=null, playData=null;
 
-// Port of galion-render palette::background_at — background only, never the dot.
 function paintBg(tms,b){
   const base=hex(b.base),A=hex(b.from),V=hex(b.to);
   const ph=(tms%WASH_MS)/WASH_MS*2*Math.PI, drift=0.15*Math.sin(ph), d=img.data;
@@ -33,33 +89,337 @@ function paintBg(tms,b){
       d[k]=c[0];d[k+1]=c[1];d[k+2]=c[2];d[k+3]=255;}}
   bx.putImageData(img,0,0);
 }
-// Fallback when the heartbeat is unreachable: plain idle pulse (galion-render dot.rs Idle).
-function idleLocal(){const t=performance.now()-t0, s=Math.sin(((t%IDLE_MS)/IDLE_MS)*2*Math.PI);
-  const k=0.84+0.03*s, c=hex(TOK.dot).map(x=>Math.round(x*k));
-  return {t_ms:Math.floor(t),radius:0.100+0.006*s,
-    dot:"#"+c.map(x=>x.toString(16).padStart(2,"0")).join(""),bg:TOK};}
+
+// Server mode → displayed mode with hysteresis, local mic preempt, offline state.
+function pickMode(now){
+  if(now-lastOk>OFFLINE_MS) return "offline";
+  let m=(latest&&latest.mode)||latest&&latest.state||"idle";
+  if(m==="rika") m="speaking";
+  if(m!=="idle"&&m!=="listening"&&m!=="speaking"&&m!=="thinking") m="idle";
+  if(playing) m="speaking";                          // our own reply audio is audible right now
+  const localVoice=micState==="on"&&(micRms-micFloor*1.6)>LOCAL_VOICE;
+  if(localVoice&&m!=="speaking") m="listening";   // instant feedback, before the round trip
+  if(turnsInFlight>0&&!playing&&!vadOn&&micState==="on"&&m!=="listening"&&m!=="speaking") m="thinking";
+  if(m!==cand){cand=m;candSince=now;}
+  const held=now-candSince;
+  if(cand===shown) return shown;
+  if(shown==="offline"||cand==="speaking"||cand==="thinking"||cand==="listening"&&shown!=="speaking") return cand;
+  if(shown==="speaking"&&held<HOLD_LEAVE_SPEAK_MS) return shown;
+  if(cand==="idle"&&held<HOLD_IDLE_MS) return shown;
+  return cand;
+}
+
+// Semi-implicit Euler spring-damper. dt is milliseconds.
+function spring(p,v,target,dt,w,z){
+  const h=Math.min(0.05,Math.max(0.001,dt/1000));
+  const a=-w*w*(p-target)-2*z*w*v;
+  v+=a*h; p+=v*h;
+  if(!isFinite(p)||!isFinite(v)) return [target,0];
+  return [p,v];
+}
+// Envelope of the WAV currently in the speakers (0..1). This is the me band the orb follows.
+function samplePlayEnv(){
+  if(!playing||!playAn||!playData){ playEnv*=0.82; return playEnv; }
+  playAn.getByteTimeDomainData(playData);
+  let sum=0;
+  for(let i=0;i<playData.length;i++){ const v=(playData[i]-128)/128; sum+=v*v; }
+  const e=clamp(Math.sqrt(sum/playData.length)*6.5,0,1);
+  playEnv=playEnv*0.42+e*0.58;
+  return playEnv;
+}
+function target(mode,now){
+  const t=now-t0;
+  micEnv=micEnv*0.72+clamp(micRms,0,1)*0.28;
+  const env=samplePlayEnv();
+  if(mode==="offline") return [R.off,B.off];
+  if(mode==="listening"){
+    const local=clamp((micRms-micFloor)*8,0,1);
+    const lv=Math.max(clamp(+(latest&&latest.level)||0,0,1), local, micEnv*4);
+    return [R.listen+0.055*lv+0.003*Math.sin(t/420), B.listen];
+  }
+  if(mode==="thinking"){
+    const s=0.5+0.5*Math.sin(t/280);
+    return [0.112+0.012*s, 0.76+0.12*s];
+  }
+  if(mode==="speaking"){
+    if(playing) return [R.speak+R.speakDepth*env, 0.84+0.16*Math.max(env,0.15)];
+    if(latest&&typeof latest.radius==="number"&&(latest.mode==="speaking"||latest.mode==="rika"||latest.state==="speaking"))
+      return [clamp(+latest.radius,0,.5), clamp(+latest.brightness||0.94,0,1)];
+    const d=0.5+0.5*Math.abs(Math.sin(t/160*Math.PI));
+    return [R.speak+R.speakDepth*d, 0.88+0.12*d];
+  }
+  const s=Math.sin(((t%IDLE_MS)/IDLE_MS)*2*Math.PI);
+  return [R.idle+0.008*s, B.idle+0.04*s];
+}
 
 function draw(){
-  const live=latest&&performance.now()-lastOk<1000;
-  const f=live?latest:idleLocal();
-  const dpr=window.devicePixelRatio||1, W=Math.round(innerWidth*dpr), H=Math.round(innerHeight*dpr);
+  const now=performance.now(), dt=Math.min(50,now-lastFrame); lastFrame=now;
+  shown=pickMode(now);
+  const [tr,tb]=target(shown,now);
+  const sp=SPRING[shown]||SPRING.idle;
+  [rP,rV]=spring(rP,rV,tr,dt,sp.w,sp.z);
+  [bP,bV]=spring(bP,bV,tb,dt,sp.w*0.85,Math.min(1.2,sp.z+0.08));
+  const squash=clamp(rV*6,-0.14,0.14);
+  aspect+=(1+squash-aspect)*(1-Math.exp(-dt/90));
+  const dpr=Math.min(window.devicePixelRatio||1, 3);
+  const W=Math.round(innerWidth*dpr), H=Math.round(innerHeight*dpr);
   if(cv.width!==W||cv.height!==H){cv.width=W;cv.height=H;}
+  const f=latest||{};
   const b=(f.bg&&okHex(f.bg.base)&&okHex(f.bg.from)&&okHex(f.bg.to))?f.bg:TOK;
-  paintBg(f.t_ms|0,b);
+  paintBg(now-t0,b);
   cx.imageSmoothingEnabled=true; cx.imageSmoothingQuality="high"; cx.drawImage(bg,0,0,W,H);
-  const r=Math.min(.5,Math.max(0,+f.radius||0))*Math.min(W,H);
-  cx.fillStyle=okHex(f.dot)?f.dot:TOK.dot;           // one flat neutral colour, no glow
-  cx.beginPath(); cx.arc(W/2,H/2,r,0,2*Math.PI); cx.fill();
+  const r=clamp(rP,0,.5)*Math.min(W,H), k=clamp(bP,0,1);
+  cx.fillStyle="#"+hex(TOK.dot).map(x=>Math.round(x*k).toString(16).padStart(2,"0")).join("");
+  cx.save(); cx.translate(W/2,H/2);
+  cx.scale(clamp(aspect,0.82,1.18), 1/clamp(aspect,0.82,1.18));
+  cx.beginPath(); cx.arc(0,0,r,0,2*Math.PI); cx.fill();
+  cx.restore();
   requestAnimationFrame(draw);
 }
-async function poll(){
-  const t=performance.now();
-  try{const r=await fetch("dot",{cache:"no-store"}); const j=await r.json();
-    if(j&&typeof j.radius==="number"){latest=j;lastOk=performance.now();}}catch(e){}
-  setTimeout(poll,Math.max(0,80-(performance.now()-t)));   // one heartbeat frame
+
+// Pipelined polling: a new request every 80 ms, ≤3 in flight, each with a timeout;
+// out-of-order replies are dropped (t_ms), a restarted server (t_ms jumps back) is accepted.
+function pollOnce(){
+  if(inflight>=MAX_INFLIGHT) return;
+  inflight++;
+  const ac=window.AbortController?new AbortController():null;
+  const to=setTimeout(()=>{try{ac&&ac.abort();}catch(e){}},FETCH_TIMEOUT_MS);
+  fetch("dot",{cache:"no-store",signal:ac?ac.signal:undefined,headers:{"ngrok-skip-browser-warning":"1"}})
+    .then(r=>r.ok?r.json():null)
+    .then(j=>{
+      if(!j||typeof j.radius!=="number") return;
+      const t=+j.t_ms||0;
+      if(t<=lastT&&t>lastT-2000) return;   // stale/out-of-order
+      lastT=t; latest=j; lastOk=performance.now();
+      if(!everOk){everOk=true;}
+      onReply(j.reply);
+    })
+    .catch(()=>{})
+    .finally(()=>{clearTimeout(to);inflight--;});
 }
-function fs(){const d=document.documentElement; if(!document.fullscreenElement&&d.requestFullscreen)d.requestFullscreen().catch(()=>{});}
-addEventListener("click",fs); addEventListener("dblclick",fs);
-addEventListener("keydown",e=>{if(e.key==="f"||e.key==="F"||e.key==="Enter")fs();});
-poll(); requestAnimationFrame(draw);
+setInterval(pollOnce,POLL_MS);
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible") pollOnce();});
+
+function showErr(msg){
+  errEl.textContent=msg||"";
+  errEl.classList.toggle("show", !!msg);
+}
+function hideHint(){ hint.classList.add("hide"); }
+
+function tickMic(){
+  if(micState!=="on"||!micAnalyser||!micData) return;
+  micAnalyser.getByteTimeDomainData(micData);
+  let sum=0;
+  for(let i=0;i<micData.length;i++){const v=(micData[i]-128)/128; sum+=v*v;}
+  micRms=Math.sqrt(sum/micData.length);
+  micFloor=micRms<micFloor?0.7*micFloor+0.3*micRms:micFloor+0.002*(micRms-micFloor);
+  // Level for the dot (audio itself goes to /turn). One POST at a time so a slow link never queues up.
+  if(!micPosting){
+    micPosting=true;
+    const lv={rms:+micRms.toFixed(4),t:Date.now()}; if(playing) lv.playing=playId;
+    try{fetch("mic",{method:"POST",headers:{"Content-Type":"application/json","ngrok-skip-browser-warning":"1"},
+      body:JSON.stringify(lv)}).catch(()=>{}).finally(()=>{micPosting=false;});}
+    catch(e){micPosting=false;}
+  }
+  setTimeout(tickMic,80);
+}
+
+async function enableMic(){
+  if(micState==="on"||micState==="pending") return;
+  if(!window.isSecureContext && location.hostname!=="localhost" && location.hostname!=="127.0.0.1"){
+    showErr("Microphone needs HTTPS. Open the https:// link."); return;
+  }
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
+    showErr("This browser cannot open the microphone."); return;
+  }
+  micState="pending"; showErr("");
+  // Create + unlock the AudioContext synchronously inside the tap (before any await) so that
+  // mobile Safari/Chrome let us play reply audio later. Reused for capture and playback.
+  try{
+    const AC=window.AudioContext||window.webkitAudioContext;
+    if(!micCtx) micCtx=new AC({latencyHint:"interactive"});
+    unlockAudio(micCtx);
+  }catch(e){}
+  try{
+    micStream=await navigator.mediaDevices.getUserMedia({
+      audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true,channelCount:1},
+      video:false
+    });
+    if(micCtx.state==="suspended") await micCtx.resume();
+    const src=micCtx.createMediaStreamSource(micStream);
+    micAnalyser=micCtx.createAnalyser();
+    micAnalyser.fftSize=1024;
+    src.connect(micAnalyser);
+    micData=new Uint8Array(micAnalyser.fftSize);
+    micState="on";
+    hideHint();
+    showErr("");
+    tickMic();
+    startCapture(src).catch(()=>showErr("Speech capture unavailable — level only."));
+  }catch(e){
+    micState="denied";
+    const name=e&&(e.name||"");
+    if(name==="NotAllowedError"||name==="PermissionDeniedError")
+      showErr("Microphone blocked — allow it in browser settings, then tap again.");
+    else if(name==="NotFoundError")
+      showErr("No microphone found on this device.");
+    else
+      showErr("Could not open the microphone.");
+  }
+}
+
+function onActivate(e){
+  // First intentional tap: mic. Avoid synthetic click-after-touch double fire.
+  if(e.type==="touchend"){ e.preventDefault(); enableMic(); return; }
+  if(e.type==="click"){ enableMic(); }
+}
+cv.addEventListener("touchend",onActivate,{passive:false});
+cv.addEventListener("click",onActivate);
+addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();enableMic();}});
+
+// ───────────────────────── Voice pipeline: capture → VAD → /turn, reply playback ─────────────────
+// Silent one-sample buffer played inside the gesture: the classic iOS "unlock".
+function unlockAudio(ctx){
+  try{ if(ctx.state==="suspended") ctx.resume().catch(()=>{}); }catch(e){}
+  try{ const b=ctx.createBuffer(1,1,ctx.sampleRate), s=ctx.createBufferSource();
+       s.buffer=b; s.connect(ctx.destination); s.start(0); }catch(e){}
+}
+
+// AudioWorklet (inline module via Blob URL; page is one include_str! file) batching 128-frame
+// quanta into ~2048-sample chunks. Falls back to ScriptProcessor where worklets are missing.
+const WORKLET_SRC=`class GvCap extends AudioWorkletProcessor{
+  constructor(){super();this.b=new Float32Array(2048);this.n=0;}
+  process(ins){const c=ins[0]&&ins[0][0];if(c){for(let i=0;i<c.length;i++){this.b[this.n++]=c[i];
+    if(this.n===this.b.length){this.port.postMessage(this.b.slice(0));this.n=0;}}}return true;}}
+registerProcessor("gv-cap",GvCap);`;
+
+async function startCapture(src){
+  const ctx=micCtx; capRatio=ctx.sampleRate/CAP_SR; capPos=0;
+  capSink=ctx.createGain(); capSink.gain.value=0; capSink.connect(ctx.destination); // keeps graph pulled, silent
+  if(ctx.audioWorklet&&window.AudioWorkletNode&&window.Blob&&window.URL){
+    try{
+      const url=URL.createObjectURL(new Blob([WORKLET_SRC],{type:"application/javascript"}));
+      await ctx.audioWorklet.addModule(url); URL.revokeObjectURL(url);
+      capNode=new AudioWorkletNode(ctx,"gv-cap",{numberOfInputs:1,numberOfOutputs:1,channelCount:1,channelCountMode:"explicit"});
+      capNode.port.onmessage=e=>onCapChunk(e.data);
+      src.connect(capNode); capNode.connect(capSink); return;
+    }catch(e){ capNode=null; }
+  }
+  const sp=(ctx.createScriptProcessor||ctx.createJavaScriptNode).call(ctx,2048,1,1);
+  sp.onaudioprocess=e=>onCapChunk(new Float32Array(e.inputBuffer.getChannelData(0)));
+  src.connect(sp); sp.connect(capSink); capNode=sp;
+}
+
+// Device rate → 16 kHz by box-averaging over each output sample's span (cheap anti-alias).
+function onCapChunk(x){
+  if(micState!=="on") return;
+  const r=capRatio; let p=capPos;
+  while(p+r<=x.length){
+    const a=Math.floor(p), b=Math.min(x.length,Math.floor(p+r)); let s=0;
+    for(let i=a;i<b;i++) s+=x[i];
+    capFrame[capFill++]=b>a?s/(b-a):x[a];
+    if(capFill===VAD_FRAME){ vadFrame(capFrame); capFrame=new Float32Array(VAD_FRAME); capFill=0; }
+    p+=r;
+  }
+  capPos=p-x.length; if(capPos<0) capPos=0;
+}
+
+// Energy VAD with adaptive floor. Start after 80 ms of speech (200 ms + higher bar while our reply
+// plays, so echo leaking past AEC does not self-barge). End of turn = 640 ms quiet after speech.
+function vadFrame(f){
+  let s=0; for(let i=0;i<f.length;i++) s+=f[i]*f[i];
+  const rms=Math.sqrt(s/f.length), ms=1000*VAD_FRAME/CAP_SR;
+  const thr=Math.max(VAD_ABS, vadFloor*VAD_FLOOR_X)*(playing?VAD_PLAY_X:1);
+  const speech=rms>thr;
+  if(!vadOn&&!speech) vadFloor=rms<vadFloor?0.8*vadFloor+0.2*rms:vadFloor+0.01*(rms-vadFloor);
+  vadFloor=clamp(vadFloor,0.0005,0.05);
+  if(!vadOn){
+    preroll.push(f); while(preroll.length*ms>PREROLL_MS) preroll.shift();
+    vadRun=speech?vadRun+ms:0;
+    if(vadRun>=(playing?VAD_BARGE_MS:VAD_START_MS)){
+      vadOn=true; uttBarge=playing; if(playing) stopPlayback();
+      utt=preroll; preroll=[]; uttMs=utt.length*ms; vadSpeechMs=vadRun; vadQuiet=0;
+    }
+    return;
+  }
+  utt.push(f); uttMs+=ms;
+  if(speech){ vadSpeechMs+=ms; vadQuiet=0; } else vadQuiet+=ms;
+  if(vadQuiet>=VAD_END_MS||uttMs>=MAX_UTT_MS) endUtterance();
+}
+
+function endUtterance(){
+  const frames=utt, ok=vadSpeechMs>=MIN_SPEECH_MS, barge=uttBarge;
+  vadOn=false; vadRun=0; vadQuiet=0; vadSpeechMs=0; uttMs=0; utt=[]; uttBarge=false;
+  if(ok) postTurn(frames,barge);
+}
+
+function encodeWav(frames,sr){
+  const n=frames.reduce((a,f)=>a+f.length,0), buf=new ArrayBuffer(44+n*2), v=new DataView(buf);
+  const str=(o,t)=>{for(let i=0;i<t.length;i++) v.setUint8(o+i,t.charCodeAt(i));};
+  str(0,"RIFF"); v.setUint32(4,36+n*2,true); str(8,"WAVE"); str(12,"fmt ");
+  v.setUint32(16,16,true); v.setUint16(20,1,true); v.setUint16(22,1,true);
+  v.setUint32(24,sr,true); v.setUint32(28,sr*2,true); v.setUint16(32,2,true); v.setUint16(34,16,true);
+  str(36,"data"); v.setUint32(40,n*2,true);
+  let o=44; for(const f of frames) for(let i=0;i<f.length;i++,o+=2){
+    const x=clamp(f[i],-1,1); v.setInt16(o,x<0?x*0x8000:x*0x7FFF,true); }
+  return buf;
+}
+
+// Body is an ArrayBuffer → the browser sets Content-Length itself (it is a forbidden header for JS).
+function postTurn(frames,barge){
+  const wav=encodeWav(frames,CAP_SR), id=Date.now().toString(36)+"-"+(++turnSeq);
+  turnsInFlight++;
+  const watch=turnsInFlight;
+  fetch("turn",{method:"POST",cache:"no-store",body:wav,headers:{
+      "Content-Type":"audio/wav","X-Turn-Id":id,"X-Sample-Rate":String(CAP_SR),
+      "X-Barge-In":barge?"1":"0","ngrok-skip-browser-warning":"1"}})
+    .then(r=>{ if(!r.ok&&r.status!==404){ turnsInFlight=Math.max(0,turnsInFlight-1); showErr("Voice turn failed ("+r.status+")."); } else showErr(""); })
+    .catch(()=>{ turnsInFlight=Math.max(0,turnsInFlight-1); });
+  setTimeout(()=>{ if(!playing&&turnsInFlight>=watch) turnsInFlight=Math.max(0,turnsInFlight-1); }, 20000);
+}
+
+// /dot reply:{id,url,ms}. Replies already present before the tap are marked seen, never played.
+function onReply(rp){
+  if(!rp||rp.id==null||!rp.url) return;
+  const id=String(rp.id);
+  if(micState!=="on"||!micCtx){ seenReplies.add(id); return; }
+  if(seenReplies.has(id)) return;
+  seenReplies.add(id); if(seenReplies.size>64) seenReplies=new Set([...seenReplies].slice(-32));
+  if(vadOn) return;                                  // user is mid-utterance: this reply is stale
+  playReply(id,String(rp.url));
+}
+
+function decode(ab){
+  return new Promise((res,rej)=>{ const p=micCtx.decodeAudioData(ab,res,rej); if(p&&p.then) p.then(res,rej); });
+}
+
+async function playReply(id,url){
+  try{
+    const r=await fetch(url,{cache:"no-store",headers:{"ngrok-skip-browser-warning":"1"}});
+    if(!r.ok) return;
+    const buf=await decode(await r.arrayBuffer());
+    if(vadOn||micState!=="on") return;               // barged in while downloading
+    if(micCtx.state==="suspended") await micCtx.resume().catch(()=>{});
+    stopPlayback();
+    if(!playAn){
+      playAn=micCtx.createAnalyser(); playAn.fftSize=1024; playAn.smoothingTimeConstant=0.35;
+      playData=new Uint8Array(playAn.fftSize);
+    }
+    const s=micCtx.createBufferSource(); s.buffer=buf; s.connect(playAn); playAn.connect(micCtx.destination);
+    s.onended=()=>{ if(playSrc===s){ playSrc=null; playing=false; playId=null; turnsInFlight=0; } };
+    playSrc=s; playId=id; playing=true; turnsInFlight=0; s.start(0);
+  }catch(e){}
+}
+
+function stopPlayback(){
+  const s=playSrc; playSrc=null; playing=false; playId=null;
+  if(s){ try{s.onended=null; s.stop(0);}catch(e){} try{s.disconnect();}catch(e){} }
+}
+
+// iOS: resume audio after lock-screen return
+document.addEventListener("visibilitychange",()=>{
+  if(document.visibilityState==="visible"&&micCtx&&micCtx.state==="suspended") micCtx.resume().catch(()=>{});
+});
+
+pollOnce(); requestAnimationFrame(draw);
 </script></body></html>

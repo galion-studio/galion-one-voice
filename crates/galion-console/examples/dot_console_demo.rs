@@ -115,13 +115,22 @@ fn run<T: TimingFeed, A: AffectFeed>(args: &[String], mut pump: DemoPump<T, A>, 
             Err(e) => notes.push(format!("png surface failed: {e}")),
         }
     }
+    #[cfg(feature = "phone-turn")]
+    let mut phone: Option<galion_console::phone_host::PhoneHost> = None;
     if let Some(addr) = val(args, "--web") {
         #[cfg(feature = "dot-viz-web")]
         match addr.parse() {
-            Ok(a) => match dc.attach(Box::new(galion_render::WebSurface::serve(a).with_page(galion_console::dotviz::SCREEN_HTML))) {
-                Ok(()) => notes.push(format!("web → screen http://{addr}/  · json /dot")),
-                Err(e) => notes.push(format!("web surface failed: {e}")),
-            },
+            Ok(a) => {
+                let web = galion_render::WebSurface::serve(a).with_page(galion_console::dotviz::SCREEN_HTML);
+                #[cfg(feature = "phone-turn")]
+                {
+                    phone = Some(galion_console::phone_host::PhoneHost::from_surface(&web));
+                }
+                match dc.attach(Box::new(web)) {
+                    Ok(()) => notes.push(format!("web → screen http://{addr}/  · /dot /mic /turn /reply")),
+                    Err(e) => notes.push(format!("web surface failed: {e}")),
+                }
+            }
             Err(e) => notes.push(format!("bad --web addr {addr}: {e}")),
         }
         #[cfg(not(feature = "dot-viz-web"))]
@@ -154,7 +163,18 @@ fn run<T: TimingFeed, A: AffectFeed>(args: &[String], mut pump: DemoPump<T, A>, 
         if s != Seg::Me {
             yielded = false;
         }
-        fill_you(&mut you, i, s, barge, &mut rng);
+        let phone_you;
+        #[cfg(feature = "phone-turn")]
+        {
+            phone_you = phone.as_mut().is_some_and(|p| p.drive_you(&mut you));
+        }
+        #[cfg(not(feature = "phone-turn"))]
+        {
+            phone_you = false;
+        }
+        if !phone_you {
+            fill_you(&mut you, i, s, barge, &mut rng);
+        }
         let inp = FrameIn {
             you_pcm: &you,
             affect: None,
@@ -171,12 +191,27 @@ fn run<T: TimingFeed, A: AffectFeed>(args: &[String], mut pump: DemoPump<T, A>, 
         if out.yield_now() {
             yielded = true;
         }
+        let phone_me;
+        #[cfg(feature = "phone-turn")]
+        {
+            phone_me = phone.as_mut().is_some_and(|p| p.drive_me(&mut me));
+        }
+        #[cfg(not(feature = "phone-turn"))]
+        {
+            phone_me = false;
+        }
         let want_me = s == Seg::Me && !yielded;
-        let me_voiced = want_me && (me_voiced_prev || out.me_onset_allowed) && !out.paused;
+        let me_voiced = if phone_me {
+            !out.paused
+        } else {
+            want_me && (me_voiced_prev || out.me_onset_allowed) && !out.paused
+        };
         if me_voiced && !me_voiced_prev {
             hb.note_me_onset(&out, true);
         }
-        fill_me(&mut me, i, me_voiced, out.me_gain());
+        if !phone_me {
+            fill_me(&mut me, i, me_voiced, out.me_gain());
+        }
         let snap = pump.pump(i, &you, SAMPLE_RATE);
         dc.frame(&out, &you, &me, me_voiced, &snap, step_us);
         me_voiced_prev = me_voiced;

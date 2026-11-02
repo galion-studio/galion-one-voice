@@ -32,6 +32,8 @@ pub mod dot;
 pub mod surface;
 pub mod backends;
 pub mod png;
+/// Std-only WAV helpers for the phone path (mono PCM16, 16 kHz ↔ 24 kHz).
+pub mod wav;
 
 pub use frame::{Band, BandState, Emotion, VizFrame};
 pub use surface::{Fanout, NullSurface, RenderError, RenderSurface, SurfaceCaps, SurfaceKind};
@@ -44,7 +46,7 @@ pub use backends::terminal::{TerminalDotSurface, TerminalSurface};
 #[cfg(feature = "window")]
 pub use backends::window::{FrameMailbox, WindowSurface};
 #[cfg(feature = "web")]
-pub use backends::web::WebSurface;
+pub use backends::web::{MicTap, ReplyBox, Turn, TurnFormat, TurnInbox, WebSurface};
 
 /// Returns the surface kinds compiled into this build, in preference order.
 #[allow(unused_mut)]

@@ -12,6 +12,11 @@ pub mod route;
 /// W21-03: runnable EN demo lane on galion-ml-voice stubs (feature `cascade`).
 #[cfg(feature = "cascade")]
 pub mod en_lane;
+/// Rule-table reply stand-in and prosody heuristic (no weights). Always compiled.
+pub mod canned;
+/// Phone turn: 16 kHz utterance → transcript → reply text → 24 kHz WAV (feature `cascade`).
+#[cfg(feature = "cascade")]
+pub mod phone;
 
 pub const ONSET_P50_BUDGET_MS: u32 = 800;
 pub const BARGE_IN_BUDGET_MS: u32 = 200;
@@ -33,7 +38,7 @@ pub enum Emotion { Neutral, Happy, Sad, Angry, Unknown }
 #[derive(Debug, Clone, PartialEq)]
 pub struct Transcript { pub text: String, pub lang: Lang }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum CascadeError { Unsupported(&'static str), Empty, BudgetExceeded { stage: &'static str, ms: u32 } }
 
 /// Inbound speech recognition (Whisper-class / Parakeet-class slot).
@@ -97,6 +102,12 @@ impl<A: Asr, E: EmotionIn, L: Llm, T: Tts> Cascade<A, E, L, T> {
 pub fn mock_cascade() -> Cascade<MockAsr, MockEmotion, MockLlm, MockTts> {
     Cascade { asr: MockAsr, emo: MockEmotion, llm: MockLlm, tts: MockTts }
 }
+
+pub use canned::{CannedLlm, ProsodyEmotion, ReplyLlm};
+#[cfg(feature = "cascade")]
+pub use phone::{
+    phone_turn, phone_turn_wav, AsrMode, AsrSource, LlmMode, PhoneConfig, PhoneError, PhoneLane, PhoneTurn, PhoneTurnAsr,
+};
 
 #[cfg(test)]
 mod tests {

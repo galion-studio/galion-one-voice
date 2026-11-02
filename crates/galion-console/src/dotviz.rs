@@ -371,4 +371,13 @@ mod tests {
         let snap = pump.pump(0, &tone(0.1), SAMPLE_RATE);
         assert!(snap.affect.is_none() && snap.lat.get(Stage::Sense).is_none());
     }
+
+    #[test]
+    fn screen_page_is_phone_path_and_v2_orb() {
+        assert!(SCREEN_HTML.contains("POST /turn"));
+        assert!(SCREEN_HTML.contains("function spring"));
+        assert!(SCREEN_HTML.contains("samplePlayEnv"));
+        assert!(SCREEN_HTML.contains("V2 orb"));
+        assert!(SCREEN_HTML.contains("id=\"s\""));
+    }
 }

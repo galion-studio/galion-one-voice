@@ -20,9 +20,15 @@
 //! playback (feature `wav-mic`, galion-presence loader) and the stubbed live mic.
 //! The [`dotviz`] module (feature `dot-viz`, W21-04) bridges heartbeat `FrameOut` →
 //! galion-render one dot (PNG / terminal / web) + live timing / emotion bars.
+//! The [`turn_worker`] module (feature `phone-turn`) runs PhoneLane off the 80 ms thread.
+//! [`phone_host`] (same feature) is what the screen demo polls each tick.
 
 #[cfg(feature = "dot-viz")]
 pub mod dotviz;
+#[cfg(feature = "phone-turn")]
+pub mod phone_host;
+#[cfg(feature = "phone-turn")]
+pub mod turn_worker;
 pub mod feeds;
 pub mod heartbeat;
 pub mod live;

@@ -23,3 +23,7 @@ galion-ml-voice = { path = "../galion-ml-voice", optional = true }
 [[example]]
 name = "en_cascade"
 required-features = ["cascade"]
+
+[[example]]
+name = "phone_turn"
+required-features = ["cascade"]

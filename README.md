@@ -1,134 +1,151 @@
 # Galion Voice
 
-Perpetual Open MIT License (draft) · © 2026 Maciej Grajczyk · 2026-11-02 (Europe/Zagreb, UTC+1)
-**LOCAL ONLY.** Nothing here has been pushed or deployed. The interface is **one dot** at `http://127.0.0.1:7878/`.
+Perpetual Open MIT License · © 2026 Maciej Grajczyk
 
-## 1. What it is
+One voice. One mark on a near-black ground. An 80 ms heartbeat under everything.
 
-Galion Voice is a full-duplex voice-to-voice system that runs on CPU.
+You speak on the **you** band. Galion answers on the **me** band. A feeling
+band carries a few bytes of emotion each frame, and only when consent allows
+it. Consent starts denied. The clock does not move: 12.5 Hz, 24 kHz, from
+`LOCKS.toml`.
 
-- **Dual-band audio.** The caller speaks on the **you** band and Galion answers on the **me** band, at the same time. A third
-  **feeling** band carries an 8-byte `EmotionWire` per 80 ms frame per direction (`LOCKS.toml` `[bands]`).
-- **Emotion in, emotion out.** `galion-emotion` reads affect from the caller (consent-gated, default deny) and expresses it in
-  **Galion's own voice**. It counterbalances rather than mirrors: anger gets a calmer reply, and joy is the only state shared
-  (slightly below the caller). See `galion-emotion/README.md` and `galion-demo/README.md`.
-- **Rika.** When the caller falls silent and takes a breath, Rika leans in (≈160 ms) on the feeling band only. It never reads the transcript.
-- **One clock.** Everything steps on an 80 ms heartbeat (12.5 Hz). It is not configurable.
-- **CPU-friendly.** Pure Rust workspace, own tensor kernels (`galion-tensor`, SIMD/int8 GEMV), no GPU. No third-party inference
-  runtime is linked into the primary crates (gates G2/G3).
-- **Built from borrowed open pieces**, each kept at arm's length:
-  - **A21 speech:** Piper VITS `en_US-ljspeech-medium` (MIT, LJSpeech public domain), run on CPU out of process.
-  - **Fallback speech:** flite (`libflite1`).
-  - **Student plan (not trained):** PersonaPlex-7B distilled into a ~1.0B student (`galion-student/`); PersonaPlex outputs as eval
-    data only, never weights. Kyutai Moshi/Moshiko (CC-BY-4.0) is the logit teacher and fallback. Mimi codec is a stub.
-  - **Affect reference:** SenseVoice-Small as an offline reference seam only. Nothing is downloaded or run.
+The mark is a single orb (`#F5F5F7`). It rests, it listens, it thinks while a
+turn is in flight, and it moves with the reply you actually hear. Amber
+(`#F5A524`) and violet (`#7C3AED`) are a slow wash behind it. They never tint
+the mark.
 
-Today the demo is honest about its stubs: ASR is `StubAsr`, the LLM is `MockLlm` (echo, "you said: …"), emotion is fixed in the
-EN turn, Mimi is `IS_STUB`, and there is no microphone (input is a WAV or synthetic audio).
+```text
+phone  --https-->  ngrok now, Caddy later
+                      |
+                      v
+               127.0.0.1:7878  WebSurface (loopback only)
+                      |
+        +-------------+-------------+
+        | 80 ms heartbeat           |  turn worker (never inside the tick)
+        | you / me / Rika           |  PhoneLane: ASR → canned reply → Piper
+        +-------------+-------------+
+                      |
+                      v
+               one orb  (spring, mic energy, playback envelope)
+```
 
-## 2. Run the V1 demo
+## Where the work stands
+
+| | |
+|---|---|
+| **V1** | Foundation. One-dot console, heartbeat, Rika, English cascade, Piper A21, phone interim path. |
+| **V2** | This program: process bus, orb engine, harder edge. Plan: [docs/galion-voice-v2/GALION-VOICE-V2.md](docs/galion-voice-v2/GALION-VOICE-V2.md). |
+| **V3** | Production-ready Galion Voice. Later. |
+| **Plan V5** | How this stack would reach the VPS, and why it has not. [docs/ops/PLAN-V5.md](docs/ops/PLAN-V5.md). |
+
+English speech recognition on the phone is **not ratified**. `GALION_ASR=interim`
+is a labelled placeholder (a sentence chosen by how long you talked). It does
+not know the words. The owner’s choice is A, B, or C in
+[docs/policy/RATIFY-EN-ASR-PHONE-PATH.md](docs/policy/RATIFY-EN-ASR-PHONE-PATH.md).
+whisper.cpp is rejected. `LOCKS.toml` is unchanged.
+
+The reply you hear is a short canned line, spoken by Piper
+(`en_US-ljspeech-medium`, CPU, out of process) when that pack is on disk, else
+flite. Tones are not passed off as a reply. The small `.gq` model that should
+replace the canned table does not exist yet.
+
+Nothing here has been deployed to the VPS. SSH is still a human step.
+
+## Run the demo
+
+Loopback only. Rust 1.85 or newer.
 
 ```bash
-cd /workspace/galion-voice-code
-scripts/a21/fetch-a21.sh             # once: A21 Piper pack into weights/ (sha256-pinned); --check verifies offline
-scripts/run-v1-demo.sh               # live demo: open http://127.0.0.1:7878/  (Ctrl-C stops)
-scripts/run-v1-demo.sh --headless    # no ports/display: artifacts + soft checks → galion-demo/out/v1/V1-SUMMARY.txt
-scripts/run-v1-demo.sh --check       # one live loop, curls / /dot /health on :7878, exit 0/1
-FEED_PORT=17906 scripts/run-v1-demo.sh --check   # side port when :7878 is in use
+scripts/a21/fetch-a21.sh          # once, optional: Piper pack into weights/ (sha256-pinned)
+scripts/run-v1-screen.sh          # http://127.0.0.1:7878/  for an hour
+scripts/run-v1-screen.sh --check  # page, /dot, /mic, /turn, security headers
 ```
 
-**One UI: `http://127.0.0.1:7878/`.** One solid dot (`#F5F5F7`) on obsidian `#0A0A0C` with a slow amber → violet background wash.
-No text, no buttons, no chrome. Modes: idle · rika · listening · speaking. Press `F` or double-click for fullscreen.
-The server binds **loopback only** by design and serves `/`, `/dot` and `/health`. There is no public exposure and no reverse proxy.
+On a phone the microphone needs HTTPS. In another terminal, on the same machine:
 
-Prerequisites:
-- Rust stable + cargo (`--offline` builds), python3 (≥ 3.11 for `check-locks.sh`), curl, coreutils `timeout`.
-- The A21 pack (`scripts/a21/fetch-a21.sh`). Linux x86_64 only.
-- Speakers via PulseAudio/PipeWire (`paplay`) or ALSA (`aplay`). `GALION_PLAY=0` turns playback off.
-
-Exit codes: `0` ok · `1` check FAIL · `64` bad arg · `69` port busy (`pkill -f galion-live-demo`) · `124` timeout.
-Full runbook, flags and soft checks C0–C12: **[docs/V1-DEMO.md](docs/V1-DEMO.md)**.
-
-## 3. Project structure
-
-```
-Cargo.toml              workspace (12 members below), edition 2021, license MIT
-LOCKS.toml              Eureka locks: 80 ms clock, bands, gates, consent, formats, one-dot UI, licence
-LEDGER.md               agent ledger + owner decisions (e.g. t123u)
-crates/
-  galion-tensor         SIMD/int8 GEMV, conv stream, attention, KV ring, .gq reader
-  galion-heartbeat      the 80 ms Heartbeat::step
-  galion-live-demo      the V1 live loop + std-only HTTP server (/, /dot, /health), play.rs
-  galion-cascade        EN cascade lane: Asr / EmotionIn / Llm / Tts traits, mocks
-  galion-console        developer console (not user UI); assets/v1-screen.html = the one-dot page
-  galion-mimi           Mimi codec (stub)
-  galion-presence       presence replay harness (specs/presence*.json)
-  galion-sideband       Hermes sideband types
-  galion-student-backend  student VoiceBackend slot (stub)
-  galion-ml-voice       language id (EN only) + speech slots, incl. A21WeightTts (speech/weights.rs)
-galion-emotion/         affect detect + express, consent gate, Rika, EmotionWire
-galion-render/          one-dot render + NullSurface
-galion-student/         student distillation plan (config stubs, no weights)
-galion-probe/           CPU/bandwidth probe (G0/R0)
-galion-demo/            legacy canned Python demo (not on the V1 path)
-galion-gates/           run-gates.sh (G0–G6, PS, LK, DG, LV, V1; R0–R3 PENDING)
-scripts/                run-v1-demo.sh, run-v1-screen.sh, run-live-demo.sh, run-en-cascade-demo.sh,
-                        run-dot-console-demo.sh, check-locks.sh, check-no-forbidden.sh, a21/, v1/, deploy/ (dry-run)
-specs/                  presence specs + fixtures
-weights/                fetched A21 pack (tts/, runtime/); not vendored (.gitignore = *)
-docs/                   V1-DEMO.md, LIVE-DEMO.md, agent-v1-demo/, agent-wave20/, agent-wave21/, cascade/, multilingual/
+```bash
+ngrok http 127.0.0.1:7878
 ```
 
-## 4. A21 speech path (Piper, CPU)
+Open the `https://` name, tap the orb, talk. The page posts a WAV to `/turn`
+when you pause, then plays `/reply/<id>.wav`. Speaking over the reply cuts it
+off. Notes: [docs/agent-v1-demo/EDGE-NGROK.md](docs/agent-v1-demo/EDGE-NGROK.md).
 
+The screen script sets `GALION_ASR=interim` and `GALION_LLM=canned` for that
+process. Export `GALION_ASR=off` beforehand if you want real speech to be
+refused instead of the placeholder.
+
+Headless V1 checks (no phone):
+
+```bash
+scripts/run-v1-demo.sh --headless
 ```
-EN turn: StubAsr → MockLlm "you said: …" → A21 Piper VITS (CPU, out of process, ~0.5 s) → 24 kHz WAV → me band → dot "speaking"
+
+Full runbook: [docs/V1-DEMO.md](docs/V1-DEMO.md).
+
+## Layout
+
+```text
+LOCKS.toml            the contract (clock, bands, consent, formats, the one mark)
+LEDGER.md             what landed, and what an owner decided
+crates/galion-heartbeat     the 80 ms step
+crates/galion-cascade       EN lane + PhoneLane (feature cascade)
+crates/galion-console       screen demo, v1-screen.html, turn worker
+galion-render/              the mark, and the loopback HTTP surface
+galion-emotion/             affect, consent, Rika
+crates/galion-ml-voice      Piper slot + flite fallback (feature speech)
+galion-student/             distillation plan only; no weights
+galion-gates/               local gates; R0–R3 pending SSH
+scripts/run-v1-screen.sh
+scripts/check-phone-pipeline.sh
+docs/galion-voice-v2/       V2 sector plan
+docs/ops/PLAN-V5.md
+docs/brand/GALION-VOICE-BRAND.md
 ```
 
-- **Pack:** `weights/tts/en_US-ljspeech-medium.onnx` + `.onnx.json`, from HF `rhasspy/piper-voices` (MIT), runtime Piper
-  2023.11.14-2 (`weights/runtime/piper/piper`, onnxruntime 1.14.1, MIT). Fetched and sha256-verified by `scripts/a21/fetch-a21.sh`.
-- **Deterministic** by default (`noise_scale=0`, `noise_w=0`); `GALION_A21_NOISE=natural` opts into sampled prosody. RTF ≈ 0.03–0.05.
-- **Selection:** `GALION_SPEECH=auto|a21|flite|off` (default `auto` = A21, then flite). `GALION_A21_RUNTIME=<piper>` overrides the runtime.
-- **Fallback only:** flite (`apt install libflite1`) when the pack is missing.
-- **Neither present:** the EN cascade **exits 3** (`SPEECH=ABSENT`). It never passes tones off as the reply.
+`weights/` is gitignored. Fetch the A21 pack; do not commit it.
 
-Still open (do not bypass, do not edit LOCKS to make them go away):
-1. **LOCKS ratification (owner).** `.onnx` + out-of-process onnxruntime is an owner-approved exception (t123u, LEDGER) to
-   `formats.foreign_runtime_allowed=false` and `weight_formats = ["safetensors"]`. LOCKS.toml is **not** amended.
-2. **espeak-ng is GPL-3 (counsel).** Piper phonemizes with it. It is unlinked and out of process, but needs sign-off.
-3. **Voice choice and consent** for LJSpeech; the Galion-native `.gq` decoder is not built (`GALION_NATIVE_DECODER_WIRED=false`).
+## Licence
 
-Full list: [docs/agent-v1-demo/A21-BLOCKERS.md](docs/agent-v1-demo/A21-BLOCKERS.md) · counsel memo: [docs/agent-wave20/A21-COUNSEL-MEMO.md](docs/agent-wave20/A21-COUNSEL-MEMO.md).
+Code in this repository is Perpetual Open MIT, (c) 2026 Maciej Grajczyk.
+`LOCKS.toml` says free forever, and no paid tiers. That is the licence.
 
-## 5. License
+Weights are separate. They are not in git. The Piper voice pack keeps its own
+MIT grant and is downloaded by `scripts/a21/fetch-a21.sh`. A future student
+model would ship with its own `LICENSE-WEIGHTS`. No GPL code is copied in.
 
-- **Code:** Perpetual Open MIT License (draft) · © 2026 Maciej Grajczyk. Free forever, no paid tiers (`LOCKS.toml` `[licence]`).
-  It covers **code only**. Cargo manifests declare `license = "MIT"`.
-- **Weights:** separate. They keep their own licences (e.g. `LICENSE-WEIGHTS` for a future student), and they are **not vendored**
-  (`formats.weights_vendored = false`, `weights/.gitignore` = `*`). The A21 Piper pack is fetched, not shipped.
-- **No GPL code is copied in.** No NC data.
+## Contributing
 
-## 6. Contributing
+1. Read [LOCKS.toml](LOCKS.toml). Changing a value is an owner decision and a
+   LEDGER line. Do not "fix" a lock to make a demo easier.
+2. No GGML-family containers, and no candle / ort / tract / burn / llama / ggml
+   in manifests. The A21 ONNX path is out of process and still waiting to be
+   written into the lock file by the owner.
+3. The user surface is one mark. No menu, face, or second widget. The phone
+   hint is the gesture prompt; do not grow it into chrome.
+4. Consent stays deny by default. Do not wire caller-emotion into the phone
+   lane unless `sense` is granted in that session.
+5. Before you call it done:
 
-1. **Read the locks first.** [LOCKS.toml](LOCKS.toml) is the contract. Changing any value needs an owner decision and a LEDGER entry.
-   Gate thresholds may only be tightened.
-2. **Run the local gates before you call anything done:**
-   ```bash
-   scripts/check-locks.sh            # Eureka locks
-   scripts/check-no-forbidden.sh     # no forbidden container formats / runtimes (galion-tensor scope)
-   galion-gates/run-gates.sh         # G0–G3 hard; G4/G6/PS/LK/DG/LV/V1 soft (GALION_GATES_HARD=1 makes them count)
-   scripts/run-v1-demo.sh --headless # V1 soft checks C0–C12
-   ```
-   No green gate, no done. Zero tests counts as a fail.
-3. **No unauthorized formats or runtimes.** No GGML-family containers, no candle/ort/tract/burn/llama/ggml in manifests.
-   Weights are safetensors (`.gq` reader later). The A21 `.onnx` path is the one scoped exception, still pending ratification.
-4. **One dot.** No UI additions: no text, menus, buttons, orbs, faces, waveforms or logos. `galion-console` is a developer tool.
-5. **Consent is deny-by-default.** Workplace and education purposes are hard-off and not overridable (EU AI Act Art. 5(1)(f)).
-6. **Local first.** No pushes, deploys or weight vendoring without owner sign-off. Record status in `docs/` and `LEDGER.md`,
-   dated in Europe/Zagreb time.
+```bash
+scripts/check-locks.sh
+scripts/check-no-forbidden.sh
+cargo test --workspace
+cargo test -p galion-render --features web
+cargo test -p galion-cascade --features cascade
+cargo test -p galion-console --features phone-turn
+scripts/run-v1-screen.sh --check
+```
 
-Further reading: [docs/V1-DEMO.md](docs/V1-DEMO.md) · [docs/agent-v1-demo/FP-SUMMARY.md](docs/agent-v1-demo/FP-SUMMARY.md) ·
-[docs/LIVE-DEMO.md](docs/LIVE-DEMO.md) · [docs/cascade/EN-CASCADE-LANE.md](docs/cascade/EN-CASCADE-LANE.md) ·
-[docs/multilingual/README.md](docs/multilingual/README.md) · [LEDGER.md](LEDGER.md)
+6. Deploy is [Plan V5](docs/ops/PLAN-V5.md). Dry-run scripts refuse `--execute`.
+   Do not add an SSH key, and do not point the app at a public address.
+   `WebSurface` will reject the bind.
+
+Further: [V2 plan](docs/galion-voice-v2/GALION-VOICE-V2.md) ·
+[Plan V5](docs/ops/PLAN-V5.md) ·
+[brand](docs/brand/GALION-VOICE-BRAND.md) ·
+[phone API](docs/cascade/PHONE-TURN-API.md) ·
+[A21 blockers](docs/agent-v1-demo/A21-BLOCKERS.md) ·
+[LEDGER](LEDGER.md)
 
 — Maciej Grajczyk

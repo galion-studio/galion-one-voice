@@ -1,0 +1,27 @@
+# Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+# PR checks for the V2 track. Tests and lock gates only. No deploy, no SSH.
+name: gates
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.85.0
+      - name: Eureka locks
+        run: scripts/check-locks.sh
+      - name: Forbidden formats and runtimes
+        run: scripts/check-no-forbidden.sh
+      - name: Workspace tests
+        run: cargo test --workspace
+      - name: Phone HTTP surface
+        run: cargo test -p galion-render --features web --lib
+      - name: Phone lane
+        run: cargo test -p galion-cascade --features cascade --lib
+      - name: Turn worker
+        run: cargo test -p galion-console --features phone-turn --lib

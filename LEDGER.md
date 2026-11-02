@@ -35,3 +35,5 @@
 - espeak-ng is GPL-3, pending counsel.
 - Flite is the fallback only. Weights are not vendored (`scripts/a21/fetch-a21.sh`).
 - See docs/agent-v1-demo/A21-BLOCKERS.md and FP-03-STATUS.md.
+
+**2026-11-02 · Galion Voice V2 program · Plan V5.** Phone path from the local V1 delta landed on mainline (`PhoneLane`, `CannedLlm`, `TurnWorker`, `PhoneHost`, `POST /turn`, `GET /reply`, mic tap). V2 orb foundation is the same page: spring-damper, mic energy, playback envelope. Docs: `docs/galion-voice-v2/GALION-VOICE-V2.md`, `docs/ops/PLAN-V5.md`, `docs/brand/GALION-VOICE-BRAND.md`. LOCKS.toml values not edited. No SSH. No VPS deploy. ASR still unratified (A/B/C). `GALION_ASR=interim` remains a labelled placeholder. Plan V4 dry-runs stay the deploy refusal (`--execute` exits 2).
