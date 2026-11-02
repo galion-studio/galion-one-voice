@@ -142,6 +142,7 @@ scripts/run-v1-screen.sh --check
    `WebSurface` will reject the bind.
 
 Further: [V2 plan](docs/galion-voice-v2/GALION-VOICE-V2.md) ·
+[animation engine](docs/galion-voice-v2/ANIMATION-ENGINE.md) ·
 [Plan V5](docs/ops/PLAN-V5.md) ·
 [brand](docs/brand/GALION-VOICE-BRAND.md) ·
 [phone API](docs/cascade/PHONE-TURN-API.md) ·

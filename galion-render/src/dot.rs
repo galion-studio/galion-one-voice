@@ -93,6 +93,8 @@ impl DotParams {
             }
             DotState::Speaking => {
                 // Quantised to the 80 ms grid: one step per frame, never in between.
+                // Continuous motion between these targets is `OrbEngine`. Do not
+                // smooth this function; G4 hashes it.
                 let step = (t_ms / FRAME_MS) % 4;
                 let rhythm = [0.0f32, 0.5, 1.0, 0.5][step as usize];
                 let drive = 0.65 * level + 0.35 * rhythm;
