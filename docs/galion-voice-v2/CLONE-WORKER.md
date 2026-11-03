@@ -18,7 +18,7 @@ One long-lived child, the same idea as the warm Piper worker
 | Stdin | one JSON line `{"text":"..."}` | one JSON line, below |
 | Stdout | raw s16le | raw s16le, 24 kHz |
 | Boundary | stderr `Real-time factor:` | stderr `galion-clone-utt:` |
-| Disk | no PCM cache | no PCM cache |
+| Disk | no PCM cache | no raw PCM cache; the compiler lands `voices/gq/<persona>.gqvoice` |
 | Fallback | flite if the pack is missing | Piper, then flite |
 
 Request line, written by `clone_worker::request_line`. There is no reference
@@ -33,6 +33,16 @@ field. A child that sees a non-empty `reference`, `audio_prompt`,
 `persona` is `samantha` or `jarvis`. Jarvis sets `tags` false and the stub
 strips bracket tags from the text. Samantha may keep them for a later model.
 An unknown persona name is treated as Samantha.
+
+## Runtime packet
+
+Worker stdout stays raw s16le. That buffer is not what the speech stack plays.
+`CloneTts::synthesize` compiles each clause through `speech::gqvoice`.
+When the utterance finishes, the stack writes `voices/gq/<persona>.gqvoice`
+(`GALION_GQVOICE` overrides the directory) and returns the samples it read
+back from that file. The format, the 80 ms sectors, and the Samantha and
+Jarvis commands are [`GQVOICE.md`](GQVOICE.md). Piper still speaks when the
+child or the compiler fails. The child still does not write a file.
 
 ## What the stub does not do
 
