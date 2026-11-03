@@ -25,6 +25,13 @@ Host, when a human has finished the console work: Titanaxe VPS `51.38.137.193`.
 SSH user in the V4 draft: `galion`, key only. This plan does not ship a key,
 does not read one out of the environment, and does not try port 22.
 
+CPU session caps for that host are in
+`docs/galion-voice-v2/symphony/STAGING-CPU.md`. Plus is a CX23-class budget
+(one voice session). Ultra is a CX43-class budget (two sessions while a
+burst is assumed, five only after a measurement). Until a human writes the
+box's vCPU and RAM into the ledger, staging uses the Plus cap. This plan
+does not open a socket.
+
 Port 7878 is never public. 22, 80, and 443 are the only ports the V4 notes
 open, and only after the human steps below.
 

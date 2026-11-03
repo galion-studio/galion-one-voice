@@ -23,6 +23,7 @@ in-tree ORT, `paid_tiers=false`.
 | **V3** | Production-ready Galion Voice. Real EN ASR ratified, reply model past the canned table, speech warm, edge on the VPS, gates R0–R3 green, consent story counsel has signed. | Later. Nothing in this plan pretends to be V3. |
 | **Plan V4** | The ops dry-run that already exists: `scripts/deploy/harden-dryrun.sh`, `scripts/deploy/release-dryrun.sh`, `docs/agent-wave20/R0-R3-DRY-RUN.md`, `docs/deploy/TITANAXE-VPS.md`. | Written. `--execute` refuses. No SSH. |
 | **Plan V5** | The deploy track for the stack as it is now, including the phone routes. | `docs/ops/PLAN-V5.md`. |
+| **Staging CPU** | CPU-first cascade budgets for Titanaxe. Plus is a CX23-class cap (1 session). Ultra is a CX43-class cap (2 while a burst is assumed, 5 only after a measurement). Unknown host uses the Plus cap. | `docs/galion-voice-v2/symphony/STAGING-CPU.md`. Plan only. No SSH. |
 
 Ops numbers and product numbers are different series. Plan V4 is not "Voice V4".
 The agent ledger titled "Galion Voice V4" is the wave ledger in `LEDGER.md`.
@@ -526,8 +527,9 @@ Hermes on the 80 ms tick.
 run, results recorded. Status: **approved-pending-setup**. A human installs
 per-user anonymized access codes. This program does not connect.
 
-**Depends on.** Plan V5 human steps H1–H4. `galion-gates/run-gates.sh` remote
-block, which connects only if `GALION_VPS_HOST` is set.
+**Depends on.** Plan V5 human steps H1–H4. CPU session caps:
+`docs/galion-voice-v2/symphony/STAGING-CPU.md`. `galion-gates/run-gates.sh`
+remote block, which connects only if `GALION_VPS_HOST` is set.
 
 **Acceptance.**
 
