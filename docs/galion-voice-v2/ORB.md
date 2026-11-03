@@ -4,8 +4,9 @@ Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
 Master slogan: "The seamless connection with the human being, on the voice only."
 The orb is the mark that connection has. It is still one mark. The slogan is
 not drawn on it.
-`LOCKS.toml` `[ui]` is unchanged: one dot, solid `#F5F5F7`, size and brightness
-only, gradient on the background only.
+`LOCKS.toml` `[ui]` is unchanged: one dot, `#F5F5F7`, amber→violet on the
+background only. The live mark's body stop is that locked pigment. Brightness
+is glow and a little size. It does not multiply the fill.
 
 ## Why V1 felt stiff
 
@@ -22,23 +23,31 @@ did not follow the sound coming out of the speaker.
 replaces the lerp with a spring-damper.
 
 - State is position and velocity for radius and for brightness (`spring()`).
-- The easing profile is **Luti**. Each mode has its own stiffness and damping
-  (`LUTI` on the page; `SPRING` is the same object). The Rust gain set is
-  `galion-render` `Luti`. The numbers are the ones below. They are not a
-  `LOCKS.toml` value.
-- Idle is a slow breath (soft spring, low frequency).
+- The easing profile is **Luti**. Each mode has a soft aim (`LUTI` on the
+  page; `SPRING` is the same object). The live gain eases toward that aim
+  (480 ms). A mode change does not rebind ω and ζ in one frame. The numbers
+  are the ones below. They are not a `LOCKS.toml` value.
+- Idle is a slow breath (soft spring, low frequency). Rika lean-in stays on
+  this motion. The lean is a little extra radius, not the speaking spring.
 - Listening couples radius to microphone energy, local RMS first, `/dot` level
   as well. The mark grows while you talk, before the server round trip.
+  The drive is low-passed.
 - Thinking is the gap after `POST /turn` returns and before playback starts.
   It is a motion of the same mark, not a new widget. `LOCKS.toml` `dot_states`
   is still idle / listening / speaking. Thinking is a client motion pending an
   owner decision if it should become a fourth locked state.
 - Speaking, while a reply WAV is playing, follows `samplePlayEnv()`: an
-  `AnalyserNode` on the playback graph. Radius and brightness track that
-  envelope, so the orb moves with the voice the phone is actually playing.
-  Server `/dot` radius is only the fallback when nothing is playing locally yet.
-- A little velocity becomes ellipse aspect (`aspect`). Still one filled shape.
-  The mark is one vector ellipse (`canvas` path, not a sprite). No second
+  `AnalyserNode` on the playback graph, low-passed (about 200 ms attack,
+  380 ms release). Radius tracks that envelope calmly. An empty WAV does not
+  pump the mark. Server `/dot` radius is the fallback when nothing is playing
+  locally yet, and that target is low-passed before the spring.
+- Aspect stays 1. The mark is a circle. The old `radius_velocity * 6` squash
+  (draw clamp 0.82..=1.18) flipped the disc between wide and tall ovals and
+  is gone.
+- The fill is a near-white radial gradient. The body stops are `#F5F5F7`.
+  A 1-device-pixel stroke `rgba(255,255,255,0.55)` is the contour. The inner
+  highlight follows `GET /dot` `"emotion"`. The surround wash follows that
+  same feeling. No second
   ring, no face, no caption on the mark.
 
 The server me band is the other half. `PhoneHost::drive_me` drains reply PCM

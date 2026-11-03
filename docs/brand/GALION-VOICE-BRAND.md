@@ -30,13 +30,20 @@ is the only slogan. The product can be quiet. The dot is the interface.
 
 The mark is one orb. It is the V1 dot, given mass.
 
-- Fill `#F5F5F7` (near-white). Solid. Brightness changes the whole fill.
+- Fill `#F5F5F7` (near-white). The live mark's body stops are that token.
+  A soft inner highlight and a hairline edge stay in the same near-white
+  family. Brightness is glow and a little size. It does not multiply the fill.
+  The PNG golden still scales the solid token by brightness (G4). That path
+  is not the phone.
 - Ground `#0A0A0C` (near-black).
 - Background wash only: amber `#F5A524` → violet `#7C3AED`. The wash never
-  tints the mark. `LOCKS.toml` `[ui]` `gradient_scope = background`.
-- Motion: idle breath, listen (opens with the microphone), think (a tighter
+  tints the mark. `LOCKS.toml` `[ui]` `gradient_scope = background` — the
+  amber→violet wash stays on the ground. `LOCKS.toml` was not edited.
+- Motion: idle breath, listen (opens with the microphone), think (a quiet
   pulse while a turn is in flight), speak (radius follows the reply you hear).
-  See `docs/galion-voice-v2/ORB.md`.
+  The mark stays a circle. See `docs/galion-voice-v2/ORB.md`.
+- Interior: a quiet warmth from the live `/dot` `emotion` object (heartbeat
+  `AffectFeed`), read through the empathy table. Not a hue change of the mark.
 
 There is no wordmark on the user surface, no second shape, no face, no
 waveform bar. `chrome_allowed = false`. A one-line hint, "Tap the dot to talk",
@@ -50,9 +57,10 @@ surface. `console_is_user_ui = false`.
 ## Colour use outside the product surface
 
 Docs, the README, a slide: near-black ground, the off-white mark, amber and
-violet only as a thin wash or a single accent, never as a rainbow. Do not
-recolour the mark per emotion. Emotion is motion and voice, not a hue shift
-of the dot. That matches `dot_color` being one value.
+violet only as a thin wash or a single accent, never as a rainbow. Emotion
+does not recolour the mark into another hue. On the phone it is a quiet
+shift inside the near-white highlight, plus the breath. `dot_color` stays
+one value.
 
 ## Licence, and what is not a price list
 

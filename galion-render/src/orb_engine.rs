@@ -6,16 +6,9 @@
 //! today, a future softbuffer thread later) feeds those targets in and
 //! steps radius and brightness with the real frame `dt`.
 //!
-//! The easing profile is [`Luti`]: one spring-damper gain set, the same
-//! numbers as `LUTI` in `v1-screen.html`. [`DisplayHz::Hz240`] stays a
-//! first-class step (`1/240` s). It is not a resample onto the heartbeat.
-//!
 //! Do not call [`OrbEngine::step`] from `Heartbeat::step`. The heartbeat
 //! is the 12.5 Hz audio clock. This loop runs only on the animation
-//! thread, at whatever vsync the display actually delivered. A `/dot`
-//! witness may take one Luti step per handoff so the in-process account
-//! (frames, last `dt`, settle error, cost hint) is visible. That witness
-//! does not replace the golden radius.
+//! thread, at whatever vsync the display actually delivered.
 //!
 //! Thinking and offline are motions of the same mark. They are not
 //! [`crate::dot::DotState`] values. `LOCKS.toml` `dot_states` stays
@@ -46,8 +39,11 @@ impl DisplayHz {
     }
 }
 
-/// Which spring the page uses. Gains are the [`Luti`] profile (`LUTI` in
-/// `v1-screen.html`; `SPRING` on that page is the same object).
+/// Page eases toward these aims. A mode change does not apply them in one frame.
+/// Time constant matches `GAIN_TAU` (480 ms) in `v1-screen.html`.
+const GAIN_TAU_S: f32 = 0.48;
+
+/// Which spring the page uses. Aims match `SPRING` in `v1-screen.html`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum OrbMotion {
     Idle,
@@ -70,14 +66,28 @@ impl OrbMotion {
         }
     }
 
-    /// Radius channel. Brightness uses [`OrbMotion::brightness_gain`].
+    /// Radius-channel aim. [`OrbEngine::step`] eases toward this (480 ms)
+    /// so a mode change does not retune the spring in one frame.
+    /// Brightness uses [`OrbMotion::brightness_gain`] from the same aim.
+    /// The phone uses brightness for glow and a little size, not fill pigment.
     pub fn radius_gain(self) -> SpringGain {
-        Luti::radius(self)
+        let (omega, zeta) = match self {
+            OrbMotion::Idle => (1.8, 0.92),
+            OrbMotion::Listening => (3.4, 0.88),
+            OrbMotion::Thinking => (2.4, 0.90),
+            OrbMotion::Speaking => (3.0, 0.92),
+            OrbMotion::Offline => (2.0, 1.02),
+        };
+        SpringGain { omega, zeta }
     }
 
     /// Page: brightness spring is `w * 0.85` and `min(1.2, z + 0.08)`.
     pub fn brightness_gain(self) -> SpringGain {
-        Luti::brightness(self)
+        let g = self.radius_gain();
+        SpringGain {
+            omega: g.omega * 0.85,
+            zeta: (g.zeta + 0.08).min(1.2),
+        }
     }
 
     fn from_dot_state(state: DotState) -> Self {
@@ -86,91 +96,6 @@ impl OrbMotion {
             DotState::Listening => OrbMotion::Listening,
             DotState::Speaking => OrbMotion::Speaking,
         }
-    }
-}
-
-/// Luti easing profile.
-///
-/// One spring-damper gain set for the fluid circle. These are the numbers
-/// the phone already draws (`LUTI` / `SPRING` in `v1-screen.html`). They
-/// are not a `LOCKS.toml` value. Do not retune them to chase a look.
-///
-/// `omega` is rad/s. `zeta` is the damping ratio. Brightness derives from
-/// the radius gain: `omega * 0.85`, `zeta + 0.08` capped at `1.2`.
-///
-/// [`DotParams`] stays the 80 ms golden. Luti fills the time between those
-/// targets. It is not stored on the dot, and it is not part of the G4 hash.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Luti;
-
-impl Luti {
-    pub const NAME: &'static str = "luti";
-
-    /// Fixed flop hint for one accepted step (radius, brightness, aspect).
-    /// A stand-in for "a few dozen floating-point operations". Not a
-    /// measured duration, and not a profiler sample.
-    pub const STEP_COST: u32 = 48;
-
-    pub fn radius(motion: OrbMotion) -> SpringGain {
-        let (omega, zeta) = match motion {
-            OrbMotion::Idle => (2.4, 0.86),
-            OrbMotion::Listening => (11.0, 0.70),
-            OrbMotion::Thinking => (6.5, 0.48),
-            OrbMotion::Speaking => (18.0, 0.58),
-            OrbMotion::Offline => (3.2, 1.05),
-        };
-        SpringGain { omega, zeta }
-    }
-
-    pub fn brightness(motion: OrbMotion) -> SpringGain {
-        let g = Self::radius(motion);
-        SpringGain {
-            omega: g.omega * 0.85,
-            zeta: (g.zeta + 0.08).min(1.2),
-        }
-    }
-}
-
-/// In-process account of one [`OrbEngine`].
-///
-/// Updated only inside [`OrbEngine::step`]. No exporter, no scrape
-/// endpoint of its own. A refused step does not increment `frames`,
-/// sets `last_dt_s` to `0`, and charges `cost_hint` `0` for that call.
-/// `settle_err` stays at the previous finite error.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct OrbAccount {
-    /// Always [`Luti::NAME`].
-    pub profile: &'static str,
-    /// Accepted display steps. Not heartbeat frames.
-    pub frames: u64,
-    /// Seconds integrated on the last call. `0.0` if that call was refused.
-    pub last_dt_s: f32,
-    /// Max of `|radius − target|` and `|brightness − target|` after the
-    /// last accepted step.
-    pub settle_err: f32,
-    /// [`Luti::STEP_COST`] when the last call integrated, else `0`.
-    pub cost_hint: u32,
-}
-
-impl OrbAccount {
-    pub const fn empty() -> Self {
-        Self {
-            profile: Luti::NAME,
-            frames: 0,
-            last_dt_s: 0.0,
-            settle_err: 0.0,
-            cost_hint: 0,
-        }
-    }
-
-    /// Compact object. `hz` is the display rate the caller used for this
-    /// step (`240` on the `/dot` witness). `0` means the caller did not
-    /// name a rate; `dt_s` is still the integrated step.
-    pub fn to_json(self, hz: u32) -> String {
-        format!(
-            "{{\"profile\":\"{}\",\"hz\":{hz},\"frames\":{},\"dt_s\":{:.6},\"settle_err\":{:.6},\"cost_hint\":{}}}",
-            self.profile, self.frames, self.last_dt_s, self.settle_err, self.cost_hint
-        )
     }
 }
 
@@ -185,11 +110,13 @@ pub struct OrbSample {
     pub brightness: f32,
     pub radius_v: f32,
     pub brightness_v: f32,
-    /// Already clamped to `0.82..=1.18`. One filled mark, stretched a little.
+    /// Held at 1. The mark is a circle. Velocity used to squash this
+    /// (`radius_v * 6`, clamp ±0.14, draw clamp 0.82..=1.18) and the
+    /// phone flipped between wide and tall ovals.
     pub aspect: f32,
     /// Seconds integrated for this sample. `0.0` if the step was refused.
     pub dt_s: f32,
-    /// In-process Luti account after this call. Not a second mark.
+    /// In-process Luti witness. Not a second mark.
     pub account: OrbAccount,
 }
 
@@ -205,28 +132,27 @@ impl OrbSample {
     /// and not a substitute for `/dot` targets.
     pub fn to_json(self) -> String {
         format!(
-            "{{\"motion\":\"{}\",\"profile\":\"{}\",\"radius\":{:.4},\"brightness\":{:.4},\"aspect\":{:.4},\"radius_v\":{:.4},\"brightness_v\":{:.4},\"dt_s\":{:.6},\"frames\":{},\"settle_err\":{:.6},\"cost_hint\":{}}}",
+            "{{\"motion\":\"{}\",\"radius\":{:.4},\"brightness\":{:.4},\"aspect\":{:.4},\"radius_v\":{:.4},\"brightness_v\":{:.4},\"dt_s\":{:.6}}}",
             self.motion.as_str(),
-            self.account.profile,
             self.radius,
             self.brightness,
             self.aspect,
             self.radius_v,
             self.brightness_v,
             self.dt_s,
-            self.account.frames,
-            self.account.settle_err,
-            self.account.cost_hint,
         )
     }
 }
 
-/// Radius, brightness, and a little aspect, integrated in display time.
+/// Radius and brightness, integrated in display time. Aspect stays 1.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct OrbEngine {
     radius: Spring,
     brightness: Spring,
     aspect: f32,
+    /// Smoothed toward [`OrbMotion::radius_gain`]. Starts at the idle aim.
+    omega: f32,
+    zeta: f32,
     frames: u64,
     last_dt_s: f32,
     settle_err: f32,
@@ -247,10 +173,13 @@ impl OrbEngine {
         } else {
             0.84
         };
+        let idle = OrbMotion::Idle.radius_gain();
         Self {
             radius: Spring::new(radius, 0.0),
             brightness: Spring::new(brightness, 0.0),
             aspect: 1.0,
+            omega: idle.omega,
+            zeta: idle.zeta,
             frames: 0,
             last_dt_s: 0.0,
             settle_err: 0.0,
@@ -279,17 +208,6 @@ impl OrbEngine {
         self.aspect
     }
 
-    /// Frames stepped, last `dt`, settle error, and the static cost hint.
-    pub fn account(&self) -> OrbAccount {
-        OrbAccount {
-            profile: Luti::NAME,
-            frames: self.frames,
-            last_dt_s: self.last_dt_s,
-            settle_err: self.settle_err,
-            cost_hint: self.cost_hint,
-        }
-    }
-
     /// Step toward explicit targets. Targets outside the mark's range are
     /// clamped before the force is applied (`radius` 0..=0.5, `brightness`
     /// 0..=1). A non-finite target or `dt` holds the current pose.
@@ -310,23 +228,32 @@ impl OrbEngine {
         }
         let radius_target = radius_target.clamp(0.0, 0.5);
         let brightness_target = brightness_target.clamp(0.0, 1.0);
-        let radius = self.radius.step(radius_target, dt_s, motion.radius_gain());
-        let bright = self
-            .brightness
-            .step(brightness_target, dt_s, motion.brightness_gain());
-        self.advance_aspect(radius.velocity, radius.dt_s);
+        let radius_gain = self.ease_radius_gain(motion, dt_s);
+        let bright_gain = SpringGain {
+            omega: radius_gain.omega * 0.85,
+            zeta: (radius_gain.zeta + 0.08).min(1.2),
+        };
+        let radius = self.radius.step(radius_target, dt_s, radius_gain);
+        let bright = self.brightness.step(brightness_target, dt_s, bright_gain);
+        self.aspect = 1.0;
         let used = radius.dt_s.max(bright.dt_s);
         self.frames = self.frames.saturating_add(1);
         self.last_dt_s = used;
         let err_r = (self.radius.position - radius_target).abs();
         let err_b = (self.brightness.position - brightness_target).abs();
-        self.settle_err = if err_r.is_finite() && err_b.is_finite() {
-            err_r.max(err_b)
-        } else {
-            0.0
-        };
+        self.settle_err = if err_r.is_finite() && err_b.is_finite() { err_r.max(err_b) } else { 0.0 };
         self.cost_hint = Luti::STEP_COST;
         self.sample(motion, used)
+    }
+
+    pub fn account(&self) -> OrbAccount {
+        OrbAccount {
+            profile: Luti::NAME,
+            frames: self.frames,
+            last_dt_s: self.last_dt_s,
+            settle_err: self.settle_err,
+            cost_hint: self.cost_hint,
+        }
     }
 
     /// Use a [`DotParams`] golden as the target. The dot is not modified.
@@ -341,22 +268,24 @@ impl OrbEngine {
         )
     }
 
-    fn advance_aspect(&mut self, radius_velocity: f32, dt_s: f32) {
-        if dt_s <= 0.0 || !radius_velocity.is_finite() {
-            if !self.aspect.is_finite() {
-                self.aspect = 1.0;
-            }
-            return;
+    /// Ease ω and ζ toward the motion's aim. One frame never snaps the gain.
+    fn ease_radius_gain(&mut self, motion: OrbMotion, dt_s: f32) -> SpringGain {
+        let aim = motion.radius_gain();
+        if !self.omega.is_finite() {
+            self.omega = aim.omega;
         }
-        let squash = (radius_velocity * 6.0).clamp(-0.14, 0.14);
-        let aim = 1.0 + squash;
-        let k = 1.0 - (-dt_s * 1000.0 / 90.0).exp();
-        let next = self.aspect + (aim - self.aspect) * k;
-        self.aspect = if next.is_finite() {
-            next.clamp(0.82, 1.18)
-        } else {
-            1.0
-        };
+        if !self.zeta.is_finite() {
+            self.zeta = aim.zeta;
+        }
+        if let Some(h) = integrate_dt(dt_s) {
+            let k = 1.0 - (-h / GAIN_TAU_S).exp();
+            self.omega += (aim.omega - self.omega) * k;
+            self.zeta += (aim.zeta - self.zeta) * k;
+        }
+        SpringGain {
+            omega: self.omega,
+            zeta: self.zeta,
+        }
     }
 
     fn sample(&self, motion: OrbMotion, dt_s: f32) -> OrbSample {
@@ -366,10 +295,47 @@ impl OrbEngine {
             brightness: finite_or(self.brightness.position, 0.0),
             radius_v: finite_or(self.radius.velocity, 0.0),
             brightness_v: finite_or(self.brightness.velocity, 0.0),
-            aspect: clamp_finite(self.aspect, 0.82, 1.18),
+            aspect: 1.0,
             dt_s,
             account: self.account(),
         }
+    }
+}
+
+/// Named gain table. The phone calls it `LUTI`. `SPRING` is the same object.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Luti;
+
+impl Luti {
+    pub const NAME: &'static str = "luti";
+    pub const STEP_COST: u32 = 48;
+
+    pub fn radius(motion: OrbMotion) -> SpringGain {
+        motion.radius_gain()
+    }
+
+    pub fn brightness(motion: OrbMotion) -> SpringGain {
+        let g = motion.radius_gain();
+        SpringGain { omega: g.omega * 0.85, zeta: (g.zeta + 0.08).min(1.2) }
+    }
+}
+
+/// One-step account beside the dot golden. The page does not draw it.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct OrbAccount {
+    pub profile: &'static str,
+    pub frames: u64,
+    pub last_dt_s: f32,
+    pub settle_err: f32,
+    pub cost_hint: u32,
+}
+
+impl OrbAccount {
+    pub fn to_json(self, hz: u32) -> String {
+        format!(
+            "{{\"profile\":\"{}\",\"hz\":{},\"frames\":{},\"dt_s\":{:.6},\"settle_err\":{:.6},\"cost_hint\":{}}}",
+            self.profile, hz, self.frames, self.last_dt_s, self.settle_err, self.cost_hint
+        )
     }
 }
 
@@ -398,32 +364,26 @@ mod tests {
     fn assert_draw(s: OrbSample) {
         assert!(s.radius.is_finite() && s.brightness.is_finite() && s.aspect.is_finite());
         assert!(s.radius_v.is_finite() && s.brightness_v.is_finite() && s.dt_s.is_finite());
-        assert!(s.account.settle_err.is_finite() && s.account.last_dt_s.is_finite());
-        assert_eq!(s.account.profile, Luti::NAME);
         assert!((0.0..=0.5).contains(&s.draw_radius()));
         assert!((0.0..=1.0).contains(&s.draw_brightness()));
-        assert!((0.82..=1.18).contains(&s.aspect));
+        assert!((s.aspect - 1.0).abs() < 1e-6, "aspect {}", s.aspect);
         assert!(!s.to_json().contains("NaN"));
     }
 
     #[test]
     fn gains_match_the_phone_page() {
         let cases = [
-            (OrbMotion::Idle, 2.4_f32, 0.86_f32),
-            (OrbMotion::Listening, 11.0, 0.70),
-            (OrbMotion::Thinking, 6.5, 0.48),
-            (OrbMotion::Speaking, 18.0, 0.58),
-            (OrbMotion::Offline, 3.2, 1.05),
+            (OrbMotion::Idle, 1.8_f32, 0.92_f32),
+            (OrbMotion::Listening, 3.4, 0.88),
+            (OrbMotion::Thinking, 2.4, 0.90),
+            (OrbMotion::Speaking, 3.0, 0.92),
+            (OrbMotion::Offline, 2.0, 1.02),
         ];
-        assert_eq!(Luti::NAME, "luti");
-        assert_eq!(Luti::STEP_COST, 48);
         for (motion, w, z) in cases {
             let r = motion.radius_gain();
-            assert_eq!(r, Luti::radius(motion));
             assert_eq!(r.omega, w);
             assert_eq!(r.zeta, z);
             let b = motion.brightness_gain();
-            assert_eq!(b, Luti::brightness(motion));
             assert!((b.omega - w * 0.85).abs() < 1e-6);
             assert!((b.zeta - (z + 0.08).min(1.2)).abs() < 1e-6);
         }
@@ -629,7 +589,8 @@ mod tests {
     #[test]
     fn draw_clamp_holds_when_the_target_is_outside_the_mark() {
         let mut engine = OrbEngine::at_rest(0.0, 0.0);
-        for _ in 0..30 {
+        // Soft speaking aim (ω 3) needs longer than the old ω 18 to reach the clamp.
+        for _ in 0..240 {
             let sample = engine.step(OrbMotion::Speaking, 10.0, -4.0, DisplayHz::Hz60.dt_s());
             assert_draw(sample);
             assert!(sample.draw_radius() <= 0.5);
@@ -640,17 +601,30 @@ mod tests {
     }
 
     #[test]
-    fn aspect_leaves_one_and_stays_in_range() {
+    fn aspect_stays_a_circle_when_radius_velocity_is_large() {
         let mut engine = OrbEngine::idle();
-        let mut moved = false;
-        for _ in 0..40 {
-            let sample = engine.step(OrbMotion::Speaking, 0.22, 1.0, DisplayHz::Hz240.dt_s());
+        for i in 0..80 {
+            let target = if i % 2 == 0 { 0.05 } else { 0.24 };
+            let sample = engine.step(OrbMotion::Speaking, target, 1.0, DisplayHz::Hz60.dt_s());
             assert_draw(sample);
-            if (sample.aspect - 1.0).abs() > 1e-4 {
-                moved = true;
-            }
+            assert!((sample.aspect - 1.0).abs() < 1e-6, "{}", sample.aspect);
         }
-        assert!(moved, "aspect {}", engine.aspect());
+        assert!((engine.aspect() - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn mode_change_does_not_snap_the_gain() {
+        let mut engine = OrbEngine::idle();
+        let before = engine.omega;
+        let _ = engine.step(OrbMotion::Speaking, 0.20, 0.9, DisplayHz::Hz60.dt_s());
+        let aim = OrbMotion::Speaking.radius_gain().omega;
+        let idle = OrbMotion::Idle.radius_gain().omega;
+        assert!(
+            (engine.omega - before).abs() < (aim - idle) * 0.2,
+            "omega snapped from {before} to {}",
+            engine.omega
+        );
+        assert!(engine.omega < idle + (aim - idle) * 0.25);
     }
 
     #[test]
@@ -675,57 +649,7 @@ mod tests {
         let sample = engine.step(OrbMotion::Listening, 0.14, 0.96, DisplayHz::Hz240.dt_s());
         let json = sample.to_json();
         assert!(json.contains("\"motion\":\"listening\""));
-        assert!(json.contains("\"profile\":\"luti\""));
         assert!(json.contains("\"dt_s\":"));
-        assert!(json.contains("\"frames\":1"));
-        assert!(json.contains("\"cost_hint\":48"));
         assert!(json.starts_with('{') && json.ends_with('}'));
-    }
-
-    #[test]
-    fn luti_account_counts_accepted_steps_at_240() {
-        assert_eq!(DisplayHz::Hz240.hz(), 240);
-        assert!((DisplayHz::Hz240.dt_s() - (1.0 / 240.0)).abs() < 1e-6);
-        let mut engine = OrbEngine::at_rest(0.18, 0.90);
-        assert_eq!(engine.account(), OrbAccount::empty());
-        let sample = engine.step(OrbMotion::Speaking, 0.18, 0.90, DisplayHz::Hz240.dt_s());
-        assert_draw(sample);
-        assert_eq!(sample.account.frames, 1);
-        assert_eq!(sample.account.cost_hint, Luti::STEP_COST);
-        assert!((sample.account.last_dt_s - DisplayHz::Hz240.dt_s()).abs() < 1e-6);
-        assert!(sample.account.settle_err < 1e-4, "err {}", sample.account.settle_err);
-        let witness = sample.account.to_json(DisplayHz::Hz240.hz());
-        assert!(witness.contains("\"profile\":\"luti\""));
-        assert!(witness.contains("\"hz\":240"));
-        assert!(witness.contains("\"frames\":1"));
-        assert!(witness.contains("\"cost_hint\":48"));
-
-        let mut moving = OrbEngine::idle();
-        let moved = moving.step(OrbMotion::Speaking, 0.20, 0.95, DisplayHz::Hz240.dt_s());
-        assert!(moved.account.settle_err > 1e-3);
-        for _ in 0..239 {
-            moving.step(OrbMotion::Speaking, 0.20, 0.95, DisplayHz::Hz240.dt_s());
-        }
-        assert_eq!(moving.account().frames, 240);
-        assert_eq!(moving.account().cost_hint, Luti::STEP_COST);
-        assert!((moving.account().last_dt_s - DisplayHz::Hz240.dt_s()).abs() < 1e-6);
-    }
-
-    #[test]
-    fn refused_step_does_not_increment_the_luti_account() {
-        let mut engine = OrbEngine::idle();
-        let first = engine.step(OrbMotion::Idle, 0.12, 0.9, DisplayHz::Hz240.dt_s());
-        assert_eq!(first.account.frames, 1);
-        let err = first.account.settle_err;
-        let held = engine.step(OrbMotion::Idle, f32::NAN, 0.9, DisplayHz::Hz60.dt_s());
-        assert_eq!(held.account.frames, 1);
-        assert_eq!(held.dt_s, 0.0);
-        assert_eq!(held.account.last_dt_s, 0.0);
-        assert_eq!(held.account.cost_hint, 0);
-        assert_eq!(held.account.settle_err, err);
-        assert!(held.account.settle_err.is_finite());
-        let zero = engine.step(OrbMotion::Listening, 0.14, 0.9, 0.0);
-        assert_eq!(zero.account.frames, 1);
-        assert_eq!(zero.account.cost_hint, 0);
     }
 }

@@ -396,6 +396,11 @@ mod tests {
         assert!(SCREEN_HTML.contains("POST /turn"));
         assert!(SCREEN_HTML.contains("function spring"));
         assert!(SCREEN_HTML.contains("samplePlayEnv"));
+        assert!(SCREEN_HTML.contains("function empathy"));
+        assert!(SCREEN_HTML.contains("createRadialGradient"));
+        assert!(SCREEN_HTML.contains("#F5F5F7"));
+        assert!(SCREEN_HTML.contains("MARK.strokePx"));
+        assert!(!SCREEN_HTML.contains("rV*6"), "aspect squash must stay gone");
         assert!(SCREEN_HTML.contains("V2 orb"));
         assert!(SCREEN_HTML.contains("id=\"s\""));
         assert!(SCREEN_HTML.contains("data-mark=\"orb\""));
@@ -403,8 +408,8 @@ mod tests {
         assert!(SCREEN_HTML.contains("const LUTI="));
         assert!(SCREEN_HTML.contains("const SPRING=LUTI"));
         assert!(SCREEN_HTML.contains(&format!("LUTI_COST={}", galion_render::Luti::STEP_COST)));
-        assert!(SCREEN_HTML.contains("ellipse"));
-        assert!(SCREEN_HTML.contains("240 Hz"));
+        assert!(SCREEN_HTML.contains("not an ellipse"));
+        assert!(SCREEN_HTML.contains("MARK.core"));
         assert!(!SCREEN_HTML.contains("react") && !SCREEN_HTML.contains("vue") && !SCREEN_HTML.contains("svelte"));
         assert!(!SCREEN_HTML.contains("from \"react\"") && !SCREEN_HTML.contains("from 'vue'"));
         assert!(SCREEN_HTML.contains("Razgovarate s umjetnom inteligencijom. Galion je AI asistent, a ne osoba."));
@@ -413,9 +418,7 @@ mod tests {
         assert!(SCREEN_HTML.contains("fetch(\"session\""));
         assert!(SCREEN_HTML.contains("X-Galion-Session"));
         assert!(!SCREEN_HTML.contains("?token=") && !SCREEN_HTML.contains("?session="));
-        assert!(SCREEN_HTML.contains("EMPATHY_WASH=0.5"));
-        assert!(SCREEN_HTML.contains("EMPATHY_DESAT=0.55"));
-        assert!(SCREEN_HTML.contains("cx.fillStyle=\"#\"+hex(TOK.dot)"));
+        assert!(SCREEN_HTML.contains("function markInner"));
         assert!(SCREEN_HTML.contains("dot:\"#F5F5F7\""));
         assert!(!SCREEN_HTML.contains("#B695CF"), "heather is not painted; the lock keeps the circle");
     }

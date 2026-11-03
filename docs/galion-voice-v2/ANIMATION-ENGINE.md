@@ -6,9 +6,11 @@ the note for the Rust foundation that landed beside it. It is not V3.
 There is no separate white paper in this repository. This file is the
 engine note. Motion contract: `ORB.md`. Brand: `docs/brand/GALION-VOICE-BRAND.md`.
 
-The mark stays one filled orb. Fill `#F5F5F7`, ground `#0A0A0C`, wash
-amber `#F5A524` → violet `#7C3AED` on the background only.
-`chrome_allowed = false`. `LOCKS.toml` `[ui]` is not edited.
+The mark stays one orb. The phone paints `#F5F5F7` as the body of a
+near-white gradient (brightness is glow and a little size, not a pigment
+multiply). Ground `#0A0A0C`, wash amber `#F5A524` → violet `#7C3AED` on the
+background only. `chrome_allowed = false`. `LOCKS.toml` `[ui]` is not edited.
+Aspect is held at 1.
 
 ## Two clocks
 
@@ -65,21 +67,24 @@ p = p + v h
 ```
 
 Radius and brightness are two independent springs. Brightness uses
-`w * 0.85` and `min(1.2, z + 0.08)`, as the page does. Aspect is not a
-third spring. A little radius velocity becomes ellipse squash, then an
-exponential ease (`dt` in milliseconds, time constant 90 ms), clamped at
-draw to `0.82..=1.18`. Still one filled shape.
+`w * 0.85` and `min(1.2, z + 0.08)`, as the page does, from the *eased*
+gain, not from the aim applied raw. Aspect is not a spring and is not a
+squash. It stays 1. The old `radius_velocity * 6` path (clamp ±0.14, draw
+clamp `0.82..=1.18`) made the phone flip between wide and tall ovals, including
+on an empty reply. That path is gone.
 
 Gains are the **Luti** profile (the page's `LUTI` table; `SPRING` is the
-same object). `Luti::radius` / `Luti::brightness` in `orb_engine.rs`:
+same object). `OrbEngine::step` eases toward the aim with a 480 ms time
+constant, matching `GAIN_TAU` on the page, so a mode change does not snap
+ω and ζ. `Luti::radius` / `Luti::brightness` in `orb_engine.rs`:
 
 | Motion | `w` | `z` | What it feels like |
 |---|---|---|---|
-| idle | 2.4 | 0.86 | Slow breath. Soft. |
-| listening | 11 | 0.70 | Opens with the microphone. |
-| thinking | 6.5 | 0.48 | Tighter pulse while a turn is in flight. |
-| speaking | 18 | 0.58 | Follows the voice that is playing. |
-| offline | 3.2 | 1.05 | Small and still when `/dot` has gone quiet. |
+| idle | 1.8 | 0.92 | Slow breath. Soft. |
+| listening | 3.4 | 0.88 | Opens with the microphone. |
+| thinking | 2.4 | 0.90 | Quiet pulse while a turn is in flight. |
+| speaking | 3.0 | 0.92 | Follows a low-passed envelope. A circle. |
+| offline | 2.0 | 1.02 | Small and still when `/dot` has gone quiet. |
 
 Thinking and offline are motions. They are not `DotState` values.
 `dot_states` in `LOCKS.toml` stays idle / listening / speaking. Rika
@@ -96,7 +101,7 @@ also fires when `dt` is 0; the Rust step does not. A non-finite target
 holds the last finite pose. The page can return NaN when `target` is NaN.
 The Rust step must not.
 
-Draw clamps: radius `0..=0.5`, brightness `0..=1`, aspect `0.82..=1.18`.
+Draw clamps: radius `0..=0.5`, brightness `0..=1`, aspect `1` (a circle).
 The integrator position may sit slightly outside that for one overshoot.
 Targets are clamped into the legal range before the force is computed, so
 a bad number cannot wind the spring up.
