@@ -7,7 +7,8 @@
 //! Samantha when the weight rises. Samantha does not borrow his dryness.
 //!
 //! The reference path does not denoise. [`STRIP_REFERENCE_TEXTURE`] stays false.
-//! Jarvis keeps the Tony Stark hub bed (clicks, alarms, room tone) as character.
+//! Jarvis's Tony Stark hub bed (clicks, alarms, room tone) is a character layer
+//! on the me band. It is toggleable. It never reads or writes caller audio.
 
 use crate::express::{Oklch, ProsodyControl, StubExpressor};
 use crate::frame::{Affect, EmotionFrame};
@@ -16,6 +17,8 @@ use crate::frame::{Affect, EmotionFrame};
 pub const STRIP_REFERENCE_TEXTURE: bool = false;
 /// Empathy is the live weight. There is no scripted line to speak.
 pub const CANNED_EMPATHY: bool = false;
+/// Peak of a hub click on the me band, before the frame's loudness scale.
+pub const HUB_GAIN: f32 = 0.04;
 
 /// Register the heartbeat is speaking in. Not a film checkpoint.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -44,6 +47,51 @@ pub enum Manner {
     Shared,
 }
 
+/// Hub clicks, alarms, and room tone for Jarvis. Not a denoise, and not the caller.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct HubLayer {
+    /// True only for Jarvis when the host has the layer on.
+    pub enabled: bool,
+    /// 0 when the layer is off. [`HUB_GAIN`] when it is on.
+    pub gain: f32,
+}
+
+impl HubLayer {
+    /// Samantha has no bed. Jarvis has one when `on` is true. Default in
+    /// [`Feeling::live`] is on, so the character is present until the host mutes it.
+    pub fn character(persona: VoicePersona, on: bool) -> Self {
+        if persona == VoicePersona::Jarvis && on {
+            Self { enabled: true, gain: HUB_GAIN }
+        } else {
+            Self { enabled: false, gain: 0.0 }
+        }
+    }
+
+    /// Add the bed to `me`. Caller audio is not an argument and is not touched.
+    /// Off is a no-op, so muting the layer does not rewrite the reference.
+    pub fn mix_me(self, me: &mut [f32]) {
+        if !self.enabled || !(self.gain > 0.0) || me.is_empty() {
+            return;
+        }
+        let n = me.len();
+        let click = n / 8;
+        let alarm = n / 2;
+        if click < n {
+            me[click] = (me[click] + self.gain).clamp(-1.0, 1.0);
+        }
+        if alarm < n && alarm != click {
+            me[alarm] = (me[alarm] + self.gain * 0.65).clamp(-1.0, 1.0);
+        }
+        let mut i = 0;
+        while i < n {
+            if i != click && i != alarm {
+                me[i] = (me[i] + self.gain * 0.08).clamp(-1.0, 1.0);
+            }
+            i = i.saturating_add(64);
+        }
+    }
+}
+
 /// Feeling band for one frame. Copy, stack only. No text.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Feeling {
@@ -55,8 +103,8 @@ pub struct Feeling {
     /// Amber share of the background wash. Not a circle colour.
     pub wash_amber: f32,
     pub manner: Manner,
-    /// Jarvis reference keeps hub clicks, alarms, and room tone.
-    pub hub_texture: bool,
+    /// Character bed. Separate from the you band.
+    pub hub: HubLayer,
     /// Control tokens may exist later. Jarvis is always false. Piper must not speak them.
     pub tags: bool,
 }
@@ -74,14 +122,20 @@ const JARVIS_E0: Column = (-0.3, 0.92, 0.96, 0.92, 0.42, 80.0, 0.28);
 const JARVIS_E1: Column = (-0.4, 0.90, 0.94, 0.88, 0.55, 120.0, 0.50);
 
 impl Feeling {
-    /// Persona at rest. e = 0, neutral mark, no empathy colour.
+    /// Persona at rest. e = 0, neutral mark, no empathy colour. Hub layer on for Jarvis.
     pub fn rest(persona: VoicePersona) -> Self {
         Self::live(persona, None)
     }
 
-    /// One consented caller frame → this persona's conduct.
+    /// One consented caller frame → this persona's conduct. Jarvis hub layer on.
     /// `None` is no frame (no consent, or nothing to answer): e stays 0.
     pub fn live(persona: VoicePersona, caller: Option<&EmotionFrame>) -> Self {
+        Self::conduct(persona, caller, true)
+    }
+
+    /// Same as [`Self::live`], with the hub layer forced on or off.
+    /// The flag does not change `e`, OKLCH, or prosody. Samantha stays silent either way.
+    pub fn conduct(persona: VoicePersona, caller: Option<&EmotionFrame>, hub_on: bool) -> Self {
         let color = StubExpressor.voice_color(caller);
         let e = color.e;
         let (lo, hi) = match persona {
@@ -103,7 +157,7 @@ impl Feeling {
             prosody,
             wash_amber: lerp(lo.6, hi.6, e),
             manner,
-            hub_texture: persona == VoicePersona::Jarvis,
+            hub: HubLayer::character(persona, hub_on),
             tags: persona == VoicePersona::Samantha,
         }
     }
@@ -154,9 +208,10 @@ mod tests {
         assert_eq!(s.e, 0.0);
         assert_eq!(s.manner, Manner::Plain);
         assert_eq!(s.oklch, NEUTRAL_OKLCH);
-        assert!(!s.hub_texture);
+        assert!(!s.hub.enabled);
         assert!(s.tags);
-        assert!(j.hub_texture);
+        assert!(j.hub.enabled);
+        assert!((j.hub.gain - HUB_GAIN).abs() < 1e-6);
         assert!(!j.tags);
         assert!((j.prosody.warmth - 0.42).abs() < 1e-4);
         assert_eq!(j.prosody.pre_pause_ms, 80);
@@ -199,7 +254,33 @@ mod tests {
         assert_eq!(j.prosody.pre_pause_ms, 120);
         assert!(j.prosody.warmth < s.prosody.warmth);
         assert!(j.prosody.pre_pause_ms < s.prosody.pre_pause_ms);
-        assert!(j.hub_texture);
+        assert!(j.hub.enabled);
+    }
+
+    #[test]
+    fn hub_layer_toggles_without_touching_caller_audio() {
+        let caller = frame(-0.6, 0.2, 0.4, 1.0);
+        let on = Feeling::conduct(VoicePersona::Jarvis, Some(&caller), true);
+        let off = Feeling::conduct(VoicePersona::Jarvis, Some(&caller), false);
+        assert!(on.hub.enabled);
+        assert!(!off.hub.enabled);
+        assert_eq!(off.hub.gain, 0.0);
+        assert_eq!(on.e, off.e);
+        assert_eq!(on.oklch, off.oklch);
+        assert_eq!(on.prosody, off.prosody);
+        let forced = Feeling::conduct(VoicePersona::Samantha, Some(&caller), true);
+        assert!(!forced.hub.enabled, "samantha has no hub bed to enable");
+
+        let you = [0.25f32; 128];
+        let you_before = you;
+        let mut me = [0.0f32; 128];
+        on.hub.mix_me(&mut me);
+        assert_eq!(you, you_before, "mix_me has no caller buffer");
+        assert!(me.iter().any(|s| *s != 0.0));
+        let mut muted = [0.0f32; 128];
+        off.hub.mix_me(&mut muted);
+        assert!(muted.iter().all(|s| *s == 0.0));
+        assert!(!STRIP_REFERENCE_TEXTURE);
     }
 
     #[test]

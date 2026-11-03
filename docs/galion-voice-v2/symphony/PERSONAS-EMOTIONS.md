@@ -66,14 +66,15 @@ Sounds:
 - **Answered.** Still lower, still slower, still quieter. Warmth stops at 0.55. The pause grows to 120 ms, not to her 250. He does not become warm in her way. Anger is answered by steadiness. Pitch does not rise.
 - **Shared.** Joy does not brighten him. Pitch stays −0.3 st. Amusement, when the words earn it, is one dry clause, then the fact. The heartbeat carries the manner. It does not write the clause.
 - **Tags.** Off on every backend.
-- **Hub texture.** The Jarvis reference carries the Tony Stark hub: clicks, alarms, and room tone. That bed is character. `hub_texture` is true. `STRIP_REFERENCE_TEXTURE` is false. This path has no denoise step and will not grow one to "clean him up."
+- **Hub layer.** The Jarvis reference carries the Tony Stark hub: clicks, alarms, and room tone. That bed is character. `STRIP_REFERENCE_TEXTURE` is false: nothing denoises the reference. At runtime the bed is a separate me-band layer (`HubLayer`). It defaults on. `Heartbeat::set_hub_layer(false)` mutes it. Muting does not rewrite the reference and does not touch the you band. Samantha has no bed; turning the flag on does not give her one. The one-dot page does not grow a control for this. The host sets it.
 
 What he does not say, at any `e`: "I know this is difficult." "I'm worried about you." "Take a deep breath." A high weight only makes him quieter. The words stay on the task.
 
 ## Where the numbers live
 
 - Conduct: `galion-emotion/src/persona.rs` (`Feeling::live`).
-- Heartbeat: `crates/galion-heartbeat/src/lib.rs` (`FrameOut.feeling`, `voice_prosody`).
+- Heartbeat: `crates/galion-heartbeat/src/lib.rs` (`FrameOut.feeling`, `voice_prosody`, `set_hub_layer`).
+- Hub mix: `HubLayer::mix_me` writes the me band only. The demo calls it after `step`, and does not pass `you`.
 - Voice drafts, same columns: `docs/galion-voice-v2/personas/voice/samantha.toml`, `jarvis.toml`.
 - Behaviour prose: `docs/galion-voice-v2/personas/SAMANTHA.md`, `JARVIS.md`.
 - Weight and colour: `docs/galion-voice-v2/EMPATHY.md`.

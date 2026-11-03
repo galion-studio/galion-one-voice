@@ -213,14 +213,14 @@ fn feeling_tracks_live_empathy_inside_step() {
     assert!((off.feeling.e - 1.0).abs() < 1e-6);
     assert_eq!(off.feeling.manner, Manner::Answered);
     assert_eq!(off.feeling.persona, VoicePersona::Samantha);
-    assert!(!off.feeling.hub_texture);
+    assert!(!off.feeling.hub.enabled);
     assert_eq!(off.voice_prosody().pre_pause_ms, 250);
     assert_eq!(galion_heartbeat::FRAME_MS, 80);
 
     hb.set_persona(VoicePersona::Jarvis);
     let jar = hb.step(&frame_with(&pcm, Some(tired()), consent_bits::SENSE, false));
     assert_eq!(jar.feeling.persona, VoicePersona::Jarvis);
-    assert!(jar.feeling.hub_texture);
+    assert!(jar.feeling.hub.enabled);
     assert!((jar.feeling.prosody.warmth - 0.55).abs() < 1e-4);
     assert_eq!(jar.feeling.prosody.pre_pause_ms, 120);
     assert!((jar.voice_prosody().pitch_shift_st - -0.4).abs() < 1e-4);
@@ -230,6 +230,36 @@ fn feeling_tracks_live_empathy_inside_step() {
     let quiet = hb.step(&frame_with(&pcm, Some(tired()), 0, false));
     assert_eq!(quiet.feeling.e, 0.0, "no SENSE, no empathy");
     assert_eq!(quiet.feeling.manner, Manner::Plain);
+}
+
+#[test]
+fn feeling_hub_toggle_leaves_user_audio_and_prosody() {
+    let you = vec![0.2f32; FRAME_SAMPLES];
+    let snapshot = you.clone();
+    let mut hb = Heartbeat::new(HeartbeatConfig::default(), granted());
+    hb.set_persona(VoicePersona::Jarvis);
+    let on = hb.step(&frame_with(&you, Some(tired()), consent_bits::SENSE, false));
+    assert!(on.feeling.hub.enabled);
+    let mut me = vec![0.0f32; 128];
+    on.feeling.hub.mix_me(&mut me);
+    assert!(me.iter().any(|s| *s != 0.0));
+    assert_eq!(you, snapshot);
+
+    hb.set_hub_layer(false);
+    let off = hb.step(&frame_with(&you, Some(tired()), consent_bits::SENSE, false));
+    assert!(!off.feeling.hub.enabled);
+    assert_eq!(off.feeling.e, on.feeling.e);
+    assert_eq!(off.feeling.prosody, on.feeling.prosody);
+    let mut muted = vec![0.0f32; 128];
+    off.feeling.hub.mix_me(&mut muted);
+    assert!(muted.iter().all(|s| *s == 0.0));
+    assert_eq!(you, snapshot);
+
+    hb.set_persona(VoicePersona::Samantha);
+    hb.set_hub_layer(true);
+    let sam = hb.step(&frame_with(&you, Some(tired()), consent_bits::SENSE, false));
+    assert!(!sam.feeling.hub.enabled);
+    assert_eq!(you, snapshot);
 }
 
 #[test]
@@ -258,7 +288,7 @@ fn feeling_step_fits_the_cpu_tick() {
     let t0 = std::time::Instant::now();
     for _ in 0..n {
         let out = hb.step(&input);
-        assert!(out.feeling.hub_texture);
+        assert!(out.feeling.hub.enabled);
         assert!(out.feeling.e > 0.9);
     }
     let elapsed = t0.elapsed();

@@ -213,6 +213,8 @@ fn run<T: TimingFeed, A: AffectFeed>(args: &[String], mut pump: DemoPump<T, A>, 
                 fill_me(&mut me, i, me_voiced, out.me_gain());
             }
         }
+        // Jarvis hub bed on the me band only. Caller samples in `you` are not passed in.
+        out.feeling.hub.mix_me(&mut me);
         // Persona loudness from this frame's feeling. Rika's me_gain is already in the synthetic fill.
         let loud = out.feeling.prosody.energy;
         if loud != 1.0 {

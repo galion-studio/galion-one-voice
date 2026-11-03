@@ -31,6 +31,8 @@
 //! live galion-emotion weight (OKLCH + persona prosody) for Samantha or Jarvis.
 //! It is computed inside [`Heartbeat::step`] from the consented caller frame.
 //! No phrase table. No accelerator. A missing SENSE bit clears it to rest.
+//! Jarvis's hub bed is a me-band layer. [`Heartbeat::set_hub_layer`] toggles it
+//! between frames. `step` does not mix it into `you_pcm`.
 
 use galion_emotion::band::consent_bits;
 use galion_emotion::{
@@ -167,6 +169,8 @@ pub struct Heartbeat<G: ConsentGate> {
     paused_frames: u32,
     persona: VoicePersona,
     feeling: Feeling,
+    /// Jarvis hub bed. Default on. Samantha ignores it. Not applied to `you_pcm`.
+    hub_on: bool,
 }
 
 impl<G: ConsentGate> Heartbeat<G> {
@@ -183,6 +187,7 @@ impl<G: ConsentGate> Heartbeat<G> {
             paused_frames: 0,
             persona,
             feeling: Feeling::rest(persona),
+            hub_on: true,
         }
     }
 
@@ -194,7 +199,7 @@ impl<G: ConsentGate> Heartbeat<G> {
         self.index = 0;
         self.pending = neutral_output(0, Some(OffReason::Disabled));
         self.paused_frames = 0;
-        self.feeling = Feeling::rest(self.persona);
+        self.feeling = Feeling::conduct(self.persona, None, self.hub_on);
     }
 
     /// Register for the next frames. Not called inside [`Self::step`].
@@ -204,6 +209,16 @@ impl<G: ConsentGate> Heartbeat<G> {
 
     pub fn persona(&self) -> VoicePersona {
         self.persona
+    }
+
+    /// Jarvis character bed. `false` mutes the layer. It does not denoise a
+    /// reference and it does not change caller audio. Not called inside [`Self::step`].
+    pub fn set_hub_layer(&mut self, on: bool) {
+        self.hub_on = on;
+    }
+
+    pub fn hub_layer_on(&self) -> bool {
+        self.hub_on
     }
 
     pub fn gate(&self) -> &G {
@@ -277,12 +292,15 @@ impl<G: ConsentGate> Heartbeat<G> {
 
         // Feeling is the same 80 ms step. SENSE off → rest. A late frame holds.
         let sense = input.consent_bits & consent_bits::SENSE != 0;
+        let hub_on = self.hub_on;
         if !sense {
-            self.feeling = Feeling::rest(self.persona);
+            self.feeling = Feeling::conduct(self.persona, None, hub_on);
         } else if !paused {
-            self.feeling = Feeling::live(self.persona, seen.as_ref());
+            self.feeling = Feeling::conduct(self.persona, seen.as_ref(), hub_on);
         } else if self.feeling.persona != self.persona {
-            self.feeling = Feeling::rest(self.persona);
+            self.feeling = Feeling::conduct(self.persona, None, hub_on);
+        } else {
+            self.feeling.hub = galion_emotion::HubLayer::character(self.persona, hub_on);
         }
 
         let applied = core::mem::replace(&mut self.pending, decided);
