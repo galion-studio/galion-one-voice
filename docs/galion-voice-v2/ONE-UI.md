@@ -89,4 +89,11 @@ scripts/one-ui.sh --venv
 
 Do not point the orb at that environment. It does not run the mark.
 
+## Auto-record
+
+After the first tap the microphone stays open. Speech starts the take.
+Quiet ends it. The page then proceeds on the same `POST /turn`. There is
+no second button and no second AI page. The workflow is
+`docs/galion-voice-v2/symphony/AUTO-WORKFLOW.md`.
+
 — Maciej Grajczyk

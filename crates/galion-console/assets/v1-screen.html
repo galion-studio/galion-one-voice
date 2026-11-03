@@ -13,7 +13,9 @@
      V1 voice pipeline (supersedes the UX-01 "no raw audio leaves the page" note, per Maciej):
        mic level  → POST /mic  {rms,t[,playing]} every ~80 ms (drives the dot, unchanged)
        utterance  → POST /turn  audio/wav (16 kHz mono 16-bit PCM), cut on-device by VAD
-                    (~640 ms quiet after speech). Headers: X-Turn-Id, X-Sample-Rate, X-Barge-In.
+                    (~640 ms quiet after speech). That end is the auto-record. proceedTurn
+                    posts the same /turn with X-Galion-Proceed: auto. No second page.
+                    Headers: X-Turn-Id, X-Sample-Rate, X-Barge-In, X-Galion-Proceed.
        reply      ← /dot JSON gains reply:{id,url,ms}; page fetches the WAV and plays it through
                     the AudioContext unlocked by the tap. User speech during playback = barge-in:
                     playback stops at once and the new utterance is captured.
@@ -539,7 +541,13 @@ function vadFrame(f){
 function endUtterance(){
   const frames=utt, ok=vadSpeechMs>=MIN_SPEECH_MS, barge=uttBarge;
   vadOn=false; vadRun=0; vadQuiet=0; vadSpeechMs=0; uttMs=0; utt=[]; uttBarge=false;
-  if(ok) postTurn(frames,barge);
+  if(ok) proceedTurn(frames,barge);
+}
+
+// The take is already cut. Proceed on the same POST /turn. Nothing new is drawn.
+function proceedTurn(frames,barge){
+  cv.dataset.proceed="auto";
+  postTurn(frames,barge);
 }
 
 function encodeWav(frames,sr){
@@ -561,7 +569,7 @@ function postTurn(frames,barge){
   const watch=turnsInFlight;
   fetch("turn",{method:"POST",cache:"no-store",body:wav,headers:sessionHeaders({
       "Content-Type":"audio/wav","X-Turn-Id":id,"X-Sample-Rate":String(CAP_SR),
-      "X-Barge-In":barge?"1":"0"})})
+      "X-Barge-In":barge?"1":"0","X-Galion-Proceed":"auto"})})
     .then(r=>{ if(!r.ok&&r.status!==404){ turnsInFlight=Math.max(0,turnsInFlight-1); showErr("Voice turn failed ("+r.status+")."); } else showErr(""); })
     .catch(()=>{ turnsInFlight=Math.max(0,turnsInFlight-1); });
   setTimeout(()=>{ if(!playing&&turnsInFlight>=watch) turnsInFlight=Math.max(0,turnsInFlight-1); }, 20000);
