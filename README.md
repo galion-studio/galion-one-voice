@@ -70,7 +70,8 @@ for V2 voice work is local Chatterbox cloning, not a cloud API
 ([VOICE-CLONING.md](docs/galion-voice-v2/VOICE-CLONING.md)). No film audio
 is in this repo. The clearance checklist for those two film voices is
 [RIGHTS-CLEARANCE.md](docs/galion-voice-v2/RIGHTS-CLEARANCE.md). Both gates
-are closed.
+are closed. The closed ingest outline is
+[CLIP-INGEST.md](docs/galion-voice-v2/CLIP-INGEST.md).
 
 ## Run the demo
 

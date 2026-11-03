@@ -637,7 +637,8 @@ film *Her*) are **owner-directed research targets**. Rights, consent, and
 licence must be cleared before any clip is ingested or any public demo uses
 a clone. This repository does not fetch film audio and does not store a clip.
 The per-persona checklist and the LEDGER paste templates are
-`RIGHTS-CLEARANCE.md`. Both gates are closed.
+`RIGHTS-CLEARANCE.md`. Both gates are closed. The closed outline of that
+ingest is `CLIP-INGEST.md`.
 
 **Architecture to adopt, not to vendor.** Resemble AI Chatterbox, MIT for
 the code in `resemble-ai/chatterbox` (copyright 2025 Resemble AI, read
@@ -732,7 +733,7 @@ This program does not SSH, and it does not download a model.
 - Titanaxe access codes. Status is approved-pending-setup. The human installs per-user anonymized codes on `51.38.137.193`. No shared key. No deploy from this program.
 - The Vosk sidecar, its sha256 pin, and any later Vosk line in LOCKS. Letter A is chosen. `interim` stays until the WER bar.
 - espeak-ng counsel. The Piper exception text is already in LOCKS, sunset `2027-02-01`.
-- Rights clearance before any Jarvis or Samantha reference clip. Checklist: `docs/galion-voice-v2/RIGHTS-CLEARANCE.md`. Both gates are closed. No film audio is fetched here.
+- Rights clearance before any Jarvis or Samantha reference clip. Checklist: `docs/galion-voice-v2/RIGHTS-CLEARANCE.md`. Both gates are closed. No film audio is fetched here. The closed process is `CLIP-INGEST.md`.
 - Chatterbox generate against a real reference. The t230u pin allows an out-of-process worker. The stub does not call generate, and CI does not fetch weights.
 - Whether the hint line and a `thinking` state may exist on the locked surface.
 - The public-demo GDPR notice, and the exact origin string once a name exists. Login and "no wildcard on staging" are decided.

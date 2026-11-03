@@ -27,7 +27,8 @@ and written in `LEDGER.md`:
 - calling a clone worker with that clip
 - a public demo that speaks in either voice
 
-This change does not fetch audio and does not add a clip.
+This change does not fetch audio and does not add a clip. The closed
+ingest outline is `CLIP-INGEST.md`. It does not clear the hold.
 
 The boxes for each persona, and the LEDGER lines to paste when a gate
 actually opens, are `docs/galion-voice-v2/RIGHTS-CLEARANCE.md`. Writing
@@ -124,7 +125,7 @@ or ingest a clip. Replaces the external-API swarm, which is dropped.
 | 5 | Zero-shot ~10 s conditioning, no fine-tune | `docs/galion-voice-v2/VOICE-CLONING.md` | planned-not-spawned |
 | 6 | Jarvis research-target mapping | `docs/galion-voice-v2/VOICE-CLONING.md` | planned-not-spawned |
 | 7 | Samantha tags and emotional register | `docs/galion-voice-v2/VOICE-CLONING.md` | planned-not-spawned |
-| 8 | Rights, consent, licence gate | `docs/galion-voice-v2/RIGHTS-CLEARANCE.md` | checklist written; both gates closed |
+| 8 | Rights, consent, licence gate | `docs/galion-voice-v2/RIGHTS-CLEARANCE.md` and `docs/galion-voice-v2/CLIP-INGEST.md` | checklist written; both gates closed; ingest outline only, gate not opened |
 | 9 | Art. 50 watermark note (no Perth vendor) | `docs/galion-voice-v2/VOICE-CLONING.md` | planned-not-spawned |
 | 10 | Piper fallback and warm-worker shape | `docs/galion-voice-v2/CLONE-WORKER.md` | scaffolded; Piper speaks when the clone slot is absent |
 | 11 | TTFA eval plan (no measurement) | `docs/galion-voice-v2/FLASH-EVAL.md` | harness prints `measured: false` until a flagged run |
