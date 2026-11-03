@@ -20,6 +20,8 @@
 //! playback (feature `wav-mic`, galion-presence loader) and the stubbed live mic.
 //! The [`dotviz`] module (feature `dot-viz`, W21-04) bridges heartbeat `FrameOut` →
 //! galion-render one dot (PNG / terminal / web) + live timing / emotion bars.
+//! [`v2v`] (same feature) is the voice-to-voice outline called after `step`:
+//! Vosk final, instruction reply, Nano request, Jarvis hub mix at playback.
 //! The [`turn_worker`] module (feature `phone-turn`) runs PhoneLane off the 80 ms thread.
 //! [`phone_host`] (same feature) is what the screen demo polls each tick.
 //! The [`bus`] module (same feature) is the V2-S1 envelope: `BusMsg` lanes next to
@@ -29,6 +31,8 @@
 pub mod bus;
 #[cfg(feature = "dot-viz")]
 pub mod dotviz;
+#[cfg(feature = "dot-viz")]
+pub mod v2v;
 pub mod feeds;
 pub mod heartbeat;
 pub mod live;

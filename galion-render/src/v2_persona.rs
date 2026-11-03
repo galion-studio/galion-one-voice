@@ -146,6 +146,16 @@ impl Floor {
         self.id.as_str()
     }
 
+    /// Persona column at weight `e`. Words are not part of this read.
+    pub fn prosody_at(&self, e: f32) -> Prosody {
+        let e = if e.is_finite() { e.clamp(0.0, 1.0) } else { 0.0 };
+        let band = match self.id {
+            PersonaId::Samantha => &self.books.samantha,
+            PersonaId::Jarvis => &self.books.jarvis,
+        };
+        lerp_prosody(band.e0, band.e1, e)
+    }
+
     pub fn say(&mut self, text: &str, barge_flag: bool, e: f32, sense: bool) -> Say {
         self.say_turn(text, barge_flag, e, sense)
     }
@@ -168,7 +178,7 @@ impl Floor {
     fn finish(&mut self, reply: String, silence: bool, barge: bool, e: f32, sense: bool) -> Say {
         let reply = strip_tags(&reply);
         debug_assert!(
-            !contains_forbidden(&reply),
+            !is_canned_empathy(&reply),
             "forbidden empathy line in {reply:?}"
         );
         let band = match self.id {
@@ -583,7 +593,8 @@ fn lerp(a: f32, b: f32, t: f32) -> f32 {
     a + (b - a) * t
 }
 
-fn contains_forbidden(reply: &str) -> bool {
+/// True when `reply` carries a scripted empathy line. The feeling stays in `e`.
+pub fn is_canned_empathy(reply: &str) -> bool {
     let low = reply.to_ascii_lowercase();
     FORBIDDEN.iter().any(|p| low.contains(p))
 }
@@ -930,8 +941,23 @@ mod tests {
         assert!(b.samantha.wired && b.jarvis.wired);
     }
 
+    #[test]
+    fn canned_empathy_is_a_named_line_and_the_column_is_the_voice() {
+        assert!(is_canned_empathy("I hear you."));
+        assert!(is_canned_empathy("That sounds hard."));
+        assert!(!is_canned_empathy("Your mother died this morning."));
+        let floor = Floor::new();
+        let rest = floor.prosody_at(0.0);
+        assert!((rest.warmth - 0.62).abs() < 1e-3);
+        assert_eq!(rest.pre_pause_ms, 0);
+        let full = floor.prosody_at(1.0);
+        assert!((full.pitch_st - -0.5).abs() < 1e-3);
+        assert_eq!(full.pre_pause_ms, 250);
+        assert!((full.warmth - 0.75).abs() < 1e-3);
+    }
+
     fn no_script(s: &Say) {
-        assert!(!contains_forbidden(&s.reply), "{}", s.reply);
+        assert!(!is_canned_empathy(&s.reply), "{}", s.reply);
         assert!(!s.tags_in_reply, "{}", s.reply);
         assert!(!s.reply.contains('[') && !s.reply.contains(']'), "{}", s.reply);
         assert!(!s.film_voice && !s.clone_live);
