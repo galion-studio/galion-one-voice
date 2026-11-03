@@ -79,4 +79,6 @@
 3. **Persona.** PR #7 is on main (`5ab3d38`). `BusBody::Persona` is on that bus: depth 1, session opens as Samantha, explicit `turn_id` 0 survives barge-in, empathy needs `sense` and a cancelled turn restores the floor, a lower source does not override a higher one. `Heartbeat::step` does not send it. The turn worker reads the id onto the reply and does not draw it. Not a film voice.
 4. **Flash.** `docs/galion-voice-v2/FLASH-EVAL.md` and `scripts/eval/flash-ttfa.sh`. Default JSON is `measured: false` and has no `ttfa_ms`. No CPU number is claimed here.
 
+**2026-11-03 05:16 CET · Clip ingest outline.** Docs only. `docs/galion-voice-v2/CLIP-INGEST.md` records the closed process for one ~10 s Samantha reference and one ~10 s Jarvis reference: LEDGER rights before any fetch, store outside git (`GALION_CLIP_STORE` unset, not `weights/clone/`), consent line with no samples, sha256 only after a file exists, retention and deletion, worker handoff that today exits 3 on a clip key, Art. 50 disclosure left on, Perth watermark not vendored. No rights granted. No fetch. No file. No hash. `reference_clips` stays false. LOCKS.toml not edited. No model download.
+
 — Maciej Grajczyk

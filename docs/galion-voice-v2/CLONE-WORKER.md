@@ -71,5 +71,6 @@ Turbo swaps in `t3_turbo_v1.safetensors`. Repo ids: `ResembleAI/chatterbox-nano`
 Jarvis and Samantha, as film voices, stay on the hold in `VOICE-CLONING.md`.
 The persona id on this worker is the register from `SAMANTHA-V2.md` §4.
 It is not a conditioning clip. This scaffold does not fetch film audio.
+The ingest outline, still closed, is `CLIP-INGEST.md`.
 
 — Maciej Grajczyk
