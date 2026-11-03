@@ -106,16 +106,23 @@ date (Europe/Zagreb), what was run, result, and the fact that SSH was not used.
 
 These are copied forward from Plan V4 because they are still undone.
 
-- **H1.** Put an operator ed25519 public key on the VPS through the provider
-  console or rescue mode. User `galion`, `authorized_keys` mode 600, directory 700.
-  Confirm a second session before closing the one that installed it.
+- **H1.** **Approved-pending-setup** (2026-11-03, corrected by t198u).
+  A human installs **per-user anonymized access codes** on Titanaxe
+  `51.38.137.193`. Every user gets their own code. There is no shared
+  `galion` pubkey. This plan does not SSH, does not generate a code, and
+  does not store one. Confirm a second session before closing the one that
+  installed access.
 - **H2.** Public name: a DNS A record to `51.38.137.193`, or the sslip.io
   fallback written in the Titanaxe note. Set `GALION_ACME_EMAIL` to a real address.
-- **H3.** Demo open, or edge basic auth. The Caddy draft has the auth block commented.
+- **H3.** **Decided.** Staging and any public demo are behind login
+  (ngrok OAuth or basic auth). CORS is the exact `https://` origin only.
+  No wildcard. The local loopback demo may still omit `GALION_CORS_ORIGINS`.
+  The Caddy auth block stays the human's to enable. Do not commit a password.
 - **H4.** Owner approval to run a release. The dry-run script is the checklist,
   not the approval.
 
-Until H1 is done, "deploy" means section 4. An agent must not invent H1.
+Until the human finishes H1, "deploy" means section 4. An agent must not
+invent a code or a key. Approval is not a connection.
 
 ## 6. What "auto merge + deploy" means
 

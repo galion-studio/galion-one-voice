@@ -3,6 +3,7 @@
 This directory holds the plan scaffolding for the Galion Voice distilled student: PersonaPlex-7B distilled into a 1.0B model (S1), with 1.6B (S2) and 0.5B (S0) as alternates.
 
 **Status:** config stubs only. Nothing has been trained and no weights are included.
+Owner decision 2026-11-03: **S0** is the first size to attempt. S1 and S2 stay later. Canned replies remain the phone fallback until readiness tests pass.
 
 - **License:** the code and configs here are Perpetual Open MIT. Weights ship separately, with their own `LICENSE-WEIGHTS`.
 - **Weights:** exported as safetensors with a quant metadata table (primary path only; no foreign pack formats).

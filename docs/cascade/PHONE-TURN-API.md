@@ -1,10 +1,10 @@
 # Phone turn API (S4+S5+S6) — `galion_cascade::phone` (feature `cascade`)
 
-> ⚠ **S4 English ASR is NOT ratified.** See `docs/policy/RATIFY-EN-ASR-PHONE-PATH.md`
-> (A: Vosk out of process · B: A21 ONNX exception extended to ASR · C: hold stub until
-> native Whisper-tiny.en `.safetensors`). `GALION_ASR=interim` is a **placeholder**:
+> **S4 letter A is chosen** (Vosk, out of process, small-en, grammar mode for intents).
+> The sidecar is not built. `GALION_ASR=interim` is still a **placeholder**:
 > it does not recognise words; it returns a canned English transcript by utterance length.
-> No GGML, no LOCKS.toml change.
+> It stays until the WER bar. No GGML. The Vosk exception is not in `LOCKS.toml`.
+> See `docs/policy/RATIFY-EN-ASR-PHONE-PATH.md`.
 
 ```rust
 let mut lane = galion_cascade::PhoneLane::from_env();      // once per worker thread (Send)
