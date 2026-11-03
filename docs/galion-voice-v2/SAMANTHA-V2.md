@@ -332,7 +332,8 @@ story. That is the whole section.
 5. **Rights.** The Samantha and Jarvis names are registers under the
    V2-S14 hold. This spec does not clear a clip, a clone, a tag in a
    public demo, or a claim that the session speaks in those film voices.
-   The hold stands until you lift it in writing.
+   The hold stands until you lift it in writing. The boxes and the
+   LEDGER paste templates are `RIGHTS-CLEARANCE.md`. Both gates are closed.
 6. **Luti lean.** Are the `w` and `z` scales in §2 and §4 acceptable, or
    does the named table stay fixed and only the wash move?
 7. **Piper warmth.** `GALION_A21_NOISE=natural` is still open (V2-S6).

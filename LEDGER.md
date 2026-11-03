@@ -81,4 +81,6 @@
 
 **2026-11-03 · Voice persona instructions.** Runtime character files under `docs/galion-voice-v2/personas/`: Galion One (main product voice), Galion Research (product voice, ex-Hermes Research), Samantha and Jarvis (**TEST / INTERNAL**, clone-capability only, not shipping personas). Index: `personas/README.md`. One-line pointers from `GALION-VOICE-V2.md` and `SAMANTHA-V2.md`. Empathy stays the OKLCH weight plus prosody (`EMPATHY.md`); the instruction files forbid canned empathy lines. No audio assets. No clip. Rights not cleared. LOCKS.toml not edited. No weights. No clone worker. Signed Maciej Grajczyk.
 
+**2026-11-03 05:16 CET · V2-S14 rights-clearance checklist (docs only).** Both research targets: `docs/galion-voice-v2/RIGHTS-CLEARANCE.md`. Samantha (*Her*, 2014) and Jarvis (Iron Man film voice). Per-persona boxes for consent, film-clip rights, licence, and public-demo gates. Paste templates for a later private, public-demo, or refused line are in that file. **Neither gate is cleared.** No box is ticked. No film audio fetched. No model download. No clone run. No sha256 of a clip, because there is no clip. `reference_clips` stays false. Piper speaks. A register id (`SAMANTHA-V2.md`) is not a film voice. Not legal advice.
+
 — Maciej Grajczyk

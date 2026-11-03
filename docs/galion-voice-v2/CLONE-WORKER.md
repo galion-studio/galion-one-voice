@@ -69,6 +69,7 @@ Turbo swaps in `t3_turbo_v1.safetensors`. Repo ids: `ResembleAI/chatterbox-nano`
 ## Rights
 
 Jarvis and Samantha, as film voices, stay on the hold in `VOICE-CLONING.md`.
+The checklist is `RIGHTS-CLEARANCE.md`. Both gates are closed.
 The persona id on this worker is the register from `SAMANTHA-V2.md` §4.
 It is not a conditioning clip. This scaffold does not fetch film audio.
 
