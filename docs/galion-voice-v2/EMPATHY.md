@@ -55,6 +55,9 @@ This change does not edit the lock. The circle fill stays the locked colour,
 scaled only by brightness. `e` eases the existing amber `#F5A524` ↔ violet
 `#7C3AED` wash toward a half mix (`EMPATHY_WASH_AMBER = 0.5`) and lowers its
 saturation. Recolouring the circle needs an owner edit of the lock.
+A latched fault suspends this pull: the field becomes the locked amber →
+violet pair at full strength, and the circle stays `#F5F5F7`
+(`ERROR-STATE.md`). When the fault clears, this pull returns.
 
 ## Spectrum
 
