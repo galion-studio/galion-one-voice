@@ -660,6 +660,8 @@ governors, or service limits.
 calm command and interface layer. Both are research targets under the legal
 hold. They are not shipped voices.
 
+Character instructions: [`personas/`](personas/README.md).
+
 **LOCKS.** t230u wrote `[formats.exceptions.v2s14_chatterbox]`: PyTorch stays
 out of process, sunset `2027-02-01`, weights not vendored, no reference
 clips. Global `foreign_runtime_allowed` is still false. The A21 Piper pin
