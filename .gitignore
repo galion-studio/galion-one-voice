@@ -1,3 +1,28 @@
 /target
 __pycache__/
 *.pyc
+
+# Owner's indoor testing references — Samantha: no permission / copyright claims; Jarvis: Apache 2.0 unconfirmed with original creator — local testing only, remove later.
+# WAV and MP3 clone refs under personas/ stay local. .toml and .md stay tracked.
+# Text slots refs/samantha.placeholder and refs/jarvis.placeholder stay tracked (not audio).
+# A .placeholder dropped beside a clip is ignored.
+docs/galion-voice-v2/personas/refs/samantha.wav
+docs/galion-voice-v2/personas/refs/jarvis.wav
+docs/galion-voice-v2/personas/refs/*.wav
+docs/galion-voice-v2/personas/refs/*.wave
+docs/galion-voice-v2/personas/refs/*.mp3
+docs/galion-voice-v2/personas/refs/*.wav.placeholder
+docs/galion-voice-v2/personas/refs/*.mp3.placeholder
+docs/galion-voice-v2/personas/voice/*.wav
+docs/galion-voice-v2/personas/voice/*.wave
+docs/galion-voice-v2/personas/voice/*.mp3
+docs/galion-voice-v2/personas/**/*.wav
+docs/galion-voice-v2/personas/**/*.wave
+docs/galion-voice-v2/personas/**/*.mp3
+docs/galion-voice-v2/personas/**/*.wav.placeholder
+docs/galion-voice-v2/personas/**/*.mp3.placeholder
+docs/galion-voice-v2/personas/**/*.[Ww][Aa][Vv]
+docs/galion-voice-v2/personas/**/*.[Ww][Aa][Vv][Ee]
+docs/galion-voice-v2/personas/**/*.[Mm][Pp]3
+docs/galion-voice-v2/personas/**/*.[Ww][Aa][Vv].[Pp]laceholder
+docs/galion-voice-v2/personas/**/*.[Mm][Pp]3.[Pp]laceholder
