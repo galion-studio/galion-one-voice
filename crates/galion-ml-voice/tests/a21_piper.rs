@@ -13,6 +13,10 @@ fn a21_piper_speaks_deterministic_words_on_cpu() {
         return;
     };
     assert_eq!(st.id(), "present-verified", "{}", st.summary());
+    // This test is about the A21 slot. Pin it: with clone weights fetched on the
+    // host, `auto` would (correctly) pick the Chatterbox clone worker instead.
+    // Single test in this binary, so setting the env here does not race.
+    std::env::set_var("GALION_SPEECH", "a21");
     let mut s = SpeechStack::detect();
     assert!(matches!(s.backend, SpeechBackend::A21Weights { .. }), "{}", s.backend.label());
     assert_eq!(s.backend.speech_token(), "a21");
