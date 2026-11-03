@@ -29,6 +29,16 @@ jobs:
         run: scripts/eval/v2-hard-loop.sh --self-check
       - name: Jarvis hub texture (toggle and band check)
         run: scripts/eval/jarvis-texture.sh
+      - name: Stream TTFA (stub 15 ms fails; Piper is the live path)
+        run: |
+          set +e
+          scripts/eval/clone-stream-ttfa.sh
+          code=$?
+          if [ "$code" = 2 ]; then
+            echo "NOT A HARD-PASS. No Piper pack on this runner. Stub clock is FAIL and product_claim is false. Live path is scripts/eval/piper-stream-ttfa.sh when the A21 pack is present."
+            exit 0
+          fi
+          exit "$code"
       - name: Phone HTTP surface
         run: cargo test -p galion-render --features web --lib
       - name: Phone lane

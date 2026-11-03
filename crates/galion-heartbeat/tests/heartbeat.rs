@@ -35,6 +35,22 @@ fn drive(hb: &mut Heartbeat<DefaultConsentGate>, frames: &[Vec<f32>], f: impl Fn
 }
 
 #[test]
+fn last_caller_frame_follows_the_80ms_affect_and_clears_when_off() {
+    use galion_emotion::EmotionFrame;
+    let mut hb = Heartbeat::new(HeartbeatConfig::rika_v0(), granted());
+    let pcm = vec![0.0f32; FRAME_SAMPLES];
+    let frame = EmotionFrame {
+        seq: 1, t_ms: 0, dur_ms: 80, valence: -0.6, arousal: 0.2, dominance: 0.4, confidence: 0.9,
+    };
+    let mut on = inp(&pcm, RIKA_BITS);
+    on.affect = Some(frame);
+    hb.step(&on);
+    assert_eq!(hb.last_caller_frame(), Some(frame));
+    hb.step(&inp(&pcm, 0));
+    assert_eq!(hb.last_caller_frame(), None);
+}
+
+#[test]
 fn frame_constants_match_locks() {
     assert_eq!(galion_heartbeat::FRAME_MS, 80);
     assert_eq!(FRAME_SAMPLES, 1920);

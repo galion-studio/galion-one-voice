@@ -31,7 +31,7 @@ use std::time::{Duration, Instant};
 use galion_console::dotviz::{demo_band, DemoPump, DemoSeg, DotConsole, PanelOpts};
 use galion_console::live::{AffectFeed, StubAffect, StubTiming, TimingFeed};
 use galion_emotion::{DefaultConsentGate, EmotionFrame, Purpose};
-use galion_heartbeat::symphony::{BandView, SymphonyWire};
+use galion_heartbeat::symphony::{BandView, NanoPcmRing, SymphonyWire};
 use galion_heartbeat::{FrameIn, Heartbeat, HeartbeatConfig, FRAME_MS, FRAME_SAMPLES, RIKA_BITS, SAMPLE_RATE};
 use galion_render::{PngSeqConfig, PngSeqSurface};
 
@@ -145,6 +145,7 @@ fn run<T: TimingFeed, A: AffectFeed>(args: &[String], mut pump: DemoPump<T, A>, 
     let mut wire = SymphonyWire::new();
     // Previous tick's consented reading. The feeling decision itself runs inside step.
     let mut held_affect: Option<EmotionFrame> = None;
+    let mut nano = NanoPcmRing::new();
     let mut rng = Lcg(13);
     let mut me_voiced_prev = false;
     let mut yielded = false;
@@ -189,6 +190,13 @@ fn run<T: TimingFeed, A: AffectFeed>(args: &[String], mut pump: DemoPump<T, A>, 
         let out = hb.step(&inp);
         let step_us = ts.elapsed().as_secs_f32() * 1e6;
         let emit = wire.me_emit(&out, me.len());
+        // Outside step. Prosody is galion-emotion's 80 ms voice_color, then Rika's apply.
+        // No empathy sentence is written from this frame.
+        #[cfg(feature = "phone-turn")]
+        if let Some(p) = phone.as_mut() {
+            let color = galion_emotion::StubExpressor.voice_color(hb.last_caller_frame().as_ref());
+            p.note_prosody(out.prosody(color.prosody));
+        }
         if out.yield_now() {
             yielded = true;
         }
@@ -234,7 +242,13 @@ fn run<T: TimingFeed, A: AffectFeed>(args: &[String], mut pump: DemoPump<T, A>, 
         let you_active = phone_you || s == DemoSeg::You || barge;
         let feeling_e = if sense { out.applied.lean_in } else { 0.0 };
         let me_slot: &[f32] = if emit && me_voiced { &me } else { &[] };
-        let sector = wire.step(&out, BandView { you_active, feeling_e, sense, me_slot }, &mut scratch);
+        let sector = wire.step(&out, BandView { you_active, feeling_e, sense, me_slot }, &mut scratch, Some(&mut nano));
+        if sector.release_slot {
+            nano.release();
+        }
+        if sector.nano_frame {
+            me.copy_from_slice(&scratch);
+        }
         let snap = pump.pump(i, &you, SAMPLE_RATE);
         held_affect = if snap.sense {
             snap.affect.map(|a| EmotionFrame {

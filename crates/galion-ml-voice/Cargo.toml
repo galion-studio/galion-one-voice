@@ -33,6 +33,7 @@ galion-tensor = { path = "../galion-tensor", default-features = false }
 galion-heartbeat = { path = "../galion-heartbeat", optional = true, default-features = false }
 
 [dev-dependencies]
+galion-emotion = { path = "../../galion-emotion" }
 galion-heartbeat = { path = "../galion-heartbeat", default-features = false }
 
 [[bin]]
