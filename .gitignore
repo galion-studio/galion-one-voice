@@ -26,3 +26,6 @@ docs/galion-voice-v2/personas/**/*.[Ww][Aa][Vv][Ee]
 docs/galion-voice-v2/personas/**/*.[Mm][Pp]3
 docs/galion-voice-v2/personas/**/*.[Ww][Aa][Vv].[Pp]laceholder
 docs/galion-voice-v2/personas/**/*.[Mm][Pp]3.[Pp]laceholder
+
+# #54 sample voices: fetch per scripts/eval/sample-voices/SAMPLE-VOICES.md (WAVs are not committed)
+scripts/eval/sample-voices/*.wav

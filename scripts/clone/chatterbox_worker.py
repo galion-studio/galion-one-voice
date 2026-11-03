@@ -41,6 +41,12 @@ result). It does not load torch.
 
 GALION_CLONE_STUB_FRAMES=N (1..8) makes the stub emit N heartbeat frames of
 protocol PCM (1920 samples at 24 kHz, 80 ms each) with progress on stderr.
+
+#54 stream path: ``GALION_CLONE_STREAM=1`` (not with the stub) streams Nano
+PCM in chunks through ``nano_stream.py`` (``galion-clone-chunk: N`` before
+each chunk, ``galion-clone-path: stream``, utt marker after the PCM). It
+uses the same pinned checkpoint, the same one-thread pin, and the same
+REFS.sha256 reference gate as the generate path. LOCKS.toml is not read.
 """
 
 from __future__ import annotations
@@ -57,6 +63,9 @@ REPO = os.path.dirname(os.path.dirname(HERE))
 ALLOWLIST_PATH = os.path.join(HERE, "REFS.sha256")
 TOKENIZER_PINS = os.path.join(HERE, "TOKENIZER.sha256")
 WEIGHT_PINS = os.path.join(HERE, "PINS.sha256")
+if HERE not in sys.path:
+    sys.path.insert(0, HERE)
+
 TAG = re.compile(r"\[[A-Za-z][A-Za-z0-9_ ]{0,32}\]")
 REF_KEYS = ("reference", "audio_prompt", "audio_prompt_path", "clip")
 NANO_SR = 24_000
@@ -685,6 +694,15 @@ def guard(msg: dict, persona: str) -> tuple[dict, dict | None]:
     return layer, ref
 
 
+_PCM_FILES: dict = {}
+
+
+def stub_pcm_file(pcm_fd: int):
+    if pcm_fd not in _PCM_FILES:
+        _PCM_FILES[pcm_fd] = os.fdopen(pcm_fd, "wb", buffering=0, closefd=False)
+    return _PCM_FILES[pcm_fd]
+
+
 def run_stub(pcm_fd: int) -> None:
     while True:
         msg = read_request()
@@ -708,8 +726,26 @@ def run_stub(pcm_fd: int) -> None:
                 sys.stderr.flush()
                 write_all(pcm_fd, one)
             continue
-        pcm = struct.pack("<h", n) + struct.pack("<200h", *([tone] * 200))
-        frame_utterance(pcm_fd, pcm, "protocol-stub", persona)
+        # #54: same 402 bytes as before, written as two paced chunks (stream
+        # framing, utt marker after the PCM) so a reader can clock first PCM.
+        import time
+
+        import nano_stream
+
+        def paced():
+            for index, chunk in enumerate(nano_stream.protocol_chunks(text)):
+                if index:
+                    time.sleep(0.05)
+                yield chunk
+
+        nano_stream.write_chunks(
+            stub_pcm_file(pcm_fd),
+            paced(),
+            engine="protocol-stub",
+            persona=persona,
+            path="stream",
+            err=sys.stderr,
+        )
 
 
 def run_unwired(pcm_fd: int) -> None:
@@ -759,6 +795,58 @@ def run_nano(pcm_fd: int, allow: dict[str, tuple[str, str]]) -> None:
         frame_utterance(pcm_fd, pcm, "chatterbox-nano", persona)
 
 
+def run_stream(pcm_fd: int, allow: dict[str, tuple[str, str]]) -> None:
+    """#54: chunked Nano PCM. No whole-utterance generate on this path."""
+    import nano_stream
+
+    root = weights_root()
+    if not os.environ.get("GALION_CLONE_CKPT", "").strip():
+        if not tensors_pinned(root):
+            absent("pinned safetensors mismatch")
+        if not tokenizer_ready(root):
+            absent("tokenizer files missing or not pinned")
+        os.environ["GALION_CLONE_CKPT"] = build_ckpt(root)
+    # Main's t284 pin wins over a caller thread count.
+    os.environ["GALION_CLONE_THREADS"] = "1"
+    pcm = os.fdopen(pcm_fd, "wb", buffering=0)
+    model, load_note = nano_stream.try_load()
+    local_refs = os.environ.get("GALION_CLONE_LOCAL_REFS") == "1"
+    while True:
+        msg = read_request()
+        if msg is None:
+            return
+        persona = normalize_persona(msg.get("persona", "samantha"))
+        for key in ("denoise", "strip", "clean", "normalize"):
+            if truthy(msg.get(key)):
+                refuse("denoise refused; texture is character")
+        log_texture(texture_layer_state(msg, persona), persona)
+        if local_refs:
+            ref_path = resolve_allowlisted(persona, nonempty_refs(msg), allow)
+        else:
+            if nonempty_refs(msg):
+                refuse("reference clips are on the rights hold (not a consented clip)")
+            ref_path = None
+        text = prepare_text(str(msg.get("text", "")), msg)
+        if model is None:
+            nano_stream.write_unwired(sys.stderr, load_note or "model not loaded")
+            continue
+        if not text:
+            nano_stream.write_unwired(sys.stderr, "empty text")
+            continue
+        sys.stderr.write("galion-clone-emit: galion-vc\n")
+        try:
+            nano_stream.write_chunks(
+                pcm,
+                nano_stream.iter_pcm(model, text, ref_path),
+                engine="nano",
+                persona=persona,
+                path="stream",
+                err=sys.stderr,
+            )
+        except nano_stream.NoStreamHook as exc:
+            nano_stream.write_unwired(sys.stderr, str(exc))
+
+
 def main() -> None:
     asked_note = pin_cpu()
     model = clone_model()
@@ -778,6 +866,9 @@ def main() -> None:
         return
     if not weights_present():
         absent("pinned safetensors missing")
+    if os.environ.get("GALION_CLONE_STREAM") == "1":
+        run_stream(pcm_fd, load_allowlist())
+        return
     if os.environ.get("GALION_CLONE_LOCAL_REFS") != "1":
         run_unwired(pcm_fd)
         return

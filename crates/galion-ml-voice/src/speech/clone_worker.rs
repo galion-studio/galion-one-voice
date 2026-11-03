@@ -39,14 +39,23 @@
 //! [`CloneWorker::poll_pcm`] reads stdout without blocking and pushes s16le
 //! into [`galion_heartbeat::symphony::NanoPcmRing`]. Call it before
 //! `Heartbeat::step`. Do not call it inside either step.
+//!
+//! #54 stream path: with `GALION_CLONE_STREAM=1` the child streams Nano PCM
+//! chunks (`galion-clone-chunk:` / `galion-clone-path: stream`) and the
+//! utterance marker follows the PCM. The reader accepts either order.
+//! [`CloneFrameDrain::drain_frame`] copies one 80 ms frame and does not
+//! generate. The host calls it beside `Heartbeat::step`, not inside it.
 #![allow(unsafe_code)]
 
 use super::sha256;
 use crate::{Audio, LanguageId, TtsEngine, VoiceError};
+use std::cell::UnsafeCell;
 use std::io::{Read, Write};
 use std::os::unix::io::AsRawFd;
 use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStderr, ChildStdin, ChildStdout, Command, Stdio};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 /// Output rate. The heartbeat me band (`galion_heartbeat::SAMPLE_RATE`).
@@ -59,6 +68,87 @@ pub const CLONE_FRAME_SAMPLES: usize = galion_heartbeat::FRAME_SAMPLES;
 /// Does not spawn, read, or write the child, and does not allocate.
 pub fn hot_frame_samples(queued: usize) -> usize {
     queued.min(CLONE_FRAME_SAMPLES)
+}
+
+const RING_FRAMES: usize = 4;
+const RING_CAP: usize = CLONE_FRAME_SAMPLES * RING_FRAMES;
+
+/// Fixed SPSC ring of clone PCM. The worker thread pushes. The host thread
+/// drains one frame. No lock, no allocation after [`Self::new`], no generate.
+///
+/// A full ring drops the newest samples. One [`Self::drain_frame`] never
+/// plays a backlog in a single call. The host calls it once per 80 ms tick,
+/// after `Heartbeat::step`, on a thread that is not inside that function.
+pub struct CloneFrameDrain {
+    buf: UnsafeCell<Box<[i16]>>,
+    r: AtomicUsize,
+    w: AtomicUsize,
+}
+
+// SAFETY: one producer and one consumer. A slot is written only while it is
+// unpublished, and read only after the producer release-stores `w`. The
+// consumer release-stores `r` only after it has finished reading.
+unsafe impl Sync for CloneFrameDrain {}
+
+impl CloneFrameDrain {
+    pub fn new() -> Self {
+        Self {
+            buf: UnsafeCell::new(vec![0; RING_CAP].into_boxed_slice()),
+            r: AtomicUsize::new(0),
+            w: AtomicUsize::new(0),
+        }
+    }
+
+    /// Copy samples in. Returns how many were stored. The rest are dropped.
+    pub fn push_slice(&self, samples: &[i16]) -> usize {
+        let mut n = 0;
+        for sample in samples {
+            if !self.push_one(*sample) {
+                break;
+            }
+            n += 1;
+        }
+        n
+    }
+
+    pub fn push_one(&self, sample: i16) -> bool {
+        let w = self.w.load(Ordering::Relaxed);
+        let r = self.r.load(Ordering::Acquire);
+        if w.wrapping_sub(r) >= RING_CAP {
+            return false;
+        }
+        // SAFETY: this slot is unpublished. The consumer does not read it
+        // until `w` is release-stored below.
+        unsafe {
+            *(&mut *self.buf.get()).get_unchecked_mut(w % RING_CAP) = sample;
+        }
+        self.w.store(w.wrapping_add(1), Ordering::Release);
+        true
+    }
+
+    /// Copy one 80 ms frame into `out`. Allocation-free. Does not generate.
+    /// Returns false when a full frame is not buffered; `out` is left as it was.
+    pub fn drain_frame(&self, out: &mut [i16; CLONE_FRAME_SAMPLES]) -> bool {
+        let r = self.r.load(Ordering::Relaxed);
+        let w = self.w.load(Ordering::Acquire);
+        if w.wrapping_sub(r) < CLONE_FRAME_SAMPLES {
+            return false;
+        }
+        for i in 0..CLONE_FRAME_SAMPLES {
+            // SAFETY: index `r + i` is inside the published range. The
+            // producer does not reuse it until `r` advances below.
+            out[i] = unsafe { *(&*self.buf.get()).get_unchecked((r + i) % RING_CAP) };
+        }
+        self.r
+            .store(r.wrapping_add(CLONE_FRAME_SAMPLES), Ordering::Release);
+        true
+    }
+}
+
+impl Default for CloneFrameDrain {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 const PINS_TEXT: &str = include_str!("../../../../scripts/clone/PINS.sha256");
@@ -411,6 +501,11 @@ pub struct CloneWorker {
     poll_announced: usize,
     poll_taken: usize,
     poll_awaiting: bool,
+    frames: Arc<CloneFrameDrain>,
+    ring_pushed: AtomicUsize,
+    first_pcm_ms: Option<u32>,
+    utt_ms: Option<u32>,
+    path: String,
     pid: u32,
     calls: u32,
     cold_ms: Option<u32>,
@@ -425,6 +520,16 @@ impl CloneWorker {
         Self::spawn_env(script, model, persona, &[])
     }
 
+    /// Same child, PCM also published into a shared [`CloneFrameDrain`].
+    pub fn spawn_ring(
+        script: &Path,
+        model: CloneModel,
+        persona: &str,
+        frames: Arc<CloneFrameDrain>,
+    ) -> Result<Self, VoiceError> {
+        Self::spawn_env_ring(script, model, persona, &[], frames)
+    }
+
     /// `extra` is set on the child only. It does not change this process.
     /// `GALION_CLONE_STUB_PCM=1` is protocol PCM. It does not call generate.
     pub fn spawn_env(
@@ -432,6 +537,16 @@ impl CloneWorker {
         model: CloneModel,
         persona: &str,
         extra: &[(&str, &str)],
+    ) -> Result<Self, VoiceError> {
+        Self::spawn_env_ring(script, model, persona, extra, Arc::new(CloneFrameDrain::new()))
+    }
+
+    pub fn spawn_env_ring(
+        script: &Path,
+        model: CloneModel,
+        persona: &str,
+        extra: &[(&str, &str)],
+        frames: Arc<CloneFrameDrain>,
     ) -> Result<Self, VoiceError> {
         let persona = persona_name(persona);
         let mut cmd = Command::new("python3");
@@ -476,6 +591,11 @@ impl CloneWorker {
             poll_announced: 0,
             poll_taken: 0,
             poll_awaiting: false,
+            frames,
+            ring_pushed: AtomicUsize::new(0),
+            first_pcm_ms: None,
+            utt_ms: None,
+            path: String::new(),
             pid,
             calls: 0,
             cold_ms: None,
@@ -506,6 +626,21 @@ impl CloneWorker {
     }
     pub fn engine(&self) -> &str {
         &self.engine
+    }
+    pub fn path(&self) -> &str {
+        &self.path
+    }
+    /// Milliseconds from the request write to the first PCM byte. Absent
+    /// until that byte arrives. This is not the time to the utterance marker.
+    pub fn first_pcm_ms(&self) -> Option<u32> {
+        self.first_pcm_ms
+    }
+    /// Milliseconds from the request write to the utterance marker.
+    pub fn utt_ms(&self) -> Option<u32> {
+        self.utt_ms
+    }
+    pub fn frames(&self) -> Arc<CloneFrameDrain> {
+        Arc::clone(&self.frames)
     }
 
     /// Non-blocking pull of child stdout into `ring`.
@@ -665,7 +800,13 @@ impl CloneWorker {
                 .map_err(|e| VoiceError::Backend(format!("clone worker stdin flush: {e}")))?;
         }
         self.pcm_buf.clear();
-        let pcm = self.read_utterance(Duration::from_secs(60))?;
+        self.ring_pushed.store(0, Ordering::Relaxed);
+        self.first_pcm_ms = None;
+        self.utt_ms = None;
+        self.path.clear();
+        self.engine.clear();
+        let pcm = self.read_utterance(t0, Duration::from_secs(60))?;
+        self.utt_ms = Some(elapsed_ms(t0));
         let ms = elapsed_ms(t0);
         self.calls += 1;
         if self.calls == 1 {
@@ -683,7 +824,7 @@ impl CloneWorker {
         Ok(pcm)
     }
 
-    fn read_utterance(&mut self, timeout: Duration) -> Result<Vec<i16>, VoiceError> {
+    fn read_utterance(&mut self, t0: Instant, timeout: Duration) -> Result<Vec<i16>, VoiceError> {
         let deadline = Instant::now() + timeout;
         let mark = self.err_log.len();
         loop {
@@ -722,6 +863,7 @@ impl CloneWorker {
             if rc > 0 {
                 if fds[0].revents & (POLLIN | POLLHUP) != 0 {
                     self.drain(Pipe::Out)?;
+                    self.publish_pcm(t0);
                     progress = true;
                 }
                 if fds[1].revents & (POLLIN | POLLHUP) != 0 {
@@ -731,6 +873,9 @@ impl CloneWorker {
             }
             if let Some(engine) = line_value(&self.err_log[mark..], "galion-clone-engine:") {
                 self.engine = engine;
+            }
+            if let Some(path) = line_value(&self.err_log[mark..], "galion-clone-path:") {
+                self.path = path;
             }
             if self.err_log[mark..].contains("galion-clone-refuse:") {
                 return Err(VoiceError::Backend(format!(
@@ -743,6 +888,7 @@ impl CloneWorker {
             if let Some(n) = announced_utt(&self.err_log[mark..]) {
                 if self.stdout.as_ref().is_some() {
                     let _ = self.drain(Pipe::Out);
+                    self.publish_pcm(t0);
                 }
                 if self.pcm_buf.len() >= n {
                     self.pcm_buf.truncate(n);
@@ -752,6 +898,7 @@ impl CloneWorker {
             let exited = matches!(self.child.as_mut().map(|c| c.try_wait()), Some(Ok(Some(_))));
             if exited {
                 let _ = self.drain(Pipe::Out);
+                self.publish_pcm(t0);
                 let _ = self.drain(Pipe::Err);
                 if self.err_log[mark..].contains("galion-clone-refuse:") {
                     return Err(VoiceError::Backend(format!(
@@ -785,6 +932,24 @@ impl CloneWorker {
             .chunks_exact(2)
             .map(|b| i16::from_le_bytes([b[0], b[1]]))
             .collect())
+    }
+
+    fn publish_pcm(&mut self, t0: Instant) {
+        let ready = self.pcm_buf.len() / 2;
+        if ready == 0 {
+            return;
+        }
+        let already = self.ring_pushed.load(Ordering::Relaxed);
+        if ready > already {
+            for i in already..ready {
+                let sample = i16::from_le_bytes([self.pcm_buf[i * 2], self.pcm_buf[i * 2 + 1]]);
+                let _ = self.frames.push_one(sample);
+            }
+            self.ring_pushed.store(ready, Ordering::Relaxed);
+        }
+        if self.first_pcm_ms.is_none() {
+            self.first_pcm_ms = Some(elapsed_ms(t0));
+        }
     }
 
     fn drain(&mut self, pipe: Pipe) -> Result<(), VoiceError> {
@@ -825,6 +990,7 @@ pub struct CloneTts {
     model: CloneModel,
     persona: &'static str,
     worker: Option<CloneWorker>,
+    frames: Arc<CloneFrameDrain>,
     spawns: u32,
     /// Worker PCM for the utterance in progress. Landed once, as one packet.
     pending: Vec<i16>,
@@ -848,6 +1014,7 @@ impl CloneTts {
             model,
             persona,
             worker: None,
+            frames: Arc::new(CloneFrameDrain::new()),
             spawns: 0,
             pending: Vec::new(),
             dir: super::gqvoice::gqvoice_dir(),
@@ -860,6 +1027,7 @@ impl CloneTts {
             script: PathBuf::from("test"),
             model: worker.model(),
             persona: worker.persona(),
+            frames: worker.frames(),
             worker: Some(worker),
             spawns: 1,
             pending: Vec::new(),
@@ -881,6 +1049,12 @@ impl CloneTts {
         Ok(Some(audio))
     }
 
+    /// Ring the host drains once per tick. Empty until the worker pushes.
+    /// Cloning the `Arc` does not start generate.
+    pub fn frames(&self) -> Arc<CloneFrameDrain> {
+        Arc::clone(&self.frames)
+    }
+
     pub fn model_name(&self) -> &'static str {
         self.model.as_str()
     }
@@ -899,7 +1073,12 @@ impl CloneTts {
         if alive {
             return Ok(());
         }
-        let worker = CloneWorker::spawn(&self.script, self.model, self.persona)?;
+        let worker = CloneWorker::spawn_ring(
+            &self.script,
+            self.model,
+            self.persona,
+            Arc::clone(&self.frames),
+        )?;
         self.worker = Some(worker);
         self.spawns += 1;
         Ok(())
@@ -931,7 +1110,9 @@ pub struct FlashReport {
     pub measured: bool,
     pub product_claim: bool,
     pub engine: Option<String>,
+    pub path: Option<String>,
     pub ttfa_ms: Option<u32>,
+    pub utt_ms: Option<u32>,
     pub note: String,
 }
 
@@ -941,25 +1122,40 @@ impl FlashReport {
             measured: false,
             product_claim: false,
             engine: None,
+            path: None,
             ttfa_ms: None,
+            utt_ms: None,
             note: note.into(),
         }
     }
 
-    /// A number from a run. `product_claim` is true only for engine `model`.
-    /// Nano generate reports `chatterbox-nano`, which is not that label.
-    pub fn from_pcm(engine: &str, ttfa_ms: u32) -> Self {
-        let model = engine == "model";
-        let note = if model {
-            "CPU time to first PCM. Record it in LEDGER before calling it a Flash result."
+    /// A number from a run. `product_claim` is true only when `real_nano_pcm`
+    /// is set, the child said `nano` (stream path) or `chatterbox-nano`
+    /// (#53 generate label), and `path` is `stream`. A protocol stub, a turbo
+    /// label, and a whole-utterance clock are not claims.
+    pub fn from_pcm(
+        engine: &str,
+        path: &str,
+        ttfa_ms: u32,
+        utt_ms: u32,
+        real_nano_pcm: bool,
+    ) -> Self {
+        let nano = engine == "nano" || engine == "chatterbox-nano";
+        let claim = real_nano_pcm && nano && path == "stream";
+        let note = if claim {
+            "CPU time to the first streamed Nano PCM chunk. Record it in LEDGER before calling it a Flash result."
+        } else if engine == "protocol-stub" {
+            "STUB. Protocol PCM only. Not a Nano measurement and not a product claim."
         } else {
-            "protocol-stub clock only. Not a Flash result and not a product claim."
+            "Not real streamed Nano PCM. Not a product claim."
         };
         Self {
             measured: true,
-            product_claim: model,
+            product_claim: claim,
             engine: Some(engine.to_string()),
+            path: Some(path.to_string()),
             ttfa_ms: Some(ttfa_ms),
+            utt_ms: Some(utt_ms),
             note: note.to_string(),
         }
     }
@@ -976,8 +1172,14 @@ impl FlashReport {
             engine,
             escape(&self.note),
         );
+        if let Some(path) = &self.path {
+            s.push_str(&format!(",\"path\":\"{}\"", escape(path)));
+        }
         if let Some(ms) = self.ttfa_ms {
             s.push_str(&format!(",\"ttfa_ms\":{ms}"));
+        }
+        if let Some(ms) = self.utt_ms {
+            s.push_str(&format!(",\"utt_ms\":{ms}"));
         }
         s.push('}');
         s
@@ -1016,7 +1218,16 @@ pub fn flash_from_env() -> FlashReport {
     let t0 = Instant::now();
     match worker.synthesize("Hi.") {
         Ok(pcm) if !pcm.is_empty() && worker.engine() != "unwired" => {
-            FlashReport::from_pcm(worker.engine(), elapsed_ms(t0))
+            let ttfa = worker.first_pcm_ms().unwrap_or_else(|| elapsed_ms(t0));
+            let utt = worker.utt_ms().unwrap_or(ttfa);
+            let nano = matches!(worker.engine(), "nano" | "chatterbox-nano");
+            FlashReport::from_pcm(
+                worker.engine(),
+                worker.path(),
+                ttfa,
+                utt,
+                nano && worker.path() == "stream" && nano_speech(pcm.as_slice()),
+            )
         }
         Ok(_) => FlashReport::absent("generate is not wired; no TTFA number"),
         Err(e) => FlashReport::absent(format!("worker returned no PCM ({e}); no TTFA number")),
@@ -1145,6 +1356,31 @@ fn tail(s: &str) -> String {
 
 fn elapsed_ms(t0: Instant) -> u32 {
     t0.elapsed().as_millis().min(u32::MAX as u128) as u32
+}
+
+/// True for a buffer that can be Nano speech: at least one 80 ms frame,
+/// a real peak, and more than one amplitude. The protocol stub is 201
+/// samples of a constant tone and returns false.
+fn nano_speech(pcm: &[i16]) -> bool {
+    if pcm.len() < CLONE_FRAME_SAMPLES {
+        return false;
+    }
+    let head = &pcm[..pcm.len().min(4_000)];
+    let mut peak = 0i32;
+    let mut first = head[0];
+    let mut varied = false;
+    for sample in head.iter().skip(1) {
+        let value = i32::from(*sample);
+        if value.abs() > peak {
+            peak = value.abs();
+        }
+        if *sample != first {
+            varied = true;
+        } else {
+            first = *sample;
+        }
+    }
+    varied && peak >= 100
 }
 
 #[derive(Clone, Copy)]
@@ -1389,11 +1625,19 @@ mod tests {
         assert!(json.contains("\"measured\":false"));
         assert!(json.contains("\"product_claim\":false"));
         assert!(!json.contains("ttfa"));
-        let stub = FlashReport::from_pcm("protocol-stub", 12);
+        let stub = FlashReport::from_pcm("protocol-stub", "stream", 12, 40, false);
         assert!(stub.json().contains("\"ttfa_ms\":12"));
+        assert!(stub.json().contains("\"path\":\"stream\""));
+        assert!(stub.json().contains("\"utt_ms\":40"));
+        assert!(stub.note.contains("STUB"));
         assert!(!stub.product_claim);
-        assert!(!FlashReport::from_pcm("model", 4).note.is_empty());
-        assert!(FlashReport::from_pcm("model", 4).product_claim);
+        let labeled = FlashReport::from_pcm("nano", "stream", 4, 90, false);
+        assert!(!labeled.product_claim);
+        assert!(FlashReport::from_pcm("nano", "stream", 4, 90, true).product_claim);
+        assert!(FlashReport::from_pcm("chatterbox-nano", "stream", 4, 90, true).product_claim);
+        assert!(!FlashReport::from_pcm("chatterbox-nano", "", 1800, 1800, true).product_claim);
+        assert!(!FlashReport::from_pcm("model", "whole", 1800, 1800, true).product_claim);
+        assert!(!FlashReport::from_pcm("piper", "stream", 40, 80, false).product_claim);
     }
 
     #[test]
@@ -1569,7 +1813,13 @@ mod tests {
         assert_eq!(w.engine(), "protocol-stub");
         assert!(w.cold_ms().is_some() && w.warm_ms().is_some());
         assert_ne!(a[0], b[0]);
-        let report = FlashReport::from_pcm(w.engine(), w.warm_ms().unwrap());
+        let report = FlashReport::from_pcm(
+            w.engine(),
+            w.path(),
+            w.first_pcm_ms().unwrap_or(w.warm_ms().unwrap()),
+            w.utt_ms().unwrap_or(w.warm_ms().unwrap()),
+            false,
+        );
         assert!(!report.product_claim);
         assert!(report.json().contains("protocol-stub"));
         assert_eq!(
@@ -1842,5 +2092,98 @@ while left:
     sys.stdout.buffer.flush()
     left -= take
 sys.stdin.buffer.readline()
+"#;
+
+    #[test]
+    fn drain_takes_one_frame_and_drops_overflow() {
+        let drain = CloneFrameDrain::new();
+        let frame = [3i16; CLONE_FRAME_SAMPLES];
+        for _ in 0..4 {
+            assert_eq!(drain.push_slice(&frame), CLONE_FRAME_SAMPLES);
+        }
+        assert_eq!(
+            drain.push_slice(&[9, 9]),
+            0,
+            "a full ring drops the newest samples"
+        );
+        let mut out = [0i16; CLONE_FRAME_SAMPLES];
+        assert!(drain.drain_frame(&mut out));
+        assert_eq!(out[0], 3);
+        assert!(drain.drain_frame(&mut out));
+        assert!(drain.drain_frame(&mut out));
+        assert!(drain.drain_frame(&mut out));
+        assert!(!drain.drain_frame(&mut out));
+    }
+
+    #[test]
+    fn first_frame_is_drained_before_the_utterance_marker() {
+        use std::sync::atomic::{AtomicBool, Ordering};
+        use std::sync::Arc;
+        let dir = std::env::temp_dir().join(format!("galion-clone-stream-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let script = dir.join("stream-clone.py");
+        std::fs::write(&script, STREAM_CLONE).unwrap();
+        let mut perm = std::fs::metadata(&script).unwrap().permissions();
+        perm.set_mode(0o755);
+        std::fs::set_permissions(&script, perm).unwrap();
+        let mut w = CloneWorker::spawn(&script, CloneModel::Nano, "samantha").unwrap();
+        let frames = w.frames();
+        let done = Arc::new(AtomicBool::new(false));
+        let flag = Arc::clone(&done);
+        let worker = std::thread::spawn(move || {
+            let pcm = w.synthesize("hello there").unwrap();
+            let clock = (
+                w.first_pcm_ms(),
+                w.utt_ms(),
+                w.path().to_string(),
+                w.engine().to_string(),
+            );
+            flag.store(true, Ordering::Release);
+            (pcm, clock)
+        });
+        let start = Instant::now();
+        let mut out = [0i16; CLONE_FRAME_SAMPLES];
+        let mut got = false;
+        while start.elapsed() < Duration::from_secs(3) {
+            if frames.drain_frame(&mut out) {
+                got = true;
+                break;
+            }
+            if done.load(Ordering::Acquire) {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        assert!(got, "no frame before the worker finished");
+        assert!(
+            !done.load(Ordering::Acquire),
+            "the frame arrived only with the finished utterance"
+        );
+        assert_eq!(out[0], 7);
+        let (pcm, (first, utt, path, engine)) = worker.join().unwrap();
+        assert_eq!(pcm.len(), CLONE_FRAME_SAMPLES);
+        assert_eq!(path, "stream");
+        assert_eq!(engine, "protocol-stub");
+        let first = first.expect("first pcm");
+        let utt = utt.expect("utt");
+        assert!(first + 50 < utt, "first {first} utt {utt}");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    const STREAM_CLONE: &str = r#"#!/usr/bin/env python3
+import sys, time, struct
+sys.stdin.buffer.readline()
+n = 1920
+pcm = struct.pack("<%dh" % n, *([7] * n))
+sys.stderr.write("galion-clone-engine: protocol-stub\n")
+sys.stderr.write("galion-clone-path: stream\n")
+sys.stderr.write("galion-clone-chunk: %d\n" % len(pcm))
+sys.stderr.flush()
+sys.stdout.buffer.write(pcm)
+sys.stdout.buffer.flush()
+time.sleep(0.45)
+sys.stderr.write("galion-clone-utt: %d\n" % len(pcm))
+sys.stderr.flush()
 "#;
 }
