@@ -113,12 +113,14 @@ The heartbeat thread only calls `try_submit` and `try_recv`. Piper cold-start
 and synthesis happen on `galion-turn-worker`. A newer turn id cancels an older
 reply before publish. That cancel is the seed of the V2 barge-in token.
 
-What is deliberately missing: a real ASR engine, a `.gq` reply model, a warm
-Piper process across turns (the stack is built once per worker, which already
-avoids per-turn process start when the backend allows it; Piper today is still
-out of process per `speak`), wiring that orb integrator into the surfaces
-(the step itself is in `galion-render`; the page still draws the phone), and
-any path that opens SSH.
+Piper on a `PhoneLane` is one out-of-process worker for the life of that lane
+(stdin JSON, stdout raw PCM). `PhoneLane::new` pre-warms it, so the first
+caller turn does not pay process start. Cold vs warm first-clause PCM is
+`scripts/bench-piper-warmth.sh`. See V2-S6.
+
+What is deliberately missing: a real ASR engine, a `.gq` reply model, wiring
+the orb integrator into the surfaces (the step itself is in `galion-render`;
+the page still draws the phone), and any path that opens SSH.
 
 ## 5. Sectors
 
@@ -335,8 +337,21 @@ is not, failure when neither is (no silent tones as the reply). Emotion
 prosody is a hook, not a second voice.
 
 **Depends on.** A21 pack on disk for the neural path. V2-S5 if prosody should
-follow reply emotion. The worker already builds `PhoneLane` once, so the
-stack object is warm; the Piper process may still start per `speak`.
+follow reply emotion. The turn worker builds `PhoneLane` once. That lane now
+owns the Piper process.
+
+**Landed.** When the A21 pack is present, `PhoneLane::new` starts one Piper
+child (`--json-input --output_raw`) and discards a short "Hello." so the
+first caller turn is warm. Raw PCM is framed by the runtime's
+`Real-time factor:` line on stderr (piper 2023.11.14-2 logs it after flushing
+stdout). Nothing is written to disk. Flite is unchanged when the pack is
+absent. Streaming text flushes a clause at punctuation or 8 words
+(`SpeechStack::begin_stream`); a whole reply takes the same split. Cold vs
+warm first-clause PCM is `scripts/bench-piper-warmth.sh` (one JSON object,
+no invented number when the pack is missing). `GALION_SPEECH=off` is still
+`NoSpeech`, and the turn worker still publishes the two-tone WAV with
+`backend=tone` and `error` set. A superseded turn drops clauses not yet sent
+and does not kill Piper.
 
 **Acceptance.**
 

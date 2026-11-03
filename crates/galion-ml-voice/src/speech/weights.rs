@@ -12,14 +12,17 @@
 //! Decoders:
 //! - `.onnx` + `<file>.json` = a **Piper VITS voice pack** (rhasspy/piper-voices, MIT;
 //!   default `en_US-ljspeech-medium`, LJSpeech public-domain data). Decoded by the
-//!   **Piper runtime** (rhasspy/piper 2023.11.14-2, MIT; bundles onnxruntime 1.14.1 MIT
+//!   **Piper runtime** (rhasspy/piper 2023.11.14-2, MIT; bundles its own ONNX Runtime
 //!   and espeak-ng GPL-3 for phonemes) run **out of process** on the **CPU**. Nothing is
-//!   linked into any Galion crate (no `ort` crate: check-no-forbidden stays green).
-//!   Runtime: `$GALION_A21_RUNTIME` or `<repo>/weights/runtime/piper/piper`.
+//!   linked into any Galion crate (check-no-forbidden stays green). One worker is
+//!   spawned for the life of this slot and reused across clauses and turns
+//!   (`--json-input --output_raw`). Runtime: `$GALION_A21_RUNTIME` or
+//!   `<repo>/weights/runtime/piper/piper`.
 //! - `.safetensors` / `.gq` = future Galion-native decoder on galion-tensor:
 //!   [`GALION_NATIVE_DECODER_WIRED`] = `false`, so such packs report Present but inactive.
 //! Nothing here downloads anything (scripts/a21/fetch-a21.sh is the only fetcher).
 
+use super::piper_worker::{PiperProsody, PiperWorker};
 use super::sha256;
 use crate::{Audio, LanguageId, TtsEngine, VoiceError};
 use std::path::{Path, PathBuf};
@@ -146,7 +149,16 @@ impl WeightStatus {
 }
 
 /// The A21 TTS slot. Constructible only when it can really speak.
-pub struct A21WeightTts { model: PathBuf, config: PathBuf, runtime: PathBuf, rate: u32, voice: String }
+/// The Piper process is started on the first synthesis and kept for later turns.
+pub struct A21WeightTts {
+    model: PathBuf,
+    config: PathBuf,
+    runtime: PathBuf,
+    rate: u32,
+    voice: String,
+    worker: Option<PiperWorker>,
+    spawns: u32,
+}
 
 impl A21WeightTts {
     pub fn try_new(status: &WeightStatus) -> Result<Self, String> {
@@ -160,13 +172,35 @@ impl A21WeightTts {
                 let cfg = std::fs::read_to_string(&config).map_err(|e| format!("{}: {e}", config.display()))?;
                 let rate = json_u32(&cfg, "sample_rate").ok_or_else(|| format!("{}: no audio.sample_rate", config.display()))?;
                 let voice = path.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
-                Ok(Self { model: path.clone(), config, runtime, rate, voice })
+                Ok(Self { model: path.clone(), config, runtime, rate, voice, worker: None, spawns: 0 })
             }
             other => Err(other.summary()),
         }
     }
     /// Voice pack name, e.g. `en_US-ljspeech-medium`.
     pub fn voice(&self) -> &str { &self.voice }
+    /// Pid of the warm worker, once it has been started.
+    pub fn piper_pid(&self) -> Option<u32> { self.worker.as_ref().map(PiperWorker::pid) }
+    /// How many times the Piper process has been spawned. `1` means every turn reused it.
+    pub fn piper_spawns(&self) -> u32 { self.spawns }
+    pub fn worker_alive(&mut self) -> bool { self.worker.as_mut().is_some_and(PiperWorker::is_alive) }
+
+    fn ensure(&mut self) -> Result<(), VoiceError> {
+        let alive = self.worker.as_mut().is_some_and(PiperWorker::is_alive);
+        if alive { return Ok(()); }
+        // Neutral is the phone default (consent deny). The hook does not change scales.
+        let prosody = PiperProsody::from_env().with_emotion("Neutral");
+        let worker = PiperWorker::spawn(&self.runtime, &self.model, &self.config, &prosody)?;
+        self.worker = Some(worker);
+        self.spawns += 1;
+        Ok(())
+    }
+
+    /// Start a new process after the previous one died. Not used for barge-in.
+    pub fn respawn(&mut self) -> Result<(), VoiceError> {
+        self.worker = None;
+        self.ensure()
+    }
 }
 
 /// Minimal `"key": <uint>` lookup (no serde in this crate).
@@ -179,28 +213,15 @@ fn json_u32(s: &str, key: &str) -> Option<u32> {
 impl TtsEngine for A21WeightTts {
     fn languages(&self) -> &[LanguageId] { LanguageId::ALL }
     fn synthesize(&mut self, text: &str, lang: LanguageId) -> Result<Audio, VoiceError> {
-        use std::io::Write;
-        use std::process::{Command, Stdio};
         let _ = lang; // English voice pack.
         let (_, body) = crate::split_lang_token(text);
         let body = body.trim().replace(['\n', '\r'], " ");
         if body.is_empty() { return Err(VoiceError::EmptyInput); }
-        // Deterministic by default (noise 0): same text -> same samples (demo SHA256SUMS).
-        // GALION_A21_NOISE=natural uses Piper's sampled defaults (0.667 / 0.8).
-        let natural = std::env::var("GALION_A21_NOISE").map(|v| v == "natural").unwrap_or(false);
-        let (ns, nw) = if natural { ("0.667", "0.8") } else { ("0", "0") };
-        let mut child = Command::new(&self.runtime)
-            .arg("--quiet").arg("--model").arg(&self.model).arg("--config").arg(&self.config)
-            .args(["--noise_scale", ns, "--noise_w", nw, "--sentence_silence", "0", "--output_raw"])
-            .stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped())
-            .spawn().map_err(|e| VoiceError::Backend(format!("A21 piper spawn {}: {e}", self.runtime.display())))?;
-        child.stdin.take().unwrap().write_all(format!("{body}\n").as_bytes()).map_err(|e| VoiceError::Backend(format!("A21 piper stdin: {e}")))?;
-        let out = child.wait_with_output().map_err(|e| VoiceError::Backend(format!("A21 piper: {e}")))?;
-        if !out.status.success() || out.stdout.len() < 2 {
-            return Err(VoiceError::Backend(format!("A21 piper failed ({}): {}", out.status, String::from_utf8_lossy(&out.stderr).trim())));
-        }
-        let f: Vec<f32> = out.stdout.chunks_exact(2).map(|b| i16::from_le_bytes([b[0], b[1]]) as f32 / 32768.0).collect();
-        Ok(Audio { sample_rate: super::SPEECH_RATE, samples: super::resample(&f, self.rate, super::SPEECH_RATE) })
+        self.ensure()?;
+        let rate = self.rate;
+        let pcm = self.worker.as_mut().unwrap().synthesize(&body)?;
+        let f: Vec<f32> = pcm.iter().map(|&s| s as f32 / 32768.0).collect();
+        Ok(Audio { sample_rate: super::SPEECH_RATE, samples: super::resample(&f, rate, super::SPEECH_RATE) })
     }
 }
 

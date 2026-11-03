@@ -31,19 +31,24 @@
 //!
 //! # S6 TTS
 //! [`SpeechStack::detect`] (A21 Piper VITS `en_US-ljspeech-medium` if the sha256-verified
-//! pack + Piper runtime are on disk, else libflite). No backend → [`PhoneError::NoSpeech`];
-//! tones are never returned as a reply (FRXDEL Q2).
+//! pack + Piper runtime are on disk, else libflite). The A21 path keeps **one** Piper
+//! process for the life of the lane (stdin JSON, stdout raw PCM). [`PhoneLane::new`]
+//! pre-warms it with a discarded "Hello." so the first caller turn is warm. No backend
+//! → [`PhoneError::NoSpeech`]; tones are never returned as a reply (FRXDEL Q2).
 //!
 //! # Threads
 //! [`PhoneLane`] is `Send`: build it once on a worker thread and call [`PhoneLane::turn`]
-//! per utterance (the speech stack is reused). [`phone_turn`] / [`phone_turn_wav`] are
-//! one-shot conveniences that read env each call.
+//! per utterance (the speech stack and the Piper process are reused). [`phone_turn`] /
+//! [`phone_turn_wav`] are one-shot conveniences that read env each call.
 
 use crate::canned::CannedLlm;
 use crate::en_lane::{spoken_text, to_f32, to_pcm16, wav_bytes, LANE_RATE_HZ};
 use crate::{CascadeError, Emotion, Lang, Llm, MockLlm, Transcript};
 use galion_ml_voice::speech::{resample, SpeechStack};
 use galion_ml_voice::stub::SAMPLES_PER_CHAR;
+use galion_ml_voice::VoiceError;
+use std::sync::atomic::AtomicU64;
+use std::sync::Arc;
 use std::time::Instant;
 
 /// Phone-path input rate (16 kHz mono PCM16).
@@ -100,6 +105,8 @@ pub enum PhoneError {
     AsrUnratified(&'static str),
     /// No speech backend on this machine (Piper/flite missing); never falls back to tones.
     NoSpeech(String),
+    /// A newer turn superseded this one between clauses. The Piper process is still running.
+    Superseded,
     /// Error from the cascade (LLM / route).
     Cascade(CascadeError),
 }
@@ -111,6 +118,7 @@ impl std::fmt::Display for PhoneError {
             PhoneError::BadWav(m) => write!(f, "bad WAV: {m}"),
             PhoneError::AsrUnratified(m) => write!(f, "{m}"),
             PhoneError::NoSpeech(m) => write!(f, "no speech backend: {m}"),
+            PhoneError::Superseded => write!(f, "turn superseded before speech finished"),
             PhoneError::Cascade(e) => write!(f, "cascade: {e:?}"),
         }
     }
@@ -145,7 +153,13 @@ impl AsrSource {
 
 /// Per-stage wall time (ms).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub struct StageMs { pub asr: u32, pub llm: u32, pub tts: u32 }
+pub struct StageMs {
+    pub asr: u32,
+    pub llm: u32,
+    pub tts: u32,
+    /// Speak entry → first clause PCM. The rest of `tts` is the remainder.
+    pub tts_first_pcm: u32,
+}
 
 /// One finished phone turn.
 #[derive(Debug, Clone)]
@@ -261,15 +275,31 @@ impl PhoneLane {
     /// Env-configured lane (`GALION_ASR`, `GALION_LLM`, `GALION_SPEECH`, …).
     pub fn from_env() -> Self { Self::new(PhoneConfig::from_env()) }
 
-    pub fn new(cfg: PhoneConfig) -> Self {
+    pub fn new(cfg: PhoneConfig) -> Self { Self::with_speech(cfg, SpeechStack::detect()) }
+
+    /// Lane around an existing stack. Pre-warms Piper when that stack is A21.
+    pub fn with_speech(cfg: PhoneConfig, mut speech: SpeechStack) -> Self {
         let llm: Box<dyn Llm + Send> = match cfg.llm { LlmMode::Canned => Box::new(CannedLlm::new()), LlmMode::Echo => Box::new(MockLlm) };
-        Self { cfg, asr: PhoneTurnAsr::new(cfg.asr), llm, speech: SpeechStack::detect() }
+        speech.prewarm();
+        Self { cfg, asr: PhoneTurnAsr::new(cfg.asr), llm, speech }
     }
 
     /// True when S6 can produce spoken words on this machine.
     pub fn can_speak(&self) -> bool { self.speech.can_speak() }
     /// `(id, label)` of the speech backend.
     pub fn speech_backend(&self) -> (&'static str, String) { (self.speech.backend.id(), self.speech.backend.label()) }
+
+    /// `(pid, spawn count)` of the warm Piper worker. Pid is `None` for flite / off.
+    /// Spawn count `1` means every turn reused the process started with the lane.
+    pub fn piper_worker(&self) -> (Option<u32>, u32) {
+        let w = self.speech.warmth();
+        (w.piper_pid, w.piper_spawns)
+    }
+
+    /// Drop queued Piper clauses when `turn_id` falls behind `current`. Does not kill Piper.
+    pub fn arm_cancel(&mut self, current: Arc<AtomicU64>, turn_id: u64) {
+        self.speech.arm_cancel(current, turn_id);
+    }
 
     /// S4 → S5 only (no audio). Useful for UIs that show text before speech.
     pub fn reply_text(&mut self, pcm16k: &[i16]) -> Result<(String, AsrSource, String), PhoneError> {
@@ -322,13 +352,17 @@ impl PhoneLane {
     ) -> Result<PhoneTurn, PhoneError> {
         if !self.speech.can_speak() { return Err(PhoneError::NoSpeech(self.speech.backend.label())); }
         let t2 = Instant::now();
-        let audio = self.speech.speak(&reply_text).map_err(|e| PhoneError::NoSpeech(format!("{e:?}")))?;
+        let audio = self.speech.speak(&reply_text).map_err(|e| match e {
+            VoiceError::Cancelled => PhoneError::Superseded,
+            other => PhoneError::NoSpeech(format!("{other:?}")),
+        })?;
         let pcm = to_pcm16(&resample(&audio.samples, audio.sample_rate, PHONE_OUT_RATE_HZ));
         let wav = wav_bytes(&pcm, PHONE_OUT_RATE_HZ);
         let tts_ms = ms_since(t2);
+        let tts_first_pcm = self.speech.warmth().last_first_pcm_ms.unwrap_or(tts_ms);
         Ok(PhoneTurn {
             transcript, reply_text, wav_bytes: wav, ms: ms_since(t0),
-            stage_ms: StageMs { asr: asr_ms, llm: llm_ms, tts: tts_ms }, asr,
+            stage_ms: StageMs { asr: asr_ms, llm: llm_ms, tts: tts_ms, tts_first_pcm }, asr,
             llm: self.llm.name(), speech_backend: self.speech.backend.id(), speech_label: self.speech.backend.label(),
         })
     }
@@ -446,8 +480,22 @@ mod tests {
         let peak = w[44..].chunks_exact(2).map(|c| i16::from_le_bytes([c[0], c[1]]).unsigned_abs()).max().unwrap();
         assert!(peak > 1500, "speech too quiet: {peak}");
         assert!(t.ms >= t.stage_ms.tts);
-        // WAV-in path, same lane (stack reused)
+        assert!(t.stage_ms.tts_first_pcm <= t.stage_ms.tts);
+        let (pid, spawns) = l.piper_worker();
+        // WAV-in path, same lane (stack and, when A21 is up, the same Piper process)
         let t2 = l.turn_wav(&wav_bytes(&fx("thanks"), 16_000)).unwrap();
         assert_eq!((t2.transcript.as_str(), t2.reply_text.as_str()), ("thanks", "Any time."));
+        let (pid2, spawns2) = l.piper_worker();
+        assert_eq!(pid2, pid, "piper pid changed across two turns");
+        if pid.is_some() {
+            assert_eq!(spawns, 1, "prewarm should be the only spawn");
+            assert_eq!(spawns2, 1, "second turn must reuse the worker");
+        }
+    }
+    #[test] fn speech_off_is_not_a_spoken_reply() {
+        let mut l = PhoneLane::with_speech(cfg(AsrMode::Interim), galion_ml_voice::speech::SpeechStack::silent("GALION_SPEECH=off"));
+        let e = l.turn(&voice(1.5)).unwrap_err();
+        assert!(matches!(e, PhoneError::NoSpeech(ref m) if m.contains("GALION_SPEECH=off")), "{e}");
+        assert_eq!(l.piper_worker().0, None);
     }
 }

@@ -22,7 +22,14 @@ One-shot: `galion_cascade::phone_turn(&pcm)` / `phone_turn_wav(&bytes)`.
 | `GALION_LLM` | unset/`canned` (CannedLlm, phone default) · `echo` |
 | `GALION_SPEECH` | `auto` (A21 Piper, else flite) · `a21` · `flite` · `off` → `NoSpeech` |
 
-Errors: `PhoneError::{Empty, BadWav, AsrUnratified, NoSpeech, Cascade}` (impl `std::error::Error`).
+A21 keeps one Piper process for the lane (`--json-input --output_raw`).
+`PhoneLane::new` pre-warms it. Two turns reuse that process (`piper_worker()`
+is `(Some(pid), 1)`). The reply's first clause is flushed at punctuation or
+8 words; `stage_ms.tts_first_pcm` is the time to that PCM. Cold vs warm
+numbers: `scripts/bench-piper-warmth.sh` (no PCM file). `off` does not speak;
+the turn worker publishes the two-tone WAV with `backend=tone` and `error`.
+
+Errors: `PhoneError::{Empty, BadWav, AsrUnratified, NoSpeech, Superseded, Cascade}` (impl `std::error::Error`).
 Smoke: `GALION_ASR=interim cargo run -p galion-cascade --features cascade --example phone_turn [in.wav [out.wav]]`.
 
 Virtual user (offline, `127.0.0.1` only): `scripts/eval/virtual-user.sh`. Report under `galion-gates/results/presence-eval/`. See `docs/eval/PRESENCE-EVAL.md`. `text-inject` is the harness supplying words. It is not recognition. Interim stays `interim-placeholder`.
