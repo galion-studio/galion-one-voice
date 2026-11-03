@@ -1,0 +1,63 @@
+{
+  "frame_bar": "pass",
+  "frame_ms": 80,
+  "kind": "stub",
+  "locks_edited": false,
+  "measured": {
+    "present": false
+  },
+  "owner": "Maciej Grajczyk",
+  "program": "Galion Voice",
+  "schema": "galion-ttfa-gate/v1",
+  "stub": {
+    "backend": "mock",
+    "barge_in": "pass",
+    "barge_in_ms": 80,
+    "barge_in_one_frame_should": "pass",
+    "e_to_a": "pass",
+    "e_to_a_frames": 1,
+    "e_to_a_ms": 80,
+    "frame_ms": 80,
+    "kind": "stub",
+    "measured": false,
+    "onset": "pass",
+    "onset_p50_ms": 240,
+    "runs": [
+      {
+        "backend": "mock",
+        "barge_in": "pass",
+        "barge_in_ms": 80,
+        "barge_in_one_frame_should": "pass",
+        "digest_fnv1a64": "9f657f360c565dbf",
+        "e_to_a": "pass",
+        "e_to_a_frames": 1,
+        "e_to_a_ms": 80,
+        "frame_ms": 80,
+        "kind": "stub",
+        "measured": false,
+        "onset": "pass",
+        "onset_p50_ms": 240,
+        "spec": "presence",
+        "verdict": "green"
+      },
+      {
+        "backend": "mock",
+        "barge_in": "pass",
+        "barge_in_ms": 80,
+        "barge_in_one_frame_should": "pass",
+        "digest_fnv1a64": "db7541ec9f6f42c7",
+        "e_to_a": "absent",
+        "e_to_a_frames": null,
+        "e_to_a_ms": null,
+        "frame_ms": 80,
+        "kind": "stub",
+        "measured": false,
+        "onset": "pass",
+        "onset_p50_ms": 240,
+        "spec": "presence-wav",
+        "verdict": "green"
+      }
+    ]
+  },
+  "verdict": "pass"
+}

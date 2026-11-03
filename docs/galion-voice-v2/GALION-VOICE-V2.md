@@ -570,6 +570,8 @@ barge-in during TTS is a spec assertion (`me` stops, new turn wins).
 
 **Phone loopback eval.** `scripts/eval/virtual-user.sh` runs T0–T2 offline on `127.0.0.1`: text or fixture WAV in, CannedLlm plus Piper or flite out, reply WAV captured when a backend exists. The JSON report is `galion-gates/results/presence-eval/`. TTFA there is a loopback full-utterance time. PSTN is not run. It does not add an engagement metric. See `docs/eval/PRESENCE-EVAL.md`.
 
+**Streaming frame bar.** Live sectors share the 80 ms heartbeat. The gate is `docs/galion-voice-v2/symphony/TTFA.md` (`docs/galion-voice-v2/symphony/scripts/ttfa-gate.sh`). It reads `LOCKS.toml` and leaves the file unchanged. Onset p50 stays ≤ 300 ms, barge-in ≤ 200 ms, e-to-a ≤ 160 ms / 2 frames. The mock replay is a stub and prints no `ttfa_ms`. A wall-clock `ttfa_ms` is accepted only from a measured file, and that number has to sit inside one frame.
+
 **Risks.** Teaching the harness to score "how long the user stayed". That
 list is already rejected. Do not reopen it in V2.
 
