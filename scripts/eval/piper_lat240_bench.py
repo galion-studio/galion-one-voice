@@ -83,6 +83,7 @@ def main():
     ap.add_argument("--idle-ms", type=int, default=0, help="sleep before each measured line (call idle gap)")
     ap.add_argument("--keepalive-ms", type=int, default=0, help="if >0, synth a throwaway 'Mm.' this long before each measured line")
     ap.add_argument("--label", default="")
+    ap.add_argument("--replay", default="", help="full-loop.ndjson: replay each run's real first_clause after a 'Mm-hm.' backchannel, like the loop")
     a = ap.parse_args()
     cpus = None
     if a.cpus:
@@ -98,6 +99,15 @@ def main():
     res = {"label": a.label, "model": Path(a.model).name, "rate": rate, "cpus": a.cpus or "all", "threads": pp.threads(),
            "idle_ms": a.idle_ms, "keepalive_ms": a.keepalive_ms, "cold_spawn_to_done_ms": round(cold_total, 1),
            "loadavg": os.getloadavg()[0], "by_words": {}}
+    if a.replay:
+        rows = [json.loads(l) for l in open(a.replay) if l.strip()]
+        v, base = [], []
+        for _ in range(max(1, a.reps // 10)):
+            for r in rows:
+                pp.say("Mm-hm.")
+                f, _, _, _ = pp.say(r["first_clause"]); v.append(f); base.append(r["piper_ttfa_ms"])
+        res["replay"] = {"ours": summ(v), "loop_baseline": summ(base), "clauses": len(rows)}
+        pp.close(); print(json.dumps(res)); return
     for k in a.words.split(","):
         ttfa, first_ms = [], []
         for _ in range(a.reps):
