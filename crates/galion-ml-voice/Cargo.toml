@@ -12,7 +12,7 @@ publish = false
 [features]
 # V1-03: real-speech path (A21 weight slot + interim system TTS via runtime dlopen of
 # libflite). Off by default: the default build stays no-I/O, no FFI.
-speech = []
+speech = ["dep:galion-heartbeat"]
 
 [[example]]
 name = "piper_warmth"
@@ -23,3 +23,4 @@ name = "flash_ttfa"
 required-features = ["speech"]
 
 [dependencies]
+galion-heartbeat = { path = "../galion-heartbeat", optional = true, default-features = false }

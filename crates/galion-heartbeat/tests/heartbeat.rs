@@ -187,9 +187,10 @@ fn reset_starts_a_fresh_session() {
 
 #[test]
 fn hot_path_source_has_no_blocking_or_allocating_calls() {
-    let src = include_str!("../src/lib.rs");
-    let code: String = src.lines().filter(|l| !l.trim_start().starts_with("//")).collect::<Vec<_>>().join("\n");
-    for bad in ["Mutex", "RwLock", "Condvar", "sleep", "std::fs", "std::net", "Instant", "SystemTime", "mpsc", "Vec<", "vec!", "String", "Box::new", "format!", "println!", "thread::"] {
-        assert!(!code.contains(bad), "hot-path crate source contains `{bad}`");
+    for (label, src) in [("src/lib.rs", include_str!("../src/lib.rs")), ("src/symphony.rs", include_str!("../src/symphony.rs"))] {
+        let code: String = src.lines().filter(|l| !l.trim_start().starts_with("//")).collect::<Vec<_>>().join("\n");
+        for bad in ["Mutex", "RwLock", "Condvar", "sleep", "std::fs", "std::net", "Instant", "SystemTime", "mpsc", "Vec<", "vec!", "String", "Box::new", "format!", "println!", "thread::"] {
+            assert!(!code.contains(bad), "{label} contains `{bad}`");
+        }
     }
 }

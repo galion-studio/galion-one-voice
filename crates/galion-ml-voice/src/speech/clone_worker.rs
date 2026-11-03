@@ -23,8 +23,17 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStderr, ChildStdin, ChildStdout, Command, Stdio};
 use std::time::{Duration, Instant};
 
-/// Output rate. Matches the phone lane.
-pub const CLONE_RATE_HZ: u32 = 24_000;
+/// Output rate. The heartbeat me band (`galion_heartbeat::SAMPLE_RATE`).
+pub const CLONE_RATE_HZ: u32 = galion_heartbeat::SAMPLE_RATE;
+/// One live frame. Synthesis of the child stays off [`galion_heartbeat::Heartbeat::step`].
+pub const CLONE_FRAME_MS: u32 = galion_heartbeat::FRAME_MS;
+pub const CLONE_FRAME_SAMPLES: usize = galion_heartbeat::FRAME_SAMPLES;
+
+/// Samples a live step may take from queued clone PCM.
+/// Does not spawn, read, or write the child, and does not allocate.
+pub fn hot_frame_samples(queued: usize) -> usize {
+    queued.min(CLONE_FRAME_SAMPLES)
+}
 
 const PINS_TEXT: &str = include_str!("../../../../scripts/clone/PINS.sha256");
 
@@ -677,6 +686,17 @@ mod tests {
     use super::*;
     use std::os::unix::fs::PermissionsExt;
     use std::process::{Command, Stdio};
+
+    #[test]
+    fn frame_matches_heartbeat() {
+        assert_eq!(CLONE_FRAME_MS, galion_heartbeat::FRAME_MS);
+        assert_eq!(CLONE_FRAME_MS, 80);
+        assert_eq!(CLONE_RATE_HZ, galion_heartbeat::SAMPLE_RATE);
+        assert_eq!(CLONE_FRAME_SAMPLES, galion_heartbeat::FRAME_SAMPLES);
+        assert_eq!(hot_frame_samples(10_000), CLONE_FRAME_SAMPLES);
+        assert_eq!(hot_frame_samples(3), 3);
+        assert_eq!(hot_frame_samples(0), 0);
+    }
 
     #[test]
     fn pins_are_safetensors_and_weights_are_not_in_the_tree() {
