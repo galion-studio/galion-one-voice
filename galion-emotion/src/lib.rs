@@ -15,6 +15,7 @@
 //!   [`loudness::AffectEstimator`] (loudness heuristic, synthetic fixtures, offline
 //!   reference replay; later a learned head) behind the same consent gate.
 //! * [`band`] defines the 8-byte wire sample and the duplex packet that carries it.
+//! * [`duplex`] is the host clock: one [`VoiceColor`] per 80 ms frame, after the heartbeat step.
 //!
 //! Phase 2 status: all model-backed parts are **stubs** (cheap DSP heuristics),
 //! zero dependencies, zero model downloads, safetensors + .gq only.
@@ -22,6 +23,7 @@
 pub mod band;
 pub mod consent;
 pub mod detect;
+pub mod duplex;
 pub mod express;
 pub mod film;
 pub mod frame;
@@ -32,6 +34,7 @@ pub mod store;
 pub use band::{consent_bits, consent_bits_of, encode_with_consent, Direction, DuplexPacket, EmotionBand, EmotionWire};
 pub use consent::{ConsentDecision, ConsentGate, ConsentState, DefaultConsentGate, Purpose};
 pub use detect::{AffectDetector, DetectError, EnergyStubDetector};
+pub use duplex::EmotionClock;
 pub use express::{
     empathy_weight, EmpathyPolicy, Oklch, ProsodyControl, ProsodyExpressor, StubExpressor, VoiceColor, EMPATHY_OKLCH,
     EMPATHY_PROSODY, EMPATHY_WASH_AMBER, NEUTRAL_OKLCH,
