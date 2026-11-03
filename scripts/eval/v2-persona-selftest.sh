@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
-# Local self-test for /health, /dot, persona files, and the five moods.
-# Does not fetch a clip. Does not start ngrok.
+# STUB-PASS only. Local check for /health, /dot, persona files, and moods.
+# Does not fetch a clip. Does not hash a reference. Does not run Nano.
+# A green line here is not HARD-PASS. The hard loop is
+# scripts/eval/v2-hard-loop.sh (docs/galion-voice-v2/HARD-LOOP.md).
 #   BASE=http://127.0.0.1:7878 scripts/eval/v2-persona-selftest.sh
 set -euo pipefail
 cd "$(dirname "$0")/../.."
@@ -28,4 +30,5 @@ say quiet '{"text":"You don'\''t have to say anything. Just stay."}' | grep -q '
 dot=$(curl -fsS "$BASE/dot")
 grep -q '"mood":"quiet"' <<<"$dot"
 grep -q '"label":"quiet"' <<<"$dot"
-echo "v2 persona self-test OK ($BASE)"
+echo "v2 persona self-test STUB-PASS ($BASE)"
+echo "STUB-PASS is not HARD-PASS. Weights, reference hashes, Nano generate, streaming TTFA: scripts/eval/v2-hard-loop.sh"
