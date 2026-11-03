@@ -62,7 +62,9 @@ Galion clock. That match was not re-measured.
 
 **Worker.** The scaffold is `docs/galion-voice-v2/CLONE-WORKER.md`: one
 long-lived process, the same idea as the warm Piper worker. Text in, PCM
-out, no file of samples. Nano is the primary. Turbo is the option on the
+out of the child. The child writes no file. The Rust compiler turns that
+PCM into a `.gqvoice` packet (`GQVOICE.md`) and the speech stack plays the
+packet. Nano is the primary. Turbo is the option on the
 same stdin line. If the pinned weights are missing, Piper
 (`en_US-ljspeech-medium`) speaks. Flite remains the pack-missing fallback
 under that. The Python stub does not call generate and refuses a reference
