@@ -54,6 +54,16 @@ sunset `2027-02-01`. Other lock values are unchanged. Tones are not passed
 off as a reply. The first student size on the backlog is S0. Canned stays
 the fallback until readiness tests. The `.gq` student does not exist yet.
 
+Obsidian Open Mind is a separate Rust agent stack,
+[galion-studio/obsidian-open-mind](https://github.com/galion-studio/obsidian-open-mind).
+This repository keeps only the voice-side seam: nerve notes
+(`voice.frame_miss`, `voice.fallback`, `voice.backend_up`) and a Hermes
+side-band handoff for problem-solving. Hermes is not on the 80 ms tick.
+The Open Mind tree is not vendored. On a VPS it belongs at
+`/opt/galion/openmind` after a human deploy. It is not on this Cursor host,
+and nothing here connects.
+[OPENMIND-NERVE-CORTEX.md](docs/galion-voice-v2/OPENMIND-NERVE-CORTEX.md).
+
 Nothing here has been deployed to the VPS. Access is approved-pending-setup:
 per-user anonymized codes, installed by a human. No shared key. Priority 1
 for V2 voice work is local Chatterbox cloning, not a cloud API
@@ -104,6 +114,7 @@ Full runbook: [docs/V1-DEMO.md](docs/V1-DEMO.md).
 LOCKS.toml            the contract (clock, bands, consent, formats, the one mark)
 LEDGER.md             what landed, and what an owner decided
 crates/galion-heartbeat     the 80 ms step
+crates/galion-openmind      nerve notes + Hermes handoff (no daemon required)
 crates/galion-cascade       EN lane + PhoneLane (feature cascade)
 crates/galion-console       screen demo, v1-screen.html, turn worker
 galion-render/              the mark, and the loopback HTTP surface
@@ -162,6 +173,7 @@ scripts/run-v1-screen.sh --check
    `WebSurface` will reject the bind.
 
 Further: [V2 plan](docs/galion-voice-v2/GALION-VOICE-V2.md) ·
+[Open Mind nerve and cortex](docs/galion-voice-v2/OPENMIND-NERVE-CORTEX.md) ·
 [animation engine](docs/galion-voice-v2/ANIMATION-ENGINE.md) ·
 [one-UI](docs/galion-voice-v2/ONE-UI.md) ·
 [Plan V5](docs/ops/PLAN-V5.md) ·

@@ -502,6 +502,11 @@ replies stay the fallback until readiness tests pass. Training go-ahead and
 the teacher checkpoint are still not given. Configs stay stubs. The Open Mind
 slot file may still say S1; that string is not a licence to skip S0.
 
+The voice-side nerve and cortex seam is
+[OPENMIND-NERVE-CORTEX.md](OPENMIND-NERVE-CORTEX.md) and
+`crates/galion-openmind`. It does not train a student, and it does not put
+Hermes on the 80 ms tick.
+
 ### V2-S10 · Gates R0–R3
 
 **Goal.** Remote probe and gate run on the VPS, unchanged in spirit from
@@ -681,6 +686,21 @@ by this decision before any OpenRouter approval was kept. Do not call Hermes
 from this record. No secrets in the repo. Gateway choice C5 in the sideband
 crate is now this approval; the transport is still a trait, not a client.
 
+The hook that offers `Turn`, `Intent`, and `Affect` is
+`galion_openmind::CortexHandoff`. It uses the types already in
+`galion-sideband` and only `try_send`s. Detail:
+[OPENMIND-NERVE-CORTEX.md](OPENMIND-NERVE-CORTEX.md).
+
+### Open Mind nerve and cortex
+
+The voice engine's seam to Obsidian Open Mind is
+[OPENMIND-NERVE-CORTEX.md](OPENMIND-NERVE-CORTEX.md). Nerve notes are
+`voice.frame_miss`, `voice.fallback`, and `voice.backend_up` (groups
+`galion-os` and `hermes`). Cortex, for this program, means Hermes taking
+the analytical problem on the side band. The Open Mind repository is not
+vendored. `/opt/galion/openmind` is the path a human deploy uses on the VPS.
+This program does not SSH, and it does not download a model.
+
 ## 6. What this program landed
 
 - Phone modules from the V1 delta: `phone.rs`, `canned.rs`, `turn_worker.rs`,
@@ -693,6 +713,10 @@ crate is now this approval; the transport is still a trait, not a client.
 - Security headers, CORS allowlist switch, retention note.
 - `scripts/check-phone-pipeline.sh` and a thicker `run-v1-screen.sh --check`.
 - This plan, Plan V5, the brand doc, the README.
+- Voice-side Open Mind seam: `crates/galion-openmind` and
+  `docs/galion-voice-v2/OPENMIND-NERVE-CORTEX.md`. Local nerve notes when no
+  daemon is present. Hermes handoff through `galion-sideband`. Not inside
+  `Heartbeat::step`. LOCKS.toml not edited.
 
 ## 7. What stays human
 

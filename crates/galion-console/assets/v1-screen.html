@@ -59,6 +59,9 @@ canvas{display:block;position:fixed;inset:0;width:100%;height:100%;width:100dvw;
 <script>
 "use strict";
 const TOK={dot:"#F5F5F7",base:"#0A0A0C",from:"#F5A524",to:"#7C3AED"};
+// Empathy (galion-emotion `e`) moves only this wash. The circle fill stays TOK.dot.
+// EMPATHY_WASH matches galion-emotion EMPATHY_WASH_AMBER. Spectrum does not set hue.
+const EMPATHY_WASH=0.5, EMPATHY_DESAT=0.55;
 const WASH=0.38, WASH_MS=24000, IDLE_MS=1600, BW=96, BH=54;
 // Mirrors galion-render/src/dot.rs (UX-01). Keep in sync.
 const R={idle:0.100, listen:0.135, speak:0.105, speakDepth:0.050, off:0.060};
@@ -92,7 +95,7 @@ let playSrc=null, playId=null, playing=false, seenReplies=new Set();
 const LUTI={idle:{w:2.4,z:0.86},listening:{w:11,z:0.70},thinking:{w:6.5,z:0.48},speaking:{w:18,z:0.58},offline:{w:3.2,z:1.05}};
 const SPRING=LUTI;
 const LUTI_COST=48;
-let rP=R.idle, rV=0, bP=B.idle, bV=0, aspect=1, micEnv=0, playEnv=0, turnsInFlight=0;
+let rP=R.idle, rV=0, bP=B.idle, bV=0, aspect=1, micEnv=0, playEnv=0, turnsInFlight=0, eShown=0;
 let engN=0;
 let playAn=null, playData=null;
 let sessionToken="";
@@ -127,12 +130,19 @@ function discloseAi(){
   }catch(e){}
 }
 
-function paintBg(tms,b){
+function paintBg(tms,b,e){
   const base=hex(b.base),A=hex(b.from),V=hex(b.to);
   const ph=(tms%WASH_MS)/WASH_MS*2*Math.PI, drift=0.15*Math.sin(ph), d=img.data;
+  const pull=(typeof e==="number"&&isFinite(e))?clamp(e,0,1):0;
   for(let y=0;y<BH;y++){const v=(y+.5)/BH;
     for(let x=0;x<BW;x++){const u=(x+.5)/BW;
-      const ramp=Math.min(1,Math.max(0,.5*(u+v)+drift)), hue=lerp(A,V,ramp);
+      let ramp=Math.min(1,Math.max(0,.5*(u+v)+drift));
+      if(pull) ramp=ramp+(EMPATHY_WASH-ramp)*pull;
+      let hue=lerp(A,V,ramp);
+      if(pull){
+        const g=(hue[0]+hue[1]+hue[2])/3;
+        hue=hue.map(c=>Math.round(c+(g-c)*pull*EMPATHY_DESAT));
+      }
       const du=u-.5,dv=v-.5, r=Math.sqrt(du*du+dv*dv)/Math.SQRT1_2, vg=Math.max(0,1-r);
       const c=lerp(base,hue,WASH*vg*vg), k=(y*BW+x)*4;
       d[k]=c[0];d[k+1]=c[1];d[k+2]=c[2];d[k+3]=255;}}
@@ -220,10 +230,14 @@ function draw(){
   if(cv.width!==W||cv.height!==H){cv.width=W;cv.height=H;}
   const f=latest||{};
   const b=(f.bg&&okHex(f.bg.base)&&okHex(f.bg.from)&&okHex(f.bg.to))?f.bg:TOK;
-  paintBg(now-t0,b);
+  const eTarget=(typeof f.e==="number"&&isFinite(f.e))?clamp(f.e,0,1):0;
+  eShown+=(eTarget-eShown)*(1-Math.exp(-dt/900));
+  if(eShown<0.001) eShown=0;
+  paintBg(now-t0,b,eShown);
   cx.imageSmoothingEnabled=true; cx.imageSmoothingQuality="high"; cx.drawImage(bg,0,0,W,H);
   const rad=clamp(rP,0,.5)*Math.min(W,H), k=clamp(bP,0,1);
   const ax=clamp(aspect,0.82,1.18), rx=rad*ax, ry=rad/ax;
+  // Locked mark. Brightness only. Empathy does not enter this fill.
   cx.fillStyle="#"+hex(TOK.dot).map(x=>Math.round(x*k).toString(16).padStart(2,"0")).join("");
   if(rx>0&&ry>0){ cx.beginPath(); cx.ellipse(W/2,H/2,rx,ry,0,0,2*Math.PI); cx.fill(); }
   requestAnimationFrame(draw);

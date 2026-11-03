@@ -22,10 +22,11 @@
 
 use std::collections::VecDeque;
 
+use galion_emotion::{EmotionFrame, StubExpressor};
 use galion_heartbeat::{FrameOut, FRAME_MS};
 use galion_render::{dot, Emotion, Fanout, RenderSurface, VizFrame};
 
-use crate::live::{AffectFeed, LiveSnapshot, Stage, StageLatencies, TimingFeed};
+use crate::live::{AffectFeed, AffectReading, LiveSnapshot, Stage, StageLatencies, TimingFeed};
 
 /// V1-01 single screen: the one dot, fullscreen, nothing else. Served at `/` and
 /// `/screen` by `galion_render::WebSurface::with_page` (feature `dot-viz-web`); polls
@@ -82,7 +83,25 @@ pub fn viz_from_heartbeat(out: &FrameOut, you_pcm: &[f32], me_pcm: &[f32], me_vo
     f.speak.active = me_voiced && !out.paused;
     let lean = out.applied.lean_in.clamp(0.0, 1.0);
     f.speak.emotion = Emotion { label: if lean > 0.0 { "lean-in" } else { "neutral" }, intensity: lean, valence: 0.0 };
+    // Same weight `voice_color` uses for prosody. Dominance is not on the
+    // console reading; every negative label is in the empathy set, so 0.5
+    // does not change `e`. Off the audio step: this runs after `Heartbeat::step`.
+    f.empathy = if snap.sense { empathy_of(snap.affect) } else { 0.0 };
     f
+}
+
+fn empathy_of(reading: Option<AffectReading>) -> f32 {
+    let Some(a) = reading else { return 0.0 };
+    let frame = EmotionFrame {
+        seq: 0,
+        t_ms: 0,
+        dur_ms: FRAME_MS as u16,
+        valence: a.valence,
+        arousal: a.arousal,
+        dominance: 0.5,
+        confidence: a.confidence,
+    };
+    StubExpressor.voice_color(Some(&frame)).e
 }
 
 /// Pumps a timing feed and an affect feed from the host loop.
@@ -394,5 +413,44 @@ mod tests {
         assert!(SCREEN_HTML.contains("fetch(\"session\""));
         assert!(SCREEN_HTML.contains("X-Galion-Session"));
         assert!(!SCREEN_HTML.contains("?token=") && !SCREEN_HTML.contains("?session="));
+        assert!(SCREEN_HTML.contains("EMPATHY_WASH=0.5"));
+        assert!(SCREEN_HTML.contains("EMPATHY_DESAT=0.55"));
+        assert!(SCREEN_HTML.contains("cx.fillStyle=\"#\"+hex(TOK.dot)"));
+        assert!(SCREEN_HTML.contains("dot:\"#F5F5F7\""));
+        assert!(!SCREEN_HTML.contains("#B695CF"), "heather is not painted; the lock keeps the circle");
+    }
+
+    #[test]
+    fn negative_caller_sets_empathy_without_moving_the_dot() {
+        use crate::live::AffectReading;
+        use galion_render::DotParams;
+        let mut gate = DefaultConsentGate::default();
+        gate.grant(0, "en", Purpose::PersonalAssistant);
+        let mut hb = Heartbeat::new(HeartbeatConfig::default(), gate);
+        let quiet = vec![0.0f32; FRAME_SAMPLES];
+        let out = hb.step(&FrameIn {
+            you_pcm: &quiet,
+            affect: None,
+            tension: None,
+            consent_bits: 0,
+            purpose: Purpose::PersonalAssistant,
+            session_open: true,
+            me_speaking: false,
+            late: false,
+        });
+        let mut snap = LiveSnapshot::default();
+        let neutral = viz_from_heartbeat(&out, &quiet, &quiet, false, &snap);
+        snap.sense = true;
+        snap.affect = Some(AffectReading { valence: -0.8, arousal: 0.4, confidence: 1.0 });
+        let empathic = viz_from_heartbeat(&out, &quiet, &quiet, false, &snap);
+        assert_eq!(neutral.empathy, 0.0);
+        assert!((empathic.empathy - 1.0).abs() < 1e-5, "{}", empathic.empathy);
+        assert_eq!(DotParams::from_frame(&neutral).radius, DotParams::from_frame(&empathic).radius);
+        assert_eq!(DotParams::from_frame(&neutral).brightness, DotParams::from_frame(&empathic).brightness);
+        snap.affect = Some(AffectReading { valence: 0.8, arousal: 0.8, confidence: 1.0 });
+        assert_eq!(viz_from_heartbeat(&out, &quiet, &quiet, false, &snap).empathy, 0.0);
+        snap.sense = false;
+        snap.affect = Some(AffectReading { valence: -0.8, arousal: 0.4, confidence: 1.0 });
+        assert_eq!(viz_from_heartbeat(&out, &quiet, &quiet, false, &snap).empathy, 0.0, "no sense, no empathy");
     }
 }

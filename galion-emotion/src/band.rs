@@ -240,7 +240,7 @@ mod tests {
     fn full_duplex_loop() {
         use crate::consent::{DefaultConsentGate, Purpose};
         use crate::detect::{AffectDetector, EnergyStubDetector};
-        use crate::express::{EmpathyPolicy, ProsodyExpressor, StubExpressor};
+        use crate::express::StubExpressor;
 
         let mut gate = DefaultConsentGate::default();
         gate.grant(0, "hr", Purpose::PersonalAssistant);
@@ -252,9 +252,9 @@ mod tests {
         let pcm: Vec<f32> = (0..1920).map(|i| 0.3 * (i as f32 * 0.05).sin()).collect();
         let caller = det.detect(&pcm, 24_000, 0, &gate, Purpose::PersonalAssistant).ok();
         let pin = inb.push(0, 80, vec![0; 4], caller);
-        let target = exp.respond(inb.current().as_ref());
-        let ctrl = exp.plan(&target);
-        let pout = outb.push(0, 80, vec![0; 4], Some(target));
+        let voiced = exp.voice_color(inb.current().as_ref());
+        let ctrl = voiced.prosody;
+        let pout = outb.push(0, 80, vec![0; 4], Some(voiced.target));
         assert_eq!(decode(&pin.emotion, 0, 80).0, Direction::Inbound);
         assert_eq!(decode(&pout.emotion, 0, 80).0, Direction::Outbound);
         assert!(ctrl.energy > 0.0);
@@ -266,6 +266,6 @@ mod tests {
         inb.reset();
         let p2 = inb.push(80, 80, vec![], caller2);
         assert!(decode(&p2.emotion, 80, 80).2.is_none());
-        assert!(exp.respond(inb.current().as_ref()).valence > 0.0);
+        assert!(exp.voice_color(inb.current().as_ref()).target.valence > 0.0);
     }
 }

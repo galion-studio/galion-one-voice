@@ -32,7 +32,10 @@ pub mod store;
 pub use band::{consent_bits, consent_bits_of, encode_with_consent, Direction, DuplexPacket, EmotionBand, EmotionWire};
 pub use consent::{ConsentDecision, ConsentGate, ConsentState, DefaultConsentGate, Purpose};
 pub use detect::{AffectDetector, DetectError, EnergyStubDetector};
-pub use express::{EmpathyPolicy, ProsodyControl, ProsodyExpressor, StubExpressor};
+pub use express::{
+    empathy_weight, EmpathyPolicy, Oklch, ProsodyControl, ProsodyExpressor, StubExpressor, VoiceColor, EMPATHY_OKLCH,
+    EMPATHY_PROSODY, EMPATHY_WASH_AMBER, NEUTRAL_OKLCH,
+};
 pub use film::{
     apply_film, check_counterbalance, feeling_budget, measure_feeling, within_budget, BudgetReport, FilmConditioner,
     FilmParams, PolicyViolation, StubFilm, FEELING_BUDGET_PCT, FRAME,

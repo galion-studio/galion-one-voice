@@ -239,7 +239,7 @@ pub fn measure_feeling<F: FnMut()>(iters: usize, frame: Duration, mut f: F) -> B
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::express::{EmpathyPolicy, ProsodyExpressor, StubExpressor};
+    use crate::express::{EmpathyPolicy, StubExpressor};
 
     fn f(v: f32, a: f32, d: f32, c: f32) -> EmotionFrame {
         EmotionFrame { seq: 0, t_ms: 0, dur_ms: 80, valence: v, arousal: a, dominance: d, confidence: c }
@@ -361,11 +361,10 @@ mod tests {
             if let Ok(fr) = det.detect(&pcm, 24_000, t, &gate, Purpose::PersonalAssistant) {
                 store.record(&fr);
             }
-            let target = exp.respond(store.adapt_target().as_ref());
-            let ctrl = exp.plan(&target);
-            film.condition(Some(&target), &mut params);
+            let voiced = exp.voice_color(store.adapt_target().as_ref());
+            film.condition(Some(&voiced.target), &mut params);
             apply_film(&mut hidden, &params);
-            std::hint::black_box((&ctrl, &hidden));
+            std::hint::black_box((&voiced.prosody, &voiced.oklch, &hidden));
             t += 80;
         });
         eprintln!("A9 feeling-path budget: median {:?} p95 {:?} max {:?} budget {:?} ({:.3}% of frame)", r.median, r.p95, r.max, r.budget, r.pct_of_frame);
