@@ -37,6 +37,7 @@ pub mod sha256;
 pub mod weights;
 
 pub use clause::{ClauseBuf, CLAUSE_WORDS};
+pub use weights::A21RingFeed;
 
 /// Output rate of every speech backend (Mimi-class 24 kHz lane bus).
 pub const SPEECH_RATE: u32 = crate::stub::SAMPLE_RATE;

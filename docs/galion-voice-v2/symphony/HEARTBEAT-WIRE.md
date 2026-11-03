@@ -52,7 +52,8 @@ These stay outside both calls. They may allocate. They may block. They must not 
 | Work | Where it runs |
 |---|---|
 | Chatterbox model call | out of process, off the frame. Still unwired. |
-| `CloneWorker::poll_pcm` | host, before `Heartbeat::step`. Non-blocking. Fills `NanoPcmRing`. |
+| `A21RingFeed::poll` when `GALION_SPEECH=a21` | host, before `Heartbeat::step`. Reads Piper stdout, resamples the native rate to 24 kHz, pushes the new samples. This is the ring feed. |
+| `CloneWorker::poll_pcm` | not the feed. Protocol stub bytes are not a voice. |
 | Persona reply text (`Floor::say`) | turn path, off the frame |
 | Paint, JSON, HTTP, glyph history | after the step, best effort |
 
@@ -62,13 +63,15 @@ These stay outside both calls. They may allocate. They may block. They must not 
 
 `NanoPcmRing` is a fixed buffer of `NANO_RING_FRAMES` (4) heartbeat frames. No heap. No lock. No syscall inside `step`.
 
-The child writes raw s16le at 24 kHz on stdout and progress on stderr (`galion-clone-progress:`, then `galion-clone-utt:`). `poll_pcm` reads both without waiting and converts s16le into the ring. One odd byte is kept on the worker, not allocated. A full ring drops new samples and counts them. It does not grow a catch-up queue.
+When `GALION_SPEECH=a21`, `A21RingFeed` is the feed. Piper writes native-rate s16le (the ljspeech pack is 22050 Hz). `poll` resamples that to 24 kHz and pushes it. `step` then takes 1920 samples or nothing. A remainder shorter than one frame stays queued. A full ring drops new samples. It does not grow a catch-up queue.
 
-`step` then takes 1920 samples or nothing. A remainder shorter than one frame stays queued. The me slot is used for that tick only when the ring did not supply a full frame, so Piper (or the rendered me band) can still speak. `nano_frame` is true only for a ring frame.
+`GALION_CLONE_STUB_FRAMES` is not this feed. Those bytes are a protocol tone. They are not Piper and they are not a voice.
+
+The me slot is used for that tick only when the ring did not supply a full frame. `nano_frame` is true only for a ring frame.
 
 Host order, once per frame:
 
-1. `CloneWorker::poll_pcm(&mut ring)` when a child is running. Skip this when there is no child.
+1. `A21RingFeed::poll(&mut ring)` when `GALION_SPEECH=a21`. Skip this otherwise.
 2. `Heartbeat::step`.
 3. `SymphonyWire::step(..., Some(&mut ring))`.
 4. If `release_slot`, `ring.release()` after `step` returns.
@@ -77,9 +80,10 @@ Host order, once per frame:
 
 | Piece | Kind | Meaning |
 |---|---|---|
-| Ring drain on `SymphonyWire::step` | hard | Real copy of one 1920-sample frame. `allocs=0`. Non-blocking. Late frame is a pause. No catch-up. |
-| `poll_pcm` into that ring | hard IPC | Real non-blocking read of the child pipes. The shape is in place. It is not inside `step`. |
-| Chatterbox `generate` | stub, BLOCKED | The worker does not import torch and does not call the model. Weights are not in the tree. `GALION_CLONE_STUB_PCM=1` with `GALION_CLONE_STUB_FRAMES` writes protocol PCM so the drain can be tested. That PCM is not a voice and not a Flash result. |
+| Ring drain on `SymphonyWire::step` | hard | One 1920-sample frame at 24 kHz. `allocs=0`. Non-blocking. Late frame is a pause. No catch-up. |
+| Piper feed when `GALION_SPEECH=a21` | hard, measured | `A21RingFeed` resamples real Piper PCM into the ring. `piper_measured=true` only for that run. |
+| `GALION_CLONE_STUB_FRAMES` | not a feed | Protocol tone. Not Piper. Not a voice. Not `piper_measured`. |
+| Chatterbox `generate` | BLOCKED | The worker does not import torch and does not call the model. |
 
 Piper remains the fallback when the clone slot is absent or the ring has no full frame.
 

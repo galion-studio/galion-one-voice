@@ -24,9 +24,9 @@ Toolchain: Rust 1.85.0. Profile: `cargo test` (debug). This file records that ru
 | Yield copies nothing and asks the host to release the slot | PASS | `yield_releases_the_slot_and_copies_nothing` |
 | Clone drain size is one heartbeat frame | PASS | `frame_matches_heartbeat`; `drain_takes_one_heartbeat_frame_and_leaves_the_tail` |
 | Nano ring drain is one frame, hard | PASS | `nano_ring_drains_one_frame_and_a_late_tick_does_not_catch_up`. Late tick pops nothing. The next tick takes 1920. The tail stays. A full ring drops overflow instead of growing a catch-up queue. `steps_allocate_nothing` drains the ring inside the counting allocator (`allocs=0`). |
-| Child stdout into that ring, hard IPC | PASS | `nano_pcm_drains_one_heartbeat_frame`. `poll_pcm` is non-blocking and runs before `Heartbeat::step`. `SymphonyWire::step` then takes one frame. Protocol PCM, not a model. |
+| Piper feed, `GALION_SPEECH=a21` | HARD, measured | `a21_piper_pcm_feeds_one_heartbeat_frame`. Real Piper PCM, native 22050 Hz resampled to 24 kHz, one 1920-sample frame. `piper_measured=true`. `GALION_CLONE_STUB_FRAMES` is not this feed. |
 | Live frame loop still runs with the wire in the loop | PASS | `galion-live-demo` `tests/live.rs` (feature `dot-viz`), including `live_loop_drains_one_nano_frame_and_leaves_the_tail` |
-| Chatterbox `generate` (model PCM) | BLOCKED, stub | The worker does not import torch and does not call generate. Weights are not in the tree. `GALION_CLONE_STUB_FRAMES` exists so the drain can move bytes. That is not a voice. This row does not fail the harness. |
+| Chatterbox `generate` (model PCM) | BLOCKED | The worker does not import torch and does not call generate. Weights are not in the tree. That row does not fail the harness. |
 
 `LOCKS.toml` was not edited.
 
@@ -40,6 +40,16 @@ verdict=PASS frame_ms=80 bands=3 sectors=3 allocs=0 late=pause p99_us=107.175 ma
 
 The ceiling is 800 µs. The timed region includes the Nano ring drain. Other debug passes in this session stayed under it: p99 103.553 / 107.175 / 109.088 µs, max 118.434 / 135.156 / 359.494 µs. A later run may print another pair. The harness fails when either number reaches 800.
 
+## Piper feed
+
+`GALION_SPEECH=a21`, Piper `en_US-ljspeech-medium` on CPU. Native 22050 Hz resampled to 24 kHz. One frame is 1920 samples. Late frame paused and did not pop the ring. The next step took one frame. `allocs=0`. Stub frames were not the source.
+
+```text
+piper_measured=true engine=piper-cpu voice=en_US-ljspeech-medium native_hz=22050 rate_hz=24000 frame=1920 first_frame_ms=377 drain_us=0.831 late_us=1.189 allocs=0 late=pause
+```
+
+`first_frame_ms` is submit until the ring held one frame, including the cold Piper load. `drain_us` is `Heartbeat::step` plus `SymphonyWire::step` on that PCM.
+
 The clock read is outside `step`. The counting allocator is armed only around the two `step` calls.
 
 ## Fail and blocked
@@ -48,6 +58,6 @@ A failing assertion, or a missing `verdict=PASS` line, is **FAIL**. The script e
 
 `cargo` missing on the machine is **BLOCKED**. The script exits 2.
 
-Model PCM from Chatterbox is **BLOCKED** for this gate, as the table says. The drain and the pipe shape are hard. The samples the stub writes are not. The 80 ms harness itself passed.
+Model PCM from Chatterbox is **BLOCKED**. The ring feed that was measured is Piper under `GALION_SPEECH=a21`, with `piper_measured=true`. `GALION_CLONE_STUB_FRAMES` is not that measurement. The 80 ms harness itself passed.
 
 — Maciej Grajczyk
