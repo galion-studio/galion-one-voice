@@ -66,6 +66,8 @@ pub struct TurnReply {
     pub llm: &'static str,
     /// `"asr=.. llm=.. tts=.."` stage timings.
     pub stages: String,
+    /// Register in force when the turn was admitted. Not drawn, not a film voice.
+    pub persona: &'static str,
     /// Set when the lane failed and the tone was published instead.
     pub error: Option<String>,
     pub in_ms: u32,
@@ -219,6 +221,7 @@ fn turn_job_from(msg: BusMsg) -> TurnJob {
 }
 
 fn respond(lane: &mut PhoneLane, mut job: TurnJob, gate: &BusGate) -> Option<TurnReply> {
+    let persona = gate.persona_id().as_str();
     lane.arm_cancel(gate.cancel_token(), job.id);
     let t0 = Instant::now();
     let in_ms = (job.pcm.len() as u64 * 1000 / job.rate.max(1) as u64) as u32;
@@ -250,6 +253,7 @@ fn respond(lane: &mut PhoneLane, mut job: TurnJob, gate: &BusGate) -> Option<Tur
                 error: None,
                 in_ms,
                 took_ms: t0.elapsed().as_millis() as u32,
+                persona,
             })
         }
         Err(PhoneError::Superseded) => None,
@@ -277,6 +281,7 @@ fn respond(lane: &mut PhoneLane, mut job: TurnJob, gate: &BusGate) -> Option<Tur
                 error: Some(format!("{kind}: {e}")),
                 in_ms,
                 took_ms: t0.elapsed().as_millis() as u32,
+                persona,
             })
         }
     }
@@ -378,7 +383,7 @@ mod tests {
             std::thread::sleep(std::time::Duration::from_millis(5));
         }
         let r = got.expect("reply");
-        assert_eq!((r.id, r.backend), (1, "tone"));
+        assert_eq!((r.id, r.backend, r.persona), (1, "tone", "samantha"));
         assert!(r
             .error
             .as_deref()
@@ -388,6 +393,26 @@ mod tests {
         w.supersede(9); // barge-in: anything older than 9 is stale
         assert_eq!(w.bus().cancel(), 9);
         assert!(w.try_recv().is_none());
+    }
+
+    #[test]
+    fn explicit_jarvis_is_on_the_reply_and_survives_barge_in() {
+        let _lock = env_lock();
+        let _env = EnvGuard::set(&[("GALION_ASR", "off")]);
+        let w = TurnWorker::spawn();
+        w.bus()
+            .try_send(crate::bus::BusMsg::persona_explicit(w.bus().alloc_id(), 0, crate::bus::PersonaId::Jarvis))
+            .unwrap();
+        assert!(w.try_submit(TurnJob { id: 1, rate: 16_000, pcm: vec![0; 160] }).is_ok());
+        let t0 = Instant::now();
+        let mut got = None;
+        while got.is_none() && t0.elapsed().as_secs() < 5 {
+            got = w.try_recv();
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+        assert_eq!(got.expect("reply").persona, "jarvis");
+        w.supersede(9);
+        assert_eq!(w.bus().persona_id(), crate::bus::PersonaId::Jarvis);
     }
 
     #[test]
@@ -436,6 +461,7 @@ mod tests {
             llm: "none",
             stages: String::new(),
             error: None,
+            persona: "samantha",
             in_ms: 1,
             took_ms: 1,
         };

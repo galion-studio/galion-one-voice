@@ -11,6 +11,11 @@
 //! on ASR, a reply model, or TTS, and nothing here runs inside `Heartbeat::step`.
 //! Barge-in stores a cancel token. Receivers drop `turn_id < cancel` before ASR
 //! and again before a reply is published. The worker thread is not killed.
+//!
+//! [`BusBody::Persona`] is the mid-session register from `SAMANTHA-V2.md` §4.
+//! Depth 1. Explicit pins use `turn_id` 0 and survive barge-in. Empathy and
+//! intent use the current turn and restore the previous floor if that turn
+//! is cancelled. `Heartbeat::step` does not send it.
 
 use std::collections::VecDeque;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
@@ -35,6 +40,15 @@ pub const WORKER_REPLY_DEPTH: usize = 4;
 pub const MAX_UTTERANCE_BYTES: usize = 4 * 1024 * 1024;
 /// `SpeechPcm` rate. The phone lane speaks at 24 kHz.
 pub const SPEECH_RATE_HZ: u32 = 24_000;
+/// Persona lane depth. Latest accepted switch replaces the previous one.
+pub const PERSONA_DEPTH: usize = 1;
+/// Shown `e` at or above this, for [`EMPATHY_SWITCH_FRAMES`] frames, prefers Samantha.
+/// Owner-tunable proposal from `SAMANTHA-V2.md` §4. Not applied inside `Heartbeat::step`.
+pub const EMPATHY_SWITCH_ON: f32 = 0.65;
+/// Shown `e` at or below this, for the same frame count, releases that preference.
+pub const EMPATHY_SWITCH_OFF: f32 = 0.50;
+/// 8 × 80 ms = 640 ms. One frame is never enough.
+pub const EMPATHY_SWITCH_FRAMES: u32 = 8;
 
 /// `PartialAsr.source` for a decoded stub fixture.
 pub const ASR_STUB_FIXTURE: &str = "stub-fixture";
@@ -72,6 +86,187 @@ impl OrbMode {
             OrbMode::Speaking => "speaking",
             OrbMode::Offline => "offline",
         }
+    }
+}
+
+/// Register id from `SAMANTHA-V2.md` §4. An unnamed id is not a variant: it is ignored.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PersonaId {
+    /// Warm conversational register. Tags may be kept for a later clone worker.
+    Samantha,
+    /// Calm command register. Paralinguistic tags are off.
+    Jarvis,
+}
+
+impl PersonaId {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            PersonaId::Samantha => "samantha",
+            PersonaId::Jarvis => "jarvis",
+        }
+    }
+
+    /// `None` for a future id. The slot does not change.
+    pub fn parse(s: &str) -> Option<Self> {
+        match s.trim().to_ascii_lowercase().as_str() {
+            "samantha" => Some(PersonaId::Samantha),
+            "jarvis" => Some(PersonaId::Jarvis),
+            _ => None,
+        }
+    }
+
+    /// Samantha may carry tags later. Jarvis does not.
+    pub fn tags_allowed(self) -> bool {
+        matches!(self, PersonaId::Samantha)
+    }
+
+    /// Baseline at `e`, then the empathy end of the same id. Clamped by
+    /// [`galion_emotion::ProsodyControl::clamped`]. Samantha at `e = 1` is the
+    /// sector profile. These knobs are not a film voice.
+    pub fn prosody(self, e: f32) -> galion_emotion::ProsodyControl {
+        let e = if e.is_finite() {
+            e.clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
+        let (lo, hi) = match self {
+            PersonaId::Samantha => (SAMANTHA_E0, SAMANTHA_E1),
+            PersonaId::Jarvis => (JARVIS_E0, JARVIS_E1),
+        };
+        galion_emotion::ProsodyControl {
+            pitch_shift_st: lerp(lo.0, hi.0, e),
+            pitch_range: lerp(lo.1, hi.1, e),
+            rate: lerp(lo.2, hi.2, e),
+            energy: lerp(lo.3, hi.3, e),
+            warmth: lerp(lo.4, hi.4, e),
+            pre_pause_ms: lerp(lo.5, hi.5, e).round() as u16,
+        }
+        .clamped()
+    }
+
+    /// Wash amber at `e`. Every id lerps toward `0.50`. Not a circle colour.
+    pub fn wash_amber(self, e: f32) -> f32 {
+        let e = if e.is_finite() {
+            e.clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
+        let (lo, hi) = match self {
+            PersonaId::Samantha => (0.62, 0.50),
+            PersonaId::Jarvis => (0.28, 0.50),
+        };
+        lerp(lo, hi, e)
+    }
+}
+
+/// pitch, range, rate, loudness, warmth, pre-pause ms. Design table, §4.
+const SAMANTHA_E0: (f32, f32, f32, f32, f32, f32) = (0.0, 1.00, 1.00, 1.00, 0.62, 0.0);
+const SAMANTHA_E1: (f32, f32, f32, f32, f32, f32) = (-0.5, 0.88, 0.92, 0.80, 0.75, 250.0);
+const JARVIS_E0: (f32, f32, f32, f32, f32, f32) = (-0.3, 0.92, 0.96, 0.92, 0.42, 80.0);
+const JARVIS_E1: (f32, f32, f32, f32, f32, f32) = (-0.4, 0.90, 0.94, 0.88, 0.55, 120.0);
+
+fn lerp(a: f32, b: f32, t: f32) -> f32 {
+    a + (b - a) * t
+}
+
+/// Why the register changed. `Session` is the opening default, not a person asking.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PersonaSource {
+    /// The session opened as Samantha. Lowest rank. Any real trigger may replace it.
+    Session,
+    /// A command or a task. Word intent does not need `sense`.
+    Intent,
+    /// Empathy weight. Needs `sense`. Dropped when that turn is cancelled.
+    Empathy,
+    /// The person asked. `turn_id` is 0. Sticks across barge-in.
+    Explicit,
+}
+
+impl PersonaSource {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            PersonaSource::Session => "session",
+            PersonaSource::Intent => "intent",
+            PersonaSource::Empathy => "empathy",
+            PersonaSource::Explicit => "explicit",
+        }
+    }
+
+    fn rank(self) -> u8 {
+        match self {
+            PersonaSource::Session => 0,
+            PersonaSource::Intent => 1,
+            PersonaSource::Empathy => 2,
+            PersonaSource::Explicit => 3,
+        }
+    }
+}
+
+/// Word request, not recognition. `None` when the utterance is not a pin.
+/// "switch back" returns the session register, Samantha.
+pub fn explicit_persona_request(text: &str) -> Option<PersonaId> {
+    let t = text.trim().to_ascii_lowercase();
+    if t == "samantha" || t.contains("be samantha") || t.contains("switch to samantha") {
+        Some(PersonaId::Samantha)
+    } else if t == "jarvis" || t.contains("be jarvis") || t.contains("switch to jarvis") {
+        Some(PersonaId::Jarvis)
+    } else if t.contains("switch back") {
+        Some(PersonaId::Samantha)
+    } else {
+        None
+    }
+}
+
+/// Hysteresis for an empathy-driven Samantha preference.
+///
+/// Default is deny: `sense == false` never arms. High `e` from anger still
+/// prefers warmth. It does not select a louder id. `Heartbeat::step` does not
+/// call this.
+#[derive(Clone, Debug, Default)]
+pub struct EmpathySwitchGate {
+    high: u32,
+    low: u32,
+    armed: bool,
+}
+
+impl EmpathySwitchGate {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn armed(&self) -> bool {
+        self.armed
+    }
+
+    /// `true` while Samantha's warmth should be preferred. A frame between the
+    /// two thresholds breaks both streaks.
+    pub fn observe(&mut self, e: f32, sense: bool) -> bool {
+        if !sense {
+            *self = Self::default();
+            return false;
+        }
+        let e = if e.is_finite() {
+            e.clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
+        if e >= EMPATHY_SWITCH_ON {
+            self.high = self.high.saturating_add(1);
+            self.low = 0;
+            if self.high >= EMPATHY_SWITCH_FRAMES {
+                self.armed = true;
+            }
+        } else if e <= EMPATHY_SWITCH_OFF {
+            self.low = self.low.saturating_add(1);
+            self.high = 0;
+            if self.low >= EMPATHY_SWITCH_FRAMES {
+                self.armed = false;
+            }
+        } else {
+            self.high = 0;
+            self.low = 0;
+        }
+        self.armed
     }
 }
 
@@ -161,6 +356,17 @@ pub enum BusBody {
     },
     BargeIn {
         turn_id: u64,
+    },
+    /// Mid-session register (`SAMANTHA-V2.md` §4). Depth 1. Not a second broker.
+    ///
+    /// An explicit pin is stamped `turn_id = 0` and survives barge-in. An
+    /// empathy or intent switch uses the current `turn_id` and is restored to
+    /// the previous floor if that turn is cancelled. A lower-rank source does
+    /// not override a higher one that is still in force. Empathy also needs
+    /// consent `sense`. The opening floor is Samantha, source `session`.
+    Persona {
+        id: PersonaId,
+        source: PersonaSource,
     },
     Fault {
         stage: String,
@@ -313,6 +519,45 @@ impl BusMsg {
         Self::consent(id, t_ms, 0, PURPOSE_NONE)
     }
 
+    /// The person asked. `turn_id` is 0 so a later barge-in does not forget it.
+    pub fn persona_explicit(id: u64, t_ms: u64, persona: PersonaId) -> Self {
+        Self {
+            id,
+            turn_id: 0,
+            t_ms,
+            cancel: 0,
+            body: BusBody::Persona {
+                id: persona,
+                source: PersonaSource::Explicit,
+            },
+        }
+    }
+
+    /// Empathy or intent for this turn. `Explicit` is forced onto [`Self::persona_explicit`].
+    /// `Session` is not a trigger and is dropped by the lane.
+    pub fn persona_for_turn(
+        id: u64,
+        turn_id: u64,
+        t_ms: u64,
+        cancel: u64,
+        persona: PersonaId,
+        source: PersonaSource,
+    ) -> Self {
+        if source == PersonaSource::Explicit {
+            return Self::persona_explicit(id, t_ms, persona);
+        }
+        Self {
+            id,
+            turn_id,
+            t_ms,
+            cancel,
+            body: BusBody::Persona {
+                id: persona,
+                source,
+            },
+        }
+    }
+
     pub fn barge_in(id: u64, turn_id: u64, t_ms: u64) -> Self {
         Self {
             id,
@@ -369,6 +614,42 @@ pub enum StageResult {
     Published,
 }
 
+/// Applied register, and the floor a cancelled turn-scoped switch returns to.
+struct PersonaHold {
+    current: BusMsg,
+    floor: BusMsg,
+}
+
+impl PersonaHold {
+    fn session() -> Self {
+        let msg = session_persona();
+        Self {
+            current: msg.clone(),
+            floor: msg,
+        }
+    }
+}
+
+fn session_persona() -> BusMsg {
+    BusMsg {
+        id: 0,
+        turn_id: 0,
+        t_ms: 0,
+        cancel: 0,
+        body: BusBody::Persona {
+            id: PersonaId::Samantha,
+            source: PersonaSource::Session,
+        },
+    }
+}
+
+fn persona_source_of(msg: &BusMsg) -> PersonaSource {
+    match msg.body {
+        BusBody::Persona { source, .. } => source,
+        _ => PersonaSource::Session,
+    }
+}
+
 struct Inner {
     /// Shared with Piper. A stale `turn_id` drops clauses; the process stays up.
     cancel: Arc<AtomicU64>,
@@ -380,6 +661,8 @@ struct Inner {
     mic: Mutex<Option<BusMsg>>,
     orb: Mutex<Option<BusMsg>>,
     consent: Mutex<Option<BusMsg>>,
+    /// Current register plus the floor restored when a turn-scoped switch is cancelled.
+    persona: Mutex<PersonaHold>,
     utterances: Mutex<VecDeque<BusMsg>>,
     partials: Mutex<VecDeque<BusMsg>>,
     replies: Mutex<VecDeque<BusMsg>>,
@@ -417,6 +700,14 @@ impl BusGate {
     /// Same atomic [`ProcessBus::supersede`] writes. Piper reads it to drop clauses.
     pub(crate) fn cancel_token(&self) -> Arc<AtomicU64> {
         Arc::clone(&self.inner.cancel)
+    }
+
+    /// Register in force for the next clause. Does not classify and does not allocate.
+    pub(crate) fn persona_id(&self) -> PersonaId {
+        match lock(&self.inner.persona).current.body {
+            BusBody::Persona { id, .. } => id,
+            _ => PersonaId::Samantha,
+        }
     }
 }
 
@@ -461,6 +752,7 @@ impl ProcessBus {
                 mic: Mutex::new(None),
                 orb: Mutex::new(None),
                 consent: Mutex::new(None),
+                persona: Mutex::new(PersonaHold::session()),
                 utterances: Mutex::new(VecDeque::new()),
                 partials: Mutex::new(VecDeque::new()),
                 replies: Mutex::new(VecDeque::new()),
@@ -543,6 +835,7 @@ impl ProcessBus {
             BusBody::MicLevel { .. } => self.enqueue_slot(&self.inner.mic, msg),
             BusBody::OrbState { .. } => self.enqueue_slot(&self.inner.orb, msg),
             BusBody::Consent { .. } => self.enqueue_slot(&self.inner.consent, msg),
+            BusBody::Persona { .. } => self.enqueue_persona(msg),
             BusBody::Utterance { .. } => {
                 self.enqueue_fifo(&self.inner.utterances, UTTERANCE_DEPTH, msg, Stale::Asr)
             }
@@ -620,6 +913,25 @@ impl ProcessBus {
         lock(&self.inner.consent).take()
     }
 
+    /// Latest register. The slot is not emptied. Depth [`PERSONA_DEPTH`].
+    pub fn persona(&self) -> BusMsg {
+        lock(&self.inner.persona).current.clone()
+    }
+
+    pub fn persona_id(&self) -> PersonaId {
+        match self.persona().body {
+            BusBody::Persona { id, .. } => id,
+            _ => PersonaId::Samantha,
+        }
+    }
+
+    pub fn persona_source(&self) -> PersonaSource {
+        match self.persona().body {
+            BusBody::Persona { source, .. } => source,
+            _ => PersonaSource::Session,
+        }
+    }
+
     /// Drop a stale utterance before any ASR work. `BargeIn` only moves cancel.
     pub fn before_asr(&self, mut msg: BusMsg) -> Option<BusMsg> {
         self.observe_cancel(&msg);
@@ -688,6 +1000,12 @@ impl ProcessBus {
         let _ = clear_slot(&self.inner.mic, c);
         let _ = clear_slot(&self.inner.orb, c);
         let _ = clear_slot(&self.inner.consent, c);
+        {
+            let mut g = lock(&self.inner.persona);
+            if g.current.is_stale(c) {
+                g.current = g.floor.clone();
+            }
+        }
         let n = retain_fifo(&self.inner.utterances, c);
         self.inner
             .dropped_before_asr
@@ -697,6 +1015,41 @@ impl ProcessBus {
             .dropped_before_publish
             .fetch_add(n, Ordering::Relaxed);
         let _ = retain_fifo(&self.inner.faults, c);
+    }
+
+    fn sense_granted(&self) -> bool {
+        lock(&self.inner.consent).as_ref().is_some_and(
+            |m| matches!(m.body, BusBody::Consent { bits, .. } if bits & CONSENT_SENSE != 0),
+        )
+    }
+
+    /// Depth 1. A stale turn-scoped switch is dropped and the floor stays.
+    /// A lower rank does not override a higher rank that is still in force.
+    /// Empathy without `sense` is dropped. The lane never blocks.
+    fn enqueue_persona(&self, msg: BusMsg) -> SendOutcome {
+        let source = match &msg.body {
+            BusBody::Persona { source, .. } => *source,
+            _ => return SendOutcome::Dropped,
+        };
+        if source == PersonaSource::Session || msg.is_stale(self.cancel()) {
+            return SendOutcome::Dropped;
+        }
+        if source == PersonaSource::Empathy && !self.sense_granted() {
+            return SendOutcome::Dropped;
+        }
+        let mut g = lock(&self.inner.persona);
+        if source.rank() < persona_source_of(&g.current).rank()
+            && !g.current.is_stale(self.cancel())
+        {
+            return SendOutcome::Dropped;
+        }
+        if source == PersonaSource::Explicit {
+            g.floor = msg.clone();
+            g.current = msg;
+        } else {
+            g.current = msg;
+        }
+        SendOutcome::Replaced
     }
 
     fn enqueue_slot(&self, slot: &Mutex<Option<BusMsg>>, msg: BusMsg) -> SendOutcome {
@@ -1051,12 +1404,163 @@ mod tests {
             late: false,
         };
         let t = Instant::now();
+        assert_eq!(bus.persona_id(), PersonaId::Samantha);
         let _out = hb.step(&frame);
+        assert_eq!(
+            bus.persona_id(),
+            PersonaId::Samantha,
+            "Heartbeat::step must not switch persona"
+        );
         assert!(
             t.elapsed() < Duration::from_millis(20),
             "Heartbeat::step waited {:?}",
             t.elapsed()
         );
+    }
+
+    #[test]
+    fn persona_session_opens_as_samantha_and_explicit_survives_barge_in() {
+        let bus = ProcessBus::new();
+        assert_eq!(bus.persona_id(), PersonaId::Samantha);
+        assert_eq!(bus.persona_source(), PersonaSource::Session);
+        assert!(PersonaId::Samantha.tags_allowed());
+        assert!(!PersonaId::Jarvis.tags_allowed());
+        assert!(PersonaId::parse("sky").is_none());
+        assert_eq!(PersonaId::parse(" Jarvis ").unwrap(), PersonaId::Jarvis);
+
+        let outcome = bus
+            .try_send(BusMsg::persona_explicit(
+                bus.alloc_id(),
+                80,
+                PersonaId::Jarvis,
+            ))
+            .unwrap();
+        assert_eq!(outcome, SendOutcome::Replaced);
+        bus.supersede(4);
+        assert_eq!(bus.persona_id(), PersonaId::Jarvis);
+        assert_eq!(bus.persona_source(), PersonaSource::Explicit);
+        assert_eq!(bus.persona().turn_id, 0);
+
+        let blocked = bus
+            .try_send(BusMsg::persona_for_turn(
+                bus.alloc_id(),
+                5,
+                160,
+                bus.cancel(),
+                PersonaId::Samantha,
+                PersonaSource::Empathy,
+            ))
+            .unwrap();
+        assert_eq!(blocked, SendOutcome::Dropped);
+        assert_eq!(bus.persona_id(), PersonaId::Jarvis);
+    }
+
+    #[test]
+    fn empathy_needs_sense_and_a_cancelled_turn_restores_the_floor() {
+        let bus = ProcessBus::new();
+        let denied = bus
+            .try_send(BusMsg::persona_for_turn(
+                bus.alloc_id(),
+                1,
+                80,
+                0,
+                PersonaId::Samantha,
+                PersonaSource::Empathy,
+            ))
+            .unwrap();
+        assert_eq!(denied, SendOutcome::Dropped);
+        assert_eq!(bus.persona_source(), PersonaSource::Session);
+
+        bus.try_send(BusMsg::consent(
+            bus.alloc_id(),
+            80,
+            CONSENT_SENSE,
+            PURPOSE_PERSONAL_ASSISTANT,
+        ))
+        .unwrap();
+        let intent = bus
+            .try_send(BusMsg::persona_for_turn(
+                bus.alloc_id(),
+                2,
+                160,
+                0,
+                PersonaId::Jarvis,
+                PersonaSource::Intent,
+            ))
+            .unwrap();
+        assert_eq!(intent, SendOutcome::Replaced);
+        assert_eq!(bus.persona_id(), PersonaId::Jarvis);
+
+        let empathy = bus
+            .try_send(BusMsg::persona_for_turn(
+                bus.alloc_id(),
+                2,
+                240,
+                0,
+                PersonaId::Samantha,
+                PersonaSource::Empathy,
+            ))
+            .unwrap();
+        assert_eq!(empathy, SendOutcome::Replaced);
+        assert_eq!(bus.persona_source(), PersonaSource::Empathy);
+        let lower = bus
+            .try_send(BusMsg::persona_for_turn(
+                bus.alloc_id(),
+                2,
+                320,
+                0,
+                PersonaId::Jarvis,
+                PersonaSource::Intent,
+            ))
+            .unwrap();
+        assert_eq!(lower, SendOutcome::Dropped);
+        assert_eq!(bus.persona_id(), PersonaId::Samantha);
+
+        bus.supersede(3);
+        assert_eq!(bus.persona_id(), PersonaId::Samantha);
+        assert_eq!(bus.persona_source(), PersonaSource::Session);
+    }
+
+    #[test]
+    fn empathy_gate_needs_eight_frames_and_does_not_pick_a_louder_id() {
+        let mut gate = EmpathySwitchGate::new();
+        assert!(!gate.observe(1.0, false));
+        assert!(!gate.armed());
+        for _ in 0..7 {
+            assert!(!gate.observe(EMPATHY_SWITCH_ON, true));
+        }
+        assert!(gate.observe(EMPATHY_SWITCH_ON, true));
+        assert_eq!(
+            explicit_persona_request("be Jarvis"),
+            Some(PersonaId::Jarvis)
+        );
+        assert_eq!(
+            explicit_persona_request("please switch back"),
+            Some(PersonaId::Samantha)
+        );
+        assert_eq!(explicit_persona_request("hello galion"), None);
+        for _ in 0..7 {
+            assert!(gate.observe(EMPATHY_SWITCH_OFF, true));
+        }
+        assert!(!gate.observe(0.1, true));
+        assert!(samantha_pitch_matches_sector(
+            PersonaId::Samantha.prosody(1.0)
+        ));
+        assert!((PersonaId::Samantha.wash_amber(0.0) - 0.62).abs() < 1e-6);
+        assert!((PersonaId::Jarvis.wash_amber(1.0) - 0.50).abs() < 1e-6);
+        let jarvis = PersonaId::Jarvis.prosody(0.0);
+        assert!((jarvis.pitch_shift_st - -0.3).abs() < 1e-6);
+        assert!(!jarvis.warmth.is_nan());
+    }
+
+    fn samantha_pitch_matches_sector(p: galion_emotion::ProsodyControl) -> bool {
+        let sector = galion_emotion::EMPATHY_PROSODY;
+        p.pitch_shift_st == sector.pitch_shift_st
+            && p.pitch_range == sector.pitch_range
+            && p.rate == sector.rate
+            && p.energy == sector.energy
+            && p.warmth == sector.warmth
+            && p.pre_pause_ms == sector.pre_pause_ms
     }
 
     #[test]

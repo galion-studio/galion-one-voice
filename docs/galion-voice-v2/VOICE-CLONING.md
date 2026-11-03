@@ -55,10 +55,13 @@ watermark before returning samples.
 Output rate in the public ports is described as 24 kHz, which matches the
 Galion clock. That match was not re-measured.
 
-**Worker, when it is built.** One long-lived process, the same idea as the
-warm Piper worker. Text in, PCM out, no file of samples. If it is missing,
-Piper (`en_US-ljspeech-medium`) speaks. Flite remains the pack-missing
-fallback under that.
+**Worker.** The scaffold is `docs/galion-voice-v2/CLONE-WORKER.md`: one
+long-lived process, the same idea as the warm Piper worker. Text in, PCM
+out, no file of samples. Nano is the primary. Turbo is the option on the
+same stdin line. If the pinned weights are missing, Piper
+(`en_US-ljspeech-medium`) speaks. Flite remains the pack-missing fallback
+under that. The Python stub does not call generate and refuses a reference
+clip. Weights are fetched only with `GALION_CLONE_FETCH=1`.
 
 **Personas.**
 
@@ -74,12 +77,14 @@ accelerator. Recording the approval does not change host settings.
 
 ## LOCKS
 
-No new lock text for Chatterbox. The only exception in `LOCKS.toml` is the
-A21 Piper pin, sunset `2027-02-01`.
+t230u wrote `[formats.exceptions.v2s14_chatterbox]`. It is an out-of-process
+PyTorch worker only, sunset `2027-02-01` (90 days from 2026-11-03). The A21
+Piper pin is unchanged. Global `foreign_runtime_allowed` stays false.
 
-- `foreign_runtime_allowed = false`. A PyTorch worker is a foreign runtime until an owner writes an exception. Not written now.
-- `forbidden_runtimes` includes `ort`, `llama`, `ggml`, `candle`. No in-tree ONNX Runtime. A community ONNX export of Chatterbox does not ride the Piper pin. GGML ports (GGUF, `chatterbox.cpp`) are the wrong shape even out of process, because the container ban is "anywhere".
-- `weights_vendored = false`. Do not commit Nano or Turbo weights.
+- The worker is a separate process. Nothing in the Galion crates links PyTorch.
+- `in_tree_ort`, `in_tree_ggml`, and `in_tree_llama` are false on that pin. A community ONNX export does not ride the Piper pin. A GGML-family port is still the wrong shape.
+- `weights_vendored = false`. Do not commit Nano or Turbo weights. `scripts/clone/fetch-clone-weights.sh` refuses unless `GALION_CLONE_FETCH=1`.
+- `reference_clips = false`. No film audio.
 - Do not "temporarily" port the net onto candle.
 
 ## Dropped external APIs
@@ -105,19 +110,19 @@ or ingest a clip. Replaces the external-API swarm, which is dropped.
 | # | Role | Deliverable | Status |
 |---|---|---|---|
 | 1 | Architecture map (T3, VoiceEncoder, S3Gen, vocoder) | `docs/galion-voice-v2/VOICE-CLONING.md` | planned-not-spawned |
-| 2 | Nano 110M CPU worker contract | `docs/galion-voice-v2/VOICE-CLONING.md` | planned-not-spawned |
-| 3 | Turbo quality option, same process | `docs/galion-voice-v2/VOICE-CLONING.md` | planned-not-spawned |
-| 4 | CPU streaming / Flash eval plan (no run) | `docs/galion-voice-v2/VOICE-CLONING.md` | planned-not-spawned |
+| 2 | Nano 110M CPU worker contract | `docs/galion-voice-v2/CLONE-WORKER.md` | scaffolded, no weights, no generate |
+| 3 | Turbo quality option, same process | `docs/galion-voice-v2/CLONE-WORKER.md` | scaffolded, same stub |
+| 4 | CPU streaming / Flash eval plan (no run) | `docs/galion-voice-v2/FLASH-EVAL.md` | plan + harness stub, no number |
 | 5 | Zero-shot ~10 s conditioning, no fine-tune | `docs/galion-voice-v2/VOICE-CLONING.md` | planned-not-spawned |
 | 6 | Jarvis research-target mapping | `docs/galion-voice-v2/VOICE-CLONING.md` | planned-not-spawned |
 | 7 | Samantha tags and emotional register | `docs/galion-voice-v2/VOICE-CLONING.md` | planned-not-spawned |
 | 8 | Rights, consent, licence gate | `LEDGER.md` | planned-not-spawned |
 | 9 | Art. 50 watermark note (no Perth vendor) | `docs/galion-voice-v2/VOICE-CLONING.md` | planned-not-spawned |
-| 10 | Piper fallback and warm-worker shape | `docs/galion-voice-v2/GALION-VOICE-V2.md` | planned-not-spawned |
-| 11 | TTFA eval plan (no measurement) | `docs/galion-voice-v2/VOICE-CLONING.md` | planned-not-spawned |
+| 10 | Piper fallback and warm-worker shape | `docs/galion-voice-v2/CLONE-WORKER.md` | scaffolded; Piper speaks when the clone slot is absent |
+| 11 | TTFA eval plan (no measurement) | `docs/galion-voice-v2/FLASH-EVAL.md` | harness prints `measured: false` until a flagged run |
 | 12 | Presence and barge-in with a clone | `docs/galion-voice-v2/GALION-VOICE-V2.md` (V2-S11) | planned-not-spawned |
 | 13 | No PCM on disk, no film audio in git | `docs/galion-voice-v2/SECURITY-EDGE.md` | planned-not-spawned |
-| 14 | CI: no download, no paid API | `docs/galion-voice-v2/VOICE-CLONING.md` | planned-not-spawned |
+| 14 | CI: no download, no paid API | `scripts/clone/fetch-clone-weights.sh` | fetch refuses unless `GALION_CLONE_FETCH=1`; CI does not set it |
 | 15 | CPU/RAM policy (record only) | `LEDGER.md` | planned-not-spawned |
 | 16 | Docs and LEDGER upkeep | `LEDGER.md` | planned-not-spawned |
 

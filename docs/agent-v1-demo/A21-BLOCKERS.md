@@ -28,7 +28,7 @@ Context: Q2 says the EN reply must say words. That is **met by A21**: a neural T
 - [x] Dead `V1_SPEECH_CMD` / `scripts/v1/speech.sh` branch removed from `run-v1-demo.sh`.
 
 ## TRUE remaining blockers
-1. **LOCKS ratification of the Piper pin — written 2026-11-03.** `[formats.exceptions.a21_piper]` records t123u: out-of-process Piper, `en_US-ljspeech-medium`, no in-tree ort, sunset `2027-02-01`. Global `foreign_runtime_allowed=false` and `weight_formats` are unchanged. Do not widen the pin to ASR or Chatterbox. espeak-ng (item 2) is still open.
+1. **LOCKS ratification of the Piper pin — written 2026-11-03.** `[formats.exceptions.a21_piper]` records t123u: out-of-process Piper, `en_US-ljspeech-medium`, no in-tree ort, sunset `2027-02-01`. Global `foreign_runtime_allowed=false` and `weight_formats` are unchanged. Do not widen this pin to ASR or Chatterbox. t230u wrote a separate `[formats.exceptions.v2s14_chatterbox]` pin for an out-of-process PyTorch worker. That pin does not change the Piper hashes or the sunset. espeak-ng (item 2) is still open.
 2. **espeak-ng is GPL-3 (counsel).** Piper phonemizes with espeak-ng 1.52 (libespeak-ng + espeak-ng-data, bundled in the Piper tarball). The runtime is separate, out of process and unlinked from Galion code, but counsel must confirm GPL-3 is acceptable to ship.
    - The MIT-only alternative is a Galion-native phonemizer, which is not built.
 3. **Voice choice and consent.** LJSpeech is a public-domain single female reader. Confirm it is acceptable as the demo voice under the LOCKS consent rules, or pick another MIT/PD Piper voice. Swapping voices means changing the file and its pin only.

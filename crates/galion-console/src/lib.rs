@@ -42,7 +42,7 @@ pub mod turn_worker;
 pub mod ui;
 
 #[cfg(feature = "phone-turn")]
-pub use bus::{BusBody, BusMsg, OrbMode, ProcessBus};
+pub use bus::{BusBody, BusMsg, OrbMode, PersonaId, PersonaSource, ProcessBus};
 pub use heartbeat::{Answer, HeartbeatEvent, YesNo, FRAME_MS};
 pub use live::{
     AffectFeed, AffectSample, AnswerLog, ComposedFeed, LiveFeed, LiveSource, LiveView, NoAffect,

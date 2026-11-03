@@ -3,6 +3,9 @@
 //! V1-03 real-speech path (feature `speech`). ENGLISH ONLY.
 //!
 //! Selection order (first that can actually speak wins):
+//! 0. [`clone_worker::CloneTts`] — V2-S14 Chatterbox slot, out of process, only when
+//!    the pinned safetensors are on disk. Nano primary, Turbo via `GALION_CLONE_MODEL`.
+//!    Absent weights skip this slot (no download). A dead child falls back to A21.
 //! 1. [`weights::A21WeightTts`] — the A21 neural TTS slot (FP-03). Activates when a
 //!    sha256-verified voice pack is on disk (`GALION_TTS_WEIGHTS` /
 //!    `GALION_SPEECH_WEIGHTS` or `<repo>/weights/tts/`) AND a decoder for it exists
@@ -15,7 +18,9 @@
 //! 3. none — the caller must fail loudly (FRXDEL Q2: the EN cascade must say
 //!    actual words; tones are not an acceptable reply).
 //!
-//! Env: `GALION_SPEECH=auto|a21|flite|off` (default `auto`: a21, else flite),
+//! Env: `GALION_SPEECH=auto|clone|a21|flite|off` (default `auto`: clone if the
+//!      pinned pack is on disk, else a21, else flite),
+//!      `GALION_CLONE_MODEL=nano|turbo`, `GALION_CLONE_PERSONA=samantha|jarvis`,
 //!      `GALION_A21_RUNTIME` (Piper exe), `GALION_A21_NOISE=natural` (sampled prosody),
 //!      `GALION_FLITE_VOICE=slt|kal16|awb|rms|kal` (default `slt`).
 
@@ -25,6 +30,7 @@ use std::sync::Arc;
 use std::time::Instant;
 
 pub mod clause;
+pub mod clone_worker;
 pub mod flite;
 pub mod piper_worker;
 pub mod sha256;
@@ -38,6 +44,9 @@ pub const SPEECH_RATE: u32 = crate::stub::SAMPLE_RATE;
 /// Which backend produced (or would produce) speech.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SpeechBackend {
+    /// V2-S14 clone worker (Chatterbox Nano or Turbo, CPU, out of process).
+    /// Not a film voice. Piper speaks if this child is absent.
+    Clone { model: String, persona: String },
     /// A21 neural TTS (Piper VITS voice pack, CPU, out of process).
     A21Weights { voice: String },
     /// Interim system TTS (libflite, runtime dlopen). Real words, not neural.
@@ -50,18 +59,25 @@ impl SpeechBackend {
     /// Stable short id for JSON / UI labels.
     pub fn id(&self) -> &'static str {
         match self {
+            SpeechBackend::Clone { .. } => "clone-worker",
             SpeechBackend::A21Weights { .. } => "a21-weights",
             SpeechBackend::SystemFlite { .. } => "system-flite",
             SpeechBackend::None { .. } => "none",
         }
     }
-    /// Gate/runbook token: `SPEECH=a21|flite|ABSENT`.
+    /// Gate/runbook token: `SPEECH=clone|a21|flite|ABSENT`.
     pub fn speech_token(&self) -> &'static str {
-        match self { SpeechBackend::A21Weights { .. } => "a21", SpeechBackend::SystemFlite { .. } => "flite", SpeechBackend::None { .. } => "ABSENT" }
+        match self {
+            SpeechBackend::Clone { .. } => "clone",
+            SpeechBackend::A21Weights { .. } => "a21",
+            SpeechBackend::SystemFlite { .. } => "flite",
+            SpeechBackend::None { .. } => "ABSENT",
+        }
     }
     /// Human label; always states what it is NOT.
     pub fn label(&self) -> String {
         match self {
+            SpeechBackend::Clone { model, persona } => format!("V2-S14 clone worker (Chatterbox {model}, register {persona}; CPU; out of process; not a film voice)"),
             SpeechBackend::A21Weights { voice } => format!("A21 neural TTS (Piper VITS {voice}; CPU; MIT)"),
             SpeechBackend::SystemFlite { voice } => format!("fallback system TTS (libflite cmu_us_{voice}; real words; NOT A21, NOT neural)"),
             SpeechBackend::None { reason } => format!("no speech backend ({reason})"),
@@ -82,6 +98,9 @@ pub struct Warmth {
     pub piper_pid: Option<u32>,
     /// `1` after a normal A21 session: the process was not started again.
     pub piper_spawns: u32,
+    pub clone_pid: Option<u32>,
+    /// `1` after a normal clone session: the process was not started again.
+    pub clone_spawns: u32,
 }
 
 /// The selected speech engine plus an honest status report.
@@ -100,6 +119,7 @@ pub struct SpeechStack {
 }
 
 enum Engine {
+    Clone(clone_worker::CloneTts),
     A21(weights::A21WeightTts),
     Flite(flite::FliteTts),
     #[cfg(test)]
@@ -123,7 +143,14 @@ impl SpeechStack {
         if mode == "off" {
             return Self::bare(SpeechBackend::None { reason: "GALION_SPEECH=off".into() }, weights, None);
         }
-        if mode == "auto" || mode == "a21" {
+        if mode == "auto" || mode == "clone" {
+            if let Ok(t) = clone_worker::CloneTts::try_new() {
+                let model = t.model_name().to_string();
+                let persona = t.persona().to_string();
+                return Self::bare(SpeechBackend::Clone { model, persona }, weights, Some(Engine::Clone(t)));
+            }
+        }
+        if mode == "auto" || mode == "a21" || mode == "clone" {
             if let Ok(t) = weights::A21WeightTts::try_new(&weights) {
                 let voice = t.voice().to_string();
                 return Self::bare(SpeechBackend::A21Weights { voice }, weights, Some(Engine::A21(t)));
@@ -133,14 +160,14 @@ impl SpeechStack {
                 return Self::bare(SpeechBackend::None { reason }, weights, None);
             }
         }
-        if mode == "auto" || mode == "flite" { match flite::FliteTts::open_default() {
+        if mode == "auto" || mode == "flite" || mode == "clone" { match flite::FliteTts::open_default() {
             Ok(t) => {
                 let voice = t.voice().to_string();
                 Self::bare(SpeechBackend::SystemFlite { voice }, weights, Some(Engine::Flite(t)))
             }
             Err(e) => Self::bare(SpeechBackend::None { reason: format!("{e}; {}", weights.summary()) }, weights, None),
         } } else {
-            Self::bare(SpeechBackend::None { reason: format!("unknown GALION_SPEECH={mode} (auto|a21|flite|off)") }, weights, None)
+            Self::bare(SpeechBackend::None { reason: format!("unknown GALION_SPEECH={mode} (auto|clone|a21|flite|off)") }, weights, None)
         }
     }
 
@@ -156,7 +183,7 @@ impl SpeechStack {
     /// Discard one short synthesis so the first caller turn is not the cold start.
     /// No PCM is kept. Flite and `off` do nothing.
     pub fn prewarm(&mut self) {
-        if self.prewarmed || !self.is_piper() { return; }
+        if self.prewarmed || !self.streams_clauses() { return; }
         if self.speak("Hello.").is_ok() { self.prewarmed = true; }
     }
 
@@ -168,15 +195,16 @@ impl SpeechStack {
     }
 
     pub fn warmth(&self) -> Warmth {
-        let (piper_pid, piper_spawns) = match &self.engine {
-            Some(Engine::A21(t)) => (t.piper_pid(), t.piper_spawns()),
-            _ => (None, 0),
+        let (piper_pid, piper_spawns, clone_pid, clone_spawns) = match &self.engine {
+            Some(Engine::A21(t)) => (t.piper_pid(), t.piper_spawns(), None, 0),
+            Some(Engine::Clone(t)) => (None, 0, t.clone_pid(), t.clone_spawns()),
+            _ => (None, 0, None, 0),
         };
         Warmth {
             cold_first_pcm_ms: self.cold_first_pcm_ms,
             warm_first_pcm_ms: self.warm_first_pcm_ms,
             last_first_pcm_ms: self.last_first_pcm_ms,
-            piper_pid, piper_spawns,
+            piper_pid, piper_spawns, clone_pid, clone_spawns,
         }
     }
 
@@ -195,7 +223,7 @@ impl SpeechStack {
     /// closes it. Flite waits for [`finish`](SpeechStream::finish).
     pub fn begin_stream(&mut self) -> SpeechStream<'_> {
         SpeechStream {
-            piper: self.is_piper(),
+            piper: self.streams_clauses(),
             stack: self,
             clauses: ClauseBuf::new(),
             flite_buf: String::new(),
@@ -206,7 +234,9 @@ impl SpeechStack {
         }
     }
 
-    fn is_piper(&self) -> bool { matches!(self.backend, SpeechBackend::A21Weights { .. }) }
+    fn streams_clauses(&self) -> bool {
+        matches!(self.backend, SpeechBackend::A21Weights { .. } | SpeechBackend::Clone { .. })
+    }
 
     fn cancelled(&self) -> bool {
         self.cancel.as_ref().is_some_and(|c| self.turn_id < c.load(Ordering::Acquire))
@@ -221,18 +251,42 @@ impl SpeechStack {
 
     fn synth_one(&mut self, text: &str) -> Result<Audio, VoiceError> {
         if self.cancelled() { return Err(VoiceError::Cancelled); }
-        match self.engine.as_mut() {
-            None => Err(VoiceError::Backend(self.backend.label())),
-            Some(Engine::Flite(t)) => t.synthesize(text, LanguageId::En),
+        let Some(mut engine) = self.engine.take() else {
+            return Err(VoiceError::Backend(self.backend.label()));
+        };
+        let result = match &mut engine {
+            Engine::Flite(t) => t.synthesize(text, LanguageId::En),
             #[cfg(test)]
-            Some(Engine::Mock(t)) => t.synthesize(text, LanguageId::En),
-            Some(Engine::A21(t)) => {
+            Engine::Mock(t) => t.synthesize(text, LanguageId::En),
+            Engine::A21(t) => {
                 let first = t.synthesize(text, LanguageId::En);
-                if first.is_ok() || t.worker_alive() { return first; }
-                t.respawn()?;
-                t.synthesize(text, LanguageId::En)
+                if first.is_ok() || t.worker_alive() {
+                    first
+                } else {
+                    match t.respawn() {
+                        Ok(()) => t.synthesize(text, LanguageId::En),
+                        Err(e) => Err(e),
+                    }
+                }
             }
-        }
+            Engine::Clone(t) => t.synthesize(text, LanguageId::En),
+        };
+        let failed_clone = matches!(engine, Engine::Clone(_))
+            && result.is_err()
+            && !matches!(result, Err(VoiceError::Cancelled));
+        self.engine = Some(engine);
+        if failed_clone { self.fallback_piper(text) } else { result }
+    }
+
+    /// Piper speaks when the clone child cannot. The lane is not restarted.
+    fn fallback_piper(&mut self, text: &str) -> Result<Audio, VoiceError> {
+        let Ok(piper) = weights::A21WeightTts::try_new(&self.weights) else {
+            return Err(VoiceError::Backend("clone worker failed and A21 piper is absent".into()));
+        };
+        let voice = piper.voice().to_string();
+        self.backend = SpeechBackend::A21Weights { voice };
+        self.engine = Some(Engine::A21(piper));
+        self.synth_one(text)
     }
 
     #[cfg(test)]

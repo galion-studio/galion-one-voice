@@ -51,9 +51,28 @@ ReplyText     { text: text, emotion: tag }          // emotion tag only if sense
 SpeechPcm     { rate: 24000, pcm: bytes, ms: u32 }  // drives the me band
 OrbState      { mode: idle|listening|thinking|speaking|offline, level: f32, env: f32 }
 Consent       { bits: u8, purpose: tag }            // mirrors EmotionWire; default deny
+Persona       { id: samantha|jarvis, source: explicit|empathy|intent }
 BargeIn       { turn_id: u64 }                      // sets cancel
 Fault         { stage: text, kind: text }           // no raw audio, no transcript unless debug
 ```
+
+`Persona` is `SAMANTHA-V2.md` §4, landed on the bus in `bus.rs` after PR #7
+(`5ab3d38`). Depth 1, same replace rule as `Consent` and `OrbState`, with
+two extra rules:
+
+- An explicit pin is stamped `turn_id = 0`. Barge-in does not clear it.
+  A lower source does not override it while it is in force.
+- Empathy and intent use the current `turn_id`. If that turn is cancelled,
+  the switch is dropped and the previous floor remains. The session opens
+  as `samantha` (`source` session, which is not a trigger). Empathy also
+  needs consent `sense`. Without it the message is dropped.
+
+A future id is ignored. The lane does not restart, and the Piper process
+is not killed. `Heartbeat::step` does not classify and does not send
+`Persona`. The 80 ms frame may read the latest slot. Reading is not deciding.
+
+The ids are registers, not film voices. A reference clip is still on the
+rights hold in `VOICE-CLONING.md`.
 
 `source` on `PartialAsr` is `stub-fixture`, `interim-placeholder`, or a future
 ratified engine id. The UI must be able to tell a placeholder from recognition.
@@ -64,6 +83,7 @@ That label exists today as `AsrSource`.
 | Queue | Depth | When full |
 |---|---|---|
 | MicLevel | 1 | replace (latest RMS wins) |
+| Persona | 1 | replace, unless the new source ranks below one still in force; a stale turn restores the floor |
 | Utterance | 8 | drop oldest (`MAX_PENDING_TURNS`) |
 | SpeechPcm / replies | 8 | evict oldest WAV (`MAX_STORED_REPLIES`) |
 | worker job | 1 | `try_submit` returns the job; host keeps one pending, newest wins |
