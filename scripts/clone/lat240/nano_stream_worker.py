@@ -11,7 +11,7 @@ stdout : say        -> one JSON line + pcm_bytes raw 24 kHz s16le (as before)
                        then {"op":"say","done":true,"ms":..,"first_ms":..,"audio_ms":..}
 Each chunk is watermarked (Perth) before it leaves the process.
 Env: GALION_CLONE_CKPT, GALION_CLONE_THREADS (<=4 per lane), GALION_CLONE_STEPS (1|2, default 1),
-     GALION_CLONE_Q8T3 (1 = int8 dynamic T3, default 1), GALION_CLONE_PROMPT_S (default 3),
+     GALION_CLONE_Q8T3 (1 = int8 dynamic T3, default 1), GALION_CLONE_PROMPT_S (default 0 = full ref; 3 s cut drops similarity, see 03 report),
      GALION_CLONE_ORT (1 = ONNX Runtime for flow estimator + HiFT core, default 0),
      GALION_CLONE_FIRST / GALION_CLONE_EVERY (tokens; default 12 / 36).
 CC0 donors only; no celebrity reference; no downloads (HF offline)."""
@@ -32,7 +32,7 @@ import numpy as np, torch
 import nano_fast as N
 if os.environ.get("GALION_CLONE_CKPT"): N.CKPT = os.environ["GALION_CLONE_CKPT"]
 E = lambda k, d: os.environ.get(k, d)
-STEPS = int(E("GALION_CLONE_STEPS", "1")); PROMPT_S = float(E("GALION_CLONE_PROMPT_S", "3")) or None
+STEPS = int(E("GALION_CLONE_STEPS", "1")); PROMPT_S = float(E("GALION_CLONE_PROMPT_S", "0")) or None
 FIRST = int(E("GALION_CLONE_FIRST", "12")); EVERY = int(E("GALION_CLONE_EVERY", "36"))
 M, _ = N.load(int(_thr))
 if E("GALION_CLONE_Q8T3", "1") == "1": N.quant_t3(M)
