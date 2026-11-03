@@ -642,8 +642,11 @@ film *Her*) are **owner-directed research targets**. Rights, consent, and
 licence must be cleared before any clip is ingested or any public demo uses
 a clone. This repository does not fetch film audio and does not store a clip.
 The per-persona checklist and the LEDGER paste templates are
-`RIGHTS-CLEARANCE.md`. Both gates are closed. The closed outline of that
-ingest is `CLIP-INGEST.md`.
+`RIGHTS-CLEARANCE.md`. t287 records PRIVATE CLEARED for both personas
+in `LEDGER.md` (owner t273). Counsel is not named. The checklist boxes
+stay unchecked. `reference_clips` in `LOCKS.toml` is still false and
+needs an owner flip. The worker store is `symphony/CLIP-STORE.md`.
+The earlier outline is `CLIP-INGEST.md`.
 
 **Architecture to adopt, not to vendor.** Resemble AI Chatterbox, MIT for
 the code in `resemble-ai/chatterbox` (copyright 2025 Resemble AI, read

@@ -11,8 +11,10 @@
 //! Weights are not vendored. [`weights_ready`] is false until the pinned
 //! safetensors are on disk. Nothing here downloads them.
 //!
-//! The Python stub does not call Chatterbox generate and refuses a reference
-//! clip. `GALION_CLONE_STUB_PCM=1` is protocol PCM, not a Flash result.
+//! The Python stub does not call Chatterbox generate. A `reference` path is
+//! added only by [`super::clip_store`] when owner clearance t273 is recorded
+//! and the outside WAV passes. Other clip keys are still a refusal.
+//! `GALION_CLONE_STUB_PCM=1` is protocol PCM, not a Flash result.
 #![allow(unsafe_code)]
 
 use super::sha256;
@@ -254,7 +256,19 @@ impl CloneWorker {
     /// One clause in, one PCM buffer out. Same process on every call.
     pub fn synthesize(&mut self, text: &str) -> Result<Vec<i16>, VoiceError> {
         let t0 = Instant::now();
-        let line = request_line(text, self.model, self.persona);
+        let reference = super::clip_store::reference_to_send(self.persona);
+        let texture = if self.persona == "jarvis" && reference.is_some() {
+            Some(super::clip_store::jarvis_texture())
+        } else {
+            None
+        };
+        let line = request_line(
+            text,
+            self.model,
+            self.persona,
+            reference.as_deref(),
+            texture,
+        );
         {
             let stdin = self
                 .stdin
@@ -544,7 +558,8 @@ impl FlashReport {
 }
 
 /// Default harness path. No number unless `GALION_FLASH_EVAL=1` and a worker
-/// returns PCM. Does not download and does not send a reference clip.
+/// returns PCM. Does not download. A reference path is attached only when
+/// [`super::clip_store::reference_to_send`] has an outside WAV.
 pub fn flash_from_env() -> FlashReport {
     if std::env::var("GALION_FLASH_EVAL").ok().as_deref() != Some("1") {
         return FlashReport::absent("GALION_FLASH_EVAL is not 1; no TTFA number");
@@ -580,7 +595,26 @@ pub fn flash_from_env() -> FlashReport {
     }
 }
 
-fn request_line(text: &str, model: CloneModel, persona: &str) -> String {
+fn json_escape(s: &str) -> Option<String> {
+    let mut out = String::with_capacity(s.len());
+    for c in s.chars() {
+        match c {
+            '"' => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\"),
+            c if (c as u32) < 0x20 => return None,
+            c => out.push(c),
+        }
+    }
+    Some(out)
+}
+
+fn request_line(
+    text: &str,
+    model: CloneModel,
+    persona: &str,
+    reference: Option<&Path>,
+    texture: Option<&str>,
+) -> String {
     let tags = if tags_allowed(persona) {
         "true"
     } else {
@@ -603,6 +637,20 @@ fn request_line(text: &str, model: CloneModel, persona: &str) -> String {
     s.push_str(persona_name(persona));
     s.push_str("\",\"tags\":");
     s.push_str(tags);
+    if let Some(path) = reference {
+        if let Some(esc) = json_escape(&path.display().to_string()) {
+            s.push_str(",\"reference\":\"");
+            s.push_str(&esc);
+            s.push('"');
+        }
+    }
+    if let Some(layer) = texture {
+        if layer == "hub" || layer == "off" {
+            s.push_str(",\"texture\":\"");
+            s.push_str(layer);
+            s.push('"');
+        }
+    }
     s.push_str("}\n");
     s
 }
@@ -705,17 +753,41 @@ mod tests {
     }
 
     #[test]
-    fn request_line_has_no_reference_and_jarvis_tags_are_off() {
-        let line = request_line("say \"hi\"", CloneModel::Nano, "samantha");
+    fn request_line_omits_a_reference_unless_one_is_passed() {
+        let line = request_line("say \"hi\"", CloneModel::Nano, "samantha", None, None);
         assert!(line.contains("\"model\":\"nano\""));
         assert!(line.contains("\"tags\":true"));
         assert!(!line.contains("reference"));
         assert!(!line.contains("audio_prompt"));
-        let jarvis = request_line("hello", CloneModel::Turbo, "jarvis");
+        let jarvis = request_line("hello", CloneModel::Turbo, "jarvis", None, None);
         assert!(jarvis.contains("\"model\":\"turbo\""));
         assert!(jarvis.contains("\"tags\":false"));
         assert!(!tags_allowed("jarvis"));
         assert_eq!(persona_name("other"), "samantha");
+        let with = request_line(
+            "hi",
+            CloneModel::Nano,
+            "samantha",
+            Some(Path::new("/outside/samantha/reference.wav")),
+            None,
+        );
+        assert!(with.contains("\"reference\":\"/outside/samantha/reference.wav\""));
+        assert!(!with.contains("audio_prompt"));
+        assert!(!with.contains("texture"));
+        let hub = request_line(
+            "hi",
+            CloneModel::Nano,
+            "jarvis",
+            Some(Path::new("/outside/jarvis/reference.wav")),
+            Some("hub"),
+        );
+        assert!(hub.contains("\"texture\":\"hub\""));
+        let off = request_line("hi", CloneModel::Nano, "jarvis", None, Some("off"));
+        assert!(off.contains("\"texture\":\"off\""));
+        assert!(
+            request_line("a\nb", CloneModel::Nano, "samantha", None, None)
+                .contains("\"text\":\"a b\"")
+        );
     }
 
     #[test]
@@ -758,6 +830,7 @@ mod tests {
         let mut child = Command::new("python3")
             .arg(&script)
             .env("GALION_CLONE_STUB_PCM", "1")
+            .env_remove("GALION_CLIP_STORE")
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
@@ -777,8 +850,52 @@ mod tests {
             String::from_utf8_lossy(&out.stderr)
         );
         let err = String::from_utf8_lossy(&out.stderr);
-        assert!(err.contains("rights hold"), "{err}");
+        assert!(err.contains("clip store"), "{err}");
         assert!(out.stdout.is_empty(), "a refused clip must not produce PCM");
+
+        let hold =
+            std::env::temp_dir().join(format!("galion-clearance-closed-{}", std::process::id()));
+        std::fs::write(&hold, "decision=closed\ncounsel=\nsend_reference=no\n").unwrap();
+        let mut child = Command::new("python3")
+            .arg(&script)
+            .env("GALION_CLONE_STUB_PCM", "1")
+            .env("GALION_CLIP_CLEARANCE", &hold)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap();
+        {
+            let mut stdin = child.stdin.take().unwrap();
+            stdin
+                .write_all(b"{\"text\":\"hi\",\"reference\":\"clip.wav\"}\n")
+                .unwrap();
+        }
+        let out = child.wait_with_output().unwrap();
+        assert_eq!(out.status.code(), Some(3));
+        let err = String::from_utf8_lossy(&out.stderr);
+        assert!(err.contains("rights hold"), "{err}");
+        assert!(out.stdout.is_empty());
+        let _ = std::fs::remove_file(&hold);
+
+        let mut child = Command::new("python3")
+            .arg(&script)
+            .env("GALION_CLONE_STUB_PCM", "1")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap();
+        {
+            let mut stdin = child.stdin.take().unwrap();
+            stdin
+                .write_all(b"{\"text\":\"hi\",\"audio_prompt\":\"x.wav\"}\n")
+                .unwrap();
+        }
+        let out = child.wait_with_output().unwrap();
+        assert_eq!(out.status.code(), Some(3));
+        assert!(out.stdout.is_empty());
+        assert!(String::from_utf8_lossy(&out.stderr).contains("rights hold"));
 
         let absent = Command::new("python3")
             .arg(&script)
@@ -788,6 +905,98 @@ mod tests {
             .unwrap();
         assert_eq!(absent.status.code(), Some(2));
         assert!(String::from_utf8_lossy(&absent.stderr).contains("galion-clone-absent"));
+
+        let store =
+            std::env::temp_dir().join(format!("galion-worker-store-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&store);
+        let wav = store.join("jarvis").join("reference.wav");
+        std::fs::create_dir_all(wav.parent().unwrap()).unwrap();
+        std::fs::write(
+            &wav,
+            b"RIFF\x24\x00\x00\x00WAVEfmt \x10\x00\x00\x00\x01\x00\x01\x00\x80\x3e\x00\x00\x00\x7d\x00\x00\x02\x00\x10\x00data\x00\x00\x00\x00",
+        )
+        .unwrap();
+        let digest = super::super::sha256::file_hex(&wav).unwrap();
+        std::fs::write(
+            store.join("jarvis").join("reference.wav.sha256"),
+            format!("{digest}  reference.wav\n"),
+        )
+        .unwrap();
+        let wav_s = wav.display().to_string();
+        let line =
+            format!("{{\"text\":\"hi there\",\"persona\":\"jarvis\",\"reference\":\"{wav_s}\"}}\n");
+        let mut child = Command::new("python3")
+            .arg(&script)
+            .env("GALION_CLONE_STUB_PCM", "1")
+            .env("GALION_CLIP_STORE", &store)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap();
+        {
+            let mut stdin = child.stdin.take().unwrap();
+            stdin.write_all(line.as_bytes()).unwrap();
+        }
+        let out = child.wait_with_output().unwrap();
+        assert_eq!(
+            out.status.code(),
+            Some(0),
+            "{}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        let err = String::from_utf8_lossy(&out.stderr);
+        assert!(err.contains("galion-clone-reference: wav"), "{err}");
+        assert!(err.contains("galion-clone-texture: hub"), "{err}");
+        assert!(!out.stdout.is_empty());
+        let wav_bytes = std::fs::read(&wav).unwrap();
+        assert_ne!(out.stdout.as_slice(), wav_bytes.as_slice());
+        let off = format!("{{\"text\":\"hi there\",\"persona\":\"jarvis\",\"reference\":\"{wav_s}\",\"texture\":\"off\"}}\n");
+        let mut child = Command::new("python3")
+            .arg(&script)
+            .env("GALION_CLONE_STUB_PCM", "1")
+            .env("GALION_CLIP_STORE", &store)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap();
+        {
+            let mut stdin = child.stdin.take().unwrap();
+            stdin.write_all(off.as_bytes()).unwrap();
+        }
+        let out = child.wait_with_output().unwrap();
+        assert_eq!(
+            out.status.code(),
+            Some(0),
+            "{}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        assert!(String::from_utf8_lossy(&out.stderr).contains("galion-clone-texture: off"));
+        assert_eq!(
+            std::fs::read(&wav).unwrap(),
+            wav_bytes,
+            "texture off must not rewrite the wav"
+        );
+        let mp3 = format!("{{\"text\":\"hi\",\"reference\":\"{wav_s}.mp3\"}}\n");
+        let mut child = Command::new("python3")
+            .arg(&script)
+            .env("GALION_CLONE_STUB_PCM", "1")
+            .env("GALION_CLIP_STORE", &store)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap();
+        {
+            let mut stdin = child.stdin.take().unwrap();
+            stdin.write_all(mp3.as_bytes()).unwrap();
+        }
+        let out = child.wait_with_output().unwrap();
+        assert_eq!(out.status.code(), Some(3));
+        assert!(out.stdout.is_empty());
+        assert!(String::from_utf8_lossy(&out.stderr).contains("wav only"));
+        let _ = std::fs::remove_dir_all(&store);
     }
 
     #[test]

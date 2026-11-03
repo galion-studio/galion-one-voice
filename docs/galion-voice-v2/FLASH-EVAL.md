@@ -25,7 +25,10 @@ engine, because generate is not wired. A protocol-stub clock is a test of
 the pipe. It is not a Flash result. Do not copy a number into `LEDGER.md`
 or a demo until a model run is actually recorded there.
 
-No reference clip is sent. Film audio stays on the rights hold.
+A reference path is sent only when `symphony/CLIP-STORE.md` opens the
+gate. CI does not set `GALION_CLIP_STORE`, so this harness sends none
+unless that store is present. `reference_clips` in `LOCKS.toml` is still
+false until the owner flips it.
 
 ## Harness
 
@@ -57,7 +60,7 @@ refuses unless `GALION_CLONE_FETCH=1`.
 ## What a real run would add, later
 
 1. Pinned safetensors on disk, fetched by a human with `GALION_CLONE_FETCH=1`.
-2. The child actually calls generate, still out of process, still with no reference clip until rights are cleared.
+2. The child actually calls generate, still out of process. A reference WAV is the clip-store path in `symphony/CLIP-STORE.md`, not a file in git.
 3. The stderr engine line says `model`.
 4. Three CPU runs, cold and warm, phrase fixed, written into `LEDGER.md` with the host and the model id.
 5. Still no film audio. Still no celebrity demo.

@@ -21,9 +21,14 @@ One long-lived child, the same idea as the warm Piper worker
 | Disk | no PCM cache | no PCM cache |
 | Fallback | flite if the pack is missing | Piper, then flite |
 
-Request line, written by `clone_worker::request_line`. There is no reference
-field. A child that sees a non-empty `reference`, `audio_prompt`,
-`audio_prompt_path`, or `clip` exits 3 and writes no PCM.
+Request line, written by `clone_worker::request_line`. A `reference` path
+is added only when `symphony/CLIP-STORE.md` says the gate is open: LEDGER
+`PRIVATE CLEARED` for that persona (t273), `send_reference = true`, and a
+WAV under `$GALION_CLIP_STORE` outside the work tree. Jarvis may also
+carry `"texture":"hub"` or `"texture":"off"` (`GALION_JARVIS_TEXTURE`).
+The texture flag does not rewrite the file. `audio_prompt`,
+`audio_prompt_path`, and `clip` still exit 3 and write no PCM. A
+`reference` that fails the store check does the same.
 
 ```text
 {"text":"Hello.","model":"nano","persona":"samantha","tags":true}
@@ -68,10 +73,13 @@ Turbo swaps in `t3_turbo_v1.safetensors`. Repo ids: `ResembleAI/chatterbox-nano`
 
 ## Rights
 
-Jarvis and Samantha, as film voices, stay on the hold in `VOICE-CLONING.md`.
-The checklist is `RIGHTS-CLEARANCE.md`. Both gates are closed.
+Jarvis and Samantha, as film voices, have an owner PRIVATE CLEARED line
+in `LEDGER.md` (t273, confirmed t287). Counsel is not named there. The
+checklist boxes in `RIGHTS-CLEARANCE.md` stay unchecked. Public demo
+stays closed. `LOCKS.toml` `reference_clips` is still false and still
+needs an owner flip. The clip store is `symphony/CLIP-STORE.md`.
 The persona id on this worker is the register from `SAMANTHA-V2.md` §4.
-It is not a conditioning clip. This scaffold does not fetch film audio.
-The ingest outline, still closed, is `CLIP-INGEST.md`.
+This scaffold does not fetch film audio and does not call generate.
+The older ingest outline is `CLIP-INGEST.md`.
 
 — Maciej Grajczyk

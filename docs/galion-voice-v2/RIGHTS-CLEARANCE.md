@@ -295,7 +295,7 @@ Leave this group unchecked for a private clearance.
 2. Paste the private LEDGER template for that persona. Fill every field.
 3. Only then may a human place the one clip on the owner's machine, off git.
 4. Compute duration and sha256. Amend the LEDGER line with those two facts. Do not invent them in advance.
-5. A later owner commit may set `reference_clips` true for that persona. This file does not edit `LOCKS.toml`. The worker keeps refusing a clip until that commit exists.
+5. A later owner commit may set `reference_clips` true for that persona. This file does not edit `LOCKS.toml`. t287 records the PRIVATE CLEARED path in `LEDGER.md` without that flip: `reference_clips` stays false until the owner edits the lock. The worker `send_reference` gate is `symphony/CLIP-STORE.md`. Checklist boxes that need a counsel name stay unchecked. No counsel name is invented.
 6. A public demo waits for its own LEDGER line, after the private line, with login, exact CORS, Art. 50, and the imitation sentence.
 7. Weight fetch (`GALION_CLONE_FETCH=1`) is a different decision. Clearance of a voice does not download Nano or Turbo. This file does not set the flag.
 
@@ -352,10 +352,13 @@ The refused blocks close that persona. They do not flip
 
 ## State of this writing
 
-2026-11-03, Europe/Zagreb. Every box above is unchecked. Both private
-gates are closed. Both public-demo gates are closed. No clip is in the
-tree. No sha256 of a clip is recorded, because no clip was fetched.
-`reference_clips` remains false. Seat 8 is the checklist, not a
-clearance.
+2026-11-03, Europe/Zagreb. t287 records the PRIVATE CLEARED path for
+Samantha and Jarvis in `LEDGER.md` (owner decision t273). Every box
+above stays unchecked. A counsel name was not supplied, and this file
+does not invent one. A ticked box still needs the instrument. Both
+public-demo groups stay unchecked. No clip is in the tree. No sha256
+of a clip is recorded here, because no landing WAV was in this tree to
+hash. `reference_clips` remains false until the owner flips
+`LOCKS.toml`. The worker path is `symphony/CLIP-STORE.md`.
 
 — Maciej Grajczyk

@@ -5,6 +5,12 @@ Europe/Zagreb. Outline only. The gate is closed.
 
 Master slogan: "The seamless connection with the human being, on the voice only."
 
+Owner record t287 is later than this outline. The live store and the
+PRIVATE CLEARED ledger path are `symphony/CLIP-STORE.md`. Where this
+file and that one disagree about `send_reference`, CLIP-STORE.md is the
+later record. `LOCKS.toml` `reference_clips` is still false until the
+owner flips it.
+
 This file is the process for two reference clips, about ten seconds each:
 Samantha (*Her*, 2014) and Jarvis (an Iron Man film voice). It records the
 gates, the store, the consent line, the hash, the retention term, the

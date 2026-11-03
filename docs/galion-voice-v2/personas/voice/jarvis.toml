@@ -2,7 +2,8 @@
 # Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
 #
 # The /v2 demo route reads this file for prosody, wash, tags, and the
-# rights hold. The clone worker does not. No clip, no weights.
+# page hold. The clone worker reads send_reference, and the texture toggle.
+# clip_path stays empty: the wav is not in git. No weights.
 # Register numbers are the design table in SAMANTHA-V2.md §4.
 # A British accent is the intended register, not a fact about
 # en_US-ljspeech-medium. Rights hold: ../VOICE-CLONING.md.
@@ -66,7 +67,7 @@ duration_target_s = 10
 min_duration_s = 5
 clip_path = ""
 placeholder = "docs/galion-voice-v2/personas/refs/jarvis.placeholder"
-note = "placeholder is a text marker. It is not audio. Do not commit a wav, and do not put this path on the worker request line."
+note = "placeholder is a text marker. It is not audio. The page stays on hold (public demo closed). Owner t273 / t287 unlocks worker send_reference for a WAV in $GALION_CLIP_STORE. This path stays empty. LOCKS reference_clips still needs an owner flip."
 
 [worker]
 binding = "galion.clone.worker"
@@ -81,7 +82,7 @@ model = "nano"
 quality_option = "turbo"
 request_persona = "jarvis"
 request_tags = false
-send_reference = false
+send_reference = true
 rate_hz = 24000
 pcm = "s16le"
 weights_vendored = false
@@ -94,7 +95,7 @@ order = ["piper", "flite"]
 engine = "piper"
 voice = "en_US-ljspeech-medium"
 artifact = "weights/tts/en_US-ljspeech-medium.onnx"
-when = "clone worker absent, unwired, or dead; rights hold still closed"
+when = "clone worker absent, unwired, or dead"
 tags = false
 is_film_voice = false
 
@@ -102,3 +103,13 @@ is_film_voice = false
 engine = "flite"
 when = "A21 Piper pack missing"
 tags = false
+
+# Hub bed (clicks, alarms, ambience). Separate from the voice.
+# Default on. GALION_JARVIS_TEXTURE=0 asks for the layer off.
+# The flag does not rewrite reference.wav.
+[texture]
+id = "hub"
+default = "on"
+env = "GALION_JARVIS_TEXTURE"
+off = "0"
+strips_samples = false

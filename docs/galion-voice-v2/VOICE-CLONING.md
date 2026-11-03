@@ -125,7 +125,7 @@ or ingest a clip. Replaces the external-API swarm, which is dropped.
 | 5 | Zero-shot ~10 s conditioning, no fine-tune | `docs/galion-voice-v2/VOICE-CLONING.md` | planned-not-spawned |
 | 6 | Jarvis research-target mapping | `docs/galion-voice-v2/VOICE-CLONING.md` | planned-not-spawned |
 | 7 | Samantha tags and emotional register | `docs/galion-voice-v2/VOICE-CLONING.md` | planned-not-spawned |
-| 8 | Rights, consent, licence gate | `docs/galion-voice-v2/RIGHTS-CLEARANCE.md` and `docs/galion-voice-v2/CLIP-INGEST.md` | checklist written; both gates closed; ingest outline only, gate not opened |
+| 8 | Rights, consent, licence gate | `docs/galion-voice-v2/RIGHTS-CLEARANCE.md`, `CLIP-INGEST.md`, `symphony/CLIP-STORE.md` | t273/t287 PRIVATE CLEARED in `LEDGER.md`; counsel not named; boxes unchecked; `reference_clips` still false pending an owner flip |
 | 9 | Art. 50 watermark note (no Perth vendor) | `docs/galion-voice-v2/VOICE-CLONING.md` | planned-not-spawned |
 | 10 | Piper fallback and warm-worker shape | `docs/galion-voice-v2/CLONE-WORKER.md` | scaffolded; Piper speaks when the clone slot is absent |
 | 11 | TTFA eval plan (no measurement) | `docs/galion-voice-v2/FLASH-EVAL.md` | harness prints `measured: false` until a flagged run |

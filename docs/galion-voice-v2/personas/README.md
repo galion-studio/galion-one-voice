@@ -20,7 +20,7 @@ These files tell a speaking agent who it is. Session mechanics, the bus body, an
 | [SAMANTHA.md](SAMANTHA.md) | **Samantha** | **TEST / INTERNAL.** Her-inspired voice used only to exercise cloning capability. Not a shipping product persona. |
 | [JARVIS.md](JARVIS.md) | **Jarvis** | **TEST / INTERNAL.** Iron Man–inspired voice used only to exercise cloning capability. Not a shipping product persona. |
 
-Samantha and Jarvis are defined from publicly known character traits, in prose. This folder does not clear rights, consent, or licence. It does not point at a recording. A clip, a clone worker, and a public demo in either film voice stay on the hold in `VOICE-CLONING.md` until an owner writes the clearance in `LEDGER.md`.
+Samantha and Jarvis are defined from publicly known character traits, in prose. The owner PRIVATE CLEARED line for a local WAV is in `LEDGER.md` (t273, t287). This folder still does not name counsel, and it does not point at a recording in git. A public demo stays closed. `reference_clips` in `LOCKS.toml` still needs an owner flip. The store is `../symphony/CLIP-STORE.md`.
 
 `SAMANTHA-V2.md` may pin the ids `samantha` and `jarvis` on the process bus while a call is alive. That pin selects a register for a test. It does not turn either id into a product voice. A product session that has not been pinned to a test id speaks as Galion One.
 
