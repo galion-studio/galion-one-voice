@@ -1,9 +1,24 @@
 # V2-S14 · Chatterbox Nano stream (time to first audio)
 
 Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
-Europe/Zagreb. A streaming hook and a gate. Not a model measurement.
+Europe/Zagreb. Merge is held (admin t298 and t299).
 
 The spelling is **Galion**. The product is Galion Voice.
+
+## HARD-PASS
+
+A HARD-PASS, and any merge gate for this PR, needs real engine PCM
+measured on this box. The engine is Piper (`GALION_SPEECH=a21`,
+`en_US-ljspeech-medium`) or Chatterbox Nano when a local CPU run actually
+calls `stream` or `generate` and returns PCM. `product_claim` is true
+only for that PCM.
+
+A protocol-stub clock does not count. The 15 ms first-PCM figure was the
+stub. `product_claim` is false on that clock. It is not a TTFA result and
+it is not an 80 ms result. The two-token flush described below is 80 ms
+of speech-token time at 25 Hz. That arithmetic was not measured here.
+
+`LOCKS.toml` was not edited. No WAV is committed.
 
 ## What was verified
 
@@ -28,7 +43,7 @@ before the import.
 `scripts/clone/nano_stream.py` chooses one path:
 
 1. `model.stream`, if the local install grew it (PR 528 or a later merge). `chunk_tokens` is 2, not the PR default of 24. Twenty-four tokens is 960 ms of speech before the first flush.
-2. Otherwise a token loop with the same KV cache as `inference_turbo`, yielding each token, then meanflow on the stable prefix. Lookahead is 3. The first vocoder call is at 5 tokens: 80 ms of stable speech plus the lookahead the flow drops. Noise already drawn is kept. Each flush vocodes the prefix and yields the new tail.
+2. Otherwise a token loop with the same KV cache as `inference_turbo`, yielding each token, then meanflow on the stable prefix. Lookahead is 3 tokens. The first vocoder call is planned at 5 tokens (lookahead plus 2). At 25 Hz those 2 tokens are 80 ms of speech time. That is a plan. It is not a measured TTFA. Noise already drawn is kept. Each flush vocodes the prefix and yields the new tail.
 3. If the object can only speak through `generate`, the worker writes no PCM. `SpeechStack` hands the line to Piper, then flite. Piper is unchanged.
 
 `GALION_CLONE_STREAM=1` is the opt-in. It needs `GALION_CLONE_CKPT`, a flat
@@ -55,9 +70,23 @@ real PCM, `engine` is `piper`, `product_claim` is true, and
 clock, is `FAIL`. `product_claim` stays false for that clock. `stub` on
 the Piper report stays false.
 
-CC0 clips live in `scripts/eval/sample-voices/` (`SAMPLE-VOICES.md`). The
-gate checks they are RIFF/WAVE. The named sample on a pass is
-`scripts/eval/sample-voices/pdx-voice.wav`. Piper does not condition on it.
+CC0 source URLs are listed in `scripts/eval/sample-voices/SAMPLE-VOICES.md`.
+The audio files are not in git. Piper does not condition on them.
+
+## Why Nano has no real clock on this box
+
+A Nano HARD-PASS needs torch, the pinned safetensors, and a CPU call that
+returns PCM from `stream` or from the chunked meanflow path. This box has
+none of that:
+
+- `python3` has no `torch`.
+- `weights/clone/` is absent, so the pinned Nano tensors are not on disk.
+- Master `ChatterboxTurboTTS` has `generate()`, which returns when the
+  utterance is finished. `stream()` is still only on open PR 528.
+- No `GALION_CLONE_CKPT` was loaded, and no Nano PCM was written.
+
+`model_measured` stays false. The clone smoke's 1.8–2.4 s figure is from
+another machine. It is not a clock from this box, and it is not a stub.
 
 ### Coordinator box (t301)
 
@@ -83,11 +112,13 @@ SpeechStack clock above. Two runs, not averaged.
 |---|---|---|---|---|
 | 1 | 379.0 | 379.1 | 67.1 | 25088 |
 | 2 | 331.8 | 331.8 | 37.8 | 25088 |
+| 3 | 315.0 | 319.4 | 39.3 | 25088 |
 
-Both runs: voice `en_US-ljspeech-medium`, sample
-`scripts/eval/sample-voices/pdx-voice.wav`, engine `piper`,
-`product_claim` true, `piper_measured` true, `model_measured` false,
-`stub` false, gate PASS.
+Both runs are real Piper PCM on this box. Voice
+`en_US-ljspeech-medium`, engine `piper`, `product_claim` true,
+`piper_measured` true, `model_measured` false, `stub` false. They are
+not an 80 ms claim. Admin t298 and t299 still hold merge. A stub clock
+with `product_claim` false does not add to this table.
 
 Without `GALION_SPEECH=a21` the same script exits 2 and prints `FAIL`.
 That is the stub rejection, not a pass.

@@ -26,8 +26,6 @@ sys.path.insert(0, str(CLONE))
 import nano_stream  # noqa: E402
 
 WHOLE_UTT_FAIL_MS = 1500
-TARGET_LO_MS = 80
-TARGET_HI_MS = 160
 GAP_MS = 30
 
 
@@ -357,7 +355,6 @@ def main() -> None:
         "path": None if not product_claim else model.get("path"),
         "engine": None if not product_claim else "nano",
         "chunks": None if not product_claim else model.get("chunks"),
-        "target_ms": [TARGET_LO_MS, TARGET_HI_MS],
         "whole_utt_fail_ms": WHOLE_UTT_FAIL_MS,
         "model_measured": model_measured and product_claim,
         "product_claim": product_claim,
