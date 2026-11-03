@@ -71,6 +71,9 @@ The symphony standard for that clock is
 Gate results go in [`symphony/SELF-EVAL.md`](symphony/SELF-EVAL.md).
 Non-inference cost on that tick is the symphony account,
 `docs/galion-voice-v2/symphony/ONE-PERCENT.md`.
+is the clock. Clone, persona, and the one dot sit on that step
+(`symphony/HEARTBEAT-WIRE.md`). The turn worker is forbidden to run inside
+that call.
 
 **Rika.** On silence and an in-breath, Rika leans in on the feeling band
 (about 160 ms in the stub measurement). It needs consent bits `sense` and
@@ -668,6 +671,7 @@ S3Gen and a vocoder emit audio. No training step in that API.
 - **Quality option:** Chatterbox-Turbo, listed at 350M, same family. Turbo's own code requires a reference longer than 5 seconds. The owner target is one clip of about 10 seconds per persona.
 - **Streaming eval:** the owner name is a Flash streaming eval on CPU. Upstream master exposes `generate()`, not a model named Flash. Open PR 528 proposes `ChatterboxTurboTTS.stream()` for near-real-time CPU playback and was still open when this note was written. The eval is planned. It is not run here.
 - **Samantha:** paralinguistic tags (`[laugh]`, `[chuckle]`, and the set Turbo/Nano already document) carry warmth. Jarvis stays calm and precise: short command lines, tags off.
+- **Jarvis hub:** clicks, alarms, and virtual ambience are a separate layer. The toggle mixes it on or off and does not denoise the speech asset. ABI and band check: `symphony/JARVIS-TEXTURE.md`.
 - **Watermark:** upstream `generate()` applies a Perth watermark. The Nano path should keep a watermark beside the Art. 50 disclosure. Perth's own licence was not read in this session. Do not vendor it yet.
 - **Worker:** the scaffold in `CLONE-WORKER.md` is one out-of-process process, same shape as the warm Piper worker. Piper speaks if the clone worker is absent. No PCM on disk. Generate is not wired. No film audio.
 - **Weights:** gitignored under `weights/clone/`. CloudAgents fetch tag `clone-weights-v1` with `scripts/clone/fetch-clone-weights.sh`. The layout and the admin upload are `CLONE-WEIGHTS.md`. A clean clone does not contain the blobs.

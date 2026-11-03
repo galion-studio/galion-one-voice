@@ -27,6 +27,8 @@ jobs:
         run: scripts/eval/flash-ttfa.sh
       - name: Hard loop classifiers (no product verdict)
         run: scripts/eval/v2-hard-loop.sh --self-check
+      - name: Jarvis hub texture (toggle and band check)
+        run: scripts/eval/jarvis-texture.sh
       - name: Phone HTTP surface
         run: cargo test -p galion-render --features web --lib
       - name: Phone lane

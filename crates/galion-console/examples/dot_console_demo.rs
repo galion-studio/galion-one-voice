@@ -30,7 +30,8 @@ use std::time::{Duration, Instant};
 
 use galion_console::dotviz::{demo_band, DemoPump, DemoSeg, DotConsole, PanelOpts};
 use galion_console::live::{AffectFeed, StubAffect, StubTiming, TimingFeed};
-use galion_emotion::{DefaultConsentGate, Purpose};
+use galion_emotion::{DefaultConsentGate, EmotionFrame, Purpose};
+use galion_heartbeat::symphony::{BandView, SymphonyWire};
 use galion_heartbeat::{FrameIn, Heartbeat, HeartbeatConfig, FRAME_MS, FRAME_SAMPLES, RIKA_BITS, SAMPLE_RATE};
 use galion_render::{PngSeqConfig, PngSeqSurface};
 
@@ -140,6 +141,10 @@ fn run<T: TimingFeed, A: AffectFeed>(args: &[String], mut pump: DemoPump<T, A>, 
 
     let mut you = vec![0.0f32; FRAME_SAMPLES];
     let mut me = vec![0.0f32; FRAME_SAMPLES];
+    let mut scratch = [0.0f32; FRAME_SAMPLES];
+    let mut wire = SymphonyWire::new();
+    // Previous tick's consented reading. The feeling decision itself runs inside step.
+    let mut held_affect: Option<EmotionFrame> = None;
     let mut rng = Lcg(13);
     let mut me_voiced_prev = false;
     let mut yielded = false;
@@ -166,9 +171,13 @@ fn run<T: TimingFeed, A: AffectFeed>(args: &[String], mut pump: DemoPump<T, A>, 
                 fill_you(&mut you, i, s, barge, &mut rng);
             }
         }
+        #[cfg(feature = "phone-turn")]
+        if let Some(host) = phone.as_ref() {
+            hb.set_persona(host.voice_persona());
+        }
         let inp = FrameIn {
             you_pcm: &you,
-            affect: None,
+            affect: if sense { held_affect } else { None },
             tension: None,
             consent_bits: bits,
             purpose: Purpose::PersonalAssistant,
@@ -179,13 +188,19 @@ fn run<T: TimingFeed, A: AffectFeed>(args: &[String], mut pump: DemoPump<T, A>, 
         let ts = Instant::now();
         let out = hb.step(&inp);
         let step_us = ts.elapsed().as_secs_f32() * 1e6;
+        let emit = wire.me_emit(&out, me.len());
         if out.yield_now() {
             yielded = true;
         }
         let phone_me;
         #[cfg(feature = "phone-turn")]
         {
-            phone_me = phone.as_mut().is_some_and(|p| p.drive_me(&mut me));
+            if out.yield_now() {
+                if let Some(p) = phone.as_mut() {
+                    p.release_me();
+                }
+            }
+            phone_me = phone.as_mut().is_some_and(|p| p.poll_me(&mut me, emit));
         }
         #[cfg(not(feature = "phone-turn"))]
         {
@@ -207,8 +222,34 @@ fn run<T: TimingFeed, A: AffectFeed>(args: &[String], mut pump: DemoPump<T, A>, 
                 fill_me(&mut me, i, me_voiced, out.me_gain());
             }
         }
+        // Jarvis hub bed on the me band only. Caller samples in `you` are not passed in.
+        out.feeling.hub.mix_me(&mut me);
+        // Persona loudness from this frame's feeling. Rika's me_gain is already in the synthetic fill.
+        let loud = out.feeling.prosody.energy;
+        if loud != 1.0 {
+            for s in me.iter_mut() {
+                *s = (*s * loud).clamp(-1.0, 1.0);
+            }
+        }
+        let you_active = phone_you || s == DemoSeg::You || barge;
+        let feeling_e = if sense { out.applied.lean_in } else { 0.0 };
+        let me_slot: &[f32] = if emit && me_voiced { &me } else { &[] };
+        let sector = wire.step(&out, BandView { you_active, feeling_e, sense, me_slot }, &mut scratch);
         let snap = pump.pump(i, &you, SAMPLE_RATE);
-        dc.frame(&out, &you, &me, me_voiced, &snap, step_us);
+        held_affect = if snap.sense {
+            snap.affect.map(|a| EmotionFrame {
+                seq: i as u32,
+                t_ms: (i as u32).saturating_mul(FRAME_MS),
+                dur_ms: FRAME_MS as u16,
+                valence: a.valence,
+                arousal: a.arousal,
+                dominance: 0.5,
+                confidence: a.confidence,
+            })
+        } else {
+            None
+        };
+        dc.frame_marked(&out, &you, &me, me_voiced, &snap, step_us, Some(sector.dot));
         me_voiced_prev = me_voiced;
 
         if headless {
