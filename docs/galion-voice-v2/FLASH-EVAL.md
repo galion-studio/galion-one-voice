@@ -64,4 +64,13 @@ refuses unless `GALION_CLONE_FETCH=1`.
 
 Until those lines exist, this document's only number is the absence of one.
 
+## Stub versus hard
+
+A run of this page, including a protocol-stub clock, is **STUB-PASS**.
+It is not **HARD-PASS**. The hard loop is `scripts/eval/v2-hard-loop.sh`,
+written up in `HARD-LOOP.md`. That harness refuses `HARD-PASS` unless
+reference hashes match and engine `model` streams a first PCM. The Admin
+UI check of generations and LLM thoughts is `ADMIN-UI-CHECK.md`. Maciej
+Grajczyk has to sign that page. This file does not.
+
 — Maciej Grajczyk
