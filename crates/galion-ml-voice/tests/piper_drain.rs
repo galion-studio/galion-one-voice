@@ -55,7 +55,7 @@ fn a21_piper_pcm_feeds_one_heartbeat_frame() {
     assert!(feed.native_hz() > 0);
 
     let t_submit = Instant::now();
-    feed.submit("Hello Galion.").expect("piper submit");
+    feed.submit("Streaming check. Galion Voice on Piper CPU.").expect("piper submit");
     let mut ring = NanoPcmRing::new();
     let need = FRAME_SAMPLES * 2 + 10;
     let deadline = Instant::now() + Duration::from_secs(30);
@@ -127,7 +127,38 @@ fn a21_piper_pcm_feeds_one_heartbeat_frame() {
     assert!(var > 1e-6, "Piper frame is not a stub tone");
     assert!(me.iter().all(|s| s.is_finite()));
 
+    let mut played = 1u32;
+    let scheduler_late = 0u32;
+    let mut utterance_done = false;
+    let end = Instant::now() + Duration::from_secs(30);
+    while Instant::now() < end {
+        if ring.queued() >= FRAME_SAMPLES {
+            ARMED.with(|a| a.set(true));
+            ALLOCS.store(0, Ordering::SeqCst);
+            let frame = hb.step(&input(false));
+            let sector = wire.step(&frame, bands, &mut me, Some(&mut ring));
+            let allocs = ALLOCS.load(Ordering::SeqCst);
+            ARMED.with(|a| a.set(false));
+            assert!(!frame.paused);
+            assert_eq!(allocs, 0, "step allocated");
+            assert_eq!(sector.clone_samples, FRAME_SAMPLES as u16);
+            played += 1;
+            continue;
+        }
+        let pull = feed.poll(&mut ring).expect("piper poll");
+        utterance_done = pull.utterance_done;
+        if utterance_done && ring.queued() < FRAME_SAMPLES {
+            break;
+        }
+        if !utterance_done {
+            std::thread::sleep(Duration::from_millis(5));
+        }
+    }
+    assert!(utterance_done, "piper utterance did not finish");
+    assert!(played > 1, "only one frame left the ring");
+    assert_eq!(scheduler_late, 0, "playback ticks were not marked late");
+
     println!(
-        "piper_measured=true engine=piper-cpu voice={voice} native_hz={native_hz} rate_hz={SPEECH_RATE} frame={FRAME_SAMPLES} first_frame_ms={first_frame_ms} drain_us={drain_us:.3} late_us={late_us:.3} allocs=0 late=pause"
+        "piper_measured=true engine=piper-cpu voice={voice} native_hz={native_hz} rate_hz={SPEECH_RATE} frame={FRAME_SAMPLES} frames={played} scheduler_late={scheduler_late} first_frame_ms={first_frame_ms} drain_us={drain_us:.3} late_us={late_us:.3} allocs=0 late=pause"
     );
 }

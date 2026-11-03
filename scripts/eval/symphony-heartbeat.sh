@@ -58,10 +58,11 @@ if [[ $c1 -ne 0 || $c2 -ne 0 || $c3 -ne 0 || $c4 -ne 0 || $c5 -ne 0 ]]; then
   echo "verdict=FAIL clone=$c1 sectors=$c2 persona=$c3 drain=$c4 live=$c5 piper=$c6"
   exit 1
 fi
-echo "verdict=PASS"
 if printf '%s\n' "$plog" | grep -q 'piper_measured=true'; then
+  echo "verdict=PASS"
   printf '%s\n' "$plog" | grep 'piper_measured=true' | tail -1
-else
-  echo "piper_measured=false reason=pack-absent"
+  exit 0
 fi
-exit 0
+echo "verdict=FAIL reason=stub-frames-are-not-a-voice"
+echo "piper_measured=false reason=pack-absent"
+exit 1

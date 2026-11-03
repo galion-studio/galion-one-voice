@@ -24,7 +24,7 @@ Toolchain: Rust 1.85.0. Profile: `cargo test` (debug). This file records that ru
 | Yield copies nothing and asks the host to release the slot | PASS | `yield_releases_the_slot_and_copies_nothing` |
 | Clone drain size is one heartbeat frame | PASS | `frame_matches_heartbeat`; `drain_takes_one_heartbeat_frame_and_leaves_the_tail` |
 | Nano ring drain is one frame, hard | PASS | `nano_ring_drains_one_frame_and_a_late_tick_does_not_catch_up`. Late tick pops nothing. The next tick takes 1920. The tail stays. A full ring drops overflow instead of growing a catch-up queue. `steps_allocate_nothing` drains the ring inside the counting allocator (`allocs=0`). |
-| Piper feed, `GALION_SPEECH=a21` | HARD, measured | `a21_piper_pcm_feeds_one_heartbeat_frame`. Real Piper PCM, native 22050 Hz resampled to 24 kHz, one 1920-sample frame. `piper_measured=true`. `GALION_CLONE_STUB_FRAMES` is not this feed. |
+| Piper feed, `GALION_SPEECH=a21` | HARD, measured | `a21_piper_pcm_feeds_one_heartbeat_frame`. Real Piper PCM, native 22050 Hz resampled to 24 kHz. 41 full frames, `scheduler_late=0`, `allocs=0`, late=pause. `piper_measured=true`. `GALION_CLONE_STUB_FRAMES` is not this feed. The harness fails the ship if that line is missing. |
 | Live frame loop still runs with the wire in the loop | PASS | `galion-live-demo` `tests/live.rs` (feature `dot-viz`), including `live_loop_drains_one_nano_frame_and_leaves_the_tail` |
 | Chatterbox `generate` (model PCM) | BLOCKED | The worker does not import torch and does not call generate. Weights are not in the tree. That row does not fail the harness. |
 
@@ -45,10 +45,10 @@ The ceiling is 800 µs. The timed region includes the Nano ring drain. Other deb
 `GALION_SPEECH=a21`, Piper `en_US-ljspeech-medium` on CPU. Native 22050 Hz resampled to 24 kHz. One frame is 1920 samples. Late frame paused and did not pop the ring. The next step took one frame. `allocs=0`. Stub frames were not the source.
 
 ```text
-piper_measured=true engine=piper-cpu voice=en_US-ljspeech-medium native_hz=22050 rate_hz=24000 frame=1920 first_frame_ms=377 drain_us=0.831 late_us=1.189 allocs=0 late=pause
+piper_measured=true engine=piper-cpu voice=en_US-ljspeech-medium native_hz=22050 rate_hz=24000 frame=1920 frames=41 scheduler_late=0 first_frame_ms=343 drain_us=0.512 late_us=1.102 allocs=0 late=pause
 ```
 
-`first_frame_ms` is submit until the ring held one frame, including the cold Piper load. `drain_us` is `Heartbeat::step` plus `SymphonyWire::step` on that PCM.
+Phrase: `Streaming check. Galion Voice on Piper CPU.` `first_frame_ms` is submit until the ring held one frame, including the cold Piper load. `drain_us` is one `Heartbeat::step` plus `SymphonyWire::step` on that PCM. `frames=41` is every full 1920-sample frame the step took after that. Playback steps were not marked late (`scheduler_late=0`). The short tail under one frame stays queued. A separate arrival-time count of the same phrase, same pack, resampled 22050 to 24000, was 42 frames including that tail, `late_ticks=0`. `GALION_CLONE_STUB_FRAMES` is not this run. The harness exits 1 if `piper_measured=true` is missing.
 
 The clock read is outside `step`. The counting allocator is armed only around the two `step` calls.
 
