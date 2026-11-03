@@ -28,7 +28,8 @@ grep -q '^frame_ms = 80' LOCKS.toml || fail "frame_ms is not 80"
 grep -q '^reference_clips = false' LOCKS.toml || fail "reference_clips was flipped; this landing must not edit LOCKS.toml"
 grep -q 'model_primary = "chatterbox-nano"' LOCKS.toml || fail "primary model is not chatterbox-nano"
 
-if grep -E -q 'import (torch|gguf|llama_cpp)|ffmpeg|noisereduce|\.gguf' "$WORKER"; then
+# torch is imported lazily inside the generate path (PR #53), never at module level.
+if grep -E -q '^(import|from) (torch|gguf|llama_cpp)|import (gguf|llama_cpp)|ffmpeg|noisereduce|\.gguf' "$WORKER"; then
   fail "worker imports a forbidden runtime or a denoise tool"
 fi
 grep -q 'denoise refused' "$WORKER" || fail "worker does not refuse denoise"

@@ -50,13 +50,17 @@ cleared and written in `LEDGER.md`:
 - a public demo that speaks in either voice
 
 `LOCKS.toml` `[formats.exceptions.v2s14_chatterbox]` sets
-`reference_clips = false`. The worker treats a non-empty `reference`,
-`audio_prompt`, `audio_prompt_path`, or `clip` as exit 3 and writes no
-PCM (`CLONE-WORKER.md`). `scripts/clone/fetch-clone-weights.sh` fetches
-pinned `.safetensors` only when `GALION_CLONE_FETCH=1`, and it refuses
-audio suffixes and persona filenames. The release in `CLONE-WEIGHTS.md`
-is that same list. A LEDGER clearance does not flip the lock and does not
-set that flag. An owner edits the lock later, in its own commit, after
+`reference_clips = false`. Without `GALION_CLONE_LOCAL_REFS=1`, the
+worker treats a non-empty `reference`, `audio_prompt`,
+`audio_prompt_path`, or `clip` as exit 3 and writes no PCM
+(`CLONE-WORKER.md`). With that variable, a local file is accepted only
+when its sha256 matches `scripts/clone/REFS.sha256` for the requested
+persona. That env gate is not this checklist, and it does not flip the
+lock. `scripts/clone/fetch-clone-weights.sh` fetches pinned safetensors
+only when `GALION_CLONE_FETCH=1`, and it refuses audio suffixes and
+persona filenames. The release in `CLONE-WEIGHTS.md` is that same list.
+A LEDGER clearance does not flip the lock and does not set either flag.
+An owner edits the lock later, in its own commit, after
 the clearance line is real.
 
 Chatterbox code is MIT, copyright 2025 Resemble AI, read 2026-11-03.
