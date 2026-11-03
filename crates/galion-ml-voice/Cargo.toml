@@ -22,4 +22,8 @@ required-features = ["speech"]
 name = "flash_ttfa"
 required-features = ["speech"]
 
+[[example]]
+name = "gqvoice"
+required-features = ["speech"]
+
 [dependencies]

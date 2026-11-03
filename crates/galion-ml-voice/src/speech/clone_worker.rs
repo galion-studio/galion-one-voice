@@ -418,6 +418,9 @@ pub struct CloneTts {
     persona: &'static str,
     worker: Option<CloneWorker>,
     spawns: u32,
+    /// Worker PCM for the utterance in progress. Landed once, as one packet.
+    pending: Vec<i16>,
+    dir: PathBuf,
 }
 
 impl CloneTts {
@@ -438,7 +441,36 @@ impl CloneTts {
             persona,
             worker: None,
             spawns: 0,
+            pending: Vec::new(),
+            dir: super::gqvoice::gqvoice_dir(),
         })
+    }
+
+    #[cfg(test)]
+    pub fn for_test(worker: CloneWorker, dir: PathBuf) -> Self {
+        Self {
+            script: PathBuf::from("test"),
+            model: worker.model(),
+            persona: worker.persona(),
+            worker: Some(worker),
+            spawns: 1,
+            pending: Vec::new(),
+            dir,
+        }
+    }
+
+    pub(crate) fn clear_pending(&mut self) {
+        self.pending.clear();
+    }
+
+    /// Compile the utterance and return samples read back from the landed file.
+    pub(crate) fn land_pending(&mut self) -> Result<Option<crate::Audio>, VoiceError> {
+        let pcm = std::mem::take(&mut self.pending);
+        if pcm.is_empty() {
+            return Ok(None);
+        }
+        let audio = super::gqvoice::handoff_at(&pcm, self.persona, self.model.as_str(), &self.dir)?;
+        Ok(Some(audio))
     }
 
     pub fn model_name(&self) -> &'static str {
@@ -479,11 +511,9 @@ impl TtsEngine for CloneTts {
         }
         self.ensure()?;
         let pcm = self.worker.as_mut().unwrap().synthesize(&body)?;
-        let samples = pcm.iter().map(|&s| s as f32 / 32768.0).collect();
-        Ok(Audio {
-            sample_rate: CLONE_RATE_HZ,
-            samples,
-        })
+        let accepted = super::gqvoice::accept_worker_pcm(&pcm, self.persona, self.model.as_str())?;
+        self.pending.extend_from_slice(&accepted.playable);
+        Ok(accepted.audio)
     }
 }
 
@@ -733,6 +763,24 @@ mod tests {
         assert!(!stub.product_claim);
         assert!(!FlashReport::from_pcm("model", 4).note.is_empty());
         assert!(FlashReport::from_pcm("model", 4).product_claim);
+    }
+
+    #[test]
+    fn synthesize_compiles_before_it_returns_audio() {
+        let src = include_str!("clone_worker.rs");
+        let head = src.split("mod tests").next().expect("impl");
+        assert!(
+            head.contains("gqvoice::accept_worker_pcm"),
+            "worker pcm must enter the compiler"
+        );
+        assert!(
+            head.contains("gqvoice::handoff_at"),
+            "the utterance must be landed before playback"
+        );
+        assert!(
+            !head.contains("32768.0"),
+            "do not hand worker pcm to the stack in place"
+        );
     }
 
     #[test]
