@@ -66,7 +66,7 @@ duration_target_s = 10
 min_duration_s = 5
 clip_path = ""
 placeholder = "docs/galion-voice-v2/personas/refs/jarvis.placeholder"
-note = "placeholder is a text marker. It is not audio. Do not commit a wav, and do not put this path on the worker request line."
+note = "placeholder is a text marker. It is not audio. Do not commit a wav, and do not put this path on the worker request line. Hub clicks, alarms, and ambience are a separate layer. The toggle does not denoise the asset. See symphony/JARVIS-TEXTURE.md."
 
 [worker]
 binding = "galion.clone.worker"

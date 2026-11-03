@@ -73,5 +73,7 @@ The checklist is `RIGHTS-CLEARANCE.md`. Both gates are closed.
 The persona id on this worker is the register from `SAMANTHA-V2.md` §4.
 It is not a conditioning clip. This scaffold does not fetch film audio.
 The ingest outline, still closed, is `CLIP-INGEST.md`.
+A Jarvis hub toggle is not a denoise flag and not a reference clip.
+The ABI is `symphony/JARVIS-TEXTURE.md`. This scaffold does not mix the layer.
 
 — Maciej Grajczyk

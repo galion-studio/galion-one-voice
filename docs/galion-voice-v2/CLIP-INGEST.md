@@ -26,7 +26,11 @@ not a chapter, not a third voice.
 | Id | Research target | Length | Register |
 |---|---|---|---|
 | `samantha` | Voice of *Her* (2014) | about 10 s | Conversational. Paralinguistic tags may stay. |
-| `jarvis` | Iron Man film voice | about 10 s | Calm command. Tags off. |
+| `jarvis` | Iron Man film voice | about 10 s | Calm command. Tags off. Hub layer stays separate. |
+
+The Jarvis hub (clicks, alarms, virtual ambience) is a separate layer.
+The toggle mixes it. Turning it off does not denoise the asset. The ABI
+and the forbid-list are `symphony/JARVIS-TEXTURE.md`.
 
 About ten seconds is the owner target in `VOICE-CLONING.md`. Chatterbox
 Turbo's public code asserts a reference longer than five seconds, so the
