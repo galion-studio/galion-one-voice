@@ -12,13 +12,14 @@ publish = false
 [features]
 # Fallback lane is never default (A18).
 # W21-03: `cascade` also enables the EN demo lane (adapters onto galion-ml-voice stubs).
-cascade = ["dep:galion-ml-voice", "galion-ml-voice/speech"]
+cascade = ["dep:galion-ml-voice", "galion-ml-voice/speech", "dep:galion-asr-vosk"]
 # V1-03: the EN lane speaks real words (A21 weight slot -> interim libflite via runtime dlopen).
 
 [dependencies]
 # Default build: zero dependencies, builds with `cargo --offline`, no weights.
 # W21-03: optional path dep (workspace-local, offline, zero transitive deps).
 galion-ml-voice = { path = "../galion-ml-voice", optional = true }
+galion-asr-vosk = { path = "../galion-asr-vosk", optional = true }
 
 [[example]]
 name = "en_cascade"

@@ -1598,6 +1598,7 @@ mod tests {
         assert!(asr_source_is_placeholder(ASR_INTERIM_PLACEHOLDER));
         assert_ne!(ASR_INTERIM_PLACEHOLDER, "recognition");
         assert!(!asr_source_is_placeholder("recognition"));
+        assert!(!asr_source_is_placeholder("vosk"));
 
         for motion in [
             galion_render::OrbMotion::Idle,

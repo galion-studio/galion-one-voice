@@ -91,4 +91,6 @@
 
 **2026-11-03 · V2 persona demo route.** `/v2` is the one-dot Samantha / Jarvis test. It reads `personas/voice/samantha.toml` and `jarvis.toml` (`wired` is that route, not a live clone). `GET /dot` carries `persona` and `mood`. The surround wash eases among calm, grief, joy, vulnerability, and quiet. The disc body stays `#F5F5F7`. Mouth on the page is the browser, not Piper and not a film voice. Rights hold stays closed. No clip. The phone canned table no longer speaks "I hear you" or "That sounds hard"; words stay on the matter. LOCKS.toml not edited. Eval: `docs/galion-voice-v2/evals/PERSONA-EVAL-2026-11-03.md`.
 
+**2026-11-03 · V2-S4 letter A, Vosk out of process.** `galion-asr-vosk` speaks NDJSON (20 ms frames, partial then final). libvosk is dlopen'd in that process only. `GALION_ASR=vosk` is the live mic path when `weights/asr/vosk-model-small-en-us-0.15` is present (`scripts/asr/fetch-vosk.sh`, `docs/asr/VOSK.md`). A missing model is `AsrUnavailable`. `scripts/run-v1-screen.sh` refuses `GALION_ASR=interim` and does not default to it. `AsrMode::Interim` remains for the presence-eval label check only. Free decoding is the default. `GALION_VOSK_GRAMMAR=intents` forwards the canned list. No word-error rate is claimed. Weights are not in git. LOCKS.toml not edited. No Hermes, no clone, no SSH.
+
 — Maciej Grajczyk

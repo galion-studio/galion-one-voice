@@ -87,11 +87,11 @@ scripts/check-phone-pipeline.sh --no-start
 NGROK_URL=https://<the-name-ngrok-printed> scripts/check-phone-pipeline.sh --no-start
 ```
 
-`GALION_ASR` defaults to `interim` inside `run-v1-screen.sh` only. That is a
-labelled placeholder (`asr=interim-placeholder`). It is not recognition.
-Unsetting it restores refusal (`AsrUnratified`) and the two-tone "turn arrived"
-signal. `GALION_LLM` defaults to `canned` in that script. `GALION_SPEECH`
-defaults to `auto` (Piper if `scripts/a21/fetch-a21.sh` has been run, else flite).
+`run-v1-screen.sh` sets `GALION_ASR=vosk` when the small-en model is on disk
+and `stub` when it is not. It refuses `GALION_ASR=interim`. A missing model
+is an error on the mic turn, not a made-up sentence. `GALION_LLM` defaults
+to `canned` in that script. `GALION_SPEECH` defaults to `auto` (Piper if
+`scripts/a21/fetch-a21.sh` has been run, else flite). See `docs/asr/VOSK.md`.
 
 CORS sends `Access-Control-Allow-Origin: *` only while `GALION_CORS_ORIGINS`
 is unset (the local V1 demo). Staging must set that variable to the exact
@@ -180,7 +180,7 @@ the LEDGER line. A key is not approval to publish.
 
 The unit drafted in the Titanaxe note is the one to install: `Restart=always`,
 sandboxing, a memory cap, `User=galion`, bind `127.0.0.1:7878`,
-`Environment=GALION_ASR=interim` only while the placeholder is the demo,
+`Environment=GALION_ASR=vosk` when the small-en model is installed on that machine, otherwise leave ASR unset,
 `GALION_LLM=canned`, `GALION_SPEECH=auto`, and the A21 pack root if the weights
 were fetched on that machine. No raw-audio path in the unit. `NoNewPrivileges`
 and a read-only root are preferred; the unit's own draft wins if it already

@@ -1,11 +1,15 @@
 # DRAFT · Ratification · English ASR on the phone path (CPU, out of process)
 
 **Status: letter A chosen by Maciej Grajczyk, 2026-11-03 (Europe/Zagreb).**
-Vosk, out of process, small-en (`vosk-model-small-en-us-0.15`), grammar mode
-for intents. `interim` stays until the WER bar. The Vosk exception is **not**
-in `LOCKS.toml`. The only lock text added with this decision is the A21 Piper
-sunset pin. Prepared as a draft 2026-11-02. Companion note `RATIFY-A21-ONNX-EXCEPTION.md`
-was named and is not in this tree; the Piper pin lives in `LOCKS.toml`.
+Vosk, out of process, small-en (`vosk-model-small-en-us-0.15`). The worker
+is `galion-asr-vosk` (`docs/asr/VOSK.md`). The live screen uses it when the
+model is on disk and does not use the length-bucket placeholder. Free
+decoding is the mic default. `GALION_VOSK_GRAMMAR=intents` forwards the
+canned phrase list and errors if the model cannot build it. The Vosk
+exception is **not** in `LOCKS.toml`. No word-error rate is claimed here.
+The A21 Piper sunset pin is unchanged. Prepared as a draft 2026-11-02.
+Companion note `RATIFY-A21-ONNX-EXCEPTION.md` was named and is not in this
+tree; the Piper pin lives in `LOCKS.toml`.
 
 ## Facts
 - `LOCKS.toml [formats]`: `ggml_container_allowed = false` ("zero llama.cpp/GGML-family weight containers anywhere, cascade lane included"), `foreign_runtime_allowed = false`, `forbidden_runtimes = ["candle","ort","tract","burn","llama","ggml"]`, `weight_formats = ["safetensors"]`.
@@ -43,7 +47,7 @@ Why: no GGML, no ONNX, a permissive licence, it fits CPU real time on phone-clas
 
 ## Checklist to ratify
 - [x] Owner picks A, B or C (reply with letter). **A**, 2026-11-03. Signature below.
-- [ ] Download and pin the Vosk sha256, then a later owner edit may add a sunset exception. Not done. Do not widen the Piper pin to cover it. `scripts/check-locks.sh` and `check-no-forbidden.sh` stay the gates.
+- [x] Download path and zip sha256: `scripts/asr/fetch-vosk.sh`, `docs/asr/VOSK.md`. Weights are not vendored. A later owner edit may add a sunset exception. Not in `LOCKS.toml`. Do not widen the Piper pin. `scripts/check-locks.sh` and `check-no-forbidden.sh` stay the gates.
 - [ ] Licence/NOTICE entry for the chosen runtime and model (Apache-2.0 attribution).
 - [ ] Gate check on the phone target: ASR partials do not push `onset_p50_max_ms = 300` / `barge_in_max_ms = 200` over budget.
 

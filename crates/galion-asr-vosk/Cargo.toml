@@ -1,0 +1,19 @@
+# Galion Voice — Perpetual Open MIT License
+[package]
+name = "galion-asr-vosk"
+description = "Out-of-process Vosk ASR worker (letter A). libvosk is dlopen'd here, never linked into the phone lane."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version = "1.85"
+publish = false
+
+[[bin]]
+name = "galion-asr-vosk"
+path = "src/main.rs"
+
+# Test peer for the NDJSON protocol. The screen script never launches it.
+[[bin]]
+name = "galion-asr-protocol-double"
+path = "src/bin/protocol_double.rs"

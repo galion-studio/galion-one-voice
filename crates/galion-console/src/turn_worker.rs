@@ -4,11 +4,11 @@
 //! `try_recv`s the reply each tick; it never blocks on model work.
 //!
 //! Pipeline: [`galion_cascade::PhoneLane`] (S4 ASR → S5 LLM → S6 TTS), built once from env
-//! inside the worker thread (`GALION_ASR`, `GALION_LLM`, `GALION_SPEECH`). S4 English ASR is
-//! **not ratified**: `GALION_ASR=interim` is a length-based placeholder transcript, labelled
-//! `asr=interim-placeholder` in every reply. Errors (e.g. `AsrUnratified` when `GALION_ASR` is
-//! unset/stub/off, `NoSpeech`) are reported in [`TurnReply::error`] and a clear two-tone WAV is
-//! published instead, so the phone still hears that its turn arrived.
+//! inside the worker thread (`GALION_ASR`, `GALION_LLM`, `GALION_SPEECH`). S4 is Vosk when
+//! `GALION_ASR=vosk` and the small-en model is on disk (`asr=vosk`). The length-bucket
+//! placeholder is not selected by the environment. Errors (`AsrUnratified`, `AsrUnavailable`,
+//! `NoSpeech`) are reported in [`TurnReply::error`] and a clear two-tone WAV is published
+//! instead, so the phone still hears that its turn arrived. The tone is not a transcript.
 //! `GALION_SPEECH=off` is that path: two-tone WAV, `backend=tone`, `error` set.
 //!
 //! The job slot is the V2-S1 bus lane ([`crate::bus::JOB_DEPTH`] = 1, `try_send` only).
@@ -259,7 +259,8 @@ fn respond(lane: &mut PhoneLane, mut job: TurnJob, gate: &BusGate) -> Option<Tur
         Err(PhoneError::Superseded) => None,
         Err(e) => {
             let kind = match &e {
-                PhoneError::AsrUnratified(_) => "AsrUnratified (set GALION_ASR=interim for the placeholder lane; real EN ASR awaits ratification)",
+                PhoneError::AsrUnratified(_) => "AsrUnratified (set GALION_ASR=vosk and place the small-en model; docs/asr/VOSK.md)",
+                PhoneError::AsrUnavailable(_) => "AsrUnavailable (Vosk model or worker missing; typed text still works; no transcript invented)",
                 PhoneError::NoSpeech(_) => "NoSpeech (GALION_SPEECH / Piper weights)",
                 PhoneError::BadWav(_) => "BadWav",
                 PhoneError::Empty => "Empty",
@@ -348,14 +349,6 @@ mod tests {
                 match prev { Some(v) => std::env::set_var(k, v), None => std::env::remove_var(k) }
             }
         }
-    }
-
-    fn voice(secs: f32) -> Vec<i16> {
-        let n = (secs * 16_000.0) as usize;
-        (0..n).map(|i| {
-            let t = i as f32 / 16_000.0;
-            (0.2 * (t * 180.0 * std::f32::consts::TAU).sin() * (t * 3.0 * std::f32::consts::TAU).sin().abs() * 32767.0) as i16
-        }).collect()
     }
 
     #[test]
@@ -474,9 +467,9 @@ mod tests {
     #[test]
     fn speech_off_publishes_tone_and_error_label() {
         let _lock = env_lock();
-        let _env = EnvGuard::set(&[("GALION_SPEECH", "off"), ("GALION_ASR", "interim")]);
+        let _env = EnvGuard::set(&[("GALION_SPEECH", "off"), ("GALION_ASR", "stub")]);
         let w = TurnWorker::spawn();
-        assert!(w.try_submit(TurnJob { id: 3, rate: 16_000, pcm: voice(1.2) }).is_ok());
+        assert!(w.try_submit(TurnJob { id: 3, rate: 16_000, pcm: galion_cascade::stub_fixture_pcm16("hello") }).is_ok());
         let t0 = Instant::now();
         let mut got = None;
         while got.is_none() && t0.elapsed().as_secs() < 8 {

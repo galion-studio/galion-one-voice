@@ -3,12 +3,13 @@
 //! One phone turn from a WAV file, or from a stub fixture string.
 //!
 //! ```text
-//! GALION_ASR=interim cargo run -p galion-cascade --features cascade --example phone_turn -- [in.wav [out.wav]]
+//! GALION_ASR=vosk cargo run -p galion-cascade --features cascade --example phone_turn -- [in.wav [out.wav]]
 //! cargo run -p galion-cascade --features cascade --example phone_turn -- --fixture "hello"
 //! ```
 //!
-//! Real speech is refused unless `GALION_ASR=interim` (placeholder, not recognition)
-//! or a future ratified engine. No audio is written unless `out.wav` is given.
+//! Real speech needs `GALION_ASR=vosk` and the small-en model (`docs/asr/VOSK.md`).
+//! A missing model is an error. This example does not invent a transcript.
+//! No audio is written unless `out.wav` is given.
 //! Exit 0 ok, 2 lane error, 64 bad args.
 
 use galion_cascade::en_lane::wav_bytes;
@@ -48,8 +49,8 @@ fn main() -> ExitCode {
         Err(e) => {
             eprintln!("phone error: {e}");
             if matches!(lane.cfg.asr, AsrMode::Stub | AsrMode::Off) {
-                eprintln!("real speech needs an owner pick in docs/policy/RATIFY-EN-ASR-PHONE-PATH.md");
-                eprintln!("GALION_ASR=interim is the labelled placeholder, not recognition");
+                eprintln!("real speech needs GALION_ASR=vosk and the small-en model (docs/asr/VOSK.md)");
+                eprintln!("this program does not invent a transcript");
             }
             return ExitCode::from(2);
         }
