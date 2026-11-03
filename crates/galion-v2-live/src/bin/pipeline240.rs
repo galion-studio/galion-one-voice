@@ -233,6 +233,8 @@ fn fast(asr: &mut Asr, mut p: Piper, cfg: &llm::LlmCfg, pcm16: &[(&str, Vec<i16>
         let (mut spec_at, mut commit_at, mut asr_at) = (None::<f64>, None::<f64>, None::<f64>);
         let mut awaiting_final = false;
         let mut final_checked = false;
+        let mut ignore_final = false; // a hold-check final whose turn then resumed
+        let mut run_hold = 0;
         let mut spec_text_first: Option<String> = None;
         let mut spec_hit = false;
         let (mut run_false_spec, mut run_false_commit, mut run_restart, mut run_spec) = (0, 0, 0, 0);
@@ -261,7 +263,8 @@ fn fast(asr: &mut Asr, mut p: Piper, cfg: &llm::LlmCfg, pcm16: &[(&str, Vec<i16>
             while let Ok(ev) = asr.rx.try_recv() {
                 if ev.fin {
                     if !ev.text.is_empty() { if !finals.is_empty() { finals.push(' '); } finals.push_str(&ev.text); } partial.clear();
-                    if awaiting_final { asr_at = Some(ev.t_ms); on_final!(now_ms()); }
+                    if awaiting_final && ignore_final { awaiting_final = false; ignore_final = false; }
+                    else if awaiting_final { asr_at = Some(ev.t_ms); on_final!(now_ms()); }
                 } else if !ev.sync { partial = ev.text; }
             }
             let tr = if partial.is_empty() { finals.clone() } else if finals.is_empty() { partial.clone() } else { format!("{finals} {partial}") };
@@ -276,7 +279,8 @@ fn fast(asr: &mut Asr, mut p: Piper, cfg: &llm::LlmCfg, pcm16: &[(&str, Vec<i16>
                     run_spec += 1; spec_at = Some(t_trig); spec_text_first = Some(tr.clone());
                     if t_rel < guard { run_false_spec += 1; }
                 }
-                EpEv::Resume => { if let Some(r) = resp.take() { stale.push(r.abort_detached()); } spec_at = None; final_checked = false; }
+                EpEv::Resume | EpEv::Start => { if let Some(r) = resp.take() { stale.push(r.abort_detached()); } spec_at = None; final_checked = false; if awaiting_final { ignore_final = true; } }
+                EpEv::Hold => { if !awaiting_final { asr.finalize().unwrap(); awaiting_final = true; ignore_final = false; } run_hold += 1; }
                 EpEv::Commit => {
                     if t_rel < guard { run_false_commit += 1; if let Some(r) = resp.take() { stale.push(r.abort_detached()); } spec_at = None; continue; }
                     commit_at = Some(now_ms());
@@ -317,7 +321,7 @@ fn fast(asr: &mut Asr, mut p: Piper, cfg: &llm::LlmCfg, pcm16: &[(&str, Vec<i16>
         let gated = fa.max(commit_at);
         let row = json!({"run": run, "clip": name, "asr": final_text, "llm_input": spec_text, "spec_text_at_commit": spec_text_at_commit, "spec_hit": hit, "reply": o.reply.trim(), "first_clause": o.spoken_first,
             "first_clause_words": o.spoken_first.split_whitespace().count(), "provider": o.provider, "cost_usd": o.cost, "wasted_usd": wasted,
-            "false_spec_this_turn": run_false_spec, "false_commit_this_turn": run_false_commit, "restarts_this_turn": run_restart, "llm_calls_started": run_spec + run_restart + if run_spec == 0 { 1 } else { 0 },
+            "false_spec_this_turn": run_false_spec, "false_commit_this_turn": run_false_commit, "restarts_this_turn": run_restart, "hold_checks_this_turn": run_hold, "llm_calls_started": run_spec + run_restart + if run_spec == 0 { 1 } else { 0 },
             "eos_to_llm_trigger_ms": r1(trig - eos_abs), "eos_to_spec_ms": spec_rel.map(r1), "eos_to_commit_ms": r1(commit_at - eos_abs),
             "eos_to_asr_final_ms": r1(asr_at - eos_abs), "asr_final_after_spec_ms": spec_at.map(|t| r1(asr_at - t)),
             "gap_trigger_to_llm_request_ms": r1(o.t_sent - trig), "llm_ttft_ms": r1(ft - o.t_sent), "tok_to_clause_ms": r1(fc - ft), "piper_ttfa_ms": r1(fa - sf),

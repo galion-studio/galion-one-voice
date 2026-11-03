@@ -4,7 +4,7 @@
 //! core-count effects, and the full loop on real CC0 speech:
 //! end of speech → VAD/endpoint → streaming Vosk final → real LLM stream
 //! (first clause) → warm Piper first PCM. No stub clocks anywhere.
-use galion_v2_live::{audio, asr::Asr, llm, now_ms, piper::{Piper, PiperPaths, PIPER_HZ}, stats::{summary, r1}, vad::{Vad, VadEv}};
+use galion_v2_live::{audio, asr::Asr, llm, now_ms, piper::{Piper, PiperPaths, PIPER_HZ}, stats::{summary, r1}, vad::{Vad, VadEv}, warm::{Prompt, WarmPool}};
 use serde_json::json;
 use std::time::Duration;
 
@@ -125,6 +125,13 @@ fn full_loop(paths: &PiperPaths, runs: usize, out_dir: &str) -> serde_json::Valu
     let mut asr = Asr::spawn().unwrap_or_else(|e| { eprintln!("{e}"); std::process::exit(2) });
     let mut p = Piper::spawn(paths, 1.0, 0.667).unwrap();
     for _ in 0..3 { ttfa_once(&mut p, "Warming up."); }
+    // latency-240: one pre-connected HTTP/2 curl (TLS done, headers sent, waiting for
+    // the body) replaces the per-turn curl spawn + TCP + TLS. GALION_WARM=0 = old path.
+    const SYSTEM: &str = "You are Samantha, a warm voice companion on a live call. Reply in one or two short spoken sentences. Start with a short reaction.";
+    let use_warm = std::env::var("GALION_WARM").map(|v| v != "0").unwrap_or(true);
+    let prompt = Prompt::new(&cfg, SYSTEM, 0.7);
+    let mut pool = if use_warm { Some(WarmPool::new(&cfg, 1).unwrap_or_else(|e| { eprintln!("{e}"); std::process::exit(2) })) } else { None };
+    let mut bc_wait = Vec::new();
     // Backchannel lane: a cached Piper "Mm-hm." is queued at endpoint; its first audio is the floor hold.
     let mut rows = Vec::new();
     let (mut eos_to_endpoint, mut eos_to_asr, mut eos_to_tok, mut eos_to_clause, mut eos_to_audio, mut llm_ttft, mut piper_ttfa, mut eos_to_bc) =
@@ -136,6 +143,7 @@ fn full_loop(paths: &PiperPaths, runs: usize, out_dir: &str) -> serde_json::Valu
         let eos_rel = true_eos_ms(x);
         while asr.rx.try_recv().is_ok() {}
         let mut vad = Vad::new(hang_ms);
+        if let Some(pl) = pool.as_mut() { pl.refill().unwrap(); }
         let start = now_ms();
         let mut endpoint_at = None; let mut text = String::new();
         // feed in real time: 20 ms frames, then 1.5 s of trailing room silence
@@ -167,16 +175,20 @@ fn full_loop(paths: &PiperPaths, runs: usize, out_dir: &str) -> serde_json::Valu
         let asr_at = asr_final_at.unwrap_or(endpoint_at);
         // LLM first, at ASR final (latency-240 fix: this used to wait for the
         // whole "Mm-hm." synth + a 30 ms idle poll, ~68 ms p50 on the turn).
-        let msgs = json!([{"role":"system","content":"You are Samantha, a warm voice companion on a live call. Reply in one or two short spoken sentences. Start with a short reaction."},
-                          {"role":"user","content": if text.is_empty() { "(unclear audio)".to_string() } else { text.clone() }}]);
+        let user = if text.is_empty() { "(unclear audio)".to_string() } else { text.clone() };
         let t_llm = now_ms();
-        let rx = llm::stream(&cfg, msgs).unwrap();
+        let rx = match pool.as_mut() {
+            Some(pl) => pl.take().unwrap().fire(&prompt.body(&user)).unwrap().rx,
+            None => llm::stream(&cfg, json!([{"role":"system","content": SYSTEM}, {"role":"user","content": user}])).unwrap(),
+        };
         // backchannel (floor hold) runs while the LLM request is in flight — real Piper on the same warm process
         let before_bc = p.done.load(std::sync::atomic::Ordering::SeqCst);
         p.drain();
         let _tbc = p.say("Mm-hm.").unwrap();
         let bc = p.first_pcm(5000).unwrap();
-        let _ = p.collect_until_done(before_bc, 1, 5000);
+        // Backchannel is streamed (its first PCM is the floor hold); no 30 ms idle poll.
+        // Piper is one process, so the first clause only waits until "Mm-hm." is done, if it isn't yet.
+        let bc_done = |p: &Piper| p.done.load(std::sync::atomic::Ordering::SeqCst) > before_bc;
         // first clause capped at 3 words (2-4 word budget); the cap now fires on leading-space tokens
         let mut cl = llm::Clauser::new(std::env::var("GALION_FIRST_CLAUSE_WORDS").ok().and_then(|v| v.parse().ok()).unwrap_or(3));
         let (mut first_tok, mut first_clause, mut first_audio, mut said_first) = (None, None, None, None::<f64>);
@@ -189,6 +201,9 @@ fn full_loop(paths: &PiperPaths, runs: usize, out_dir: &str) -> serde_json::Valu
                     for c in cl.push(&s) {
                         if first_clause.is_none() {
                             first_clause = Some(now_ms()); spoken_first = c.clone();
+                            let w0 = now_ms(); let dl = w0 + 5000.0;
+                            while !bc_done(&p) && now_ms() < dl { std::thread::sleep(Duration::from_micros(500)); }
+                            bc_wait.push(now_ms() - w0);
                             p.drain();
                             said_first = Some(p.say(&c).unwrap());
                             let ch = p.first_pcm(5000).unwrap();
@@ -200,14 +215,15 @@ fn full_loop(paths: &PiperPaths, runs: usize, out_dir: &str) -> serde_json::Valu
                 llm::LlmEv::Done(_, c, pr) => { cost = c; provider = pr; }
             }
         }
-        if first_clause.is_none() { if let Some(c) = cl.flush() { first_clause = Some(now_ms()); spoken_first = c.clone(); p.drain(); said_first = Some(p.say(&c).unwrap()); first_audio = Some(p.first_pcm(5000).unwrap().t_ms); } }
+        if first_clause.is_none() { if let Some(c) = cl.flush() { first_clause = Some(now_ms()); spoken_first = c.clone();
+            while !bc_done(&p) { std::thread::sleep(Duration::from_micros(500)); } p.drain(); said_first = Some(p.say(&c).unwrap()); first_audio = Some(p.first_pcm(5000).unwrap().t_ms); } }
         std::thread::sleep(Duration::from_millis(400)); p.drain();
         cost_total += cost.unwrap_or(0.0);
         let (Some(ft), Some(fc), Some(fa), Some(sf)) = (first_tok, first_clause, first_audio, said_first) else { eprintln!("run {run}: LLM returned nothing"); continue };
         eos_to_endpoint.push(endpoint_at - eos_abs); eos_to_asr.push(asr_at - eos_abs); eos_to_tok.push(ft - eos_abs);
         eos_to_clause.push(fc - eos_abs); eos_to_audio.push(fa - eos_abs); llm_ttft.push(ft - t_llm); piper_ttfa.push(fa - sf); eos_to_bc.push(bc.t_ms - eos_abs);
         let row = json!({"run": run, "clip": name, "asr": text, "reply": reply.trim(), "first_clause": spoken_first, "provider": provider, "cost_usd": cost,
-            "eos_to_endpoint_ms": r1(endpoint_at - eos_abs), "eos_to_asr_final_ms": r1(asr_at - eos_abs), "llm_ttft_ms": r1(ft - t_llm), "gap_asr_to_llm_request_ms": r1(t_llm - asr_at), "first_clause_words": spoken_first.split_whitespace().count(),
+            "eos_to_endpoint_ms": r1(endpoint_at - eos_abs), "eos_to_asr_final_ms": r1(asr_at - eos_abs), "llm_ttft_ms": r1(ft - t_llm), "warm_http2": use_warm, "gap_asr_to_llm_request_ms": r1(t_llm - asr_at), "first_clause_words": spoken_first.split_whitespace().count(),
             "eos_to_first_token_ms": r1(ft - eos_abs), "eos_to_first_clause_ms": r1(fc - eos_abs), "piper_ttfa_ms": r1(fa - sf),
             "eos_to_first_content_audio_ms": r1(fa - eos_abs), "eos_to_backchannel_audio_ms": r1(bc.t_ms - eos_abs)});
         eprintln!("loop {run}: {row}");
@@ -215,7 +231,7 @@ fn full_loop(paths: &PiperPaths, runs: usize, out_dir: &str) -> serde_json::Valu
     }
     std::fs::write(format!("{out_dir}/full-loop.ndjson"), &log).unwrap();
     rows.push(0);
-    json!({"endpoint_hang_ms": hang_ms, "llm_model": cfg.model, "llm_provider_order": cfg.provider_order, "llm_cost_usd_total": cost_total,
+    json!({"endpoint_hang_ms": hang_ms, "warm_http2": use_warm, "bc_wait_before_first_clause": summary("bc wait", &bc_wait), "llm_model": cfg.model, "llm_provider_order": cfg.provider_order, "llm_cost_usd_total": cost_total,
         "eos_to_endpoint": summary("eos→endpoint", &eos_to_endpoint), "eos_to_asr_final": summary("eos→asr final", &eos_to_asr),
         "llm_ttft": summary("llm ttft", &llm_ttft), "eos_to_first_token": summary("eos→first token", &eos_to_tok),
         "eos_to_first_clause": summary("eos→first clause", &eos_to_clause), "piper_ttfa_in_loop": summary("piper ttfa in loop", &piper_ttfa),
