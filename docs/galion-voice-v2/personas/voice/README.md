@@ -43,5 +43,10 @@ Both files use the same keys.
 `../refs/` ignores audio suffixes. The wavs stay out of git. Do not commit
 one. Do not denoise Jarvis. Do not download Chatterbox weights from this
 draft. The runbook is [`../../symphony/CLONE-LANDING.md`](../../symphony/CLONE-LANDING.md).
+| `[reference]` | `clip_path` is `""`. `present` and `ingest` are false. `placeholder` names a text marker under `../refs/`, not a wav. The page stays `hold`. The worker path is `symphony/CLIP-STORE.md`. |
+| `[worker]` | Binding `galion.clone.worker`. Script `scripts/clone/chatterbox_worker.py`. Env `GALION_CLONE_PERSONA`, `GALION_CLONE_MODEL`, `GALION_CLONE_WORKER`. Model `nano`, quality option `turbo`. `send_reference = true` only after the LEDGER private-cleared line and an outside WAV. PCM is 24 kHz s16le. Weights are not vendored. |
+| `[texture]` | Jarvis only. Hub bed, default on, toggle `GALION_JARVIS_TEXTURE=0`. The file is not stripped. |
+
+`../refs/` ignores audio. A gitignored WAV may sit there. The worker reads `$GALION_CLIP_STORE`, not that directory. Do not commit the WAV. `LOCKS.toml` `reference_clips` stays false until the owner flips it.
 
 — Maciej Grajczyk

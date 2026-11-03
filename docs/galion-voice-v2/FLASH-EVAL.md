@@ -36,6 +36,10 @@ not a product claim. The default harness does not set
 `measured: false`. A protocol-stub clock is a test of the pipe. Do not
 copy a number into `LEDGER.md` until a model run is actually recorded
 there. `generate()` still returns the whole utterance.
+A reference path is sent only when `symphony/CLIP-STORE.md` opens the
+gate. CI does not set `GALION_CLIP_STORE`, so this harness sends none
+unless that store is present. `reference_clips` in `LOCKS.toml` is still
+false until the owner flips it.
 
 ## Harness
 
@@ -72,6 +76,9 @@ refuses unless `GALION_CLONE_FETCH=1`.
 1. Pinned safetensors on disk, fetched with `GALION_CLONE_FETCH=1` from release `clone-weights-v1` (`CLONE-WEIGHTS.md`), plus a flat `GALION_CLONE_CKPT`. `GALION_CLONE_STREAM=1`.
 2. The child streams. It does not call `generate()`. Still out of process. Still no reference clip until the operator allowlist is armed. `LOCKS.toml` stays as it is.
 3. The stderr engine line says `nano` and the path line says `stream`. `ttfa_ms` is the first chunk. `utt_ms` is the closing marker. The live CPU pass today is Piper, `GALION_SPEECH=a21`.
+1. Pinned safetensors on disk, fetched by a human with `GALION_CLONE_FETCH=1`.
+2. The child actually calls generate, still out of process. A reference WAV is the clip-store path in `symphony/CLIP-STORE.md`, not a file in git.
+3. The stderr engine line says `model`.
 4. Three CPU runs, cold and warm, phrase fixed, written into `LEDGER.md` with the host and the model id.
 5. Still no film audio. Still no celebrity demo.
 
