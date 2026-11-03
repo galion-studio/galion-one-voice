@@ -34,7 +34,11 @@ impl DotSink {
     #[cfg(feature = "dot-viz-web")]
     pub fn attach_web(&mut self, addr: std::net::SocketAddr) -> Result<(), String> {
         // V1-01 owns the page (galion_console::dotviz::SCREEN_HTML); we only feed it the live loop.
-        self.dc.attach(Box::new(galion_render::WebSurface::serve(addr).with_page(galion_console::dotviz::SCREEN_HTML)))
+        self.dc.attach(Box::new(
+            galion_render::WebSurface::serve(addr)
+                .with_page(galion_console::dotviz::SCREEN_HTML)
+                .with_v2_page(galion_console::dotviz::V2_SCREEN_HTML),
+        ))
     }
 }
 

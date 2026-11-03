@@ -121,13 +121,15 @@ fn run<T: TimingFeed, A: AffectFeed>(args: &[String], mut pump: DemoPump<T, A>, 
         #[cfg(feature = "dot-viz-web")]
         match addr.parse() {
             Ok(a) => {
-                let web = galion_render::WebSurface::serve(a).with_page(galion_console::dotviz::SCREEN_HTML);
+                let web = galion_render::WebSurface::serve(a)
+                    .with_page(galion_console::dotviz::SCREEN_HTML)
+                    .with_v2_page(galion_console::dotviz::V2_SCREEN_HTML);
                 #[cfg(feature = "phone-turn")]
                 {
                     phone = Some(galion_console::phone_host::PhoneHost::from_surface(&web));
                 }
                 match dc.attach(Box::new(web)) {
-                    Ok(()) => notes.push(format!("web → screen http://{addr}/  · /dot /mic /turn /reply")),
+                    Ok(()) => notes.push(format!("web → screen http://{addr}/  · /v2 /dot /mic /turn /reply")),
                     Err(e) => notes.push(format!("web surface failed: {e}")),
                 }
             }

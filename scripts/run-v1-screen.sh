@@ -50,7 +50,13 @@ echo "Galion Voice · one dot → $URL"
 if [[ "$CHECK" == "1" ]]; then
   sleep 2
   page=$(curl -fsS "$URL")
-  grep -q '<canvas id="s"></canvas>' <<<"$page" && echo "  / : one canvas page OK ($(wc -c <<<"$page") bytes)" || { echo "  / : FAIL"; exit 1; }
+  grep -q '<canvas id="s"' <<<"$page" && echo "  / : one canvas page OK ($(wc -c <<<"$page") bytes)" || { echo "  / : FAIL"; exit 1; }
+  v2=$(curl -fsS "${URL}v2")
+  grep -q 'data-persona="samantha"' <<<"$v2" && echo "  /v2 : persona dot OK" || { echo "  /v2 : FAIL"; exit 1; }
+  state=$(curl -fsS "${URL}v2/state")
+  grep -q '"rights":"hold"' <<<"$state" && grep -q '"film_voice":false' <<<"$state" && echo "  /v2/state : rights hold OK" || { echo "  /v2/state : FAIL ($state)"; exit 1; }
+  say=$(curl -fsS -X POST -H 'Content-Type: application/json' --data '{"text":"My mother died this morning."}' "${URL}v2/say")
+  grep -q 'Your mother died this morning.' <<<"$say" && ! grep -qi 'i hear you' <<<"$say" && echo "  POST /v2/say : matter, no canned empathy" || { echo "  POST /v2/say : FAIL ($say)"; exit 1; }
   seen=""
   for _ in $(seq 1 150); do seen+=" $(curl -fsS "${URL}dot" 2>/dev/null | sed -n 's/.*"mode":"\([a-z]*\)".*/\1/p')"; sleep 0.07; done
   echo "  /dot modes over ~12 s:$(tr ' ' '\n' <<<"$seen" | sort -u | tr '\n' ' ')"

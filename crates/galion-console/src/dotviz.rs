@@ -33,6 +33,9 @@ use crate::live::{AffectFeed, AffectReading, LiveSnapshot, Stage, StageLatencies
 /// `/dot` every 80 ms. See docs/agent-v1-demo/V1-01-STATUS.md.
 pub const SCREEN_HTML: &str = include_str!("../assets/v1-screen.html");
 
+/// V2 one-dot for the Samantha / Jarvis test. Served at `/v2`.
+pub const V2_SCREEN_HTML: &str = include_str!("../assets/v2-screen.html");
+
 /// Root-mean-square of a PCM slice (0 for empty).
 pub fn rms(pcm: &[f32]) -> f32 {
     if pcm.is_empty() {
@@ -393,6 +396,11 @@ mod tests {
 
     #[test]
     fn screen_page_is_phone_path_and_v2_orb() {
+        assert!(V2_SCREEN_HTML.contains("data-persona=\"samantha\""));
+        assert!(V2_SCREEN_HTML.contains("createRadialGradient"));
+        assert!(V2_SCREEN_HTML.contains("v2/say"));
+        assert!(V2_SCREEN_HTML.contains("not a film clone"));
+        assert!(!V2_SCREEN_HTML.contains("I hear you"));
         assert!(SCREEN_HTML.contains("POST /turn"));
         assert!(SCREEN_HTML.contains("function spring"));
         assert!(SCREEN_HTML.contains("samplePlayEnv"));

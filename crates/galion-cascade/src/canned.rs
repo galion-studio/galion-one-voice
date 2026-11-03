@@ -27,13 +27,13 @@ const INTENTS: &[(&[&str], &str)] = &[
     (&["hello how are you", "hi how are you", "hey how are you"], "Hi! I'm doing well, thanks. How about you?"),
     (&["i'm fine", "i am fine", "i'm good", "i am good", "i'm okay", "doing well", "not bad"], "Glad to hear it."),
     (&["can you hear me", "are you there", "are you listening", "you there"], "Yes, I can hear you."),
-    (&["testing", "test", "mic check", "one two three", "check check"], "I hear you loud and clear."),
+    (&["testing", "test", "mic check", "one two three", "check check"], "Loud and clear."),
     (&["say something", "talk to me", "speak"], "Hello! I'm Galion. Nice to talk with you."),
     (&["tell me a joke", "joke", "something funny"], "I'm still learning jokes. Give me time."),
     (&["nice to meet you", "pleased to meet you"], "Nice to meet you too."),
     (&["good job", "well done", "awesome", "great", "cool", "nice"], "Thanks!"),
     (&["sorry", "my bad", "apologies"], "No problem at all."),
-    (&["repeat", "say that again", "pardon", "what did you say"], "Sure — I said I'm here and listening."),
+    (&["repeat", "say that again", "pardon", "what did you say"], "Say the part you want again."),
     (&["hi galion", "hey galion", "hello there"], "Hi! Good to hear you."),
     (&["good afternoon"], "Good afternoon! What can I do for you?"),
     (&["hello", "hi", "hey", "hiya", "howdy", "greetings", "good morning", "good evening"], "Hi. I'm here — go ahead."),
@@ -51,10 +51,10 @@ const INTENTS: &[(&[&str], &str)] = &[
     (&["how old are you"], "I'm brand new. Still learning."),
     (&["where are you", "where do you live"], "I run on this machine, right here."),
     (&["i love you", "love you"], "That's kind. Thank you."),
-    (&["i'm tired", "i am tired", "tired", "exhausted"], "Sounds like a long day. Take it easy."),
+    (&["i'm tired", "i am tired", "tired", "exhausted"], "You're tired."),
     (&["i'm bored", "i am bored", "bored"], "Then let's talk. What's on your mind?"),
     (&["hold on", "one moment", "one second", "give me a second", "wait"], "Sure, take your time."),
-    (&["what's new", "anything new"], "Not much. I'm here and listening."),
+    (&["what's new", "anything new"], "Not much on my side."),
     (&["can you call", "phone call", "call me"], "I can't place calls yet, sorry."),
     (&["okay", "ok", "alright", "got it", "understood"], "Great."),
     (&["yes", "yeah", "yep", "sure"], "Good."),
@@ -70,18 +70,22 @@ impl CannedLlm {
         let words: Vec<&str> = t.split(|c: char| !c.is_ascii_alphanumeric() && c != '\'').filter(|w| !w.is_empty()).collect();
         let joined = format!(" {} ", words.join(" "));
         let hit = |k: &str| if k.contains(' ') { joined.contains(&format!(" {k} ")) } else { words.iter().any(|w| *w == k) };
-        // Emotion first when it is strong: acknowledge before content.
-        match e {
-            Emotion::Angry => return "I hear you. Let's slow down — tell me what went wrong.",
-            Emotion::Sad => return "That sounds hard. I'm listening.",
-            _ => {}
-        }
+        // Words stay on the matter. A strong emotion does not replace the
+        // sentence with a sympathy script (GALION-ONE.md, SAMANTHA.md).
         for (keys, reply) in INTENTS {
             if keys.iter().any(|k| hit(k)) {
                 return reply;
             }
         }
-        if words.is_empty() { "I didn't catch that." } else { "Mm. Say a bit more?" }
+        if words.is_empty() {
+            "I didn't catch that."
+        } else {
+            match e {
+                Emotion::Angry => "Tell me what went wrong.",
+                Emotion::Sad => "Say what happened.",
+                _ => "Mm. Say a bit more?",
+            }
+        }
     }
 }
 
@@ -164,7 +168,10 @@ mod tests {
         let mut l = CannedLlm::new();
         assert_eq!(l.reply(&tr("hello galion"), Emotion::Neutral).unwrap(), "[Neutral] Hi. I'm here — go ahead.");
         assert_eq!(l.reply(&tr("what's your name"), Emotion::Happy).unwrap(), "[Happy] I'm Galion — a voice, still learning to talk.");
-        assert!(l.reply(&tr("this is broken"), Emotion::Angry).unwrap().starts_with("[Angry] I hear you"));
+        assert_eq!(l.reply(&tr("this is broken"), Emotion::Angry).unwrap(), "[Angry] Tell me what went wrong.");
+        assert_eq!(l.body("i'm tired", Emotion::Sad), "You're tired.");
+        assert!(!l.body("this is broken", Emotion::Angry).to_ascii_lowercase().contains("i hear you"));
+        assert!(!l.body("hello", Emotion::Sad).to_ascii_lowercase().contains("that sounds"));
         assert_eq!(l.reply(&tr("zebra quantum"), Emotion::Neutral).unwrap(), "[Neutral] Mm. Say a bit more?");
         assert!(matches!(l.reply(&tr("  "), Emotion::Neutral), Err(CascadeError::Empty)));
         // "this" must not match "hi" (word match, not substring).
@@ -179,8 +186,8 @@ mod tests {
         assert_eq!(l.body("Hi Galion!", n), "Hi! Good to hear you.");
         assert_eq!(l.body("how are you?", n), "Doing fine, thanks. What's on your mind?");
         assert_eq!(l.body("hello, how are you", n), "Hi! I'm doing well, thanks. How about you?");
-        assert_eq!(l.body("test", n), "I hear you loud and clear.");
-        assert_eq!(l.body("testing one two three", n), "I hear you loud and clear.");
+        assert_eq!(l.body("test", n), "Loud and clear.");
+        assert_eq!(l.body("testing one two three", n), "Loud and clear.");
         assert_eq!(l.body("can you hear me", n), "Yes, I can hear you.");
         assert_eq!(l.body("what's up", n), "Doing fine, thanks. What's on your mind?");
         assert_eq!(l.body("I'm good", n), "Glad to hear it.");

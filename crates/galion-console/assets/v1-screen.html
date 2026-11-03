@@ -133,14 +133,24 @@ function discloseAi(){
   }catch(e){}
 }
 
+// Surround + interior targets. The disc body stays #F5F5F7. These only move the wash.
+const MOOD={
+  calm:{wash:0.38,amber:0.46,warm:0.30},
+  grief:{wash:0.58,amber:0.08,warm:0.14},
+  joy:{wash:0.66,amber:0.84,warm:0.62},
+  vulnerability:{wash:0.44,amber:0.22,warm:0.20},
+  quiet:{wash:0.20,amber:0.28,warm:0.24}
+};
+let moodWash=0.38, moodAmber=0.46;
 function paintBg(tms,b){
   const base=hex(b.base),A=hex(b.from),V=hex(b.to);
   const ph=(tms%WASH_MS)/WASH_MS*2*Math.PI, drift=0.15*Math.sin(ph), d=img.data;
   for(let y=0;y<BH;y++){const v=(y+.5)/BH;
     for(let x=0;x<BW;x++){const u=(x+.5)/BW;
-      const ramp=Math.min(1,Math.max(0,.5*(u+v)+drift)), hue=lerp(A,V,ramp);
+      const ramp=Math.min(1,Math.max(0,.5*(u+v)+drift));
+      const hue=lerp(V,A,Math.min(1,Math.max(0,ramp*0.35+moodAmber*0.75)));
       const du=u-.5,dv=v-.5, r=Math.sqrt(du*du+dv*dv)/Math.SQRT1_2, vg=Math.max(0,1-r);
-      const c=lerp(base,hue,WASH*vg*vg), k=(y*BW+x)*4;
+      const c=lerp(base,hue,moodWash*vg*vg), k=(y*BW+x)*4;
       d[k]=c[0];d[k+1]=c[1];d[k+2]=c[2];d[k+3]=255;}}
   bx.putImageData(img,0,0);
 }
@@ -242,6 +252,13 @@ function draw(){
   [rP,rV]=spring(rP,rV,trLp,dt,wS,zS);
   [bP,bV]=spring(bP,bV,tbLp,dt,wS*0.85,Math.min(1.2,zS+0.08));
   const feel=empathy(latest&&latest.emotion);
+  const moodName=(latest&&MOOD[latest.mood])?latest.mood:"calm";
+  const moodT=MOOD[moodName];
+  const mk=1-Math.exp(-dt/EM_TAU);
+  moodWash+=(moodT.wash-moodWash)*mk;
+  moodAmber+=(moodT.amber-moodAmber)*mk;
+  if(latest&&latest.mood){ feel.v=moodT.warm; feel.a=Math.min(1,moodT.wash); }
+  cv.dataset.mood=moodName;
   const leanNow=clamp(+((latest&&latest.emotion&&latest.emotion.lean)!=null?latest.emotion.lean:(latest&&latest.lean)||0),0,1);
   const ek=1-Math.exp(-dt/EM_TAU);
   emV+=(feel.v-emV)*ek; emA+=(feel.a-emA)*ek; emLean+=(leanNow-emLean)*ek;

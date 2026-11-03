@@ -1,7 +1,9 @@
 # Persona voice configs
 
 Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
-Europe/Zagreb. Drafts only. The binary does not load these files.
+Europe/Zagreb. Drafts. The `/v2` demo route reads these files for
+prosody, wash, the tag rule, and the rights hold. The clone worker
+does not. `wired` means that route, not a live film clone.
 
 The spelling is **Galion**. The product is Galion Voice.
 
@@ -26,7 +28,7 @@ Both files use the same keys.
 
 | Key | Meaning |
 |---|---|
-| `id`, `status`, `wired`, `session_default` | Draft id. `wired` is false: nothing reads the file. The session default in the spec is Samantha. |
+| `id`, `status`, `wired`, `session_default` | Draft id. `wired` is true because `/v2` reads the file. The clone worker is still not live. The session default in the spec is Samantha. |
 | `[register]` | Label, line length, accent claim. Prosody at `e = 0` and `e = 1` copies the design table in `SAMANTHA-V2.md` §4 (pitch, pitch range, rate, loudness, warmth, pre-pause). Wash amber and the Luti `w`/`z` scales sit beside that table. Luti is marked `proposal`. |
 | `[tags]` | Samantha: `enabled = true`, allowed `[laugh]` and `[chuckle]`, and only on the clone worker. Jarvis: `enabled = false`, `strip_brackets = true`, empty allow-list. Piper and flite never receive tags. |
 | `[reference]` | `clip_path` is `""`. `present` and `ingest` are false. `placeholder` names a text marker under `../refs/`, not a wav. Target length is about 10 s (Turbo's public assert is longer than 5 s). Rights stay `hold`. |
