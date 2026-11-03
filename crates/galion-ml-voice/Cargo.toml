@@ -18,4 +18,8 @@ speech = []
 name = "piper_warmth"
 required-features = ["speech"]
 
+[[example]]
+name = "flash_ttfa"
+required-features = ["speech"]
+
 [dependencies]

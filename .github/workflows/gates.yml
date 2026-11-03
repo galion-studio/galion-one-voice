@@ -19,6 +19,10 @@ jobs:
         run: scripts/check-no-forbidden.sh
       - name: Workspace tests
         run: cargo test --workspace
+      - name: Clone worker scaffold (no weight download)
+        run: cargo test -p galion-ml-voice --features speech
+      - name: Flash TTFA harness (no number without a run)
+        run: scripts/eval/flash-ttfa.sh
       - name: Phone HTTP surface
         run: cargo test -p galion-render --features web --lib
       - name: Phone lane

@@ -134,7 +134,7 @@ Samantha V2 extends the V2 program. It does not replace it.
 
 | Piece | Where | What Samantha uses |
 |---|---|---|
-| Process bus | PR #7, open, `cursor/v2-s1-process-bus-b8ed`. Types in `crates/galion-console/src/bus.rs`. Shapes in `IPC.md` on that branch. | `e`, consent, and the active persona travel as bus bodies. `try_send` only. Cancel still drops a stale turn. |
+| Process bus | PR #7, merged as `5ab3d38`. Types in `crates/galion-console/src/bus.rs`. Shapes in `IPC.md`. | `BusBody::Persona` is on that bus. `try_send` only. Cancel still drops a stale turn. An explicit pin (`turn_id` 0) stays. |
 | Orb engine | PR #4, merged. `ORB.md`, `ANIMATION-ENGINE.md`. | One filled mark, display-rate spring, wash behind it. |
 | Luti | PR #12, open, `cursor/one-ui-luti-engine-4351`. | The named gain table. Samantha leans it with `e`. She does not rename it. |
 | Empathy | PR #13, open. `EMPATHY.md` on that branch. | `voice_color`. The session behaves as that sector specifies. |
@@ -145,8 +145,9 @@ Left where they are:
   a hook on the reply, not a second speech stack.
 - **`v1-screen.html`.** The phone page remains the page. No React, no second
   surface, no caption of the persona name.
-- **`LOCKS.toml`.** Not edited. `[ui]`, `[consent]`, the 80 ms frame, and
-  the Piper sunset pin stay as written.
+- **`LOCKS.toml`.** This session spec does not edit `[ui]`, `[consent]`, the
+  80 ms frame, or the Piper sunset pin. t230u added a separate out-of-process
+  Chatterbox pin. It does not change those locks and it does not clear a clip.
 - **Piper path.** `en_US-ljspeech-medium`, out of process, warm worker.
   Prosody may later move rate, pitch, energy, or the noise flag. It does
   not change voice identity, and it does nothing useful while `e` is 0 and
@@ -176,8 +177,10 @@ not the wall clock), `cancel`, and one body. Receivers already drop
 is kept. That rule is the barge-in story, and a persona switch does not
 get a special exemption from it.
 
-This spec adds one body. It is not in `bus.rs` today. Landing it is a
-later change on top of that bus, not a second broker.
+This spec adds one body. It is `BusBody::Persona` in `bus.rs`, on the bus
+PR #7 merged (`5ab3d38`). It is not a second broker. A name that is not
+`samantha` or `jarvis` is ignored. The turn worker reads the id onto the
+reply. It does not draw it, and it does not restart the lane.
 
 ```text
 BusBody::Persona {
@@ -340,11 +343,11 @@ story. That is the whole section.
    Galion register sit under both, with Samantha and Jarvis only after
    an explicit ask?
 10. **Crossed orders.** An explicit Samantha pin is in force, and the
-    next sentence is a command. Does the pin win for the whole session,
-    or does a command borrow Jarvis for one turn and then return?
-11. **Bus landing.** `Persona` is specified against PR #7 and is not in
-    that branch's `BusBody` yet. Add it there, or wait until the bus
-    merges and follow with a small patch?
+    next sentence is a command. The landed rule is the priority already
+    in this section: a lower trigger does not override a higher one, so
+    the pin wins. A one-turn borrow would be a later owner change.
+11. **Bus landing.** Done. `Persona` is on the merged bus. `/dot` does
+    not yet print the id. The page read is still open.
 12. **The empty slot.** Who names the third id, and does it need its own
     rights note before it is allowed to speak?
 

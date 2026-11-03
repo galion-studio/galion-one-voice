@@ -97,7 +97,8 @@ sources = ["Q-RESEARCH.Q12", "Q-BUILD.Q7", "Q-BUILD.Q9", "Q-GATES.Q6", "Q-BRANDI
 
 # Owner exception t123u, written 2026-11-03 (Europe/Zagreb) at Maciej Grajczyk's
 # direction. Every value above this block is unchanged. This pin is not a
-# general ONNX allowance, not in-tree ort, and not an ASR or Chatterbox exception.
+# general ONNX allowance, not in-tree ort, and not an ASR exception.
+# Chatterbox is a separate pin below. Do not widen this one.
 [formats.exceptions.a21_piper]
 artifact = "weights/tts/en_US-ljspeech-medium.onnx"
 json_artifact = "weights/tts/en_US-ljspeech-medium.onnx.json"
@@ -112,6 +113,27 @@ sunset = "2027-02-01"
 decision = "t123u"
 owner = "Maciej Grajczyk"
 notes = "Sunset is 90 days from 2026-11-03. espeak-ng GPL-3 stays counsel-open. Do not widen this pin."
+
+# Owner exception t230u, written 2026-11-03 (Europe/Zagreb) at Maciej Grajczyk's
+# direction. Out-of-process PyTorch for the V2-S14 Chatterbox worker only.
+# Global locks above are unchanged. The A21 Piper pin above is unchanged.
+# No in-tree ort, ggml, or llama. Weights are not vendored. No reference clips.
+[formats.exceptions.v2s14_chatterbox]
+lane = "V2-S14 clone TTS only"
+runtime = "PyTorch, CPU, separate process; not linked into any Galion crate"
+in_process = false
+in_tree_ort = false
+in_tree_ggml = false
+in_tree_llama = false
+weights_vendored = false
+model_primary = "chatterbox-nano"
+model_option = "chatterbox-turbo"
+fallback = "formats.exceptions.a21_piper"
+reference_clips = false
+sunset = "2027-02-01"
+decision = "t230u"
+owner = "Maciej Grajczyk"
+notes = "Sunset is 90 days from 2026-11-03. Foreign runtime stays out of process. No film audio. No celebrity clone. Do not widen this pin to ASR or an in-tree runtime."
 
 # ---------------------------------------------------------------- UI
 [ui]

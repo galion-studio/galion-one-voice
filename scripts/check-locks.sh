@@ -80,6 +80,22 @@ eq("ui.dot_states", ["idle", "listening", "speaking"])
 # licence
 eq("licence.code", "Perpetual Open MIT"); eq("licence.paid_tiers", False)
 
+# Owner pins. Global foreign_runtime_allowed stays false. These blocks do not widen it.
+eq("formats.exceptions.a21_piper.in_tree_ort", False)
+eq("formats.exceptions.a21_piper.weights_vendored", False)
+eq("formats.exceptions.a21_piper.sunset", "2027-02-01")
+eq("formats.exceptions.a21_piper.sha256", "6f52a751e2349abe7a76735eb09dc1875298c77ea2342ffd2fef79ff81b87f22")
+eq("formats.exceptions.v2s14_chatterbox.in_process", False)
+eq("formats.exceptions.v2s14_chatterbox.in_tree_ort", False)
+eq("formats.exceptions.v2s14_chatterbox.in_tree_ggml", False)
+eq("formats.exceptions.v2s14_chatterbox.in_tree_llama", False)
+eq("formats.exceptions.v2s14_chatterbox.weights_vendored", False)
+eq("formats.exceptions.v2s14_chatterbox.reference_clips", False)
+eq("formats.exceptions.v2s14_chatterbox.sunset", "2027-02-01")
+eq("formats.exceptions.v2s14_chatterbox.model_primary", "chatterbox-nano")
+eq("formats.exceptions.v2s14_chatterbox.model_option", "chatterbox-turbo")
+eq("formats.exceptions.v2s14_chatterbox.fallback", "formats.exceptions.a21_piper")
+
 # every locked section must cite Q-* sources
 qid = re.compile(r"^Q-[A-Z]+\.Q\d+$")
 for sec in ("clock", "bands", "gates", "consent", "formats", "ui", "licence"):

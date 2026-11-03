@@ -92,10 +92,11 @@ puts `reply` on `/dot`.
 (`docs/agent-v1-demo/EDGE-NGROK.md`). Caddy on Titanaxe `51.38.137.193` is
 drafted (`docs/deploy/TITANAXE-VPS.md`) and not installed from here.
 
-**LOCKS.** `LOCKS.toml` is the contract. Global values are unchanged. The only
-addition in this program is the sunset-dated A21 Piper exception above.
-GGML-family containers stay out. `forbidden_runtimes` stays as written.
-`paid_tiers = false`. Chatterbox is not a lock exception.
+**LOCKS.** `LOCKS.toml` is the contract. Global values are unchanged. The
+sunset pins are the A21 Piper exception above and
+`[formats.exceptions.v2s14_chatterbox]` (out of process only, sunset
+`2027-02-01`). GGML-family containers stay out. `forbidden_runtimes` stays
+as written. `paid_tiers = false`. `foreign_runtime_allowed` stays false.
 
 ## 4. How a phone turn moves today
 
@@ -647,7 +648,7 @@ S3Gen and a vocoder emit audio. No training step in that API.
 - **Streaming eval:** the owner name is a Flash streaming eval on CPU. Upstream master exposes `generate()`, not a model named Flash. Open PR 528 proposes `ChatterboxTurboTTS.stream()` for near-real-time CPU playback and was still open when this note was written. The eval is planned. It is not run here.
 - **Samantha:** paralinguistic tags (`[laugh]`, `[chuckle]`, and the set Turbo/Nano already document) carry warmth. Jarvis stays calm and precise: short command lines, tags off.
 - **Watermark:** upstream `generate()` applies a Perth watermark. The Nano path should keep a watermark beside the Art. 50 disclosure. Perth's own licence was not read in this session. Do not vendor it yet.
-- **Worker:** a later out-of-process process, same shape as the warm Piper worker. Piper speaks if the clone worker is absent. No PCM on disk.
+- **Worker:** the scaffold in `CLONE-WORKER.md` is one out-of-process process, same shape as the warm Piper worker. Piper speaks if the clone worker is absent. No PCM on disk. Generate is not wired. No film audio.
 
 **CPU and memory (t204u, t205u).** Admin approves full threading, SIMD, and
 maximum memory for Chatterbox Nano/Turbo workers, for every Galion Voice
@@ -659,14 +660,12 @@ governors, or service limits.
 calm command and interface layer. Both are research targets under the legal
 hold. They are not shipped voices.
 
-**LOCKS.** Do not edit locks for this sector. PyTorch (the upstream stack)
-stays out of process; `foreign_runtime_allowed` is still false, so a later
-owner exception would be required before a worker is linked or fetched.
-No GGML port (`chatterbox.cpp` and GGUF builds are the wrong shape). No
-in-tree ort (a community ONNX export does not extend the Piper pin). The
-multilingual T3 uses a Llama backbone; `llama` is a forbidden runtime name
-inside the tree. Weights are not downloaded and not vendored. `.pt` files
-are not a lock weight format.
+**LOCKS.** t230u wrote `[formats.exceptions.v2s14_chatterbox]`: PyTorch stays
+out of process, sunset `2027-02-01`, weights not vendored, no reference
+clips. Global `foreign_runtime_allowed` is still false. The A21 Piper pin
+is unchanged. No in-tree ort. No in-tree ggml. No in-tree llama. A community
+ONNX export does not extend the Piper pin. `.pt` files are not fetched.
+The worker scaffold does not download weights in CI. See `CLONE-WORKER.md`.
 
 **External APIs.** ElevenLabs, Cartesia, Play.ht, hosted Resemble cloning,
 Inworld, Fish Audio, and Azure Personal Voice are **dropped**. Notes on why
@@ -730,7 +729,7 @@ This program does not SSH, and it does not download a model.
 - The Vosk sidecar, its sha256 pin, and any later Vosk line in LOCKS. Letter A is chosen. `interim` stays until the WER bar.
 - espeak-ng counsel. The Piper exception text is already in LOCKS, sunset `2027-02-01`.
 - Rights clearance before any Jarvis or Samantha reference clip. No film audio is fetched here.
-- A Chatterbox owner exception, if a worker is ever fetched. Not written now.
+- Chatterbox generate against a real reference. The t230u pin allows an out-of-process worker. The stub does not call generate, and CI does not fetch weights.
 - Whether the hint line and a `thinking` state may exist on the locked surface.
 - The public-demo GDPR notice, and the exact origin string once a name exists. Login and "no wildcard on staging" are decided.
 - Turning auto-merge on in the GitHub settings, if branch protection is not already doing it. The workflow file only runs checks.
@@ -741,7 +740,7 @@ This program does not SSH, and it does not download a model.
 - A cloud or paid voice-cloning API.
 - A new tunnel product. ngrok now, Caddy later.
 - GGML, in-tree or out of process.
-- Editing `LOCKS.toml` values beyond the A21 Piper sunset pin.
+- Editing global `LOCKS.toml` values. The A21 Piper pin and the V2-S14 out-of-process Chatterbox pin are the only exceptions, and neither flips `foreign_runtime_allowed`.
 - Calling the interim transcript recognition.
 - Calling the spring page V3.
 - Ingesting a film clip or shipping a celebrity voice before rights clearance.
