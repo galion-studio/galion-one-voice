@@ -2,18 +2,21 @@
 // Copyright (c) 2026 Maciej Grajczyk.
 //! Screen-demo glue for the phone path (feature `phone-turn`).
 //!
-//! The 80 ms loop calls [`PhoneHost::drive_you`] and [`PhoneHost::drive_me`].
-//! Neither waits on ASR, the reply model, or TTS. [`crate::turn_worker::TurnWorker`]
-//! owns that work. Reply PCM is only a memory queue drained one heartbeat frame
-//! at a time into the me band. Nothing here writes audio to disk.
+//! The 80 ms loop calls [`PhoneHost::drive_you`] and [`PhoneHost::drive_me`]
+//! *outside* `Heartbeat::step`. Neither waits on ASR, the reply model, or TTS.
+//! [`crate::turn_worker::TurnWorker`] owns that work. Levels, utterances, barge-in,
+//! and published replies go through [`crate::bus::ProcessBus`] (`try_send` only).
+//! Reply PCM is only a memory queue drained one heartbeat frame at a time into
+//! the me band. Nothing here writes audio to disk.
 
 use std::collections::VecDeque;
 use std::time::Duration;
 
-use galion_heartbeat::SAMPLE_RATE;
+use galion_heartbeat::{FRAME_MS, SAMPLE_RATE};
 use galion_render::backends::web::{MicTap, ReplyBox, TurnInbox, WebSurface};
 
-use crate::turn_worker::{TurnJob, TurnWorker};
+use crate::bus::{pcm16_to_bytes, BusMsg, ProcessBus};
+use crate::turn_worker::{TurnJob, TurnReply, TurnWorker};
 
 /// What the phone path overrode on this tick.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -29,34 +32,51 @@ pub struct PhoneHost {
     mic: MicTap,
     turns: TurnInbox,
     replies: ReplyBox,
+    bus: ProcessBus,
     worker: TurnWorker,
     /// Remaining reply samples at 24 kHz.
     play: VecDeque<i16>,
     /// A turn the worker could not accept yet (channel full). Newest wins.
     pending: Option<TurnJob>,
     phase: f32,
+    /// Heartbeat frames observed on [`Self::drive_you`]. `t_ms = frame * 80`.
+    frame: u64,
+    t_ms: u64,
 }
 
 impl PhoneHost {
     /// Spawn the turn worker and clone the HTTP handles. Call before `open` returns
     /// the surface into a `Box<dyn RenderSurface>`.
     pub fn from_surface(web: &WebSurface) -> Self {
+        let bus = ProcessBus::new();
         Self {
             mic: web.mic_tap(),
             turns: web.turn_inbox(),
             replies: web.reply_box(),
-            worker: TurnWorker::spawn(),
+            worker: TurnWorker::spawn_on(bus.clone()),
+            bus,
             play: VecDeque::new(),
             pending: None,
             phase: 0.0,
+            frame: 0,
+            t_ms: 0,
         }
+    }
+
+    pub fn bus(&self) -> &ProcessBus {
+        &self.bus
     }
 
     /// Replace `you` when the browser posted a fresh RMS above the room floor.
     pub fn drive_you(&mut self, you: &mut [f32]) -> bool {
+        self.frame = self.frame.saturating_add(1);
+        self.t_ms = self.frame.saturating_mul(u64::from(FRAME_MS));
         let Some(rms) = self.mic.latest(Duration::from_millis(320)) else {
             return false;
         };
+        let _ = self
+            .bus
+            .try_send(BusMsg::mic_level(self.bus.alloc_id(), self.t_ms, rms));
         if rms < 0.012 {
             return false;
         }
@@ -80,19 +100,29 @@ impl PhoneHost {
             // New utterance cancels whatever the speakers were playing (barge-in).
             wipe_play(&mut self.play);
             if let Some((rate, ch, pcm)) = t.pcm16() {
-                self.enqueue(TurnJob { id: t.id, rate, pcm: downmix(&pcm, ch) });
+                let pcm = downmix(&pcm, ch);
+                let turn_id = t.id;
+                let _ =
+                    self.bus
+                        .try_send(BusMsg::barge_in(self.bus.alloc_id(), turn_id, self.t_ms));
+                let _ = self.bus.try_send(BusMsg::utterance(
+                    self.bus.alloc_id(),
+                    turn_id,
+                    self.t_ms,
+                    self.bus.cancel(),
+                    rate,
+                    pcm16_to_bytes(&pcm),
+                ));
+                self.enqueue(TurnJob {
+                    id: turn_id,
+                    rate,
+                    pcm,
+                });
             }
         }
         self.flush_submit();
         if let Some(r) = self.worker.try_recv() {
-            let _ = self.replies.set_reply(r.id.to_string(), r.wav.clone(), r.ms);
-            wipe_play(&mut self.play);
-            self.play.extend(r.pcm.iter().copied());
-            // Lengths and labels only. The helper cannot take PCM or the transcript.
-            eprintln!(
-                "{}",
-                phone_reply_log_line(r.id, r.asr, r.backend, r.ms, r.in_ms, r.took_ms, r.error.as_deref())
-            );
+            self.publish(r);
         }
         if self.play.is_empty() {
             return false;
@@ -162,6 +192,59 @@ fn wipe_play(play: &mut VecDeque<i16>) {
 }
 
 impl PhoneHost {
+    fn publish(&mut self, r: TurnReply) {
+        let speech = BusMsg::speech_pcm(
+            self.bus.alloc_id(),
+            r.id,
+            self.t_ms,
+            self.bus.cancel(),
+            pcm16_to_bytes(&r.pcm),
+            r.ms,
+        );
+        let text = BusMsg::reply_text(
+            self.bus.alloc_id(),
+            r.id,
+            self.t_ms,
+            self.bus.cancel(),
+            r.text.clone(),
+            None,
+            false,
+        );
+        let Some(speech) = self.bus.before_publish(speech) else {
+            return;
+        };
+        let _ = self.bus.try_send_reply(speech);
+        if let Some(text) = self.bus.before_publish(text) {
+            let _ = self.bus.try_send_reply(text);
+        }
+        if let Some(err) = r.error.as_deref() {
+            let _ = self.bus.try_send(BusMsg::fault(
+                self.bus.alloc_id(),
+                r.id,
+                self.t_ms,
+                self.bus.cancel(),
+                "phone",
+                fault_kind(err),
+            ));
+        }
+        let _ = self.replies.set_reply(r.id.to_string(), r.wav.clone(), r.ms);
+        wipe_play(&mut self.play);
+        self.play.extend(r.pcm.iter().copied());
+        // Lengths and labels only. The helper cannot take PCM or the transcript.
+        eprintln!(
+            "{}",
+            phone_reply_log_line(
+                r.id,
+                r.asr,
+                r.backend,
+                r.ms,
+                r.in_ms,
+                r.took_ms,
+                r.error.as_deref()
+            )
+        );
+    }
+
     fn enqueue(&mut self, job: TurnJob) {
         if let Some(old) = self.pending.take() {
             if old.id > job.id {
@@ -179,6 +262,17 @@ impl PhoneHost {
             }
         }
     }
+}
+
+/// First token of a lane error (`AsrUnratified`, `Empty`, …). No audio, no transcript.
+fn fault_kind(err: &str) -> String {
+    err.split(':')
+        .next()
+        .unwrap_or("error")
+        .trim()
+        .chars()
+        .take(64)
+        .collect()
 }
 
 /// Average interleaved PCM down to mono. `channels == 1` clones.
@@ -208,8 +302,19 @@ mod tests {
     #[test]
     fn phone_log_has_no_pcm_or_transcript() {
         let transcript = "SECRET_TRANSCRIPT_do_not_log";
-        let line = phone_reply_log_line(7, "interim-placeholder", "tone", 80, 100, 40, Some("AsrUnratified"));
-        assert!(line.contains("id=7") && line.contains("audio_ms=80") && line.contains("err=AsrUnratified"), "{line}");
+        let line = phone_reply_log_line(
+            7,
+            "interim-placeholder",
+            "tone",
+            80,
+            100,
+            40,
+            Some("AsrUnratified"),
+        );
+        assert!(
+            line.contains("id=7") && line.contains("audio_ms=80") && line.contains("err=AsrUnratified"),
+            "{line}"
+        );
         assert!(!line.contains(transcript), "{line}");
         assert!(!line.contains("RIFF"), "{line}");
         assert!(!line.to_ascii_lowercase().contains("pcm"), "{line}");
@@ -233,5 +338,45 @@ mod tests {
         assert_eq!(pop_pcm(&mut q), Some(1));
         wipe_play(&mut q);
         assert!(q.is_empty());
+    }
+
+    #[test]
+    fn drive_posts_mic_level_and_utterance_on_the_bus() {
+        use crate::bus::BusBody;
+        use galion_render::backends::web::TurnFormat;
+
+        std::env::set_var("GALION_ASR", "off");
+        let web = WebSurface::mailbox();
+        web.mic_tap().set(0.25);
+        web.turn_inbox().push(
+            TurnFormat::Pcm16 {
+                rate: 16_000,
+                channels: 1,
+            },
+            vec![0, 0, 1, 0],
+        );
+        let mut host = PhoneHost::from_surface(&web);
+        let mut you = vec![0.0f32; 8];
+        assert!(host.drive_you(&mut you));
+        match host.bus().try_recv_mic().unwrap().body {
+            BusBody::MicLevel { rms } => assert!((rms - 0.25).abs() < 1e-6),
+            other => panic!("{other:?}"),
+        }
+        let mut me = vec![0.0f32; 8];
+        let _ = host.drive_me(&mut me);
+        assert_eq!(host.bus().cancel(), 1);
+        let utt = host
+            .bus()
+            .try_recv_utterance()
+            .expect("utterance on the bus");
+        assert_eq!(utt.turn_id, 1);
+        assert_eq!(utt.t_ms, u64::from(galion_heartbeat::FRAME_MS));
+        match utt.body {
+            BusBody::Utterance { rate, pcm } => {
+                assert_eq!(rate, 16_000);
+                assert_eq!(pcm, vec![0, 0, 1, 0]);
+            }
+            other => panic!("{other:?}"),
+        }
     }
 }
