@@ -1,0 +1,18 @@
+# Galion Voice — Perpetual Open MIT License
+[package]
+name = "galion-symphony"
+description = "Galion Voice symphony: V6 one-percent engine account on the 80 ms tick. Non-inference only. Stub and measured stay labelled."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version = "1.85"
+publish = false
+
+[dependencies]
+galion-emotion = { path = "../../galion-emotion" }
+galion-heartbeat = { path = "../galion-heartbeat", default-features = false }
+
+[[example]]
+name = "one-percent"
+path = "examples/one_percent.rs"

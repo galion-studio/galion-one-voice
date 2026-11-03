@@ -69,6 +69,8 @@ The symphony standard for that clock is
 [`symphony/EUREKA.md`](symphony/EUREKA.md): one heartbeat, three bands
 (you · me · feeling), a late frame is a pause, harness before model.
 Gate results go in [`symphony/SELF-EVAL.md`](symphony/SELF-EVAL.md).
+Non-inference cost on that tick is the symphony account,
+`docs/galion-voice-v2/symphony/ONE-PERCENT.md`.
 
 **Rika.** On silence and an in-breath, Rika leans in on the feeling band
 (about 160 ms in the stub measurement). It needs consent bits `sense` and
@@ -747,6 +749,12 @@ This program does not SSH, and it does not download a model.
   `docs/galion-voice-v2/OPENMIND-NERVE-CORTEX.md`. Local nerve notes when no
   daemon is present. Hermes handoff through `galion-sideband`. Not inside
   `Heartbeat::step`. LOCKS.toml not edited.
+- Symphony one-percent account: `crates/galion-symphony` and
+  `docs/galion-voice-v2/symphony/ONE-PERCENT.md`. P1 is ≤ 1% non-inference
+  CPU on the 80 ms tick. P3 is that tick's p99 under 800 µs, with the ≪
+  flag recorded at 80 µs. A late frame is a pause. Stub durations and the
+  local clock are separate series. `product_claim` stays false. Gate:
+  `galion-gates/op-one-percent.sh`. LOCKS.toml not edited.
 
 ## 7. What stays human
 

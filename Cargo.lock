@@ -270,6 +270,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "galion-symphony"
+version = "0.0.1"
+dependencies = [
+ "galion-emotion",
+ "galion-heartbeat",
+]
+
+[[package]]
 name = "galion-tensor"
 version = "0.0.1"
 dependencies = [
