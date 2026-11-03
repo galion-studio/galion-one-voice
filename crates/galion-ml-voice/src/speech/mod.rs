@@ -94,6 +94,9 @@ impl SpeechBackend {
     }
 }
 
+/// Throwaway lines spoken (and discarded) by [`SpeechStack::prewarm`].
+pub const PREWARM_LINES: &[&str] = &["Hello.", "Okay, I hear you.", "That sounds good, tell me more about it."];
+
 /// Cold/warm first-clause PCM for one stack. Times are absent until that speak happens.
 /// No PCM is stored here.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -251,9 +254,14 @@ impl SpeechStack {
         if self.prewarmed || !self.streams_clauses() {
             return;
         }
-        if self.speak("Hello.").is_ok() {
-            self.prewarmed = true;
+        // lat240: three lines of different lengths at call start. The first
+        // pays process spawn + model load (cold, ~330 ms); the next two take the
+        // first-run cost of new input lengths so no caller turn sees either.
+        let mut ok = false;
+        for line in PREWARM_LINES {
+            ok |= self.speak(line).is_ok();
         }
+        self.prewarmed = ok;
     }
 
     /// Supersede gate shared with the turn worker. A stale `turn_id` drops
