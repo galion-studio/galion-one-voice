@@ -200,7 +200,8 @@ mod tests {
             }
             s.position
         }
-        // ~50 ms of a fast spring (w = 18), before it has settled.
+        // ~50 ms of a stiff numerical spring (w = 18). That gain is a
+        // step-size check, not the phone's speaking aim (see OrbMotion).
         // Finer dt lands closer to the 960 Hz reference. 240 Hz stays
         // within a few thousandths of a radius-fraction (~0.18 of travel).
         let fine = at(1.0 / 960.0, 48);

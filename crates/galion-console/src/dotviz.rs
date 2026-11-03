@@ -377,6 +377,11 @@ mod tests {
         assert!(SCREEN_HTML.contains("POST /turn"));
         assert!(SCREEN_HTML.contains("function spring"));
         assert!(SCREEN_HTML.contains("samplePlayEnv"));
+        assert!(SCREEN_HTML.contains("function empathy"));
+        assert!(SCREEN_HTML.contains("createRadialGradient"));
+        assert!(SCREEN_HTML.contains("#F5F5F7"));
+        assert!(SCREEN_HTML.contains("MARK.strokePx"));
+        assert!(!SCREEN_HTML.contains("rV*6"), "aspect squash must stay gone");
         assert!(SCREEN_HTML.contains("V2 orb"));
         assert!(SCREEN_HTML.contains("id=\"s\""));
         assert!(SCREEN_HTML.contains("Razgovarate s umjetnom inteligencijom. Galion je AI asistent, a ne osoba."));

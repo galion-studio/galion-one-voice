@@ -16,14 +16,17 @@
 //! every surface. Rendering is strictly *best-effort and non-blocking for audio*: a slow
 //! or broken surface is dropped, never allowed to stall the duplex loop.
 //!
-//! **User surface = one dot** ([`dot`]): a solid `#F5F5F7` dot whose radius/brightness
-//! come only from heartbeat state, on the obsidian + amber→violet background ([`palette`]).
-//! The gradient is background only and never touches the dot. [`NullSurface`] is the
-//! headless CI/gate sink (G4) and records the dot it would have drawn.
+//! **User surface = one dot** ([`dot`]): `#F5F5F7` on obsidian, amber→violet on the
+//! background only. The discrete golden ([`DotParams`]) is still a solid fill
+//! scaled by brightness, and that is what G4 hashes. The phone page paints the
+//! locked pigment itself (a near-white gradient whose body stop is `#F5F5F7`)
+//! and uses brightness for glow and a little size, not as a multiply on the fill.
+//! [`NullSurface`] records [`DotParams`] and does not see the phone gradient.
 //!
 //! [`OrbEngine`] is the display-rate spring between those discrete targets
-//! (60 / 120 / 240 Hz, variable `dt`). Surfaces do not call it, so the G4
-//! golden stays [`DotParams`]. It must not run inside `Heartbeat::step`.
+//! (60 / 120 / 240 Hz, variable `dt`). Aspect stays 1 — a circle. Surfaces do
+//! not call it, so the G4 golden stays [`DotParams`]. It must not run inside
+//! `Heartbeat::step`.
 //!
 //! `galion-console` owns *what* is shown (layout, panels, colors); `galion-render` owns
 //! *where* it is shown. Console builds a `VizFrame`, render delivers it.

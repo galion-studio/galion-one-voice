@@ -50,8 +50,10 @@ These are in the repository. V2 extends them.
 
 **One mark.** `LOCKS.toml` `[ui]`: one dot, `#F5F5F7` on `#0A0A0C`, amber
 `#F5A524` to violet `#7C3AED` on the background only, size and brightness only,
-`chrome_allowed = false`. `galion-render` draws that mark from heartbeat state.
-The phone page is `crates/galion-console/assets/v1-screen.html`.
+`chrome_allowed = false`. The lock file is not edited. The phone paints the
+locked pigment as the body of a near-white gradient and uses brightness for
+glow, not as a multiply on the fill. `galion-render` `DotParams` is still the
+solid golden (G4). The phone page is `crates/galion-console/assets/v1-screen.html`.
 
 **Heartbeat, 80 ms.** `LOCKS.toml` `[clock]`: 12.5 Hz, 24 kHz, 1920 samples,
 60 ms compute budget inside the frame. `galion-heartbeat` `Heartbeat::step`
@@ -211,7 +213,8 @@ A shader is a later engine step, not a requirement for the phone to feel alive.
 "Tap the dot to talk" is the smallest prompt that makes a phone mic usable.
 It is a tension with `chrome_allowed = false`. It is not a lock edit.
 
-**LOCKS.** `[ui]` unchanged. Gradient stays off the mark. `dot_states` stays
+**LOCKS.** `[ui]` unchanged. Amber→violet stays off the mark. The phone's
+own fill is a near-white gradient whose body is `#F5F5F7`. `dot_states` stays
 three names until an owner adds `thinking`. The page may move as if thinking;
 it must not pretend the lock already lists that state.
 

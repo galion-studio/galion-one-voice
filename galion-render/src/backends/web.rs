@@ -18,6 +18,10 @@
 //!                      galion-console, this crate only serves the bytes); 404 otherwise
 //! `/dot` also carries `"mode"` (idle|listening|speaking|rika), `"lean"` (Rika lean-in 0..1)
 //! and `"level"` (0..1, the band driving the state) so the page can animate on its own clock.
+//! `"emotion"` is the live affect on this same frame (rewritten every `present`, 12.5 Hz):
+//! `sense`, `label`, `valence`, `arousal` from `listen.emotion` (the heartbeat
+//! `AffectFeed`), plus `lean`. It is not a snapshot taken once at startup.
+//! The page maps it through the empathy table; this crate does not retint the dot.
 //! When the host has published a reply, `/dot` additionally carries
 //! `"reply":{"id":"<id>","url":"/reply/<id>.wav","ms":<duration ms>}` (latest reply only;
 //! the page should play it once per new `id`). Absent when no reply was set / after
@@ -270,6 +274,28 @@ impl ReplyBox {
         let (id, ms) = g.latest.as_ref()?;
         Some(format!("{{\"id\":\"{id}\",\"url\":\"/reply/{id}.wav\",\"ms\":{ms}}}"))
     }
+}
+
+/// Live affect riding on `/dot`. `listen.emotion` is whatever the heartbeat
+/// just wrote (galion-console `viz_from_heartbeat` ← `AffectFeed`). Label
+/// `"neutral"` with zero valence and arousal is the untouched default, so
+/// `sense` is false — the page then holds the neutral-warm empathy prior.
+fn emotion_json(f: &VizFrame) -> String {
+    let e = &f.listen.emotion;
+    let valence = if e.valence.is_finite() { e.valence.clamp(-1.0, 1.0) } else { 0.0 };
+    let arousal = if e.intensity.is_finite() { e.intensity.clamp(0.0, 1.0) } else { 0.0 };
+    let lean = crate::dot::lean_in_of(f);
+    let sense = e.label != "neutral" || valence != 0.0 || arousal != 0.0;
+    let mut label = String::new();
+    for c in e.label.chars() {
+        if label.len() >= 24 { break; }
+        if c.is_ascii_alphanumeric() || c == '-' || c == '_' { label.push(c); }
+    }
+    if label.is_empty() { label.push_str("neutral"); }
+    format!(
+        "{{\"sense\":{},\"label\":\"{label}\",\"valence\":{valence:.3},\"arousal\":{arousal:.3},\"lean\":{lean:.3}}}",
+        if sense { "true" } else { "false" }
+    )
 }
 
 /// Insert `"reply":{..}` into a `/dot` JSON object (no-op when `reply` is `None`).
@@ -764,7 +790,13 @@ impl RenderSurface for WebSurface {
                 crate::dot::DotState::Idle => 0.0,
             };
             let level = if level.is_finite() { level.clamp(0.0, 1.0) } else { 0.0 };
-            d.push_str(&format!(",\"mode\":\"{}\",\"lean\":{:.3},\"level\":{:.3}}}", crate::dot::screen_mode(f), crate::dot::lean_in_of(f), level));
+            d.push_str(&format!(
+                ",\"mode\":\"{}\",\"lean\":{:.3},\"level\":{:.3},\"emotion\":{}}}",
+                crate::dot::screen_mode(f),
+                crate::dot::lean_in_of(f),
+                level,
+                emotion_json(f)
+            ));
         }
         if let Ok(mut g) = self.sh.latest_dot.lock() { *g = d; }
         Ok(())
@@ -846,7 +878,36 @@ mod tests {
         w.present(&f).unwrap();
         let r = get(a, "/dot");
         assert!(r.contains("\"state\":\"idle\"") && r.contains("\"mode\":\"rika\"") && r.contains("\"lean\":0.500"), "{r}");
+        assert!(r.contains("\"emotion\"") && r.contains("\"sense\":false"), "{r}");
         assert!(r.trim_end().ends_with('}'));
+        w.close().unwrap();
+    }
+
+    #[test]
+    fn dot_emotion_tracks_each_presented_frame() {
+        let mut w = WebSurface::serve("127.0.0.1:0".parse().unwrap());
+        w.open().unwrap();
+        let a = w.local_addr().unwrap();
+        w.present(&VizFrame::default()).unwrap();
+        let quiet = get(a, "/dot");
+        assert!(quiet.contains("\"sense\":false") && quiet.contains("\"label\":\"neutral\""), "{quiet}");
+        let mut hot = VizFrame::default();
+        hot.t_ms = 800;
+        hot.listen.emotion = crate::frame::Emotion { label: "tense", intensity: 0.82, valence: -0.6 };
+        w.present(&hot).unwrap();
+        let live = get(a, "/dot");
+        assert!(live.contains("\"sense\":true"), "{live}");
+        assert!(live.contains("\"label\":\"tense\""), "{live}");
+        assert!(live.contains("\"valence\":-0.600"), "{live}");
+        assert!(live.contains("\"arousal\":0.820"), "{live}");
+        assert!(!quiet.contains("\"label\":\"tense\""));
+        let mut next = hot;
+        next.t_ms = 1600;
+        next.listen.emotion = crate::frame::Emotion { label: "warm", intensity: 0.31, valence: 0.4 };
+        w.present(&next).unwrap();
+        let later = get(a, "/dot");
+        assert!(later.contains("\"label\":\"warm\"") && later.contains("\"arousal\":0.310"), "{later}");
+        assert!(!later.contains("\"label\":\"tense\""));
         w.close().unwrap();
     }
 

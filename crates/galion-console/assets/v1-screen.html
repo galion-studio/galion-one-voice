@@ -4,8 +4,11 @@
      UX-01: the page animates on its own 60 fps clock from /dot {mode,level} (no 80 ms stutter),
      listening = larger + full bright + still; speaking = smaller base, pulsing; idle = slow breath;
      server unreachable = small dim still dot (never mistaken for idle).
-     V2 orb foundation: the same one mark, driven by a spring-damper (idle / listen / think / speak).
-     Speak radius tracks the reply WAV envelope (AnalyserNode on the playback graph) so the orb is heard.
+     V2 orb: the same one mark, a calm circle on a soft spring (idle / listen / think / speak).
+     Fill is the locked near-white #F5F5F7 (a quiet gradient around that pigment, 1px hairline).
+     Brightness is glow and a little size — it does not multiply the fill.
+     Aspect stays 1. Speak radius follows a low-passed reply envelope, not an ellipse.
+     Interior warmth follows GET /dot "emotion" (live heartbeat AffectFeed), via StubExpressor.
      V1 voice pipeline (supersedes the UX-01 "no raw audio leaves the page" note, per Maciej):
        mic level  → POST /mic  {rms,t[,playing]} every ~80 ms (drives the dot, unchanged)
        utterance  → POST /turn  audio/wav (16 kHz mono 16-bit PCM), cut on-device by VAD
@@ -57,12 +60,17 @@ canvas{display:block;position:fixed;inset:0;width:100%;height:100%;width:100dvw;
 <script>
 "use strict";
 const TOK={dot:"#F5F5F7",base:"#0A0A0C",from:"#F5A524",to:"#7C3AED"};
+// Body of the mark is the locked token. Edge is a whisper darker, still the same pigment.
+// Stroke is a 1-device-pixel hairline. Brightness never scales these channels.
+const MARK={core:"#F5F5F7",edge:"#E8E8ED",stroke:"rgba(255,255,255,0.55)",strokePx:1};
 const WASH=0.38, WASH_MS=24000, IDLE_MS=1600, BW=96, BH=54;
-// Mirrors galion-render/src/dot.rs (UX-01). Keep in sync.
-const R={idle:0.100, listen:0.135, speak:0.105, speakDepth:0.050, off:0.060};
-const B={idle:0.84, listen:1.00, off:0.30};
+// Radius fractions mirror galion-render DotParams scale. Brightness here is glow (0..1), not pigment.
+const R={idle:0.100, listen:0.135, speak:0.105, speakDepth:0.028, off:0.060};
+const B={idle:0.48, listen:0.72, off:0.08};
 const POLL_MS=80, MAX_INFLIGHT=3, FETCH_TIMEOUT_MS=1200, OFFLINE_MS=1500;
 const HOLD_IDLE_MS=300, HOLD_LEAVE_SPEAK_MS=160, LOCAL_VOICE=0.02;
+// Soft springs. Same aims as OrbMotion::radius_gain. Eased — a mode change does not rebind in one frame.
+const GAIN_TAU=480, TARGET_TAU=140, ENV_ATTACK=200, ENV_RELEASE=380, EM_TAU=520;
 const hex=h=>[1,3,5].map(i=>parseInt(h.slice(i,i+2),16));
 const okHex=h=>typeof h==="string"&&/^#[0-9A-Fa-f]{6}$/.test(h);
 const lerp=(a,b,t)=>a.map((x,i)=>Math.round(x+(b[i]-x)*t));
@@ -85,9 +93,11 @@ let capNode=null, capSink=null, capRatio=1, capPos=0, capFrame=new Float32Array(
 let vadFloor=0.003, vadOn=false, vadRun=0, vadQuiet=0, vadSpeechMs=0, uttMs=0, uttBarge=false;
 let preroll=[], utt=[], turnSeq=0;
 let playSrc=null, playId=null, playing=false, seenReplies=new Set();
-// V2 orb: spring state (position + velocity), mic energy, playback envelope, in-flight turns.
-const SPRING={idle:{w:2.4,z:0.86},listening:{w:11,z:0.70},thinking:{w:6.5,z:0.48},speaking:{w:18,z:0.58},offline:{w:3.2,z:1.05}};
-let rP=R.idle, rV=0, bP=B.idle, bV=0, aspect=1, micEnv=0, playEnv=0, turnsInFlight=0;
+// V2 orb: spring state. Gains ease from the idle aim. No aspect — the mark is a circle.
+const SPRING={idle:{w:1.8,z:0.92},listening:{w:3.4,z:0.88},thinking:{w:2.4,z:0.90},speaking:{w:3.0,z:0.92},offline:{w:2.0,z:1.02}};
+let rP=R.idle, rV=0, bP=B.idle, bV=0, wS=SPRING.idle.w, zS=SPRING.idle.z;
+let trLp=R.idle, tbLp=B.idle, micEnv=0, playEnv=0, turnsInFlight=0;
+let emV=0.30, emA=0.35, emLean=0, liveLp=0;
 let playAn=null, playData=null;
 let sessionToken="";
 
@@ -137,7 +147,7 @@ function paintBg(tms,b){
 function pickMode(now){
   if(now-lastOk>OFFLINE_MS) return "offline";
   let m=(latest&&latest.mode)||latest&&latest.state||"idle";
-  if(m==="rika") m="speaking";
+  if(m==="rika") m="idle"; // lean-in stays idle motion; /dot "lean" carries the feeling
   if(m!=="idle"&&m!=="listening"&&m!=="speaking"&&m!=="thinking") m="idle";
   if(playing) m="speaking";                          // our own reply audio is audible right now
   const localVoice=micState==="on"&&(micRms-micFloor*1.6)>LOCAL_VOICE;
@@ -160,50 +170,80 @@ function spring(p,v,target,dt,w,z){
   if(!isFinite(p)||!isFinite(v)) return [target,0];
   return [p,v];
 }
-// Envelope of the WAV currently in the speakers (0..1). This is the me band the orb follows.
-function samplePlayEnv(){
-  if(!playing||!playAn||!playData){ playEnv*=0.82; return playEnv; }
-  playAn.getByteTimeDomainData(playData);
-  let sum=0;
-  for(let i=0;i<playData.length;i++){ const v=(playData[i]-128)/128; sum+=v*v; }
-  const e=clamp(Math.sqrt(sum/playData.length)*6.5,0,1);
-  playEnv=playEnv*0.42+e*0.58;
+// Low-passed envelope of the WAV in the speakers (0..1). Silence stays near rest.
+function samplePlayEnv(dt){
+  let e=0;
+  if(playing&&playAn&&playData){
+    playAn.getByteTimeDomainData(playData);
+    let sum=0;
+    for(let i=0;i<playData.length;i++){ const v=(playData[i]-128)/128; sum+=v*v; }
+    e=clamp(Math.sqrt(sum/playData.length)*3.2,0,1);
+  }
+  const tc=e>playEnv?ENV_ATTACK:ENV_RELEASE;
+  playEnv+=(e-playEnv)*(1-Math.exp(-Math.max(1,dt)/tc));
+  if(playEnv<1e-4) playEnv=0;
   return playEnv;
 }
-function target(mode,now){
+// Galion's feeling, not a mirror. Same table as galion_emotion::StubExpressor
+// (dominance defaults to 0.5, so high-arousal negative reads as Angry → calm).
+// Valence near 0 is "no opinion" (loudness SENSE): stay neutral-warm, keep live arousal.
+function empathy(em){
+  if(!em||em.sense===false) return {v:0.30,a:0.35,live:0};
+  const v=clamp(+em.valence||0,-1,1), a=clamp(+em.arousal||0,0,1);
+  if(Math.abs(v)<0.05) return {v:0.30,a:0.35,live:a};
+  if(v>=0.25) return {v:Math.max(v*0.9,0.30), a:Math.max(a*0.85,0.35), live:a};
+  if(v<=-0.25&&a>=0.6) return {v:0.20,a:0.20,live:a};
+  if(v<=-0.25) return {v:0.25,a:0.20,live:a};
+  return {v:0.30,a:0.35,live:a};
+}
+// Inner highlight only. Stays inside 240..255 so the disc still reads as #F5F5F7.
+function markInner(warm){
+  const w=clamp(warm,0,1);
+  return [Math.round(246+9*w), Math.round(246+6*w), Math.round(252-12*w)];
+}
+function target(mode,now,dt){
   const t=now-t0;
-  micEnv=micEnv*0.72+clamp(micRms,0,1)*0.28;
-  const env=samplePlayEnv();
+  micEnv+=(clamp(micRms,0,1)-micEnv)*(1-Math.exp(-Math.max(1,dt)/200));
+  const env=samplePlayEnv(dt);
   if(mode==="offline") return [R.off,B.off];
   if(mode==="listening"){
-    const local=clamp((micRms-micFloor)*8,0,1);
-    const lv=Math.max(clamp(+(latest&&latest.level)||0,0,1), local, micEnv*4);
-    return [R.listen+0.055*lv+0.003*Math.sin(t/420), B.listen];
+    const local=clamp((micRms-micFloor)*6,0,1);
+    const lv=Math.max(clamp(+(latest&&latest.level)||0,0,1), local, micEnv*2.5);
+    return [R.listen+0.028*lv+0.004*Math.sin(t/1100), B.listen+0.16*lv];
   }
   if(mode==="thinking"){
-    const s=0.5+0.5*Math.sin(t/280);
-    return [0.112+0.012*s, 0.76+0.12*s];
+    const s=0.5+0.5*Math.sin(t/1100);
+    return [0.108+0.008*s, 0.50+0.10*s];
   }
   if(mode==="speaking"){
-    if(playing) return [R.speak+R.speakDepth*env, 0.84+0.16*Math.max(env,0.15)];
-    if(latest&&typeof latest.radius==="number"&&(latest.mode==="speaking"||latest.mode==="rika"||latest.state==="speaking"))
-      return [clamp(+latest.radius,0,.5), clamp(+latest.brightness||0.94,0,1)];
-    const d=0.5+0.5*Math.abs(Math.sin(t/160*Math.PI));
-    return [R.speak+R.speakDepth*d, 0.88+0.12*d];
+    const breath=Math.sin(t/1400);
+    if(playing) return [R.speak+R.speakDepth*env+0.006*breath, 0.40+0.32*env];
+    if(latest&&typeof latest.radius==="number"&&(latest.mode==="speaking"||latest.state==="speaking"))
+      return [clamp(+latest.radius,0,0.5), 0.40+0.28*clamp(+latest.brightness||0.8,0,1)];
+    const s=Math.sin(((t%2800)/2800)*2*Math.PI);
+    return [R.speak+0.012*s, 0.46+0.08*s];
   }
   const s=Math.sin(((t%IDLE_MS)/IDLE_MS)*2*Math.PI);
-  return [R.idle+0.008*s, B.idle+0.04*s];
+  const lean=clamp(+(latest&&latest.lean)||0,0,1);
+  return [R.idle+0.010*s+0.016*lean, B.idle+0.08*s+0.12*lean];
 }
 
 function draw(){
   const now=performance.now(), dt=Math.min(50,now-lastFrame); lastFrame=now;
   shown=pickMode(now);
-  const [tr,tb]=target(shown,now);
-  const sp=SPRING[shown]||SPRING.idle;
-  [rP,rV]=spring(rP,rV,tr,dt,sp.w,sp.z);
-  [bP,bV]=spring(bP,bV,tb,dt,sp.w*0.85,Math.min(1.2,sp.z+0.08));
-  const squash=clamp(rV*6,-0.14,0.14);
-  aspect+=(1+squash-aspect)*(1-Math.exp(-dt/90));
+  const [tr,tb]=target(shown,now,dt);
+  const aim=SPRING[shown]||SPRING.idle;
+  const gk=1-Math.exp(-dt/GAIN_TAU);
+  wS+=(aim.w-wS)*gk; zS+=(aim.z-zS)*gk;
+  const tk=1-Math.exp(-dt/TARGET_TAU);
+  trLp+=(tr-trLp)*tk; tbLp+=(tb-tbLp)*tk;
+  [rP,rV]=spring(rP,rV,trLp,dt,wS,zS);
+  [bP,bV]=spring(bP,bV,tbLp,dt,wS*0.85,Math.min(1.2,zS+0.08));
+  const feel=empathy(latest&&latest.emotion);
+  const leanNow=clamp(+((latest&&latest.emotion&&latest.emotion.lean)!=null?latest.emotion.lean:(latest&&latest.lean)||0),0,1);
+  const ek=1-Math.exp(-dt/EM_TAU);
+  emV+=(feel.v-emV)*ek; emA+=(feel.a-emA)*ek; emLean+=(leanNow-emLean)*ek;
+  liveLp+=(feel.live-liveLp)*ek;
   const dpr=Math.min(window.devicePixelRatio||1, 3);
   const W=Math.round(innerWidth*dpr), H=Math.round(innerHeight*dpr);
   if(cv.width!==W||cv.height!==H){cv.width=W;cv.height=H;}
@@ -211,11 +251,29 @@ function draw(){
   const b=(f.bg&&okHex(f.bg.base)&&okHex(f.bg.from)&&okHex(f.bg.to))?f.bg:TOK;
   paintBg(now-t0,b);
   cx.imageSmoothingEnabled=true; cx.imageSmoothingQuality="high"; cx.drawImage(bg,0,0,W,H);
-  const r=clamp(rP,0,.5)*Math.min(W,H), k=clamp(bP,0,1);
-  cx.fillStyle="#"+hex(TOK.dot).map(x=>Math.round(x*k).toString(16).padStart(2,"0")).join("");
-  cx.save(); cx.translate(W/2,H/2);
-  cx.scale(clamp(aspect,0.82,1.18), 1/clamp(aspect,0.82,1.18));
-  cx.beginPath(); cx.arc(0,0,r,0,2*Math.PI); cx.fill();
+  const k=clamp(bP,0,1);
+  const rad=Math.max(1, clamp(rP,0,0.5)*(0.97+0.03*k)*Math.min(W,H));
+  const presence=shown==="offline"?0.5:1;
+  cx.save(); cx.translate(W/2,H/2); cx.globalAlpha=presence;
+  if(shown!=="offline"&&k>0.02){
+    const reach=rad*(1.10+0.05*k);
+    const halo=cx.createRadialGradient(0,0,rad*0.94,0,0,reach);
+    halo.addColorStop(0,"rgba(245,245,247,"+(0.04+0.08*k).toFixed(3)+")");
+    halo.addColorStop(1,"rgba(245,245,247,0)");
+    cx.fillStyle=halo; cx.beginPath(); cx.arc(0,0,reach,0,2*Math.PI); cx.fill();
+  }
+  const drift=(0.05+0.04*liveLp+0.02*emLean)*(0.65+0.35*emA);
+  const ox=-rad*drift*(0.75+0.25*Math.sin((now-t0)/3200));
+  const oy=-rad*drift*(0.85+0.15*Math.cos((now-t0)/4100));
+  const [ir,ig,ib]=markInner(emV);
+  const fall=clamp(0.46+0.05*Math.sin((now-t0)/2400)*(0.4+liveLp)+0.04*emA,0.36,0.58);
+  const g=cx.createRadialGradient(ox,oy,Math.max(1,rad*0.04),0,0,rad);
+  g.addColorStop(0,"rgb("+ir+","+ig+","+ib+")");
+  g.addColorStop(fall,MARK.core);
+  g.addColorStop(0.90,MARK.core);
+  g.addColorStop(1,MARK.edge);
+  cx.fillStyle=g; cx.beginPath(); cx.arc(0,0,rad,0,2*Math.PI); cx.fill();
+  cx.strokeStyle=MARK.stroke; cx.lineWidth=MARK.strokePx; cx.stroke();
   cx.restore();
   requestAnimationFrame(draw);
 }

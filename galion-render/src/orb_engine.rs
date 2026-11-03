@@ -39,7 +39,11 @@ impl DisplayHz {
     }
 }
 
-/// Which spring the page uses. Gains match `SPRING` in `v1-screen.html`.
+/// Page eases toward these aims. A mode change does not apply them in one frame.
+/// Time constant matches `GAIN_TAU` (480 ms) in `v1-screen.html`.
+const GAIN_TAU_S: f32 = 0.48;
+
+/// Which spring the page uses. Aims match `SPRING` in `v1-screen.html`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum OrbMotion {
     Idle,
@@ -62,14 +66,17 @@ impl OrbMotion {
         }
     }
 
-    /// Radius channel. Brightness uses [`OrbMotion::brightness_gain`].
+    /// Radius-channel aim. [`OrbEngine::step`] eases toward this (480 ms)
+    /// so a mode change does not retune the spring in one frame.
+    /// Brightness uses [`OrbMotion::brightness_gain`] from the same aim.
+    /// The phone uses brightness for glow and a little size, not fill pigment.
     pub fn radius_gain(self) -> SpringGain {
         let (omega, zeta) = match self {
-            OrbMotion::Idle => (2.4, 0.86),
-            OrbMotion::Listening => (11.0, 0.70),
-            OrbMotion::Thinking => (6.5, 0.48),
-            OrbMotion::Speaking => (18.0, 0.58),
-            OrbMotion::Offline => (3.2, 1.05),
+            OrbMotion::Idle => (1.8, 0.92),
+            OrbMotion::Listening => (3.4, 0.88),
+            OrbMotion::Thinking => (2.4, 0.90),
+            OrbMotion::Speaking => (3.0, 0.92),
+            OrbMotion::Offline => (2.0, 1.02),
         };
         SpringGain { omega, zeta }
     }
@@ -103,7 +110,9 @@ pub struct OrbSample {
     pub brightness: f32,
     pub radius_v: f32,
     pub brightness_v: f32,
-    /// Already clamped to `0.82..=1.18`. One filled mark, stretched a little.
+    /// Held at 1. The mark is a circle. Velocity used to squash this
+    /// (`radius_v * 6`, clamp ±0.14, draw clamp 0.82..=1.18) and the
+    /// phone flipped between wide and tall ovals.
     pub aspect: f32,
     /// Seconds integrated for this sample. `0.0` if the step was refused.
     pub dt_s: f32,
@@ -133,12 +142,15 @@ impl OrbSample {
     }
 }
 
-/// Radius, brightness, and a little aspect, integrated in display time.
+/// Radius and brightness, integrated in display time. Aspect stays 1.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct OrbEngine {
     radius: Spring,
     brightness: Spring,
     aspect: f32,
+    /// Smoothed toward [`OrbMotion::radius_gain`]. Starts at the idle aim.
+    omega: f32,
+    zeta: f32,
 }
 
 impl OrbEngine {
@@ -155,10 +167,13 @@ impl OrbEngine {
         } else {
             0.84
         };
+        let idle = OrbMotion::Idle.radius_gain();
         Self {
             radius: Spring::new(radius, 0.0),
             brightness: Spring::new(brightness, 0.0),
             aspect: 1.0,
+            omega: idle.omega,
+            zeta: idle.zeta,
         }
     }
 
@@ -201,11 +216,14 @@ impl OrbEngine {
         }
         let radius_target = radius_target.clamp(0.0, 0.5);
         let brightness_target = brightness_target.clamp(0.0, 1.0);
-        let radius = self.radius.step(radius_target, dt_s, motion.radius_gain());
-        let bright = self
-            .brightness
-            .step(brightness_target, dt_s, motion.brightness_gain());
-        self.advance_aspect(radius.velocity, radius.dt_s);
+        let radius_gain = self.ease_radius_gain(motion, dt_s);
+        let bright_gain = SpringGain {
+            omega: radius_gain.omega * 0.85,
+            zeta: (radius_gain.zeta + 0.08).min(1.2),
+        };
+        let radius = self.radius.step(radius_target, dt_s, radius_gain);
+        let bright = self.brightness.step(brightness_target, dt_s, bright_gain);
+        self.aspect = 1.0;
         self.sample(motion, radius.dt_s.max(bright.dt_s))
     }
 
@@ -221,22 +239,24 @@ impl OrbEngine {
         )
     }
 
-    fn advance_aspect(&mut self, radius_velocity: f32, dt_s: f32) {
-        if dt_s <= 0.0 || !radius_velocity.is_finite() {
-            if !self.aspect.is_finite() {
-                self.aspect = 1.0;
-            }
-            return;
+    /// Ease ω and ζ toward the motion's aim. One frame never snaps the gain.
+    fn ease_radius_gain(&mut self, motion: OrbMotion, dt_s: f32) -> SpringGain {
+        let aim = motion.radius_gain();
+        if !self.omega.is_finite() {
+            self.omega = aim.omega;
         }
-        let squash = (radius_velocity * 6.0).clamp(-0.14, 0.14);
-        let aim = 1.0 + squash;
-        let k = 1.0 - (-dt_s * 1000.0 / 90.0).exp();
-        let next = self.aspect + (aim - self.aspect) * k;
-        self.aspect = if next.is_finite() {
-            next.clamp(0.82, 1.18)
-        } else {
-            1.0
-        };
+        if !self.zeta.is_finite() {
+            self.zeta = aim.zeta;
+        }
+        if let Some(h) = integrate_dt(dt_s) {
+            let k = 1.0 - (-h / GAIN_TAU_S).exp();
+            self.omega += (aim.omega - self.omega) * k;
+            self.zeta += (aim.zeta - self.zeta) * k;
+        }
+        SpringGain {
+            omega: self.omega,
+            zeta: self.zeta,
+        }
     }
 
     fn sample(&self, motion: OrbMotion, dt_s: f32) -> OrbSample {
@@ -246,7 +266,7 @@ impl OrbEngine {
             brightness: finite_or(self.brightness.position, 0.0),
             radius_v: finite_or(self.radius.velocity, 0.0),
             brightness_v: finite_or(self.brightness.velocity, 0.0),
-            aspect: clamp_finite(self.aspect, 0.82, 1.18),
+            aspect: 1.0,
             dt_s,
         }
     }
@@ -279,18 +299,18 @@ mod tests {
         assert!(s.radius_v.is_finite() && s.brightness_v.is_finite() && s.dt_s.is_finite());
         assert!((0.0..=0.5).contains(&s.draw_radius()));
         assert!((0.0..=1.0).contains(&s.draw_brightness()));
-        assert!((0.82..=1.18).contains(&s.aspect));
+        assert!((s.aspect - 1.0).abs() < 1e-6, "aspect {}", s.aspect);
         assert!(!s.to_json().contains("NaN"));
     }
 
     #[test]
     fn gains_match_the_phone_page() {
         let cases = [
-            (OrbMotion::Idle, 2.4_f32, 0.86_f32),
-            (OrbMotion::Listening, 11.0, 0.70),
-            (OrbMotion::Thinking, 6.5, 0.48),
-            (OrbMotion::Speaking, 18.0, 0.58),
-            (OrbMotion::Offline, 3.2, 1.05),
+            (OrbMotion::Idle, 1.8_f32, 0.92_f32),
+            (OrbMotion::Listening, 3.4, 0.88),
+            (OrbMotion::Thinking, 2.4, 0.90),
+            (OrbMotion::Speaking, 3.0, 0.92),
+            (OrbMotion::Offline, 2.0, 1.02),
         ];
         for (motion, w, z) in cases {
             let r = motion.radius_gain();
@@ -502,7 +522,8 @@ mod tests {
     #[test]
     fn draw_clamp_holds_when_the_target_is_outside_the_mark() {
         let mut engine = OrbEngine::at_rest(0.0, 0.0);
-        for _ in 0..30 {
+        // Soft speaking aim (ω 3) needs longer than the old ω 18 to reach the clamp.
+        for _ in 0..240 {
             let sample = engine.step(OrbMotion::Speaking, 10.0, -4.0, DisplayHz::Hz60.dt_s());
             assert_draw(sample);
             assert!(sample.draw_radius() <= 0.5);
@@ -513,17 +534,30 @@ mod tests {
     }
 
     #[test]
-    fn aspect_leaves_one_and_stays_in_range() {
+    fn aspect_stays_a_circle_when_radius_velocity_is_large() {
         let mut engine = OrbEngine::idle();
-        let mut moved = false;
-        for _ in 0..40 {
-            let sample = engine.step(OrbMotion::Speaking, 0.22, 1.0, DisplayHz::Hz240.dt_s());
+        for i in 0..80 {
+            let target = if i % 2 == 0 { 0.05 } else { 0.24 };
+            let sample = engine.step(OrbMotion::Speaking, target, 1.0, DisplayHz::Hz60.dt_s());
             assert_draw(sample);
-            if (sample.aspect - 1.0).abs() > 1e-4 {
-                moved = true;
-            }
+            assert!((sample.aspect - 1.0).abs() < 1e-6, "{}", sample.aspect);
         }
-        assert!(moved, "aspect {}", engine.aspect());
+        assert!((engine.aspect() - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn mode_change_does_not_snap_the_gain() {
+        let mut engine = OrbEngine::idle();
+        let before = engine.omega;
+        let _ = engine.step(OrbMotion::Speaking, 0.20, 0.9, DisplayHz::Hz60.dt_s());
+        let aim = OrbMotion::Speaking.radius_gain().omega;
+        let idle = OrbMotion::Idle.radius_gain().omega;
+        assert!(
+            (engine.omega - before).abs() < (aim - idle) * 0.2,
+            "omega snapped from {before} to {}",
+            engine.omega
+        );
+        assert!(engine.omega < idle + (aim - idle) * 0.25);
     }
 
     #[test]
