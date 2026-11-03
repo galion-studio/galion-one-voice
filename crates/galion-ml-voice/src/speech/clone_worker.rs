@@ -17,7 +17,12 @@
 //! safetensors are on disk. Nothing here downloads them.
 //!
 //! The child is CPU-only Chatterbox Nano (Turbo remains the quality option,
-//! not a swap), pinned to one thread: the ~1 vCPU voice-session budget.
+//! not a swap). Its CPU placement is a [`ClonePlan`]: `session` is one thread
+//! (the ~1 vCPU multi-tenant voice-session budget); on a dedicated host with
+//! 8+ usable cores the two personas get disjoint cores and matching thread
+//! pools (`split4`: Samantha 0-3, Jarvis 4-7, 4 threads each; `split3`:
+//! 0-2 / 3-5, 3 threads, 6-7 left to ASR, Piper and the loop). The pin is a
+//! `sched_setaffinity` in the child before exec, not a taskset wrapper.
 //! No GPU. No GGUF. PyTorch stays in that process and is not linked here.
 //!
 //! A reference is attached only for the owner-cleared Samantha and Jarvis
@@ -42,8 +47,9 @@ pub const CLONE_RATE_HZ: u32 = 24_000;
 const PINS_TEXT: &str = include_str!("../../../../scripts/clone/PINS.sha256");
 const REFS_TEXT: &str = include_str!("../../../../scripts/clone/REFS.sha256");
 
-/// This child asks for one hardware thread. That is the voice-session
-/// budget (~1 vCPU). The cascade burst of ~4 is not this process.
+/// Plan `session`: this child asks for one hardware thread. That is the
+/// voice-session budget (~1 vCPU). The cascade burst of ~4 is not this
+/// process. Dedicated hosts use a split [`ClonePlan`] instead.
 pub const CLONE_SESSION_VCPU: u32 = 1;
 pub const CLONE_BURST_VCPU: u32 = 4;
 
@@ -295,10 +301,233 @@ fn resolve_reference(persona: &str) -> Result<Option<ResolvedRef>, VoiceError> {
     resolve_reference_at(persona, store.as_deref(), &repo_root())
 }
 
-fn apply_cpu_budget(cmd: &mut Command) {
-    for key in CPU_THREAD_KEYS {
-        cmd.env(key, CLONE_SESSION_VCPU.to_string());
+/// How the clone children share the host CPUs (latency-240, agent 02).
+///
+/// Measured on the 8-core live box (latency-240/02-core-pinning.md): two
+/// unpinned Nano workers at 8 threads each oversubscribe 16 threads on 8
+/// cores and live RTF drifts to ~2x; disjoint cores with matching pools keep
+/// each voice near its solo RTF.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ClonePlan {
+    /// One thread, no pin: the ~1 vCPU voice-session budget (multi-tenant).
+    Session,
+    /// Samantha cores 0-3, Jarvis cores 4-7, 4 threads each.
+    Split4,
+    /// Samantha cores 0-2, Jarvis cores 3-5, 3 threads each; 6-7 reserved
+    /// for ASR, Piper and the call loop.
+    Split3,
+}
+
+/// Plan `auto` picks on a dedicated host with at least [`DEDICATED_MIN_CPUS`]
+/// usable cores. Chosen from the measured matrix in 02-core-pinning.md.
+pub const DEDICATED_PLAN: ClonePlan = ClonePlan::Split4;
+/// Both split plans index cores 0-7.
+pub const DEDICATED_MIN_CPUS: usize = 8;
+
+impl ClonePlan {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            ClonePlan::Session => "session",
+            ClonePlan::Split4 => "split4",
+            ClonePlan::Split3 => "split3",
+        }
     }
+
+    /// `session`, `split4`, `split3`; `auto` (or empty) resolves by core count.
+    pub fn parse(s: &str, usable_cpus: usize) -> Option<Self> {
+        match s.trim().to_ascii_lowercase().as_str() {
+            "session" | "1" => Some(ClonePlan::Session),
+            "split4" | "4+4" => Some(ClonePlan::Split4),
+            "split3" | "3+3" => Some(ClonePlan::Split3),
+            "" | "auto" => Some(if usable_cpus >= DEDICATED_MIN_CPUS {
+                DEDICATED_PLAN
+            } else {
+                ClonePlan::Session
+            }),
+            _ => None,
+        }
+    }
+
+    /// Cores this plan leaves for ASR, Piper and the loop.
+    pub fn reserved_cpus(self) -> Vec<usize> {
+        match self {
+            ClonePlan::Split3 => vec![6, 7],
+            _ => Vec::new(),
+        }
+    }
+}
+
+/// Where one clone child runs and how many threads its pools get.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ClonePlacement {
+    pub plan: ClonePlan,
+    /// Empty means not pinned (inherit the parent's mask).
+    pub cpus: Vec<usize>,
+    pub threads: u32,
+}
+
+impl ClonePlacement {
+    /// The plan's default cores for `persona` (only Samantha and Jarvis exist).
+    pub fn for_persona(plan: ClonePlan, persona: &str, usable_cpus: usize) -> Self {
+        let jarvis = persona_name(persona) == "jarvis";
+        let (cpus, threads) = match plan {
+            ClonePlan::Session => (Vec::new(), CLONE_SESSION_VCPU),
+            ClonePlan::Split4 => (
+                if jarvis {
+                    (4..8).collect()
+                } else {
+                    (0..4).collect()
+                },
+                4,
+            ),
+            ClonePlan::Split3 => (
+                if jarvis {
+                    (3..6).collect()
+                } else {
+                    (0..3).collect()
+                },
+                3,
+            ),
+        };
+        if plan != ClonePlan::Session && usable_cpus < DEDICATED_MIN_CPUS {
+            // A split plan on a small host would pin onto cores that are not there.
+            return Self::for_persona(ClonePlan::Session, persona, usable_cpus);
+        }
+        Self {
+            plan,
+            cpus,
+            threads,
+        }
+    }
+
+    /// `GALION_CLONE_CPU_PLAN` (default auto), then per-persona overrides
+    /// `GALION_CLONE_CPUS_<PERSONA>` (`0-3`, `0,2,4`, or `none`) and
+    /// `GALION_CLONE_THREADS`. A pinned child never gets more threads than
+    /// cores: oversubscription is what this plan exists to stop.
+    pub fn from_env(persona: &str) -> Self {
+        let n = usable_cpus();
+        let get = |k: &str| std::env::var(k).ok();
+        let plan = ClonePlan::parse(get("GALION_CLONE_CPU_PLAN").as_deref().unwrap_or(""), n)
+            .unwrap_or(ClonePlan::Session);
+        let mut p = Self::for_persona(plan, persona, n);
+        if p.plan == ClonePlan::Session {
+            return p;
+        }
+        let key = format!(
+            "GALION_CLONE_CPUS_{}",
+            persona_name(persona).to_ascii_uppercase()
+        );
+        if let Some(v) = get(&key) {
+            if v.trim().eq_ignore_ascii_case("none") {
+                p.cpus.clear();
+            } else if let Some(c) = parse_cpu_list(&v).filter(|c| c.iter().all(|&i| i < n)) {
+                p.threads = p.threads.min(c.len() as u32).max(1);
+                p.cpus = c;
+            }
+        }
+        if let Some(t) = get("GALION_CLONE_THREADS").and_then(|t| t.trim().parse::<u32>().ok()) {
+            let cap = if p.cpus.is_empty() {
+                n as u32
+            } else {
+                p.cpus.len() as u32
+            };
+            p.threads = t.clamp(1, cap.max(1));
+        }
+        p
+    }
+
+    /// taskset-style list, e.g. `0-3`; empty when not pinned.
+    pub fn cpu_list(&self) -> String {
+        format_cpu_list(&self.cpus)
+    }
+}
+
+/// Usable cores for this process (respects an inherited affinity mask).
+pub fn usable_cpus() -> usize {
+    std::thread::available_parallelism()
+        .map(|n| n.get())
+        .unwrap_or(1)
+}
+
+/// Parse `0-3`, `0,2,4`, `0-2,6`. None on anything else.
+pub fn parse_cpu_list(s: &str) -> Option<Vec<usize>> {
+    let mut v = Vec::new();
+    for part in s.split(',').map(str::trim).filter(|p| !p.is_empty()) {
+        match part.split_once('-') {
+            Some((a, b)) => {
+                let (a, b) = (
+                    a.trim().parse::<usize>().ok()?,
+                    b.trim().parse::<usize>().ok()?,
+                );
+                if a > b || b >= CPU_SET_BITS {
+                    return None;
+                }
+                v.extend(a..=b);
+            }
+            None => {
+                let i = part.parse::<usize>().ok()?;
+                if i >= CPU_SET_BITS {
+                    return None;
+                }
+                v.push(i);
+            }
+        }
+    }
+    v.sort_unstable();
+    v.dedup();
+    (!v.is_empty()).then_some(v)
+}
+
+fn format_cpu_list(cpus: &[usize]) -> String {
+    let mut out: Vec<String> = Vec::new();
+    let mut i = 0;
+    while i < cpus.len() {
+        let mut j = i;
+        while j + 1 < cpus.len() && cpus[j + 1] == cpus[j] + 1 {
+            j += 1;
+        }
+        out.push(if i == j {
+            cpus[i].to_string()
+        } else {
+            format!("{}-{}", cpus[i], cpus[j])
+        });
+        i = j + 1;
+    }
+    out.join(",")
+}
+
+const CPU_SET_BITS: usize = 1024;
+
+/// Pin a child to `cpus` with `sched_setaffinity` after fork, before exec.
+/// Empty `cpus` leaves the inherited mask. Usable for any worker (Piper, ASR).
+pub fn apply_affinity(cmd: &mut Command, cpus: &[usize]) {
+    if cpus.is_empty() {
+        return;
+    }
+    let mut mask = [0u64; CPU_SET_BITS / 64];
+    for &c in cpus {
+        mask[c / 64] |= 1u64 << (c % 64);
+    }
+    use std::os::unix::process::CommandExt;
+    // SAFETY: the closure runs in the forked child before exec and only makes
+    // one async-signal-safe syscall on a mask it owns by value.
+    unsafe {
+        cmd.pre_exec(move || {
+            if sched_setaffinity(0, std::mem::size_of_val(&mask), mask.as_ptr()) != 0 {
+                return Err(std::io::Error::last_os_error());
+            }
+            Ok(())
+        });
+    }
+}
+
+fn apply_cpu_budget(cmd: &mut Command, placement: &ClonePlacement) {
+    for key in CPU_THREAD_KEYS {
+        cmd.env(key, placement.threads.to_string());
+    }
+    cmd.env("GALION_CLONE_CPU_PLAN", placement.plan.as_str());
+    cmd.env("GALION_CLONE_CPUS", placement.cpu_list());
+    apply_affinity(cmd, &placement.cpus);
     cmd.env("GALION_CLONE_DEVICE", "cpu");
     cmd.env("CUDA_VISIBLE_DEVICES", "");
     cmd.env("HIP_VISIBLE_DEVICES", "");
@@ -381,7 +610,18 @@ pub struct CloneWorker {
 }
 
 impl CloneWorker {
+    /// Spawn with [`ClonePlacement::from_env`] (plan `auto` by default).
     pub fn spawn(script: &Path, model: CloneModel, persona: &str) -> Result<Self, VoiceError> {
+        let placement = ClonePlacement::from_env(persona);
+        Self::spawn_placed(script, model, persona, &placement)
+    }
+
+    pub fn spawn_placed(
+        script: &Path,
+        model: CloneModel,
+        persona: &str,
+        placement: &ClonePlacement,
+    ) -> Result<Self, VoiceError> {
         let persona = persona_name(persona);
         let mut cmd = Command::new("python3");
         cmd.arg(script)
@@ -390,11 +630,10 @@ impl CloneWorker {
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
-        apply_cpu_budget(&mut cmd);
-        let mut child = cmd.spawn()
-            .map_err(|e| {
-                VoiceError::Backend(format!("clone worker spawn {}: {e}", script.display()))
-            })?;
+        apply_cpu_budget(&mut cmd, placement);
+        let mut child = cmd.spawn().map_err(|e| {
+            VoiceError::Backend(format!("clone worker spawn {}: {e}", script.display()))
+        })?;
         let pid = child.id();
         let stdin = child.stdin.take();
         let stdout = child.stdout.take();
@@ -952,6 +1191,7 @@ const O_NONBLOCK: i32 = 0o4000;
 extern "C" {
     fn poll(fds: *mut PollFd, nfds: u64, timeout: i32) -> i32;
     fn fcntl(fd: i32, cmd: i32, arg: i32) -> i32;
+    fn sched_setaffinity(pid: i32, cpusetsize: usize, mask: *const u64) -> i32;
 }
 
 fn set_nonblock(fd: i32) -> std::io::Result<()> {
@@ -1359,11 +1599,95 @@ mod tests {
         v
     }
 
+    #[test]
+    fn clone_plans_split_the_cores_and_never_oversubscribe() {
+        assert_eq!(ClonePlan::parse("auto", 8), Some(DEDICATED_PLAN));
+        assert_eq!(ClonePlan::parse("", 4), Some(ClonePlan::Session));
+        assert_eq!(ClonePlan::parse("3+3", 8), Some(ClonePlan::Split3));
+        assert_eq!(ClonePlan::parse("bogus", 8), None);
+        let s4 = ClonePlacement::for_persona(ClonePlan::Split4, "samantha", 8);
+        let j4 = ClonePlacement::for_persona(ClonePlan::Split4, "jarvis", 8);
+        assert_eq!((s4.cpu_list().as_str(), s4.threads), ("0-3", 4));
+        assert_eq!((j4.cpu_list().as_str(), j4.threads), ("4-7", 4));
+        let s3 = ClonePlacement::for_persona(ClonePlan::Split3, "samantha", 8);
+        let j3 = ClonePlacement::for_persona(ClonePlan::Split3, "jarvis", 8);
+        assert_eq!((s3.cpu_list().as_str(), s3.threads), ("0-2", 3));
+        assert_eq!((j3.cpu_list().as_str(), j3.threads), ("3-5", 3));
+        assert_eq!(ClonePlan::Split3.reserved_cpus(), vec![6, 7]);
+        for (a, b) in [(&s4, &j4), (&s3, &j3)] {
+            assert!(a.cpus.iter().all(|c| !b.cpus.contains(c)), "disjoint");
+            assert!(a.threads as usize <= a.cpus.len() && b.threads as usize <= b.cpus.len());
+        }
+        let small = ClonePlacement::for_persona(ClonePlan::Split4, "jarvis", 4);
+        assert_eq!(
+            small,
+            ClonePlacement {
+                plan: ClonePlan::Session,
+                cpus: vec![],
+                threads: 1
+            }
+        );
+        assert_eq!(parse_cpu_list("0-2,6"), Some(vec![0, 1, 2, 6]));
+        assert_eq!(parse_cpu_list("3-1"), None);
+        assert_eq!(parse_cpu_list("x"), None);
+        assert_eq!(format_cpu_list(&[0, 1, 2, 6]), "0-2,6");
+    }
+
+    #[test]
+    fn real_stub_takes_split_threads_up_to_its_pinned_cores() {
+        let script = worker_script().expect("worker script");
+        let k = usable_cpus().min(4);
+        let cpus: Vec<usize> = (0..k).collect();
+        let mut cmd = Command::new("python3");
+        cmd.arg(&script)
+            .env("GALION_CLONE_STUB_PCM", "1")
+            .env("GALION_CLONE_CPU_PLAN", "split4")
+            .env("GALION_CLONE_THREADS", "8")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+        apply_affinity(&mut cmd, &cpus);
+        let mut child = cmd.spawn().unwrap();
+        {
+            let mut stdin = child.stdin.take().unwrap();
+            stdin
+                .write_all(b"{\"text\":\"hi\",\"persona\":\"jarvis\"}\n")
+                .unwrap();
+        }
+        let out = child.wait_with_output().unwrap();
+        let log = String::from_utf8_lossy(&out.stderr);
+        assert!(out.status.success(), "{log}");
+        assert!(log.contains(&format!("threads={k} ")), "{log}");
+        assert!(log.contains(&format!("asked=8 applied={k}")), "{log}");
+    }
+
+    #[test]
+    fn affinity_lands_in_the_child_before_exec() {
+        if usable_cpus() < 2 {
+            return;
+        }
+        let mut cmd = Command::new("sh");
+        cmd.arg("-c")
+            .arg("grep Cpus_allowed_list /proc/self/status");
+        apply_affinity(&mut cmd, &[1]);
+        let out = cmd.output().unwrap();
+        let text = String::from_utf8_lossy(&out.stdout);
+        assert!(text.trim_end().ends_with("\t1"), "{text}");
+    }
+
     const FAKE_CLONE: &str = r#"#!/usr/bin/env python3
 import json, os, struct, sys
 keys = ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS", "TORCH_NUM_THREADS", "GALION_CLONE_THREADS")
-if any(os.environ.get(k) != "1" for k in keys):
+want = os.environ.get("GALION_CLONE_THREADS", "")
+plan = os.environ.get("GALION_CLONE_CPU_PLAN", "")
+if not want.isdigit() or int(want) < 1 or any(os.environ.get(k) != want for k in keys):
     sys.stderr.write("galion-clone-refuse: cpu pin missing\n")
+    sys.exit(3)
+if plan not in ("session", "split4", "split3") or (plan == "session" and want != "1"):
+    sys.stderr.write("galion-clone-refuse: cpu plan missing\n")
+    sys.exit(3)
+if plan != "session" and int(want) > len(os.sched_getaffinity(0)):
+    sys.stderr.write("galion-clone-refuse: threads exceed pinned cores\n")
     sys.exit(3)
 if os.environ.get("GALION_CLONE_DEVICE") != "cpu" or os.environ.get("CUDA_VISIBLE_DEVICES") != "" or os.environ.get("GALION_CLONE_DENOISE") != "0":
     sys.stderr.write("galion-clone-refuse: cpu pin missing\n")
