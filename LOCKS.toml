@@ -95,6 +95,24 @@ weight_formats = ["safetensors"]  # .gq later, reader only until a student exist
 weights_vendored = false
 sources = ["Q-RESEARCH.Q12", "Q-BUILD.Q7", "Q-BUILD.Q9", "Q-GATES.Q6", "Q-BRANDING.Q14", "Q-STUDENT.Q13"]
 
+# Owner exception t123u, written 2026-11-03 (Europe/Zagreb) at Maciej Grajczyk's
+# direction. Every value above this block is unchanged. This pin is not a
+# general ONNX allowance, not in-tree ort, and not an ASR or Chatterbox exception.
+[formats.exceptions.a21_piper]
+artifact = "weights/tts/en_US-ljspeech-medium.onnx"
+json_artifact = "weights/tts/en_US-ljspeech-medium.onnx.json"
+sha256 = "6f52a751e2349abe7a76735eb09dc1875298c77ea2342ffd2fef79ff81b87f22"
+json_sha256 = "141d612cc0a95ed7efc1ca936b845c2364967f2e9217c5dbfcf69fc4d6c65860"
+runtime_tarball_sha256 = "a50cb45f355b7af1f6d758c1b360717877ba0a398cc8cbe6d2a7a3a26e225992"
+runtime = "piper 2023.11.14-2, CPU, separate process; onnxruntime 1.14.1 stays inside that process and is not linked"
+lane = "A21 TTS only"
+in_tree_ort = false
+weights_vendored = false
+sunset = "2027-02-01"
+decision = "t123u"
+owner = "Maciej Grajczyk"
+notes = "Sunset is 90 days from 2026-11-03. espeak-ng GPL-3 stays counsel-open. Do not widen this pin."
+
 # ---------------------------------------------------------------- UI
 [ui]
 rule = "one-dot"                  # the interface is one dot; nothing else on screen

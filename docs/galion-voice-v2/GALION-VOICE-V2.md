@@ -6,6 +6,8 @@ and it is not V3.
 
 The spelling is **Galion**. The product is Galion Voice.
 
+Master slogan: "The seamless connection with the human being, on the voice only."
+
 ## 1. Version map
 
 | Name | What it is | State |
@@ -37,8 +39,10 @@ app on loopback, and it says how long a voice recording lives (not long, and
 not on disk).
 
 V2 does **not** invent a second tunnel, a second HTTP server, or a second
-render crate. ngrok stays the public HTTPS until a human has an SSH key on
-Titanaxe. Caddy is the later edge. The drafts are already in the deploy notes.
+render crate. ngrok stays the public HTTPS until a human has finished
+access setup on Titanaxe. That setup is per-user anonymized access codes,
+not one shared key. Caddy is the later edge. The drafts are already in the
+deploy notes.
 
 ## 3. The V1 stack this plan sits on
 
@@ -63,8 +67,10 @@ feature `cascade`, never the default build, never the 80 ms primary path.
 
 **Piper A21.** `en_US-ljspeech-medium`, CPU, out of process, sha256-pinned,
 fetched by `scripts/a21/fetch-a21.sh`, not vendored. Owner decision t123u
-(LEDGER): A21 is Piper. LOCKS is not amended. espeak-ng (GPL-3, phonemizer)
-is waiting on counsel. Flite is the fallback. Tones are not a reply.
+(LEDGER): A21 is Piper. The scoped sunset exception is
+`[formats.exceptions.a21_piper]` in `LOCKS.toml` (sunset `2027-02-01`).
+Global format locks are unchanged. No in-tree ort. espeak-ng (GPL-3,
+phonemizer) is waiting on counsel. Flite is the fallback. Tones are not a reply.
 
 **PhoneLane.** `galion-cascade` `phone` (feature `cascade`): 16 kHz PCM in,
 transcript, reply text, 24 kHz WAV out. `GALION_ASR` unset means stub
@@ -80,9 +86,10 @@ puts `reply` on `/dot`.
 (`docs/agent-v1-demo/EDGE-NGROK.md`). Caddy on Titanaxe `51.38.137.193` is
 drafted (`docs/deploy/TITANAXE-VPS.md`) and not installed from here.
 
-**LOCKS.** `LOCKS.toml` is the contract. This program does not change its
-values. GGML-family containers stay out. `forbidden_runtimes` stays as written.
-`paid_tiers = false`.
+**LOCKS.** `LOCKS.toml` is the contract. Global values are unchanged. The only
+addition in this program is the sunset-dated A21 Piper exception above.
+GGML-family containers stay out. `forbidden_runtimes` stays as written.
+`paid_tiers = false`. Chatterbox is not a lock exception.
 
 ## 4. How a phone turn moves today
 
@@ -124,7 +131,16 @@ the page still draws the phone), and any path that opens SSH.
 
 ## 5. Sectors
 
-Order is dependency order, not a calendar.
+Master slogan: "The seamless connection with the human being, on the voice only."
+
+Order below is dependency order, not a calendar. Priority is separate.
+
+**Priority (Maciej Grajczyk, 2026-11-03).**
+
+1. **V2-S14** — real-voice cloning on the Chatterbox architecture, local CPU, self-offline. Detail after V2-S13, and in `VOICE-CLONING.md`.
+2. Everything else in this list, in the order written.
+
+Sector numbers are not renumbered. V2-S15 (Hermes) is an approved gateway beside local models. It is not priority 1.
 
 ### V2-S1 · Process bus
 
@@ -222,9 +238,9 @@ only with the public-bind flag plus session auth and an exact origin list.
 Art. 50 disclosure on the first turn (HR and EN). Retention note. Demo log
 omits transcript text and PCM.
 
-**Still open.** The owner sets the real public origin and turns on ngrok OAuth
-or basic auth before any URL is shared. HSTS belongs on ngrok/Caddy, not on
-loopback HTTP. Counsel still owns the public-demo notice.
+**Still open.** The owner fills the real public origin when a name exists.
+HSTS belongs on ngrok/Caddy, not on loopback HTTP. Counsel still owns the
+public-demo notice. Login and the exact-origin rule are decided below.
 
 **Acceptance.**
 
@@ -244,51 +260,53 @@ splitting the page, which is a later change, not a silent break.
 test, matching the build spec. No lock key needs to change. Consent `sense`
 stays deny; prosody classification stays unwired.
 
-**Owner decision.** The public origin list. Whether the demo is open or behind
-edge auth (`basic_auth` is commented in the Caddy draft). Counsel on showing
-the demo to other people (GDPR notice, ngrok as processor).
+**Owner decision (2026-11-03, YES).** Staging and any public demo sit behind
+login: ngrok OAuth or basic auth. CORS on that demo is an exact `https://`
+origin list. No wildcard. The unset-variable `*` remains the local loopback
+default only, and it is not a staging setting. Counsel on the GDPR notice is
+still open. Detail: `SECURITY-EDGE.md`, Plan V5.
 
 ### V2-S4 · Real EN ASR
 
-**Goal.** After the owner picks A, B, or C, replace the interim placeholder.
-Until then the placeholder stays labelled and the default stays refusal.
+**Goal.** Letter A is chosen. Build a Vosk sidecar later. Until the WER bar
+passes, `interim` stays labelled and the unset default stays refusal.
 
-**Depends on.** `docs/policy/RATIFY-EN-ASR-PHONE-PATH.md`. V2-S1 if the engine
-is a sidecar (option A wants a process, which the bus can host). A21 counsel
-only if option B widens the ONNX exception.
+**Depends on.** `docs/policy/RATIFY-EN-ASR-PHONE-PATH.md` (letter A recorded).
+V2-S1 if the engine is a sidecar. The A21 ONNX pin is not widened for ASR.
 
-**The choice, restated.**
+**Owner decision (2026-11-03, YES, letter A).** Maciej Grajczyk. Vosk,
+out of process, is the EN ASR choice.
 
-- **A.** Vosk, out of process, Apache-2.0, not GGML, not ONNX. Recommended in
-  the draft. Needs a sunset-dated LOCKS exception the owner writes.
-- **B.** Extend the A21 ONNX exception to an ASR model. Better accuracy, wider
-  exception. Only if A21 is ratified and Vosk is not good enough.
-- **C.** No foreign ASR. Keep the stub until Whisper-tiny English runs as
-  safetensors on `galion-tensor`. The phone has no real recognition until then.
-- **Rejected.** whisper.cpp. It needs the GGML-family container ban lifted
-  everywhere. Not offered.
+- Model pin to fetch later, not in git: `vosk-model-small-en-us-0.15` (small-en). sha256 is not pinned yet. No weights in this change.
+- Grammar mode for intents. Open dictation is not the product path.
+- Separate process. PCM stays off disk. The worker thread runs it, not `Heartbeat::step`.
+- `GALION_ASR=interim` is retired only after the WER bar: about 15% word error on the five scripted phrases in the policy draft. Until that measurement exists, the UI keeps the `interim-placeholder` label.
+- B and C are not the choice. whisper.cpp stays rejected.
+- The Vosk LOCKS exception is not written here. Global locks stay. The Piper pin is the only exception text.
 
-**Acceptance, once a letter is picked.**
+**Scaffold (docs only).** No sidecar binary, no vendor directory, no download.
+The later process boundary is the same shape as the warm Piper worker: one
+long-lived process, stdin/stdout PCM16, grammar string supplied by the intent
+list, failure returns the labelled placeholder rather than a fake transcript.
+
+**Acceptance, when the sidecar exists.**
 
 1. Five scripted English phrases return transcripts with the words in them,
-   not the length-bucket placeholder. The policy draft's bar is about 15% word
-   error on those phrases.
-2. `GALION_ASR=interim` still exists until the owner removes it, and the UI
+   not the length-bucket placeholder. The bar is about 15% word error on those phrases.
+2. `GALION_ASR=interim` still exists until that bar passes, and the UI
    label cannot say the words were recognised when they were not.
 3. `scripts/check-locks.sh` and `scripts/check-no-forbidden.sh` stay green.
 4. Partials do not push the heartbeat past `onset` / barge-in budgets. ASR
    runs on the worker, not inside `step`.
 
-**Risks.** An agent "temporarily" vendors a GGML runtime to make the demo
-clever. That is a lock break, not a shortcut. Shipping `interim` as if it
-were recognition. The page and the log already carry the label; V3 must not
-drop it.
+**Risks.** Vendoring a GGML runtime to make the demo clever. Shipping
+`interim` as if it were recognition. Writing a Vosk exception that also
+loosens `ggml` or `ort`.
 
 **LOCKS.** `ggml_container_allowed = false`. `foreign_runtime_allowed = false`.
-`forbidden_runtimes` includes `ggml` and `ort`. Weight formats are safetensors.
-Agents do not edit these values. Option A or B is an owner edit plus a LEDGER line.
-
-**Owner decision.** The letter A, B, or C. Signature line is on the policy draft.
+`forbidden_runtimes` includes `ggml` and `ort`. Weight formats stay
+safetensors (plus the Piper pin). A Vosk exception, if it is ever written,
+is a later owner edit.
 
 ### V2-S5 · Reply intelligence
 
@@ -326,8 +344,10 @@ No GGML. `sense` deny. Workplace and education purposes hard-off. Emotion out
 is Galion's own voice, counterbalancing rather than mirroring (existing
 emotion crate). The phone lane does not express that yet; V2-S6 is the hook.
 
-**Owner decision.** When `sense` may be granted for a demo. Which student
-size (S0 / S1 / S2) is the reply model. Not decided here.
+**Owner decision (2026-11-03, YES).** The first student size is **S0**
+(about 0.5B, `galion-student/configs/s0.toml`). S1 and S2 stay later sizes.
+`CannedLlm` remains the phone fallback until readiness tests say the student
+can speak. `sense` for a demo is still undecided. No weights are trained here.
 
 ### V2-S6 · Speech runtime
 
@@ -372,11 +392,14 @@ and does not kill Piper.
 Rust binary (the exception is out of process). Treating flite as the product
 voice.
 
-**LOCKS.** A21 `.onnx` is the scoped exception t123u, not yet written into
-LOCKS. Do not widen it. espeak-ng GPL-3 waits on counsel (`docs/agent-v1-demo/A21-BLOCKERS.md`).
+**LOCKS.** A21 `.onnx` is `[formats.exceptions.a21_piper]`, sunset
+`2027-02-01`. Out of process. No in-tree ort. Do not widen it to ASR or to
+Chatterbox. espeak-ng GPL-3 waits on counsel (`docs/agent-v1-demo/A21-BLOCKERS.md`).
 
-**Owner decision.** Ratify the A21 exception text. Counsel on espeak-ng.
-Whether `GALION_A21_NOISE=natural` is allowed in the demo.
+**Owner decision (2026-11-03, YES).** The exception text above is the
+ratification of t123u. Counsel on espeak-ng is still open. Whether
+`GALION_A21_NOISE=natural` is allowed in the demo is still open. Piper stays
+the fallback under V2-S14 until a local clone worker exists and rights are clear.
 
 ### V2-S7 · CI/CD track
 
@@ -438,8 +461,9 @@ surface. The mark is the orb. It is drawn, not a file dropped on the page.
 A Local / Plus / Ultra price list is not in this repository. It is not
 documented as a product.
 
-**Owner decision.** If a freemium split is ever real, it is an owner edit of
-`[licence]` plus counsel. Not a README sentence.
+**Owner decision.** The master slogan is "The seamless connection with the human being, on the voice only."
+It is the one public line (`docs/brand/GALION-VOICE-BRAND.md`). It is not a stack of slogans, and it is not chrome on the dot.
+If a freemium split is ever real, it is an owner edit of `[licence]` plus counsel. Not a README sentence.
 
 ### V2-S9 · Student and Open Mind slot
 
@@ -466,14 +490,17 @@ against `weights_vendored = false`.
 **LOCKS.** safetensors / `.gq`, no GGML, no vendored weights, licence split
 between code and weights.
 
-**Owner decision.** Training go-ahead. Which checkpoint is allowed as teacher.
-Not this program.
+**Owner decision (2026-11-03, YES).** S0 is the first student size. Canned
+replies stay the fallback until readiness tests pass. Training go-ahead and
+the teacher checkpoint are still not given. Configs stay stubs. The Open Mind
+slot file may still say S1; that string is not a licence to skip S0.
 
 ### V2-S10 · Gates R0–R3
 
 **Goal.** Remote probe and gate run on the VPS, unchanged in spirit from
 `docs/agent-wave20/R0-R3-DRY-RUN.md`. R0 reachability, R1–R3 the strict gate
-run, results recorded. Still blocked on a human SSH key.
+run, results recorded. Status: **approved-pending-setup**. A human installs
+per-user anonymized access codes. This program does not connect.
 
 **Depends on.** Plan V5 human steps H1–H4. `galion-gates/run-gates.sh` remote
 block, which connects only if `GALION_VPS_HOST` is set.
@@ -485,13 +512,18 @@ block, which connects only if `GALION_VPS_HOST` is set.
 3. After a human key exists, R0 is a prebuilt probe, not a build on the VPS,
    and the result JSON lands in `galion-gates/results/` with a LEDGER line.
 
-**Risks.** A "quick" SSH from an agent that found a key in the environment.
-Plan V5 says the key is human-installed and this program does not go looking.
+**Risks.** A "quick" SSH from an agent that found a key or a code in the
+environment. Plan V5 says the human installs access and this program does
+not go looking. One shared `galion` pubkey is not the approved design.
 
 **LOCKS.** Probe section stays as written. Thresholds only tighten.
 
-**Owner decision.** Install the key. Choose the public name. Approve the
-first real release.
+**Owner decision (2026-11-03, YES, corrected by t198u).** Admin approves
+access setup on Titanaxe `51.38.137.193`. The design is **per-user anonymized
+access codes**: every user gets their own code. There is no shared key.
+Status is **approved-pending-setup**. The human does the install. No code is
+invented here, and nothing connects. Public name and the first release (H2, H4)
+are still open.
 
 ### V2-S11 · Presence
 
@@ -571,6 +603,77 @@ lock key lists languages; the code does.
 
 **Owner decision.** When the multilingual plan is approved.
 
+### V2-S14 · Real-voice cloning (Chatterbox, local) — priority 1
+
+**Goal.** One local, self-offline clone path for two research-target voices.
+No cloud TTS API. No fine-tune. Piper remains the speaking fallback until
+this worker exists and the rights gate is clear. Full note:
+`VOICE-CLONING.md`.
+
+**Legal hold.** Cloning a performer's voice from a film without rights is
+high risk. The comparison the owner requires is OpenAI's Sky voice, which
+was withdrawn after Scarlett Johansson objected that it resembled her
+performance in *Her*. Jarvis (an Iron Man film voice) and Samantha (the 2014
+film *Her*) are **owner-directed research targets**. Rights, consent, and
+licence must be cleared before any clip is ingested or any public demo uses
+a clone. This repository does not fetch film audio and does not store a clip.
+
+**Architecture to adopt, not to vendor.** Resemble AI Chatterbox, MIT for
+the code in `resemble-ai/chatterbox` (copyright 2025 Resemble AI, read
+2026-11-03). Zero-shot: a reference clip conditions a VoiceEncoder embedding,
+speech-token prompt, and an S3Gen reference. T3 then emits speech tokens;
+S3Gen and a vocoder emit audio. No training step in that API.
+
+- **Primary:** Chatterbox-Nano, listed at 110M, the CPU-sized English model. The upstream README claims about 3× realtime on 8 cores. That is a vendor claim, not a Galion measurement.
+- **Quality option:** Chatterbox-Turbo, listed at 350M, same family. Turbo's own code requires a reference longer than 5 seconds. The owner target is one clip of about 10 seconds per persona.
+- **Streaming eval:** the owner name is a Flash streaming eval on CPU. Upstream master exposes `generate()`, not a model named Flash. Open PR 528 proposes `ChatterboxTurboTTS.stream()` for near-real-time CPU playback and was still open when this note was written. The eval is planned. It is not run here.
+- **Samantha:** paralinguistic tags (`[laugh]`, `[chuckle]`, and the set Turbo/Nano already document) carry warmth. Jarvis stays calm and precise: short command lines, tags off.
+- **Watermark:** upstream `generate()` applies a Perth watermark. The Nano path should keep a watermark beside the Art. 50 disclosure. Perth's own licence was not read in this session. Do not vendor it yet.
+- **Worker:** a later out-of-process process, same shape as the warm Piper worker. Piper speaks if the clone worker is absent. No PCM on disk.
+
+**CPU and memory (t204u, t205u).** Admin approves full threading, SIMD, and
+maximum memory for Chatterbox Nano/Turbo workers, for every Galion Voice
+worker, and for this Linux Cursor host. No artificial caps. Still
+self-offline. No cloud. This decision does not change system settings,
+governors, or service limits.
+
+**Personas.** Samantha is the conversational, emotional layer. Jarvis is the
+calm command and interface layer. Both are research targets under the legal
+hold. They are not shipped voices.
+
+**LOCKS.** Do not edit locks for this sector. PyTorch (the upstream stack)
+stays out of process; `foreign_runtime_allowed` is still false, so a later
+owner exception would be required before a worker is linked or fetched.
+No GGML port (`chatterbox.cpp` and GGUF builds are the wrong shape). No
+in-tree ort (a community ONNX export does not extend the Piper pin). The
+multilingual T3 uses a Llama backbone; `llama` is a forbidden runtime name
+inside the tree. Weights are not downloaded and not vendored. `.pt` files
+are not a lock weight format.
+
+**External APIs.** ElevenLabs, Cartesia, Play.ht, hosted Resemble cloning,
+Inworld, Fish Audio, and Azure Personal Voice are **dropped**. Notes on why
+they were looked at, and then dropped, are in `VOICE-CLONING.md`.
+
+**Swarm.** Sixteen Chatterbox-local seats are planned and not spawned.
+The earlier external-API seat list is dropped with those vendors. Slogan
+research seats are a separate plan (`SLOGAN-AGENTS.md`) and are also not spawned.
+
+**Owner decision (2026-11-03, YES).** Maciej Grajczyk. Priority 1 of the V2
+backlog. Record only.
+
+### V2-S15 · Hermes gateway
+
+**Goal.** High-capability model calls for research, prediction, and
+agent-assist go through **Hermes** (Galion Research / the Hermes access
+layer already typed in `galion-sideband`). Local models stay the voice path.
+Hermes is not on the 80 ms heartbeat. The 3 s retrieval cap stands.
+
+**Owner decision (t198u, 2026-11-03, YES).** Hermes is the approved external
+gateway beside local models. A t197u note that named OpenRouter was replaced
+by this decision before any OpenRouter approval was kept. Do not call Hermes
+from this record. No secrets in the repo. Gateway choice C5 in the sideband
+crate is now this approval; the transport is still a trait, not a client.
+
 ## 6. What this program landed
 
 - Phone modules from the V1 delta: `phone.rs`, `canned.rs`, `turn_worker.rs`,
@@ -586,20 +689,24 @@ lock key lists languages; the code does.
 
 ## 7. What stays human
 
-- SSH key on Titanaxe. No deploy from this program.
-- ASR letter A, B, or C, and any LOCKS edit that follows.
-- A21 exception text inside LOCKS, and espeak-ng counsel.
+- Titanaxe access codes. Status is approved-pending-setup. The human installs per-user anonymized codes on `51.38.137.193`. No shared key. No deploy from this program.
+- The Vosk sidecar, its sha256 pin, and any later Vosk line in LOCKS. Letter A is chosen. `interim` stays until the WER bar.
+- espeak-ng counsel. The Piper exception text is already in LOCKS, sunset `2027-02-01`.
+- Rights clearance before any Jarvis or Samantha reference clip. No film audio is fetched here.
+- A Chatterbox owner exception, if a worker is ever fetched. Not written now.
 - Whether the hint line and a `thinking` state may exist on the locked surface.
-- Public demo notice and CORS names.
+- The public-demo GDPR notice, and the exact origin string once a name exists. Login and "no wildcard on staging" are decided.
 - Turning auto-merge on in the GitHub settings, if branch protection is not already doing it. The workflow file only runs checks.
 
 ## 8. Non-goals
 
-- A second voice stack beside PhoneLane.
+- A second voice stack beside PhoneLane. A clone worker, when it exists, is another out-of-process speech backend with Piper behind it.
+- A cloud or paid voice-cloning API.
 - A new tunnel product. ngrok now, Caddy later.
 - GGML, in-tree or out of process.
-- Editing `LOCKS.toml` values.
+- Editing `LOCKS.toml` values beyond the A21 Piper sunset pin.
 - Calling the interim transcript recognition.
 - Calling the spring page V3.
+- Ingesting a film clip or shipping a celebrity voice before rights clearance.
 
 — Maciej Grajczyk

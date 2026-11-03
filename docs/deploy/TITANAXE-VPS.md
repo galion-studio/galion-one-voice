@@ -1,6 +1,9 @@
 # Deploy path · Titanaxe VPS 51.38.137.193 · DEPLOY-01 · 2026-11-02 (Europe/Zagreb)
 
-**Status: PLAN + LOCAL ARTIFACTS ONLY. Nothing has connected to the VPS. No SSH key exists on this box.**
+**Status: PLAN + LOCAL ARTIFACTS ONLY. Nothing has connected to the VPS.**
+Access design (2026-11-03, t198u): **per-user anonymized access codes**, not
+one shared `galion` pubkey. Status **approved-pending-setup**. A human
+installs the codes. This tree does not hold a code or a private key.
 
 ## Shape
 ```
@@ -38,9 +41,9 @@ operator ──ssh:22 (key only, user galion)──▶ VPS
 - `harden-dryrun.sh --probe`: TCP connects to 22/80/443 succeeded, but HTTP on 80/443 timed out. This box's egress proxy probably accepts the connect itself, so the result is **inconclusive**. It does not show that anything is running on the VPS.
 
 ## Human steps
-- **H1** Put an operator ed25519 public key on the VPS through the Titanaxe console or rescue mode, then share the matching access with the operator box. Nothing can start before this.
+- **H1** Approved-pending-setup. A human installs per-user anonymized access codes through the Titanaxe console or rescue mode. Every user gets their own code. No shared key. Nothing in this repo connects, and no code is generated here.
 - **H2** Choose the public name: a domain (set its DNS A record) or the sslip.io default. Set `GALION_ACME_EMAIL` to a real address.
-- **H3** Decide whether the demo is public or behind basic_auth.
+- **H3** Decided: the public demo is behind login (OAuth or basic auth), with exact https CORS origins. The human turns the edge block on. No password in git.
 - **H4** Approve the release (gate in `release-dryrun.sh`).
 
 — Maciej Grajczyk
