@@ -13,7 +13,7 @@ use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use galion_heartbeat::{FRAME_MS, SAMPLE_RATE};
+use galion_heartbeat::{FRAME_MS, FRAME_SAMPLES, SAMPLE_RATE};
 use galion_render::backends::web::{MicTap, ReplyBox, SayInbox, SpokenLine, Turn, TurnInbox, WebSurface};
 use galion_render::v2_persona::Floor;
 
@@ -119,8 +119,15 @@ impl PhoneHost {
     }
 
     /// Take at most the newest utterance and the newest typed line, publish any
-    /// finished reply, drain one frame of reply PCM into `me`.
+    /// finished reply, drain one heartbeat frame of reply PCM into `me`.
     pub fn drive_me(&mut self, me: &mut [f32]) -> bool {
+        self.poll_me(me, true)
+    }
+
+    /// Poll the worker, then optionally copy one [`FRAME_SAMPLES`] frame.
+    /// `emit == false` still polls and does not pop PCM: a late heartbeat is a pause.
+    /// A buffer longer than one frame does not catch up.
+    pub fn poll_me(&mut self, me: &mut [f32], emit: bool) -> bool {
         self.flush_submit();
         let turn = self.turns.take_latest();
         let say = self.pending_line.take().or_else(|| self.says.take_latest());
@@ -142,14 +149,33 @@ impl PhoneHost {
         if let Some(r) = self.worker.try_recv() {
             self.publish(r);
         }
-        if self.play.is_empty() {
+        if !emit || self.play.is_empty() {
             return false;
         }
-        for x in me.iter_mut() {
-            *x = pop_pcm(&mut self.play).map(|s| s as f32 / 32768.0).unwrap_or(0.0);
-        }
-        true
+        copy_one_frame(&mut self.play, me)
     }
+
+    /// Drop queued reply PCM. Call this on a yield, before the next poll,
+    /// so a reply published on that same tick is not wiped.
+    pub fn release_me(&mut self) {
+        wipe_play(&mut self.play);
+    }
+}
+
+/// Copy at most one heartbeat frame. Does not allocate.
+fn copy_one_frame(play: &mut VecDeque<i16>, me: &mut [f32]) -> bool {
+    if play.is_empty() {
+        return false;
+    }
+    let n = me.len().min(FRAME_SAMPLES);
+    for (i, x) in me.iter_mut().enumerate() {
+        if i < n {
+            *x = pop_pcm(play).map(|s| s as f32 / 32768.0).unwrap_or(0.0);
+        } else {
+            *x = 0.0;
+        }
+    }
+    true
 }
 
 impl Drop for PhoneHost {
@@ -396,6 +422,20 @@ mod tests {
         assert!(redacted.contains("err=redacted"), "{redacted}");
         assert!(!redacted.contains("RIFF") && !redacted.contains(transcript), "{redacted}");
         assert!(!redacted.to_ascii_lowercase().contains("pcm"), "{redacted}");
+    }
+
+    #[test]
+    fn drain_takes_one_heartbeat_frame_and_leaves_the_tail() {
+        let mut play = VecDeque::from(vec![16_000i16; FRAME_SAMPLES + 4]);
+        let mut me = vec![0.0f32; FRAME_SAMPLES + 4];
+        assert!(copy_one_frame(&mut play, &mut me));
+        assert_eq!(play.len(), 4, "the next frame stays queued");
+        assert!(me[..FRAME_SAMPLES].iter().all(|s| (*s - 16_000.0 / 32_768.0).abs() < 1e-6));
+        assert!(me[FRAME_SAMPLES..].iter().all(|s| *s == 0.0), "no second frame in this tick");
+        let mut short_play = VecDeque::from(vec![1_000i16; 100]);
+        let mut short = [0.0f32; 8];
+        assert!(copy_one_frame(&mut short_play, &mut short));
+        assert_eq!(short_play.len(), 92, "a short buffer still takes only its own length");
     }
 
     #[test]

@@ -30,6 +30,7 @@ pub mod sha256;
 use galion_emotion::band::consent_bits;
 use galion_emotion::{Cue, OffReason, Purpose, RikaState};
 use galion_heartbeat::presence::RikaReplayBackend;
+use galion_heartbeat::symphony::{BandView, DotMark, SymphonyWire};
 use galion_heartbeat::{HeartbeatConfig, FRAME_MS, FRAME_SAMPLES, SAMPLE_RATE};
 use galion_presence::backend::{AffectIn, AffectOut, FrameIn as PIn};
 use galion_presence::spec::YouState;
@@ -210,6 +211,8 @@ pub struct FrameRecord {
     pub affect_out: AffectOut,
     /// Me-voice label for this frame ([`MeVoice::tag`]).
     pub voice_tag: &'static str,
+    /// One-dot mark from [`SymphonyWire`] for this frame.
+    pub dot: DotMark,
 }
 
 /// End-of-run summary.
@@ -326,6 +329,8 @@ pub fn run_frames(you: &[f32], cfg: &RunCfg, voice: &mut dyn MeVoice, sinks: &mu
     let frame_dur = Duration::from_millis(FRAME_MS as u64);
     let t0 = Instant::now();
     let mut prev_voiced = false;
+    let mut wire = SymphonyWire::new();
+    let mut scratch = [0.0f32; FRAME_SAMPLES];
     for i in 0..frames {
         let a = i as usize * FRAME_SAMPLES;
         let b = (a + FRAME_SAMPLES).min(you.len());
@@ -363,6 +368,20 @@ pub fn run_frames(you: &[f32], cfg: &RunCfg, voice: &mut dyn MeVoice, sinks: &mu
         };
         let out = &mut me[a..a + FRAME_SAMPLES];
         voice.render(&ctx, out);
+        let sector = {
+            let emit = wire.me_emit(&ho, out.len());
+            let me_slot: &[f32] = if emit && ctx.voiced { &*out } else { &[] };
+            wire.step(
+                &ho,
+                BandView {
+                    you_active: you_state == YouState::Speech,
+                    feeling_e: if sense { po.affect_out.arousal } else { 0.0 },
+                    sense,
+                    me_slot,
+                },
+                &mut scratch,
+            )
+        };
         prev_voiced = po.me_voiced;
         s.paused_frames += ho.paused as u32;
         s.late_frames += late as u32;
@@ -389,6 +408,7 @@ pub fn run_frames(you: &[f32], cfg: &RunCfg, voice: &mut dyn MeVoice, sinks: &mu
             off: ho.decided.off,
             affect_out: po.affect_out,
             voice_tag: voice.tag(),
+            dot: sector.dot,
         };
         for k in sinks.iter_mut() {
             k.on_frame(&rec);

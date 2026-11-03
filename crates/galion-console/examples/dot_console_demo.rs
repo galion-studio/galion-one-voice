@@ -31,6 +31,7 @@ use std::time::{Duration, Instant};
 use galion_console::dotviz::{demo_band, DemoPump, DemoSeg, DotConsole, PanelOpts};
 use galion_console::live::{AffectFeed, StubAffect, StubTiming, TimingFeed};
 use galion_emotion::{DefaultConsentGate, Purpose};
+use galion_heartbeat::symphony::{BandView, SymphonyWire};
 use galion_heartbeat::{FrameIn, Heartbeat, HeartbeatConfig, FRAME_MS, FRAME_SAMPLES, RIKA_BITS, SAMPLE_RATE};
 use galion_render::{PngSeqConfig, PngSeqSurface};
 
@@ -140,6 +141,8 @@ fn run<T: TimingFeed, A: AffectFeed>(args: &[String], mut pump: DemoPump<T, A>, 
 
     let mut you = vec![0.0f32; FRAME_SAMPLES];
     let mut me = vec![0.0f32; FRAME_SAMPLES];
+    let mut scratch = [0.0f32; FRAME_SAMPLES];
+    let mut wire = SymphonyWire::new();
     let mut rng = Lcg(13);
     let mut me_voiced_prev = false;
     let mut yielded = false;
@@ -179,13 +182,19 @@ fn run<T: TimingFeed, A: AffectFeed>(args: &[String], mut pump: DemoPump<T, A>, 
         let ts = Instant::now();
         let out = hb.step(&inp);
         let step_us = ts.elapsed().as_secs_f32() * 1e6;
+        let emit = wire.me_emit(&out, me.len());
         if out.yield_now() {
             yielded = true;
         }
         let phone_me;
         #[cfg(feature = "phone-turn")]
         {
-            phone_me = phone.as_mut().is_some_and(|p| p.drive_me(&mut me));
+            if out.yield_now() {
+                if let Some(p) = phone.as_mut() {
+                    p.release_me();
+                }
+            }
+            phone_me = phone.as_mut().is_some_and(|p| p.poll_me(&mut me, emit));
         }
         #[cfg(not(feature = "phone-turn"))]
         {
@@ -207,8 +216,12 @@ fn run<T: TimingFeed, A: AffectFeed>(args: &[String], mut pump: DemoPump<T, A>, 
                 fill_me(&mut me, i, me_voiced, out.me_gain());
             }
         }
+        let you_active = phone_you || s == DemoSeg::You || barge;
+        let feeling_e = if sense { out.applied.lean_in } else { 0.0 };
+        let me_slot: &[f32] = if emit && me_voiced { &me } else { &[] };
+        let sector = wire.step(&out, BandView { you_active, feeling_e, sense, me_slot }, &mut scratch);
         let snap = pump.pump(i, &you, SAMPLE_RATE);
-        dc.frame(&out, &you, &me, me_voiced, &snap, step_us);
+        dc.frame_marked(&out, &you, &me, me_voiced, &snap, step_us, Some(sector.dot));
         me_voiced_prev = me_voiced;
 
         if headless {

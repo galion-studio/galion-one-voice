@@ -17,6 +17,10 @@
 //!   nothing catches up on the next frame. Rika is told (`late`) so it does not
 //!   advance hysteresis on scheduler artefacts (D20 §5.1, R9).
 //!
+//! [`symphony`] puts clone, persona, and the one dot on this same step.
+//! [`symphony::SymphonyWire::step`] never blocks and never allocates. Clone
+//! synthesis, persona reply text, and paint stay off both calls.
+//!
 //! Pipeline timing: the feeling-band decision made in frame *t* is **applied**
 //! (audible) in frame *t+1* ([`FrameOut::applied`]). With Rika's 2-frame
 //! hysteresis this gives evidence *t* → armed *t+1* → audible *t+2* = 160 ms
@@ -35,6 +39,8 @@ use galion_emotion::{
 
 #[cfg(feature = "presence")]
 pub mod presence;
+
+pub mod symphony;
 
 /// The heartbeat period. Locked (LOCKS.toml `[frame] frame_ms = 80`).
 pub const FRAME_MS: u32 = 80;

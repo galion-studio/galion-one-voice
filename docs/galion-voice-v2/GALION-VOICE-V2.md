@@ -71,6 +71,9 @@ The symphony standard for that clock is
 Gate results go in [`symphony/SELF-EVAL.md`](symphony/SELF-EVAL.md).
 Non-inference cost on that tick is the symphony account,
 `docs/galion-voice-v2/symphony/ONE-PERCENT.md`.
+is the clock. Clone, persona, and the one dot sit on that step
+(`symphony/HEARTBEAT-WIRE.md`). The turn worker is forbidden to run inside
+that call.
 
 **Rika.** On silence and an in-breath, Rika leans in on the feeling band
 (about 160 ms in the stub measurement). It needs consent bits `sense` and
