@@ -11,7 +11,12 @@ test -f docs/galion-voice-v2/personas/JARVIS.md
 test -f docs/galion-voice-v2/personas/voice/samantha.toml
 test -f docs/galion-voice-v2/personas/voice/jarvis.toml
 curl -fsS "$BASE/health" | grep -qx ok
-curl -fsS "$BASE/v2" | grep -q 'const MOOD'
+curl -fsS "$BASE/" | grep -q 'const MOOD'
+curl -fsS "$BASE/" | grep -q 'id="say-text"'
+curl -fsS "$BASE/" | grep -q 'data-persona="samantha"'
+v2hdr=$(curl -sI "$BASE/v2")
+grep -q '302' <<<"$v2hdr"
+grep -qi 'location: /' <<<"$v2hdr"
 curl -fsS "$BASE/dot" | grep -q '"persona"'
 say() {
   curl -fsS -X POST -H 'Content-Type: application/json' --data "$2" "$BASE/v2/say"
@@ -20,5 +25,7 @@ say grief '{"text":"My mother died this morning."}' | grep -q '"mood":"grief"'
 say joy '{"text":"I got the job. I can'\''t stop smiling."}' | grep -q '"mood":"joy"'
 say vuln '{"text":"I don'\''t think anyone actually likes me."}' | grep -q '"mood":"vulnerability"'
 say quiet '{"text":"You don'\''t have to say anything. Just stay."}' | grep -q '"mood":"quiet"'
-curl -fsS "$BASE/dot" | grep -q '"mood":"quiet"'
+dot=$(curl -fsS "$BASE/dot")
+grep -q '"mood":"quiet"' <<<"$dot"
+grep -q '"label":"quiet"' <<<"$dot"
 echo "v2 persona self-test OK ($BASE)"

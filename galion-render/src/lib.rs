@@ -45,7 +45,7 @@ pub mod backends;
 pub mod png;
 /// Std-only WAV helpers for the phone path (mono PCM16, 16 kHz ↔ 24 kHz).
 pub mod wav;
-/// Instruction-layer floor for the Samantha / Jarvis `/v2` demo.
+/// Instruction-layer floor for the one circle page. `GET /v2` redirects to `/`.
 pub mod v2_persona;
 
 pub use frame::{Band, BandState, Emotion, VizFrame};

@@ -10,10 +10,12 @@
 //! the me band. Nothing here writes audio to disk.
 
 use std::collections::VecDeque;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use galion_heartbeat::{FRAME_MS, SAMPLE_RATE};
-use galion_render::backends::web::{MicTap, ReplyBox, TurnInbox, WebSurface};
+use galion_render::backends::web::{MicTap, ReplyBox, SayInbox, SpokenLine, Turn, TurnInbox, WebSurface};
+use galion_render::v2_persona::Floor;
 
 use crate::bus::{pcm16_to_bytes, BusMsg, ProcessBus};
 use crate::turn_worker::{TurnJob, TurnReply, TurnWorker};
@@ -31,13 +33,17 @@ pub struct PhoneDrive {
 pub struct PhoneHost {
     mic: MicTap,
     turns: TurnInbox,
+    says: SayInbox,
     replies: ReplyBox,
+    floor: Arc<Mutex<Floor>>,
     bus: ProcessBus,
     worker: TurnWorker,
     /// Remaining reply samples at 24 kHz.
     play: VecDeque<i16>,
     /// A turn the worker could not accept yet (channel full). Newest wins.
     pending: Option<TurnJob>,
+    /// A typed line the speak slot could not accept yet.
+    pending_line: Option<SpokenLine>,
     phase: f32,
     /// Heartbeat frames observed on [`Self::drive_you`]. `t_ms = frame * 80`.
     frame: u64,
@@ -52,11 +58,14 @@ impl PhoneHost {
         Self {
             mic: web.mic_tap(),
             turns: web.turn_inbox(),
+            says: web.say_inbox(),
             replies: web.reply_box(),
+            floor: web.persona_floor(),
             worker: TurnWorker::spawn_on(bus.clone()),
             bus,
             play: VecDeque::new(),
             pending: None,
+            pending_line: None,
             phase: 0.0,
             frame: 0,
             t_ms: 0,
@@ -92,33 +101,25 @@ impl PhoneHost {
         true
     }
 
-    /// Take at most the newest utterance, publish any finished reply, drain one
-    /// frame of reply PCM into `me`.
+    /// Take at most the newest utterance and the newest typed line, publish any
+    /// finished reply, drain one frame of reply PCM into `me`.
     pub fn drive_me(&mut self, me: &mut [f32]) -> bool {
         self.flush_submit();
-        if let Some(t) = self.turns.take_latest() {
-            // New utterance cancels whatever the speakers were playing (barge-in).
-            wipe_play(&mut self.play);
-            if let Some((rate, ch, pcm)) = t.pcm16() {
-                let pcm = downmix(&pcm, ch);
-                let turn_id = t.id;
-                let _ =
-                    self.bus
-                        .try_send(BusMsg::barge_in(self.bus.alloc_id(), turn_id, self.t_ms));
-                let _ = self.bus.try_send(BusMsg::utterance(
-                    self.bus.alloc_id(),
-                    turn_id,
-                    self.t_ms,
-                    self.bus.cancel(),
-                    rate,
-                    pcm16_to_bytes(&pcm),
-                ));
-                self.enqueue(TurnJob {
-                    id: turn_id,
-                    rate,
-                    pcm,
-                });
+        let turn = self.turns.take_latest();
+        let say = self.pending_line.take().or_else(|| self.says.take_latest());
+        // Submit the older id first so the newer one keeps the cancel token.
+        match (say, turn) {
+            (Some(s), Some(t)) if s.id > t.id => {
+                self.submit_turn(t);
+                self.submit_say(s);
             }
+            (Some(s), Some(t)) => {
+                self.submit_say(s);
+                self.submit_turn(t);
+            }
+            (Some(s), None) => self.submit_say(s),
+            (None, Some(t)) => self.submit_turn(t),
+            (None, None) => {}
         }
         self.flush_submit();
         if let Some(r) = self.worker.try_recv() {
@@ -217,6 +218,11 @@ impl PhoneHost {
         if let Some(text) = self.bus.before_publish(text) {
             let _ = self.bus.try_send_reply(text);
         }
+        if !r.transcript.trim().is_empty() {
+            if let Ok(mut floor) = self.floor.lock() {
+                let _ = floor.say(&r.transcript, false, 0.0, false);
+            }
+        }
         if let Some(err) = r.error.as_deref() {
             let _ = self.bus.try_send(BusMsg::fault(
                 self.bus.alloc_id(),
@@ -243,6 +249,46 @@ impl PhoneHost {
                 r.error.as_deref()
             )
         );
+    }
+
+    fn submit_say(&mut self, mut line: SpokenLine) {
+        if line.barge {
+            wipe_play(&mut self.play);
+        }
+        if line.silence || line.reply.trim().is_empty() {
+            return;
+        }
+        let id = line.id;
+        let text = std::mem::take(&mut line.reply);
+        if let Err(text) = self.worker.try_speak(id, text) {
+            line.reply = text;
+            self.pending_line = Some(line);
+        }
+    }
+
+    fn submit_turn(&mut self, t: Turn) {
+        // New utterance cancels whatever the speakers were playing (barge-in).
+        wipe_play(&mut self.play);
+        if let Some((rate, ch, pcm)) = t.pcm16() {
+            let pcm = downmix(&pcm, ch);
+            let turn_id = t.id;
+            let _ = self
+                .bus
+                .try_send(BusMsg::barge_in(self.bus.alloc_id(), turn_id, self.t_ms));
+            let _ = self.bus.try_send(BusMsg::utterance(
+                self.bus.alloc_id(),
+                turn_id,
+                self.t_ms,
+                self.bus.cancel(),
+                rate,
+                pcm16_to_bytes(&pcm),
+            ));
+            self.enqueue(TurnJob {
+                id: turn_id,
+                rate,
+                pcm,
+            });
+        }
     }
 
     fn enqueue(&mut self, job: TurnJob) {
@@ -378,5 +424,47 @@ mod tests {
             }
             other => panic!("{other:?}"),
         }
+    }
+
+    #[test]
+    fn typed_line_is_spoken_and_grief_stays_on_the_floor() {
+        let prev_speech = std::env::var("GALION_SPEECH").ok();
+        let prev_asr = std::env::var("GALION_ASR").ok();
+        std::env::set_var("GALION_ASR", "off");
+        std::env::set_var("GALION_SPEECH", "off");
+        let web = WebSurface::mailbox();
+        {
+            let said = web
+                .persona_floor()
+                .lock()
+                .unwrap()
+                .say("My mother died this morning.", false, 0.0, false);
+            assert_eq!(said.mood, "grief");
+        }
+        web.say_inbox()
+            .push("Your mother died this morning.".into(), false, false);
+        let mut host = PhoneHost::from_surface(&web);
+        match prev_speech {
+            Some(v) => std::env::set_var("GALION_SPEECH", v),
+            None => std::env::remove_var("GALION_SPEECH"),
+        }
+        match prev_asr {
+            Some(v) => std::env::set_var("GALION_ASR", v),
+            None => std::env::remove_var("GALION_ASR"),
+        }
+        let mut me = vec![0.0f32; 8];
+        let t0 = std::time::Instant::now();
+        let mut got = false;
+        while !got && t0.elapsed().as_secs() < 5 {
+            let _ = host.drive_you(&mut [0.0; 8]);
+            let _ = host.drive_me(&mut me);
+            got = web.reply_box().latest_json().is_some();
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        assert!(got, "persona line was not published for the page to play");
+        let floor = web.persona_floor();
+        let floor = floor.lock().unwrap();
+        assert!(floor.mood_from_turn());
+        assert_eq!(floor.mood(), "grief");
     }
 }

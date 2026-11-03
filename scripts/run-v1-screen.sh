@@ -78,8 +78,9 @@ if [[ "$CHECK" == "1" ]]; then
   sleep 2
   page=$(curl -fsS "$URL")
   grep -q '<canvas id="s"' <<<"$page" && echo "  / : one canvas page OK ($(wc -c <<<"$page") bytes)" || { echo "  / : FAIL"; exit 1; }
-  v2=$(curl -fsS "${URL}v2")
-  grep -q 'data-persona="samantha"' <<<"$v2" && echo "  /v2 : persona dot OK" || { echo "  /v2 : FAIL"; exit 1; }
+  grep -q 'data-persona="samantha"' <<<"$page" && grep -q 'id="say-text"' <<<"$page" && grep -q 'data-mouth="piper"' <<<"$page" && echo "  / : persona, mic page, text box OK" || { echo "  / : persona/text FAIL"; exit 1; }
+  v2hdr=$(curl -sI "${URL}v2")
+  grep -q '302' <<<"$v2hdr" && grep -qi 'location: /' <<<"$v2hdr" && echo "  /v2 : redirect OK" || { echo "  /v2 : FAIL ($v2hdr)"; exit 1; }
   state=$(curl -fsS "${URL}v2/state")
   grep -q '"rights":"hold"' <<<"$state" && grep -q '"film_voice":false' <<<"$state" && echo "  /v2/state : rights hold OK" || { echo "  /v2/state : FAIL ($state)"; exit 1; }
   say=$(curl -fsS -X POST -H 'Content-Type: application/json' --data '{"text":"My mother died this morning."}' "${URL}v2/say")

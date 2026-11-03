@@ -1,6 +1,7 @@
 <!doctype html>
 <!-- Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
-     V1-01 single screen: one dot. Mobile-safe. Tap the dot → mic permission + levels.
+     One screen: one dot. Mobile-safe. Tap the dot → mic. A text box sits under it.
+     Typed lines go to the persona floor and come back as Piper audio on /reply.
      UX-01: the page animates on its own 60 fps clock from /dot {mode,level} (no 80 ms stutter),
      listening = larger + full bright + still; speaking = smaller base, pulsing; idle = slow breath;
      server unreachable = small dim still dot (never mistaken for idle).
@@ -34,13 +35,25 @@ html,body{margin:0;width:100%;height:100%;height:100dvh;background:#0A0A0C;overf
 canvas{display:block;position:fixed;inset:0;width:100%;height:100%;width:100dvw;height:100dvh;
   padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
   box-sizing:border-box}
-#ai-disclosure{position:fixed;left:16px;right:16px;bottom:max(56px,calc(env(safe-area-inset-bottom) + 44px));
+#ai-disclosure{position:fixed;left:16px;right:16px;bottom:max(112px,calc(env(safe-area-inset-bottom) + 100px));
   text-align:center;font:500 12px/1.35 -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
   color:rgba(245,245,247,.78);pointer-events:none}
 #ai-disclosure [lang="en"]{display:block;margin-top:2px;color:rgba(245,245,247,.55)}
-#hint{position:fixed;left:0;right:0;bottom:max(24px,env(safe-area-inset-bottom));
+#ai-disclosure .hold{display:block;margin-top:2px;color:rgba(245,245,247,.42)}
+#hint{position:fixed;left:0;right:0;bottom:max(74px,calc(env(safe-area-inset-bottom) + 62px));
   text-align:center;font:500 14px/1.3 -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
   color:rgba(245,245,247,.55);pointer-events:none;opacity:1;transition:opacity .6s ease;padding:0 16px}
+#say{position:fixed;left:12px;right:12px;bottom:max(10px,env(safe-area-inset-bottom));
+  display:flex;gap:8px;z-index:3;margin:0}
+#say input{flex:1;min-width:0;font:500 16px/1.3 -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+  color:#F5F5F7;background:rgba(245,245,247,.08);border:1px solid rgba(245,245,247,.35);
+  border-radius:999px;padding:12px 16px;-webkit-user-select:text;user-select:text;
+  -webkit-appearance:none;appearance:none}
+#say input::placeholder{color:rgba(245,245,247,.38)}
+#say input:focus{outline:1px solid rgba(245,245,247,.7)}
+#say button{font:600 15px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+  color:#0A0A0C;background:#F5F5F7;border:0;border-radius:999px;padding:0 16px;
+  -webkit-tap-highlight-color:transparent}
 #hint.hide{opacity:0}
 #err{position:fixed;left:16px;right:16px;top:max(16px,env(safe-area-inset-top));
   text-align:center;font:500 13px/1.35 -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
@@ -48,14 +61,19 @@ canvas{display:block;position:fixed;inset:0;width:100%;height:100%;width:100dvw;
 #err.show{opacity:1}
 </style></head>
 <body>
-<canvas id="s" data-mark="orb" data-profile="luti"></canvas>
+<canvas id="s" data-mark="orb" data-profile="luti" data-persona="samantha" data-mouth="piper" data-film-voice="false" data-rights="hold"></canvas>
 <!--galion-ai-disclosure-->
 <div id="ai-disclosure" role="note">
   <span lang="hr">Razgovarate s umjetnom inteligencijom. Galion je AI asistent, a ne osoba.</span>
   <span lang="en">You are talking to an AI. Galion is an AI assistant, not a person.</span>
+  <span class="hold">This voice is not a film clone.</span>
 </div>
 <!--/galion-ai-disclosure-->
-<div id="hint">Tap the dot to talk</div>
+<div id="hint">Tap the dot to talk, or type below</div>
+<form id="say" autocomplete="off">
+  <input id="say-text" type="text" name="text" enterkeyhint="send" maxlength="400" placeholder="Type to Galion" aria-label="Message" autocapitalize="sentences">
+  <button type="submit">Send</button>
+</form>
 <div id="err" role="status" aria-live="polite"></div>
 <script>
 "use strict";
@@ -102,6 +120,7 @@ let trLp=R.idle, tbLp=B.idle, micEnv=0, playEnv=0, turnsInFlight=0;
 let emV=0.30, emA=0.35, emLean=0, liveLp=0;
 let playAn=null, playData=null;
 let sessionToken="";
+let hearReplies=false;
 
 function sessionHeaders(extra){
   const h={"ngrok-skip-browser-warning":"1"};
@@ -311,6 +330,7 @@ function pollOnce(){
       const t=+j.t_ms||0;
       if(t<=lastT&&t>lastT-2000) return;   // stale/out-of-order
       lastT=t; latest=j; lastOk=performance.now();
+      if(j.persona) cv.dataset.persona=j.persona;
       if(!everOk){everOk=true;}
       onReply(j.reply);
     })
@@ -358,11 +378,7 @@ async function enableMic(){
   micState="pending"; showErr("");
   // Create + unlock the AudioContext synchronously inside the tap (before any await) so that
   // mobile Safari/Chrome let us play reply audio later. Reused for capture and playback.
-  try{
-    const AC=window.AudioContext||window.webkitAudioContext;
-    if(!micCtx) micCtx=new AC({latencyHint:"interactive"});
-    unlockAudio(micCtx);
-  }catch(e){}
+  ensureAudio();
   try{
     micStream=await navigator.mediaDevices.getUserMedia({
       audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true,channelCount:1},
@@ -398,10 +414,60 @@ function onActivate(e){
 }
 cv.addEventListener("touchend",onActivate,{passive:false});
 cv.addEventListener("click",onActivate);
-addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();enableMic();}});
+addEventListener("keydown",e=>{
+  if(e.target&&e.target.id==="say-text") return;
+  if(e.key==="Enter"||e.key===" "){e.preventDefault();enableMic();}
+});
+const sayForm=document.getElementById("say"), sayInput=document.getElementById("say-text");
+if(sayForm&&sayInput){
+  sayForm.addEventListener("submit",e=>{
+    e.preventDefault();
+    const t=sayInput.value;
+    sayInput.value="";
+    sendText(t);
+  });
+}
+async function sendText(text){
+  const t=(text||"").trim();
+  if(!t) return;
+  // Same gesture as Send: unlock playback before any await, mic or not.
+  if(!ensureAudio()){ showErr("This browser cannot play audio."); return; }
+  const barge=playing;
+  if(playing) stopPlayback();
+  discloseAi();
+  await ensureSession();
+  turnsInFlight++;
+  const watch=turnsInFlight;
+  try{
+    const r=await fetch("v2/say",{method:"POST",cache:"no-store",headers:sessionHeaders({"Content-Type":"application/json"}),
+      body:JSON.stringify({text:t,barge:!!barge,e:0,sense:false})});
+    if(!r.ok){ turnsInFlight=Math.max(0,turnsInFlight-1); showErr("Message failed ("+r.status+")."); return; }
+    const j=await r.json();
+    showErr("");
+    if(j&&j.persona) cv.dataset.persona=j.persona;
+    if(j&&j.mood&&MOOD[j.mood]){
+      if(!latest) latest={radius:R.idle,t_ms:0};
+      latest.mood=j.mood;
+      latest.emotion={sense:true,label:j.mood,valence:0,arousal:0.3,lean:(latest.emotion&&latest.emotion.lean)||0};
+    }
+    hideHint();
+    if(j&&(j.silence||!j.reply)){ turnsInFlight=Math.max(0,turnsInFlight-1); return; }
+  }catch(e){ turnsInFlight=Math.max(0,turnsInFlight-1); showErr("Could not send that."); }
+  setTimeout(()=>{ if(!playing&&turnsInFlight>=watch) turnsInFlight=Math.max(0,turnsInFlight-1); }, 20000);
+}
 
 // ───────────────────────── Voice pipeline: capture → VAD → /turn, reply playback ─────────────────
 // Silent one-sample buffer played inside the gesture: the classic iOS "unlock".
+function ensureAudio(){
+  try{
+    const AC=window.AudioContext||window.webkitAudioContext;
+    if(!AC) return false;
+    if(!micCtx) micCtx=new AC({latencyHint:"interactive"});
+    unlockAudio(micCtx);
+    hearReplies=true;
+    return true;
+  }catch(e){ return false; }
+}
 function unlockAudio(ctx){
   try{ if(ctx.state==="suspended") ctx.resume().catch(()=>{}); }catch(e){}
   try{ const b=ctx.createBuffer(1,1,ctx.sampleRate), s=ctx.createBufferSource();
@@ -505,7 +571,7 @@ function postTurn(frames,barge){
 function onReply(rp){
   if(!rp||rp.id==null||!rp.url) return;
   const id=String(rp.id);
-  if(micState!=="on"||!micCtx){ seenReplies.add(id); return; }
+  if(!hearReplies||!micCtx){ seenReplies.add(id); return; }
   if(seenReplies.has(id)) return;
   seenReplies.add(id); if(seenReplies.size>64) seenReplies=new Set([...seenReplies].slice(-32));
   if(vadOn) return;                                  // user is mid-utterance: this reply is stale
@@ -521,7 +587,8 @@ async function playReply(id,url){
     const r=await fetch(url,{cache:"no-store",headers:sessionHeaders()});
     if(!r.ok) return;
     const buf=await decode(await r.arrayBuffer());
-    if(vadOn||micState!=="on") return;               // barged in while downloading
+    if(vadOn) return;                                // user is mid-utterance: this reply is stale
+    if(!hearReplies) return;
     if(micCtx.state==="suspended") await micCtx.resume().catch(()=>{});
     stopPlayback();
     if(!playAn){
