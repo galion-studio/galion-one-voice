@@ -68,7 +68,7 @@ def refuse(why: str) -> None:
     raise SystemExit(3)
 
 
-SPLIT_PLANS = ("split4", "split3", "local")
+SPLIT_PLANS = ("split4", "split3")
 
 
 def pin_cpu() -> tuple:

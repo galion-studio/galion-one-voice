@@ -67,7 +67,10 @@ impl PiperWorker {
     /// Spawn Piper. The model loads inside the child before it reads stdin.
     /// The first [`synthesize`](Self::synthesize) therefore pays load + inference.
     pub fn spawn(runtime: &Path, model: &Path, config: &Path, prosody: &PiperProsody) -> Result<Self, VoiceError> {
-        let mut child = Command::new(runtime)
+        let mut cmd = Command::new(runtime);
+        // V2 core map: Piper owns core 6 during a live call (no-op when the map is off).
+        super::core_map::apply_affinity(&mut cmd, &super::core_map::placement(super::core_map::CoreRole::Piper).cpus);
+        let mut child = cmd
             .arg("--model").arg(model)
             .arg("--config").arg(config)
             .arg("--output_raw")

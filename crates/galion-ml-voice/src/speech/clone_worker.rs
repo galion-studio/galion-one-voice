@@ -33,6 +33,8 @@
 //! `GALION_CLONE_STUB_PCM=1` is protocol PCM, not a Flash result.
 #![allow(unsafe_code)]
 
+pub use super::core_map::{apply_affinity, parse_cpu_list, usable_cpus};
+use super::core_map::format_cpu_list;
 use super::sha256;
 use crate::{Audio, LanguageId, TtsEngine, VoiceError};
 use std::io::{Read, Write};
@@ -316,21 +318,20 @@ pub enum ClonePlan {
     /// Samantha cores 0-2, Jarvis cores 3-5, 3 threads each; 6-7 reserved
     /// for ASR, Piper and the call loop.
     Split3,
-    /// V2 fully local: both voices share cores 0-3 at 2 threads each (never
-    /// more threads than cores, even when both speak at once); cores 4-7 are
-    /// the local LLM's (4 threads). ASR and Piper are not pinned.
-    Local,
+    /// No clone worker: V2 live calls are fully local and every core has a
+    /// role in [`super::core_map`] (LLM 2-5, Piper 6, ...). Spawning refuses
+    /// and the speech stack falls back to Piper.
+    Off,
 }
 
 /// Plan `auto` picks on a dedicated host with at least [`DEDICATED_MIN_CPUS`]
 /// usable cores. Chosen from the measured matrix in 02-core-pinning.md.
 pub const DEDICATED_PLAN: ClonePlan = ClonePlan::Split4;
-/// Plan `auto` picks when `GALION_LLM_LOCAL` is set (V2 fully local).
-pub const LOCAL_LLM_PLAN: ClonePlan = ClonePlan::Local;
+/// Plan `auto` picks when `GALION_LLM_LOCAL` is set (V2 fully local, the
+/// owner ruling: no clone workers during a live call).
+pub const LOCAL_LLM_PLAN: ClonePlan = ClonePlan::Off;
 /// The dedicated plans index cores 0-7.
 pub const DEDICATED_MIN_CPUS: usize = 8;
-/// Local LLM placement under [`ClonePlan::Local`]: cores 4-7, 4 threads.
-pub const LOCAL_LLM_THREADS: u32 = 4;
 
 impl ClonePlan {
     pub fn as_str(self) -> &'static str {
@@ -338,11 +339,11 @@ impl ClonePlan {
             ClonePlan::Session => "session",
             ClonePlan::Split4 => "split4",
             ClonePlan::Split3 => "split3",
-            ClonePlan::Local => "local",
+            ClonePlan::Off => "off",
         }
     }
 
-    /// `session`, `split4`, `split3`, `local`; `auto` (or empty) resolves by
+    /// `session`, `split4`, `split3`, `off`; `auto` (or empty) resolves by
     /// core count (local LLM hosts: see [`ClonePlan::auto`]).
     pub fn parse(s: &str, usable_cpus: usize) -> Option<Self> {
         Self::parse_with(s, usable_cpus, false)
@@ -352,7 +353,7 @@ impl ClonePlan {
     /// that also runs the LLM, [`DEDICATED_PLAN`] when the LLM is remote.
     pub fn parse_with(s: &str, usable_cpus: usize, local_llm: bool) -> Option<Self> {
         match s.trim().to_ascii_lowercase().as_str() {
-            "local" => Some(ClonePlan::Local),
+            "off" | "live" => Some(ClonePlan::Off),
             "" | "auto" if local_llm && usable_cpus >= DEDICATED_MIN_CPUS => Some(LOCAL_LLM_PLAN),
             "session" | "1" => Some(ClonePlan::Session),
             "split4" | "4+4" => Some(ClonePlan::Split4),
@@ -370,17 +371,7 @@ impl ClonePlan {
     pub fn reserved_cpus(self) -> Vec<usize> {
         match self {
             ClonePlan::Split3 => vec![6, 7],
-            ClonePlan::Local => vec![4, 5, 6, 7],
             _ => Vec::new(),
-        }
-    }
-
-    /// Where a local LLM server should run under this plan (cores, threads).
-    /// Pin it with [`apply_affinity`] and pass the thread count (`-t`).
-    pub fn llm_placement(self) -> Option<(Vec<usize>, u32)> {
-        match self {
-            ClonePlan::Local => Some(((4..8).collect(), LOCAL_LLM_THREADS)),
-            _ => None,
         }
     }
 }
@@ -416,9 +407,9 @@ impl ClonePlacement {
                 },
                 3,
             ),
-            ClonePlan::Local => ((0..4).collect(), 2),
+            ClonePlan::Off => (Vec::new(), 0),
         };
-        if plan != ClonePlan::Session && usable_cpus < DEDICATED_MIN_CPUS {
+        if matches!(plan, ClonePlan::Split4 | ClonePlan::Split3) && usable_cpus < DEDICATED_MIN_CPUS {
             // A split plan on a small host would pin onto cores that are not there.
             return Self::for_persona(ClonePlan::Session, persona, usable_cpus);
         }
@@ -436,14 +427,12 @@ impl ClonePlacement {
     pub fn from_env(persona: &str) -> Self {
         let n = usable_cpus();
         let get = |k: &str| std::env::var(k).ok();
-        let local_llm = get("GALION_LLM_LOCAL").is_some_and(|v| {
-            !matches!(v.trim().to_ascii_lowercase().as_str(), "" | "0" | "false" | "no")
-        });
+        let local_llm = super::core_map::local_llm_env();
         let plan_env = get("GALION_CLONE_CPU_PLAN");
         let plan = ClonePlan::parse_with(plan_env.as_deref().unwrap_or(""), n, local_llm)
             .unwrap_or(ClonePlan::Session);
         let mut p = Self::for_persona(plan, persona, n);
-        if p.plan == ClonePlan::Session {
+        if matches!(p.plan, ClonePlan::Session | ClonePlan::Off) {
             return p;
         }
         let key = format!(
@@ -461,9 +450,6 @@ impl ClonePlacement {
         if let Some(t) = get("GALION_CLONE_THREADS").and_then(|t| t.trim().parse::<u32>().ok()) {
             let cap = if p.cpus.is_empty() {
                 n as u32
-            } else if p.plan == ClonePlan::Local {
-                // Both voices share these cores: half each, so two at once fit.
-                (p.cpus.len() / 2) as u32
             } else {
                 p.cpus.len() as u32
             };
@@ -475,85 +461,6 @@ impl ClonePlacement {
     /// taskset-style list, e.g. `0-3`; empty when not pinned.
     pub fn cpu_list(&self) -> String {
         format_cpu_list(&self.cpus)
-    }
-}
-
-/// Usable cores for this process (respects an inherited affinity mask).
-pub fn usable_cpus() -> usize {
-    std::thread::available_parallelism()
-        .map(|n| n.get())
-        .unwrap_or(1)
-}
-
-/// Parse `0-3`, `0,2,4`, `0-2,6`. None on anything else.
-pub fn parse_cpu_list(s: &str) -> Option<Vec<usize>> {
-    let mut v = Vec::new();
-    for part in s.split(',').map(str::trim).filter(|p| !p.is_empty()) {
-        match part.split_once('-') {
-            Some((a, b)) => {
-                let (a, b) = (
-                    a.trim().parse::<usize>().ok()?,
-                    b.trim().parse::<usize>().ok()?,
-                );
-                if a > b || b >= CPU_SET_BITS {
-                    return None;
-                }
-                v.extend(a..=b);
-            }
-            None => {
-                let i = part.parse::<usize>().ok()?;
-                if i >= CPU_SET_BITS {
-                    return None;
-                }
-                v.push(i);
-            }
-        }
-    }
-    v.sort_unstable();
-    v.dedup();
-    (!v.is_empty()).then_some(v)
-}
-
-fn format_cpu_list(cpus: &[usize]) -> String {
-    let mut out: Vec<String> = Vec::new();
-    let mut i = 0;
-    while i < cpus.len() {
-        let mut j = i;
-        while j + 1 < cpus.len() && cpus[j + 1] == cpus[j] + 1 {
-            j += 1;
-        }
-        out.push(if i == j {
-            cpus[i].to_string()
-        } else {
-            format!("{}-{}", cpus[i], cpus[j])
-        });
-        i = j + 1;
-    }
-    out.join(",")
-}
-
-const CPU_SET_BITS: usize = 1024;
-
-/// Pin a child to `cpus` with `sched_setaffinity` after fork, before exec.
-/// Empty `cpus` leaves the inherited mask. Usable for any worker (Piper, ASR).
-pub fn apply_affinity(cmd: &mut Command, cpus: &[usize]) {
-    if cpus.is_empty() {
-        return;
-    }
-    let mut mask = [0u64; CPU_SET_BITS / 64];
-    for &c in cpus {
-        mask[c / 64] |= 1u64 << (c % 64);
-    }
-    use std::os::unix::process::CommandExt;
-    // SAFETY: the closure runs in the forked child before exec and only makes
-    // one async-signal-safe syscall on a mask it owns by value.
-    unsafe {
-        cmd.pre_exec(move || {
-            if sched_setaffinity(0, std::mem::size_of_val(&mask), mask.as_ptr()) != 0 {
-                return Err(std::io::Error::last_os_error());
-            }
-            Ok(())
-        });
     }
 }
 
@@ -652,6 +559,20 @@ impl CloneWorker {
         Self::spawn_placed(script, model, persona, &placement)
     }
 
+    /// Test spawn that follows the host env, except that plan `off` (which
+    /// must refuse) falls back to `session` so protocol tests still run.
+    #[cfg(test)]
+    pub(crate) fn spawn_for_test(script: &Path, model: CloneModel, persona: &str) -> Self {
+        let p = ClonePlacement::from_env(persona);
+        if p.plan == ClonePlan::Off {
+            let err = Self::spawn(script, model, persona).err().expect("plan off refuses");
+            assert!(err.to_string().contains("no clone workers during a live call"), "{err}");
+            let session = ClonePlacement::for_persona(ClonePlan::Session, persona, 1);
+            return Self::spawn_placed(script, model, persona, &session).unwrap();
+        }
+        Self::spawn(script, model, persona).unwrap()
+    }
+
     pub fn spawn_placed(
         script: &Path,
         model: CloneModel,
@@ -659,6 +580,11 @@ impl CloneWorker {
         placement: &ClonePlacement,
     ) -> Result<Self, VoiceError> {
         let persona = persona_name(persona);
+        if placement.plan == ClonePlan::Off {
+            return Err(VoiceError::Backend(
+                "clone plan off: no clone workers during a live call (core map v2); Piper speaks".into(),
+            ));
+        }
         let mut cmd = Command::new("python3");
         cmd.arg(script)
             .env("GALION_CLONE_MODEL", model.as_str())
@@ -1227,7 +1153,6 @@ const O_NONBLOCK: i32 = 0o4000;
 extern "C" {
     fn poll(fds: *mut PollFd, nfds: u64, timeout: i32) -> i32;
     fn fcntl(fd: i32, cmd: i32, arg: i32) -> i32;
-    fn sched_setaffinity(pid: i32, cpusetsize: usize, mask: *const u64) -> i32;
 }
 
 fn set_nonblock(fd: i32) -> std::io::Result<()> {
@@ -1604,7 +1529,7 @@ mod tests {
         perm.set_mode(0o755);
         std::fs::set_permissions(&script, perm).unwrap();
         let before = entries(&dir);
-        let mut w = CloneWorker::spawn(&script, CloneModel::Nano, "jarvis").unwrap();
+        let mut w = CloneWorker::spawn_for_test(&script, CloneModel::Nano, "jarvis");
         let pid = w.pid();
         let a = w.synthesize("turn one [laugh]").unwrap();
         let b = w.synthesize("turn two says hi").unwrap();
@@ -1652,14 +1577,9 @@ mod tests {
         assert_eq!(ClonePlan::Split3.reserved_cpus(), vec![6, 7]);
         assert_eq!(ClonePlan::parse_with("auto", 8, true), Some(LOCAL_LLM_PLAN));
         assert_eq!(ClonePlan::parse_with("auto", 4, true), Some(ClonePlan::Session));
-        let sl = ClonePlacement::for_persona(ClonePlan::Local, "samantha", 8);
-        let jl = ClonePlacement::for_persona(ClonePlan::Local, "jarvis", 8);
-        assert_eq!((sl.cpu_list().as_str(), sl.threads), ("0-3", 2));
-        assert_eq!(sl.cpus, jl.cpus);
-        assert!(sl.threads + jl.threads <= sl.cpus.len() as u32, "both speaking never oversubscribe");
-        let (llm, t) = ClonePlan::Local.llm_placement().unwrap();
-        assert_eq!((format_cpu_list(&llm).as_str(), t), ("4-7", 4));
-        assert!(llm.iter().all(|c| !sl.cpus.contains(c)));
+        assert_eq!(ClonePlan::parse("live", 8), Some(ClonePlan::Off));
+        let off = ClonePlacement::for_persona(ClonePlan::Off, "jarvis", 8);
+        assert_eq!((off.cpus.len(), off.threads), (0, 0));
         for (a, b) in [(&s4, &j4), (&s3, &j3)] {
             assert!(a.cpus.iter().all(|c| !b.cpus.contains(c)), "disjoint");
             assert!(a.threads as usize <= a.cpus.len() && b.threads as usize <= b.cpus.len());
@@ -1677,6 +1597,15 @@ mod tests {
         assert_eq!(parse_cpu_list("3-1"), None);
         assert_eq!(parse_cpu_list("x"), None);
         assert_eq!(format_cpu_list(&[0, 1, 2, 6]), "0-2,6");
+    }
+
+    #[test]
+    fn plan_off_refuses_to_spawn_a_clone_during_a_live_call() {
+        let off = ClonePlacement::for_persona(ClonePlan::Off, "samantha", 8);
+        let err = CloneWorker::spawn_placed(Path::new("/bin/true"), CloneModel::Nano, "samantha", &off)
+            .err()
+            .expect("off refuses");
+        assert!(err.to_string().contains("Piper speaks"), "{err}");
     }
 
     #[test]
@@ -1707,20 +1636,6 @@ mod tests {
         assert!(log.contains(&format!("asked=8 applied={k}")), "{log}");
     }
 
-    #[test]
-    fn affinity_lands_in_the_child_before_exec() {
-        if usable_cpus() < 2 {
-            return;
-        }
-        let mut cmd = Command::new("sh");
-        cmd.arg("-c")
-            .arg("grep Cpus_allowed_list /proc/self/status");
-        apply_affinity(&mut cmd, &[1]);
-        let out = cmd.output().unwrap();
-        let text = String::from_utf8_lossy(&out.stdout);
-        assert!(text.trim_end().ends_with("\t1"), "{text}");
-    }
-
     const FAKE_CLONE: &str = r#"#!/usr/bin/env python3
 import json, os, struct, sys
 keys = ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS", "TORCH_NUM_THREADS", "GALION_CLONE_THREADS")
@@ -1729,7 +1644,7 @@ plan = os.environ.get("GALION_CLONE_CPU_PLAN", "")
 if not want.isdigit() or int(want) < 1 or any(os.environ.get(k) != want for k in keys):
     sys.stderr.write("galion-clone-refuse: cpu pin missing\n")
     sys.exit(3)
-if plan not in ("session", "split4", "split3", "local") or (plan == "session" and want != "1"):
+if plan not in ("session", "split4", "split3") or (plan == "session" and want != "1"):
     sys.stderr.write("galion-clone-refuse: cpu plan missing\n")
     sys.exit(3)
 if plan != "session" and int(want) > len(os.sched_getaffinity(0)):
