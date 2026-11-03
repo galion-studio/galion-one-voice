@@ -13,12 +13,19 @@
 //!
 //! `e` in a request is a harness knob for prosody. It is not a reading of the
 //! caller. Emotion-driven id changes stay off unless `sense` is set, and one
-//! frame never flips the id (the gate is 8 holds at or above 0.65).
+//! frame never flips the id (the gate is [`HOLD_FRAMES`] holds at or above [`HOLD_E`]).
 
 use std::time::{Duration, Instant};
 
 const SAMANTHA_TOML: &str = include_str!("../../docs/galion-voice-v2/personas/voice/samantha.toml");
 const JARVIS_TOML: &str = include_str!("../../docs/galion-voice-v2/personas/voice/jarvis.toml");
+
+/// Consecutive sensed frames at or above [`HOLD_E`] before the id may change.
+/// One frame never flips it. Matches `galion_heartbeat::symphony::PERSONA_HOLD_FRAMES`
+/// (checked from the console build; this crate stays dependency-free).
+pub const HOLD_FRAMES: u8 = 8;
+pub const HOLD_E: f32 = 0.65;
+pub const RELEASE_E: f32 = 0.50;
 
 const FORBIDDEN: &[&str] = &[
     "i hear you",
@@ -155,12 +162,12 @@ impl Floor {
             self.high_e = 0;
             return;
         }
-        if e >= 0.65 {
+        if e >= HOLD_E {
             self.high_e = self.high_e.saturating_add(1);
-            if self.high_e >= 8 && self.id != PersonaId::Samantha {
+            if self.high_e >= HOLD_FRAMES && self.id != PersonaId::Samantha {
                 self.id = PersonaId::Samantha;
             }
-        } else if e <= 0.50 {
+        } else if e <= RELEASE_E {
             self.high_e = 0;
         }
     }
@@ -998,7 +1005,7 @@ mod tests {
         let mut f = Floor::new();
         f.id = PersonaId::Jarvis;
         f.pin = false;
-        for _ in 0..7 {
+        for _ in 0..usize::from(HOLD_FRAMES - 1) {
             let s = f.say_turn("still working", false, 0.9, true);
             assert_eq!(s.persona, "jarvis");
         }
