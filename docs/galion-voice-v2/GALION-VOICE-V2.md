@@ -6,6 +6,12 @@ and it is not V3.
 
 The spelling is **Galion**. The product is Galion Voice.
 
+Research synthesis dated 2026-11-03 is
+[`docs/research/galion-voice-v2/`](../research/galion-voice-v2/README.md).
+It is not this plan. Domain claims there are desk synthesis.
+**LOCKS.toml overrides any conflicting domain text:** no whisper.cpp, no
+in-tree ORT, `paid_tiers=false`.
+
 ## 1. Version map
 
 | Name | What it is | State |
