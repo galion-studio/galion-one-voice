@@ -194,6 +194,16 @@ impl SpeechStack {
         self.turn_id = turn_id;
     }
 
+    /// Clone playback ring, when this stack selected the clone slot.
+    /// Take the `Arc` before the first speak. Draining it does not generate.
+    /// `Heartbeat::step` does not call this.
+    pub fn clone_frames(&self) -> Option<Arc<clone_worker::CloneFrameDrain>> {
+        match &self.engine {
+            Some(Engine::Clone(t)) => Some(t.frames()),
+            _ => None,
+        }
+    }
+
     pub fn warmth(&self) -> Warmth {
         let (piper_pid, piper_spawns, clone_pid, clone_spawns) = match &self.engine {
             Some(Engine::A21(t)) => (t.piper_pid(), t.piper_spawns(), None, 0),
@@ -388,6 +398,7 @@ mod tests {
         assert!(off.speak("hello").is_err());
         off.prewarm();
         assert_eq!(off.warmth().piper_pid, None);
+        assert!(off.clone_frames().is_none());
     }
 
     #[test]

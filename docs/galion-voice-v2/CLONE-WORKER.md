@@ -23,7 +23,9 @@ One long-lived child, the same idea as the warm Piper worker
 
 Request line, written by `clone_worker::request_line`. There is no reference
 field. A child that sees a non-empty `reference`, `audio_prompt`,
-`audio_prompt_path`, or `clip` exits 3 and writes no PCM.
+`audio_prompt_path`, or `clip` exits 3 and writes no PCM. The only
+exception is `GALION_CLONE_LOCAL_REFS=1` together with an operator sha256
+allowlist, below. That exception does not edit `LOCKS.toml`.
 
 ```text
 {"text":"Hello.","model":"nano","persona":"samantha","tags":true}
@@ -34,19 +36,34 @@ field. A child that sees a non-empty `reference`, `audio_prompt`,
 strips bracket tags from the text. Samantha may keep them for a later model.
 An unknown persona name is treated as Samantha.
 
-## What the stub does not do
+## What the worker does
 
-`scripts/clone/chatterbox_worker.py`:
+`scripts/clone/chatterbox_worker.py` writes PCM in chunks. A chunk marker
+on stderr comes before the bytes, then `galion-clone-utt:` closes the
+utterance. The parent clocks the first bytes. It does not wait for that
+closing line to know that audio has started.
 
-- does not import torch
-- does not download weights
-- does not call Chatterbox generate
-- does not accept a reference clip
+The stub (`GALION_CLONE_STUB_PCM=1`) does not import torch and does not
+call Chatterbox. Its two writes are protocol PCM, not a voice. The first
+write is one sample. The second follows about 50 ms later so a gate can
+see that the first bytes are not the finished utterance.
 
-Without `GALION_CLONE_STUB_PCM=1`, and without the pinned safetensors on
-disk, the process exits 2 (`galion-clone-absent`). With the files present
-and the stub flag off, each request is `galion-clone-unwired` and no
-samples are written. Protocol PCM is not a voice and not a Flash result.
+Without that flag, and without the pinned safetensors on disk, the process
+exits 2 (`galion-clone-absent`). With the files present and
+`GALION_CLONE_STREAM` unset, each request is `galion-clone-unwired` and no
+samples are written. The unwired path does not call `generate()`.
+
+`GALION_CLONE_STREAM=1` loads Nano from `GALION_CLONE_CKPT` and streams.
+Master has no `stream()` method (that is unmerged PR 528). The worker uses
+`stream()` when the install has it, otherwise a token loop plus meanflow
+with `finalize=False`. A model that can only block in `generate()` is
+refused, and Piper remains the fallback. The design and the gate are
+`STREAM-TTFA.md`.
+
+A reference clip still exits 3. `GALION_CLONE_LOCAL_REFS=1` plus an
+operator sha256 allowlist (`GALION_CLONE_REF_SHA` or
+`GALION_CLONE_REF_ALLOW`) is the only way a path is accepted. This file
+does not read `LOCKS.toml`.
 
 `SpeechStack` selects this slot only when `weights_ready` is true (size and
 sha256 against `scripts/clone/PINS.sha256`). CI does not have those files.
