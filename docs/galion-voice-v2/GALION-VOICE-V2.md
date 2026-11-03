@@ -64,6 +64,10 @@ solid golden (G4). The phone page is `crates/galion-console/assets/v1-screen.htm
 **Heartbeat, 80 ms.** `LOCKS.toml` `[clock]`: 12.5 Hz, 24 kHz, 1920 samples,
 60 ms compute budget inside the frame. `galion-heartbeat` `Heartbeat::step`
 is the clock. The turn worker is forbidden to run inside that call.
+The symphony standard for that clock is
+[`symphony/EUREKA.md`](symphony/EUREKA.md): one heartbeat, three bands
+(you · me · feeling), a late frame is a pause, harness before model.
+Gate results go in [`symphony/SELF-EVAL.md`](symphony/SELF-EVAL.md).
 
 **Rika.** On silence and an in-breath, Rika leans in on the feeling band
 (about 160 ms in the stub measurement). It needs consent bits `sense` and
