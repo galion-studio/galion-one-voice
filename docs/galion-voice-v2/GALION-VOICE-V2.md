@@ -8,6 +8,12 @@ The spelling is **Galion**. The product is Galion Voice.
 
 Master slogan: "The seamless connection with the human being, on the voice only."
 
+Research synthesis dated 2026-11-03 is
+[`docs/research/galion-voice-v2/`](../research/galion-voice-v2/README.md).
+It is not this plan. Domain claims there are desk synthesis.
+**LOCKS.toml overrides any conflicting domain text:** no whisper.cpp, no
+in-tree ORT, `paid_tiers=false`.
+
 ## 1. Version map
 
 | Name | What it is | State |
@@ -86,10 +92,11 @@ puts `reply` on `/dot`.
 (`docs/agent-v1-demo/EDGE-NGROK.md`). Caddy on Titanaxe `51.38.137.193` is
 drafted (`docs/deploy/TITANAXE-VPS.md`) and not installed from here.
 
-**LOCKS.** `LOCKS.toml` is the contract. Global values are unchanged. The only
-addition in this program is the sunset-dated A21 Piper exception above.
-GGML-family containers stay out. `forbidden_runtimes` stays as written.
-`paid_tiers = false`. Chatterbox is not a lock exception.
+**LOCKS.** `LOCKS.toml` is the contract. Global values are unchanged. The
+sunset pins are the A21 Piper exception above and
+`[formats.exceptions.v2s14_chatterbox]` (out of process only, sunset
+`2027-02-01`). GGML-family containers stay out. `forbidden_runtimes` stays
+as written. `paid_tiers = false`. `foreign_runtime_allowed` stays false.
 
 ## 4. How a phone turn moves today
 
