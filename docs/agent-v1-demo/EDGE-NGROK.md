@@ -67,6 +67,21 @@ All in `galion-render/src/backends/web.rs` unless noted.
 - Rebuild + restart `dot_console_demo` so `/turn` + CORS preflight are live behind ngrok
   (owner of web.rs / demo process).
 - Decide on the stray cloudflared quick tunnel.
-- Optional: ngrok free static domain or `--basic-auth`/OAuth on the edge while private.
+
+## Staging auth (V2-S3)
+
+The notes above describe the 2026-11-02 edge, when every response sent
+`Access-Control-Allow-Origin: *`. That wildcard remains only while
+`GALION_CORS_ORIGINS` is unset. A shared staging URL must:
+
+1. Set `GALION_CORS_ORIGINS` to the exact `https://` origin (not `*`).
+2. Put OAuth or basic auth on the tunnel. The password and any OAuth client
+   secret stay in the operator's environment, not in this repo.
+   `ngrok http 127.0.0.1:7878 --basic-auth "$GALION_NGROK_USER:$GALION_NGROK_PASS"`
+   or the ngrok `oauth` Traffic Policy. Unauthenticated `curl` must fail at
+   ngrok before loopback.
+3. Leave the app on `127.0.0.1`. Do not pass `0.0.0.0`.
+
+See `docs/galion-voice-v2/SECURITY-EDGE.md`.
 
 — Maciej Grajczyk

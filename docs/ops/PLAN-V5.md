@@ -71,12 +71,14 @@ Public HTTPS is ngrok, started by a human on the machine that runs the screen:
 
 ```bash
 scripts/run-v1-screen.sh
-# other terminal:
-ngrok http 127.0.0.1:7878
+# other terminal, staging only — OAuth or basic auth is required.
+# Put the password in the environment. Do not write it into the repo.
+ngrok http 127.0.0.1:7878 --basic-auth "$GALION_NGROK_USER:$GALION_NGROK_PASS"
 ```
 
 The page sends `ngrok-skip-browser-warning: 1` on its fetches. The phone must
-use the `https://` name or the browser will refuse the microphone.
+use the `https://` name or the browser will refuse the microphone. OAuth on
+the tunnel is the other acceptable auth. Details: `docs/galion-voice-v2/SECURITY-EDGE.md`.
 
 Check:
 
@@ -91,8 +93,11 @@ Unsetting it restores refusal (`AsrUnratified`) and the two-tone "turn arrived"
 signal. `GALION_LLM` defaults to `canned` in that script. `GALION_SPEECH`
 defaults to `auto` (Piper if `scripts/a21/fetch-a21.sh` has been run, else flite).
 
-CORS stays `*` until `GALION_CORS_ORIGINS` is set to the real https origin.
-Do that once the ngrok name is stable for a session, or once Caddy has a name.
+CORS sends `Access-Control-Allow-Origin: *` only while `GALION_CORS_ORIGINS`
+is unset (the local V1 demo). Staging must set that variable to the exact
+`https://` origin. A foreign `Origin` is then 403 with no allow-origin header,
+and `/turn` requires the session token from `POST /session` (body, not URL).
+A literal `*` in the variable is not the wildcard.
 
 Every attempt, including a dry-run and a failed check, gets a LEDGER line:
 date (Europe/Zagreb), what was run, result, and the fact that SSH was not used.

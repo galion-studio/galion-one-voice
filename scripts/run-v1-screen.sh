@@ -7,7 +7,9 @@
 #   scripts/run-v1-screen.sh                  # serve for 1 h (Ctrl-C to stop)
 #   scripts/run-v1-screen.sh --open           # + open it once, fullscreen kiosk (first browser found)
 #   scripts/run-v1-screen.sh --check          # ~15 s self-test: page, /dot modes, /mic, /turn
-#   ngrok http 127.0.0.1:7878                 # phone HTTPS; see docs/agent-v1-demo/EDGE-NGROK.md
+#   ngrok http 127.0.0.1:7878                 # local only. Staging must add OAuth or basic auth
+#                                         # and set GALION_CORS_ORIGINS. No secrets in this file.
+#                                         # docs/galion-voice-v2/SECURITY-EDGE.md
 #
 # Env: V1_SCREEN_ADDR=127.0.0.1:7878 · V1_SCREEN_SECONDS=3600 · OUT=target/v1-screen
 #      GALION_ASR=interim (default here: labelled placeholder, not recognition)

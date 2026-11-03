@@ -25,6 +25,22 @@ pub struct TurnJob {
     pub pcm: Vec<i16>,
 }
 
+impl TurnJob {
+    /// Overwrite the utterance. Also run from [`Drop`].
+    pub fn wipe(&mut self) {
+        for s in &mut self.pcm {
+            *s = 0;
+        }
+        std::hint::black_box(self.pcm.as_slice());
+    }
+}
+
+impl Drop for TurnJob {
+    fn drop(&mut self) {
+        self.wipe();
+    }
+}
+
 /// Finished reply: mono PCM16 at [`LANE_RATE_HZ`] (24 kHz) + its WAV bytes.
 pub struct TurnReply {
     pub id: u64,
@@ -46,6 +62,36 @@ pub struct TurnReply {
     pub error: Option<String>,
     pub in_ms: u32,
     pub took_ms: u32,
+}
+
+impl TurnReply {
+    /// Overwrite PCM, the WAV bytes, and the transcript. Also run from [`Drop`].
+    pub fn wipe(&mut self) {
+        for s in &mut self.pcm {
+            *s = 0;
+        }
+        for b in &mut self.wav {
+            *b = 0;
+        }
+        std::hint::black_box(self.pcm.as_slice());
+        std::hint::black_box(self.wav.as_slice());
+        wipe_string(&mut self.transcript);
+        wipe_string(&mut self.text);
+    }
+}
+
+impl Drop for TurnReply {
+    fn drop(&mut self) {
+        self.wipe();
+    }
+}
+
+fn wipe_string(s: &mut String) {
+    let mut v = std::mem::take(s).into_bytes();
+    for b in &mut v {
+        *b = 0;
+    }
+    std::hint::black_box(v.as_slice());
 }
 
 /// Handle owned by the heartbeat loop.
@@ -114,11 +160,17 @@ impl TurnWorker {
     }
 }
 
-fn respond(lane: &mut PhoneLane, job: TurnJob) -> TurnReply {
+fn respond(lane: &mut PhoneLane, mut job: TurnJob) -> TurnReply {
     let t0 = Instant::now();
     let in_ms = (job.pcm.len() as u64 * 1000 / job.rate.max(1) as u64) as u32;
-    let wav_in = wav_bytes(&job.pcm, job.rate);
-    match lane.turn_wav(&wav_in) {
+    let mut wav_in = wav_bytes(&job.pcm, job.rate);
+    let result = lane.turn_wav(&wav_in);
+    for b in &mut wav_in {
+        *b = 0;
+    }
+    std::hint::black_box(wav_in.as_slice());
+    job.wipe();
+    match result {
         Ok(t) => {
             let pcm = reply_pcm(&t.wav_bytes);
             let ms = (pcm.len() as u64 * 1000 / LANE_RATE_HZ as u64) as u32;
@@ -203,5 +255,31 @@ mod tests {
         assert!(r.wav.starts_with(b"RIFF"));
         w.supersede(9); // barge-in: anything older than 9 is stale
         assert!(w.try_recv().is_none());
+    }
+
+    #[test]
+    fn reply_and_job_pcm_are_zeroised() {
+        let mut job = TurnJob { id: 1, rate: 16_000, pcm: vec![9, -9, 12345] };
+        job.wipe();
+        assert!(job.pcm.iter().all(|&s| s == 0));
+        let mut reply = TurnReply {
+            id: 1,
+            transcript: "SECRET_TRANSCRIPT".into(),
+            text: "hello".into(),
+            pcm: vec![42, -42],
+            wav: b"RIFFPCM".to_vec(),
+            ms: 1,
+            backend: "tone",
+            asr: "none",
+            llm: "none",
+            stages: String::new(),
+            error: None,
+            in_ms: 1,
+            took_ms: 1,
+        };
+        reply.wipe();
+        assert!(reply.pcm.iter().all(|&s| s == 0));
+        assert!(reply.wav.iter().all(|&b| b == 0));
+        assert!(reply.transcript.is_empty() && reply.text.is_empty());
     }
 }

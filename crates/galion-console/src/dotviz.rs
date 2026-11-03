@@ -379,5 +379,11 @@ mod tests {
         assert!(SCREEN_HTML.contains("samplePlayEnv"));
         assert!(SCREEN_HTML.contains("V2 orb"));
         assert!(SCREEN_HTML.contains("id=\"s\""));
+        assert!(SCREEN_HTML.contains("Razgovarate s umjetnom inteligencijom. Galion je AI asistent, a ne osoba."));
+        assert!(SCREEN_HTML.contains("You are talking to an AI. Galion is an AI assistant, not a person."));
+        assert!(SCREEN_HTML.contains("function discloseAi"));
+        assert!(SCREEN_HTML.contains("fetch(\"session\""));
+        assert!(SCREEN_HTML.contains("X-Galion-Session"));
+        assert!(!SCREEN_HTML.contains("?token=") && !SCREEN_HTML.contains("?session="));
     }
 }

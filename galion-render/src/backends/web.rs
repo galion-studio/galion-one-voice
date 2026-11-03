@@ -48,10 +48,19 @@
 //! stalled tunnel socket) can no longer stall `/dot` for everyone else.
 //! FP-02: the old `/frame` (full VizFrame JSON for a web console that never existed) is gone.
 //! `VizFrame::to_json` stays for other callers.
-//! **Localhost only.** `serve` refuses any non-loopback address at `open()`
-//! (`RenderError::Unsupported`); reach it over an SSH tunnel on the VPS. There is no
-//! public-bind switch in this crate by design (FINAL-BUILD-SPEC / A12).
+//! **Loopback by default.** `serve` refuses any non-loopback address at `open()`
+//! (`RenderError::Unsupported`). `0.0.0.0` is accepted only when
+//! `GALION_ALLOW_PUBLIC_BIND=1` and auth is on (`GALION_REQUIRE_SESSION=1` plus an
+//! exact `GALION_CORS_ORIGINS` list). This tree does not turn that flag on.
 //! The HTML/JS console itself is owned by galion-console and is not embedded here.
+//!
+//! ## V2-S3 edge
+//! `GALION_CORS_ORIGINS` unset → `Access-Control-Allow-Origin: *` (V1 local demo).
+//! Staging must set exact origins; a literal `*` in the variable is not the wildcard.
+//! A foreign `Origin` gets **403** and no allow-origin header. There is no WebSocket.
+//! The phone path's session token is minted by `POST /session` and returned in the
+//! **body** (`transport: body`). It is refused in the query string. Later audio posts
+//! send `X-Galion-Session` (binary body) or `"session"` in the JSON body.
 
 use crate::frame::VizFrame;
 use crate::surface::{RenderError, RenderSurface, SurfaceCaps, SurfaceKind};
@@ -74,7 +83,16 @@ pub const MAX_PENDING_TURNS: usize = 8;
 /// Reply WAVs kept addressable under `/reply/<id>.wav` (oldest evicted).
 pub const MAX_STORED_REPLIES: usize = 8;
 /// CORS `Access-Control-Allow-Headers` sent on every response (incl. OPTIONS preflight).
-pub const CORS_ALLOW_HEADERS: &str = "Content-Type, X-Turn-Id, X-Sample-Rate, X-Barge-In, ngrok-skip-browser-warning";
+pub const CORS_ALLOW_HEADERS: &str =
+    "Content-Type, X-Turn-Id, X-Sample-Rate, X-Barge-In, X-Galion-Session, ngrok-skip-browser-warning";
+
+pub use super::edge::{
+    bind_decision, cors_allow_origin, parse_json_string_field, AI_DISCLOSURE_EN, AI_DISCLOSURE_HR,
+};
+use super::edge::{
+    check_origin, presented_session, query_carries_token, route_is_sensitive, route_needs_session,
+    strip_ai_disclosure, wipe_string, zeroise_bytes, EdgeCfg, OriginCheck, SessionStore,
+};
 /// Whole-request read deadline (head + body).
 const REQ_DEADLINE: Duration = Duration::from_secs(10);
 
@@ -138,6 +156,17 @@ impl Turn {
             TurnFormat::Pcm16 { rate, channels } => Some((rate, channels, le_i16(&self.bytes))),
         }
     }
+
+    /// Overwrite the utterance bytes. Also run from [`Drop`].
+    pub fn wipe(&mut self) {
+        zeroise_bytes(&mut self.bytes);
+    }
+}
+
+impl Drop for Turn {
+    fn drop(&mut self) {
+        self.wipe();
+    }
 }
 
 #[derive(Debug, Default)]
@@ -151,11 +180,16 @@ pub struct TurnInbox { st: Arc<Mutex<InboxState>>, next_id: Arc<AtomicU64> }
 impl TurnInbox {
     /// Enqueue bytes as a new turn and return its id (also used by tests / embedding).
     /// When [`MAX_PENDING_TURNS`] are already pending the oldest is dropped.
-    pub fn push(&self, format: TurnFormat, bytes: Vec<u8>) -> u64 {
+    pub fn push(&self, format: TurnFormat, mut bytes: Vec<u8>) -> u64 {
         let id = self.next_id.fetch_add(1, Ordering::SeqCst) + 1;
         if let Ok(mut g) = self.st.lock() {
-            while g.q.len() >= MAX_PENDING_TURNS { g.q.pop_front(); g.dropped += 1; }
+            while g.q.len() >= MAX_PENDING_TURNS {
+                g.q.pop_front();
+                g.dropped += 1;
+            }
             g.q.push_back(Turn { id, format, bytes, received_at: Instant::now() });
+        } else {
+            zeroise_bytes(&mut bytes);
         }
         id
     }
@@ -202,8 +236,24 @@ impl ReplyBox {
         let id = id.into();
         if !valid_reply_id(&id) { return false; }
         let Ok(mut g) = self.0.lock() else { return false };
-        g.store.retain(|(k, _, _)| *k != id);
-        while g.store.len() >= MAX_STORED_REPLIES { g.store.pop_front(); }
+        let mut kept = VecDeque::new();
+        for (k, mut wav, ms) in std::mem::take(&mut g.store) {
+            if k == id {
+                if let Some(buf) = Arc::get_mut(&mut wav) {
+                    zeroise_bytes(buf);
+                }
+            } else {
+                kept.push_back((k, wav, ms));
+            }
+        }
+        g.store = kept;
+        while g.store.len() >= MAX_STORED_REPLIES {
+            if let Some((_, mut wav, _)) = g.store.pop_front() {
+                if let Some(buf) = Arc::get_mut(&mut wav) {
+                    zeroise_bytes(buf);
+                }
+            }
+        }
         g.store.push_back((id.clone(), Arc::new(wav), ms));
         g.latest = Some((id, ms));
         true
@@ -397,6 +447,17 @@ struct Shared {
     turns: TurnInbox,
     replies: ReplyBox,
     page: Option<&'static str>,
+    edge: EdgeCfg,
+    sessions: Arc<SessionStore>,
+    /// First accepted `/turn` of this process already carried the Art. 50 line.
+    disclosure_sent: Arc<AtomicBool>,
+}
+
+/// Unit tests pin the V1 demo defaults. A developer shell that exports
+/// `GALION_CORS_ORIGINS` must not flip parallel tests. The demo binary is not
+/// built with `cfg(test)` and reads the environment in [`initial_edge`].
+fn initial_edge() -> EdgeCfg {
+    if cfg!(test) { EdgeCfg::v1_demo() } else { EdgeCfg::from_env() }
 }
 
 pub struct WebSurface {
@@ -410,6 +471,7 @@ pub struct WebSurface {
 impl WebSurface {
     /// Mailbox only (no socket) — for embedding into another server or for tests.
     pub fn mailbox() -> Self {
+        let edge = initial_edge();
         let sh = Shared {
             latest_dot: Arc::new(Mutex::new("{}".into())),
             latest_mic: Arc::new(Mutex::new("{\"rms\":0}".into())),
@@ -417,6 +479,9 @@ impl WebSurface {
             turns: TurnInbox::default(),
             replies: ReplyBox::default(),
             page: None,
+            sessions: Arc::new(SessionStore::new(edge.session_ttl)),
+            disclosure_sent: Arc::new(AtomicBool::new(false)),
+            edge,
         };
         Self { bind: None, sh, stop: Arc::new(AtomicBool::new(false)), local_addr: None, worker: None }
     }
@@ -429,6 +494,33 @@ impl WebSurface {
     /// Serve `html` at `/` and `/screen` (set before `open()`).
     pub fn with_page(mut self, html: &'static str) -> Self {
         self.sh.page = Some(html);
+        self
+    }
+    /// Exact `GALION_CORS_ORIGINS` value. Empty keeps the V1 wildcard.
+    /// A literal `*` is not the wildcard.
+    pub fn with_cors_origins(mut self, origins: impl Into<String>) -> Self {
+        self.sh.edge.cors_origins = origins.into();
+        self
+    }
+    /// `GALION_REQUIRE_SESSION`. An exact CORS list also requires a session.
+    pub fn with_require_session(mut self, on: bool) -> Self {
+        self.sh.edge.require_session = on;
+        self
+    }
+    /// `GALION_ALLOW_PUBLIC_BIND`. `open` still refuses `0.0.0.0` without auth.
+    pub fn with_allow_public_bind(mut self, on: bool) -> Self {
+        self.sh.edge.allow_public_bind = on;
+        self
+    }
+    /// Art. 50 disclosure. The demo default is on.
+    pub fn with_disclosure(mut self, on: bool) -> Self {
+        self.sh.edge.disclosure = on;
+        self
+    }
+    /// Override the session lifetime (tests). The env var is whole seconds, clamped.
+    pub fn with_session_ttl(mut self, ttl: Duration) -> Self {
+        self.sh.edge.session_ttl = ttl;
+        self.sh.sessions = Arc::new(SessionStore::new(ttl));
         self
     }
     /// Latest `/dot` JSON exactly as served (includes `"reply"` when one is published).
@@ -445,21 +537,6 @@ impl WebSurface {
     pub fn reply_box(&self) -> ReplyBox { self.sh.replies.clone() }
 }
 
-/// `GALION_CORS_ORIGINS` is a comma-separated allowlist. Unset or `*` keeps the V1
-/// phone default (`*`), because the ngrok hostname changes. A non-empty list echoes
-/// `Origin` only on an exact match and omits the header otherwise.
-pub fn cors_allow_origin(origin: Option<&str>, configured: &str) -> Option<String> {
-    let configured = configured.trim();
-    if configured.is_empty() || configured == "*" {
-        return Some("*".to_string());
-    }
-    let origin = origin.unwrap_or("").trim();
-    if origin.is_empty() {
-        return None;
-    }
-    configured.split(',').map(str::trim).any(|a| a == origin).then(|| origin.to_string())
-}
-
 const SECURITY_HEADERS: &str = concat!(
     "X-Content-Type-Options: nosniff\r\n",
     "Referrer-Policy: no-referrer\r\n",
@@ -467,20 +544,34 @@ const SECURITY_HEADERS: &str = concat!(
     "Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' blob:; style-src 'self' 'unsafe-inline'; connect-src 'self'; worker-src 'self' blob:; img-src 'self' data: blob:; media-src 'self' blob:; base-uri 'none'; frame-ancestors 'none'\r\n",
 );
 
-fn handle(mut stream: std::net::TcpStream, sh: &Shared) {
-    let _ = stream.set_read_timeout(Some(Duration::from_millis(2000)));
-    let (status, ctype, body, origin): (&str, &str, Vec<u8>, Option<String>) = match read_request(&mut stream, MAX_BODY_BYTES) {
-        Err((st, msg)) => (st, "text/plain", msg.as_bytes().to_vec(), None),
-        Ok(req) => {
-            let origin = req.header("origin").map(str::to_string);
-            let (st, ct, body) = route(&req, sh);
-            (st, ct, body, origin)
-        }
-    };
-    let configured = std::env::var("GALION_CORS_ORIGINS").unwrap_or_default();
-    let cors = match cors_allow_origin(origin.as_deref(), &configured) {
+enum Acao {
+    /// Echo this origin, or omit the header when `None` (same-origin / no Origin).
+    Keep(Option<String>),
+    /// Foreign Origin, or a token placed in the query string. No allow-origin header.
+    Omit,
+    /// The request never parsed, so there is no Origin to judge.
+    Unscoped,
+}
+
+fn format_acao(origin: Option<String>) -> String {
+    match origin {
         Some(o) => format!("Access-Control-Allow-Origin: {o}\r\nVary: Origin\r\n"),
         None => String::new(),
+    }
+}
+
+fn handle(mut stream: std::net::TcpStream, sh: &Shared) {
+    let _ = stream.set_read_timeout(Some(Duration::from_millis(2000)));
+    let (status, ctype, mut body, acao) = match read_request(&mut stream, MAX_BODY_BYTES) {
+        Err((st, msg)) => (st, "text/plain", msg.as_bytes().to_vec(), Acao::Unscoped),
+        Ok(mut req) => dispatch(&mut req, sh),
+    };
+    let cors = match acao {
+        Acao::Omit => String::new(),
+        Acao::Keep(o) => format_acao(o),
+        Acao::Unscoped => {
+            if sh.edge.wildcard() { format_acao(Some("*".to_string())) } else { String::new() }
+        }
     };
     let head = format!(
         "HTTP/1.1 {status}\r\nContent-Type: {ctype}\r\nContent-Length: {}\r\nCache-Control: no-store\r\n{cors}Access-Control-Allow-Methods: GET, POST, OPTIONS\r\nAccess-Control-Allow-Headers: {CORS_ALLOW_HEADERS}\r\n{SECURITY_HEADERS}Connection: close\r\n\r\n",
@@ -489,30 +580,105 @@ fn handle(mut stream: std::net::TcpStream, sh: &Shared) {
     let _ = stream.write_all(head.as_bytes());
     let _ = stream.write_all(&body);
     let _ = stream.flush();
+    // The socket has the bytes. Do not leave a token or a WAV sitting in this buffer.
+    zeroise_bytes(&mut body);
 }
 
-fn route(req: &Request, sh: &Shared) -> (&'static str, &'static str, Vec<u8>) {
+fn dispatch(req: &mut Request, sh: &Shared) -> (&'static str, &'static str, Vec<u8>, Acao) {
+    if query_carries_token(&req.query) {
+        zeroise_bytes(&mut req.body);
+        return ("400 Bad Request", "text/plain", b"session token must not be in the URL".to_vec(), Acao::Omit);
+    }
+    let origin = req.header("origin").map(str::to_string);
+    let sensitive = route_is_sensitive(&req.method, &req.path);
+    match check_origin(origin.as_deref(), &sh.edge.cors_origins, sensitive) {
+        OriginCheck::Reject => {
+            zeroise_bytes(&mut req.body);
+            ("403 Forbidden", "text/plain", b"origin rejected".to_vec(), Acao::Omit)
+        }
+        OriginCheck::Allow { acao } => {
+            if route_needs_session(&req.method, &req.path) && sh.edge.session_required() {
+                let mut presented = presented_session(
+                    req.header("x-galion-session"),
+                    req.header("content-type"),
+                    &req.body,
+                );
+                let ok = presented.as_deref().is_some_and(|t| sh.sessions.check(t));
+                if let Some(ref mut p) = presented {
+                    wipe_string(p);
+                }
+                if !ok {
+                    zeroise_bytes(&mut req.body);
+                    return ("401 Unauthorized", "text/plain", b"session required".to_vec(), Acao::Keep(acao));
+                }
+            }
+            let (st, ct, body) = route(req, sh);
+            (st, ct, body, Acao::Keep(acao))
+        }
+    }
+}
+
+/// Mic JSON is re-served on `GET /mic`. Drop the session field before that.
+fn mic_store_body(cleaned: &str) -> String {
+    if !cleaned.starts_with('{') || cleaned.len() > 512 || cleaned.contains("\"session\"") {
+        if let Some(rms) = parse_rms(cleaned) {
+            return format!("{{\"rms\":{rms}}}");
+        }
+        return "{\"raw\":true}".to_string();
+    }
+    cleaned.to_string()
+}
+
+fn route(req: &mut Request, sh: &Shared) -> (&'static str, &'static str, Vec<u8>) {
     let head = req.method == "HEAD";
     let method = if head { "GET" } else { req.method.as_str() };
     let txt = |s: &str| s.as_bytes().to_vec();
     let (st, ct, body) = match (method, req.path.as_str()) {
         ("OPTIONS", _) => ("204 No Content", "text/plain", Vec::new()),
+        ("POST", "/session") => {
+            if req.body.is_empty() {
+                return ("400 Bad Request", "text/plain", txt("empty body"));
+            }
+            if req.body.len() > 512 {
+                zeroise_bytes(&mut req.body);
+                return ("400 Bad Request", "text/plain", txt("session body too large"));
+            }
+            let mut token = sh.sessions.mint();
+            let ttl_s = sh.edge.session_ttl.as_secs();
+            let json = format!("{{\"token\":\"{token}\",\"ttl_s\":{ttl_s},\"transport\":\"body\"}}");
+            wipe_string(&mut token);
+            zeroise_bytes(&mut req.body);
+            ("200 OK", "application/json", json.into_bytes())
+        }
         ("POST", "/mic") => {
-            let s = String::from_utf8_lossy(&req.body);
-            let cleaned = s.trim();
-            let store = if cleaned.starts_with('{') && cleaned.len() <= 512 { cleaned.to_string() } else { "{\"raw\":true}".to_string() };
+            let mut owned = String::from_utf8_lossy(&req.body).into_owned();
+            let cleaned = owned.trim();
+            let store = mic_store_body(cleaned);
             if let Some(r) = parse_rms(cleaned) { sh.mic.set(r); }
             if let Ok(mut g) = sh.latest_mic.lock() { *g = store; }
+            wipe_string(&mut owned);
+            zeroise_bytes(&mut req.body);
             ("204 No Content", "text/plain", Vec::new())
         }
         ("POST", "/turn") => {
-            if req.header("content-length").is_none() { return ("411 Length Required", "text/plain", txt("Content-Length required")); }
+            if req.header("content-length").is_none() {
+                zeroise_bytes(&mut req.body);
+                return ("411 Length Required", "text/plain", txt("Content-Length required"));
+            }
             if req.body.is_empty() { return ("400 Bad Request", "text/plain", txt("empty body")); }
             let fmt = classify_turn(req);
             let n = req.body.len();
-            let id = sh.turns.push(fmt, req.body.clone());
+            let bytes = std::mem::take(&mut req.body);
+            let id = sh.turns.push(fmt, bytes);
             let f = match fmt { TurnFormat::Wav => "wav", TurnFormat::Pcm16 { .. } => "pcm16" };
-            ("202 Accepted", "application/json", format!("{{\"id\":{id},\"bytes\":{n},\"format\":\"{f}\"}}").into_bytes())
+            let json = if sh.edge.disclosure && !sh.disclosure_sent.swap(true, Ordering::SeqCst) {
+                format!(
+                    "{{\"id\":{id},\"bytes\":{n},\"format\":\"{f}\",\"ai_disclosure\":{{\"article\":\"50\",\"hr\":\"{AI_DISCLOSURE_HR}\",\"en\":\"{AI_DISCLOSURE_EN}\",\"audible\":true,\"visible\":true,\"first\":true}}}}"
+                )
+            } else {
+                format!("{{\"id\":{id},\"bytes\":{n},\"format\":\"{f}\"}}")
+            };
+            ("202 Accepted", "application/json", json.into_bytes())
         }
         ("GET", p) => {
             if let Some(id) = p.strip_prefix("/reply/").and_then(|r| r.strip_suffix(".wav")) {
@@ -521,7 +687,11 @@ fn route(req: &Request, sh: &Shared) -> (&'static str, &'static str, Vec<u8>) {
                     _ => ("404 Not Found", "text/plain", txt("not found")),
                 }
             } else { match p {
-                "/" | "/screen" if sh.page.is_some() => ("200 OK", "text/html; charset=utf-8", txt(sh.page.unwrap_or_default())),
+                "/" | "/screen" if sh.page.is_some() => {
+                    let html = sh.page.unwrap_or_default();
+                    let page = if sh.edge.disclosure { html.to_string() } else { strip_ai_disclosure(html) };
+                    ("200 OK", "text/html; charset=utf-8", page.into_bytes())
+                }
                 "/dot" => {
                     let d = sh.latest_dot.lock().map(|g| g.clone()).unwrap_or_default();
                     ("200 OK", "application/json", dot_with_reply(&d, sh.replies.latest_json().as_deref()).into_bytes())
@@ -542,8 +712,13 @@ impl RenderSurface for WebSurface {
     fn open(&mut self) -> Result<(), RenderError> {
         let Some(addr) = self.bind else { return Ok(()) };
         if self.worker.is_some() { return Ok(()); }
-        if !addr.ip().is_loopback() {
-            return Err(RenderError::Unsupported("web surface is localhost-only; refusing non-loopback bind (use an SSH tunnel)"));
+        if let Err(msg) = bind_decision(
+            addr.ip(),
+            self.sh.edge.allow_public_bind,
+            &self.sh.edge.cors_origins,
+            self.sh.edge.require_session,
+        ) {
+            return Err(RenderError::Unsupported(msg));
         }
         let listener = TcpListener::bind(addr)?;
         listener.set_nonblocking(true)?;
@@ -623,8 +798,26 @@ mod tests {
 
     #[test]
     fn refuses_public_bind() {
-        let mut w = WebSurface::serve("0.0.0.0:0".parse().unwrap());
-        assert!(matches!(w.open(), Err(RenderError::Unsupported(_))));
+        let mut w = WebSurface::serve("0.0.0.0:0".parse().unwrap()).with_allow_public_bind(false);
+        let msg = w.open().unwrap_err().to_string();
+        assert!(msg.contains("localhost-only"), "{msg}");
+        assert!(w.local_addr().is_none());
+    }
+
+    #[test]
+    fn refuses_public_bind_when_flagged_without_auth() {
+        let mut w = WebSurface::serve("0.0.0.0:0".parse().unwrap())
+            .with_allow_public_bind(true)
+            .with_cors_origins("*")
+            .with_require_session(true);
+        let msg = w.open().unwrap_err().to_string();
+        assert!(msg.contains("exact") && msg.contains("GALION_REQUIRE_SESSION"), "{msg}");
+        let mut w = WebSurface::serve("0.0.0.0:0".parse().unwrap())
+            .with_allow_public_bind(true)
+            .with_cors_origins("https://voice.example");
+        let msg = w.open().unwrap_err().to_string();
+        assert!(msg.contains("GALION_REQUIRE_SESSION"), "{msg}");
+        assert!(w.local_addr().is_none(), "flag without auth must not listen");
     }
 
     fn get(addr: SocketAddr, path: &str) -> String {
@@ -874,25 +1067,181 @@ mod tests {
     #[test]
     fn cors_allowlist_is_exact_and_star_is_default() {
         assert_eq!(cors_allow_origin(None, ""), Some("*".into()));
-        assert_eq!(cors_allow_origin(Some("https://a.ngrok-free.dev"), "*"), Some("*".into()));
+        assert_eq!(cors_allow_origin(Some("https://a.ngrok-free.dev"), ""), Some("*".into()));
+        assert_eq!(cors_allow_origin(Some("https://a.ngrok-free.dev"), "*"), None, "star only when the list is unset");
         assert_eq!(
             cors_allow_origin(Some("https://voice.example"), "https://voice.example, http://127.0.0.1:7878"),
             Some("https://voice.example".into())
         );
+        assert_eq!(cors_allow_origin(Some("http://127.0.0.1:7878"), "https://voice.example, http://127.0.0.1:7878"), Some("http://127.0.0.1:7878".into()));
         assert_eq!(cors_allow_origin(Some("https://evil.example"), "https://voice.example"), None);
+        assert_eq!(cors_allow_origin(Some("https://voice.example.evil"), "https://voice.example"), None);
         assert_eq!(cors_allow_origin(None, "https://voice.example"), None);
     }
 
     #[test]
     fn responses_carry_edge_security_headers() {
-        let mut w = WebSurface::serve("127.0.0.1:0".parse().unwrap());
+        let mut w = WebSurface::serve("127.0.0.1:0".parse().unwrap()).with_cors_origins("");
         w.open().unwrap();
         let r = get(w.local_addr().unwrap(), "/health");
         assert!(r.contains("X-Content-Type-Options: nosniff"), "{r}");
         assert!(r.contains("Referrer-Policy: no-referrer"), "{r}");
         assert!(r.contains("Permissions-Policy: microphone=(self)"), "{r}");
         assert!(r.contains("Content-Security-Policy:"), "{r}");
+        assert!(r.contains("Cache-Control: no-store"), "{r}");
         assert!(r.contains("Access-Control-Allow-Origin: *"), "{r}");
+        assert!(r.contains("X-Galion-Session"), "{r}");
         w.close().unwrap();
+    }
+
+    fn exchange(addr: SocketAddr, req: &[u8]) -> (String, String) {
+        let (h, b) = split_resp(&raw(addr, req));
+        (h, String::from_utf8_lossy(&b).into_owned())
+    }
+
+    #[test]
+    fn foreign_origin_is_rejected_without_acao() {
+        let mut w = WebSurface::serve("127.0.0.1:0".parse().unwrap())
+            .with_cors_origins("https://voice.example, http://127.0.0.1:7878");
+        w.open().unwrap();
+        let a = w.local_addr().unwrap();
+        let (h, body) = exchange(a, b"GET /health HTTP/1.1\r\nOrigin: https://evil.example\r\n\r\n");
+        assert!(h.starts_with("HTTP/1.1 403"), "{h}");
+        assert_eq!(body, "origin rejected");
+        assert!(!h.contains("Access-Control-Allow-Origin"), "{h}");
+        assert!(h.contains("X-Content-Type-Options: nosniff"), "{h}");
+        assert!(h.contains("Content-Security-Policy:"), "{h}");
+        assert!(h.contains("Cache-Control: no-store"), "{h}");
+        let (h, _) = exchange(a, b"OPTIONS /turn HTTP/1.1\r\nOrigin: https://voice.example.evil\r\n\r\n");
+        assert!(h.starts_with("HTTP/1.1 403") && !h.contains("Access-Control-Allow-Origin"), "{h}");
+        let (h, _) = exchange(a, b"GET /health HTTP/1.1\r\nOrigin: https://voice.example\r\n\r\n");
+        assert!(h.starts_with("HTTP/1.1 200"), "{h}");
+        assert!(h.contains("Access-Control-Allow-Origin: https://voice.example\r\n"), "{h}");
+        assert!(!h.contains("Access-Control-Allow-Origin: *"), "{h}");
+        let (h, _) = exchange(a, b"GET /health HTTP/1.1\r\nHost: x\r\n\r\n");
+        assert!(h.starts_with("HTTP/1.1 200") && !h.contains("Access-Control-Allow-Origin"), "no Origin, no echo: {h}");
+        let (h, _) = exchange(a, b"POST /turn HTTP/1.1\r\nContent-Length: 2\r\n\r\n\x00\x00");
+        assert!(h.starts_with("HTTP/1.1 403"), "sensitive route without Origin: {h}");
+        w.close().unwrap();
+    }
+
+    #[test]
+    fn session_token_is_in_body_not_url() {
+        let mut w = WebSurface::serve("127.0.0.1:0".parse().unwrap())
+            .with_cors_origins("https://voice.example")
+            .with_session_ttl(Duration::from_secs(120));
+        let inbox = w.turn_inbox();
+        w.open().unwrap();
+        let a = w.local_addr().unwrap();
+        let (h, _) = exchange(a, b"POST /turn?token=abc HTTP/1.1\r\nOrigin: https://voice.example\r\nContent-Length: 2\r\n\r\n\x00\x00");
+        assert!(h.starts_with("HTTP/1.1 400"), "{h}");
+        assert!(!h.contains("Access-Control-Allow-Origin"), "query token is not echoed: {h}");
+        assert_eq!(inbox.pending(), 0);
+        let (h, body) = exchange(
+            a,
+            b"POST /session HTTP/1.1\r\nOrigin: https://voice.example\r\nContent-Type: application/json\r\nContent-Length: 13\r\n\r\n{\"op\":\"open\"}",
+        );
+        assert!(h.starts_with("HTTP/1.1 200"), "{h} {body}");
+        assert!(body.contains("\"transport\":\"body\""), "{body}");
+        let token = parse_json_string_field(&body, "token").expect("token in body");
+        assert_eq!(token.len(), 64);
+        assert!(!body.contains('?') && !h.contains(&token));
+        let (h, _) = exchange(
+            a,
+            b"POST /turn HTTP/1.1\r\nOrigin: https://voice.example\r\nContent-Type: application/octet-stream\r\nContent-Length: 2\r\n\r\n\x01\x00",
+        );
+        assert!(h.starts_with("HTTP/1.1 401"), "allow-list requires a session: {h}");
+        assert!(h.contains("Access-Control-Allow-Origin: https://voice.example"), "{h}");
+        let req = format!(
+            "POST /turn HTTP/1.1\r\nOrigin: https://voice.example\r\nX-Galion-Session: {token}\r\nContent-Type: application/octet-stream\r\nContent-Length: 2\r\n\r\n"
+        );
+        let mut bytes = req.into_bytes();
+        bytes.extend_from_slice(&[0x02, 0x00]);
+        let (h, turn_body) = exchange(a, &bytes);
+        assert!(h.starts_with("HTTP/1.1 202"), "{h} {turn_body}");
+        assert!(turn_body.contains(AI_DISCLOSURE_HR) && turn_body.contains(AI_DISCLOSURE_EN), "{turn_body}");
+        assert!(turn_body.contains("\"article\":\"50\""), "{turn_body}");
+        let mic = format!(
+            "{{\"rms\":0.2,\"session\":\"{token}\"}}"
+        );
+        let req = format!(
+            "POST /mic HTTP/1.1\r\nOrigin: https://voice.example\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{mic}",
+            mic.len()
+        );
+        let (h, _) = exchange(a, req.as_bytes());
+        assert!(h.starts_with("HTTP/1.1 204"), "{h}");
+        let stored = get(a, "/mic");
+        assert!(!stored.contains(&token), "token must not be re-served: {stored}");
+        assert!(stored.contains("\"rms\":"));
+        let again = format!(
+            "POST /turn HTTP/1.1\r\nOrigin: https://voice.example\r\nX-Galion-Session: {token}\r\nContent-Length: 2\r\n\r\n"
+        );
+        let mut bytes = again.into_bytes();
+        bytes.extend_from_slice(&[0, 0]);
+        let (_, second) = exchange(a, &bytes);
+        assert!(!second.contains("ai_disclosure"), "disclosure is the first turn only: {second}");
+        w.close().unwrap();
+    }
+
+    #[test]
+    fn session_token_expires_and_v1_still_accepts_a_turn() {
+        let mut w = WebSurface::serve("127.0.0.1:0".parse().unwrap())
+            .with_require_session(true)
+            .with_session_ttl(Duration::from_millis(40));
+        w.open().unwrap();
+        let a = w.local_addr().unwrap();
+        let (h, _) = exchange(a, b"POST /turn HTTP/1.1\r\nContent-Length: 2\r\n\r\n\x00\x00");
+        assert!(h.starts_with("HTTP/1.1 401"), "{h}");
+        let (h, body) = exchange(a, b"POST /session HTTP/1.1\r\nContent-Type: application/json\r\nContent-Length: 13\r\n\r\n{\"op\":\"open\"}");
+        assert!(h.starts_with("HTTP/1.1 200"), "{h} {body}");
+        let token = parse_json_string_field(&body, "token").unwrap();
+        let req = format!("POST /turn HTTP/1.1\r\nX-Galion-Session: {token}\r\nContent-Length: 2\r\n\r\n");
+        let mut bytes = req.into_bytes();
+        bytes.extend_from_slice(&[0, 1]);
+        assert!(exchange(a, &bytes).0.starts_with("HTTP/1.1 202"));
+        std::thread::sleep(Duration::from_millis(80));
+        let req = format!("POST /turn HTTP/1.1\r\nX-Galion-Session: {token}\r\nContent-Length: 2\r\n\r\n");
+        let mut bytes = req.into_bytes();
+        bytes.extend_from_slice(&[0, 1]);
+        assert!(exchange(a, &bytes).0.starts_with("HTTP/1.1 401"), "expired");
+        w.close().unwrap();
+
+        let mut w = WebSurface::serve("127.0.0.1:0".parse().unwrap());
+        let inbox = w.turn_inbox();
+        w.open().unwrap();
+        let (h, body) = exchange(w.local_addr().unwrap(), b"POST /turn HTTP/1.1\r\nContent-Length: 2\r\n\r\n\x00\x00");
+        assert!(h.starts_with("HTTP/1.1 202"), "V1 wildcard does not require a session: {h} {body}");
+        assert!(body.contains(AI_DISCLOSURE_HR));
+        assert_eq!(inbox.pending(), 1);
+        w.close().unwrap();
+    }
+
+    #[test]
+    fn disclosure_flag_off_strips_the_page_and_the_first_turn() {
+        let page = "<!--galion-ai-disclosure--><p id=\"ai-disclosure\">AI</p><!--/galion-ai-disclosure--><canvas id=\"s\">";
+        let mut w = WebSurface::serve("127.0.0.1:0".parse().unwrap())
+            .with_disclosure(false)
+            .with_page(page);
+        w.open().unwrap();
+        let a = w.local_addr().unwrap();
+        let r = get(a, "/");
+        assert!(r.contains("<canvas id=\"s\">"), "{r}");
+        assert!(!r.contains("ai-disclosure"), "{r}");
+        let (_, body) = exchange(a, b"POST /turn HTTP/1.1\r\nContent-Length: 2\r\n\r\n\x00\x00");
+        assert!(!body.contains("ai_disclosure") && !body.contains(AI_DISCLOSURE_EN), "{body}");
+        w.close().unwrap();
+    }
+
+    #[test]
+    fn turn_body_is_zeroised_on_wipe() {
+        let mut t = Turn {
+            id: 1,
+            format: TurnFormat::Pcm16 { rate: 16_000, channels: 1 },
+            bytes: b"RIFFPCM_SECRET_0123456789".to_vec(),
+            received_at: Instant::now(),
+        };
+        t.wipe();
+        assert!(t.bytes.iter().all(|&b| b == 0));
+        assert!(!t.bytes.is_empty());
     }
 }
