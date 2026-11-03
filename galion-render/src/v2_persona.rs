@@ -1,4 +1,6 @@
-//! Galion Voice V2 persona floor for the `/v2` demo.
+//! Galion Voice persona floor for the one circle page (`/`).
+//!
+//! `GET /v2` redirects there. This module still answers `POST /v2/say`.
 //!
 //! Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
 //!
@@ -107,6 +109,8 @@ pub struct Floor {
     mouth: &'static str,
     checkpoint: &'static str,
     mood: &'static str,
+    /// Set once a turn has chosen the mood. Until then `/dot` keeps the heartbeat emotion.
+    mood_from_turn: bool,
     books: Books,
 }
 
@@ -124,9 +128,10 @@ impl Floor {
             last_fact: String::new(),
             speaking_until: Instant::now(),
             high_e: 0,
-            mouth: "browser",
+            mouth: "piper",
             checkpoint: "en_US-ljspeech-medium",
             mood: "calm",
+            mood_from_turn: false,
             books: Books::load(),
         }
     }
@@ -196,6 +201,11 @@ impl Floor {
 
     pub fn mood(&self) -> &'static str {
         self.mood
+    }
+
+    /// True after [`Self::say`] / [`Self::say_turn`] has classified a turn.
+    pub fn mood_from_turn(&self) -> bool {
+        self.mood_from_turn
     }
 
     pub fn state_json(&self) -> String {
@@ -410,8 +420,8 @@ fn reply_for(id: PersonaId, low: &str, raw: &str) -> (String, bool, Option<Strin
     }
     if is_sound(low) || low.contains("film") && (low.contains("you") || low.contains("voice")) {
         let line = match id {
-            PersonaId::Samantha => "The register is the test. This page uses the browser's voice, not Piper, and not the film.",
-            PersonaId::Jarvis => "Browser speech. Not Piper, and not the film voice.",
+            PersonaId::Samantha => "The register is the test. This page speaks with Piper, not a film voice.",
+            PersonaId::Jarvis => "Piper. Not the film voice.",
         };
         return (line.to_string(), false, None);
     }
@@ -722,15 +732,62 @@ pub fn json_field_f32(body: &str, key: &str) -> f32 {
     rest[..end].parse().unwrap_or(0.0)
 }
 
-pub fn annotate_dot(dot: &str, persona: &str, mood: &str) -> String {
-    let dot = dot.trim();
-    let extra = format!("\"persona\":\"{persona}\",\"mood\":\"{mood}\"");
+/// Valence (−1..1) and arousal (0..1) that match a turn mood.
+/// The circle reads these beside `emotion.label`, so they stay one story.
+pub fn mood_affect(mood: &str) -> (f32, f32) {
+    match mood {
+        "grief" => (-0.55, 0.42),
+        "joy" => (0.72, 0.66),
+        "vulnerability" => (-0.32, 0.36),
+        "quiet" => (0.04, 0.08),
+        _ => (0.10, 0.18),
+    }
+}
+
+fn known_mood(mood: &str) -> &'static str {
+    match mood {
+        "grief" => "grief",
+        "joy" => "joy",
+        "vulnerability" => "vulnerability",
+        "quiet" => "quiet",
+        _ => "calm",
+    }
+}
+
+/// Rewrite the top-level `"emotion"` object so its label, valence, and arousal
+/// match `mood`. Lean is kept. No emotion object → the string is unchanged.
+pub fn align_emotion(dot: &str, mood: &str) -> String {
+    let key = "\"emotion\":{";
+    let Some(i) = dot.rfind(key) else { return dot.to_string() };
+    let start = i + key.len();
+    let Some(rel) = dot[start..].find('}') else { return dot.to_string() };
+    let inner = &dot[start..start + rel];
+    let lean = json_field_f32(&format!("{{{inner}}}"), "lean");
+    let mood = known_mood(mood);
+    let (valence, arousal) = mood_affect(mood);
+    let new_inner = format!(
+        "\"sense\":true,\"label\":\"{mood}\",\"valence\":{valence:.3},\"arousal\":{arousal:.3},\"lean\":{lean:.3}"
+    );
+    format!("{}{new_inner}{}", &dot[..start], &dot[start + rel..])
+}
+
+/// Attach persona, and mood when a turn has set one.
+/// `mood = Some` also rewrites `emotion` so the two fields agree.
+pub fn annotate_dot(dot: &str, persona: &str, mood: Option<&str>) -> String {
+    let dot = match mood {
+        Some(m) => align_emotion(dot.trim(), m),
+        None => dot.trim().to_string(),
+    };
+    let extra = match mood {
+        Some(m) => format!("\"persona\":\"{persona}\",\"mood\":\"{}\"", known_mood(m)),
+        None => format!("\"persona\":\"{persona}\""),
+    };
     if dot.is_empty() || dot == "{}" {
         return format!("{{{extra}}}");
     }
     match dot.strip_suffix('}') {
         Some(stripped) => format!("{stripped},{extra}}}"),
-        None => dot.to_string(),
+        None => dot,
     }
 }
 
@@ -767,6 +824,10 @@ fn sound_line(id: PersonaId, mouth: &str) -> String {
             "The register is the test. This page is speaking with flite, not Piper, and not the film.".into()
         }
         (PersonaId::Jarvis, "flite") => "Flite. Not Piper, and not the film voice.".into(),
+        (PersonaId::Samantha, "piper") => {
+            "The register is the test. This page speaks with Piper, not a film voice.".into()
+        }
+        (PersonaId::Jarvis, "piper") => "Piper. Not the film voice.".into(),
         (PersonaId::Samantha, _) => {
             "The register is the test. This page uses the browser's voice, not Piper, and not the film.".into()
         }
@@ -836,6 +897,7 @@ impl Floor {
             self.last_fact = fact;
         }
         self.mood = mood_of(&reply, silence);
+        self.mood_from_turn = true;
         self.finish(reply, silence, barge, e, sense)
     }
 }
@@ -989,6 +1051,34 @@ mod tests {
         let both = f.say_turn("Book a flight and also tell me if I should leave him.", false, 0.0, false);
         assert!(both.reply.contains("can't book"));
         assert!(both.reply.contains("yours"));
+    }
+
+    #[test]
+    fn piper_mouth_names_piper_and_not_the_film() {
+        let mut f = Floor::new();
+        let s = f.say_turn("What do you sound like?", false, 0.0, false);
+        assert_eq!(s.mouth, "piper");
+        assert!(s.reply.contains("Piper"), "{}", s.reply);
+        assert!(s.reply.contains("not a film"), "{}", s.reply);
+        assert!(!s.reply.to_ascii_lowercase().contains("browser"), "{}", s.reply);
+        assert!(f.mood_from_turn());
+        no_script(&s);
+    }
+
+    #[test]
+    fn turn_mood_rewrites_emotion_label() {
+        let dot = r#"{"t_ms":1,"emotion":{"sense":true,"label":"calm","valence":0.000,"arousal":0.003,"lean":0.500}}"#;
+        let out = annotate_dot(dot, "samantha", Some("grief"));
+        assert!(out.contains("\"persona\":\"samantha\""), "{out}");
+        assert!(out.contains("\"mood\":\"grief\""), "{out}");
+        assert!(out.contains("\"label\":\"grief\""), "{out}");
+        assert!(out.contains("\"valence\":-0.550"), "{out}");
+        assert!(out.contains("\"arousal\":0.420"), "{out}");
+        assert!(out.contains("\"lean\":0.500"), "{out}");
+        assert!(!out.contains("\"label\":\"calm\""), "{out}");
+        let idle = annotate_dot(dot, "samantha", None);
+        assert!(idle.contains("\"label\":\"calm\""), "{idle}");
+        assert!(!idle.contains("\"mood\""), "{idle}");
     }
 
     #[test]

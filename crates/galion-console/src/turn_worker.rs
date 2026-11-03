@@ -16,7 +16,7 @@
 //! ASR and again before the reply is handed back. The same token drops Piper clauses
 //! that have not started. The thread and the Piper process are not killed.
 
-use std::sync::mpsc::{sync_channel, Receiver, TryRecvError};
+use std::sync::mpsc::{sync_channel, Receiver, RecvTimeoutError, SyncSender, TryRecvError, TrySendError};
 use std::time::Instant;
 
 use galion_cascade::en_lane::{wav_bytes, LANE_RATE_HZ};
@@ -104,11 +104,24 @@ fn wipe_string(s: &mut String) {
     std::hint::black_box(v.as_slice());
 }
 
-/// Handle owned by the heartbeat loop. The loop only calls [`Self::try_submit`] and
-/// [`Self::try_recv`]; both return immediately.
+/// Persona reply text to speak as-is (no ASR, no canned table).
+pub struct SpeakJob {
+    pub id: u64,
+    pub text: String,
+}
+
+impl Drop for SpeakJob {
+    fn drop(&mut self) {
+        wipe_string(&mut self.text);
+    }
+}
+
+/// Handle owned by the heartbeat loop. The loop only calls [`Self::try_submit`],
+/// [`Self::try_speak`], and [`Self::try_recv`]; all three return immediately.
 pub struct TurnWorker {
     bus: ProcessBus,
     reply_rx: Receiver<TurnReply>,
+    speak_tx: SyncSender<SpeakJob>,
 }
 
 impl TurnWorker {
@@ -138,34 +151,62 @@ impl TurnWorker {
         let job_rx = bus.take_job_rx().expect("job receiver taken once");
         let gate = bus.gate();
         let (rtx, reply_rx) = sync_channel::<TurnReply>(WORKER_REPLY_DEPTH);
+        let (speak_tx, speak_rx) = sync_channel::<SpeakJob>(1);
         let (ready_tx, ready_rx) = std::sync::mpsc::channel::<()>();
         std::thread::Builder::new()
             .name("galion-turn-worker".into())
             .spawn(move || {
                 let mut lane = PhoneLane::new(cfg);
                 let _ = ready_tx.send(());
-                while let Ok(msg) = job_rx.recv() {
-                    let turn_id = msg.turn_id;
-                    if !gate.admit_asr(turn_id) {
-                        continue; // superseded (barge-in) before ASR
+                loop {
+                    match speak_rx.try_recv() {
+                        Ok(job) => {
+                            let turn_id = job.id;
+                            if !gate.admit_asr(turn_id) {
+                                continue;
+                            }
+                            let Some(reply) = respond_speak(&mut lane, job, &gate) else {
+                                let _ = gate.admit_publish(turn_id);
+                                continue;
+                            };
+                            if !gate.admit_publish(reply.id) {
+                                continue;
+                            }
+                            if rtx.try_send(reply).is_err() {
+                                gate.note_worker_reply_dropped();
+                            }
+                            continue;
+                        }
+                        Err(TryRecvError::Disconnected) => break,
+                        Err(TryRecvError::Empty) => {}
                     }
-                    let job = turn_job_from(msg);
-                    let Some(reply) = respond(&mut lane, job, &gate) else {
-                        let _ = gate.admit_publish(turn_id);
-                        continue; // superseded while synthesizing, before publish
-                    };
-                    if !gate.admit_publish(reply.id) {
-                        continue;
-                    }
-                    if rtx.try_send(reply).is_err() {
-                        // depth 4 and full, or the host is gone: drop, never block
-                        gate.note_worker_reply_dropped();
+                    match job_rx.recv_timeout(std::time::Duration::from_millis(25)) {
+                        Ok(msg) => {
+                            let turn_id = msg.turn_id;
+                            if !gate.admit_asr(turn_id) {
+                                continue; // superseded (barge-in) before ASR
+                            }
+                            let job = turn_job_from(msg);
+                            let Some(reply) = respond(&mut lane, job, &gate) else {
+                                let _ = gate.admit_publish(turn_id);
+                                continue; // superseded while synthesizing, before publish
+                            };
+                            if !gate.admit_publish(reply.id) {
+                                continue;
+                            }
+                            if rtx.try_send(reply).is_err() {
+                                // depth 4 and full, or the host is gone: drop, never block
+                                gate.note_worker_reply_dropped();
+                            }
+                        }
+                        Err(RecvTimeoutError::Timeout) => continue,
+                        Err(RecvTimeoutError::Disconnected) => break,
                     }
                 }
             })
             .expect("spawn turn worker");
         ready_rx.recv().expect("turn worker stopped during lane start");
-        Self { bus, reply_rx }
+        Self { bus, reply_rx, speak_tx }
     }
 
     pub fn bus(&self) -> &ProcessBus {
@@ -176,6 +217,18 @@ impl TurnWorker {
     /// Older in-flight work is dropped. The thread keeps running.
     pub fn supersede(&self, id: u64) {
         self.bus.supersede(id);
+    }
+
+    /// Speak `text` as the persona already wrote it. `Err(text)` when the slot is full.
+    /// An older id does not rewind the cancel token.
+    pub fn try_speak(&self, id: u64, text: String) -> Result<(), String> {
+        self.supersede(id);
+        match self.speak_tx.try_send(SpeakJob { id, text }) {
+            Ok(()) => Ok(()),
+            Err(TrySendError::Full(mut job) | TrySendError::Disconnected(mut job)) => {
+                Err(std::mem::take(&mut job.text))
+            }
+        }
     }
 
     /// Non-blocking submit. `Err(job)` when the depth-1 job lane is full.
@@ -217,6 +270,61 @@ fn turn_job_from(msg: BusMsg) -> TurnJob {
         id: msg.turn_id,
         rate,
         pcm,
+    }
+}
+
+fn respond_speak(lane: &mut PhoneLane, mut job: SpeakJob, gate: &BusGate) -> Option<TurnReply> {
+    let persona = gate.persona_id().as_str();
+    let id = job.id;
+    lane.arm_cancel(gate.cancel_token(), id);
+    let t0 = Instant::now();
+    let mut text = std::mem::take(&mut job.text);
+    let result = lane.speak_fixed(&text);
+    wipe_string(&mut text);
+    drop(job);
+    match result {
+        Ok(t) => {
+            let pcm = reply_pcm(&t.wav_bytes);
+            let ms = (pcm.len() as u64 * 1000 / LANE_RATE_HZ as u64) as u32;
+            Some(TurnReply {
+                id,
+                transcript: String::new(),
+                text: t.reply_text,
+                pcm,
+                wav: t.wav_bytes,
+                ms,
+                backend: t.speech_backend,
+                asr: t.asr.id(),
+                llm: "persona-floor",
+                stages: format!("tts={} tts_first={}", t.stage_ms.tts, t.stage_ms.tts_first_pcm),
+                error: None,
+                in_ms: 0,
+                took_ms: t0.elapsed().as_millis() as u32,
+                persona,
+            })
+        }
+        Err(PhoneError::Superseded) => None,
+        Err(PhoneError::Empty) => None,
+        Err(e) => {
+            let pcm = tone();
+            let ms = (pcm.len() as u64 * 1000 / LANE_RATE_HZ as u64) as u32;
+            Some(TurnReply {
+                id,
+                transcript: String::new(),
+                text: String::new(),
+                wav: wav_bytes(&pcm, LANE_RATE_HZ),
+                pcm,
+                ms,
+                backend: "tone",
+                asr: "text-inject",
+                llm: "persona-floor",
+                stages: String::new(),
+                error: Some(format!("NoSpeech: {e}")),
+                in_ms: 0,
+                took_ms: t0.elapsed().as_millis() as u32,
+                persona,
+            })
+        }
     }
 }
 

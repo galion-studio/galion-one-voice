@@ -332,6 +332,16 @@ impl PhoneLane {
         self.emit(t0, asr_ms, llm_ms, transcript, asr, reply_text)
     }
 
+    /// Speak `text` as given. No ASR and no canned reply.
+    /// The persona floor already chose the words. ASR label is `text-inject`.
+    pub fn speak_fixed(&mut self, text: &str) -> Result<PhoneTurn, PhoneError> {
+        let mut owned = text.trim().to_string();
+        if owned.is_empty() { return Err(PhoneError::Empty); }
+        if owned.len() > 2000 { owned.truncate(2000); }
+        let t0 = Instant::now();
+        self.emit(t0, 0, 0, String::new(), AsrSource::TextInject, owned)
+    }
+
     /// Full turn from harness-supplied text (CannedLlm or echo, then Piper/flite).
     /// ASR label is `text-inject`. Not speech recognition.
     pub fn turn_text(&mut self, text: &str) -> Result<PhoneTurn, PhoneError> {
@@ -491,6 +501,12 @@ mod tests {
             assert_eq!(spawns, 1, "prewarm should be the only spawn");
             assert_eq!(spawns2, 1, "second turn must reuse the worker");
         }
+    }
+    #[test] fn speak_fixed_skips_the_canned_table() {
+        let mut l = PhoneLane::with_speech(cfg(AsrMode::Stub), galion_ml_voice::speech::SpeechStack::silent("off"));
+        assert!(matches!(l.speak_fixed("  "), Err(PhoneError::Empty)));
+        let e = l.speak_fixed("Your mother died this morning.").unwrap_err();
+        assert!(matches!(e, PhoneError::NoSpeech(_)), "{e}");
     }
     #[test] fn speech_off_is_not_a_spoken_reply() {
         let mut l = PhoneLane::with_speech(cfg(AsrMode::Interim), galion_ml_voice::speech::SpeechStack::silent("GALION_SPEECH=off"));

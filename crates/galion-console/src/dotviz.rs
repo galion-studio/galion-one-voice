@@ -33,8 +33,41 @@ use crate::live::{AffectFeed, AffectReading, LiveSnapshot, Stage, StageLatencies
 /// `/dot` every 80 ms. See docs/agent-v1-demo/V1-01-STATUS.md.
 pub const SCREEN_HTML: &str = include_str!("../assets/v1-screen.html");
 
-/// V2 one-dot for the Samantha / Jarvis test. Served at `/v2`.
+/// `/v2` redirect. The circle lives on [`SCREEN_HTML`].
 pub const V2_SCREEN_HTML: &str = include_str!("../assets/v2-screen.html");
+
+/// One beat of the opt-in room/you/me demo (`dot_console_demo --synthetic`).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum DemoSeg {
+    /// Digital silence. The default when `--synthetic` is off.
+    Idle,
+    Room,
+    Breath,
+    You,
+    Me,
+}
+
+const DEMO_CYCLE: u64 = 75;
+
+/// Scripted room → breath → you → me. `barge` is you talking over me on odd turns.
+pub fn demo_script(i: u64) -> (DemoSeg, bool) {
+    let c = i % DEMO_CYCLE;
+    let barge_turn = (i / DEMO_CYCLE) % 2 == 1;
+    let s = match c {
+        0..=11 => DemoSeg::Room,
+        12..=16 => DemoSeg::Breath,
+        17..=36 => DemoSeg::You,
+        37..=42 => DemoSeg::Room,
+        43..=67 => DemoSeg::Me,
+        _ => DemoSeg::Room,
+    };
+    (s, barge_turn && (58..=63).contains(&c))
+}
+
+/// `synthetic == false` stays on a silent frame: no room, no you, no me.
+pub fn demo_band(synthetic: bool, i: u64) -> (DemoSeg, bool) {
+    if synthetic { demo_script(i) } else { (DemoSeg::Idle, false) }
+}
 
 /// Root-mean-square of a PCM slice (0 for empty).
 pub fn rms(pcm: &[f32]) -> f32 {
@@ -396,11 +429,17 @@ mod tests {
 
     #[test]
     fn screen_page_is_phone_path_and_v2_orb() {
-        assert!(V2_SCREEN_HTML.contains("data-persona=\"samantha\""));
-        assert!(V2_SCREEN_HTML.contains("createRadialGradient"));
-        assert!(V2_SCREEN_HTML.contains("v2/say"));
-        assert!(V2_SCREEN_HTML.contains("not a film clone"));
-        assert!(!V2_SCREEN_HTML.contains("I hear you"));
+        assert!(V2_SCREEN_HTML.contains("url=/"));
+        assert!(V2_SCREEN_HTML.contains("location.replace"));
+        assert!(!V2_SCREEN_HTML.contains("createRadialGradient"), "the second circle page is gone");
+        assert!(SCREEN_HTML.contains("data-persona=\"samantha\""));
+        assert!(SCREEN_HTML.contains("data-mouth=\"piper\""));
+        assert!(SCREEN_HTML.contains("data-film-voice=\"false\""));
+        assert!(SCREEN_HTML.contains("data-rights=\"hold\""));
+        assert!(SCREEN_HTML.contains("id=\"say-text\""));
+        assert!(SCREEN_HTML.contains("v2/say"));
+        assert!(SCREEN_HTML.contains("not a film clone"));
+        assert!(!SCREEN_HTML.contains("I hear you"));
         assert!(SCREEN_HTML.contains("POST /turn"));
         assert!(SCREEN_HTML.contains("function spring"));
         assert!(SCREEN_HTML.contains("samplePlayEnv"));
@@ -429,6 +468,20 @@ mod tests {
         assert!(SCREEN_HTML.contains("function markInner"));
         assert!(SCREEN_HTML.contains("dot:\"#F5F5F7\""));
         assert!(!SCREEN_HTML.contains("#B695CF"), "heather is not painted; the lock keeps the circle");
+    }
+
+    #[test]
+    fn synthetic_room_script_is_opt_in() {
+        assert_eq!(demo_band(false, 20), (DemoSeg::Idle, false));
+        assert_eq!(demo_band(false, 50), (DemoSeg::Idle, false));
+        assert_eq!(demo_band(false, 75 + 60), (DemoSeg::Idle, false));
+        assert_eq!(demo_band(true, 14).0, DemoSeg::Breath);
+        assert_eq!(demo_band(true, 20).0, DemoSeg::You);
+        assert_eq!(demo_band(true, 50).0, DemoSeg::Me);
+        assert!(!demo_band(true, 60).1, "even turns do not barge");
+        let (seg, barge) = demo_band(true, 75 + 60);
+        assert_eq!(seg, DemoSeg::Me);
+        assert!(barge, "odd turns barge across the me window");
     }
 
     #[test]

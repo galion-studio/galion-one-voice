@@ -14,46 +14,25 @@
 //!   --feed stub|real   timing/affect feeds (default real when compiled: galion-tensor
 //!                      kernel timing + galion-emotion SENSE; stub = deterministic)
 //!   --sense-off        SENSE consent off: affect shows "no reading", Rika stays OFF
-//!   --web ADDR         also serve /frame + /dot JSON (needs feature dot-viz-web)
+//!   --web ADDR         also serve / + /dot JSON (needs feature dot-viz-web).
+//!                      GET /v2 redirects to /.
+//!   --synthetic        scripted room → you → me loop. Off by default: silence
+//!                      until a mic level or a typed line arrives.
 //!   --no-dot           panel without the terminal dot
 //! NO_COLOR=1 for monochrome.
 //! ```
-//! Synthetic conversation (no mic, no model, no weights): room → in-breath →
-//! you speak → pause → me speaks (and a barge-in every other turn), looping 6 s.
+//! Without `--synthetic` the you and me bands stay silent, so the circle
+//! idles until a phone turn. `--synthetic` is the old room → in-breath →
+//! you speak → pause → me speaks loop (barge-in every other turn, 6 s).
 
 use std::io::{IsTerminal, Write};
 use std::time::{Duration, Instant};
 
-use galion_console::dotviz::{DemoPump, DotConsole, PanelOpts};
+use galion_console::dotviz::{demo_band, DemoPump, DemoSeg, DotConsole, PanelOpts};
 use galion_console::live::{AffectFeed, StubAffect, StubTiming, TimingFeed};
 use galion_emotion::{DefaultConsentGate, Purpose};
 use galion_heartbeat::{FrameIn, Heartbeat, HeartbeatConfig, FRAME_MS, FRAME_SAMPLES, RIKA_BITS, SAMPLE_RATE};
 use galion_render::{PngSeqConfig, PngSeqSurface};
-
-const CYCLE: u64 = 75; // 6 s
-
-#[derive(Clone, Copy, PartialEq, Debug)]
-enum Seg {
-    Room,
-    Breath,
-    You,
-    Me,
-}
-
-fn seg(i: u64) -> (Seg, bool) {
-    let c = i % CYCLE;
-    let barge_turn = (i / CYCLE) % 2 == 1;
-    let s = match c {
-        0..=11 => Seg::Room,
-        12..=16 => Seg::Breath,
-        17..=36 => Seg::You,
-        37..=42 => Seg::Room,
-        43..=67 => Seg::Me,
-        _ => Seg::Room,
-    };
-    // Barge-in: you talk over me for 6 frames on odd turns.
-    (s, barge_turn && (58..=63).contains(&c))
-}
 
 struct Lcg(u64);
 impl Lcg {
@@ -63,14 +42,14 @@ impl Lcg {
     }
 }
 
-fn fill_you(buf: &mut [f32], i: u64, s: Seg, barge: bool, rng: &mut Lcg) {
-    let voice = s == Seg::You || barge;
+fn fill_you(buf: &mut [f32], i: u64, s: DemoSeg, barge: bool, rng: &mut Lcg) {
+    let voice = s == DemoSeg::You || barge;
     for (k, x) in buf.iter_mut().enumerate() {
         let n = (i as usize * FRAME_SAMPLES + k) as f32 / SAMPLE_RATE as f32;
         *x = if voice {
             let env = 0.55 + 0.45 * (n * 3.7 * std::f32::consts::TAU).sin().abs();
             0.1 * env * (n * 200.0 * std::f32::consts::TAU).sin() + 0.001 * rng.next()
-        } else if s == Seg::Breath {
+        } else if s == DemoSeg::Breath {
             0.003 * 3f32.sqrt() * rng.next()
         } else {
             0.001 * 3f32.sqrt() * rng.next()
@@ -96,6 +75,7 @@ fn val(args: &[String], k: &str) -> Option<String> {
 
 fn run<T: TimingFeed, A: AffectFeed>(args: &[String], mut pump: DemoPump<T, A>, sense: bool) -> std::io::Result<()> {
     let has = |k: &str| args.iter().any(|a| a == k);
+    let synthetic = has("--synthetic");
     let seconds: f32 = val(args, "--seconds").and_then(|s| s.parse().ok()).unwrap_or(8.0);
     let frames = ((seconds * 1000.0) / FRAME_MS as f32).ceil().max(1.0) as u64;
     let headless = has("--headless") || std::env::var_os("GALION_HEADLESS").is_some_and(|v| v == "1") || !std::io::stdout().is_terminal();
@@ -129,7 +109,7 @@ fn run<T: TimingFeed, A: AffectFeed>(args: &[String], mut pump: DemoPump<T, A>, 
                     phone = Some(galion_console::phone_host::PhoneHost::from_surface(&web));
                 }
                 match dc.attach(Box::new(web)) {
-                    Ok(()) => notes.push(format!("web → screen http://{addr}/  · /v2 /dot /mic /turn /reply")),
+                    Ok(()) => notes.push(format!("web → screen http://{addr}/  · /v2 redirects · /dot /mic /turn /reply")),
                     Err(e) => notes.push(format!("web surface failed: {e}")),
                 }
             }
@@ -143,6 +123,11 @@ fn run<T: TimingFeed, A: AffectFeed>(args: &[String], mut pump: DemoPump<T, A>, 
     let mut hb = Heartbeat::new(HeartbeatConfig::rika_v0(), gate);
     let bits = if sense { RIKA_BITS } else { 0 };
     let (tn, an) = pump.names();
+    if synthetic {
+        notes.push("synthetic room/you/me script on".into());
+    } else {
+        notes.push("idle until mic or text (--synthetic runs the room script)".into());
+    }
     let mut out_w = std::io::stdout().lock();
     writeln!(out_w, "galion dot+console demo · W21-04 · {frames} frames ({seconds}s) · feeds {tn}+{an} · SENSE {} · {}", if sense { "on" } else { "off" }, match (headless, realtime) { (true, true) => "headless+realtime", (true, false) => "headless (fast)", _ => "tty realtime" })?;
     for n in &notes {
@@ -161,8 +146,8 @@ fn run<T: TimingFeed, A: AffectFeed>(args: &[String], mut pump: DemoPump<T, A>, 
     let t0 = Instant::now();
     let mut late_next = false;
     for i in 0..frames {
-        let (s, barge) = seg(i);
-        if s != Seg::Me {
+        let (s, barge) = demo_band(synthetic, i);
+        if s != DemoSeg::Me {
             yielded = false;
         }
         let phone_you;
@@ -175,7 +160,11 @@ fn run<T: TimingFeed, A: AffectFeed>(args: &[String], mut pump: DemoPump<T, A>, 
             phone_you = false;
         }
         if !phone_you {
-            fill_you(&mut you, i, s, barge, &mut rng);
+            if s == DemoSeg::Idle {
+                you.fill(0.0);
+            } else {
+                fill_you(&mut you, i, s, barge, &mut rng);
+            }
         }
         let inp = FrameIn {
             you_pcm: &you,
@@ -202,7 +191,7 @@ fn run<T: TimingFeed, A: AffectFeed>(args: &[String], mut pump: DemoPump<T, A>, 
         {
             phone_me = false;
         }
-        let want_me = s == Seg::Me && !yielded;
+        let want_me = s == DemoSeg::Me && !yielded;
         let me_voiced = if phone_me {
             !out.paused
         } else {
@@ -212,7 +201,11 @@ fn run<T: TimingFeed, A: AffectFeed>(args: &[String], mut pump: DemoPump<T, A>, 
             hb.note_me_onset(&out, true);
         }
         if !phone_me {
-            fill_me(&mut me, i, me_voiced, out.me_gain());
+            if s == DemoSeg::Idle {
+                me.fill(0.0);
+            } else {
+                fill_me(&mut me, i, me_voiced, out.me_gain());
+            }
         }
         let snap = pump.pump(i, &you, SAMPLE_RATE);
         dc.frame(&out, &you, &me, me_voiced, &snap, step_us);

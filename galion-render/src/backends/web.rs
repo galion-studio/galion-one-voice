@@ -210,6 +210,53 @@ impl TurnInbox {
     pub fn pending(&self) -> usize { self.st.lock().map(|g| g.q.len()).unwrap_or(0) }
     /// Turns dropped because the inbox overflowed (or by `take_latest`).
     pub fn dropped(&self) -> u64 { self.st.lock().map(|g| g.dropped).unwrap_or(0) }
+    /// Shared id clock so a typed line and a mic turn cannot reuse the same id.
+    pub fn id_clock(&self) -> Arc<AtomicU64> { self.next_id.clone() }
+}
+
+/// One persona reply waiting to be spoken (Piper / flite), not a second page.
+#[derive(Clone, Debug)]
+pub struct SpokenLine {
+    pub id: u64,
+    pub reply: String,
+    pub silence: bool,
+    pub barge: bool,
+}
+
+impl Drop for SpokenLine {
+    fn drop(&mut self) {
+        let mut v = std::mem::take(&mut self.reply).into_bytes();
+        zeroise_bytes(&mut v);
+    }
+}
+
+#[derive(Debug, Default)]
+struct SayState { q: VecDeque<SpokenLine> }
+
+/// Typed turns from `POST /v2/say`. The phone host speaks `reply` and publishes a WAV.
+#[derive(Clone, Debug)]
+pub struct SayInbox { st: Arc<Mutex<SayState>>, next_id: Arc<AtomicU64> }
+
+impl SayInbox {
+    pub fn sharing(next_id: Arc<AtomicU64>) -> Self {
+        Self { st: Arc::new(Mutex::new(SayState::default())), next_id }
+    }
+    /// Queue a line. Empty / silence still gets an id so barge-in can cancel playback.
+    pub fn push(&self, reply: String, silence: bool, barge: bool) -> u64 {
+        let id = self.next_id.fetch_add(1, Ordering::SeqCst) + 1;
+        if let Ok(mut g) = self.st.lock() {
+            while g.q.len() >= MAX_PENDING_TURNS { g.q.pop_front(); }
+            g.q.push_back(SpokenLine { id, reply, silence, barge });
+        }
+        id
+    }
+    /// Newest line, dropping any older ones.
+    pub fn take_latest(&self) -> Option<SpokenLine> {
+        let mut g = self.st.lock().ok()?;
+        let t = g.q.pop_back();
+        g.q.clear();
+        t
+    }
 }
 
 // ---------------------------------------------------------------------------------------
@@ -469,6 +516,7 @@ struct Shared {
     latest_mic: Arc<Mutex<String>>,
     mic: MicTap,
     turns: TurnInbox,
+    says: SayInbox,
     replies: ReplyBox,
     page: Option<&'static str>,
     v2_page: Option<&'static str>,
@@ -501,11 +549,14 @@ impl WebSurface {
     /// Mailbox only (no socket) — for embedding into another server or for tests.
     pub fn mailbox() -> Self {
         let edge = initial_edge();
+        let turns = TurnInbox::default();
+        let says = SayInbox::sharing(turns.id_clock());
         let sh = Shared {
             latest_dot: Arc::new(Mutex::new("{}".into())),
             latest_mic: Arc::new(Mutex::new("{\"rms\":0}".into())),
             mic: MicTap::default(),
-            turns: TurnInbox::default(),
+            turns,
+            says,
             replies: ReplyBox::default(),
             page: None,
             v2_page: None,
@@ -534,11 +585,15 @@ impl WebSurface {
         self.sh.page = Some(html);
         self
     }
-    /// Serve the Samantha / Jarvis one-dot page at `/v2` (set before `open()`).
+    /// Body of `GET /v2`, which redirects to `/`. Set before `open()`.
     pub fn with_v2_page(mut self, html: &'static str) -> Self {
         self.sh.v2_page = Some(html);
         self
     }
+    /// Typed lines from `POST /v2/say` (persona reply text for Piper).
+    pub fn say_inbox(&self) -> SayInbox { self.sh.says.clone() }
+    /// Instruction-layer floor. The phone host feeds mic transcripts through it.
+    pub fn persona_floor(&self) -> Arc<Mutex<crate::v2_persona::Floor>> { self.sh.floor.clone() }
     /// Exact `GALION_CORS_ORIGINS` value. Empty keeps the V1 wildcard.
     /// A literal `*` is not the wildcard.
     pub fn with_cors_origins(mut self, origins: impl Into<String>) -> Self {
@@ -580,6 +635,8 @@ impl WebSurface {
     pub fn reply_box(&self) -> ReplyBox { self.sh.replies.clone() }
 }
 
+const V2_REDIRECT_HTML: &str = "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta http-equiv=\"refresh\" content=\"0; url=/\"><title>Galion Voice</title><script>location.replace(\"/\");</script></head><body><p><a href=\"/\">Galion Voice</a></p></body></html>";
+
 const SECURITY_HEADERS: &str = concat!(
     "X-Content-Type-Options: nosniff\r\n",
     "Referrer-Policy: no-referrer\r\n",
@@ -616,8 +673,9 @@ fn handle(mut stream: std::net::TcpStream, sh: &Shared) {
             if sh.edge.wildcard() { format_acao(Some("*".to_string())) } else { String::new() }
         }
     };
+    let location = if status.starts_with("302") { "Location: /\r\n" } else { "" };
     let head = format!(
-        "HTTP/1.1 {status}\r\nContent-Type: {ctype}\r\nContent-Length: {}\r\nCache-Control: no-store\r\n{cors}Access-Control-Allow-Methods: GET, POST, OPTIONS\r\nAccess-Control-Allow-Headers: {CORS_ALLOW_HEADERS}\r\n{SECURITY_HEADERS}Connection: close\r\n\r\n",
+        "HTTP/1.1 {status}\r\nContent-Type: {ctype}\r\nContent-Length: {}\r\nCache-Control: no-store\r\n{location}{cors}Access-Control-Allow-Methods: GET, POST, OPTIONS\r\nAccess-Control-Allow-Headers: {CORS_ALLOW_HEADERS}\r\n{SECURITY_HEADERS}Connection: close\r\n\r\n",
         body.len()
     );
     let _ = stream.write_all(head.as_bytes());
@@ -716,6 +774,11 @@ fn route(req: &mut Request, sh: &Shared) -> (&'static str, &'static str, Vec<u8>
                 Ok(mut floor) => floor.say_json(&text, barge, e, sense),
                 Err(_) => "{\"persona\":\"samantha\",\"reply\":\"\",\"silence\":true,\"film_voice\":false}".to_string(),
             };
+            let silence = crate::v2_persona::json_field_bool(&json, "silence");
+            let reply = crate::v2_persona::json_field_string(&json, "reply").unwrap_or_default();
+            let barge_out = crate::v2_persona::json_field_bool(&json, "barge");
+            let quiet = silence || reply.trim().is_empty();
+            sh.says.push(if quiet { String::new() } else { reply }, quiet, barge_out);
             zeroise_bytes(&mut req.body);
             ("200 OK", "application/json", json.into_bytes())
         }
@@ -753,14 +816,16 @@ fn route(req: &mut Request, sh: &Shared) -> (&'static str, &'static str, Vec<u8>
                 }
                 "/dot" => {
                     let d = sh.latest_dot.lock().map(|g| g.clone()).unwrap_or_default();
-                    let (persona, mood) = sh.floor.lock().map(|g| (g.id().to_string(), g.mood().to_string())).unwrap_or_else(|_| ("samantha".into(), "calm".into()));
-                    // Persona and mood sit beside the golden. `reply` stays the last field.
-                    let body = dot_with_reply(&crate::v2_persona::annotate_dot(&d, &persona, &mood), sh.replies.latest_json().as_deref());
+                    let (persona, mood, from_turn) = sh.floor.lock().map(|g| (g.id().to_string(), g.mood().to_string(), g.mood_from_turn())).unwrap_or_else(|_| ("samantha".into(), "calm".into(), false));
+                    // Mood is attached only after a turn, and then emotion.label matches it.
+                    // `reply` stays the last field.
+                    let mood_field = if from_turn { Some(mood.as_str()) } else { None };
+                    let body = dot_with_reply(&crate::v2_persona::annotate_dot(&d, &persona, mood_field), sh.replies.latest_json().as_deref());
                     ("200 OK", "application/json", body.into_bytes())
                 }
-                "/v2" if sh.v2_page.is_some() => {
-                    let html = sh.v2_page.unwrap_or_default();
-                    ("200 OK", "text/html; charset=utf-8", html.as_bytes().to_vec())
+                "/v2" | "/v2/" => {
+                    let html = sh.v2_page.unwrap_or(V2_REDIRECT_HTML);
+                    ("302 Found", "text/html; charset=utf-8", html.as_bytes().to_vec())
                 }
                 "/v2/state" => {
                     let json = sh.floor.lock().map(|g| g.state_json()).unwrap_or_else(|_| "{}".into());
@@ -939,14 +1004,22 @@ mod tests {
 
     #[test]
     fn v2_say_routes_personas_and_keeps_the_hold() {
-        let mut w = WebSurface::serve("127.0.0.1:0".parse().unwrap()).with_v2_page("<!doctype html><canvas id=\"s\"></canvas>");
+        let mut w = WebSurface::serve("127.0.0.1:0".parse().unwrap()).with_page("<!doctype html><canvas id=\"s\"></canvas>");
         w.open().unwrap();
         let a = w.local_addr().unwrap();
         let page = get(a, "/v2");
-        assert!(page.contains("HTTP/1.1 200") && page.contains("canvas"), "{page}");
+        assert!(page.contains("HTTP/1.1 302"), "{page}");
+        assert!(page.to_ascii_lowercase().contains("location: /"), "{page}");
         let state = get(a, "/v2/state");
         assert!(state.contains("\"rights\":\"hold\"") && state.contains("\"film_voice\":false"), "{state}");
+        assert!(state.contains("\"mouth\":\"piper\""), "{state}");
         assert!(state.contains("\"warmth_e0\":0.62") && state.contains("\"pre_pause_e0\":80"), "{state}");
+        let mut hot = VizFrame::default();
+        hot.listen.emotion = crate::frame::Emotion { label: "tense", intensity: 0.82, valence: -0.6 };
+        w.present(&hot).unwrap();
+        let before = get(a, "/dot");
+        assert!(before.contains("\"label\":\"tense\""), "{before}");
+        assert!(!before.contains("\"mood\""), "{before}");
         let body = b"{\"text\":\"My mother died this morning.\"}";
         let mut s = std::net::TcpStream::connect(a).unwrap();
         s.write_all(format!("POST /v2/say HTTP/1.1\r\nHost: x\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n", body.len()).as_bytes()).unwrap();
@@ -960,6 +1033,13 @@ mod tests {
         assert!(out.contains("\"film_voice\":false"));
         let dot = get(a, "/dot");
         assert!(dot.contains("\"persona\":\"samantha\""), "{dot}");
+        assert!(dot.contains("\"mood\":\"grief\""), "{dot}");
+        assert!(dot.contains("\"label\":\"grief\""), "{dot}");
+        assert!(dot.contains("\"valence\":-0.550"), "{dot}");
+        assert!(!dot.contains("\"label\":\"tense\""), "{dot}");
+        let line = w.say_inbox().take_latest().expect("reply queued for Piper");
+        assert_eq!(line.reply, "Your mother died this morning.");
+        assert!(!line.silence);
         w.close().unwrap();
     }
 
@@ -988,6 +1068,7 @@ mod tests {
         let later = get(a, "/dot");
         assert!(later.contains("\"label\":\"warm\"") && later.contains("\"arousal\":0.310"), "{later}");
         assert!(!later.contains("\"label\":\"tense\""));
+        assert!(!later.contains("\"mood\""), "heartbeat emotion stays until a turn sets mood: {later}");
         w.close().unwrap();
     }
 
