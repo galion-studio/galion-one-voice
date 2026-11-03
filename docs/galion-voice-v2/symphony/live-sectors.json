@@ -1,0 +1,71 @@
+{
+  "schema": "galion-ttfa-live-sectors/v1",
+  "program": "Galion Voice",
+  "owner": "Maciej Grajczyk",
+  "frame_ms": 80,
+  "note": "A live sector shares the heartbeat. Its bar is one frame. Presence musts stay the lock budgets.",
+  "sectors": [
+    {
+      "id": "heartbeat",
+      "live": true,
+      "frame_bar_ms": 80,
+      "what": "Heartbeat::step is the clock. A late frame is a pause. Compute inside the frame stays frame_budget_p95_ms."
+    },
+    {
+      "id": "barge-in",
+      "live": true,
+      "frame_bar_ms": 80,
+      "presence": "barge_in_ms",
+      "must_ms": 200,
+      "should_ms": 80,
+      "what": "Yield is counted in frames. The lock must is 200 ms. P1 should is one frame."
+    },
+    {
+      "id": "onset",
+      "live": true,
+      "frame_bar_ms": 80,
+      "presence": "onset_p50_ms",
+      "must_ms": 300,
+      "what": "Frames from the end of the you-band to the first voiced me-band. The lock must is onset p50 300 ms."
+    },
+    {
+      "id": "e-to-a",
+      "live": true,
+      "frame_bar_ms": 80,
+      "presence": "e_to_a_ms",
+      "must_ms": 160,
+      "must_frames": 2,
+      "what": "Feeling band. E-in shift to the first E-out change, within two frames (160 ms)."
+    },
+    {
+      "id": "first-playable-frame",
+      "live": true,
+      "frame_bar_ms": 80,
+      "presence": "ttfa_ms",
+      "must_ms": 80,
+      "what": "Once a sample exists, a live sector may hold it for one frame before it is eligible to play. wall-clock ttfa_ms is gated only on a measured file."
+    }
+  ],
+  "outside_bar": [
+    {
+      "id": "pstn-mouth-to-ear",
+      "harness": "docs/research/galion-voice-v2/domains/04-latency-streaming.md",
+      "what": "Research mouth-to-ear budget. A separate clock from the live-sector frame."
+    },
+    {
+      "id": "phone-loopback-full-utterance",
+      "harness": "scripts/eval/virtual-user.sh",
+      "what": "ttfa_kind loopback-full-utterance. The phone lane returns the whole utterance."
+    },
+    {
+      "id": "flash-clone",
+      "harness": "scripts/eval/flash-ttfa.sh",
+      "what": "Protocol-stub clock. product_claim stays false until a model run is recorded."
+    },
+    {
+      "id": "piper-warmth",
+      "harness": "scripts/bench-piper-warmth.sh",
+      "what": "Cold and warm first-clause PCM. A number appears only when the A21 pack is on disk."
+    }
+  ]
+}
