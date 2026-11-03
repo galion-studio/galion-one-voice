@@ -1,7 +1,18 @@
-# Reference clips stay out of git. The .placeholder files are the slots.
+# Owner's indoor testing references — Samantha: no permission / copyright claims; Jarvis: Apache 2.0 unconfirmed with original creator — local testing only, remove later.
+# Reference clips stay out of git. The .placeholder text slots stay tracked.
+# A placeholder beside a clip (*.wav.placeholder, *.mp3.placeholder) stays out.
+samantha.wav
+jarvis.wav
 *.wav
 *.wave
 *.mp3
+*.wav.placeholder
+*.mp3.placeholder
+*.[Ww][Aa][Vv]
+*.[Ww][Aa][Vv][Ee]
+*.[Mm][Pp]3
+*.[Ww][Aa][Vv].[Pp]laceholder
+*.[Mm][Pp]3.[Pp]laceholder
 *.flac
 *.ogg
 *.opus
