@@ -25,7 +25,7 @@ engine, because generate is not wired. A protocol-stub clock is a test of
 the pipe. It is not a Flash result. Do not copy a number into `LEDGER.md`
 or a demo until a model run is actually recorded there.
 
-No reference clip is sent. Film audio stays on the rights hold.
+The default Flash harness does not require a reference. Consented local wavs are the clone-landing path in `symphony/CLONE-LANDING.md` (owner t273). A protocol-stub clock is still not a Flash result, and a public demo stays closed.
 
 ## Harness
 
@@ -63,5 +63,19 @@ refuses unless `GALION_CLONE_FETCH=1`.
 5. Still no film audio. Still no celebrity demo.
 
 Until those lines exist, this document's only number is the absence of one.
+Conditioning stays off this clock until the rights gates in
+`CHATTERBOX-WORKER.md` are open. This harness still sends no clip.
+
+## Stub versus hard
+
+A run of this page, including a protocol-stub clock, is **STUB-PASS**.
+It is not **HARD-PASS**. `GALION_CLONE_STUB_PCM=1` and
+`GALION_CLONE_STUB_FRAMES=1` never yield **HARD-PASS**. `product_claim`
+is true only for PCM whose engine is `chatterbox-nano` or `nano`.
+The hard loop is `scripts/eval/v2-hard-loop.sh`, written up in
+`HARD-LOOP.md` and `HARD-REAL.md`. Fetch stays
+`GALION_CLONE_WEIGHTS_SOURCE=hf` or `release`. The harness does not
+call it. The Admin UI check is `ADMIN-UI-CHECK.md`. Maciej Grajczyk
+has to sign that page. This file does not.
 
 — Maciej Grajczyk

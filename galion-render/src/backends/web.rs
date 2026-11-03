@@ -11,6 +11,7 @@
 //!   POST /turn  -> one finished user utterance (WAV or raw PCM16LE). Stored in a bounded
 //!                  [`TurnInbox`]; the host polls it with [`TurnInbox::take`] (never blocks).
 //!                  Answers `202 {"id":N,"bytes":B,"format":"wav"|"pcm16"}`.
+//!                  `X-Galion-Proceed: auto` is allowed. It is not a second route.
 //!   GET /reply/<id>.wav -> reply audio the host published with [`ReplyBox::set_reply`];
 //!                  `audio/wav`, 404 when unknown/evicted.
 //!   GET / , /screen -> the caller's single-screen HTML page, only when one was set with
@@ -86,7 +87,7 @@ pub const MAX_PENDING_TURNS: usize = 8;
 pub const MAX_STORED_REPLIES: usize = 8;
 /// CORS `Access-Control-Allow-Headers` sent on every response (incl. OPTIONS preflight).
 pub const CORS_ALLOW_HEADERS: &str =
-    "Content-Type, X-Turn-Id, X-Sample-Rate, X-Barge-In, X-Galion-Session, ngrok-skip-browser-warning";
+    "Content-Type, X-Turn-Id, X-Sample-Rate, X-Barge-In, X-Galion-Proceed, X-Galion-Session, ngrok-skip-browser-warning";
 
 pub use super::edge::{
     bind_decision, cors_allow_origin, parse_json_string_field, AI_DISCLOSURE_EN, AI_DISCLOSURE_HR,
@@ -1246,7 +1247,7 @@ mod tests {
         let a = w.local_addr().unwrap();
         let (h, _) = split_resp(&raw(a, b"OPTIONS /turn HTTP/1.1\r\nOrigin: https://x.ngrok.app\r\n\r\n"));
         assert!(h.starts_with("HTTP/1.1 204"), "{h}");
-        for k in ["Content-Type", "X-Turn-Id", "X-Sample-Rate", "X-Barge-In", "ngrok-skip-browser-warning"] { assert!(h.contains(k), "{k} missing: {h}"); }
+        for k in ["Content-Type", "X-Turn-Id", "X-Sample-Rate", "X-Barge-In", "X-Galion-Proceed", "ngrok-skip-browser-warning"] { assert!(h.contains(k), "{k} missing: {h}"); }
         let r = raw(a, b"POST /turn HTTP/1.1\r\nX-Sample-Rate: 48000\r\nContent-Length: 2\r\n\r\n\x00\x00");
         assert!(split_resp(&r).0.starts_with("HTTP/1.1 202"));
         assert_eq!(inbox.take().unwrap().format, TurnFormat::Pcm16 { rate: 48_000, channels: 1 });

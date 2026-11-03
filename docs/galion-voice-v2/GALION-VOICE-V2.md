@@ -23,6 +23,7 @@ in-tree ORT, `paid_tiers=false`.
 | **V3** | Production-ready Galion Voice. Real EN ASR ratified, reply model past the canned table, speech warm, edge on the VPS, gates R0–R3 green, consent story counsel has signed. | Later. Nothing in this plan pretends to be V3. |
 | **Plan V4** | The ops dry-run that already exists: `scripts/deploy/harden-dryrun.sh`, `scripts/deploy/release-dryrun.sh`, `docs/agent-wave20/R0-R3-DRY-RUN.md`, `docs/deploy/TITANAXE-VPS.md`. | Written. `--execute` refuses. No SSH. |
 | **Plan V5** | The deploy track for the stack as it is now, including the phone routes. | `docs/ops/PLAN-V5.md`. |
+| **Staging CPU** | CPU-first cascade budgets for Titanaxe. Plus is a CX23-class cap (1 session). Ultra is a CX43-class cap (2 while a burst is assumed, 5 only after a measurement). Unknown host uses the Plus cap. | `docs/galion-voice-v2/symphony/STAGING-CPU.md`. Plan only. No SSH. |
 
 Ops numbers and product numbers are different series. Plan V4 is not "Voice V4".
 The agent ledger titled "Galion Voice V4" is the wave ledger in `LEDGER.md`.
@@ -68,6 +69,8 @@ The symphony standard for that clock is
 [`symphony/EUREKA.md`](symphony/EUREKA.md): one heartbeat, three bands
 (you · me · feeling), a late frame is a pause, harness before model.
 Gate results go in [`symphony/SELF-EVAL.md`](symphony/SELF-EVAL.md).
+Non-inference cost on that tick is the symphony account,
+`docs/galion-voice-v2/symphony/ONE-PERCENT.md`.
 
 **Rika.** On silence and an in-breath, Rika leans in on the feeling band
 (about 160 ms in the stub measurement). It needs consent bits `sense` and
@@ -113,6 +116,7 @@ phone browser                         loopback 127.0.0.1:7878
   AudioWorklet → 16 kHz VAD
   POST /mic   {rms}        ───────►  MicTap            (latest only)
   POST /turn  WAV          ───────►  TurnInbox         (≤ 8, RAM)
+  X-Galion-Proceed: auto   ───────►  proceed(Mic, None) → auto program
                                      PhoneHost::drive_me   every 80 ms, try_*
                                          │
                                          ▼
@@ -129,6 +133,9 @@ phone browser                         loopback 127.0.0.1:7878
   AnalyserNode envelope → orb spring
   you speak during playback → stop, new /turn, worker supersede
 ```
+
+`proceed` runs once per accepted take. Quiet 80 ms frames leave it alone. Detail:
+`docs/galion-voice-v2/symphony/AUTO-WORKFLOW.md`.
 
 The heartbeat thread only calls `try_submit` and `try_recv`. Piper cold-start
 and synthesis happen on `galion-turn-worker`. A newer turn id cancels an older
@@ -481,12 +488,11 @@ colours, the orb as the mark. Docs agree with the code. Detail:
 surface. The mark is the orb. It is drawn, not a file dropped on the page.
 
 **LOCKS.** `chrome_allowed = false`. `paid_tiers = false`. `free_forever = true`.
-A Local / Plus / Ultra price list is not in this repository. It is not
-documented as a product.
+The Ultra host plan is `docs/galion-voice-v2/symphony/PLAN-ULTRA.md` ($220/month, CX43-class). It does not edit this lock file. The one-dot page does not show a price.
 
 **Owner decision.** The master slogan is "The seamless connection with the human being, on the voice only."
 It is the one public line (`docs/brand/GALION-VOICE-BRAND.md`). It is not a stack of slogans, and it is not chrome on the dot.
-If a freemium split is ever real, it is an owner edit of `[licence]` plus counsel. Not a README sentence.
+Putting the symphony host plan into `[licence]` is still an owner edit of that file, plus counsel. Not a README sentence.
 
 ### V2-S9 · Student and Open Mind slot
 
@@ -530,8 +536,9 @@ Hermes on the 80 ms tick.
 run, results recorded. Status: **approved-pending-setup**. A human installs
 per-user anonymized access codes. This program does not connect.
 
-**Depends on.** Plan V5 human steps H1–H4. `galion-gates/run-gates.sh` remote
-block, which connects only if `GALION_VPS_HOST` is set.
+**Depends on.** Plan V5 human steps H1–H4. CPU session caps:
+`docs/galion-voice-v2/symphony/STAGING-CPU.md`. `galion-gates/run-gates.sh`
+remote block, which connects only if `GALION_VPS_HOST` is set.
 
 **Acceptance.**
 
@@ -573,6 +580,8 @@ barge-in during TTS is a spec assertion (`me` stops, new turn wins).
 3. Mock backend remains the default. The student is another backend later.
 
 **Phone loopback eval.** `scripts/eval/virtual-user.sh` runs T0–T2 offline on `127.0.0.1`: text or fixture WAV in, CannedLlm plus Piper or flite out, reply WAV captured when a backend exists. The JSON report is `galion-gates/results/presence-eval/`. TTFA there is a loopback full-utterance time. PSTN is not run. It does not add an engagement metric. See `docs/eval/PRESENCE-EVAL.md`.
+
+**Streaming frame bar.** Live sectors share the 80 ms heartbeat. The gate is `docs/galion-voice-v2/symphony/TTFA.md` (`docs/galion-voice-v2/symphony/scripts/ttfa-gate.sh`). It reads `LOCKS.toml` and leaves the file unchanged. Onset p50 stays ≤ 300 ms, barge-in ≤ 200 ms, e-to-a ≤ 160 ms / 2 frames. The mock replay is a stub and prints no `ttfa_ms`. A wall-clock `ttfa_ms` is accepted only from a measured file, and that number has to sit inside one frame.
 
 **Risks.** Teaching the harness to score "how long the user stayed". That
 list is already rejected. Do not reopen it in V2.
@@ -662,6 +671,7 @@ S3Gen and a vocoder emit audio. No training step in that API.
 - **Watermark:** upstream `generate()` applies a Perth watermark. The Nano path should keep a watermark beside the Art. 50 disclosure. Perth's own licence was not read in this session. Do not vendor it yet.
 - **Worker:** the scaffold in `CLONE-WORKER.md` is one out-of-process process, same shape as the warm Piper worker. Piper speaks if the clone worker is absent. No PCM on disk. Generate is not wired. No film audio.
 - **Weights:** gitignored under `weights/clone/`. CloudAgents fetch tag `clone-weights-v1` with `scripts/clone/fetch-clone-weights.sh`. The layout and the admin upload are `CLONE-WEIGHTS.md`. A clean clone does not contain the blobs.
+- **Worker:** the scaffold in `CLONE-WORKER.md` is one out-of-process process, same shape as the warm Piper worker. Piper speaks if the clone worker is absent. No PCM on disk. Generate is not wired. No film audio. The build plan is `CHATTERBOX-WORKER.md`. It leaves `reference_clips` false.
 
 **CPU and memory (t204u, t205u).** Admin approves full threading, SIMD, and
 maximum memory for Chatterbox Nano/Turbo workers, for every Galion Voice
@@ -739,6 +749,12 @@ This program does not SSH, and it does not download a model.
   `docs/galion-voice-v2/OPENMIND-NERVE-CORTEX.md`. Local nerve notes when no
   daemon is present. Hermes handoff through `galion-sideband`. Not inside
   `Heartbeat::step`. LOCKS.toml not edited.
+- Symphony one-percent account: `crates/galion-symphony` and
+  `docs/galion-voice-v2/symphony/ONE-PERCENT.md`. P1 is ≤ 1% non-inference
+  CPU on the 80 ms tick. P3 is that tick's p99 under 800 µs, with the ≪
+  flag recorded at 80 µs. A late frame is a pause. Stub durations and the
+  local clock are separate series. `product_claim` stays false. Gate:
+  `galion-gates/op-one-percent.sh`. LOCKS.toml not edited.
 
 ## 7. What stays human
 

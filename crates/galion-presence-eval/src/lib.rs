@@ -723,6 +723,13 @@ mod tests {
 
     #[test]
     fn virtual_user_writes_a_green_loopback_report() {
+        // The loopback scores the Piper (A21) lane. On a host that has fetched the
+        // Chatterbox clone weights, `auto` picks the out-of-process clone worker,
+        // whose cold turn exceeds the 60 s loopback read timeout. Pin the lane the
+        // report is about; an explicit caller value still wins.
+        if std::env::var_os("GALION_SPEECH").is_none() {
+            std::env::set_var("GALION_SPEECH", "a21");
+        }
         let dir = std::env::temp_dir().join(format!("galion-presence-eval-{}", std::process::id()));
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();

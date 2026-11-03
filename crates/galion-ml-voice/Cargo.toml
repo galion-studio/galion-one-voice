@@ -1,7 +1,7 @@
 # Galion Voice — Perpetual Open MIT License
 [package]
 name = "galion-ml-voice"
-description = "Galion Voice multilingual voice scaffold (agent W20-19). ENGLISH-ONLY prototype: LanguageId (En), <|en|> token helper, AsrEngine/TtsEngine/LangRouter stub traits. No weights, no I/O."
+description = "Galion Voice English scaffold and the symphony voice-clip compiler. Clone PCM becomes a .gq clip the CPU cascade loads."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -27,3 +27,13 @@ name = "gqvoice"
 required-features = ["speech"]
 
 [dependencies]
+# Reader only. Default features stay off so this crate does not pull rayon.
+# The .gq writer for voice clips lives here, not in galion-tensor.
+galion-tensor = { path = "../galion-tensor", default-features = false }
+
+[dev-dependencies]
+galion-heartbeat = { path = "../galion-heartbeat", default-features = false }
+
+[[bin]]
+name = "galion-voice-compile"
+path = "src/bin/galion-voice-compile.rs"

@@ -353,10 +353,14 @@ The refused blocks close that persona. They do not flip
 
 ## State of this writing
 
-2026-11-03, Europe/Zagreb. Every box above is unchecked. Both private
-gates are closed. Both public-demo gates are closed. No clip is in the
-tree. No sha256 of a clip is recorded, because no clip was fetched.
-`reference_clips` remains false. Seat 8 is the checklist, not a
-clearance.
+2026-11-03, Europe/Zagreb. The boxes above stay unchecked. They ask for
+counsel names and instrument fields this repo does not have, and this
+file does not invent them. Owner t273, in `LEDGER.md`, clears local
+reference send for the current Samantha and Jarvis wavs. That line is
+not a counsel opinion and not a public-demo opening. Both public-demo
+groups stay closed. No clip is committed. The digests the owner supplied
+are pinned in `scripts/clone/REFS.sha256` and checked again when a file
+is present. `reference_clips` remains false because `LOCKS.toml` is not
+edited here. The worker path is `symphony/CLONE-LANDING.md`.
 
 — Maciej Grajczyk

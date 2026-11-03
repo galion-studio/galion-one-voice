@@ -69,9 +69,12 @@ Nothing here has been deployed to the VPS. Access is approved-pending-setup:
 per-user anonymized codes, installed by a human. No shared key. Priority 1
 for V2 voice work is local Chatterbox cloning, not a cloud API
 ([VOICE-CLONING.md](docs/galion-voice-v2/VOICE-CLONING.md)). No film audio
-is in this repo. The clearance checklist for those two film voices is
-[RIGHTS-CLEARANCE.md](docs/galion-voice-v2/RIGHTS-CLEARANCE.md). Both gates
-are closed. The closed ingest outline is
+is in this repo. Owner t273 clears local send of the current Samantha and
+Jarvis wavs; the runbook is
+[CLONE-LANDING.md](docs/galion-voice-v2/symphony/CLONE-LANDING.md). The
+public-demo gates in
+[RIGHTS-CLEARANCE.md](docs/galion-voice-v2/RIGHTS-CLEARANCE.md) stay closed.
+`LOCKS.toml` was not edited. The ingest notes are
 [CLIP-INGEST.md](docs/galion-voice-v2/CLIP-INGEST.md).
 
 ## Run the demo
@@ -132,6 +135,7 @@ scripts/eval/virtual-user.sh
 scripts/run-v1-screen.sh
 scripts/check-phone-pipeline.sh
 docs/galion-voice-v2/       V2 sector plan
+docs/galion-voice-v2/symphony/PLAN-ULTRA.md   Ultra host plan ($220/month)
 docs/galion-voice-v2/ONE-UI.md   one mark, Luti, no framework, no venv
 docs/research/galion-voice-v2/  V2 research synthesis (2026-11-03); LOCKS win
 docs/ops/PLAN-V5.md
@@ -145,6 +149,7 @@ Chatterbox safetensors are fetched on demand into `weights/clone/` ([CLONE-WEIGH
 
 Code in this repository is Perpetual Open MIT, (c) 2026 Maciej Grajczyk.
 `LOCKS.toml` says free forever, and no paid tiers. That is the licence.
+The Ultra host plan is `docs/galion-voice-v2/symphony/PLAN-ULTRA.md`. It does not change this licence.
 
 Weights are separate. They are not in git. The Piper voice pack keeps its own
 MIT grant and is downloaded by `scripts/a21/fetch-a21.sh`. A future student

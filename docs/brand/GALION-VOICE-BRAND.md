@@ -74,10 +74,11 @@ Weights are not part of that grant. They stay out of git and keep their own
 licences (the A21 Piper pack is MIT and fetched, not vendored; a future
 student would ship with `LICENSE-WEIGHTS`).
 
-A Local / Plus / Ultra split is not in this repository. It is not the brand.
-If it ever becomes real, it starts as an owner change to `[licence]`, with
-counsel, and a LEDGER line. Until that edit exists, public text does not
-offer a paid tier, a trial, or a cloud plan.
+The Ultra host plan is `docs/galion-voice-v2/symphony/PLAN-ULTRA.md`
+($220/month, CX43-class / Titanaxe Max 3XL). It is not the brand. The
+one-dot page does not show a price, a trial, or a checkout. Putting that
+plan into `[licence]` starts as an owner change to the lock file, with
+counsel, and a LEDGER line. Until that edit exists, `paid_tiers` stays false.
 
 ## Writing rules
 

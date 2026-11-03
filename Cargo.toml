@@ -1,7 +1,7 @@
 # Galion Voice — Perpetual Open MIT License
 [workspace]
 resolver = "2"
-members = ["crates/galion-tensor", "crates/galion-sideband", "crates/galion-openmind", "crates/galion-console", "galion-render", "galion-emotion", "crates/galion-mimi", "crates/galion-presence", "crates/galion-presence-eval", "crates/galion-heartbeat", "crates/galion-cascade", "crates/galion-asr-vosk", "crates/galion-student-backend", "crates/galion-ml-voice", "crates/galion-live-demo"]
+members = ["crates/galion-tensor", "crates/galion-sideband", "crates/galion-openmind", "crates/galion-console", "galion-render", "galion-emotion", "crates/galion-mimi", "crates/galion-presence", "crates/galion-presence-eval", "crates/galion-heartbeat", "crates/galion-cascade", "crates/galion-asr-vosk", "crates/galion-student-backend", "crates/galion-ml-voice", "crates/galion-live-demo", "crates/galion-symphony"]
 
 [workspace.package]
 version = "0.0.1"

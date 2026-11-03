@@ -11,7 +11,8 @@
 #
 # A protocol-stub clock is not a Flash result. product_claim stays false
 # until an engine labelled model is recorded in LEDGER.md. This script
-# does not record one.
+# does not record one. STUB-PASS is not HARD-PASS. The hard loop is
+# scripts/eval/v2-hard-loop.sh.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 out=$(cargo run -q -p galion-ml-voice --features speech --example flash_ttfa)

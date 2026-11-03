@@ -1,0 +1,6 @@
+# Galion Voice V2 symphony B — current reference pins.
+# Owner digests for the local wavs. This file is not audio.
+# WAV only. MP3 is never a ref. Do not denoise. Jarvis texture is character.
+# persona sha256 duration_s rate_hz channels bits repo_rel store_rel texture
+samantha bdcb0c2903bb91c7b0fda0cf79a42406fdaa662fd8d31f6eaed3895d9c7a8693 17.41 44100 2 16 docs/galion-voice-v2/personas/refs/samantha.wav samantha/reference.wav preserve
+jarvis c2200b59fa78b3c98d13ac5dc7db3a6c14e802310dca73033d7770bd4b532c60 15.95 48000 2 16 docs/galion-voice-v2/personas/refs/jarvis.wav jarvis/reference.wav preserve-hub

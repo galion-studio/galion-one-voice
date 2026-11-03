@@ -21,18 +21,22 @@ One long-lived child, the same idea as the warm Piper worker
 | Disk | no PCM cache | no raw PCM cache; the compiler lands `voices/gq/<persona>.gqvoice` |
 | Fallback | flite if the pack is missing | Piper, then flite |
 
-Request line, written by `clone_worker::request_line`. There is no reference
-field. A child that sees a non-empty `reference`, `audio_prompt`,
-`audio_prompt_path`, or `clip` exits 3 and writes no PCM.
+Request line, written by `clone_worker::request_line`. Device is `cpu`.
+`denoise` is false. A reference field is added only for a pinned wav that
+is present and matches `scripts/clone/REFS.sha256` (`symphony/CLONE-LANDING.md`).
+Any other non-empty `reference`, `audio_prompt`, `audio_prompt_path`, or
+`clip` exits 3 and writes no PCM. MP3 exits 3. A denoise request exits 3.
 
 ```text
-{"text":"Hello.","model":"nano","persona":"samantha","tags":true}
+{"text":"Hello.","model":"nano","persona":"samantha","tags":true,"device":"cpu","denoise":false}
 ```
 
-`model` is `nano` (primary) or `turbo` (quality option, same process shape).
-`persona` is `samantha` or `jarvis`. Jarvis sets `tags` false and the stub
-strips bracket tags from the text. Samantha may keep them for a later model.
-An unknown persona name is treated as Samantha.
+`model` is `nano` (primary, not swapped) or `turbo` (quality option, same
+process shape, same one-thread CPU cap). `persona` is `samantha` or
+`jarvis`. Jarvis sets `tags` false and the stub strips bracket tags from
+the text. Samantha may keep them for a later model. An unknown persona
+name is treated as Samantha. The child is pinned to one thread
+(`session_vcpu=1`). A GPU device is refused. GGUF is refused.
 
 ## Runtime packet
 
@@ -51,7 +55,8 @@ child or the compiler fails. The child still does not write a file.
 - does not import torch
 - does not download weights
 - does not call Chatterbox generate
-- does not accept a reference clip
+- accepts only the two owner-cleared wavs, and only when the sha256 matches
+- does not denoise, and does not load GGUF
 
 Without `GALION_CLONE_STUB_PCM=1`, and without the pinned safetensors on
 disk, the process exits 2 (`galion-clone-absent`). With the files present
@@ -82,10 +87,16 @@ Hugging Face (`ResembleAI/chatterbox-nano`, `ResembleAI/chatterbox-turbo`).
 
 ## Rights
 
-Jarvis and Samantha, as film voices, stay on the hold in `VOICE-CLONING.md`.
-The checklist is `RIGHTS-CLEARANCE.md`. Both gates are closed.
-The persona id on this worker is the register from `SAMANTHA-V2.md` §4.
-It is not a conditioning clip. This scaffold does not fetch film audio.
-The ingest outline, still closed, is `CLIP-INGEST.md`.
+Owner t273 clears local send of the two current wavs. The ledger line is
+in `LEDGER.md`. No counsel name is written there. The public-demo boxes in
+`RIGHTS-CLEARANCE.md` stay unchecked. `LOCKS.toml` `reference_clips` stays
+false; this file does not edit the lock. The persona id is still the
+register from `SAMANTHA-V2.md` §4. This worker does not fetch audio.
+The landing runbook is `symphony/CLONE-LANDING.md`. The ingest outline is
+`CLIP-INGEST.md`.
+
+The later build is `CHATTERBOX-WORKER.md`: architecture, IPC, lifecycle,
+the clip pipeline after rights, and TTFA. It does not change this stub and
+does not edit `LOCKS.toml`.
 
 — Maciej Grajczyk

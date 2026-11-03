@@ -1,0 +1,5 @@
+# Compiled clips stay on the machine that built them.
+# Layout: docs/galion-voice-v2/symphony/COMPILER.md
+*.gq
+*.gq.sha256
+*.tmp

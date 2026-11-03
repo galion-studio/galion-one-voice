@@ -227,6 +227,10 @@ dependencies = [
 [[package]]
 name = "galion-ml-voice"
 version = "0.0.1"
+dependencies = [
+ "galion-heartbeat",
+ "galion-tensor",
+]
 
 [[package]]
 name = "galion-openmind"
@@ -263,6 +267,14 @@ version = "0.0.1"
 dependencies = [
  "galion-mimi",
  "galion-presence",
+]
+
+[[package]]
+name = "galion-symphony"
+version = "0.0.1"
+dependencies = [
+ "galion-emotion",
+ "galion-heartbeat",
 ]
 
 [[package]]
