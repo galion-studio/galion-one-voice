@@ -19,7 +19,11 @@ One-shot: `galion_cascade::phone_turn(&pcm)` / `phone_turn_wav(&bytes)`.
 | Env | Values |
 |---|---|
 | `GALION_ASR` | unset/`stub` (fixtures only; real speech → `AsrUnratified`) · `interim` (placeholder) · `off` |
-| `GALION_LLM` | unset/`canned` (CannedLlm, phone default) · `echo` |
+| `GALION_LLM` | unset/`canned` (CannedLlm, explicit test opt-in) · `echo` · `hermes` (loopback OpenAI chat). Any other value is an error, not a canned fallback. |
+| `GALION_LLM_URL` | `http://127.0.0.1:8642/v1/chat/completions` (default when mode is `hermes`). Numeric loopback `http://` only. No TLS. |
+| `GALION_LLM_MODEL` | model name sent to the gateway. Default `hermes-agent`. Shown on `/v2/say` and `/v2/state` as `llm`. |
+| `GALION_LLM_KEY` | optional bearer token. Not logged. |
+| `GALION_LLM_TIMEOUT_MS` | default `3000`. Timeout or a refused connect speaks `model can't be reached`. No canned fallback. |
 | `GALION_SPEECH` | `auto` (A21 Piper, else flite) · `a21` · `flite` · `off` → `NoSpeech` |
 
 A21 keeps one Piper process for the lane (`--json-input --output_raw`).

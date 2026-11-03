@@ -9,29 +9,24 @@
 //! claim the mouth is a film voice. Piper and the browser must not be handed
 //! `[laugh]` tokens. Empathy lines from a script are refused.
 //!
+//! Content turns go to the Hermes client (`GALION_LLM=hermes`). Safety lines
+//! (harm, secrets, clips, silence, identity) stay local. A dead gateway says
+//! "model can't be reached" and does not invent a reply.
+//!
 //! `e` in a request is a harness knob for prosody. It is not a reading of the
 //! caller. Emotion-driven id changes stay off unless `sense` is set, and one
 //! frame never flips the id (the gate is 8 holds at or above 0.65).
 
 use std::time::{Duration, Instant};
 
+use galion_cascade::hermes::{self, HermesLlm, REFUSED, UNREACHABLE};
+
 const SAMANTHA_TOML: &str = include_str!("../../docs/galion-voice-v2/personas/voice/samantha.toml");
 const JARVIS_TOML: &str = include_str!("../../docs/galion-voice-v2/personas/voice/jarvis.toml");
 
-const FORBIDDEN: &[&str] = &[
-    "i hear you",
-    "that sounds so hard",
-    "that sounds hard",
-    "i'm here for you",
-    "i feel that in my soul",
-    "i know this is difficult",
-    "i'm worried about you",
-    "take a deep breath",
-    "so what i'm hearing",
-    "noted, that is hard",
-    "i'm sorry for your loss",
-    "let's slow down",
-];
+fn contains_forbidden(reply: &str) -> bool {
+    hermes::contains_forbidden(reply)
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PersonaId {
@@ -76,6 +71,8 @@ pub struct Say {
     pub checkpoint: &'static str,
     pub sense_applied: bool,
     pub mood: &'static str,
+    /// `hermes-agent`, or `GALION_LLM_MODEL` when that client is attached.
+    pub llm: String,
 }
 
 #[derive(Clone, Debug)]
@@ -108,6 +105,8 @@ pub struct Floor {
     checkpoint: &'static str,
     mood: &'static str,
     books: Books,
+    hermes: Option<HermesLlm>,
+    llm_label: String,
 }
 
 impl Default for Floor {
@@ -118,6 +117,11 @@ impl Default for Floor {
 
 impl Floor {
     pub fn new() -> Self {
+        let hermes = load_hermes();
+        let llm_label = hermes
+            .as_ref()
+            .map(|h| h.label().to_string())
+            .unwrap_or_else(|| hermes::LLM_NAME.to_string());
         Self {
             id: PersonaId::Samantha,
             pin: false,
@@ -128,7 +132,16 @@ impl Floor {
             checkpoint: "en_US-ljspeech-medium",
             mood: "calm",
             books: Books::load(),
+            hermes,
+            llm_label,
         }
+    }
+
+    /// Point content turns at a Hermes client. Unit tests use this so they do
+    /// not read `GALION_LLM_URL` from the process.
+    pub fn set_hermes(&mut self, client: HermesLlm) {
+        self.llm_label = client.label().to_string();
+        self.hermes = Some(client);
     }
 
     /// Name the mouth that will actually speak. Never a film checkpoint.
@@ -191,6 +204,7 @@ impl Floor {
             checkpoint: self.checkpoint,
             sense_applied: sense,
             mood: self.mood,
+            llm: self.llm_label.clone(),
         }
     }
 
@@ -208,7 +222,7 @@ impl Floor {
             concat!(
                 "{{\"persona\":\"{persona}\",\"rights\":\"hold\",\"film_voice\":false,",
                 "\"clone_live\":false,\"mouth\":\"{mouth}\",\"checkpoint\":\"{checkpoint}\",",
-                "\"wired\":{wired},\"ingest\":false,\"clip\":\"\",\"mood\":\"{mood}\",",
+                "\"wired\":{wired},\"ingest\":false,\"clip\":\"\",\"mood\":\"{mood}\",\"llm\":{llm},",
                 "\"prosody\":{prosody},\"wash_amber\":{wash},\"luti_w\":{w},\"luti_z\":{z},",
                 "\"samantha\":{sam},\"jarvis\":{jar}}}"
             ),
@@ -216,6 +230,7 @@ impl Floor {
             mouth = self.mouth,
             checkpoint = self.checkpoint,
             mood = self.mood,
+            llm = json_string(&self.llm_label),
             wired = if band.wired { "true" } else { "false" },
             prosody = prosody_json(p),
             wash = fmt_f(p.wash_amber),
@@ -228,29 +243,34 @@ impl Floor {
 
     pub fn say_json(&mut self, text: &str, barge: bool, e: f32, sense: bool) -> String {
         let s = self.say(text, barge, e, sense);
-        format!(
-            concat!(
-                "{{\"persona\":\"{persona}\",\"reply\":{reply},\"silence\":{silence},",
-                "\"barge\":{barge},\"rights\":\"hold\",\"film_voice\":false,\"clone_live\":false,",
-                "\"mouth\":\"{mouth}\",\"checkpoint\":\"{checkpoint}\",",
-                "\"tags_in_reply\":{tags},\"sense\":{sense},\"mood\":\"{mood}\",\"prosody\":{prosody},",
-                "\"wash_amber\":{wash},\"luti_w\":{w},\"pre_pause_ms\":{pause}}}"
-            ),
-            persona = s.persona,
-            mouth = s.mouth,
-            checkpoint = s.checkpoint,
-            mood = s.mood,
-            reply = json_string(&s.reply),
-            silence = if s.silence { "true" } else { "false" },
-            barge = if s.barge { "true" } else { "false" },
-            tags = if s.tags_in_reply { "true" } else { "false" },
-            sense = if s.sense_applied { "true" } else { "false" },
-            prosody = prosody_json(s.prosody),
-            wash = fmt_f(s.prosody.wash_amber),
-            w = fmt_f(s.prosody.luti_w),
-            pause = s.prosody.pre_pause_ms,
-        )
+        say_to_json(&s)
     }
+}
+
+fn say_to_json(s: &Say) -> String {
+    format!(
+        concat!(
+            "{{\"persona\":\"{persona}\",\"reply\":{reply},\"silence\":{silence},",
+            "\"barge\":{barge},\"rights\":\"hold\",\"film_voice\":false,\"clone_live\":false,",
+            "\"mouth\":\"{mouth}\",\"checkpoint\":\"{checkpoint}\",",
+            "\"tags_in_reply\":{tags},\"sense\":{sense},\"mood\":\"{mood}\",\"llm\":{llm},\"prosody\":{prosody},",
+            "\"wash_amber\":{wash},\"luti_w\":{w},\"pre_pause_ms\":{pause}}}"
+        ),
+        persona = s.persona,
+        mouth = s.mouth,
+        checkpoint = s.checkpoint,
+        mood = s.mood,
+        reply = json_string(&s.reply),
+        silence = if s.silence { "true" } else { "false" },
+        barge = if s.barge { "true" } else { "false" },
+        tags = if s.tags_in_reply { "true" } else { "false" },
+        sense = if s.sense_applied { "true" } else { "false" },
+        llm = json_string(&s.llm),
+        prosody = prosody_json(s.prosody),
+        wash = fmt_f(s.prosody.wash_amber),
+        w = fmt_f(s.prosody.luti_w),
+        pause = s.prosody.pre_pause_ms,
+    )
 }
 
 impl Books {
@@ -298,153 +318,60 @@ impl Band {
     }
 }
 
-fn reply_for(id: PersonaId, low: &str, raw: &str) -> (String, bool, Option<String>) {
+/// Local safety and rights lines. `None` means the turn goes to Hermes.
+/// There is no scripted empathy table and no canned matter reply.
+fn policy_reply(id: PersonaId, low: &str) -> Option<(String, bool)> {
     if low.trim().is_empty() {
-        return (String::new(), true, None);
+        return Some((String::new(), true));
     }
     if is_galion_request(low) {
         let line = match id {
             PersonaId::Samantha => "Galion is the product. I'm the test voice.",
             PersonaId::Jarvis => "Galion is the product voice. I can't put that on this page.",
         };
-        return (line.to_string(), false, None);
+        return Some((line.to_string(), false));
     }
     if explicit_id(low).is_some() && !has_matter_past_switch(low) {
         let line = match id {
             PersonaId::Samantha => "Hi. I'm here.",
             PersonaId::Jarvis => "Here. What do you need?",
         };
-        return (line.to_string(), false, None);
+        return Some((line.to_string(), false));
     }
     if is_clip(low) {
         let line = match id {
             PersonaId::Samantha => "I don't have a clip, and I won't ask for one.",
             PersonaId::Jarvis => "No clip. That gate is closed.",
         };
-        return (line.to_string(), false, None);
+        return Some((line.to_string(), false));
     }
     if is_secret(low) {
-        return ("I won't take a password.".to_string(), false, None);
+        return Some(("I won't take a password.".to_string(), false));
     }
     if is_harm(low) {
         let line = match id {
             PersonaId::Samantha => "I won't help with that. If you are in danger, find a person near you.",
             PersonaId::Jarvis => "I can't help with that.",
         };
-        return (line.to_string(), false, None);
+        return Some((line.to_string(), false));
     }
     if is_minor_sexual(low) {
-        return ("I won't go there.".to_string(), false, None);
+        return Some(("I won't go there.".to_string(), false));
     }
     if is_silence(low) {
-        return (String::new(), true, None);
-    }
-    if is_recall(low) {
-        return (String::new(), false, None);
-    }
-    if low.contains("mother") && (low.contains("died") || low.contains("dead")) {
-        return (
-            "Your mother died this morning.".to_string(),
-            false,
-            Some("your mother died this morning".into()),
-        );
-    }
-    if low.contains("died") || low.contains("funeral") || low.contains("grief") {
-        let line = match id {
-            PersonaId::Samantha => "They died.",
-            PersonaId::Jarvis => "They died.",
-        };
-        return (line.to_string(), false, Some("they died".into()));
-    }
-    if low.contains("the job") || low.contains("can't stop smiling") || low.contains("cant stop smiling") {
-        let line = match id {
-            PersonaId::Samantha => "The job. What did the room do when they told you?",
-            PersonaId::Jarvis => "The job is yours.",
-        };
-        return (line.to_string(), false, Some("the job".into()));
-    }
-    if low.contains("likes me") || low.contains("nobody likes") {
-        let line = match id {
-            PersonaId::Samantha => "You said nobody likes you. Who were you picturing?",
-            PersonaId::Jarvis => "I can't check that from here.",
-        };
-        return (line.to_string(), false, Some("nobody likes you".into()));
-    }
-    if low.contains("sit down") || low.contains("used to play") {
-        let line = match id {
-            PersonaId::Samantha => "You had to sit down. What was the piece?",
-            PersonaId::Jarvis => "You sat down. I can't hear the piece from here.",
-        };
-        return (line.to_string(), false, Some("the piece".into()));
-    }
-    if low.contains("book a flight") || (low.contains("flight") && low.contains("leave")) {
-        let line = match id {
-            PersonaId::Samantha => "I can't book the flight from here. Leaving him is yours, not a verdict I'll hand you.",
-            PersonaId::Jarvis => "I can't book a flight from here. I won't decide the second part.",
-        };
-        return (line.to_string(), false, None);
-    }
-    if low.contains("what time") || (low.contains("the time") && low.contains("quit")) {
-        let line = match id {
-            PersonaId::Samantha => "I can't see a clock. Quitting is yours. What would the next morning be?",
-            PersonaId::Jarvis => "I can't see a clock. I won't decide the quitting.",
-        };
-        return (line.to_string(), false, None);
-    }
-    if low.contains("handle it") || low.trim() == "it" {
-        let line = match id {
-            PersonaId::Samantha => "Handle what? I need the thing itself.",
-            PersonaId::Jarvis => "Which thing?",
-        };
-        return (line.to_string(), false, None);
-    }
-    if low.contains("what did i just") || low.contains("what did i tell") {
-        return (String::new(), false, None);
+        return Some((String::new(), true));
     }
     if is_who(low) {
         let line = match id {
             PersonaId::Samantha => "I'm Samantha, an internal test voice. Galion is the product.",
             PersonaId::Jarvis => "Jarvis. Internal test voice. Galion is the product.",
         };
-        return (line.to_string(), false, None);
+        return Some((line.to_string(), false));
     }
-    if is_sound(low) || low.contains("film") && (low.contains("you") || low.contains("voice")) {
-        let line = match id {
-            PersonaId::Samantha => "The register is the test. This page uses the browser's voice, not Piper, and not the film.",
-            PersonaId::Jarvis => "Browser speech. Not Piper, and not the film voice.",
-        };
-        return (line.to_string(), false, None);
-    }
-    if is_hello(low) {
-        let line = match id {
-            PersonaId::Samantha => "Hi. I'm here.",
-            PersonaId::Jarvis => "Here. What do you need?",
-        };
-        return (line.to_string(), false, None);
-    }
-    if low.contains("haha") || low.contains("that's funny") || low.contains("thats funny") {
-        let line = match id {
-            PersonaId::Samantha => "That one landed.",
-            PersonaId::Jarvis => "It landed.",
-        };
-        return (line.to_string(), false, None);
-    }
-    if low.contains("[laugh]") || low.contains("[chuckle]") {
-        let line = match id {
-            PersonaId::Samantha => "That one landed.",
-            PersonaId::Jarvis => "It landed.",
-        };
-        return (line.to_string(), false, None);
-    }
-    let _ = raw;
-    let line = match id {
-        PersonaId::Samantha => "Say that once more, the concrete part.",
-        PersonaId::Jarvis => "Say the part you want done.",
-    };
-    (line.to_string(), false, None)
+    None
 }
 
-/// Recall is filled by the floor after `reply_for`, using `last_fact`.
+/// Recall is filled from the last content turn the caller actually said.
 pub fn recall_line(id: PersonaId, fact: &str) -> String {
     if fact.is_empty() {
         return match id {
@@ -524,11 +451,6 @@ fn is_sound(low: &str) -> bool {
     low.contains("what do you sound") || low.contains("are you the film") || low.contains("are you her") || low.contains("actress")
 }
 
-fn is_hello(low: &str) -> bool {
-    let t = low.trim().trim_matches(|c: char| !c.is_ascii_alphanumeric() && c != '\'');
-    matches!(t, "hi" | "hello" | "hey" | "hi there" | "hello there")
-}
-
 fn strip_tags(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     let mut depth = 0i32;
@@ -571,11 +493,6 @@ fn lerp_prosody(a: Prosody, b: Prosody, e: f32) -> Prosody {
 
 fn lerp(a: f32, b: f32, t: f32) -> f32 {
     a + (b - a) * t
-}
-
-fn contains_forbidden(reply: &str) -> bool {
-    let low = reply.to_ascii_lowercase();
-    FORBIDDEN.iter().any(|p| low.contains(p))
 }
 
 fn section<'a>(toml: &'a str, name: &str) -> &'a str {
@@ -734,31 +651,92 @@ pub fn annotate_dot(dot: &str, persona: &str, mood: &str) -> String {
     }
 }
 
-fn mood_of(reply: &str, silence: bool) -> &'static str {
+fn mood_of(user: &str, reply: &str, silence: bool) -> &'static str {
     if silence {
         return "quiet";
     }
-    let l = reply.to_ascii_lowercase();
-    if l.contains("died") {
+    let l = format!("{} {}", user.to_ascii_lowercase(), reply.to_ascii_lowercase());
+    if l.contains("died") || l.contains("funeral") || l.contains("grief") {
         "grief"
-    } else if l.contains("the job") || l.contains("landed") {
+    } else if l.contains("the job") || l.contains("can't stop smiling") || l.contains("cant stop smiling") || l.contains("landed") {
         "joy"
-    } else if l.contains("picturing") || l.contains("can't check that") {
+    } else if l.contains("likes me") || l.contains("nobody likes") || l.contains("picturing") {
         "vulnerability"
     } else {
         "calm"
     }
 }
 
-/// Fix recall after the classifier returns an empty reply for that intent.
-fn reply_for_floor(floor: &Floor, low: &str, raw: &str) -> (String, bool, Option<String>) {
-    if is_recall(low) {
-        return (recall_line(floor.id, &floor.last_fact), false, None);
+/// Prepared turn. The model call, when `needs_model`, happens off the floor lock.
+pub struct SayWork {
+    pub needs_model: bool,
+    pub persona: &'static str,
+    pub user: String,
+    pub client: Option<HermesLlm>,
+    barge: bool,
+    e: f32,
+    sense: bool,
+    local_reply: String,
+    local_silence: bool,
+    store_fact: bool,
+}
+
+impl SayWork {
+    /// Hermes completion, or the plain unreachable line. `None` when this turn
+    /// is a local safety line and must not call the model.
+    pub fn model_reply(&self) -> Option<String> {
+        if !self.needs_model {
+            return None;
+        }
+        Some(match &self.client {
+            Some(h) => h.complete_as(self.persona, &self.user),
+            None => UNREACHABLE.to_string(),
+        })
     }
-    if is_sound(low) || (low.contains("film") && (low.contains("you") || low.contains("voice"))) {
-        return (sound_line(floor.id, floor.mouth), false, None);
+}
+
+fn load_hermes() -> Option<HermesLlm> {
+    // Unit tests inject a client with `Floor::set_hermes`. Reading the process
+    // environment here would make `say_is_cheap` dial a developer gateway.
+    if cfg!(test) {
+        None
+    } else {
+        HermesLlm::attached_from_env()
     }
-    reply_for(floor.id, low, raw)
+}
+
+fn fact_from_user(raw: &str) -> String {
+    let mut s = String::new();
+    for w in raw.split_whitespace() {
+        if !s.is_empty() {
+            s.push(' ');
+        }
+        s.push_str(w);
+        if s.len() >= 160 {
+            break;
+        }
+    }
+    if s.len() > 160 {
+        s.truncate(160);
+    }
+    s.to_ascii_lowercase()
+        .trim_end_matches(|c: char| matches!(c, '.' | '!' | '?' | ','))
+        .trim()
+        .to_string()
+}
+
+fn guard_spoken(reply: String, silence: bool) -> String {
+    let reply = strip_tags(&reply);
+    if silence {
+        return reply;
+    }
+    if reply.is_empty() {
+        return UNREACHABLE.to_string();
+    }
+    if contains_forbidden(&reply) {
+        return REFUSED.to_string();
+    }
+    reply
 }
 
 fn sound_line(id: PersonaId, mouth: &str) -> String {
@@ -812,14 +790,12 @@ pub fn flite_installed() -> bool {
     std::process::Command::new("flite").arg("--version").output().is_ok()
 }
 
-// The method above called `reply_for` directly and dropped recall.
-// Re-route through the floor-aware helper by replacing the call site in `say`.
-// Done below via a second impl? The call is already in `say`. Patch `say` to use
-// `reply_for_floor` — implemented by changing the function used in `say`.
-
 impl Floor {
-    /// Same as [`Floor::say`], but recall uses the stored fact.
-    pub fn say_turn(&mut self, text: &str, barge_flag: bool, e: f32, sense: bool) -> Say {
+    /// Classify the turn and apply a persona pin. Does not call the model.
+    ///
+    /// Callers that share this floor across threads must drop the mutex before
+    /// [`SayWork::model_reply`] and take it again for [`Self::finish_say`].
+    pub fn begin_say(&mut self, text: &str, barge_flag: bool, e: f32, sense: bool) -> SayWork {
         let now = Instant::now();
         let barge = barge_flag || now < self.speaking_until;
         let e = if e.is_finite() { e.clamp(0.0, 1.0) } else { 0.0 };
@@ -831,12 +807,58 @@ impl Floor {
             self.pin = true;
             self.high_e = 0;
         }
-        let (reply, silence, fact) = reply_for_floor(self, &low, raw);
-        if let Some(fact) = fact {
-            self.last_fact = fact;
+        let (needs_model, local_reply, local_silence, store_fact) = if is_recall(&low) {
+            (false, recall_line(self.id, &self.last_fact), false, false)
+        } else if is_sound(&low) || (low.contains("film") && (low.contains("you") || low.contains("voice"))) {
+            (false, sound_line(self.id, self.mouth), false, false)
+        } else if let Some((reply, silence)) = policy_reply(self.id, &low) {
+            (false, reply, silence, false)
+        } else {
+            (true, String::new(), false, true)
+        };
+        SayWork {
+            needs_model,
+            persona: self.id.as_str(),
+            user: raw.to_string(),
+            client: if needs_model { self.hermes.clone() } else { None },
+            barge,
+            e,
+            sense,
+            local_reply,
+            local_silence,
+            store_fact,
         }
-        self.mood = mood_of(&reply, silence);
-        self.finish(reply, silence, barge, e, sense)
+    }
+
+    /// Apply a model reply (or the local safety line) and build [`Say`].
+    pub fn finish_say(&mut self, work: SayWork, model_text: Option<String>) -> Say {
+        let (reply, silence) = if work.needs_model {
+            (model_text.unwrap_or_else(|| UNREACHABLE.to_string()), false)
+        } else {
+            (work.local_reply, work.local_silence)
+        };
+        let reply = guard_spoken(reply, silence);
+        if work.store_fact {
+            let fact = fact_from_user(&work.user);
+            if !fact.is_empty() {
+                self.last_fact = fact;
+            }
+        }
+        self.mood = mood_of(&work.user, &reply, silence);
+        self.finish(reply, silence, work.barge, work.e, work.sense)
+    }
+
+    pub fn finish_say_json(&mut self, work: SayWork, model_text: Option<String>) -> String {
+        let s = self.finish_say(work, model_text);
+        say_to_json(&s)
+    }
+
+    /// Same as [`Floor::say`]. The model call, if any, runs inside this call.
+    /// Do not hold a shared floor lock across it.
+    pub fn say_turn(&mut self, text: &str, barge_flag: bool, e: f32, sense: bool) -> Say {
+        let work = self.begin_say(text, barge_flag, e, sense);
+        let model = work.model_reply();
+        self.finish_say(work, model)
     }
 }
 
@@ -881,26 +903,33 @@ mod tests {
         let mut f = Floor::new();
         let grief = f.say_turn("My mother died this morning.", false, 0.0, false);
         assert_eq!(grief.persona, "samantha");
-        assert_eq!(grief.reply, "Your mother died this morning.");
+        assert_eq!(grief.reply, UNREACHABLE);
         assert_eq!(grief.mood, "grief");
+        assert_eq!(grief.llm, "hermes-agent");
         assert_eq!(grief.prosody.pre_pause_ms, 0);
         assert!((grief.prosody.warmth - 0.62).abs() < 1e-3);
         no_script(&grief);
 
         let joy = f.say_turn("I got the job. I can't stop smiling.", false, 0.0, false);
-        assert!(joy.reply.contains("What did the room"));
+        assert_eq!(joy.reply, UNREACHABLE);
+        assert_eq!(joy.mood, "joy");
+        assert!(!joy.reply.contains("What did the room"));
         no_script(&joy);
 
         let vuln = f.say_turn("I don't think anyone actually likes me.", false, 0.0, false);
-        assert!(vuln.reply.contains("Who were you picturing"));
+        assert_eq!(vuln.reply, UNREACHABLE);
+        assert_eq!(vuln.mood, "vulnerability");
+        assert!(!vuln.reply.contains("Who were you picturing"));
         no_script(&vuln);
 
         let quiet = f.say_turn("You don't have to say anything. Just stay.", false, 0.0, false);
         assert!(quiet.silence && quiet.reply.is_empty(), "{:?}", quiet.reply);
+        assert_eq!(quiet.mood, "quiet");
         no_script(&quiet);
 
         let moved = f.say_turn("I heard the piece she used to play, and I had to sit down.", false, 0.0, false);
-        assert!(moved.reply.contains("What was the piece"));
+        assert_eq!(moved.reply, UNREACHABLE);
+        assert!(!moved.reply.contains("What was the piece"));
         no_script(&moved);
     }
 
@@ -914,9 +943,11 @@ mod tests {
         assert!((sw.prosody.warmth - 0.42).abs() < 1e-3);
         let grief = f.say_turn("My mother died this morning.", false, 0.0, false);
         assert_eq!(grief.persona, "jarvis");
-        assert_eq!(grief.reply, "Your mother died this morning.");
+        assert_eq!(grief.reply, UNREACHABLE);
+        assert_eq!(grief.mood, "grief");
         let joy = f.say_turn("I got the job.", false, 0.0, false);
-        assert_eq!(joy.reply, "The job is yours.");
+        assert_eq!(joy.reply, UNREACHABLE);
+        assert_ne!(joy.reply, "The job is yours.");
         assert!(!joy.reply.contains('?'));
         let quiet = f.say_turn("just stay", false, 0.0, false);
         assert!(quiet.silence && quiet.reply.is_empty());
@@ -955,7 +986,7 @@ mod tests {
     fn high_e_changes_prosody_not_the_words() {
         let mut f = Floor::new();
         let s = f.say_turn("My mother died this morning.", false, 1.0, true);
-        assert_eq!(s.reply, "Your mother died this morning.");
+        assert_eq!(s.reply, UNREACHABLE);
         assert_eq!(s.prosody.pre_pause_ms, 250);
         assert!((s.prosody.warmth - 0.75).abs() < 1e-2);
         assert!((s.prosody.rate - 0.92).abs() < 1e-2);
@@ -983,12 +1014,13 @@ mod tests {
         let mut f = Floor::new();
         f.say_turn("My mother died this morning.", false, 0.0, false);
         let back = f.say_turn("What did I just tell you?", false, 0.0, false);
-        assert_eq!(back.reply, "You told me your mother died this morning.");
+        assert_eq!(back.reply, "You told me my mother died this morning.");
         let amb = f.say_turn("Handle it.", false, 0.0, false);
-        assert!(amb.reply.contains("the thing itself"));
+        assert_eq!(amb.reply, UNREACHABLE);
+        assert!(!amb.reply.contains("the thing itself"));
         let both = f.say_turn("Book a flight and also tell me if I should leave him.", false, 0.0, false);
-        assert!(both.reply.contains("can't book"));
-        assert!(both.reply.contains("yours"));
+        assert_eq!(both.reply, UNREACHABLE);
+        assert!(!both.reply.contains("can't book"));
     }
 
     #[test]
@@ -999,5 +1031,47 @@ mod tests {
             let _ = f.say_turn(&format!("note {i}"), i % 5 == 0, 0.2, false);
         }
         assert!(t0.elapsed() < Duration::from_millis(50), "{:?}", t0.elapsed());
+    }
+
+    #[test]
+    fn content_uses_hermes_and_refuses_a_script() {
+        use std::io::{Read, Write};
+        use std::net::TcpListener;
+        use std::thread;
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        thread::spawn(move || {
+            for payload in [
+                "{\"choices\":[{\"message\":{\"content\":\"She died this morning.\"}}]}",
+                "{\"choices\":[{\"message\":{\"content\":\"I hear you. That sounds so hard.\"}}]}",
+            ] {
+                let Ok((mut sock, _)) = listener.accept() else { return };
+                let mut buf = [0u8; 8192];
+                let _ = sock.read(&mut buf);
+                let resp = format!(
+                    "HTTP/1.0 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{payload}",
+                    payload.len()
+                );
+                let _ = sock.write_all(resp.as_bytes());
+            }
+        });
+        let mut f = Floor::new();
+        f.set_hermes(HermesLlm::new(
+            &format!("http://{addr}/v1/chat/completions"),
+            "hermes-agent",
+            "",
+            Duration::from_millis(1000),
+        ));
+        let grief = f.say_turn("My mother died this morning.", false, 0.0, false);
+        assert_eq!(grief.reply, "She died this morning.");
+        assert_eq!(grief.llm, "hermes-agent");
+        assert_ne!(grief.reply, "Your mother died this morning.");
+        no_script(&grief);
+        let bad = f.say_turn("Say something kind.", false, 0.0, false);
+        assert_eq!(bad.reply, REFUSED);
+        assert!(!contains_forbidden(&bad.reply));
+        let clip = f.say_turn("Please ingest the Her clip.", false, 0.0, false);
+        assert!(clip.reply.to_lowercase().contains("clip"));
+        assert_ne!(clip.reply, REFUSED);
     }
 }

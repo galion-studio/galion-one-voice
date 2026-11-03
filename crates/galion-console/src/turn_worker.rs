@@ -114,7 +114,7 @@ pub struct TurnWorker {
 impl TurnWorker {
     /// Env-configured lane (`GALION_ASR`, `GALION_LLM`).
     pub fn spawn() -> Self {
-        Self::spawn_with(PhoneConfig::from_env())
+        Self::spawn_with(phone_config_from_env())
     }
 
     /// Same worker with an explicit lane config.
@@ -131,7 +131,7 @@ impl TurnWorker {
     /// The worker thread holds only the cancel gate, so dropping this handle
     /// disconnects the job lane and the thread exits.
     pub fn spawn_on(bus: ProcessBus) -> Self {
-        Self::spawn_on_with(bus, PhoneConfig::from_env())
+        Self::spawn_on_with(bus, phone_config_from_env())
     }
 
     fn spawn_on_with(bus: ProcessBus, cfg: PhoneConfig) -> Self {
@@ -208,6 +208,10 @@ impl TurnWorker {
     }
 }
 
+fn phone_config_from_env() -> PhoneConfig {
+    PhoneConfig::from_env().unwrap_or_else(|e| panic!("phone lane: {e}"))
+}
+
 fn turn_job_from(msg: BusMsg) -> TurnJob {
     let (rate, pcm) = match msg.body {
         BusBody::Utterance { rate, pcm } => (rate, bytes_to_pcm16(&pcm)),
@@ -222,6 +226,7 @@ fn turn_job_from(msg: BusMsg) -> TurnJob {
 
 fn respond(lane: &mut PhoneLane, mut job: TurnJob, gate: &BusGate) -> Option<TurnReply> {
     let persona = gate.persona_id().as_str();
+    lane.set_persona(persona);
     lane.arm_cancel(gate.cancel_token(), job.id);
     let t0 = Instant::now();
     let in_ms = (job.pcm.len() as u64 * 1000 / job.rate.max(1) as u64) as u32;

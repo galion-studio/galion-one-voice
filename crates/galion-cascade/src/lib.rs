@@ -14,6 +14,8 @@ pub mod route;
 pub mod en_lane;
 /// Rule-table reply stand-in and prosody heuristic (no weights). Always compiled.
 pub mod canned;
+/// Loopback Hermes chat client (OpenAI-compatible, std `TcpStream`, no TLS).
+pub mod hermes;
 /// Phone turn: 16 kHz utterance → transcript → reply text → 24 kHz WAV (feature `cascade`).
 #[cfg(feature = "cascade")]
 pub mod phone;
@@ -46,7 +48,12 @@ pub trait Asr { fn name(&self) -> &'static str; fn transcribe(&mut self, pcm: &[
 /// Inbound emotion reference (SenseVoice-Small slot). Advisory only.
 pub trait EmotionIn { fn classify(&mut self, pcm: &[i16]) -> Emotion; }
 /// Small LLM reply (.gq only, no legacy container formats or third-party runtimes; gate G2 / X3).
-pub trait Llm { fn name(&self) -> &'static str; fn reply(&mut self, t: &Transcript, e: Emotion) -> Result<String, CascadeError>; }
+pub trait Llm {
+    fn name(&self) -> &'static str;
+    fn reply(&mut self, t: &Transcript, e: Emotion) -> Result<String, CascadeError>;
+    /// Active test register (`samantha` or `jarvis`). The default ignores it.
+    fn set_persona(&mut self, _id: &str) {}
+}
 /// Outbound TTS (Piper / SpeechT5 / Pocket-TTS-class slot).
 pub trait Tts { fn name(&self) -> &'static str; fn synth(&mut self, text: &str, lang: Lang) -> Result<Vec<i16>, CascadeError>; }
 
@@ -104,6 +111,7 @@ pub fn mock_cascade() -> Cascade<MockAsr, MockEmotion, MockLlm, MockTts> {
 }
 
 pub use canned::{CannedLlm, ProsodyEmotion, ReplyLlm};
+pub use hermes::{contains_forbidden, HermesLlm, HermesTarget, FORBIDDEN, LLM_NAME, REFUSED, UNREACHABLE};
 #[cfg(feature = "cascade")]
 pub use phone::{
     phone_turn, phone_turn_wav, AsrMode, AsrSource, LlmMode, PhoneConfig, PhoneError, PhoneLane, PhoneTurn, PhoneTurnAsr,

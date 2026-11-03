@@ -84,8 +84,11 @@ phonemizer) is waiting on counsel. Flite is the fallback. Tones are not a reply.
 transcript, reply text, 24 kHz WAV out. `GALION_ASR` unset means stub
 (fixtures decode, real speech returns `AsrUnratified`). `interim` is a
 **placeholder**: canned English chosen by utterance length, labelled
-`interim-placeholder`, not recognition. `GALION_LLM` defaults to `CannedLlm`
-on this lane. `TurnWorker` in `galion-console` (feature `phone-turn`) runs
+`interim-placeholder`, not recognition. `GALION_LLM` unset or `canned` is
+`CannedLlm` (explicit test opt-in). `hermes` is the loopback gateway
+(`GALION_LLM_URL`, default `http://127.0.0.1:8642/v1/chat/completions`,
+3 s cap). Unknown values error. A dead gateway says `model can't be reached`
+and does not fall back to canned. `TurnWorker` in `galion-console` (feature `phone-turn`) runs
 that lane on its own thread. `PhoneHost` polls it from the screen demo.
 `WebSurface` serves `POST /mic`, `POST /turn`, `GET /reply/<id>.wav`, and
 puts `reply` on `/dot`.
@@ -114,7 +117,7 @@ phone browser                         loopback 127.0.0.1:7878
                                      TurnWorker thread
                                        PhoneLane
                                          S4 PhoneTurnAsr
-                                         S5 CannedLlm (or echo)
+                                         S5 HermesLlm, or CannedLlm / echo when opted in
                                          S6 SpeechStack (Piper, else flite)
                                          │
                                          ▼
@@ -697,14 +700,17 @@ backlog. Record only.
 
 **Goal.** High-capability model calls for research, prediction, and
 agent-assist go through **Hermes** (Galion Research / the Hermes access
-layer already typed in `galion-sideband`). Local models stay the voice path.
-Hermes is not on the 80 ms heartbeat. The 3 s retrieval cap stands.
+layer already typed in `galion-sideband`). The live reply may use that
+gateway beside the canned test table. Hermes is not on the 80 ms heartbeat.
+The 3 s retrieval cap stands.
 
 **Owner decision (t198u, 2026-11-03, YES).** Hermes is the approved external
 gateway beside local models. A t197u note that named OpenRouter was replaced
-by this decision before any OpenRouter approval was kept. Do not call Hermes
-from this record. No secrets in the repo. Gateway choice C5 in the sideband
-crate is now this approval; the transport is still a trait, not a client.
+by this decision before any OpenRouter approval was kept. No secrets in the
+repo. The voice reply path calls Hermes off the 80 ms tick: std HTTP to a
+numeric loopback OpenAI chat endpoint (`crates/galion-cascade/src/hermes.rs`,
+`GALION_LLM=hermes`, 3 s cap). The side-band trait in `galion-sideband` is
+unchanged. Do not put a key in the tree.
 
 The hook that offers `Turn`, `Intent`, and `Affect` is
 `galion_openmind::CortexHandoff`. It uses the types already in

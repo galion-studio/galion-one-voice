@@ -19,7 +19,13 @@ use std::process::ExitCode;
 
 fn main() -> ExitCode {
     let args: Vec<String> = env::args().skip(1).collect();
-    let mut lane = PhoneLane::from_env();
+    let mut lane = match PhoneLane::from_env() {
+        Ok(lane) => lane,
+        Err(e) => {
+            eprintln!("phone lane: {e}");
+            return ExitCode::from(2);
+        }
+    };
     eprintln!(
         "phone lane asr={:?} llm={:?} speech={} ({})",
         lane.cfg.asr,
@@ -55,8 +61,9 @@ fn main() -> ExitCode {
         }
     };
     println!(
-        "{{\"asr\":\"{}\",\"backend\":\"{}\",\"ms\":{},\"tts_first_pcm_ms\":{},\"wav_bytes\":{},\"recognised\":{}}}",
+        "{{\"asr\":\"{}\",\"llm\":\"{}\",\"backend\":\"{}\",\"ms\":{},\"tts_first_pcm_ms\":{},\"wav_bytes\":{},\"recognised\":{}}}",
         turn.asr.id(),
+        turn.llm,
         turn.speech_backend,
         turn.ms,
         turn.stage_ms.tts_first_pcm,
