@@ -92,7 +92,7 @@ Piper pin is unchanged. Global `foreign_runtime_allowed` stays false.
 
 - The worker is a separate process. Nothing in the Galion crates links PyTorch.
 - `in_tree_ort`, `in_tree_ggml`, and `in_tree_llama` are false on that pin. A community ONNX export does not ride the Piper pin. A GGML-family port is still the wrong shape.
-- `weights_vendored = false`. Do not commit Nano or Turbo weights. `scripts/clone/fetch-clone-weights.sh` refuses unless `GALION_CLONE_FETCH=1`.
+- `weights_vendored = false`. Do not commit Nano or Turbo weights. `scripts/clone/fetch-clone-weights.sh` refuses unless `GALION_CLONE_FETCH=1`. The release layout is `CLONE-WEIGHTS.md`.
 - `reference_clips = false`. No film audio.
 - Do not "temporarily" port the net onto candle.
 

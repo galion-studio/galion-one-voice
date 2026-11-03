@@ -56,7 +56,7 @@ refuses unless `GALION_CLONE_FETCH=1`.
 
 ## What a real run would add, later
 
-1. Pinned safetensors on disk, fetched by a human with `GALION_CLONE_FETCH=1`.
+1. Pinned safetensors on disk, fetched with `GALION_CLONE_FETCH=1` from release `clone-weights-v1` (`CLONE-WEIGHTS.md`).
 2. The child actually calls generate, still out of process, still with no reference clip until rights are cleared.
 3. The stderr engine line says `model`.
 4. Three CPU runs, cold and warm, phrase fixed, written into `LEDGER.md` with the host and the model id.
