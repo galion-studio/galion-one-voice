@@ -482,12 +482,11 @@ colours, the orb as the mark. Docs agree with the code. Detail:
 surface. The mark is the orb. It is drawn, not a file dropped on the page.
 
 **LOCKS.** `chrome_allowed = false`. `paid_tiers = false`. `free_forever = true`.
-A Local / Plus / Ultra price list is not in this repository. It is not
-documented as a product.
+The Ultra host plan is `docs/galion-voice-v2/symphony/PLAN-ULTRA.md` ($220/month, CX43-class). It does not edit this lock file. The one-dot page does not show a price.
 
 **Owner decision.** The master slogan is "The seamless connection with the human being, on the voice only."
 It is the one public line (`docs/brand/GALION-VOICE-BRAND.md`). It is not a stack of slogans, and it is not chrome on the dot.
-If a freemium split is ever real, it is an owner edit of `[licence]` plus counsel. Not a README sentence.
+Putting the symphony host plan into `[licence]` is still an owner edit of that file, plus counsel. Not a README sentence.
 
 ### V2-S9 · Student and Open Mind slot
 
