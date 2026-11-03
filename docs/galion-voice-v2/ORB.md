@@ -83,6 +83,15 @@ is still `DotParams`. The page is still what the phone sees, and
 `DotParams` stays the golden for G4. Pointing PNG or the window at the
 spring is a later owner step.
 
+## When the surface is in a fault
+
+Acceptance item 4 is the healthy room: `#0A0A0C` and the amber → violet
+wash, with the circle a solid `#F5F5F7`. A fault is a different draw of
+that same pair. The vignette comes off, the field is the gradient, and
+one `GV-` code is rendered in the gradient, clear of the circle. Luti,
+the spring feel on this mark, does not gain an error row and does not
+paint the fill. Contract: `ERROR-STATE.md`. The page does not draw this yet.
+
 ## Acceptance
 
 1. The page source contains `function spring` and `samplePlayEnv` (console test

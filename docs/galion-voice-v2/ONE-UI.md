@@ -18,7 +18,7 @@ on the screen.
 
 The hint ("Tap the dot to talk") and the Art. 50 line are the existing
 phone path, so a mic can be granted and the disclosure is visible. They
-are not a second graphic. `LOCKS.toml` `[ui]` is not edited.
+are not a second graphic. `LOCKS.toml` `[ui]` is not edited. A latched fault is `ERROR-STATE.md`: the wash goes full-bleed and one `GV-` code is drawn in that gradient. The circle fill stays `#F5F5F7`, and Luti gains no error row.
 
 ## Luti
 

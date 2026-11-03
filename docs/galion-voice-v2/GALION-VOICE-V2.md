@@ -229,6 +229,13 @@ It is a tension with `chrome_allowed = false`. It is not a lock edit.
 three names until an owner adds `thinking`. The page may move as if thinking;
 it must not pretend the lock already lists that state.
 
+**Error state.** A fault washes the whole field with the locked amber →
+violet pair at full strength, and draws one Galion code (`GV-` and four
+digits) in that same gradient. The family is inventable; the registry is
+`ERROR-STATE.md`. The mark stays one solid `#F5F5F7` circle. Luti's spring
+table is not retuned, and the gradient does not paint the fill.
+`LOCKS.toml` is not edited. The phone page does not draw this yet.
+
 **Owner decision.** Whether `thinking` becomes a locked state. Whether the
 hint sentence is allowed on the user surface or must be replaced by motion
 alone. Whether PNG and the window sample `OrbEngine` (the module is in the
@@ -723,6 +730,8 @@ This program does not SSH, and it does not download a model.
 - Security headers, CORS allowlist switch, retention note.
 - `scripts/check-phone-pipeline.sh` and a thicker `run-v1-screen.sh --check`.
 - This plan, Plan V5, the brand doc, the README.
+- Error-state requirement: `docs/galion-voice-v2/ERROR-STATE.md`. Not drawn
+  on the page. The circle fill stays `#F5F5F7`. `LOCKS.toml` not edited.
 - Voice-side Open Mind seam: `crates/galion-openmind` and
   `docs/galion-voice-v2/OPENMIND-NERVE-CORTEX.md`. Local nerve notes when no
   daemon is present. Hermes handoff through `galion-sideband`. Not inside

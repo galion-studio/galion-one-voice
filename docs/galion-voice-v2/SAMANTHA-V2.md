@@ -130,6 +130,12 @@ Interpolate with the **shown** `e`, on the display clock, never inside
 The circle fill stays `#F5F5F7`. Recolouring it needs a later owner edit
 of the lock. This spec does not make that edit.
 
+A latched fault suspends this wash. The field goes full-bleed amber →
+violet and a `GV-` code is drawn in that gradient, clear of the circle.
+Luti's table is not retuned for the fault, and the fill stays `#F5F5F7`.
+Contract: `ERROR-STATE.md`. When the fault clears, this session's wash
+and lean return.
+
 ## 3. What it builds on
 
 Samantha V2 extends the V2 program. It does not replace it.
