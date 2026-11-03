@@ -110,15 +110,21 @@ impl TurnWorker {
 
     /// Same worker with an explicit lane config.
     /// The presence-eval harness uses this so a barge-in probe does not mutate `GALION_ASR`.
+    ///
+    /// Returns only after the lane exists. Piper pre-warm runs there, so a turn
+    /// submitted as soon as `spawn` returns is not stuck behind model load in
+    /// the one-slot queue. The 80 ms loop never calls this.
     pub fn spawn_with(cfg: PhoneConfig) -> Self {
         let (tx, jrx) = sync_channel::<TurnJob>(1);
         let (rtx, rx) = sync_channel::<TurnReply>(4);
+        let (ready_tx, ready_rx) = std::sync::mpsc::channel::<()>();
         let current = Arc::new(AtomicU64::new(0));
         let cur = current.clone();
         std::thread::Builder::new()
             .name("galion-turn-worker".into())
             .spawn(move || {
                 let mut lane = PhoneLane::new(cfg);
+                let _ = ready_tx.send(());
                 while let Ok(job) = jrx.recv() {
                     if job.id < cur.load(Ordering::Acquire) {
                         continue; // superseded (barge-in) before we started
@@ -133,6 +139,7 @@ impl TurnWorker {
                 }
             })
             .expect("spawn turn worker");
+        ready_rx.recv().expect("turn worker stopped during lane start");
         Self { tx, rx, current }
     }
 
