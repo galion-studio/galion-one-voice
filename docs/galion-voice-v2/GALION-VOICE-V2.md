@@ -492,6 +492,8 @@ barge-in during TTS is a spec assertion (`me` stops, new turn wins).
    rejects those names on purpose.
 3. Mock backend remains the default. The student is another backend later.
 
+**Phone loopback eval.** `scripts/eval/virtual-user.sh` runs T0–T2 offline on `127.0.0.1`: text or fixture WAV in, CannedLlm plus Piper or flite out, reply WAV captured when a backend exists. The JSON report is `galion-gates/results/presence-eval/`. TTFA there is a loopback full-utterance time. PSTN is not run. It does not add an engagement metric. See `docs/eval/PRESENCE-EVAL.md`.
+
 **Risks.** Teaching the harness to score "how long the user stayed". That
 list is already rejected. Do not reopen it in V2.
 

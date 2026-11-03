@@ -228,6 +228,16 @@ name = "galion-presence"
 version = "0.0.1"
 
 [[package]]
+name = "galion-presence-eval"
+version = "0.0.1"
+dependencies = [
+ "galion-cascade",
+ "galion-console",
+ "galion-ml-voice",
+ "galion-presence",
+]
+
+[[package]]
 name = "galion-render"
 version = "0.0.1"
 

@@ -127,10 +127,19 @@ pub enum AsrSource {
     StubFixture,
     /// INTERIM PLACEHOLDER: canned text, the words were NOT recognised.
     InterimPlaceholder,
+    /// Virtual-user text injection. The harness supplied the words. Not speech recognition.
+    TextInject,
 }
 impl AsrSource {
-    pub fn id(&self) -> &'static str { match self { AsrSource::StubFixture => "stub-fixture", AsrSource::InterimPlaceholder => "interim-placeholder" } }
-    /// True when the transcript is real content of the input (only fixtures today).
+    pub fn id(&self) -> &'static str {
+        match self {
+            AsrSource::StubFixture => "stub-fixture",
+            AsrSource::InterimPlaceholder => "interim-placeholder",
+            AsrSource::TextInject => "text-inject",
+        }
+    }
+    /// True only for an exact stub-fixture decode.
+    /// Interim and text-inject are not recognised speech.
     pub fn is_recognised(&self) -> bool { matches!(self, AsrSource::StubFixture) }
 }
 
@@ -269,6 +278,18 @@ impl PhoneLane {
         Ok((text, src, spoken_text(&r)))
     }
 
+    /// Virtual-user text injection (S5 only, no audio).
+    ///
+    /// The words are supplied by the harness. The label is [`AsrSource::TextInject`]
+    /// (`text-inject`). [`AsrSource::is_recognised`] is false: this is not recognition.
+    pub fn inject_text(&mut self, text: &str) -> Result<(String, AsrSource, String), PhoneError> {
+        let text = text.trim();
+        if text.is_empty() { return Err(PhoneError::Empty); }
+        let transcript = text.to_string();
+        let r = self.llm.reply(&Transcript { text: transcript.clone(), lang: Lang::En }, Emotion::Neutral)?;
+        Ok((transcript, AsrSource::TextInject, spoken_text(&r)))
+    }
+
     /// One full turn: 16 kHz mono PCM16 → [`PhoneTurn`] with 24 kHz WAV bytes.
     pub fn turn(&mut self, pcm16k: &[i16]) -> Result<PhoneTurn, PhoneError> {
         let t0 = Instant::now();
@@ -278,6 +299,27 @@ impl PhoneLane {
         let raw = self.llm.reply(&Transcript { text: transcript.clone(), lang: Lang::En }, Emotion::Neutral)?;
         let reply_text = spoken_text(&raw);
         let llm_ms = ms_since(t1);
+        self.emit(t0, asr_ms, llm_ms, transcript, asr, reply_text)
+    }
+
+    /// Full turn from harness-supplied text (CannedLlm or echo, then Piper/flite).
+    /// ASR label is `text-inject`. Not speech recognition.
+    pub fn turn_text(&mut self, text: &str) -> Result<PhoneTurn, PhoneError> {
+        let t0 = Instant::now();
+        let (transcript, asr, reply_text) = self.inject_text(text)?;
+        let llm_ms = ms_since(t0);
+        self.emit(t0, 0, llm_ms, transcript, asr, reply_text)
+    }
+
+    fn emit(
+        &mut self,
+        t0: Instant,
+        asr_ms: u32,
+        llm_ms: u32,
+        transcript: String,
+        asr: AsrSource,
+        reply_text: String,
+    ) -> Result<PhoneTurn, PhoneError> {
         if !self.speech.can_speak() { return Err(PhoneError::NoSpeech(self.speech.backend.label())); }
         let t2 = Instant::now();
         let audio = self.speech.speak(&reply_text).map_err(|e| PhoneError::NoSpeech(format!("{e:?}")))?;
@@ -355,6 +397,23 @@ mod tests {
         // fixtures survive the WAV path at any declared rate
         assert_eq!(decode_stub_fixture(&wav_to_pcm16k(&wav_bytes(&fx("hi"), 24_000)).unwrap()).unwrap(), "hi");
         assert!(matches!(wav_to_pcm16k(b"nope"), Err(PhoneError::BadWav(_))));
+    }
+    #[test] fn text_inject_is_not_recognition() {
+        let mut l = PhoneLane::new(cfg(AsrMode::Interim));
+        let (t, src, r) = l.inject_text("  thanks ").unwrap();
+        assert_eq!((t.as_str(), src, r.as_str()), ("thanks", AsrSource::TextInject, "Any time."));
+        assert_eq!(src.id(), "text-inject");
+        assert!(!src.is_recognised());
+        assert!(matches!(l.inject_text("   "), Err(PhoneError::Empty)));
+        if !l.can_speak() {
+            assert!(matches!(l.turn_text("hello"), Err(PhoneError::NoSpeech(_))));
+            return;
+        }
+        let spoken = l.turn_text("hello").unwrap();
+        assert_eq!(spoken.asr, AsrSource::TextInject);
+        assert!(!spoken.asr.is_recognised());
+        assert_eq!(spoken.reply_text, "Hi. I'm here — go ahead.");
+        assert!(spoken.wav_bytes.starts_with(b"RIFF"));
     }
     #[test] fn s4_s5_reply_text_is_canned_english() {
         let mut l = PhoneLane::new(cfg(AsrMode::Stub));

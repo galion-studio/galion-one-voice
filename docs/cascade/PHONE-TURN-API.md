@@ -9,8 +9,10 @@
 ```rust
 let mut lane = galion_cascade::PhoneLane::from_env();      // once per worker thread (Send)
 let t = lane.turn(&pcm16k_mono)?;                            // or lane.turn_wav(&wav_bytes)?
+let (text, src, reply) = lane.inject_text("hello")?;         // src = text-inject; not recognition
+let spoken = lane.turn_text("hello")?;                       // same, plus 24 kHz WAV
 // t.transcript, t.reply_text, t.wav_bytes (24 kHz PCM16 RIFF), t.ms, t.stage_ms,
-// t.asr (StubFixture | InterimPlaceholder — label the UI!), t.llm, t.speech_backend
+// t.asr (StubFixture | InterimPlaceholder | TextInject — label the UI!), t.llm, t.speech_backend
 ```
 One-shot: `galion_cascade::phone_turn(&pcm)` / `phone_turn_wav(&bytes)`.
 
@@ -22,3 +24,5 @@ One-shot: `galion_cascade::phone_turn(&pcm)` / `phone_turn_wav(&bytes)`.
 
 Errors: `PhoneError::{Empty, BadWav, AsrUnratified, NoSpeech, Cascade}` (impl `std::error::Error`).
 Smoke: `GALION_ASR=interim cargo run -p galion-cascade --features cascade --example phone_turn [in.wav [out.wav]]`.
+
+Virtual user (offline, `127.0.0.1` only): `scripts/eval/virtual-user.sh`. Report under `galion-gates/results/presence-eval/`. See `docs/eval/PRESENCE-EVAL.md`. `text-inject` is the harness supplying words. It is not recognition. Interim stays `interim-placeholder`.

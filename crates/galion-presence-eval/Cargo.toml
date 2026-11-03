@@ -1,0 +1,20 @@
+# Galion Voice — Perpetual Open MIT License
+[package]
+name = "galion-presence-eval"
+description = "Galion Voice virtual-user presence eval. Offline loopback T0–T2. No engagement metrics."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version = "1.85"
+publish = false
+
+[[bin]]
+name = "galion-presence-eval"
+path = "src/main.rs"
+
+[dependencies]
+galion-cascade = { path = "../galion-cascade", default-features = false, features = ["cascade"] }
+galion-ml-voice = { path = "../galion-ml-voice", default-features = false }
+galion-console = { path = "../galion-console", default-features = false, features = ["phone-turn"] }
+galion-presence = { path = "../galion-presence" }
