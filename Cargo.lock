@@ -224,6 +224,13 @@ name = "galion-ml-voice"
 version = "0.0.1"
 
 [[package]]
+name = "galion-openmind"
+version = "0.0.1"
+dependencies = [
+ "galion-sideband",
+]
+
+[[package]]
 name = "galion-presence"
 version = "0.0.1"
 
