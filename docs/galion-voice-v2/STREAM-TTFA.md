@@ -143,8 +143,8 @@ Those earlier runs are real Piper PCM on this box. Voice
 not an 80 ms claim. Admin t298 and t299 still hold merge. A stub clock
 with `product_claim` false does not add to this table.
 
-Without `GALION_SPEECH=a21` the same script exits 2 and prints `FAIL`.
-That is the stub rejection, not a pass.
+Without the A21 pack the script exits 2 and prints `FAIL`. That is the
+stub rejection, not a pass. `product_claim` stays false.
 
 `Heartbeat::step` is unchanged. A late frame stays a pause. `drain_frame`
 copies one 1920-sample frame outside `step` and does not generate.
