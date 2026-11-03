@@ -6,6 +6,8 @@
 //!   control-token helper ([`LanguageId::token`], [`LanguageId::from_token`]).
 //! - Stub traits [`AsrEngine`], [`TtsEngine`], [`LangRouter`].
 //! - Deterministic synthetic stubs ([`stub`]) for tests — no weights, no I/O.
+//! - [`artifact`] — compiler from clone PCM into the `.gq` voice clip the
+//!   symphony loads. File I/O happens only when a path is passed in.
 //!
 //! NOTE: More languages come later per the multilingual plan
 //! (docs/multilingual/; English + Polish priority, then the top-20 spoken
@@ -18,10 +20,11 @@
 
 use core::fmt;
 
-pub mod stub;
+pub mod artifact;
 /// V1-03 real-speech path (feature `speech`): A21 weight slot + interim system TTS.
 #[cfg(feature = "speech")]
 pub mod speech;
+pub mod stub;
 
 /// Supported languages. English only for the prototype.
 ///

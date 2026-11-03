@@ -6,6 +6,11 @@
 //! Stdin is one JSON line. Stdout is raw s16le at 24 kHz. Stderr
 //! `galion-clone-utt:` frames the utterance. PCM stays in RAM.
 //!
+//! That stdout is clone output, not the symphony runtime file. Compile it
+//! with `galion-voice-compile` into `voices/compiled/<persona>.gq`
+//! ([`crate::artifact`]). Chatterbox safetensors stay this worker's weight
+//! input. The heartbeat does not play them.
+//!
 //! Nano is the primary. Turbo is the option. Piper is the fallback in
 //! [`super::SpeechStack`] when this slot is absent or the child dies.
 //! Weights are not vendored. [`weights_ready`] is false until the pinned
