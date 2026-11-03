@@ -2,10 +2,9 @@
 # Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
 #
 # The /v2 demo route reads this file for prosody, wash, tags, and the
-# rights hold. The clone worker does not. No clip, no weights.
-# Register numbers are the design table in SAMANTHA-V2.md §4.
-# Rights hold: ../VOICE-CLONING.md. Clearance, if it ever exists, is a
-# LEDGER.md line. This draft does not write that line.
+# reference gate. clone_live is not a key in this file. It is true on
+# /v2/state only when the worker, the pinned weights, and a consented
+# reference are all present. This file does not name a wav.
 
 schema = 1
 status = "draft"
@@ -64,10 +63,20 @@ rights = "hold"
 ingest = false
 present = false
 duration_target_s = 10
-min_duration_s = 5
+min_duration_s = 8
+max_duration_s = 12
+upstream_assert_s = 5
 clip_path = ""
+store_env = "GALION_CLIP_STORE"
+wav_name = "reference.wav"
+consent_name = "consent.txt"
 placeholder = "docs/galion-voice-v2/personas/refs/samantha.placeholder"
-note = "placeholder is a text marker. It is not audio. Do not commit a wav, and do not put this path on the worker request line."
+note = "placeholder is a text marker. It is not audio. Do not commit a wav. The speak line has no path. Conditioning is a separate op, and only after consent.py accepts this persona."
+
+[reference.consent]
+scope = "local-zero-shot-conditioning"
+public_demo_default = "no"
+required = ["date", "persona", "work", "performer", "grantor", "instrument", "grantee", "scope", "public_demo", "expiry", "operator", "withdrawal", "counsel", "sha256", "duration_s"]
 
 [worker]
 binding = "galion.clone.worker"
@@ -83,6 +92,10 @@ quality_option = "turbo"
 request_persona = "samantha"
 request_tags = true
 send_reference = false
+condition_op = true
+generate_env = "GALION_CLONE_GENERATE"
+device = "cpu"
+thread_cap = false
 rate_hz = 24000
 pcm = "s16le"
 weights_vendored = false
@@ -95,7 +108,7 @@ order = ["piper", "flite"]
 engine = "piper"
 voice = "en_US-ljspeech-medium"
 artifact = "weights/tts/en_US-ljspeech-medium.onnx"
-when = "clone worker absent, unwired, or dead; rights hold still closed"
+when = "clone worker absent, unwired, or dead; or the reference gate is closed"
 tags = false
 is_film_voice = false
 

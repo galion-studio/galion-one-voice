@@ -11,8 +11,11 @@
 //! Weights are not vendored. [`weights_ready`] is false until the pinned
 //! safetensors are on disk. Nothing here downloads them.
 //!
-//! The Python stub does not call Chatterbox generate and refuses a reference
-//! clip. `GALION_CLONE_STUB_PCM=1` is protocol PCM, not a Flash result.
+//! `GALION_CLONE_GENERATE=1` loads Chatterbox in the child (CPU, no thread cap)
+//! and calls `generate`. The module does not import PyTorch unless that flag
+//! is set. A speak line still carries no clip path. Conditioning is a separate
+//! op, and only when `scripts/clone/consent.py` accepts the persona.
+//! `GALION_CLONE_STUB_PCM=1` is protocol PCM, not a Flash result.
 #![allow(unsafe_code)]
 
 use super::sha256;
@@ -125,8 +128,9 @@ fn pin_matches(root: &Path, pin: &Pin) -> bool {
     sha256::file_hex(&path).ok().as_deref() == Some(pin.sha.as_str())
 }
 
-/// True when the shared tensors and this model's T3 file match [`PINS_TEXT`].
-/// Missing files return false without hashing. This does not download.
+/// True when the shared tensors, this model's T3 file, and the tokenizer text
+/// match [`PINS_TEXT`]. Missing files return false without hashing. This does
+/// not download.
 pub fn weights_ready(model: CloneModel) -> bool {
     let table = pins();
     if table.is_empty() {
@@ -134,6 +138,11 @@ pub fn weights_ready(model: CloneModel) -> bool {
     }
     let root = clone_root();
     let need = [
+        "tokenizer/vocab.json",
+        "tokenizer/merges.txt",
+        "tokenizer/tokenizer_config.json",
+        "tokenizer/special_tokens_map.json",
+        "tokenizer/added_tokens.json",
         "shared/s3gen.safetensors",
         "shared/s3gen_meanflow.safetensors",
         "shared/ve.safetensors",
@@ -268,7 +277,7 @@ impl CloneWorker {
                 .map_err(|e| VoiceError::Backend(format!("clone worker stdin flush: {e}")))?;
         }
         self.pcm_buf.clear();
-        let pcm = self.read_utterance(Duration::from_secs(60))?;
+        let pcm = self.read_utterance(self.speak_timeout(), false)?;
         let ms = elapsed_ms(t0);
         self.calls += 1;
         if self.calls == 1 {
@@ -286,7 +295,59 @@ impl CloneWorker {
         Ok(pcm)
     }
 
-    fn read_utterance(&mut self, timeout: Duration) -> Result<Vec<i16>, VoiceError> {
+    fn speak_timeout(&self) -> Duration {
+        if std::env::var("GALION_CLONE_GENERATE").ok().as_deref() == Some("1") {
+            Duration::from_secs(if self.calls == 0 { 300 } else { 180 })
+        } else {
+            Duration::from_secs(60)
+        }
+    }
+
+    /// Send `op: condition` only when [`consent_ready`] is true. A closed gate
+    /// is not an error and does not write a path. A refused op is an error:
+    /// the child has exited, and the lane falls back to Piper.
+    pub fn condition_if_ready(&mut self) -> Result<(), VoiceError> {
+        if !consent_ready(self.persona) {
+            return Ok(());
+        }
+        let store = std::env::var("GALION_CLIP_STORE").unwrap_or_default();
+        let path = PathBuf::from(store.trim()).join(self.persona).join("reference.wav");
+        if !path.is_file() {
+            return Ok(());
+        }
+        let line = condition_line(self.persona, &path);
+        {
+            let stdin = self
+                .stdin
+                .as_mut()
+                .ok_or_else(|| VoiceError::Backend("clone worker stdin closed".into()))?;
+            stdin
+                .write_all(line.as_bytes())
+                .map_err(|e| VoiceError::Backend(format!("clone worker stdin: {e}")))?;
+            stdin
+                .flush()
+                .map_err(|e| VoiceError::Backend(format!("clone worker stdin flush: {e}")))?;
+        }
+        self.pcm_buf.clear();
+        let timeout = if std::env::var("GALION_CLONE_GENERATE").ok().as_deref() == Some("1") {
+            Duration::from_secs(300)
+        } else {
+            Duration::from_secs(60)
+        };
+        let pcm = self.read_utterance(timeout, true)?;
+        if !pcm.is_empty() {
+            return Err(VoiceError::Backend("condition op returned PCM".into()));
+        }
+        if !self.err_log.contains("galion-clone-conditioned:") {
+            return Err(VoiceError::Backend(format!(
+                "condition op was not acknowledged ({})",
+                tail(&self.err_log)
+            )));
+        }
+        Ok(())
+    }
+
+    fn read_utterance(&mut self, timeout: Duration, allow_empty: bool) -> Result<Vec<i16>, VoiceError> {
         let deadline = Instant::now() + timeout;
         let mark = self.err_log.len();
         loop {
@@ -364,7 +425,19 @@ impl CloneWorker {
             }
         }
         let bytes = std::mem::take(&mut self.pcm_buf);
-        if bytes.len() < 2 || self.err_log[mark..].contains("galion-clone-unwired") {
+        let window = &self.err_log[mark..];
+        if window.contains("galion-clone-unwired") {
+            return Err(VoiceError::Backend(format!(
+                "clone worker returned no PCM ({})",
+                tail(&self.err_log)
+            )));
+        }
+        if allow_empty
+            && (window.contains("galion-clone-conditioned:") || window.contains("galion-clone-dropped:"))
+        {
+            return Ok(Vec::new());
+        }
+        if bytes.len() < 2 {
             return Err(VoiceError::Backend(format!(
                 "clone worker returned no PCM ({})",
                 tail(&self.err_log)
@@ -456,7 +529,8 @@ impl CloneTts {
         if alive {
             return Ok(());
         }
-        let worker = CloneWorker::spawn(&self.script, self.model, self.persona)?;
+        let mut worker = CloneWorker::spawn(&self.script, self.model, self.persona)?;
+        worker.condition_if_ready()?;
         self.worker = Some(worker);
         self.spawns += 1;
         Ok(())
@@ -580,14 +654,8 @@ pub fn flash_from_env() -> FlashReport {
     }
 }
 
-fn request_line(text: &str, model: CloneModel, persona: &str) -> String {
-    let tags = if tags_allowed(persona) {
-        "true"
-    } else {
-        "false"
-    };
-    let mut s = String::with_capacity(text.len() + 64);
-    s.push_str("{\"text\":\"");
+fn json_escape(text: &str) -> String {
+    let mut s = String::with_capacity(text.len());
     for c in text.chars() {
         match c {
             '"' => s.push_str("\\\""),
@@ -597,14 +665,56 @@ fn request_line(text: &str, model: CloneModel, persona: &str) -> String {
             c => s.push(c),
         }
     }
-    s.push_str("\",\"model\":\"");
-    s.push_str(model.as_str());
-    s.push_str("\",\"persona\":\"");
-    s.push_str(persona_name(persona));
-    s.push_str("\",\"tags\":");
-    s.push_str(tags);
-    s.push_str("}\n");
     s
+}
+
+fn request_line(text: &str, model: CloneModel, persona: &str) -> String {
+    let tags = if tags_allowed(persona) {
+        "true"
+    } else {
+        "false"
+    };
+    format!(
+        "{{\"text\":\"{}\",\"model\":\"{}\",\"persona\":\"{}\",\"tags\":{}}}\n",
+        json_escape(text),
+        model.as_str(),
+        persona_name(persona),
+        tags,
+    )
+}
+
+/// Conditioning is not a speak line. The parent sends this only after
+/// [`consent_ready`] returns true. The child checks the same gate again.
+fn condition_line(persona: &str, path: &Path) -> String {
+    format!(
+        "{{\"op\":\"condition\",\"persona\":\"{}\",\"audio_prompt_path\":\"{}\"}}\n",
+        persona_name(persona),
+        json_escape(&path.to_string_lossy()),
+    )
+}
+
+fn consent_script() -> Option<PathBuf> {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../scripts/clone/consent.py");
+    path.is_file().then_some(path)
+}
+
+/// True when the consent checker says this persona's clip, lock, and weight
+/// sizes are all present. A closed gate returns false. This does not fetch.
+pub fn consent_ready(persona: &str) -> bool {
+    let Some(script) = consent_script() else {
+        return false;
+    };
+    let Ok(out) = Command::new("python3")
+        .arg(&script)
+        .arg("check")
+        .arg("--persona")
+        .arg(persona_name(persona))
+        .output()
+    else {
+        return false;
+    };
+    out.status.success()
+        && String::from_utf8_lossy(&out.stdout).contains("galion-clip-ready:")
 }
 
 fn line_value(log: &str, key: &str) -> Option<String> {
@@ -681,9 +791,10 @@ mod tests {
     #[test]
     fn pins_are_safetensors_and_weights_are_not_in_the_tree() {
         let table = pins();
-        assert!(table.len() >= 5, "{table:?}");
+        assert!(table.len() >= 10, "{table:?}");
         for pin in &table {
-            assert!(pin.rel.ends_with(".safetensors"), "{}", pin.rel);
+            let allowed = pin.rel.ends_with(".safetensors") || pin.rel.starts_with("tokenizer/");
+            assert!(allowed, "{}", pin.rel);
             assert!(
                 !pin.rel.contains("wav") && !pin.rel.ends_with(".pt"),
                 "{}",
@@ -695,6 +806,7 @@ mod tests {
         assert!(table
             .iter()
             .any(|p| p.rel == "turbo/t3_turbo_v1.safetensors"));
+        assert!(table.iter().any(|p| p.rel == "tokenizer/vocab.json"));
         let nano = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../weights/clone/nano/t3_nano_v1.safetensors");
         assert!(!nano.exists(), "clone weights must not be committed");
@@ -711,6 +823,11 @@ mod tests {
         assert!(line.contains("\"tags\":true"));
         assert!(!line.contains("reference"));
         assert!(!line.contains("audio_prompt"));
+        assert!(!line.contains("\"op\""));
+        let cond = condition_line("samantha", Path::new("/outside/samantha.wav"));
+        assert!(cond.contains("\"op\":\"condition\""));
+        assert!(cond.contains("audio_prompt_path"));
+        assert!(!request_line("hi", CloneModel::Nano, "jarvis").contains("audio_prompt"));
         let jarvis = request_line("hello", CloneModel::Turbo, "jarvis");
         assert!(jarvis.contains("\"model\":\"turbo\""));
         assert!(jarvis.contains("\"tags\":false"));
@@ -821,6 +938,207 @@ mod tests {
         );
         drop(w);
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn torch_stays_inside_the_generate_loader() {
+        let src = include_str!("../../../../scripts/clone/chatterbox_worker.py");
+        let before = src.split("def load_model").next().unwrap();
+        let imports_torch = before.lines().any(|line| {
+            let t = line.trim();
+            t == "import torch" || t.starts_with("import torch ") || t.starts_with("from torch")
+        });
+        assert!(!imports_torch, "torch must stay inside load_model");
+        assert!(!src.contains("set_num_threads"));
+        assert!(!src.contains("onnxruntime"));
+        assert!(!src.contains("ggml"));
+        assert!(src.contains("device=\"cpu\""));
+        assert!(src.contains("GALION_CLONE_GENERATE"));
+    }
+
+    #[test]
+    fn consent_fields_match_both_voice_configs() {
+        let script = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../scripts/clone/consent.py");
+        let out = Command::new("python3")
+            .arg(&script)
+            .arg("fields")
+            .output()
+            .unwrap();
+        assert!(out.status.success());
+        let text = String::from_utf8_lossy(&out.stdout).into_owned();
+        let keys: Vec<_> = text.lines().map(str::trim).filter(|s| !s.is_empty()).collect();
+        assert!(keys.len() >= 12, "{keys:?}");
+        let joined = keys
+            .iter()
+            .map(|k| format!("\"{k}\""))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let line = format!("required = [{joined}]");
+        let sam = include_str!("../../../../docs/galion-voice-v2/personas/voice/samantha.toml");
+        let jar = include_str!("../../../../docs/galion-voice-v2/personas/voice/jarvis.toml");
+        assert!(sam.contains(&line), "{line}");
+        assert!(jar.contains(&line), "{line}");
+        assert!(sam.contains("duration_target_s = 10"));
+        assert!(jar.contains("min_duration_s = 8"));
+        assert!(sam.contains("send_reference = false"));
+        assert!(jar.contains("send_reference = false"));
+    }
+
+    #[test]
+    fn unset_store_is_not_a_live_clone() {
+        let script = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../scripts/clone/consent.py");
+        let out = Command::new("python3")
+            .arg(&script)
+            .arg("check")
+            .arg("--persona")
+            .arg("samantha")
+            .env_remove("GALION_CLIP_STORE")
+            .output()
+            .unwrap();
+        assert!(!out.status.success());
+        let text = String::from_utf8_lossy(&out.stdout);
+        assert!(text.contains("galion-clip-absent: samantha store"), "{text}");
+        assert!(!consent_ready("samantha") || std::env::var_os("GALION_CLIP_STORE").is_some());
+    }
+
+    #[test]
+    fn condition_refuses_while_the_lock_is_false_and_accepts_a_consented_clip() {
+        let store = std::env::temp_dir().join(format!("galion-clip-store-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&store);
+        let wav = write_persona_clip(&store, "samantha", 10);
+        let script = worker_script().unwrap();
+        let locked = Command::new("python3")
+            .arg(&script)
+            .env("GALION_CLONE_STUB_PCM", "1")
+            .env("GALION_CLIP_STORE", &store)
+            .env_remove("GALION_LOCKS_FILE")
+            .env_remove("GALION_CLONE_GENERATE")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap();
+        let refused = finish_child(locked, &condition_line("samantha", &wav));
+        assert_eq!(refused.0, Some(3), "{}", refused.2);
+        assert!(refused.2.contains("reference_clips"), "{}", refused.2);
+        assert!(refused.1.is_empty(), "a refused condition writes no PCM");
+        assert!(!refused.2.contains(store.to_str().unwrap()));
+
+        let locks = store.join("locks.toml");
+        std::fs::write(
+            &locks,
+            "[formats.exceptions.v2s14_chatterbox]\nreference_clips = true\n",
+        )
+        .unwrap();
+        let short = write_persona_clip(&store, "jarvis", 3);
+        let short_child = Command::new("python3")
+            .arg(&script)
+            .env("GALION_CLONE_STUB_PCM", "1")
+            .env("GALION_CLIP_STORE", &store)
+            .env("GALION_LOCKS_FILE", &locks)
+            .env_remove("GALION_CLONE_GENERATE")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap();
+        let short_out = finish_child(short_child, &condition_line("jarvis", &short));
+        assert_eq!(short_out.0, Some(3), "{}", short_out.2);
+        assert!(short_out.2.contains("duration"), "{}", short_out.2);
+        assert!(short_out.1.is_empty());
+
+        let open = Command::new("python3")
+            .arg(&script)
+            .env("GALION_CLONE_STUB_PCM", "1")
+            .env("GALION_CLIP_STORE", &store)
+            .env("GALION_LOCKS_FILE", &locks)
+            .env_remove("GALION_CLONE_GENERATE")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap();
+        let speak = format!(
+            "{}{}",
+            condition_line("samantha", &wav),
+            request_line("Hello.", CloneModel::Nano, "samantha")
+        );
+        let ok = finish_child(open, &speak);
+        assert_eq!(ok.0, Some(0), "{}", ok.2);
+        assert!(ok.2.contains("galion-clone-conditioned: samantha"), "{}", ok.2);
+        assert!(ok.2.contains("galion-clone-engine: protocol-stub"), "{}", ok.2);
+        assert!(!ok.2.contains(store.to_str().unwrap()), "stderr must not echo the path");
+        assert!(!ok.1.is_empty(), "the speak after condition still returns protocol PCM");
+
+        let sneak = Command::new("python3")
+            .arg(&script)
+            .env("GALION_CLONE_STUB_PCM", "1")
+            .env("GALION_CLIP_STORE", &store)
+            .env("GALION_LOCKS_FILE", &locks)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap();
+        let sneak_line = request_line("Hello.", CloneModel::Nano, "samantha").replace(
+            "\"tags\":true",
+            "\"tags\":true,\"audio_prompt_path\":\"/tmp/nope.wav\"",
+        );
+        let sneak_out = finish_child(sneak, &sneak_line);
+        assert_eq!(sneak_out.0, Some(3), "{}", sneak_out.2);
+        assert!(sneak_out.2.contains("rights hold"), "{}", sneak_out.2);
+        assert!(sneak_out.1.is_empty());
+        let _ = std::fs::remove_dir_all(&store);
+    }
+
+    fn finish_child(mut child: std::process::Child, line: &str) -> (Option<i32>, Vec<u8>, String) {
+        {
+            let mut stdin = child.stdin.take().unwrap();
+            stdin.write_all(line.as_bytes()).unwrap();
+        }
+        let out = child.wait_with_output().unwrap();
+        (
+            out.status.code(),
+            out.stdout,
+            String::from_utf8_lossy(&out.stderr).into_owned(),
+        )
+    }
+
+    fn write_persona_clip(store: &Path, persona: &str, seconds: u32) -> PathBuf {
+        let dir = store.join(persona);
+        std::fs::create_dir_all(&dir).unwrap();
+        let wav = dir.join("reference.wav");
+        std::fs::write(&wav, pcm_wav(seconds)).unwrap();
+        let sha = sha256::file_hex(&wav).unwrap();
+        std::fs::write(wav.with_extension("wav.sha256"), format!("{sha}\n")).unwrap();
+        let dur = format!("{seconds}.000");
+        let consent = format!(
+            "date: 2026-11-03 12:00 CET\npersona: {persona}\nwork: named on the instrument\nperformer: named on the instrument\ngrantor: named on the instrument\ninstrument: instrument-id\ngrantee: named on the instrument\nscope: local-zero-shot-conditioning\npublic_demo: no\nexpiry: 2027-02-01\noperator: Maciej Grajczyk\nwithdrawal: grantor revokes in writing\ncounsel: named on the instrument\nsha256: {sha}\nduration_s: {dur}\n"
+        );
+        std::fs::write(dir.join("consent.txt"), consent).unwrap();
+        wav
+    }
+
+    fn pcm_wav(seconds: u32) -> Vec<u8> {
+        let rate = 16_000u32;
+        let frames = rate * seconds;
+        let data_len = frames * 2;
+        let mut bytes = Vec::with_capacity(44 + data_len as usize);
+        bytes.extend_from_slice(b"RIFF");
+        bytes.extend_from_slice(&(36 + data_len).to_le_bytes());
+        bytes.extend_from_slice(b"WAVE");
+        bytes.extend_from_slice(b"fmt ");
+        bytes.extend_from_slice(&16u32.to_le_bytes());
+        bytes.extend_from_slice(&1u16.to_le_bytes());
+        bytes.extend_from_slice(&1u16.to_le_bytes());
+        bytes.extend_from_slice(&rate.to_le_bytes());
+        bytes.extend_from_slice(&(rate * 2).to_le_bytes());
+        bytes.extend_from_slice(&2u16.to_le_bytes());
+        bytes.extend_from_slice(&16u16.to_le_bytes());
+        bytes.extend_from_slice(b"data");
+        bytes.extend_from_slice(&data_len.to_le_bytes());
+        bytes.resize(bytes.len() + data_len as usize, 0);
+        bytes
     }
 
     fn entries(dir: &Path) -> Vec<String> {

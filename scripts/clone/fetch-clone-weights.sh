@@ -2,7 +2,7 @@
 # Galion Voice — Perpetual Open MIT License
 # Copyright (c) 2026 Maciej Grajczyk.
 #
-# V2-S14 · fetch pinned Chatterbox safetensors into weights/clone/ (not vendored).
+# V2-S14 · fetch pinned Chatterbox safetensors and tokenizer text into weights/clone/.
 # weights/.gitignore ignores everything under weights/. CI must not run this.
 #
 # Refuses unless GALION_CLONE_FETCH=1. That includes --check. No reference
@@ -77,7 +77,7 @@ while read -r rel sha size repo remote; do
   fi
 done < "$PINS"
 if [ "$rc" = 0 ]; then
-  echo "CLONE=PRESENT (safetensors only, not vendored). Generate is not run by this script."
+  echo "CLONE=PRESENT (pinned files only, not vendored). Generate is not run by this script."
 else
   echo "CLONE=ABSENT (check incomplete)" >&2
 fi

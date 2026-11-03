@@ -54,7 +54,7 @@ into a fetch script, no call to a dropped clone API.
 | 4 | `public_demo` explicit. Default is no. A demo that speaks the voice needs its own yes. | The same line | Absent. |
 | 5 | Counsel when the paper is not a direct grant from the rightsholder. The operator does not self-clear. | LEDGER, or a counsel memo the line cites | Not requested here. |
 | 6 | `reference_clips = false` has been changed by a later owner decision | `LOCKS.toml` `[formats.exceptions.v2s14_chatterbox]` | Still false. A LEDGER line alone does not flip it. |
-| 7 | The worker contract has been changed to accept a path | `CLONE-WORKER.md`, `scripts/clone/chatterbox_worker.py` | Still a refusal. Exit 3, no PCM. |
+| 7 | The worker accepts a path only on `op: condition`, and only when consent fields, the 8–12 s wav, and `reference_clips` all pass | `CHATTERBOX-WORKER.md`, `scripts/clone/consent.py` | The speak line still exits 3. Condition exits 3 while the lock is false or consent is incomplete. |
 
 The comparison `VOICE-CLONING.md` requires stays in force. In May 2024
 OpenAI withdrew the Sky voice after Scarlett Johansson said it resembled
@@ -85,7 +85,7 @@ submodule, a fixture, a CI artifact, and a commit on a side branch.
 ignores everything under `weights/` except itself. Audio does not go in
 that directory. The weight fetch already refuses those suffixes.
 
-The store this outline names is not created, and no program here reads it:
+The store is not created by this tree. `scripts/clone/consent.py` reads it when `GALION_CLIP_STORE` is set, and treats an unset variable as absent:
 
 ```text
 $GALION_CLIP_STORE/                 # absolute path outside the git work tree
@@ -245,8 +245,9 @@ copy does not stay in the repo as evidence.
 | LEDGER fetch-allowed for `samantha` | Absent |
 | LEDGER fetch-allowed for `jarvis` | Absent |
 | `reference_clips` | `false` |
-| Worker accepts a clip key | No. Exit 3, no PCM. |
-| `GALION_CLIP_STORE` | Unset. Not read. |
+| Worker accepts a clip key on the speak line | No. Exit 3, no PCM. |
+| Worker accepts `op: condition` | Only when consent, duration, sha256, and `reference_clips` all pass. The lock is still false. |
+| `GALION_CLIP_STORE` | Read by `consent.py`. Unset means not ready. No default path. |
 | Clip bytes in git | None |
 | sha256 of a clip | Not computed |
 

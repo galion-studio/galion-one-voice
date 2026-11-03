@@ -20,10 +20,12 @@ One number, when a run happens:
 - machine: this CPU, not a phone, not a VPS, not PSTN
 - label: `engine` from the child (`protocol-stub`, `unwired`, or a future `model`)
 
-`product_claim` is true only for `engine=model`. This tree never sets that
-engine, because generate is not wired. A protocol-stub clock is a test of
-the pipe. It is not a Flash result. Do not copy a number into `LEDGER.md`
-or a demo until a model run is actually recorded there.
+`product_claim` is true only for `engine=model`. The child writes that
+engine only after a real `generate` (`GALION_CLONE_GENERATE=1`). CI does
+not arm the flag and does not download weights, so CI still has no
+`ttfa_ms`. A protocol-stub clock is a test of the pipe. It is not a Flash
+result. Do not copy a number into `LEDGER.md` or a demo until a model run
+is actually recorded there.
 
 No reference clip is sent. Film audio stays on the rights hold.
 
@@ -57,7 +59,7 @@ refuses unless `GALION_CLONE_FETCH=1`.
 ## What a real run would add, later
 
 1. Pinned safetensors on disk, fetched by a human with `GALION_CLONE_FETCH=1`.
-2. The child actually calls generate, still out of process, still with no reference clip until rights are cleared.
+2. The child calls generate, out of process, on CPU. A reference is sent only as `op: condition`, and only after `consent.py` accepts it.
 3. The stderr engine line says `model`.
 4. Three CPU runs, cold and warm, phrase fixed, written into `LEDGER.md` with the host and the model id.
 5. Still no film audio. Still no celebrity demo.

@@ -2,12 +2,14 @@
 //!
 //! Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
 //!
-//! Reads the Samantha and Jarvis voice drafts
+//! Reads the Samantha and Jarvis voice configs
 //! (`docs/galion-voice-v2/personas/voice/*.toml`) and answers in the register
 //! of `personas/SAMANTHA.md` and `personas/JARVIS.md`. This is the instruction
-//! layer. It does not call Chatterbox, does not read a clip, and does not
-//! claim the mouth is a film voice. Piper and the browser must not be handed
-//! `[laugh]` tokens. Empathy lines from a script are refused.
+//! layer. It does not call Chatterbox. `clone_live` is true only when
+//! `scripts/clone/consent.py` says the worker, the pinned weights, and that
+//! persona's consented reference are present. Otherwise it stays false.
+//! Piper and the browser must not be handed `[laugh]` tokens. Empathy lines
+//! from a script are refused.
 //!
 //! `e` in a request is a harness knob for prosody. It is not a reading of the
 //! caller. Emotion-driven id changes stay off unless `sense` is set, and one
@@ -90,6 +92,25 @@ struct Band {
 }
 
 #[derive(Clone, Debug)]
+struct PersonaGate {
+    live: bool,
+    rights: &'static str,
+    block: String,
+    film: bool,
+}
+
+impl PersonaGate {
+    fn closed(block: &str) -> Self {
+        Self {
+            live: false,
+            rights: "hold",
+            block: block.to_string(),
+            film: false,
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
 struct Books {
     samantha: Band,
     jarvis: Band,
@@ -108,6 +129,8 @@ pub struct Floor {
     checkpoint: &'static str,
     mood: &'static str,
     books: Books,
+    samantha_gate: PersonaGate,
+    jarvis_gate: PersonaGate,
 }
 
 impl Default for Floor {
@@ -128,6 +151,15 @@ impl Floor {
             checkpoint: "en_US-ljspeech-medium",
             mood: "calm",
             books: Books::load(),
+            samantha_gate: load_gate("samantha"),
+            jarvis_gate: load_gate("jarvis"),
+        }
+    }
+
+    fn gate(&self) -> &PersonaGate {
+        match self.id {
+            PersonaId::Samantha => &self.samantha_gate,
+            PersonaId::Jarvis => &self.jarvis_gate,
         }
     }
 
@@ -177,6 +209,7 @@ impl Floor {
             Duration::from_millis(prosody.pre_pause_ms as u64 + speak_body_ms(&reply, prosody.rate))
         };
         self.speaking_until = Instant::now() + speak_for;
+        let gate = self.gate();
         Say {
             persona: self.id.as_str(),
             tags_in_reply: reply.contains('[') || reply.contains(']'),
@@ -184,9 +217,9 @@ impl Floor {
             silence,
             barge,
             prosody,
-            rights: "hold",
-            film_voice: false,
-            clone_live: false,
+            rights: gate.rights,
+            film_voice: gate.film,
+            clone_live: gate.live,
             mouth: self.mouth,
             checkpoint: self.checkpoint,
             sense_applied: sense,
@@ -203,16 +236,21 @@ impl Floor {
             PersonaId::Samantha => &self.books.samantha,
             PersonaId::Jarvis => &self.books.jarvis,
         };
+        let gate = self.gate();
         let p = band.e0;
         format!(
             concat!(
-                "{{\"persona\":\"{persona}\",\"rights\":\"hold\",\"film_voice\":false,",
-                "\"clone_live\":false,\"mouth\":\"{mouth}\",\"checkpoint\":\"{checkpoint}\",",
+                "{{\"persona\":\"{persona}\",\"rights\":\"{rights}\",\"film_voice\":{film},",
+                "\"clone_live\":{live},\"clone_block\":\"{block}\",\"mouth\":\"{mouth}\",\"checkpoint\":\"{checkpoint}\",",
                 "\"wired\":{wired},\"ingest\":false,\"clip\":\"\",\"mood\":\"{mood}\",",
                 "\"prosody\":{prosody},\"wash_amber\":{wash},\"luti_w\":{w},\"luti_z\":{z},",
                 "\"samantha\":{sam},\"jarvis\":{jar}}}"
             ),
             persona = self.id.as_str(),
+            rights = gate.rights,
+            film = if gate.film { "true" } else { "false" },
+            live = if gate.live { "true" } else { "false" },
+            block = json_token(&gate.block),
             mouth = self.mouth,
             checkpoint = self.checkpoint,
             mood = self.mood,
@@ -231,12 +269,15 @@ impl Floor {
         format!(
             concat!(
                 "{{\"persona\":\"{persona}\",\"reply\":{reply},\"silence\":{silence},",
-                "\"barge\":{barge},\"rights\":\"hold\",\"film_voice\":false,\"clone_live\":false,",
+                "\"barge\":{barge},\"rights\":\"{rights}\",\"film_voice\":{film},\"clone_live\":{live},",
                 "\"mouth\":\"{mouth}\",\"checkpoint\":\"{checkpoint}\",",
                 "\"tags_in_reply\":{tags},\"sense\":{sense},\"mood\":\"{mood}\",\"prosody\":{prosody},",
                 "\"wash_amber\":{wash},\"luti_w\":{w},\"pre_pause_ms\":{pause}}}"
             ),
             persona = s.persona,
+            rights = s.rights,
+            film = if s.film_voice { "true" } else { "false" },
+            live = if s.clone_live { "true" } else { "false" },
             mouth = s.mouth,
             checkpoint = s.checkpoint,
             mood = s.mood,
@@ -651,6 +692,51 @@ fn band_json(b: &Band) -> String {
     )
 }
 
+fn json_token(s: &str) -> String {
+    s.chars()
+        .filter(|c| c.is_ascii_alphanumeric() || *c == '_')
+        .collect()
+}
+
+/// `clone_live` follows the consent checker. An unset store does not spawn it.
+fn load_gate(persona: &str) -> PersonaGate {
+    let store = std::env::var("GALION_CLIP_STORE").unwrap_or_default();
+    if store.trim().is_empty() {
+        return PersonaGate::closed("store");
+    }
+    let script = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../scripts/clone/consent.py");
+    if !script.is_file() {
+        return PersonaGate::closed("worker");
+    }
+    let out = match std::process::Command::new("python3")
+        .arg(&script)
+        .arg("check")
+        .arg("--persona")
+        .arg(persona)
+        .output()
+    {
+        Ok(out) => out,
+        Err(_) => return PersonaGate::closed("worker"),
+    };
+    let text = String::from_utf8_lossy(&out.stdout);
+    let line = text.lines().next().unwrap_or("").trim();
+    if line.starts_with("galion-clip-ready:") {
+        return PersonaGate {
+            live: true,
+            rights: "cleared",
+            block: String::new(),
+            film: line.contains("public=yes"),
+        };
+    }
+    let block = line.split_whitespace().last().unwrap_or("refs");
+    let block = match block {
+        "store" | "consent" | "duration" | "sha" | "lock" | "weights" | "worker" | "inside_repo"
+        | "persona" | "wav" | "mono" => block,
+        _ => "refs",
+    };
+    PersonaGate::closed(block)
+}
+
 fn fmt_f(n: f32) -> String {
     if !n.is_finite() {
         return "0".into();
@@ -866,6 +952,34 @@ mod tests {
         assert!(!b.samantha.ingest && b.samantha.clip_path_empty);
         assert!(!b.jarvis.ingest && b.jarvis.clip_path_empty);
         assert!(b.samantha.wired && b.jarvis.wired);
+    }
+
+    #[test]
+    fn state_stays_false_without_a_store_and_can_flip_when_the_gate_opens() {
+        let mut f = Floor::new();
+        let j = f.state_json();
+        if std::env::var("GALION_CLIP_STORE").ok().map(|s| !s.trim().is_empty()).unwrap_or(false) {
+            return;
+        }
+        assert!(j.contains("\"clone_live\":false"), "{j}");
+        assert!(j.contains("\"clone_block\":\"store\""), "{j}");
+        assert!(j.contains("\"rights\":\"hold\""), "{j}");
+        assert!(j.contains("\"film_voice\":false"), "{j}");
+        f.samantha_gate = PersonaGate {
+            live: true,
+            rights: "cleared",
+            block: String::new(),
+            film: false,
+        };
+        let live = f.state_json();
+        assert!(live.contains("\"clone_live\":true"), "{live}");
+        assert!(live.contains("\"rights\":\"cleared\""), "{live}");
+        assert!(live.contains("\"film_voice\":false"), "{live}");
+        assert!(live.contains("\"clone_block\":\"\""));
+        let said = f.say_turn("Hi.", false, 0.0, false);
+        assert!(said.clone_live);
+        assert_eq!(said.rights, "cleared");
+        assert!(!said.film_voice);
     }
 
     fn no_script(s: &Say) {

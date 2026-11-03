@@ -661,7 +661,7 @@ S3Gen and a vocoder emit audio. No training step in that API.
 - **Streaming eval:** the owner name is a Flash streaming eval on CPU. Upstream master exposes `generate()`, not a model named Flash. Open PR 528 proposes `ChatterboxTurboTTS.stream()` for near-real-time CPU playback and was still open when this note was written. The eval is planned. It is not run here.
 - **Samantha:** paralinguistic tags (`[laugh]`, `[chuckle]`, and the set Turbo/Nano already document) carry warmth. Jarvis stays calm and precise: short command lines, tags off.
 - **Watermark:** upstream `generate()` applies a Perth watermark. The Nano path should keep a watermark beside the Art. 50 disclosure. Perth's own licence was not read in this session. Do not vendor it yet.
-- **Worker:** the scaffold in `CLONE-WORKER.md` is one out-of-process process, same shape as the warm Piper worker. Piper speaks if the clone worker is absent. No PCM on disk. Generate is not wired. No film audio.
+- **Worker:** `CLONE-WORKER.md` and `CHATTERBOX-WORKER.md`. One out-of-process process, same shape as the warm Piper worker. Piper speaks if the clone worker is absent. No PCM on disk. `generate` runs only when `GALION_CLONE_GENERATE=1`, on CPU. A reference is accepted only by `op: condition` after the consent gate. `reference_clips` stays false until an owner edit.
 
 **CPU and memory (t204u, t205u).** Admin approves full threading, SIMD, and
 maximum memory for Chatterbox Nano/Turbo workers, for every Galion Voice
