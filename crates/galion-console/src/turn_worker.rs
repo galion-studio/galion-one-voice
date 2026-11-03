@@ -344,7 +344,7 @@ mod tests {
         }
         let r = got.expect("tone reply");
         assert_eq!((r.id, r.backend), (3, "tone"));
-        let err = r.error.expect("error label");
+        let err = r.error.as_deref().unwrap_or("");
         assert!(err.contains("NoSpeech"), "{err}");
         assert!(err.contains("GALION_SPEECH=off"), "{err}");
         assert!(r.wav.starts_with(b"RIFF"));
