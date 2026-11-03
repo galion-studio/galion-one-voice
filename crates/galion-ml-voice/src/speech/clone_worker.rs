@@ -1012,8 +1012,24 @@ mod tests {
             .any(|p| p.rel == "turbo/t3_turbo_v1.safetensors"));
         let nano = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../weights/clone/nano/t3_nano_v1.safetensors");
-        assert!(!nano.exists(), "clone weights must not be committed");
-        if std::env::var_os("GALION_CLONE_WEIGHTS").is_none() {
+        // "Committed" means tracked by git. Weights fetched into the gitignored
+        // weights/clone/ by fetch-clone-weights.sh are allowed on disk.
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        if let Ok(out) = Command::new("git")
+            .arg("-C")
+            .arg(&root)
+            .args(["ls-files", "--", "weights/clone"])
+            .output()
+        {
+            if out.status.success() {
+                let tracked = String::from_utf8_lossy(&out.stdout);
+                assert!(
+                    !tracked.lines().any(|l| l.ends_with(".safetensors") || l.ends_with(".pt")),
+                    "clone weights must not be committed: {tracked}"
+                );
+            }
+        }
+        if std::env::var_os("GALION_CLONE_WEIGHTS").is_none() && !nano.exists() {
             assert!(!weights_ready(CloneModel::Nano));
             assert!(!weights_ready(CloneModel::Turbo));
         }
@@ -1259,7 +1275,9 @@ mod tests {
         let absent = Command::new("python3")
             .arg(&script)
             .env_remove("GALION_CLONE_STUB_PCM")
-            .env_remove("GALION_CLONE_WEIGHTS")
+            // An empty weights root: the absent path must hold even on a host
+            // that has fetched the real weights into weights/clone/.
+            .env("GALION_CLONE_WEIGHTS", std::env::temp_dir().join("galion-clone-weights-empty"))
             .output()
             .unwrap();
         assert_eq!(absent.status.code(), Some(2));

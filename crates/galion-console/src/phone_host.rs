@@ -489,7 +489,6 @@ mod tests {
 
         std::env::set_var("GALION_ASR", "off");
         let web = WebSurface::mailbox();
-        web.mic_tap().set(0.25);
         web.turn_inbox().push(
             TurnFormat::Pcm16 {
                 rate: 16_000,
@@ -498,6 +497,10 @@ mod tests {
             vec![0, 0, 1, 0],
         );
         let mut host = PhoneHost::from_surface(&web);
+        // Post the level after the host (and its turn worker) exist: `drive_you`
+        // only trusts a level newer than 320 ms, and spawning the worker can take
+        // longer than that on a loaded CPU.
+        web.mic_tap().set(0.25);
         let mut you = vec![0.0f32; 8];
         assert!(host.drive_you(&mut you));
         match host.bus().try_recv_mic().unwrap().body {
