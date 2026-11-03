@@ -27,6 +27,12 @@ One number, when a run happens:
 real Piper PCM from `GALION_SPEECH=a21` (`STREAM-TTFA.md`). A
 protocol-stub clock is FAIL. It is not a Flash result. Do not copy a stub
 number into `LEDGER.md`.
+`product_claim` is true only for `engine=model`. The child writes that
+engine only after a real `generate` (`GALION_CLONE_GENERATE=1`). CI does
+not arm the flag and does not download weights, so CI still has no
+`ttfa_ms`. A protocol-stub clock is a test of the pipe. It is not a Flash
+result. Do not copy a number into `LEDGER.md` or a demo until a model run
+is actually recorded there.
 
 The default Flash harness does not require a reference. Consented local wavs are the clone-landing path in `symphony/CLONE-LANDING.md` (owner t273). A protocol-stub clock is still not a Flash result, and a public demo stays closed.
 `product_claim` is true only for `engine=model`. A Nano generate reports
@@ -86,6 +92,7 @@ refuses unless `GALION_CLONE_FETCH=1`.
 3. The stderr engine line says `nano` and the path line says `stream`. `ttfa_ms` is the first chunk. `utt_ms` is the closing marker. The live CPU pass today is Piper, `GALION_SPEECH=a21`.
 1. Pinned safetensors on disk, fetched by a human with `GALION_CLONE_FETCH=1`.
 2. The child actually calls generate, still out of process. A reference WAV is the clip-store path in `symphony/CLIP-STORE.md`, not a file in git.
+2. The child calls generate, out of process, on CPU. A reference is sent only as `op: condition`, and only after `consent.py` accepts it.
 3. The stderr engine line says `model`.
 4. Three CPU runs, cold and warm, phrase fixed, written into `LEDGER.md` with the host and the model id.
 5. Still no film audio. Still no celebrity demo.

@@ -4,6 +4,9 @@ Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
 Europe/Zagreb. Nano generate is wired in the child. A run still needs weights and an allowlisted reference on that machine. This file is not a claim that a number was measured here.
 Europe/Zagreb. Nano speaks only behind the env gate in `NANO-BACKEND.md`.
 Piper speaks otherwise. Not a claim that a film voice shipped.
+Europe/Zagreb. The child can call `generate` when `GALION_CLONE_GENERATE=1`.
+CI does not set that flag. How to run it, and the wavs Maciej still has to
+place, are `CHATTERBOX-WORKER.md`.
 
 The spelling is **Galion**. The product is Galion Voice.
 
@@ -45,6 +48,10 @@ carry `"texture":"hub"` or `"texture":"off"` (`GALION_JARVIS_TEXTURE`).
 The texture flag does not rewrite the file. `audio_prompt`,
 `audio_prompt_path`, and `clip` still exit 3 and write no PCM. A
 `reference` that fails the store check does the same.
+field. A speak line that carries a non-empty `reference`, `audio_prompt`,
+`audio_prompt_path`, or `clip` exits 3 and writes no PCM. A consented clip
+uses `op: condition` instead. The parent sends that line only when
+`consent_ready` is true.
 
 ```text
 {"text":"Hello.","model":"nano","persona":"samantha","tags":true,"device":"cpu","denoise":false}
@@ -85,7 +92,7 @@ deadlock fix: a parent that reads stderr first no longer stalls on a
 full stdout pipe, and a parent that polls both does not stop at the
 marker while PCM is still in flight.
 
-- does not import torch
+- does not import torch unless `GALION_CLONE_GENERATE=1`
 - does not download weights
 - does not call Chatterbox generate
 - accepts only the two owner-cleared wavs, and only when the sha256 matches
@@ -157,6 +164,15 @@ A reference clip still exits 3. `GALION_CLONE_LOCAL_REFS=1` plus an
 operator sha256 allowlist (`GALION_CLONE_REF_SHA` or
 `GALION_CLONE_REF_ALLOW`) is the only way a path is accepted. This file
 does not read `LOCKS.toml`.
+- calls Chatterbox `generate` only on that flag, on CPU, after a consented reference is conditioned
+- refuses a reference on the speak line (exit 3, no PCM)
+
+Without `GALION_CLONE_STUB_PCM=1`, and without the pinned files on
+disk, the process exits 2 (`galion-clone-absent`). With the files present
+and both the stub flag and the generate flag off, each request is
+`galion-clone-unwired` and no samples are written. Protocol PCM is not a
+voice and not a Flash result. `engine=model` is written only after a real
+`generate`.
 
 `SpeechStack` selects this slot only when `weights_ready` is true (size and
 sha256 against `scripts/clone/PINS.sha256`). CI does not have those files
@@ -222,6 +238,11 @@ The content hashes were read from the Hugging Face tree API on 2026-11-03
 (LFS oids). They are records, not blobs. Tokenizer text is a separate pin
 file, `scripts/clone/TOKENIZER.sha256` (nano commit `71ccd1d`). It is not a
 release asset and this fetch does not upload it. WAVs are not fetched.
+including `--check`. It downloads the pinned `.safetensors` files and the
+tokenizer text into `weights/clone/`, which git ignores. A hash mismatch
+deletes the partial. `.pt` and audio suffixes are refused. The tensor pins
+were read from the Hugging Face tree API on 2026-11-03 (LFS oids). They
+are records, not blobs.
 
 Nano (`--nano`): `t3_nano_v1.safetensors` plus shared `s3gen`,
 `s3gen_meanflow`, `ve`. Turbo adds `t3_turbo_v1.safetensors`. The release is
@@ -265,6 +286,12 @@ A conditioning file, when the operator already has one, lives outside git
 and is opened only under the sha gate in `NANO-BACKEND.md`. This tree does
 not fetch film audio. The ingest outline is `CLIP-INGEST.md`. Gates 1–6
 there stay closed.
+A film clip is a different object. `consent.py` accepts `op: condition`
+only when `consent.txt` has every field from `RIGHTS-CLEARANCE.md`, the
+wav is mono 16-bit PCM of about 10 seconds (8–12), the sha256 matches,
+the store is outside git, and `reference_clips` is true. The lock is
+still false. This tree does not fetch the wav. The supply list is
+`CHATTERBOX-WORKER.md`. The ingest checker is `scripts/clone/ingest-clip.sh`.
 
 — Maciej Grajczyk
 

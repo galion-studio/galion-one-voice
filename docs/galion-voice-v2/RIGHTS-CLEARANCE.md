@@ -375,4 +375,14 @@ of a clip is recorded here, because no landing WAV was in this tree to
 hash. `reference_clips` remains false until the owner flips
 `LOCKS.toml`. The worker path is `symphony/CLIP-STORE.md`.
 
+The same day, the owner directed the Chatterbox Nano worker to be built.
+That direction is not an instrument, and it does not fill a field above.
+`scripts/clone/consent.py` reads a `consent.txt` the operator places
+outside git. The required keys are the ones in this checklist (date,
+persona, work, performer, grantor, instrument, grantee, scope,
+public_demo, expiry, operator, withdrawal, counsel, sha256, duration_s).
+An empty key, a bracket, or a placeholder word is a refusal. The worker
+still refuses `op: condition` while `reference_clips` is false. No box
+in this file was ticked. No LEDGER template was pasted.
+
 — Maciej Grajczyk
