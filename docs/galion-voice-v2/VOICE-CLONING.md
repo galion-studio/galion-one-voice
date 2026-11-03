@@ -68,6 +68,10 @@ clip. Weights are fetched only with `GALION_CLONE_FETCH=1`.
 - **Samantha** — conversational and emotional. Paralinguistic tags are for her. The slogan's "seamless connection" is her register: warmth, timing, pauses. The film voice is a research target under the legal hold.
 - **Jarvis** — calm, precise, command and interface. Short lines. Tags off. The film voice is a research target under the same hold.
 
+Voice binding for those two ids is a draft, not a loader:
+`docs/galion-voice-v2/personas/voice/`. The reference slots there are empty
+text markers. This file still does not fetch a clip.
+
 ## CPU and memory
 
 t204u and t205u: admin approves full threading, SIMD, and maximum memory, with

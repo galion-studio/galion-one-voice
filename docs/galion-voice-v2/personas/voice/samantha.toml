@@ -1,0 +1,104 @@
+# Galion Voice V2 — Samantha voice config (draft)
+# Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+#
+# Docs only. Nothing in the tree reads this file. No clip, no weights.
+# Register numbers are the design table in SAMANTHA-V2.md §4.
+# Rights hold: ../VOICE-CLONING.md. Clearance, if it ever exists, is a
+# LEDGER.md line. This draft does not write that line.
+
+schema = 1
+status = "draft"
+program = "Galion Voice V2"
+id = "samantha"
+wired = false
+session_default = true
+
+[register]
+label = "conversational"
+summary = "Warm, curious, Her-inspired conversational layer. Test register. Not a shipped film voice and not a claim about the Piper checkpoint."
+lines = "often two sentences; one when one is the whole truth"
+accent_claim = "none"
+prosody_source = "docs/galion-voice-v2/SAMANTHA-V2.md#4-mid-session-personality-switching"
+
+[register.prosody.e0]
+pitch_st = 0.0
+pitch_range = 1.00
+rate = 1.00
+loudness = 1.00
+warmth = 0.62
+pre_pause_ms = 0
+
+[register.prosody.e1]
+pitch_st = -0.5
+pitch_range = 0.88
+rate = 0.92
+loudness = 0.80
+warmth = 0.75
+pre_pause_ms = 250
+
+[register.wash]
+amber_e0 = 0.62
+amber_e1 = 0.50
+
+# Proposal in SAMANTHA-V2.md §4. The named Luti table stays the source.
+[register.luti]
+status = "proposal"
+w_e0 = 1.00
+w_e1 = 0.85
+z_e1 = 0.92
+
+[tags]
+enabled = true
+# Control tokens for a future clone model. Not words the caller should hear.
+# Piper and flite must not be given these tokens (spoken rubbish or a drop).
+on_clone = true
+on_piper = false
+on_flite = false
+allowed = ["[laugh]", "[chuckle]"]
+unknown_tags = "off"
+note = "GALION-VOICE-V2.md names these two. The rest of any Turbo/Nano tag set is not copied here."
+
+[reference]
+rights = "hold"
+ingest = false
+present = false
+duration_target_s = 10
+min_duration_s = 5
+clip_path = ""
+placeholder = "docs/galion-voice-v2/personas/refs/samantha.placeholder"
+note = "placeholder is a text marker. It is not audio. Do not commit a wav, and do not put this path on the worker request line."
+
+[worker]
+binding = "galion.clone.worker"
+kind = "clone"
+bound = true
+process = "out-of-process"
+script = "scripts/clone/chatterbox_worker.py"
+env_persona = "GALION_CLONE_PERSONA"
+env_model = "GALION_CLONE_MODEL"
+env_worker = "GALION_CLONE_WORKER"
+model = "nano"
+quality_option = "turbo"
+request_persona = "samantha"
+request_tags = true
+send_reference = false
+rate_hz = 24000
+pcm = "s16le"
+weights_vendored = false
+weights_dir = "weights/clone"
+
+[fallback]
+order = ["piper", "flite"]
+
+[fallback.piper]
+engine = "piper"
+voice = "en_US-ljspeech-medium"
+artifact = "weights/tts/en_US-ljspeech-medium.onnx"
+when = "clone worker absent, unwired, or dead; rights hold still closed"
+tags = false
+is_film_voice = false
+
+[fallback.flite]
+engine = "flite"
+when = "A21 Piper pack missing"
+tags = false
