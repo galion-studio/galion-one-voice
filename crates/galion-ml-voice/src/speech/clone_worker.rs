@@ -15,7 +15,8 @@
 //! a tokenizer, and a sha-allowlisted local reference are all present.
 //! `GALION_CLONE_LOCAL_REFS=1` is that ref gate. It does not read or change
 //! `LOCKS.toml`. A reference path on the JSON line is still a refusal.
-//! `GALION_CLONE_STUB_PCM=1` is protocol PCM, not a Flash result.
+//! `GALION_CLONE_STUB_PCM=1` is protocol PCM. It does not open this slot.
+//! HARD-PASS measures Piper. A stub clock is not a pass.
 #![allow(unsafe_code)]
 
 use super::{sha256, FrameProsody};
@@ -227,6 +228,11 @@ fn tokenizer_json() -> Option<PathBuf> {
 /// `tokenizer.json` for `from_local`. Absent means the slot stays closed.
 pub fn tokenizer_ready() -> bool {
     tokenizer_json().is_some()
+}
+
+/// Protocol PCM for the pipe harness. Not Nano, not Piper, not a pass.
+pub fn protocol_stub_armed() -> bool {
+    std::env::var("GALION_CLONE_STUB_PCM").ok().as_deref() == Some("1")
 }
 
 pub fn worker_script() -> Option<PathBuf> {
@@ -521,6 +527,9 @@ impl CloneTts {
             .unwrap_or(CloneModel::Nano);
         let persona = persona_name(&std::env::var("GALION_CLONE_PERSONA").unwrap_or_default());
         let script = worker_script().ok_or("clone worker script missing")?;
+        if protocol_stub_armed() {
+            return Err("GALION_CLONE_STUB_PCM=1 is protocol PCM, not the clone slot; HARD-PASS measures Piper".into());
+        }
         if !weights_ready(model) {
             return Err(format!("clone weights absent for {} (scripts/clone/fetch-clone-weights.sh; GALION_CLONE_FETCH=1)", model.as_str()));
         }
@@ -596,6 +605,11 @@ impl TtsEngine for CloneTts {
         }
         self.ensure()?;
         let pcm = self.worker.as_mut().unwrap().synthesize(&body)?;
+        if self.worker.as_ref().is_some_and(|w| w.engine() == "protocol-stub") {
+            return Err(VoiceError::Backend(
+                "protocol stub PCM is not speech and does not pass; Piper speaks".into(),
+            ));
+        }
         let samples = pcm.iter().map(|&s| s as f32 / 32768.0).collect();
         Ok(Audio {
             sample_rate: CLONE_RATE_HZ,
@@ -837,6 +851,30 @@ mod tests {
             assert!(!weights_ready(CloneModel::Nano));
             assert!(!weights_ready(CloneModel::Turbo));
         }
+    }
+
+    #[test]
+    fn protocol_stub_does_not_open_the_clone_slot() {
+        struct Guard(Option<String>);
+        impl Drop for Guard {
+            fn drop(&mut self) {
+                match self.0.take() {
+                    Some(v) => std::env::set_var("GALION_CLONE_STUB_PCM", v),
+                    None => std::env::remove_var("GALION_CLONE_STUB_PCM"),
+                }
+            }
+        }
+        let guard = Guard(std::env::var("GALION_CLONE_STUB_PCM").ok());
+        std::env::set_var("GALION_CLONE_STUB_PCM", "1");
+        assert!(protocol_stub_armed());
+        let err = match CloneTts::try_new() {
+            Err(e) => e,
+            Ok(_) => panic!("protocol stub must not construct the slot"),
+        };
+        assert!(err.contains("STUB_PCM"), "{err}");
+        assert!(err.contains("Piper"), "{err}");
+        assert!(!err.to_ascii_lowercase().contains("http"), "{err}");
+        drop(guard);
     }
 
     #[test]

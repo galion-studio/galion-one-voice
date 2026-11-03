@@ -8,7 +8,9 @@
 //!    are on disk. Nano primary, Turbo via `GALION_CLONE_MODEL`. The ref gate is
 //!    `GALION_CLONE_LOCAL_REFS=1` plus `$GALION_CLIP_STORE/<persona>/reference.wav`
 //!    matching its `.sha256` sidecar. It does not flip `LOCKS.toml`. Absent
-//!    weights or refs skip this slot (no download). A dead child falls back to A21.
+//!    weights or refs skip this slot (no download). `GALION_CLONE_STUB_PCM=1`
+//!    does not open this slot. HARD-PASS on the CPU-only loop measures Piper.
+//!    A dead child falls back to A21.
 //!    A persona whose own ref is missing speaks that utterance with Piper and
 //!    leaves the clone child up.
 //! 1. [`weights::A21WeightTts`] — the A21 neural TTS slot (FP-03). Activates when a

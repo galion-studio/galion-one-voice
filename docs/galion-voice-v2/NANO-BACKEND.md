@@ -5,10 +5,36 @@ Europe/Zagreb.
 
 The spelling is **Galion**. The product is Galion Voice.
 
-Nano is the clone backend on the V2 speech stack. Piper A21 is the fallback.
-Flite remains the fallback after Piper. This note is the runbook for a local
-box that already has the weights and a reference clip. It does not fetch
-either, and it does not flip `LOCKS.toml`.
+Nano is the clone backend on the V2 speech stack when the weights, the
+allowlisted refs, and a local torch install are already on this CPU. Piper
+A21 is the real fallback. Flite remains the fallback after Piper. This note
+is the runbook for that local box. It does not fetch weights or clips, and
+it does not flip `LOCKS.toml`.
+
+## CPU-only HARD-PASS
+
+Admin t298+t299. The hard-pass audio engine for the CPU-only loop is
+**Piper** (A21, `en_US-ljspeech-medium`, out of process, already built).
+The pass is one machine, CPU, no GPU and no cloud TTS. It does not download,
+does not call a hosted voice API, and does not import torch.
+
+| Counts as HARD-PASS | Does not count |
+|---|---|
+| Piper PCM from the sha-pinned A21 pack and the pinned Piper runtime | `GALION_CLONE_STUB_PCM=1` (protocol PCM). Not speech. Not a pass. |
+| | Nano, even when the local gate below is open. Clone is optional. |
+| | Flite. Real words, not the neural pass. |
+| | A Flash or TTFA number, including a protocol-stub clock. `product_claim` stays false. |
+
+`SpeechStack` leaves the clone slot closed while `GALION_CLONE_STUB_PCM=1`,
+so the measured loop is Piper. If a child still labels itself
+`protocol-stub`, that PCM is rejected and Piper speaks. The stub remains
+only for the pipe harness (`scripts/eval/flash-ttfa.sh`). It never satisfies
+this pass.
+
+Nano stays available on the same CPU when the local gate is open: pinned
+safetensors, sha-allowlisted refs, and `chatterbox-tts` (torch) installed
+locally. `from_local(..., device="cpu")`. No `from_pretrained`. That path
+is not what HARD-PASS measures.
 
 `reference_clips` in `[formats.exceptions.v2s14_chatterbox]` stays `false`.
 A local clip is an operator file outside git, opened only when the env gate
@@ -62,7 +88,7 @@ line of empathy.
 | `GALION_CLONE_CKPT` | Optional flat directory `from_local` can open (`ve.safetensors`, `s3gen_meanflow.safetensors`, `t3_nano_v1.safetensors`, `tokenizer.json`) |
 | `GALION_CLONE_TOKENIZER` | Directory that contains `tokenizer.json` if it is not under the weights tree or the flat checkpoint |
 | `GALION_CLONE_WORKER` | Override for `scripts/clone/chatterbox_worker.py` |
-| `GALION_CLONE_STUB_PCM` | `1` is protocol PCM for the harness. Not Nano. Not a Flash result |
+| `GALION_CLONE_STUB_PCM` | `1` is protocol PCM for the pipe harness. Not Nano. Not Piper. Never a HARD-PASS. The speech stack stays on Piper while this is set |
 | `GALION_CLONE_FETCH` | `1` allows `scripts/clone/fetch-clone-weights.sh`. CI does not set it |
 | `HF_HUB_OFFLINE`, `TRANSFORMERS_OFFLINE` | Forced to `1` on the child so a missing file cannot download |
 
@@ -91,10 +117,12 @@ A flat Hugging Face snapshot can be `GALION_CLONE_CKPT` instead of the split
 tree. The four pinned tensors are checked by basename against
 `scripts/clone/PINS.sha256`. A size or sha miss does not load the model.
 
-`chatterbox-tts` has to be installed in the `python3` that the host spawns
-(`from chatterbox.tts_turbo import ChatterboxTurboTTS`). The child calls
-`ChatterboxTurboTTS.from_local(..., device="cpu", nano=True)`. It does not
-call `from_pretrained`.
+`chatterbox-tts` (torch) has to be installed in the `python3` that the host
+spawns (`from chatterbox.tts_turbo import ChatterboxTurboTTS`). That install
+is local. The child calls
+`ChatterboxTurboTTS.from_local(..., device="cpu", nano=True)`. CPU only.
+It does not call `from_pretrained` and it does not use a cloud TTS. HARD-PASS
+does not need this install.
 
 ```bash
 # Confirm pins. This does not speak.
@@ -141,5 +169,6 @@ persona is given an empathy line.
 - It does not commit wavs, weights, or tokenizer files.
 - It does not run generate inside `Heartbeat::step`.
 - It does not publish a Flash number. A local clock is a local clock.
+- It does not let protocol PCM, Nano, flite, or a cloud call satisfy HARD-PASS. Piper does.
 
 — Maciej Grajczyk
