@@ -1,0 +1,13 @@
+# Galion Voice — Perpetual Open MIT License
+[package]
+name = "galion-openmind"
+description = "Voice-side seam to Obsidian Open Mind: NerveEvent notes and a Hermes side-band handoff. No nerve daemon, no audio on the 80 ms tick."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version = "1.85"
+publish = false
+
+[dependencies]
+galion-sideband = { path = "../galion-sideband" }

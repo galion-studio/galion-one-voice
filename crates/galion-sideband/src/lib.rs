@@ -4,6 +4,11 @@
 //! Hermes (owns knowledge + actions), per V3 §C.3 and the MoshiRAG side-stream
 //! pattern. No I/O, no transport. Gateway choice is open decision C5;
 //! memory surface is open decision C6.
+//!
+//! The voice engine offers `Turn`, `Intent`, and `Affect` through
+//! `galion-openmind::CortexHandoff`, which only `try_send`s onto
+//! [`client::SidebandClient`]. That handoff is not called from the 80 ms
+//! heartbeat. Hermes stays on this side band.
 #![forbid(unsafe_code)]
 
 pub mod client;
