@@ -55,10 +55,11 @@ fn main() -> ExitCode {
         }
     };
     println!(
-        "{{\"asr\":\"{}\",\"backend\":\"{}\",\"ms\":{},\"wav_bytes\":{},\"recognised\":{}}}",
+        "{{\"asr\":\"{}\",\"backend\":\"{}\",\"ms\":{},\"tts_first_pcm_ms\":{},\"wav_bytes\":{},\"recognised\":{}}}",
         turn.asr.id(),
         turn.speech_backend,
         turn.ms,
+        turn.stage_ms.tts_first_pcm,
         turn.wav_bytes.len(),
         turn.asr.is_recognised()
     );

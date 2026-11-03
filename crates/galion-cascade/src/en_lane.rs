@@ -30,7 +30,12 @@ pub const FRAME_SAMPLES: usize = (LANE_RATE_HZ as usize) * 80 / 1000;
 
 fn to_ml(l: Lang) -> LanguageId { match l { Lang::En => LanguageId::En } }
 fn map_err(e: VoiceError) -> CascadeError {
-    match e { VoiceError::EmptyInput => CascadeError::Empty, VoiceError::UnsupportedLanguage(_) => CascadeError::Unsupported("language not enabled (EN-only build)"), VoiceError::Backend(_) => CascadeError::Unsupported("speech backend unavailable") }
+    match e {
+        VoiceError::EmptyInput => CascadeError::Empty,
+        VoiceError::UnsupportedLanguage(_) => CascadeError::Unsupported("language not enabled (EN-only build)"),
+        VoiceError::Backend(_) => CascadeError::Unsupported("speech backend unavailable"),
+        VoiceError::Cancelled => CascadeError::Unsupported("speech cancelled"),
+    }
 }
 /// f32 [-1,1] -> PCM16 (clamped).
 pub fn to_pcm16(s: &[f32]) -> Vec<i16> { s.iter().map(|x| (x.clamp(-1.0, 1.0) * i16::MAX as f32).round() as i16).collect() }

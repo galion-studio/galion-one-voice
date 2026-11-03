@@ -14,4 +14,8 @@ publish = false
 # libflite). Off by default: the default build stays no-I/O, no FFI.
 speech = []
 
+[[example]]
+name = "piper_warmth"
+required-features = ["speech"]
+
 [dependencies]

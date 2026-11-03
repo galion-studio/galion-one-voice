@@ -104,6 +104,8 @@ pub enum VoiceError {
     EmptyInput,
     /// V1-03: a speech backend is missing or failed (e.g. A21 weights absent).
     Backend(String),
+    /// The caller superseded this utterance. A warm Piper process is left running.
+    Cancelled,
 }
 
 impl fmt::Display for VoiceError {
@@ -112,6 +114,7 @@ impl fmt::Display for VoiceError {
             VoiceError::UnsupportedLanguage(l) => write!(f, "unsupported language: {l}"),
             VoiceError::EmptyInput => f.write_str("empty input"),
             VoiceError::Backend(m) => write!(f, "speech backend: {m}"),
+            VoiceError::Cancelled => f.write_str("speech cancelled"),
         }
     }
 }

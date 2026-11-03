@@ -9,6 +9,8 @@
 //! `asr=interim-placeholder` in every reply. Errors (e.g. `AsrUnratified` when `GALION_ASR` is
 //! unset/stub/off, `NoSpeech`) are reported in [`TurnReply::error`] and a clear two-tone WAV is
 //! published instead, so the phone still hears that its turn arrived.
+//! `GALION_SPEECH=off` is that path: two-tone WAV, `backend=tone`, `error` set.
+//! A superseded turn drops Piper clauses that have not started and does not kill the worker.
 
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::mpsc::{sync_channel, Receiver, SyncSender, TryRecvError, TrySendError};
@@ -121,7 +123,7 @@ impl TurnWorker {
                     if job.id < cur.load(Ordering::Acquire) {
                         continue; // superseded (barge-in) before we started
                     }
-                    let r = respond(&mut lane, job);
+                    let Some(r) = respond(&mut lane, job, &cur) else { continue };
                     if r.id < cur.load(Ordering::Acquire) {
                         continue; // superseded while synthesizing
                     }
@@ -160,7 +162,9 @@ impl TurnWorker {
     }
 }
 
-fn respond(lane: &mut PhoneLane, mut job: TurnJob) -> TurnReply {
+fn respond(lane: &mut PhoneLane, mut job: TurnJob, current: &Arc<AtomicU64>) -> Option<TurnReply> {
+    if job.id < current.load(Ordering::Acquire) { return None; }
+    lane.arm_cancel(Arc::clone(current), job.id);
     let t0 = Instant::now();
     let in_ms = (job.pcm.len() as u64 * 1000 / job.rate.max(1) as u64) as u32;
     let mut wav_in = wav_bytes(&job.pcm, job.rate);
@@ -174,13 +178,14 @@ fn respond(lane: &mut PhoneLane, mut job: TurnJob) -> TurnReply {
         Ok(t) => {
             let pcm = reply_pcm(&t.wav_bytes);
             let ms = (pcm.len() as u64 * 1000 / LANE_RATE_HZ as u64) as u32;
-            TurnReply {
+            Some(TurnReply {
                 id: job.id, transcript: t.transcript, text: t.reply_text, pcm, wav: t.wav_bytes, ms,
                 backend: t.speech_backend, asr: t.asr.id(), llm: t.llm,
-                stages: format!("asr={} llm={} tts={}", t.stage_ms.asr, t.stage_ms.llm, t.stage_ms.tts),
+                stages: format!("asr={} llm={} tts={} tts_first={}", t.stage_ms.asr, t.stage_ms.llm, t.stage_ms.tts, t.stage_ms.tts_first_pcm),
                 error: None, in_ms, took_ms: t0.elapsed().as_millis() as u32,
-            }
+            })
         }
+        Err(PhoneError::Superseded) => None,
         Err(e) => {
             let kind = match &e {
                 PhoneError::AsrUnratified(_) => "AsrUnratified (set GALION_ASR=interim for the placeholder lane; real EN ASR awaits ratification)",
@@ -191,11 +196,11 @@ fn respond(lane: &mut PhoneLane, mut job: TurnJob) -> TurnReply {
             };
             let pcm = tone();
             let ms = (pcm.len() as u64 * 1000 / LANE_RATE_HZ as u64) as u32;
-            TurnReply {
+            Some(TurnReply {
                 id: job.id, transcript: String::new(), text: String::new(), wav: wav_bytes(&pcm, LANE_RATE_HZ), pcm, ms,
                 backend: "tone", asr: "none", llm: "none", stages: String::new(),
                 error: Some(format!("{kind}: {e}")), in_ms, took_ms: t0.elapsed().as_millis() as u32,
-            }
+            })
         }
     }
 }
@@ -234,6 +239,40 @@ pub fn tone() -> Vec<i16> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::{Mutex, MutexGuard};
+
+    fn env_lock() -> MutexGuard<'static, ()> {
+        static LOCK: Mutex<()> = Mutex::new(());
+        LOCK.lock().unwrap_or_else(|p| p.into_inner())
+    }
+
+    struct EnvGuard { saved: Vec<(String, Option<String>)> }
+    impl EnvGuard {
+        fn set(pairs: &[(&str, &str)]) -> Self {
+            let saved = pairs.iter().map(|(k, v)| {
+                let prev = std::env::var(k).ok();
+                std::env::set_var(k, v);
+                ((*k).to_string(), prev)
+            }).collect();
+            Self { saved }
+        }
+    }
+    impl Drop for EnvGuard {
+        fn drop(&mut self) {
+            for (k, prev) in self.saved.drain(..) {
+                match prev { Some(v) => std::env::set_var(k, v), None => std::env::remove_var(k) }
+            }
+        }
+    }
+
+    fn voice(secs: f32) -> Vec<i16> {
+        let n = (secs * 16_000.0) as usize;
+        (0..n).map(|i| {
+            let t = i as f32 / 16_000.0;
+            (0.2 * (t * 180.0 * std::f32::consts::TAU).sin() * (t * 3.0 * std::f32::consts::TAU).sin().abs() * 32767.0) as i16
+        }).collect()
+    }
+
     #[test]
     fn tone_is_audible_and_bounded() {
         let t = tone();
@@ -242,7 +281,8 @@ mod tests {
     }
     #[test]
     fn stale_reply_dropped_after_supersede() {
-        std::env::set_var("GALION_ASR", "off"); // -> AsrUnratified -> tone fallback
+        let _lock = env_lock();
+        let _env = EnvGuard::set(&[("GALION_ASR", "off")]); // -> AsrUnratified -> tone fallback
         let w = TurnWorker::spawn();
         assert!(w.try_submit(TurnJob { id: 1, rate: 16_000, pcm: vec![0; 160] }).is_ok());
         let t0 = Instant::now();
@@ -281,5 +321,26 @@ mod tests {
         assert!(reply.pcm.iter().all(|&s| s == 0));
         assert!(reply.wav.iter().all(|&b| b == 0));
         assert!(reply.transcript.is_empty() && reply.text.is_empty());
+    }
+
+    #[test]
+    fn speech_off_publishes_tone_and_error_label() {
+        let _lock = env_lock();
+        let _env = EnvGuard::set(&[("GALION_SPEECH", "off"), ("GALION_ASR", "interim")]);
+        let w = TurnWorker::spawn();
+        assert!(w.try_submit(TurnJob { id: 3, rate: 16_000, pcm: voice(1.2) }).is_ok());
+        let t0 = Instant::now();
+        let mut got = None;
+        while got.is_none() && t0.elapsed().as_secs() < 8 {
+            got = w.try_recv();
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+        let r = got.expect("tone reply");
+        assert_eq!((r.id, r.backend), (3, "tone"));
+        let err = r.error.expect("error label");
+        assert!(err.contains("NoSpeech"), "{err}");
+        assert!(err.contains("GALION_SPEECH=off"), "{err}");
+        assert!(r.wav.starts_with(b"RIFF"));
+        assert!(r.pcm.iter().any(|&s| s.unsigned_abs() > 1000));
     }
 }
