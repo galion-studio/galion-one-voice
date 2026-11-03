@@ -19,6 +19,8 @@ jobs:
         run: scripts/check-no-forbidden.sh
       - name: Workspace tests
         run: cargo test --workspace
+      - name: One-percent symphony gate
+        run: galion-gates/op-one-percent.sh
       - name: Clone worker scaffold (no weight download)
         run: cargo test -p galion-ml-voice --features speech
       - name: Flash TTFA harness (no number without a run)
