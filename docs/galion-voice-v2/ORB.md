@@ -1,7 +1,9 @@
 # V2-S2 · Orb motion contract
 
 Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
-This is the foundation of the graphic engine. It is still one mark.
+Master slogan: "The seamless connection with the human being, on the voice only."
+The orb is the mark that connection has. It is still one mark. The slogan is
+not drawn on it.
 `LOCKS.toml` `[ui]` is unchanged: one dot, solid `#F5F5F7`, size and brightness
 only, gradient on the background only.
 

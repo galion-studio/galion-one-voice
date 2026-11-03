@@ -1,6 +1,11 @@
 # DRAFT · Ratification · English ASR on the phone path (CPU, out of process)
 
-**Status: DRAFT. Not ratified. LOCKS.toml is unchanged.** It needs the owner's decision. Prepared 2026-11-02 (Europe/Zagreb). Companion to `RATIFY-A21-ONNX-EXCEPTION.md`.
+**Status: letter A chosen by Maciej Grajczyk, 2026-11-03 (Europe/Zagreb).**
+Vosk, out of process, small-en (`vosk-model-small-en-us-0.15`), grammar mode
+for intents. `interim` stays until the WER bar. The Vosk exception is **not**
+in `LOCKS.toml`. The only lock text added with this decision is the A21 Piper
+sunset pin. Prepared as a draft 2026-11-02. Companion note `RATIFY-A21-ONNX-EXCEPTION.md`
+was named and is not in this tree; the Piper pin lives in `LOCKS.toml`.
 
 ## Facts
 - `LOCKS.toml [formats]`: `ggml_container_allowed = false` ("zero llama.cpp/GGML-family weight containers anywhere, cascade lane included"), `foreign_runtime_allowed = false`, `forbidden_runtimes = ["candle","ort","tract","burn","llama","ggml"]`, `weight_formats = ["safetensors"]`.
@@ -37,9 +42,9 @@ Why: no GGML, no ONNX, a permissive licence, it fits CPU real time on phone-clas
 **Explicitly rejected: whisper.cpp.** It needs `ggml` to be lifted globally, which reverses Q-RESEARCH.Q12 / Q-BUILD.Q7 for every lane. It is not offered as an option.
 
 ## Checklist to ratify
-- [ ] Owner picks A, B or C (reply with letter).
-- [ ] If A or B: download and pin the sha256, then the owner edits LOCKS.toml themself (agents do not edit LOCKS values). Add a LEDGER entry and confirm `scripts/check-locks.sh` and `check-no-forbidden.sh` are green.
+- [x] Owner picks A, B or C (reply with letter). **A**, 2026-11-03. Signature below.
+- [ ] Download and pin the Vosk sha256, then a later owner edit may add a sunset exception. Not done. Do not widen the Piper pin to cover it. `scripts/check-locks.sh` and `check-no-forbidden.sh` stay the gates.
 - [ ] Licence/NOTICE entry for the chosen runtime and model (Apache-2.0 attribution).
 - [ ] Gate check on the phone target: ASR partials do not push `onset_p50_max_ms = 300` / `barge_in_max_ms = 200` over budget.
 
-Owner: Maciej Grajczyk — signature: ____________ date: ________
+Owner: Maciej Grajczyk — letter A, 2026-11-03 (Europe/Zagreb). Vosk LOCKS text not applied.

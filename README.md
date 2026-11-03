@@ -2,6 +2,8 @@
 
 Perpetual Open MIT License · © 2026 Maciej Grajczyk
 
+"The seamless connection with the human being, on the voice only."
+
 One voice. One mark on a near-black ground. An 80 ms heartbeat under everything.
 
 You speak on the **you** band. Galion answers on the **me** band. A feeling
@@ -38,18 +40,35 @@ phone  --https-->  ngrok now, Caddy later
 | **V3** | Production-ready Galion Voice. Later. |
 | **Plan V5** | How this stack would reach the VPS, and why it has not. [docs/ops/PLAN-V5.md](docs/ops/PLAN-V5.md). |
 
-English speech recognition on the phone is **not ratified**. `GALION_ASR=interim`
-is a labelled placeholder (a sentence chosen by how long you talked). It does
-not know the words. The owner’s choice is A, B, or C in
+English speech recognition on the phone: the owner chose **letter A** (Vosk,
+out of process). The sidecar is not in the tree. `GALION_ASR=interim`
+is still a labelled placeholder (a sentence chosen by how long you talked).
+It does not know the words, and it stays until a WER bar passes.
 [docs/policy/RATIFY-EN-ASR-PHONE-PATH.md](docs/policy/RATIFY-EN-ASR-PHONE-PATH.md).
-whisper.cpp is rejected. `LOCKS.toml` is unchanged.
+whisper.cpp is rejected.
 
 The reply you hear is a short canned line, spoken by Piper
 (`en_US-ljspeech-medium`, CPU, out of process) when that pack is on disk, else
-flite. Tones are not passed off as a reply. The small `.gq` model that should
-replace the canned table does not exist yet.
+flite. That Piper pin is `[formats.exceptions.a21_piper]` in `LOCKS.toml`,
+sunset `2027-02-01`. Other lock values are unchanged. Tones are not passed
+off as a reply. The first student size on the backlog is S0. Canned stays
+the fallback until readiness tests. The `.gq` student does not exist yet.
 
-Nothing here has been deployed to the VPS. SSH is still a human step.
+Obsidian Open Mind is a separate Rust agent stack,
+[galion-studio/obsidian-open-mind](https://github.com/galion-studio/obsidian-open-mind).
+This repository keeps only the voice-side seam: nerve notes
+(`voice.frame_miss`, `voice.fallback`, `voice.backend_up`) and a Hermes
+side-band handoff for problem-solving. Hermes is not on the 80 ms tick.
+The Open Mind tree is not vendored. On a VPS it belongs at
+`/opt/galion/openmind` after a human deploy. It is not on this Cursor host,
+and nothing here connects.
+[OPENMIND-NERVE-CORTEX.md](docs/galion-voice-v2/OPENMIND-NERVE-CORTEX.md).
+
+Nothing here has been deployed to the VPS. Access is approved-pending-setup:
+per-user anonymized codes, installed by a human. No shared key. Priority 1
+for V2 voice work is local Chatterbox cloning, not a cloud API
+([VOICE-CLONING.md](docs/galion-voice-v2/VOICE-CLONING.md)). No film audio
+is in this repo.
 
 ## Run the demo
 
@@ -95,6 +114,7 @@ Full runbook: [docs/V1-DEMO.md](docs/V1-DEMO.md).
 LOCKS.toml            the contract (clock, bands, consent, formats, the one mark)
 LEDGER.md             what landed, and what an owner decided
 crates/galion-heartbeat     the 80 ms step
+crates/galion-openmind      nerve notes + Hermes handoff (no daemon required)
 crates/galion-cascade       EN lane + PhoneLane (feature cascade)
 crates/galion-console       screen demo, v1-screen.html, turn worker
 galion-render/              the mark, and the loopback HTTP surface
@@ -128,8 +148,9 @@ model would ship with its own `LICENSE-WEIGHTS`. No GPL code is copied in.
 1. Read [LOCKS.toml](LOCKS.toml). Changing a value is an owner decision and a
    LEDGER line. Do not "fix" a lock to make a demo easier.
 2. No GGML-family containers, and no candle / ort / tract / burn / llama / ggml
-   in manifests. The A21 ONNX path is out of process and still waiting to be
-   written into the lock file by the owner.
+   in manifests. The A21 Piper path is the sunset pin
+   `[formats.exceptions.a21_piper]`. Do not widen it. Chatterbox, if it is
+   ever fetched, stays out of process until an owner writes a separate exception.
 3. The user surface is one mark. No menu, face, or second widget. The phone
    hint is the gesture prompt; do not grow it into chrome.
 4. Consent stays deny by default. Do not wire caller-emotion into the phone
@@ -148,11 +169,12 @@ scripts/run-v1-screen.sh --check
 ```
 
 6. Deploy is [Plan V5](docs/ops/PLAN-V5.md). Dry-run scripts refuse `--execute`.
-   Do not add an SSH key, and do not point the app at a public address.
+   Do not add a key or an access code, and do not point the app at a public address.
    `WebSurface` will reject the bind.
 
 Further: [V2 plan](docs/galion-voice-v2/GALION-VOICE-V2.md) ·
 [V2 research (2026-11-03)](docs/research/galion-voice-v2/README.md) ·
+[Open Mind nerve and cortex](docs/galion-voice-v2/OPENMIND-NERVE-CORTEX.md) ·
 [animation engine](docs/galion-voice-v2/ANIMATION-ENGINE.md) ·
 [Plan V5](docs/ops/PLAN-V5.md) ·
 [brand](docs/brand/GALION-VOICE-BRAND.md) ·

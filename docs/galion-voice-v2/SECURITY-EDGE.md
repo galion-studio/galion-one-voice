@@ -149,4 +149,11 @@ Caddy on the VPS, later, is the same rule: TLS and auth at the edge, app
 still bound to loopback. HSTS belongs there. No SSH from this change.
 See `docs/ops/PLAN-V5.md`.
 
+## Owner decision (2026-11-03)
+
+Maciej Grajczyk: a staging or public demo is behind login (ngrok OAuth or
+basic auth) before the URL is shared. CORS for that demo is an exact
+`https://` origin. No wildcard. The unset-variable `*` is the local demo
+only. No lock change. No credential in this repository.
+
 — Maciej Grajczyk

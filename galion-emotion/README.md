@@ -4,7 +4,7 @@ Emotion pipeline for **Galion Voice**, both directions, Rust-first, zero depende
 
 - `frame` — `EmotionFrame` (valence/arousal/dominance/confidence) + coarse `Affect` label, EMA smoothing
 - `detect` — `AffectDetector` trait + `EnergyStubDetector` (RMS/ZCR heuristic; consent-gated)
-- `express` — `EmpathyPolicy` (de-escalate, never mirror anger) + `ProsodyExpressor` → `ProsodyControl`
+- `express` — `EmpathyPolicy` (de-escalate, never mirror anger) + `ProsodyExpressor` → `ProsodyControl`. `StubExpressor::voice_color` is the one outbound decision: empathy weight `e`, prosody and OKLCH. Not a ninth label, not a reply line. See `docs/galion-voice-v2/EMPATHY.md`.
 - `consent` — `ConsentGate` hook, default deny; GDPR / EU AI Act Art. 5(1)(f) & 50(3) / Croatia (NN 42/2018, AZOP)
 - `band` — 8-byte `EmotionWire`, `DuplexPacket`, per-direction `EmotionBand` (100 B/s at 12.5 Hz)
 
