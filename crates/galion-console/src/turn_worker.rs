@@ -153,7 +153,7 @@ pub struct TurnWorker {
 impl TurnWorker {
     /// Env-configured lane (`GALION_ASR`, `GALION_LLM`).
     pub fn spawn() -> Self {
-        Self::spawn_with(PhoneConfig::from_env())
+        Self::spawn_with(phone_config_from_env())
     }
 
     /// Same worker with an explicit lane config.
@@ -175,7 +175,7 @@ impl TurnWorker {
 
     /// Same as [`spawn_on`] with the host's prosody slot. The 80 ms loop writes it.
     pub fn spawn_linked(bus: ProcessBus, prosody: ProsodySlot) -> Self {
-        Self::spawn_on_with(bus, PhoneConfig::from_env(), prosody)
+        Self::spawn_on_with(bus, phone_config_from_env(), prosody)
     }
 
     fn spawn_on_with(bus: ProcessBus, cfg: PhoneConfig, prosody: ProsodySlot) -> Self {
@@ -290,6 +290,10 @@ impl TurnWorker {
             }
         }
     }
+}
+
+fn phone_config_from_env() -> PhoneConfig {
+    PhoneConfig::from_env().unwrap_or_else(|e| panic!("phone lane: {e}"))
 }
 
 fn turn_job_from(msg: BusMsg) -> TurnJob {

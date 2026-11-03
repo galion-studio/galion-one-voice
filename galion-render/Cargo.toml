@@ -21,8 +21,9 @@ web = []
 full = ["terminal", "window", "web"]
 
 [dependencies]
-# Intentionally empty. Heavy GUI/web deps are only ever allowed as optional deps behind
-# `window` / `web`.
+# Std-only sibling. Hermes chat is a loopback TcpStream in galion-cascade (no TLS,
+# no weights). Heavy GUI/web deps stay optional behind `window` / `web`.
+galion-cascade = { path = "../crates/galion-cascade", default-features = false }
 
 [[example]]
 name = "demo"

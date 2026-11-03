@@ -257,6 +257,9 @@ dependencies = [
 [[package]]
 name = "galion-render"
 version = "0.0.1"
+dependencies = [
+ "galion-cascade",
+]
 
 [[package]]
 name = "galion-sideband"

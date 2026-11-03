@@ -634,6 +634,13 @@ impl WebSurface {
     pub fn turn_inbox(&self) -> TurnInbox { self.sh.turns.clone() }
     /// Shared handle for publishing reply audio; take it before boxing the surface.
     pub fn reply_box(&self) -> ReplyBox { self.sh.replies.clone() }
+    /// Attach a Hermes client to the persona floor. The next `/v2/say` content
+    /// turn uses it, and the floor lock is not held during that call.
+    pub fn set_hermes(&self, client: galion_cascade::HermesLlm) {
+        if let Ok(mut floor) = self.sh.floor.lock() {
+            floor.set_hermes(client);
+        }
+    }
 }
 
 const V2_REDIRECT_HTML: &str = "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta http-equiv=\"refresh\" content=\"0; url=/\"><title>Galion Voice</title><script>location.replace(\"/\");</script></head><body><p><a href=\"/\">Galion Voice</a></p></body></html>";
@@ -771,8 +778,23 @@ fn route(req: &mut Request, sh: &Shared) -> (&'static str, &'static str, Vec<u8>
             let barge = crate::v2_persona::json_field_bool(&raw, "barge");
             let e = crate::v2_persona::json_field_f32(&raw, "e");
             let sense = crate::v2_persona::json_field_bool(&raw, "sense");
+            zeroise_bytes(&mut req.body);
+            // Classify under the lock, then drop it before the model call.
+            // A 3 s Hermes timeout must not stall GET /v2/state or /dot.
+            let prepared = match sh.floor.lock() {
+                Ok(mut floor) => Some(floor.begin_say(&text, barge, e, sense)),
+                Err(_) => None,
+            };
+            let Some(prepared) = prepared else {
+                return (
+                    "200 OK",
+                    "application/json",
+                    txt("{\"persona\":\"samantha\",\"reply\":\"\",\"silence\":true,\"film_voice\":false}"),
+                );
+            };
+            let model = prepared.model_reply();
             let json = match sh.floor.lock() {
-                Ok(mut floor) => floor.say_json(&text, barge, e, sense),
+                Ok(mut floor) => floor.finish_say_json(prepared, model),
                 Err(_) => "{\"persona\":\"samantha\",\"reply\":\"\",\"silence\":true,\"film_voice\":false}".to_string(),
             };
             let silence = crate::v2_persona::json_field_bool(&json, "silence");
@@ -1015,6 +1037,7 @@ mod tests {
         assert!(state.contains("\"rights\":\"hold\"") && state.contains("\"film_voice\":false"), "{state}");
         assert!(state.contains("\"mouth\":\"piper\""), "{state}");
         assert!(state.contains("\"warmth_e0\":0.62") && state.contains("\"pre_pause_e0\":80"), "{state}");
+        assert!(state.contains("\"llm\":\"hermes-agent\""), "{state}");
         let mut hot = VizFrame::default();
         hot.listen.emotion = crate::frame::Emotion { label: "tense", intensity: 0.82, valence: -0.6 };
         w.present(&hot).unwrap();
@@ -1028,8 +1051,10 @@ mod tests {
         let mut out = String::new();
         s.read_to_string(&mut out).unwrap();
         assert!(out.contains("HTTP/1.1 200"), "{out}");
-        assert!(out.contains("Your mother died this morning."));
+        assert!(out.contains("model can't be reached"), "{out}");
+        assert!(!out.contains("Your mother died this morning."), "{out}");
         assert!(out.contains("\"mood\":\"grief\""));
+        assert!(out.contains("\"llm\":\"hermes-agent\""));
         assert!(!out.to_ascii_lowercase().contains("i hear you"));
         assert!(out.contains("\"film_voice\":false"));
         let dot = get(a, "/dot");
@@ -1039,8 +1064,74 @@ mod tests {
         assert!(dot.contains("\"valence\":-0.550"), "{dot}");
         assert!(!dot.contains("\"label\":\"tense\""), "{dot}");
         let line = w.say_inbox().take_latest().expect("reply queued for Piper");
-        assert_eq!(line.reply, "Your mother died this morning.");
+        assert_eq!(line.reply, "model can't be reached");
         assert!(!line.silence);
+        w.close().unwrap();
+    }
+
+    #[test]
+    fn v2_say_does_not_hold_the_floor_during_the_model_call() {
+        use std::sync::atomic::AtomicBool;
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let model = listener.local_addr().unwrap();
+        let release = Arc::new(AtomicBool::new(false));
+        let started = Arc::new(AtomicBool::new(false));
+        let release_w = release.clone();
+        let started_w = started.clone();
+        std::thread::spawn(move || {
+            let Ok((mut sock, _)) = listener.accept() else { return };
+            let mut buf = [0u8; 8192];
+            let _ = sock.read(&mut buf);
+            started_w.store(true, Ordering::SeqCst);
+            let deadline = Instant::now() + Duration::from_secs(2);
+            while !release_w.load(Ordering::SeqCst) && Instant::now() < deadline {
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            let payload = "{\"choices\":[{\"message\":{\"content\":\"She died this morning.\"}}]}";
+            let resp = format!(
+                "HTTP/1.0 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{payload}",
+                payload.len()
+            );
+            let _ = sock.write_all(resp.as_bytes());
+        });
+        let mut w = WebSurface::serve("127.0.0.1:0".parse().unwrap());
+        w.set_hermes(galion_cascade::HermesLlm::new(
+            &format!("http://{model}/v1/chat/completions"),
+            "hermes-agent",
+            "",
+            Duration::from_millis(2000),
+        ));
+        w.open().unwrap();
+        let a = w.local_addr().unwrap();
+        let say = std::thread::spawn(move || {
+            let body = b"{\"text\":\"My mother died this morning.\"}";
+            let mut s = std::net::TcpStream::connect(a).unwrap();
+            s.write_all(format!(
+                "POST /v2/say HTTP/1.1\r\nHost: x\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n",
+                body.len()
+            ).as_bytes()).unwrap();
+            s.write_all(body).unwrap();
+            let mut out = String::new();
+            s.read_to_string(&mut out).unwrap();
+            out
+        });
+        let wait_deadline = Instant::now() + Duration::from_secs(2);
+        while !started.load(Ordering::SeqCst) && Instant::now() < wait_deadline {
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        assert!(started.load(Ordering::SeqCst), "model call did not start");
+        let t = Instant::now();
+        let state = get(a, "/v2/state");
+        assert!(
+            t.elapsed() < Duration::from_millis(400),
+            "state blocked on the model call: {:?} {state}",
+            t.elapsed()
+        );
+        assert!(state.contains("\"llm\":\"hermes-agent\""), "{state}");
+        release.store(true, Ordering::SeqCst);
+        let out = say.join().unwrap();
+        assert!(out.contains("She died this morning."), "{out}");
+        assert!(!out.to_ascii_lowercase().contains("i hear you"), "{out}");
         w.close().unwrap();
     }
 
