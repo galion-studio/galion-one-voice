@@ -22,25 +22,31 @@
 //! galion-render one dot (PNG / terminal / web) + live timing / emotion bars.
 //! The [`turn_worker`] module (feature `phone-turn`) runs PhoneLane off the 80 ms thread.
 //! [`phone_host`] (same feature) is what the screen demo polls each tick.
+//! The [`bus`] module (same feature) is the V2-S1 envelope: `BusMsg` lanes next to
+//! that worker, `try_send` only, cancel checked before ASR and before reply publish.
 
+#[cfg(feature = "phone-turn")]
+pub mod bus;
 #[cfg(feature = "dot-viz")]
 pub mod dotviz;
-#[cfg(feature = "phone-turn")]
-pub mod phone_host;
-#[cfg(feature = "phone-turn")]
-pub mod turn_worker;
 pub mod feeds;
 pub mod heartbeat;
 pub mod live;
 pub mod mic;
 pub mod model;
+#[cfg(feature = "phone-turn")]
+pub mod phone_host;
 pub mod source;
+#[cfg(feature = "phone-turn")]
+pub mod turn_worker;
 pub mod ui;
 
+#[cfg(feature = "phone-turn")]
+pub use bus::{BusBody, BusMsg, OrbMode, ProcessBus};
 pub use heartbeat::{Answer, HeartbeatEvent, YesNo, FRAME_MS};
 pub use live::{
-    AffectFeed, AffectSample, AnswerLog, ComposedFeed, LiveFeed, LiveSource, LiveView, NoAffect, Stage, StageTiming, StubAffect,
-    StubFeed, StubTiming, TimingFeed,
+    AffectFeed, AffectSample, AnswerLog, ComposedFeed, LiveFeed, LiveSource, LiveView, NoAffect,
+    Stage, StageTiming, StubAffect, StubFeed, StubTiming, TimingFeed,
 };
 pub use mic::{LiveMic, MicError, MicSource, PcmMic, SynthMic};
 pub use model::{BenchSample, ConsoleState, JobState, JobStatus, TensorFrame};
