@@ -93,4 +93,6 @@
 
 **2026-11-03 · V2-S4 letter A, Vosk out of process.** `galion-asr-vosk` speaks NDJSON (20 ms frames, partial then final). libvosk is dlopen'd in that process only. `GALION_ASR=vosk` is the live mic path when `weights/asr/vosk-model-small-en-us-0.15` is present (`scripts/asr/fetch-vosk.sh`, `docs/asr/VOSK.md`). A missing model is `AsrUnavailable`. `scripts/run-v1-screen.sh` refuses `GALION_ASR=interim` and does not default to it. `AsrMode::Interim` remains for the presence-eval label check only. Free decoding is the default. `GALION_VOSK_GRAMMAR=intents` forwards the canned list. No word-error rate is claimed. Weights are not in git. LOCKS.toml not edited. No Hermes, no clone, no SSH.
 
+**2026-11-03 · Ultra symphony host plan (docs only).** Maciej Grajczyk. `docs/galion-voice-v2/symphony/PLAN-ULTRA.md` and `SELF-EVAL.md`. Ultra is $220/month, one CX43-class computer (Titanaxe Max 3XL): Galion OS, agents, voice, CPU-first. t284's "2GB SSD" is recorded and conflicts with the 160 GB class disk; the workspace quota stays open. No second price. No host booted. `LOCKS.toml` not edited. Self-eval: document gates PASS, disk quota OPEN, host NOT RUN.
+
 — Maciej Grajczyk

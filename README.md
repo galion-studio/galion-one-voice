@@ -132,6 +132,7 @@ scripts/eval/virtual-user.sh
 scripts/run-v1-screen.sh
 scripts/check-phone-pipeline.sh
 docs/galion-voice-v2/       V2 sector plan
+docs/galion-voice-v2/symphony/PLAN-ULTRA.md   Ultra host plan ($220/month)
 docs/galion-voice-v2/ONE-UI.md   one mark, Luti, no framework, no venv
 docs/research/galion-voice-v2/  V2 research synthesis (2026-11-03); LOCKS win
 docs/ops/PLAN-V5.md
@@ -144,6 +145,7 @@ docs/brand/GALION-VOICE-BRAND.md
 
 Code in this repository is Perpetual Open MIT, (c) 2026 Maciej Grajczyk.
 `LOCKS.toml` says free forever, and no paid tiers. That is the licence.
+The Ultra host plan is `docs/galion-voice-v2/symphony/PLAN-ULTRA.md`. It does not change this licence.
 
 Weights are separate. They are not in git. The Piper voice pack keeps its own
 MIT grant and is downloaded by `scripts/a21/fetch-a21.sh`. A future student
