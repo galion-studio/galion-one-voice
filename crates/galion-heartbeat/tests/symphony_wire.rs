@@ -5,8 +5,8 @@ mod common;
 use common::*;
 use galion_emotion::{DefaultConsentGate, Purpose};
 use galion_heartbeat::symphony::{
-    BandView, DotMark, Sector, SymphonyWire, BANDS, PERSONA_HOLD_E, PERSONA_HOLD_FRAMES,
-    PERSONA_RELEASE_E, STEP_BUDGET_US,
+    BandView, DotMark, NanoPcmRing, Sector, SymphonyWire, BANDS, NANO_RING_CAP, NANO_RING_FRAMES,
+    PERSONA_HOLD_E, PERSONA_HOLD_FRAMES, PERSONA_RELEASE_E, STEP_BUDGET_US,
 };
 use galion_heartbeat::{
     FrameIn, Heartbeat, HeartbeatConfig, FRAME_MS, FRAME_SAMPLES, RIKA_BITS, SAMPLE_RATE,
@@ -39,6 +39,10 @@ unsafe impl GlobalAlloc for Counting {
 }
 #[global_allocator]
 static A: Counting = Counting;
+
+fn heartbeat(rika: bool) -> Heartbeat<DefaultConsentGate> {
+    hb(rika)
+}
 
 fn hb(rika: bool) -> Heartbeat<DefaultConsentGate> {
     let mut g = DefaultConsentGate::default();
@@ -135,7 +139,7 @@ fn late_frame_pauses_and_the_next_frame_does_not_catch_up() {
     let frame = hb.step(&fin(&pcm, true));
     assert!(frame.paused);
     assert!(!wire.me_emit(&frame, me.len()));
-    let paused = wire.step(&frame, view(true, 0.9, true, &slot), &mut me);
+    let paused = wire.step(&frame, view(true, 0.9, true, &slot), &mut me, None);
     assert!(paused.paused);
     assert_eq!(paused.frame_ms, 80);
     assert_eq!(paused.clone_samples, 0, "pause consumes nothing");
@@ -148,7 +152,7 @@ fn late_frame_pauses_and_the_next_frame_does_not_catch_up() {
 
     let frame = hb.step(&fin(&pcm, false));
     assert!(wire.me_emit(&frame, me.len()));
-    let one = wire.step(&frame, view(false, 0.0, false, &slot), &mut me);
+    let one = wire.step(&frame, view(false, 0.0, false, &slot), &mut me, None);
     assert!(!one.paused);
     assert_eq!(
         one.clone_samples, FRAME_SAMPLES as u16,
@@ -159,7 +163,7 @@ fn late_frame_pauses_and_the_next_frame_does_not_catch_up() {
     let rest = &slot[one.clone_samples as usize..];
     let mut me2 = [0.0f32; FRAME_SAMPLES];
     let frame = hb.step(&fin(&pcm, false));
-    let two = wire.step(&frame, view(false, 0.0, false, rest), &mut me2);
+    let two = wire.step(&frame, view(false, 0.0, false, rest), &mut me2, None);
     assert_eq!(two.clone_samples, FRAME_SAMPLES as u16);
     assert_eq!(
         rest.len() - two.clone_samples as usize,
@@ -177,7 +181,7 @@ fn short_me_buffer_is_a_pause() {
     let mut tiny = [3.0f32; 4];
     let frame = hb.step(&fin(&pcm, false));
     assert!(!frame.paused);
-    let out = wire.step(&frame, view(false, 0.0, false, &slot), &mut tiny);
+    let out = wire.step(&frame, view(false, 0.0, false, &slot), &mut tiny, None);
     assert!(out.paused);
     assert_eq!(out.clone_samples, 0);
     assert_eq!(tiny[0], 3.0);
@@ -192,7 +196,7 @@ fn persona_needs_eight_frames_and_feeling_lands_next_frame() {
     let mut prev_applied = 0.0f32;
     for i in 0..PERSONA_HOLD_FRAMES {
         let frame = hb.step(&fin(&pcm, false));
-        let out = wire.step(&frame, view(false, 0.9, true, &[]), &mut me);
+        let out = wire.step(&frame, view(false, 0.9, true, &[]), &mut me, None);
         assert!(!out.paused);
         assert_eq!(out.persona_hold, i + 1);
         assert_eq!(out.persona_may_flip, i + 1 >= PERSONA_HOLD_FRAMES);
@@ -206,7 +210,7 @@ fn persona_needs_eight_frames_and_feeling_lands_next_frame() {
     assert!((prev_applied - 0.9).abs() < 1e-6);
 
     let frame = hb.step(&fin(&pcm, true));
-    let held = wire.step(&frame, view(false, 0.1, true, &[]), &mut me);
+    let held = wire.step(&frame, view(false, 0.1, true, &[]), &mut me, None);
     assert!(held.paused);
     assert_eq!(
         held.persona_hold, PERSONA_HOLD_FRAMES,
@@ -215,21 +219,21 @@ fn persona_needs_eight_frames_and_feeling_lands_next_frame() {
     assert!(held.persona_may_flip);
 
     let frame = hb.step(&fin(&pcm, false));
-    let released = wire.step(&frame, view(false, 0.2, true, &[]), &mut me);
+    let released = wire.step(&frame, view(false, 0.2, true, &[]), &mut me, None);
     assert_eq!(released.persona_hold, 0);
     assert!(!released.persona_may_flip);
 
     let frame = hb.step(&fin(&pcm, false));
-    let _ = wire.step(&frame, view(false, 0.9, true, &[]), &mut me);
+    let _ = wire.step(&frame, view(false, 0.9, true, &[]), &mut me, None);
     let frame = hb.step(&fin(&pcm, false));
-    let dropped = wire.step(&frame, view(false, 0.9, false, &[]), &mut me);
+    let dropped = wire.step(&frame, view(false, 0.9, false, &[]), &mut me, None);
     assert_eq!(dropped.persona_hold, 0, "no SENSE, no hold");
     assert_eq!(
         dropped.feeling_applied, 0.9,
         "the previous sensed sample still applies once"
     );
     let frame = hb.step(&fin(&pcm, false));
-    let next = wire.step(&frame, view(false, 0.9, false, &[]), &mut me);
+    let next = wire.step(&frame, view(false, 0.9, false, &[]), &mut me, None);
     assert_eq!(next.feeling_applied, 0.0);
 }
 
@@ -242,20 +246,20 @@ fn one_dot_speak_wins_and_a_pause_holds_the_mark() {
     let mut me = [0.0f32; FRAME_SAMPLES];
 
     let frame = hb.step(&fin(&pcm, false));
-    let idle = wire.step(&frame, view(false, 0.0, false, &[]), &mut me);
+    let idle = wire.step(&frame, view(false, 0.0, false, &[]), &mut me, None);
     assert_eq!(idle.dot, DotMark::Idle);
 
     let frame = hb.step(&fin(&pcm, false));
-    let listen = wire.step(&frame, view(true, 0.0, false, &[]), &mut me);
+    let listen = wire.step(&frame, view(true, 0.0, false, &[]), &mut me, None);
     assert_eq!(listen.dot, DotMark::Listening);
 
     let frame = hb.step(&fin(&pcm, false));
-    let speak = wire.step(&frame, view(true, 0.0, false, &slot), &mut me);
+    let speak = wire.step(&frame, view(true, 0.0, false, &slot), &mut me, None);
     assert_eq!(speak.dot, DotMark::Speaking, "me band wins over you");
     assert_eq!(speak.clone_samples, FRAME_SAMPLES as u16);
 
     let frame = hb.step(&fin(&pcm, true));
-    let held = wire.step(&frame, view(true, 0.0, false, &slot), &mut me);
+    let held = wire.step(&frame, view(true, 0.0, false, &slot), &mut me, None);
     assert!(held.paused);
     assert_eq!(
         held.dot,
@@ -277,7 +281,7 @@ fn yield_releases_the_slot_and_copies_nothing() {
         let frame = hb.step(&fin(x, false));
         let emit = wire.me_emit(&frame, me.len());
         let slot_now: &[f32] = if emit { &slot } else { &[] };
-        let sector = wire.step(&frame, view(true, 0.0, false, slot_now), &mut me);
+        let sector = wire.step(&frame, view(true, 0.0, false, slot_now), &mut me, None);
         if frame.yield_now() {
             saw = true;
             assert!(!emit);
@@ -304,6 +308,8 @@ fn steps_allocate_nothing() {
     let mut me = [0.0f32; FRAME_SAMPLES];
     let mut hb = hb(true);
     let mut wire = SymphonyWire::new();
+    let mut ring = NanoPcmRing::new();
+    assert_eq!(ring.push(&slot), FRAME_SAMPLES);
     ARMED.with(|a| a.set(true));
     let probe = std::hint::black_box(Box::new(7u64));
     ARMED.with(|a| a.set(false));
@@ -332,6 +338,7 @@ fn steps_allocate_nothing() {
             &frame,
             view(n % 5 == 0, 0.8, n % 17 != 0, slot_now),
             &mut me,
+            Some(&mut ring),
         );
         copied += u32::from(sector.clone_samples > 0);
         std::hint::black_box(sector);
@@ -353,14 +360,25 @@ fn harness_budget_and_verdict() {
     let mut me = [0.0f32; FRAME_SAMPLES];
     let mut hb = hb(true);
     let mut wire = SymphonyWire::new();
+    let mut ring = NanoPcmRing::new();
     let n = 4096usize;
     let mut times = Vec::with_capacity(n);
+    let mut nano_frames = 0u32;
     for i in 0..n {
+        if ring.queued() < FRAME_SAMPLES {
+            ring.push(&slot);
+        }
         let t0 = Instant::now();
         let frame = hb.step(&fin(&pcm, i % 64 == 63));
         let emit = wire.me_emit(&frame, me.len());
         let slot_now: &[f32] = if emit { &slot } else { &[] };
-        let sector = wire.step(&frame, view(i % 3 == 0, 0.4, true, slot_now), &mut me);
+        let sector = wire.step(
+            &frame,
+            view(i % 3 == 0, 0.4, true, slot_now),
+            &mut me,
+            Some(&mut ring),
+        );
+        nano_frames += u32::from(sector.nano_frame);
         let us = t0.elapsed().as_secs_f64() * 1e6;
         std::hint::black_box(sector);
         times.push(us);
@@ -378,8 +396,163 @@ fn harness_budget_and_verdict() {
         "max {max:.2} us >= {STEP_BUDGET_US}"
     );
     assert_eq!(FRAME_MS, 80);
+    assert!(nano_frames > 0, "the timed step drained the Nano ring");
+    assert_eq!(ring.dropped(), 0, "the harness must not overflow the ring");
     println!(
         "verdict=PASS frame_ms={FRAME_MS} bands=3 sectors=3 allocs=0 late=pause p99_us={p99:.3} max_us={max:.3} budget_us={STEP_BUDGET_US} n={}",
         warm.len()
     );
+}
+
+#[test]
+fn nano_ring_drains_one_frame_and_a_late_tick_does_not_catch_up() {
+    assert_eq!(FRAME_SAMPLES, 1_920);
+    assert_eq!(SAMPLE_RATE, 24_000);
+    assert_eq!(NANO_RING_FRAMES, 4);
+    assert_eq!(NANO_RING_CAP, FRAME_SAMPLES * 4);
+
+    let mut ring = NanoPcmRing::new();
+    let mut carry = None;
+    let tone = 1_000i16;
+    let mut bytes = Vec::with_capacity((FRAME_SAMPLES * 2 + 10) * 2);
+    for i in 0..(FRAME_SAMPLES * 2 + 10) {
+        let sample = if i < FRAME_SAMPLES { tone } else { 2_000 };
+        bytes.extend_from_slice(&sample.to_le_bytes());
+    }
+    let n1 = ring.push_s16le(&bytes[..3], &mut carry);
+    assert_eq!(n1, 1, "one full s16 and one leftover byte");
+    assert_eq!(carry, Some(bytes[2]));
+    let n2 = ring.push_s16le(&bytes[3..], &mut carry);
+    assert!(carry.is_none());
+    assert_eq!(n1 + n2, FRAME_SAMPLES * 2 + 10);
+
+    let pcm = [0.0f32; FRAME_SAMPLES];
+    let mut hb = hb(false);
+    let mut wire = SymphonyWire::new();
+    let mut me = [7.0f32; FRAME_SAMPLES];
+    let queued = ring.queued();
+
+    let frame = hb.step(&fin(&pcm, true));
+    assert!(frame.paused);
+    let paused = wire.step(
+        &frame,
+        view(true, 0.9, true, &[0.8; FRAME_SAMPLES]),
+        &mut me,
+        Some(&mut ring),
+    );
+    assert!(paused.paused);
+    assert_eq!(paused.clone_samples, 0);
+    assert!(!paused.nano_frame);
+    assert_eq!(ring.queued(), queued, "a late frame does not pop the ring");
+    assert_eq!(me[0], 7.0);
+
+    let frame = hb.step(&fin(&pcm, false));
+    let one = wire.step(
+        &frame,
+        view(false, 0.0, false, &[0.8; FRAME_SAMPLES]),
+        &mut me,
+        Some(&mut ring),
+    );
+    assert!(one.nano_frame);
+    assert_eq!(one.clone_samples, FRAME_SAMPLES as u16);
+    assert_eq!(one.dot, DotMark::Speaking);
+    assert!(me
+        .iter()
+        .all(|s| (*s - (tone as f32 / 32768.0)).abs() < 1e-6));
+    assert_eq!(
+        ring.queued(),
+        FRAME_SAMPLES + 10,
+        "the second frame stays queued"
+    );
+
+    let frame = hb.step(&fin(&pcm, false));
+    let two = wire.step(
+        &frame,
+        view(false, 0.0, false, &[]),
+        &mut me,
+        Some(&mut ring),
+    );
+    assert!(two.nano_frame);
+    assert_eq!(two.clone_samples, FRAME_SAMPLES as u16);
+    assert!(me.iter().all(|s| (*s - (2_000.0 / 32768.0)).abs() < 1e-6));
+    assert_eq!(ring.queued(), 10, "no catch-up: the tail waits");
+
+    let fallback = [0.8f32; FRAME_SAMPLES];
+    let frame = hb.step(&fin(&pcm, false));
+    let third = wire.step(
+        &frame,
+        view(false, 0.0, false, &fallback),
+        &mut me,
+        Some(&mut ring),
+    );
+    assert!(!third.nano_frame, "ten samples are not a frame");
+    assert_eq!(third.clone_samples, FRAME_SAMPLES as u16);
+    assert!(
+        me.iter().all(|s| (*s - 0.8).abs() < 1e-6),
+        "me slot is the fallback"
+    );
+    assert_eq!(ring.queued(), 10);
+
+    let mut wrapped = NanoPcmRing::new();
+    let mut wire = SymphonyWire::new();
+    for i in 1..=6 {
+        let sample = [i as f32 * 0.01; FRAME_SAMPLES];
+        assert_eq!(wrapped.push(&sample), FRAME_SAMPLES);
+        let frame = hb.step(&fin(&pcm, false));
+        let out = wire.step(
+            &frame,
+            view(false, 0.0, false, &[]),
+            &mut me,
+            Some(&mut wrapped),
+        );
+        assert!(out.nano_frame);
+        assert!(me.iter().all(|s| (*s - i as f32 * 0.01).abs() < 1e-6));
+        assert_eq!(wrapped.queued(), 0);
+    }
+
+    let mut full = NanoPcmRing::new();
+    let block = [0.1f32; FRAME_SAMPLES];
+    for _ in 0..NANO_RING_FRAMES {
+        assert_eq!(full.push(&block), FRAME_SAMPLES);
+    }
+    assert_eq!(full.push(&block), 0);
+    assert_eq!(full.dropped(), FRAME_SAMPLES as u32);
+    assert_eq!(full.queued(), NANO_RING_CAP);
+    let frame = hb.step(&fin(&pcm, false));
+    let kept = wire.step(
+        &frame,
+        view(false, 0.0, false, &[]),
+        &mut me,
+        Some(&mut full),
+    );
+    assert_eq!(kept.clone_samples, FRAME_SAMPLES as u16);
+    assert_eq!(full.queued(), NANO_RING_CAP - FRAME_SAMPLES);
+
+    let frames = render(&r1());
+    let mut clock = heartbeat(true);
+    let mut wire = SymphonyWire::new();
+    let mut held = NanoPcmRing::new();
+    let burst = [0.3f32; FRAME_SAMPLES];
+    let mut saw = false;
+    for x in &frames {
+        let frame = clock.step(&fin(x, false));
+        if frame.yield_now() {
+            assert_eq!(held.push(&burst), FRAME_SAMPLES);
+            let before = held.queued();
+            let sector = wire.step(
+                &frame,
+                view(true, 0.0, false, &burst),
+                &mut me,
+                Some(&mut held),
+            );
+            assert!(sector.release_slot);
+            assert_eq!(sector.clone_samples, 0);
+            assert!(!sector.nano_frame);
+            assert_eq!(held.queued(), before, "step does not drop the ring");
+            held.release();
+            assert_eq!(held.queued(), 0);
+            saw = true;
+        }
+    }
+    assert!(saw, "R1 yield frame was applied");
 }

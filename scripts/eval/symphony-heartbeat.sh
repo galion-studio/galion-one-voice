@@ -45,9 +45,11 @@ run test -p galion-console --features phone-turn --lib drain_takes_one_heartbeat
 c4=$?
 run test -p galion-live-demo --features dot-viz --test live -- --test-threads=1
 c5=$?
+run test -p galion-ml-voice --features speech --lib nano_pcm_drains_one_heartbeat_frame -- --test-threads=1
+c6=$?
 set -e
-if [[ $c1 -ne 0 || $c2 -ne 0 || $c3 -ne 0 || $c4 -ne 0 || $c5 -ne 0 ]]; then
-  echo "verdict=FAIL clone=$c1 sectors=$c2 persona=$c3 drain=$c4 live=$c5"
+if [[ $c1 -ne 0 || $c2 -ne 0 || $c3 -ne 0 || $c4 -ne 0 || $c5 -ne 0 || $c6 -ne 0 ]]; then
+  echo "verdict=FAIL clone=$c1 sectors=$c2 persona=$c3 drain=$c4 live=$c5 nano=$c6"
   exit 1
 fi
 echo "verdict=PASS"

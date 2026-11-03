@@ -13,6 +13,12 @@
 //!
 //! The Python stub does not call Chatterbox generate and refuses a reference
 //! clip. `GALION_CLONE_STUB_PCM=1` is protocol PCM, not a Flash result.
+//! `GALION_CLONE_STUB_FRAMES` asks that stub for N heartbeat frames of PCM
+//! so the host can drain them. It is still not a model.
+//!
+//! [`CloneWorker::poll_pcm`] reads stdout without blocking and pushes s16le
+//! into [`galion_heartbeat::symphony::NanoPcmRing`]. Call it before
+//! `Heartbeat::step`. Do not call it inside either step.
 #![allow(unsafe_code)]
 
 use super::sha256;
@@ -167,6 +173,16 @@ pub fn worker_script() -> Option<PathBuf> {
     path.is_file().then_some(path)
 }
 
+/// What one non-blocking [`CloneWorker::poll_pcm`] moved.
+/// `samples` is how many landed in the ring, not how many the child wrote
+/// (a full ring drops the overflow).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct PcmPull {
+    pub samples: usize,
+    pub utterance_done: bool,
+    pub refused: bool,
+}
+
 /// One warm clone process. Drop kills it. Barge-in must not.
 pub struct CloneWorker {
     child: Option<Child>,
@@ -175,6 +191,8 @@ pub struct CloneWorker {
     stderr: Option<ChildStderr>,
     err_log: String,
     pcm_buf: Vec<u8>,
+    odd_pcm: Option<u8>,
+    stdout_eof: bool,
     pid: u32,
     calls: u32,
     cold_ms: Option<u32>,
@@ -186,18 +204,31 @@ pub struct CloneWorker {
 
 impl CloneWorker {
     pub fn spawn(script: &Path, model: CloneModel, persona: &str) -> Result<Self, VoiceError> {
+        Self::spawn_env(script, model, persona, &[])
+    }
+
+    /// `extra` is set on the child only. It does not change this process.
+    /// `GALION_CLONE_STUB_PCM=1` is protocol PCM. It does not call generate.
+    pub fn spawn_env(
+        script: &Path,
+        model: CloneModel,
+        persona: &str,
+        extra: &[(&str, &str)],
+    ) -> Result<Self, VoiceError> {
         let persona = persona_name(persona);
-        let mut child = Command::new("python3")
-            .arg(script)
+        let mut cmd = Command::new("python3");
+        cmd.arg(script)
             .env("GALION_CLONE_MODEL", model.as_str())
             .env("GALION_CLONE_PERSONA", persona)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .map_err(|e| {
-                VoiceError::Backend(format!("clone worker spawn {}: {e}", script.display()))
-            })?;
+            .stderr(Stdio::piped());
+        for (key, value) in extra {
+            cmd.env(key, value);
+        }
+        let mut child = cmd.spawn().map_err(|e| {
+            VoiceError::Backend(format!("clone worker spawn {}: {e}", script.display()))
+        })?;
         let pid = child.id();
         let stdin = child.stdin.take();
         let stdout = child.stdout.take();
@@ -221,6 +252,8 @@ impl CloneWorker {
             stderr: Some(stderr),
             err_log: String::new(),
             pcm_buf: Vec::new(),
+            odd_pcm: None,
+            stdout_eof: false,
             pid,
             calls: 0,
             cold_ms: None,
@@ -251,6 +284,121 @@ impl CloneWorker {
     }
     pub fn engine(&self) -> &str {
         &self.engine
+    }
+
+    /// Non-blocking pull of child stdout into `ring`.
+    /// Does not write stdin and does not call generate.
+    /// The host calls this before `Heartbeat::step`, never inside it.
+    pub fn poll_pcm(
+        &mut self,
+        ring: &mut galion_heartbeat::symphony::NanoPcmRing,
+    ) -> Result<PcmPull, VoiceError> {
+        let mark = self.err_log.len();
+        let mut samples = 0usize;
+        for _ in 0..8 {
+            let stdout_fd = match self.stdout.as_ref() {
+                Some(pipe) if !self.stdout_eof => pipe.as_raw_fd(),
+                _ => -1,
+            };
+            let stderr_fd = match self.stderr.as_ref() {
+                Some(pipe) => pipe.as_raw_fd(),
+                None => -1,
+            };
+            if stdout_fd < 0 && stderr_fd < 0 {
+                break;
+            }
+            let mut fds = [
+                PollFd {
+                    fd: stdout_fd,
+                    events: POLLIN,
+                    revents: 0,
+                },
+                PollFd {
+                    fd: stderr_fd,
+                    events: POLLIN,
+                    revents: 0,
+                },
+            ];
+            let nfds = if stdout_fd >= 0 && stderr_fd >= 0 {
+                2
+            } else {
+                1
+            };
+            if stdout_fd < 0 {
+                fds[0] = fds[1];
+            }
+            // SAFETY: fds holds pipe fds this worker owns; nfds is 1 or 2; timeout 0 does not wait.
+            let rc = unsafe { poll(fds.as_mut_ptr(), nfds, 0) };
+            if rc < 0 {
+                let err = std::io::Error::last_os_error();
+                if err.kind() == std::io::ErrorKind::Interrupted {
+                    continue;
+                }
+                return Err(VoiceError::Backend(format!("clone worker poll: {err}")));
+            }
+            if rc == 0 {
+                break;
+            }
+            let mut progress = false;
+            if stdout_fd >= 0 && fds[0].revents & (POLLIN | POLLHUP) != 0 {
+                let before_eof = self.stdout_eof;
+                let n = self.take_stdout(ring)?;
+                samples += n;
+                if n > 0 || self.stdout_eof != before_eof {
+                    progress = true;
+                }
+            }
+            let err_i = if stdout_fd >= 0 { 1 } else { 0 };
+            if stderr_fd >= 0 && fds[err_i].revents & (POLLIN | POLLHUP) != 0 {
+                let before = self.err_log.len();
+                self.drain(Pipe::Err)?;
+                if self.err_log.len() != before {
+                    progress = true;
+                }
+            }
+            if !progress {
+                break;
+            }
+        }
+        if let Some(engine) = line_value(&self.err_log, "galion-clone-engine:") {
+            self.engine = engine;
+        }
+        let fresh = &self.err_log[mark..];
+        let utterance_done = fresh.contains("galion-clone-utt:");
+        let refused = fresh.contains("galion-clone-refuse:");
+        if self.err_log.len() > 8192 {
+            let mut cut = self.err_log.len() - 2048;
+            while cut < self.err_log.len() && !self.err_log.is_char_boundary(cut) {
+                cut += 1;
+            }
+            self.err_log.drain(..cut);
+        }
+        Ok(PcmPull {
+            samples,
+            utterance_done,
+            refused,
+        })
+    }
+
+    fn take_stdout(
+        &mut self,
+        ring: &mut galion_heartbeat::symphony::NanoPcmRing,
+    ) -> Result<usize, VoiceError> {
+        let mut buf = [0u8; 8192];
+        let read = match self.stdout.as_mut() {
+            Some(pipe) => pipe.read(&mut buf),
+            None => return Ok(0),
+        };
+        match read {
+            Ok(0) => {
+                self.stdout_eof = true;
+                Ok(0)
+            }
+            Ok(n) => Ok(ring.push_s16le(&buf[..n], &mut self.odd_pcm)),
+            Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => Ok(0),
+            Err(e) if e.kind() == std::io::ErrorKind::Interrupted => self.take_stdout(ring),
+            Err(e) => Err(VoiceError::Backend(format!("clone worker read: {e}"))),
+        }
     }
 
     pub fn is_alive(&mut self) -> bool {
@@ -650,6 +798,7 @@ enum Pipe {
     Err,
 }
 
+#[derive(Clone, Copy)]
 #[repr(C)]
 struct PollFd {
     fd: i32,
@@ -841,6 +990,101 @@ mod tests {
         );
         drop(w);
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn nano_pcm_drains_one_heartbeat_frame() {
+        let script = worker_script().expect("worker script");
+        let src = std::fs::read_to_string(&script).unwrap();
+        assert!(
+            src.lines().all(|line| {
+                let t = line.trim();
+                !t.starts_with("import torch") && !t.starts_with("from torch")
+            }),
+            "the worker must not import torch"
+        );
+        assert!(!src.contains(".generate("), "generate stays unwired");
+        let mut w = CloneWorker::spawn_env(
+            &script,
+            CloneModel::Nano,
+            "samantha",
+            &[
+                ("GALION_CLONE_STUB_PCM", "1"),
+                ("GALION_CLONE_STUB_FRAMES", "3"),
+            ],
+        )
+        .unwrap();
+        let line = request_line("Hi.", CloneModel::Nano, "samantha");
+        {
+            let stdin = w.stdin.as_mut().unwrap();
+            stdin.write_all(line.as_bytes()).unwrap();
+            stdin.flush().unwrap();
+        }
+        let mut ring = galion_heartbeat::symphony::NanoPcmRing::new();
+        let deadline = Instant::now() + Duration::from_secs(2);
+        let mut done = false;
+        while Instant::now() < deadline {
+            let pull = w.poll_pcm(&mut ring).unwrap();
+            assert!(!pull.refused, "{}", w.err_log);
+            if pull.utterance_done {
+                done = true;
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        assert!(done, "utt marker missing: {}", w.err_log);
+        assert_eq!(w.engine(), "protocol-stub");
+        assert_ne!(w.engine(), "model");
+        assert_eq!(ring.queued(), 3 * galion_heartbeat::FRAME_SAMPLES);
+        assert_eq!(ring.dropped(), 0);
+
+        let mut gate = galion_emotion::DefaultConsentGate::default();
+        gate.grant(0, "hr", galion_emotion::Purpose::PersonalAssistant);
+        let mut hb =
+            galion_heartbeat::Heartbeat::new(galion_heartbeat::HeartbeatConfig::default(), gate);
+        let you = [0.0f32; galion_heartbeat::FRAME_SAMPLES];
+        let mut wire = galion_heartbeat::symphony::SymphonyWire::new();
+        let mut me = [7.0f32; galion_heartbeat::FRAME_SAMPLES];
+        let input = |late: bool| galion_heartbeat::FrameIn {
+            you_pcm: &you,
+            affect: None,
+            tension: None,
+            consent_bits: galion_heartbeat::RIKA_BITS,
+            purpose: galion_emotion::Purpose::PersonalAssistant,
+            session_open: true,
+            me_speaking: false,
+            late,
+        };
+        let bands = galion_heartbeat::symphony::BandView {
+            you_active: false,
+            feeling_e: 0.0,
+            sense: false,
+            me_slot: &[],
+        };
+        let frame = hb.step(&input(true));
+        let paused = wire.step(&frame, bands, &mut me, Some(&mut ring));
+        assert!(frame.paused);
+        assert_eq!(paused.clone_samples, 0);
+        assert!(!paused.nano_frame);
+        assert_eq!(me[0], 7.0);
+        assert_eq!(ring.queued(), 3 * galion_heartbeat::FRAME_SAMPLES);
+
+        let frame = hb.step(&input(false));
+        let one = wire.step(&frame, bands, &mut me, Some(&mut ring));
+        assert!(one.nano_frame);
+        assert_eq!(one.clone_samples, galion_heartbeat::FRAME_SAMPLES as u16);
+        let expect = (1000 + (3 % 50)) as f32 / 32768.0;
+        assert!((me[0] - expect).abs() < 1e-6, "protocol tone, not a model");
+        assert_eq!(ring.queued(), 2 * galion_heartbeat::FRAME_SAMPLES);
+
+        let frame = hb.step(&input(false));
+        let two = wire.step(&frame, bands, &mut me, Some(&mut ring));
+        assert_eq!(two.clone_samples, galion_heartbeat::FRAME_SAMPLES as u16);
+        assert_eq!(
+            ring.queued(),
+            galion_heartbeat::FRAME_SAMPLES,
+            "one frame per step, no catch-up"
+        );
     }
 
     fn entries(dir: &Path) -> Vec<String> {

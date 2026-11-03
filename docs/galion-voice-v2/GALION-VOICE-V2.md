@@ -64,8 +64,9 @@ solid golden (G4). The phone page is `crates/galion-console/assets/v1-screen.htm
 **Heartbeat, 80 ms.** `LOCKS.toml` `[clock]`: 12.5 Hz, 24 kHz, 1920 samples,
 60 ms compute budget inside the frame. `galion-heartbeat` `Heartbeat::step`
 is the clock. Clone, persona, and the one dot sit on that step
-(`symphony/HEARTBEAT-WIRE.md`). The turn worker is forbidden to run inside
-that call.
+(`symphony/HEARTBEAT-WIRE.md`). The clone sector drains one Nano PCM frame
+from a fixed ring. The model call stays off that step. The turn worker is
+forbidden to run inside that call.
 
 **Rika.** On silence and an in-breath, Rika leans in on the feeling band
 (about 160 ms in the stub measurement). It needs consent bits `sense` and

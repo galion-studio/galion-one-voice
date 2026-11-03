@@ -23,8 +23,10 @@ Toolchain: Rust 1.85.0. Profile: `cargo test` (debug). This file records that ru
 | One-dot mark: speak wins, pause holds the mark | PASS | `one_dot_speak_wins_and_a_pause_holds_the_mark`; `sectors_match_heartbeat_frame` |
 | Yield copies nothing and asks the host to release the slot | PASS | `yield_releases_the_slot_and_copies_nothing` |
 | Clone drain size is one heartbeat frame | PASS | `frame_matches_heartbeat`; `drain_takes_one_heartbeat_frame_and_leaves_the_tail` |
-| Live frame loop still runs with the wire in the loop | PASS | `galion-live-demo` `tests/live.rs` (feature `dot-viz`) |
-| Chatterbox `generate` (model PCM) | BLOCKED | child stays off the step; generate is still unwired; weights are not in the tree. The drain size is wired. This row does not fail the harness. |
+| Nano ring drain is one frame, hard | PASS | `nano_ring_drains_one_frame_and_a_late_tick_does_not_catch_up`. Late tick pops nothing. The next tick takes 1920. The tail stays. A full ring drops overflow instead of growing a catch-up queue. `steps_allocate_nothing` drains the ring inside the counting allocator (`allocs=0`). |
+| Child stdout into that ring, hard IPC | PASS | `nano_pcm_drains_one_heartbeat_frame`. `poll_pcm` is non-blocking and runs before `Heartbeat::step`. `SymphonyWire::step` then takes one frame. Protocol PCM, not a model. |
+| Live frame loop still runs with the wire in the loop | PASS | `galion-live-demo` `tests/live.rs` (feature `dot-viz`), including `live_loop_drains_one_nano_frame_and_leaves_the_tail` |
+| Chatterbox `generate` (model PCM) | BLOCKED, stub | The worker does not import torch and does not call generate. Weights are not in the tree. `GALION_CLONE_STUB_FRAMES` exists so the drain can move bytes. That is not a voice. This row does not fail the harness. |
 
 `LOCKS.toml` was not edited.
 
@@ -33,10 +35,10 @@ Toolchain: Rust 1.85.0. Profile: `cargo test` (debug). This file records that ru
 Gate line from `harness_budget_and_verdict` (warmup 64 frames dropped, then 4032 frames, Rika on, one late frame in 64):
 
 ```text
-verdict=PASS frame_ms=80 bands=3 sectors=3 allocs=0 late=pause p99_us=118.009 max_us=148.642 budget_us=800 n=4032
+verdict=PASS frame_ms=80 bands=3 sectors=3 allocs=0 late=pause p99_us=107.175 max_us=118.434 budget_us=800 n=4032
 ```
 
-The ceiling is 800 µs. Three debug passes in this session stayed under it: p99 106.639 / 118.009 / 130.342 µs, max 138.387 / 148.642 / 158.090 µs. A later run may print another pair. The harness fails when either number reaches 800.
+The ceiling is 800 µs. The timed region includes the Nano ring drain. Other debug passes in this session stayed under it: p99 103.553 / 107.175 / 109.088 µs, max 118.434 / 135.156 / 359.494 µs. A later run may print another pair. The harness fails when either number reaches 800.
 
 The clock read is outside `step`. The counting allocator is armed only around the two `step` calls.
 
@@ -46,6 +48,6 @@ A failing assertion, or a missing `verdict=PASS` line, is **FAIL**. The script e
 
 `cargo` missing on the machine is **BLOCKED**. The script exits 2.
 
-Model PCM from Chatterbox is **BLOCKED** for this gate, as the table says. The 80 ms harness itself passed.
+Model PCM from Chatterbox is **BLOCKED** for this gate, as the table says. The drain and the pipe shape are hard. The samples the stub writes are not. The 80 ms harness itself passed.
 
 — Maciej Grajczyk

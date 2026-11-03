@@ -18,8 +18,9 @@
 //!   advance hysteresis on scheduler artefacts (D20 §5.1, R9).
 //!
 //! [`symphony`] puts clone, persona, and the one dot on this same step.
-//! [`symphony::SymphonyWire::step`] never blocks and never allocates. Clone
-//! synthesis, persona reply text, and paint stay off both calls.
+//! [`symphony::SymphonyWire::step`] never blocks and never allocates. It drains
+//! at most one Nano PCM frame from a ring the host already holds. The model
+//! call, persona reply text, and paint stay off both calls.
 //!
 //! Pipeline timing: the feeling-band decision made in frame *t* is **applied**
 //! (audible) in frame *t+1* ([`FrameOut::applied`]). With Rika's 2-frame

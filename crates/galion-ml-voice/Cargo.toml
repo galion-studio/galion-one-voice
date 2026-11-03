@@ -24,3 +24,6 @@ required-features = ["speech"]
 
 [dependencies]
 galion-heartbeat = { path = "../galion-heartbeat", optional = true, default-features = false }
+
+[dev-dependencies]
+galion-emotion = { path = "../../galion-emotion" }

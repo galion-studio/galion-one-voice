@@ -31,7 +31,7 @@ use std::time::{Duration, Instant};
 use galion_console::dotviz::{demo_band, DemoPump, DemoSeg, DotConsole, PanelOpts};
 use galion_console::live::{AffectFeed, StubAffect, StubTiming, TimingFeed};
 use galion_emotion::{DefaultConsentGate, Purpose};
-use galion_heartbeat::symphony::{BandView, SymphonyWire};
+use galion_heartbeat::symphony::{BandView, NanoPcmRing, SymphonyWire};
 use galion_heartbeat::{FrameIn, Heartbeat, HeartbeatConfig, FRAME_MS, FRAME_SAMPLES, RIKA_BITS, SAMPLE_RATE};
 use galion_render::{PngSeqConfig, PngSeqSurface};
 
@@ -143,6 +143,7 @@ fn run<T: TimingFeed, A: AffectFeed>(args: &[String], mut pump: DemoPump<T, A>, 
     let mut me = vec![0.0f32; FRAME_SAMPLES];
     let mut scratch = [0.0f32; FRAME_SAMPLES];
     let mut wire = SymphonyWire::new();
+    let mut nano = NanoPcmRing::new();
     let mut rng = Lcg(13);
     let mut me_voiced_prev = false;
     let mut yielded = false;
@@ -219,7 +220,13 @@ fn run<T: TimingFeed, A: AffectFeed>(args: &[String], mut pump: DemoPump<T, A>, 
         let you_active = phone_you || s == DemoSeg::You || barge;
         let feeling_e = if sense { out.applied.lean_in } else { 0.0 };
         let me_slot: &[f32] = if emit && me_voiced { &me } else { &[] };
-        let sector = wire.step(&out, BandView { you_active, feeling_e, sense, me_slot }, &mut scratch);
+        let sector = wire.step(&out, BandView { you_active, feeling_e, sense, me_slot }, &mut scratch, Some(&mut nano));
+        if sector.release_slot {
+            nano.release();
+        }
+        if sector.nano_frame {
+            me.copy_from_slice(&scratch);
+        }
         let snap = pump.pump(i, &you, SAMPLE_RATE);
         dc.frame_marked(&out, &you, &me, me_voiced, &snap, step_us, Some(sector.dot));
         me_voiced_prev = me_voiced;

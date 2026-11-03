@@ -48,6 +48,13 @@ disk, the process exits 2 (`galion-clone-absent`). With the files present
 and the stub flag off, each request is `galion-clone-unwired` and no
 samples are written. Protocol PCM is not a voice and not a Flash result.
 
+`GALION_CLONE_STUB_FRAMES=N` (1 through 8), together with the stub flag,
+writes N heartbeat frames of that protocol PCM: 1920 samples, 24 kHz,
+progress on stderr, samples on stdout. The worker still does not call
+generate. `CloneWorker::poll_pcm` reads those pipes without blocking and
+pushes them into `NanoPcmRing`. The heartbeat step drains one frame. See
+`symphony/HEARTBEAT-WIRE.md`.
+
 `SpeechStack` selects this slot only when `weights_ready` is true (size and
 sha256 against `scripts/clone/PINS.sha256`). CI does not have those files.
 `GALION_SPEECH=auto` therefore stays on Piper or flite. `GALION_SPEECH=clone`
