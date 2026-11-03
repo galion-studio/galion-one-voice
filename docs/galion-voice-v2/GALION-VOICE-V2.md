@@ -212,13 +212,17 @@ audio on disk by default. Detail: `SECURITY-EDGE.md`.
 (Plan V5). The inbox and reply box caps (V1).
 
 **Landed in this program.** Security headers on every response. CSP that
-matches the one-file page and the blob worklet. `GALION_CORS_ORIGINS` allowlist
-(default remains `*` so a changing ngrok host still works). Retention note.
-Demo log omits transcript text.
+matches the one-file page and the blob worklet. `GALION_CORS_ORIGINS` exact
+allow-list (`*` only when the variable is unset, for the local demo). Foreign
+`Origin` is 403 with no allow-origin header. Phone HTTP session token in the
+`POST /session` body (there is no WebSocket). Loopback bind stays; `0.0.0.0`
+only with the public-bind flag plus session auth and an exact origin list.
+Art. 50 disclosure on the first turn (HR and EN). Retention note. Demo log
+omits transcript text and PCM.
 
-**Still open.** Default the allowlist to the real public names once they are
-stable. HSTS belongs on ngrok/Caddy, not on loopback HTTP. A one-page notice
-before a demo is shown to anyone outside the project.
+**Still open.** The owner sets the real public origin and turns on ngrok OAuth
+or basic auth before any URL is shared. HSTS belongs on ngrok/Caddy, not on
+loopback HTTP. Counsel still owns the public-demo notice.
 
 **Acceptance.**
 
@@ -229,7 +233,8 @@ before a demo is shown to anyone outside the project.
    `POST /mic` 204, `OPTIONS /turn` 204, `POST /turn` 202.
 5. A running screen with `--no-png` creates no WAV under the repo.
 
-**Risks.** `Access-Control-Allow-Origin: *` left on a public demo forever.
+**Risks.** Leaving `GALION_CORS_ORIGINS` unset on a public tunnel, which keeps
+`Access-Control-Allow-Origin: *`. Staging must set exact origins.
 CSP `unsafe-inline` is required by the single included page; a nonce means
 splitting the page, which is a later change, not a silent break.
 

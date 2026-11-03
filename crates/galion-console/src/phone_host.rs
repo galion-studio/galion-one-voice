@@ -78,36 +78,87 @@ impl PhoneHost {
         self.flush_submit();
         if let Some(t) = self.turns.take_latest() {
             // New utterance cancels whatever the speakers were playing (barge-in).
-            self.play.clear();
+            wipe_play(&mut self.play);
             if let Some((rate, ch, pcm)) = t.pcm16() {
                 self.enqueue(TurnJob { id: t.id, rate, pcm: downmix(&pcm, ch) });
             }
         }
         self.flush_submit();
         if let Some(r) = self.worker.try_recv() {
-            let _ = self.replies.set_reply(r.id.to_string(), r.wav, r.ms);
-            self.play.clear();
+            let _ = self.replies.set_reply(r.id.to_string(), r.wav.clone(), r.ms);
+            wipe_play(&mut self.play);
             self.play.extend(r.pcm.iter().copied());
-            // No transcript text: that is personal data and stays off the log by default.
+            // Lengths and labels only. The helper cannot take PCM or the transcript.
             eprintln!(
-                "phone reply id={} asr={} backend={} audio_ms={} in_ms={} took_ms={} err={}",
-                r.id,
-                r.asr,
-                r.backend,
-                r.ms,
-                r.in_ms,
-                r.took_ms,
-                r.error.as_deref().unwrap_or("-")
+                "{}",
+                phone_reply_log_line(r.id, r.asr, r.backend, r.ms, r.in_ms, r.took_ms, r.error.as_deref())
             );
         }
         if self.play.is_empty() {
             return false;
         }
         for x in me.iter_mut() {
-            *x = self.play.pop_front().map(|s| s as f32 / 32768.0).unwrap_or(0.0);
+            *x = pop_pcm(&mut self.play).map(|s| s as f32 / 32768.0).unwrap_or(0.0);
         }
         true
     }
+}
+
+impl Drop for PhoneHost {
+    fn drop(&mut self) {
+        wipe_play(&mut self.play);
+        self.pending.take();
+    }
+}
+
+/// One reply line for the demo log. It records id, ASR label, backend, and
+/// durations. It does not accept PCM or transcript text. An error that looks
+/// like audio or a transcript is replaced with `redacted`.
+pub fn phone_reply_log_line(
+    id: u64,
+    asr: &str,
+    backend: &str,
+    audio_ms: u32,
+    in_ms: u32,
+    took_ms: u32,
+    err: Option<&str>,
+) -> String {
+    format!(
+        "phone reply id={id} asr={asr} backend={backend} audio_ms={audio_ms} in_ms={in_ms} took_ms={took_ms} err={}",
+        safe_log_err(err)
+    )
+}
+
+fn safe_log_err(err: Option<&str>) -> &str {
+    match err {
+        None | Some("") => "-",
+        Some(e) if log_err_is_unsafe(e) => "redacted",
+        Some(e) => e,
+    }
+}
+
+fn log_err_is_unsafe(e: &str) -> bool {
+    let lower = e.to_ascii_lowercase();
+    e.contains("RIFF") || lower.contains("pcm") || lower.contains("transcript")
+}
+
+fn pop_pcm(play: &mut VecDeque<i16>) -> Option<i16> {
+    let sample = {
+        let front = play.front_mut()?;
+        let sample = *front;
+        *front = 0;
+        sample
+    };
+    let _ = play.pop_front();
+    Some(sample)
+}
+
+fn wipe_play(play: &mut VecDeque<i16>) {
+    for s in play.iter_mut() {
+        *s = 0;
+    }
+    std::hint::black_box(play.make_contiguous());
+    play.clear();
 }
 
 impl PhoneHost {
@@ -152,5 +203,35 @@ mod tests {
     fn downmix_averages_stereo() {
         assert_eq!(downmix(&[1, 3, 10, 30], 2), vec![2, 20]);
         assert_eq!(downmix(&[4, 5], 1), vec![4, 5]);
+    }
+
+    #[test]
+    fn phone_log_has_no_pcm_or_transcript() {
+        let transcript = "SECRET_TRANSCRIPT_do_not_log";
+        let line = phone_reply_log_line(7, "interim-placeholder", "tone", 80, 100, 40, Some("AsrUnratified"));
+        assert!(line.contains("id=7") && line.contains("audio_ms=80") && line.contains("err=AsrUnratified"), "{line}");
+        assert!(!line.contains(transcript), "{line}");
+        assert!(!line.contains("RIFF"), "{line}");
+        assert!(!line.to_ascii_lowercase().contains("pcm"), "{line}");
+        let redacted = phone_reply_log_line(
+            1,
+            "none",
+            "tone",
+            1,
+            1,
+            1,
+            Some("boom RIFF pcm transcript SECRET_TRANSCRIPT_do_not_log"),
+        );
+        assert!(redacted.contains("err=redacted"), "{redacted}");
+        assert!(!redacted.contains("RIFF") && !redacted.contains(transcript), "{redacted}");
+        assert!(!redacted.to_ascii_lowercase().contains("pcm"), "{redacted}");
+    }
+
+    #[test]
+    fn reply_queue_is_zeroised_on_wipe() {
+        let mut q = VecDeque::from(vec![1i16, -2, 3000]);
+        assert_eq!(pop_pcm(&mut q), Some(1));
+        wipe_play(&mut q);
+        assert!(q.is_empty());
     }
 }
