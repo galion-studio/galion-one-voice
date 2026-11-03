@@ -63,5 +63,7 @@ refuses unless `GALION_CLONE_FETCH=1`.
 5. Still no film audio. Still no celebrity demo.
 
 Until those lines exist, this document's only number is the absence of one.
+Conditioning stays off this clock until the rights gates in
+`CHATTERBOX-WORKER.md` are open. This harness still sends no clip.
 
 — Maciej Grajczyk

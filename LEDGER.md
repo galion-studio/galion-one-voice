@@ -79,4 +79,6 @@
 3. **Persona.** PR #7 is on main (`5ab3d38`). `BusBody::Persona` is on that bus: depth 1, session opens as Samantha, explicit `turn_id` 0 survives barge-in, empathy needs `sense` and a cancelled turn restores the floor, a lower source does not override a higher one. `Heartbeat::step` does not send it. The turn worker reads the id onto the reply and does not draw it. Not a film voice.
 4. **Flash.** `docs/galion-voice-v2/FLASH-EVAL.md` and `scripts/eval/flash-ttfa.sh`. Default JSON is `measured: false` and has no `ttfa_ms`. No CPU number is claimed here.
 
+**2026-11-03 · V2-S14 Chatterbox worker build plan (docs only).** `docs/galion-voice-v2/CHATTERBOX-WORKER.md`. Long-lived child, text in, 24 kHz PCM out, Nano primary, Turbo option, Piper then flite. PyTorch stays out of process. No GGML-family port. No in-tree ORT. Weights stay unvendored. `audio_prompt_path` is specified as a separate `condition` op for one ~10 s wav per persona, and it stays refused until a LEDGER rights line and an owner edit of `reference_clips`. t230u is unchanged (`reference_clips = false`). No download. No generate. No clip. No TTFA number. LOCKS.toml not edited.
+
 — Maciej Grajczyk

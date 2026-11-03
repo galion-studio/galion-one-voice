@@ -72,4 +72,8 @@ Jarvis and Samantha, as film voices, stay on the hold in `VOICE-CLONING.md`.
 The persona id on this worker is the register from `SAMANTHA-V2.md` §4.
 It is not a conditioning clip. This scaffold does not fetch film audio.
 
+The later build is `CHATTERBOX-WORKER.md`: architecture, IPC, lifecycle,
+the clip pipeline after rights, and TTFA. It does not change this stub and
+does not edit `LOCKS.toml`.
+
 — Maciej Grajczyk
