@@ -1,0 +1,21 @@
+# Galion Voice — Perpetual Open MIT License
+[package]
+name = "galion-symphony"
+description = "Galion Voice V2 symphony translator: clone safetensors interchange into the Rust .gq load path (CPU-only). No foreign weight container."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version = "1.85"
+publish = false
+
+[[bin]]
+name = "galion-symphony"
+path = "src/main.rs"
+
+[dependencies]
+galion-tensor = { path = "../galion-tensor", default-features = false }
+galion-heartbeat = { path = "../galion-heartbeat", default-features = false }
+galion-presence = { path = "../galion-presence" }
+galion-ml-voice = { path = "../galion-ml-voice" }
+galion-emotion = { path = "../../galion-emotion" }
