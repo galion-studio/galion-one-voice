@@ -20,6 +20,7 @@ import hashlib
 import http.client
 import json
 import os
+import re
 import selectors
 import subprocess
 import sys
@@ -87,7 +88,7 @@ REQUIRED = (
     "ref-hashes",
     "weight-pins",
     "hf-fetch",
-    "nano-generate",
+    "piper-pcm",
     "ttfa-streaming",
     "real-sampling",
     "real-llm",
@@ -553,7 +554,7 @@ def classify_chain(links: dict[str, bool]) -> Gate:
     return Gate(
         "full-chain",
         "met",
-        "Vosk, instruction floor, Nano generate, streaming PCM, 80 ms EmotionClock, and playback were measured, with a real ttfa_ms.",
+        "Vosk, instruction floor, Piper PCM, 80 ms EmotionClock, and playback were measured, with a real ttfa_ms.",
     )
 
 
@@ -573,13 +574,17 @@ def classify_hf(script_text: str) -> Gate:
 
 def overall_verdict(gates: list[Gate]) -> str:
     by = {gate.name: gate for gate in gates}
-    if any(gate.status == "failed" for gate in gates):
-        return "HARD-FAIL"
     if any(name not in by for name in REQUIRED):
         return "HARD-FAIL"
     if all(by[name].status == "met" for name in REQUIRED):
         return "HARD-PASS"
-    return "STUB-PASS"
+    return "HARD-FAIL"
+
+
+def missing_gates(gates: list[Gate]) -> list[str]:
+    by = {gate.name: gate for gate in gates}
+    missing = [name for name in REQUIRED if name not in by or by[name].status != "met"]
+    return missing
 
 
 def exit_code(verdict: str, require: bool) -> int:
@@ -598,34 +603,36 @@ def assert_no_bare_pass(text: str) -> None:
         raise RuntimeError("harness tried to print a bare PASS")
 
 
-def ttfa_token(probe: WorkerProbe | None, armed: bool) -> str:
-    if armed or (probe is not None and probe.engine == "protocol-stub"):
-        return "stub"
-    if (
-        probe is not None
-        and real_engine(probe.engine)
-        and probe.ttfa_ms is not None
-        and probe.streaming
-        and probe.pcm_bytes >= 2
-    ):
-        return str(probe.ttfa_ms)
+def piper_ttfa_token(pcm_bytes: int, ttfa_ms: int | None, claim: bool) -> str:
+    if claim and pcm_bytes >= 2 and ttfa_ms is not None:
+        return str(ttfa_ms)
     return "absent"
 
 
-def report_line(verdict: str, ttfa: str, allocs: str, late: str, persona: str, dot: str, claim: bool) -> str:
+def report_line(
+    verdict: str,
+    ttfa: str,
+    allocs: str,
+    late: str,
+    persona: str,
+    dot: str,
+    claim: bool,
+    missing: list[str],
+) -> str:
     claim_s = "true" if claim else "false"
+    gaps = ",".join(missing) if missing else "none"
     return (
         f"report-line: {verdict} ttfa_ms={ttfa} allocs={allocs} "
-        f"late_frames={late} persona_http={persona} dot={dot} product_claim={claim_s}"
+        f"late_frames={late} persona_http={persona} dot={dot} "
+        f"product_claim={claim_s} missing={gaps}"
     )
 
 
 def render(gates: list[Gate], verdict: str, line: str) -> str:
     lines = [
         "Galion Voice hard loop",
-        "STUB-PASS means a real gate was absent or only a stub ran.",
-        "HARD-PASS requires every real gate: Nano PCM, 24 kHz 80 ms sampling, "
-        "a real model, a thought trace, persona refs, and the measured chain.",
+        "CPU only on this box. Piper is the real mouth. Flite, clone protocol PCM, and cloud TTS are not.",
+        "HARD-PASS requires every real gate. A missing component is HARD-FAIL, named on the report line.",
         "GALION_CLONE_STUB_PCM and GALION_CLONE_STUB_FRAMES never yield HARD-PASS.",
         "A gate status of met is that gate only.",
     ]
@@ -640,27 +647,20 @@ def render(gates: list[Gate], verdict: str, line: str) -> str:
     return text
 
 
-def report_json(gates: list[Gate], verdict: str, probe: WorkerProbe | None, line: str, claim: bool) -> dict:
+def report_json(gates: list[Gate], verdict: str, line: str, claim: bool, ttfa_ms: int | None) -> dict:
     body: dict = {
         "product": "Galion Voice",
         "overall": verdict,
         "hard_pass": verdict == "HARD-PASS",
         "product_claim": claim,
+        "engine": "piper" if claim else None,
         "report_line": line,
+        "missing": missing_gates(gates),
         "gates": [{"name": g.name, "status": g.status, "detail": g.detail} for g in gates],
     }
-    ttfa_gate = next((g for g in gates if g.name == "ttfa-streaming"), None)
-    if (
-        claim
-        and probe
-        and probe.ttfa_ms is not None
-        and ttfa_gate
-        and ttfa_gate.status == "met"
-        and real_engine(probe.engine)
-    ):
-        body["ttfa_ms"] = probe.ttfa_ms
-        body["whole_ms"] = probe.whole_ms
-        body["ttfa_kind"] = "streaming-nano"
+    if claim and ttfa_ms is not None:
+        body["ttfa_ms"] = ttfa_ms
+        body["ttfa_kind"] = "piper-cpu"
     return body
 
 
@@ -1107,7 +1107,159 @@ def weight_root() -> Path:
     return REPO / "weights" / "clone"
 
 
-def collect() -> tuple[list[Gate], WorkerProbe | None, dict[str, str]]:
+def locate_piper() -> tuple[Path, Path, Path] | None:
+    runtime = Path(os.environ.get("GALION_A21_RUNTIME", str(REPO / "weights/runtime/piper/piper")))
+    model_env = os.environ.get("GALION_TTS_WEIGHTS", "").strip()
+    if model_env:
+        model = Path(model_env)
+        if model.is_dir():
+            model = model / "en_US-ljspeech-medium.onnx"
+    else:
+        model = REPO / "weights/tts/en_US-ljspeech-medium.onnx"
+    config = Path(str(model) + ".json")
+    if "flite" in runtime.name.lower():
+        return None
+    if runtime.is_file() and os.access(runtime, os.X_OK) and model.is_file() and config.is_file():
+        return runtime, model, config
+    return None
+
+
+def voice_sample_rate(config: Path) -> int | None:
+    match = re.search(r'"sample_rate"\s*:\s*(\d+)', config.read_text(encoding="utf-8", errors="replace"))
+    return int(match.group(1)) if match else None
+
+
+def probe_piper(timeout_s: float = 60.0) -> dict:
+    found = locate_piper()
+    empty = {"found": False, "rate": None, "pcm_bytes": 0, "ttfa_ms": None, "hung": False, "flite": False}
+    runtime_name = os.environ.get("GALION_A21_RUNTIME", "")
+    if "flite" in Path(runtime_name).name.lower():
+        empty["flite"] = True
+        return empty
+    if found is None:
+        return empty
+    runtime, model, config = found
+    rate = voice_sample_rate(config)
+    proc = subprocess.Popen(
+        [
+            str(runtime),
+            "--model",
+            str(model),
+            "--config",
+            str(config),
+            "--output_raw",
+            "--json-input",
+            "--noise_scale",
+            "0",
+            "--noise_w",
+            "0",
+            "--length_scale",
+            "1.0",
+            "--sentence_silence",
+            "0",
+        ],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        cwd=str(REPO),
+    )
+    assert proc.stdin and proc.stdout and proc.stderr
+    start = time.monotonic()
+    try:
+        proc.stdin.write(b'{"text":"Hi."}\n')
+        proc.stdin.close()
+    except BrokenPipeError:
+        pass
+    selector = selectors.DefaultSelector()
+    selector.register(proc.stdout.fileno(), selectors.EVENT_READ, "out")
+    selector.register(proc.stderr.fileno(), selectors.EVENT_READ, "err")
+    pcm = bytearray()
+    err = bytearray()
+    first: float | None = None
+    hung = False
+    while selector.get_map():
+        if time.monotonic() - start > timeout_s:
+            hung = True
+            break
+        events = selector.select(timeout=0.05)
+        for key, _ in events:
+            try:
+                chunk = os.read(key.fd, 65536)
+            except OSError:
+                chunk = b""
+            now = time.monotonic()
+            if not chunk:
+                selector.unregister(key.fd)
+                continue
+            if key.data == "out":
+                if first is None and chunk:
+                    first = now
+                pcm.extend(chunk)
+            else:
+                err.extend(chunk)
+        if b"Real-time factor:" in err and proc.poll() is not None:
+            break
+    if hung or proc.poll() is None:
+        proc.kill()
+    try:
+        proc.wait(timeout=2)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        proc.wait(timeout=2)
+    ttfa = int((first - start) * 1000) if first is not None else None
+    return {
+        "found": True,
+        "rate": rate,
+        "pcm_bytes": len(pcm),
+        "ttfa_ms": ttfa,
+        "hung": hung,
+        "flite": False,
+    }
+
+
+def classify_piper(row: dict) -> Gate:
+    if row.get("flite"):
+        return Gate(
+            "piper-pcm",
+            "failed",
+            "missing: Piper. The named runtime is flite, which is not the real voice. Not HARD-PASS.",
+        )
+    if not row.get("found"):
+        return Gate(
+            "piper-pcm",
+            "failed",
+            "missing: Piper CPU runtime or en_US-ljspeech-medium pack on this box. "
+            "Not downloaded. Not a clone stub. Not cloud TTS. Not HARD-PASS.",
+        )
+    if row.get("hung") or not row.get("rate") or int(row.get("pcm_bytes") or 0) < 2:
+        return Gate(
+            "piper-pcm",
+            "failed",
+            "missing: Piper PCM at the voice sample rate. Not HARD-PASS.",
+        )
+    return Gate(
+        "piper-pcm",
+        "met",
+        f"engine piper, {row['pcm_bytes']} bytes s16le at {row['rate']} Hz from the voice json. "
+        "product_claim true for this PCM. CPU only.",
+    )
+
+
+def classify_piper_ttfa(row: dict) -> Gate:
+    if not row.get("found") or int(row.get("pcm_bytes") or 0) < 2 or row.get("ttfa_ms") is None:
+        return Gate(
+            "ttfa-streaming",
+            "failed",
+            "missing: real Piper ttfa_ms. No number is claimed. Not HARD-PASS.",
+        )
+    return Gate(
+        "ttfa-streaming",
+        "met",
+        f"Piper CPU first PCM at {row['ttfa_ms']} ms. engine piper. sample rate {row.get('rate')} Hz.",
+    )
+
+
+def collect() -> tuple[list[Gate], dict[str, str]]:
     before = locks_digest()
     pins = parse_pins(PINS.read_text(encoding="utf-8"))
     weights = evaluate_weights(weight_root(), pins)
@@ -1117,18 +1269,24 @@ def collect() -> tuple[list[Gate], WorkerProbe | None, dict[str, str]]:
         os.environ.get("GALION_CLIP_STORE", ""),
     )
     refuse = probe_worker({"text": "hi", "reference": "clip.wav"}, stub=True, timeout_s=10)
-    armed = stub_armed()
-    weights_met = weights.status == "met"
-    sent_ref = refs.status == "met" and weights_met and not armed
-    request: dict = {"text": "Hi.", "model": "nano", "persona": "samantha", "tags": True}
-    if sent_ref:
-        store = Path(os.environ["GALION_CLIP_STORE"]).expanduser().resolve()
-        request["audio_prompt_path"] = str(store / "samantha" / "reference.wav")
-    timeout = float(os.environ.get("GALION_HARD_GEN_TIMEOUT", "180" if weights_met else "15"))
-    generated = probe_worker(request, stub=os.environ.get("GALION_CLONE_STUB_PCM") == "1", timeout_s=timeout)
+    if stub_armed():
+        piper = {"ttfa_ms": None}
+        voice = Gate(
+            "piper-pcm",
+            "failed",
+            "missing: a clean Piper run. GALION_CLONE_STUB_PCM or GALION_CLONE_STUB_FRAMES is set. "
+            "A stub flag cannot yield HARD-PASS.",
+        )
+        ttfa = Gate(
+            "ttfa-streaming",
+            "failed",
+            "missing: real Piper ttfa_ms. A clone stub flag is set. No number is claimed.",
+        )
+    else:
+        piper = probe_piper()
+        voice = classify_piper(piper)
+        ttfa = classify_piper_ttfa(piper)
     hygiene = classify_hygiene(tracked_files(), locks_digest() == before)
-    voice = classify_generate(generated, weights_met, weights.status == "failed", sent_ref, armed)
-    ttfa = classify_ttfa(generated, weights_met, weights.status == "failed", armed)
     gates = [
         hygiene,
         classify_refuse(refuse),
@@ -1230,19 +1388,22 @@ def collect() -> tuple[list[Gate], WorkerProbe | None, dict[str, str]]:
         {
             "vosk": vosk_ok,
             "instruction-floor": persona_gate.status == "met",
-            "nano": voice.status == "met",
+            "piper": voice.status == "met",
             "streaming-pcm": ttfa.status == "met",
             "emotion-clock": bool(notes["clock"]) and sampling.status == "met",
             "playback": bool(notes["speaking"]) and voice.status == "met",
-            "ttfa_ms": ttfa.status == "met" and ttfa_token(generated, armed).isdigit(),
+            "ttfa_ms": ttfa.status == "met",
         }
     )
     gates.extend((persona_gate, dot_gate, sampling, late, llm, thinking, real_persona, chain))
+    claim = voice.status == "met" and ttfa.status == "met" and not stub_armed()
     facts = {
         "allocs": allocs,
         "late_frames": late_frames,
         "persona_http": persona_gate.status,
         "dot": dot_gate.status,
+        "ttfa": str(piper["ttfa_ms"]) if claim and piper.get("ttfa_ms") is not None else "absent",
+        "claim": "true" if claim else "false",
     }
     if locks_digest() != before:
         gates[0] = Gate(
@@ -1250,7 +1411,7 @@ def collect() -> tuple[list[Gate], WorkerProbe | None, dict[str, str]]:
             "failed",
             "LOCKS.toml changed during the run. This harness does not edit it. Not HARD-PASS.",
         )
-    return gates, generated, facts
+    return gates, facts
 
 
 def logic_self_check() -> None:
@@ -1284,10 +1445,9 @@ def logic_self_check() -> None:
     assert not voice_product_claim(stub, False)
     assert not voice_product_claim(nano_pcm, True)
     assert voice_product_claim(nano_pcm, False)
-    assert ttfa_token(stub, False) == "stub"
-    assert ttfa_token(nano_pcm, True) == "stub"
-    assert ttfa_token(nano_pcm, False) == "90"
-    assert ttfa_token(absent, False) == "absent"
+    assert piper_ttfa_token(402, 4, False) == "absent"
+    assert piper_ttfa_token(4000, 90, True) == "90"
+    assert piper_ttfa_token(4000, 90, False) == "absent"
     assert classify_llm("Your mother died this morning.", "floor").status == "stub"
     assert classify_llm("I hear you now.", "floor").status == "failed"
     assert classify_llm("The room stayed quiet.", "hermes").status == "met"
@@ -1356,40 +1516,40 @@ def logic_self_check() -> None:
     ]
 
     full = [Gate(name, "met", "ok-for-test") for name in REQUIRED]
-    hard_line = report_line("HARD-PASS", "90", "0", "proved", "met", "met", True)
+    hard_line = report_line("HARD-PASS", "90", "0", "proved", "met", "met", True, [])
     assert overall_verdict(full) == "HARD-PASS"
     assert overall_verdict(full[:-1]) == "HARD-FAIL"
     text = render(full, "HARD-PASS", hard_line)
     assert "overall: HARD-PASS" in text
     assert "refused" not in text
-    assert "report-line: HARD-PASS ttfa_ms=90 allocs=0 late_frames=proved persona_http=met dot=met product_claim=true" in text
-    stub_gates = [
+    assert "report-line: HARD-PASS ttfa_ms=90 allocs=0 late_frames=proved persona_http=met dot=met product_claim=true missing=none" in text
+    incomplete = [
         Gate(name, "met" if name in ("tree-hygiene", "ref-refuse", "hf-fetch", "late-pause") else "absent", "x")
         for name in REQUIRED
     ]
-    stub_line = report_line("STUB-PASS", "absent", "0", "proved", "absent", "absent", False)
-    assert overall_verdict(stub_gates) == "STUB-PASS"
-    stub_text = render(stub_gates, "STUB-PASS", stub_line)
-    assert "overall: STUB-PASS" in stub_text
-    assert "HARD-PASS of the loop: refused" in stub_text
-    assert "product_claim=false" in stub_text
-    assert "ttfa_ms=absent" in stub_text
-    failed = list(stub_gates)
-    failed[2] = Gate("ref-hashes", "failed", "mismatch")
-    assert overall_verdict(failed) == "HARD-FAIL"
-    assert exit_code("STUB-PASS", False) == 0
-    assert exit_code("STUB-PASS", True) == 2
+    gaps = missing_gates(incomplete)
+    fail_line = report_line("HARD-FAIL", "absent", "0", "proved", "absent", "absent", False, gaps)
+    assert overall_verdict(incomplete) == "HARD-FAIL"
+    assert "piper-pcm" in gaps
+    fail_text = render(incomplete, "HARD-FAIL", fail_line)
+    assert "overall: HARD-FAIL" in fail_text
+    assert "HARD-PASS of the loop: refused" in fail_text
+    assert "product_claim=false" in fail_text
+    assert "ttfa_ms=absent" in fail_text
+    assert "STUB-PASS" not in fail_text
+    assert classify_piper({"found": False, "flite": False, "pcm_bytes": 0, "rate": None, "hung": False}).status == "failed"
+    assert classify_piper({"found": True, "flite": False, "pcm_bytes": 4000, "rate": 22050, "hung": False}).status == "met"
+    assert classify_piper_ttfa({"found": False, "pcm_bytes": 0, "ttfa_ms": None}).status == "failed"
+    assert classify_piper_ttfa({"found": True, "pcm_bytes": 4000, "ttfa_ms": 90, "rate": 22050}).status == "met"
+    blob = report_json(incomplete, "HARD-FAIL", fail_line, False, None)
+    assert "ttfa_ms" not in blob
+    claimed = report_json(full, "HARD-PASS", hard_line, True, 90)
+    assert claimed["product_claim"] is True
+    assert claimed["engine"] == "piper"
+    assert claimed["ttfa_ms"] == 90
+    assert claimed["ttfa_kind"] == "piper-cpu"
     assert exit_code("HARD-FAIL", False) == 1
     assert exit_code("HARD-PASS", True) == 0
-    blob = report_json(stub_gates, "STUB-PASS", absent, stub_line, False)
-    assert "ttfa_ms" not in blob
-    claimed = report_json(full, "HARD-PASS", nano_pcm, hard_line, True)
-    assert claimed["product_claim"] is True
-    assert claimed["ttfa_ms"] == 90
-    assert claimed["ttfa_kind"] == "streaming-nano"
-    stub_claim = report_json(stub_gates, "STUB-PASS", stub, stub_line, False)
-    assert stub_claim["product_claim"] is False
-    assert "ttfa_ms" not in stub_claim
 
 
 def worker_self_check() -> None:
@@ -1415,27 +1575,27 @@ def main(argv: list[str]) -> int:
         logic_self_check()
         worker_self_check()
         print("Galion Voice hard loop self-check")
-        print("overall: STUB-PASS")
-        print("product_claim: false")
+        print("classifiers held. This is not a product verdict.")
         print("HARD-PASS of the loop: refused")
-        print("self-check exercised the classifiers, the rights-hold refusal, and the absent-weight path.")
         return 0
     logic_self_check()
-    gates, probe, facts = collect()
+    gates, facts = collect()
     verdict = overall_verdict(gates)
-    claim = voice_product_claim(probe, stub_armed())
+    claim = facts["claim"] == "true"
     line = report_line(
         verdict,
-        ttfa_token(probe, stub_armed()),
+        facts["ttfa"] if claim else "absent",
         facts["allocs"],
         facts["late_frames"],
         facts["persona_http"],
         facts["dot"],
         claim,
+        missing_gates(gates),
     )
     text = render(gates, verdict, line)
     sys.stdout.write(text)
-    blob = report_json(gates, verdict, probe, line, claim)
+    ttfa_ms = int(facts["ttfa"]) if claim and facts["ttfa"].isdigit() else None
+    blob = report_json(gates, verdict, line, claim, ttfa_ms)
     sys.stdout.write("report: " + json.dumps(blob, separators=(",", ":")) + "\n")
     out_dir = REPO / "target" / "hard-loop"
     try:

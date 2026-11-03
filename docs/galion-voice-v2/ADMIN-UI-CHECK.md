@@ -5,11 +5,10 @@ Europe/Zagreb. The spelling is **Galion**. The product is Galion Voice.
 
 ## Ready for Maciej
 
-The schedule is open. This page is ready for Maciej Grajczyk to review and
-sign in person. Agents must not sign. Every checklist box stays unchecked.
-The date stays blank. This page does not claim HARD-PASS. A stub harness
-line is not a signature. The real gates and how they are proved are in
-`HARD-REAL.md`.
+The schedule is open. Sign-off waits on live CPU Piper PCM and LLM thought
+traces from this box. Agents must not sign. Every checklist box stays
+unchecked. The date stays blank. This page does not claim HARD-PASS.
+A stub line is not a signature. The gates are in `HARD-REAL.md`.
 
 **Schedule.** This check is scheduled for **Maciej Grajczyk**. It was
 opened 2026-11-03. It is not started, and it is not done. A cloud agent

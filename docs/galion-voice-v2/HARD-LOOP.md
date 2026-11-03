@@ -22,8 +22,8 @@ Its overall line is one of three words:
 | Overall | Meaning |
 |---|---|
 | `STUB-PASS` | The harness finished. Something the hard loop needs was absent, or the only PCM was the protocol stub. **Not a hard pass.** |
-| `HARD-PASS` | Every real gate in `HARD-REAL.md` was met. Engine is `chatterbox-nano` or `nano`. `GALION_CLONE_STUB_PCM` and `GALION_CLONE_STUB_FRAMES` cannot produce this line. |
-| `HARD-FAIL` | A gate ran and failed. Exit 1. |
+| `HARD-PASS` | Every real gate in `HARD-REAL.md` was met on this CPU. The mouth is Piper. |
+| `HARD-FAIL` | Any required component is missing or failed. The report line names it. Exit 1. |
 
 `HARD-PASS` is refused unless those real inputs were on the machine.
 `GALION_HARD_REQUIRE=1` turns a `STUB-PASS` into exit 2, for a host that
