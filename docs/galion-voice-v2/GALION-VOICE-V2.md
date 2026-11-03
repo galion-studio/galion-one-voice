@@ -82,11 +82,12 @@ phonemizer) is waiting on counsel. Flite is the fallback. Tones are not a reply.
 
 **PhoneLane.** `galion-cascade` `phone` (feature `cascade`): 16 kHz PCM in,
 transcript, reply text, 24 kHz WAV out. `GALION_ASR` unset means stub
-(fixtures decode, real speech returns `AsrUnratified`). `interim` is a
-**placeholder**: canned English chosen by utterance length, labelled
-`interim-placeholder`, not recognition. `GALION_LLM` defaults to `CannedLlm`
-on this lane. `TurnWorker` in `galion-console` (feature `phone-turn`) runs
-that lane on its own thread. `PhoneHost` polls it from the screen demo.
+(fixtures decode, real speech returns `AsrUnratified`). `GALION_ASR=vosk`
+runs the out-of-process worker (`docs/asr/VOSK.md`). `GALION_ASR=interim`
+does not select the length-bucket placeholder. `GALION_LLM` defaults to
+`CannedLlm` on this lane. `TurnWorker` in `galion-console` (feature
+`phone-turn`) runs that lane on its own thread. `PhoneHost` polls it from
+the screen demo.
 `WebSurface` serves `POST /mic`, `POST /turn`, `GET /reply/<id>.wav`, and
 puts `reply` on `/dot`.
 
@@ -292,36 +293,30 @@ still open. Detail: `SECURITY-EDGE.md`, Plan V5.
 
 ### V2-S4 · Real EN ASR
 
-**Goal.** Letter A is chosen. Build a Vosk sidecar later. Until the WER bar
-passes, `interim` stays labelled and the unset default stays refusal.
+**Goal.** Letter A is in the tree: `galion-asr-vosk`, out of process, CPU.
+The live screen uses it when the small-en model is on disk. A missing model
+is an error. The length-bucket placeholder is not the live path. This note
+does not claim a measured word-error rate.
 
 **Depends on.** `docs/policy/RATIFY-EN-ASR-PHONE-PATH.md` (letter A recorded).
-V2-S1 if the engine is a sidecar. The A21 ONNX pin is not widened for ASR.
+`docs/asr/VOSK.md` for the download. The A21 ONNX pin is not widened for ASR.
 
 **Owner decision (2026-11-03, YES, letter A).** Maciej Grajczyk. Vosk,
 out of process, is the EN ASR choice.
 
-- Model pin to fetch later, not in git: `vosk-model-small-en-us-0.15` (small-en). sha256 is not pinned yet. No weights in this change.
-- Grammar mode for intents. Open dictation is not the product path.
+- Model, not in git: `vosk-model-small-en-us-0.15`. `scripts/asr/fetch-vosk.sh` pins the zip sha256. `LOCKS.toml` does not.
+- Free decoding is the mic default, so the transcript is what Vosk returned. `GALION_VOSK_GRAMMAR=intents` forwards the canned phrase list. If that recognizer cannot be built, the turn errors. It does not fall back to a sentence chosen by duration.
 - Separate process. PCM stays off disk. The worker thread runs it, not `Heartbeat::step`.
-- `GALION_ASR=interim` is retired only after the WER bar: about 15% word error on the five scripted phrases in the policy draft. Until that measurement exists, the UI keeps the `interim-placeholder` label.
+- `GALION_ASR=interim` is not a live mode. `AsrMode::Interim` remains only for the presence-eval label check, which constructs it in code.
 - B and C are not the choice. whisper.cpp stays rejected.
-- The Vosk LOCKS exception is not written here. Global locks stay. The Piper pin is the only exception text.
+- The Vosk LOCKS exception is not written. Global locks stay.
 
-**Scaffold (docs only).** No sidecar binary, no vendor directory, no download.
-The later process boundary is the same shape as the warm Piper worker: one
-long-lived process, stdin/stdout PCM16, grammar string supplied by the intent
-list, failure returns the labelled placeholder rather than a fake transcript.
+**Acceptance.**
 
-**Acceptance, when the sidecar exists.**
-
-1. Five scripted English phrases return transcripts with the words in them,
-   not the length-bucket placeholder. The bar is about 15% word error on those phrases.
-2. `GALION_ASR=interim` still exists until that bar passes, and the UI
-   label cannot say the words were recognised when they were not.
+1. Mic audio is transcribed by the worker, or the turn fails with `AsrUnavailable`. The phrases `hello` / `hello how are you` / `can you hear me` are not substituted from the length of the audio.
+2. The UI label for that path is `vosk`. The placeholder label is not used for it.
 3. `scripts/check-locks.sh` and `scripts/check-no-forbidden.sh` stay green.
-4. Partials do not push the heartbeat past `onset` / barge-in budgets. ASR
-   runs on the worker, not inside `step`.
+4. ASR runs on the worker, not inside `step`.
 
 **Risks.** Vendoring a GGML runtime to make the demo clever. Shipping
 `interim` as if it were recognition. Writing a Vosk exception that also
@@ -743,7 +738,7 @@ This program does not SSH, and it does not download a model.
 ## 7. What stays human
 
 - Titanaxe access codes. Status is approved-pending-setup. The human installs per-user anonymized codes on `51.38.137.193`. No shared key. No deploy from this program.
-- The Vosk sidecar, its sha256 pin, and any later Vosk line in LOCKS. Letter A is chosen. `interim` stays until the WER bar.
+- A Vosk line in `LOCKS.toml`. Letter A is in the tree (`docs/asr/VOSK.md`). The zip sha256 lives in the fetch script, not in the locks file. No word-error rate is claimed here.
 - espeak-ng counsel. The Piper exception text is already in LOCKS, sunset `2027-02-01`.
 - Rights clearance before any Jarvis or Samantha reference clip. Checklist: `docs/galion-voice-v2/RIGHTS-CLEARANCE.md`. Both gates are closed. No film audio is fetched here. The closed process is `CLIP-INGEST.md`.
 - Chatterbox generate against a real reference. The t230u pin allows an out-of-process worker. The stub does not call generate, and CI does not fetch weights.

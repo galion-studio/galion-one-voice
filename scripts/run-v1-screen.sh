@@ -12,8 +12,11 @@
 #                                         # docs/galion-voice-v2/SECURITY-EDGE.md
 #
 # Env: V1_SCREEN_ADDR=127.0.0.1:7878 · V1_SCREEN_SECONDS=3600 · OUT=target/v1-screen
-#      GALION_ASR=interim (default here: labelled placeholder, not recognition)
+#      GALION_ASR=vosk when weights/asr/vosk-model-small-en-us-0.15 is on disk,
+#      otherwise stub (typed text works; mic does not invent a transcript).
+#      GALION_ASR=interim is refused here (test-only placeholder).
 #      GALION_LLM=canned · GALION_SPEECH=auto · RELEASE=1
+#      Model: docs/asr/VOSK.md · scripts/asr/fetch-vosk.sh
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -30,14 +33,38 @@ while [[ $# -gt 0 ]]; do
 done
 URL="http://$ADDR/"
 PROFILE=(); [[ "${RELEASE:-0}" == "1" ]] && PROFILE=(--release)
-# Library default stays stub (real speech → AsrUnratified). The screen demo opts into the
-# labelled placeholder so a phone turn can reach Piper. Override by exporting GALION_ASR.
-export GALION_ASR="${GALION_ASR:-interim}"
 export GALION_LLM="${GALION_LLM:-canned}"
 
 mkdir -p "$OUT"
 cargo build -q "${PROFILE[@]}" --offline -p galion-console --features dot-viz-web --example dot_console_demo
-BIN="target/$([[ ${#PROFILE[@]} -gt 0 ]] && echo release || echo debug)/examples/dot_console_demo"
+cargo build -q "${PROFILE[@]}" --offline -p galion-asr-vosk --bin galion-asr-vosk
+TARGET="target/$([[ ${#PROFILE[@]} -gt 0 ]] && echo release || echo debug)"
+BIN="$TARGET/examples/dot_console_demo"
+export GALION_VOSK_BIN="$PWD/$TARGET/galion-asr-vosk"
+MODEL="${GALION_VOSK_MODEL:-$PWD/weights/asr/vosk-model-small-en-us-0.15}"
+export GALION_VOSK_MODEL="$MODEL"
+# Library default is stub. This screen uses Vosk when the model is present.
+# GALION_ASR=interim is test-only and must not invent words on :7878.
+ASR_MODE="${GALION_ASR:-}"
+if [[ "$ASR_MODE" == "interim" ]]; then
+  echo "refusing GALION_ASR=interim on the live screen. Placeholder transcripts are test-only."
+  echo "  Mic will not invent a transcript. See docs/asr/VOSK.md"
+  ASR_MODE=""
+fi
+if [[ -z "$ASR_MODE" ]]; then
+  if [[ -f "$MODEL/am/final.mdl" && -f "$MODEL/conf/model.conf" ]]; then
+    export GALION_ASR=vosk
+    echo "mic ASR: vosk ($MODEL)"
+  else
+    export GALION_ASR=stub
+    echo "mic ASR: Vosk model missing at $MODEL"
+    echo "  typed text still works. Mic turns return an error and do not invent a transcript."
+    echo "  docs/asr/VOSK.md"
+  fi
+else
+  export GALION_ASR="$ASR_MODE"
+  echo "mic ASR: $GALION_ASR"
+fi
 
 "$BIN" --headless --realtime --no-png --web "$ADDR" --seconds "$SECS" ${ARGS[@]+"${ARGS[@]}"} > "$OUT/heartbeat.log" 2>&1 &
 PID=$!

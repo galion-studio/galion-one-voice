@@ -8,21 +8,19 @@
 //!  pcm16k ──S4 PhoneTurnAsr──▶ transcript ──S5 CannedLlm──▶ reply_text ──S6 SpeechStack──▶ wav_bytes (24 kHz)
 //! ```
 //!
-//! # ⚠ S4 ASR IS NOT RATIFIED — READ THIS
-//! Real English ASR on the phone path is **blocked on an owner decision**:
-//! see `docs/policy/RATIFY-EN-ASR-PHONE-PATH.md` (options **A** Vosk out of process,
-//! **B** extend A21 ONNX exception to ASR, **C** hold the stub until native
-//! Whisper-tiny.en `.safetensors` runs on galion-tensor). whisper.cpp / GGML is
-//! explicitly rejected. Until the owner picks, [`PhoneTurnAsr`] has exactly three modes:
+//! # S4 ASR — letter A, Vosk, out of process
+//! The owner chose letter A (2026-11-03): Vosk, CPU, separate process.
+//! [`PhoneTurnAsr`] spawns `galion-asr-vosk`, which dlopens libvosk. This crate
+//! does not link it. `LOCKS.toml` is not edited. See `docs/asr/VOSK.md`.
 //!
 //! | `GALION_ASR`     | behaviour |
 //! |------------------|-----------|
-//! | unset / `stub`   | **default.** Decodes `galion_ml_voice::stub` fixture audio via `StubAsr` (tests, demos). Real speech → [`PhoneError::AsrUnratified`]. |
-//! | `interim`        | **INTERIM PLACEHOLDER — NOT SPEECH RECOGNITION.** Any non-silent audio yields a short canned English transcript chosen by utterance length. It does not listen to the words. Exists only so the phone loop produces real Piper WAV end to end. Fixtures still decode exactly. |
+//! | unset / `stub`   | **library default.** Stub fixtures decode. Real speech → [`PhoneError::AsrUnratified`]. Nothing is invented. |
+//! | `vosk`           | Real words from `vosk-model-small-en-us-0.15`. Missing model or worker → [`PhoneError::AsrUnavailable`]. A blank decode → [`PhoneError::Empty`]. |
 //! | `off`            | Always [`PhoneError::AsrUnratified`]. |
+//! | `interim`        | **Ignored.** Treated as `stub`. The length-bucket sentences are [`AsrMode::Interim`], which tests construct directly. The live screen never selects them. |
 //!
-//! Every [`PhoneTurn`] carries `asr` so a UI can label an interim transcript honestly.
-//! When the owner ratifies A/B/C, the real engine replaces the `Interim` arm only.
+//! Every [`PhoneTurn`] carries `asr` so a UI can tell a Vosk transcript from a fixture.
 //!
 //! # S5 LLM
 //! Phone turns default to [`CannedLlm`] (`GALION_LLM=canned` or unset). `GALION_LLM=echo`
@@ -60,14 +58,17 @@ pub const RATIFY_DOC: &str = "docs/policy/RATIFY-EN-ASR-PHONE-PATH.md";
 
 /// S4 ASR mode (see module docs; `GALION_ASR`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum AsrMode { Stub, Interim, Off }
+pub enum AsrMode { Stub, Interim, Vosk, Off }
 
 impl AsrMode {
     pub fn from_env() -> Self { Self::from_choice(std::env::var("GALION_ASR").ok().as_deref()) }
+    /// Live selection. `interim` is not a production mode: it maps to [`AsrMode::Stub`].
     pub fn from_choice(v: Option<&str>) -> Self {
         match v.map(|s| s.trim().to_ascii_lowercase()).as_deref() {
-            Some("interim") => AsrMode::Interim,
+            Some("vosk") => AsrMode::Vosk,
             Some("off") => AsrMode::Off,
+            // Length buckets are `AsrMode::Interim`, constructed by tests. The env value must not invent a transcript.
+            Some("interim") => AsrMode::Stub,
             _ => AsrMode::Stub,
         }
     }
@@ -101,8 +102,11 @@ pub enum PhoneError {
     Empty,
     /// WAV bytes could not be parsed (only PCM16 RIFF is accepted).
     BadWav(String),
-    /// Real speech arrived but no ratified ASR exists (see [`RATIFY_DOC`]).
+    /// Real speech arrived and this lane is not running Vosk (see [`RATIFY_DOC`]).
     AsrUnratified(&'static str),
+    /// `GALION_ASR=vosk` but the model, library, or worker could not produce words.
+    /// The message is the failure. The transcript was not invented.
+    AsrUnavailable(String),
     /// No speech backend on this machine (Piper/flite missing); never falls back to tones.
     NoSpeech(String),
     /// A newer turn superseded this one between clauses. The Piper process is still running.
@@ -117,6 +121,7 @@ impl std::fmt::Display for PhoneError {
             PhoneError::Empty => write!(f, "empty or silent audio"),
             PhoneError::BadWav(m) => write!(f, "bad WAV: {m}"),
             PhoneError::AsrUnratified(m) => write!(f, "{m}"),
+            PhoneError::AsrUnavailable(m) => write!(f, "{m}"),
             PhoneError::NoSpeech(m) => write!(f, "no speech backend: {m}"),
             PhoneError::Superseded => write!(f, "turn superseded before speech finished"),
             PhoneError::Cascade(e) => write!(f, "cascade: {e:?}"),
@@ -137,6 +142,8 @@ pub enum AsrSource {
     InterimPlaceholder,
     /// Virtual-user text injection. The harness supplied the words. Not speech recognition.
     TextInject,
+    /// Words from the Vosk worker. Not a length bucket.
+    Vosk,
 }
 impl AsrSource {
     pub fn id(&self) -> &'static str {
@@ -144,11 +151,12 @@ impl AsrSource {
             AsrSource::StubFixture => "stub-fixture",
             AsrSource::InterimPlaceholder => "interim-placeholder",
             AsrSource::TextInject => "text-inject",
+            AsrSource::Vosk => "vosk",
         }
     }
-    /// True only for an exact stub-fixture decode.
-    /// Interim and text-inject are not recognised speech.
-    pub fn is_recognised(&self) -> bool { matches!(self, AsrSource::StubFixture) }
+    /// Stub fixtures are an exact codec decode. Vosk is speech recognition.
+    /// Interim and text-inject are not.
+    pub fn is_recognised(&self) -> bool { matches!(self, AsrSource::StubFixture | AsrSource::Vosk) }
 }
 
 /// Per-stage wall time (ms).
@@ -183,8 +191,17 @@ pub struct PhoneTurn {
 }
 
 /// S4 ASR for the phone path. Input is 16 kHz mono PCM16.
-#[derive(Debug, Clone, Copy)]
-pub struct PhoneTurnAsr { pub mode: AsrMode }
+/// The Vosk worker, when `mode` is [`AsrMode::Vosk`], stays up for the life of the lane.
+pub struct PhoneTurnAsr {
+    pub mode: AsrMode,
+    worker: Option<galion_asr_vosk::VoskClient>,
+}
+
+impl std::fmt::Debug for PhoneTurnAsr {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PhoneTurnAsr").field("mode", &self.mode).finish()
+    }
+}
 
 /// RMS (0..1) below which the input counts as silence.
 pub const SILENCE_RMS: f32 = 0.003;
@@ -193,28 +210,69 @@ pub const SILENCE_RMS: f32 = 0.003;
 pub const INTERIM_TRANSCRIPTS: [&str; 3] = ["hello", "hello how are you", "can you hear me"];
 
 impl PhoneTurnAsr {
-    pub fn new(mode: AsrMode) -> Self { Self { mode } }
+    pub fn new(mode: AsrMode) -> Self { Self { mode, worker: None } }
 
-    pub fn transcribe(&self, pcm16k: &[i16]) -> Result<(String, AsrSource), PhoneError> {
+    pub fn transcribe(&mut self, pcm16k: &[i16]) -> Result<(String, AsrSource), PhoneError> {
         if pcm16k.is_empty() { return Err(PhoneError::Empty); }
         if self.mode == AsrMode::Off {
-            return Err(PhoneError::AsrUnratified("EN phone ASR disabled (GALION_ASR=off); see docs/policy/RATIFY-EN-ASR-PHONE-PATH.md options A/B/C"));
+            return Err(PhoneError::AsrUnratified("EN phone ASR disabled (GALION_ASR=off). Typed text still works. No transcript was invented."));
         }
         if let Some(t) = decode_stub_fixture(pcm16k) { return Ok((t, AsrSource::StubFixture)); }
         let rms = (pcm16k.iter().map(|&s| (s as f32 / 32768.0).powi(2)).sum::<f32>() / pcm16k.len() as f32).sqrt();
         if rms < SILENCE_RMS { return Err(PhoneError::Empty); }
         match self.mode {
             AsrMode::Interim => {
-                // ⚠ INTERIM PLACEHOLDER — the words are NOT recognised (see module docs).
+                // Test-only length buckets. `GALION_ASR=interim` does not select this arm.
                 let secs = pcm16k.len() as f32 / PHONE_IN_RATE_HZ as f32;
                 let i = if secs < 1.0 { 0 } else if secs < 2.5 { 1 } else { 2 };
                 Ok((INTERIM_TRANSCRIPTS[i].to_string(), AsrSource::InterimPlaceholder))
             }
-            _ => Err(PhoneError::AsrUnratified(
-                "EN phone ASR not ratified: real speech cannot be transcribed yet. Owner must pick A/B/C in docs/policy/RATIFY-EN-ASR-PHONE-PATH.md; set GALION_ASR=interim for the placeholder loop",
+            AsrMode::Vosk => self.vosk_transcribe(pcm16k),
+            AsrMode::Stub | AsrMode::Off => Err(PhoneError::AsrUnratified(
+                "EN phone ASR is not running on this turn (GALION_ASR=stub). Real speech needs GALION_ASR=vosk and the small-en model (docs/asr/VOSK.md). No transcript was invented.",
             )),
         }
     }
+
+    fn vosk_transcribe(&mut self, pcm16k: &[i16]) -> Result<(String, AsrSource), PhoneError> {
+        if self.worker.is_none() {
+            match galion_asr_vosk::VoskClient::open() {
+                Ok(w) => self.worker = Some(w),
+                Err(e) => return Err(PhoneError::AsrUnavailable(e)),
+            }
+        }
+        let grammar = vosk_grammar();
+        let result = self.worker.as_mut().unwrap().recognize(pcm16k, grammar.as_deref());
+        match result {
+            Ok(r) => {
+                let text = galion_asr_vosk::clean_transcript(&r.text);
+                if text.is_empty() { Err(PhoneError::Empty) } else { Ok((text, AsrSource::Vosk)) }
+            }
+            Err(e) => {
+                self.worker = None;
+                Err(PhoneError::AsrUnavailable(e))
+            }
+        }
+    }
+}
+
+/// `GALION_VOSK_GRAMMAR=intents` forwards the canned phrase list. Anything else is free decoding.
+/// If the model cannot build that recognizer, the worker errors instead of guessing.
+fn vosk_grammar() -> Option<Vec<String>> {
+    let Ok(v) = std::env::var("GALION_VOSK_GRAMMAR") else { return None };
+    if v.trim().eq_ignore_ascii_case("intents") {
+        let mut g: Vec<String> = crate::canned::intent_grammar_phrases().into_iter().map(str::to_string).collect();
+        g.push("[unk]".into());
+        Some(g)
+    } else {
+        None
+    }
+}
+
+/// PCM16 of a `galion_ml_voice` stub fixture. Tests use this so a speech-off
+/// turn reaches TTS without the length-bucket placeholder.
+pub fn stub_fixture_pcm16(text: &str) -> Vec<i16> {
+    to_pcm16(&galion_ml_voice::stub::fixture_audio(text).samples)
 }
 
 /// Decode a `galion_ml_voice::stub::fixture_audio` signal (as PCM16) if it is one:
@@ -387,37 +445,72 @@ mod tests {
         (0..n).map(|i| { let t = i as f32 / 16_000.0; (0.2 * (t * 180.0 * std::f32::consts::TAU).sin() * (t * 3.0 * std::f32::consts::TAU).sin().abs() * 32767.0) as i16 }).collect()
     }
     fn cfg(asr: AsrMode) -> PhoneConfig { PhoneConfig { asr, llm: LlmMode::Canned } }
+    fn from_env_without(key: &str) -> AsrMode {
+        let prev = std::env::var(key).ok();
+        std::env::remove_var(key);
+        let mode = AsrMode::from_env();
+        match prev { Some(v) => std::env::set_var(key, v), None => std::env::remove_var(key) }
+        mode
+    }
 
     #[test] fn env_choices() {
         assert_eq!(AsrMode::from_choice(None), AsrMode::Stub);
-        assert_eq!(AsrMode::from_choice(Some(" Interim ")), AsrMode::Interim);
+        assert_eq!(AsrMode::from_choice(Some(" Interim ")), AsrMode::Stub);
+        assert_eq!(AsrMode::from_choice(Some("vosk")), AsrMode::Vosk);
+        assert_eq!(AsrMode::from_choice(Some(" VOSK ")), AsrMode::Vosk);
+        assert_eq!(AsrMode::from_choice(Some("off")), AsrMode::Off);
         assert_eq!(AsrMode::from_choice(Some("whisper")), AsrMode::Stub);
+        assert_ne!(AsrMode::from_choice(None), AsrMode::Interim);
+        assert_ne!(AsrMode::from_choice(Some("interim")), AsrMode::Interim);
         assert_eq!(LlmMode::from_choice(None), LlmMode::Canned);
         assert_eq!(LlmMode::from_choice(Some("canned")), LlmMode::Canned);
         assert_eq!(LlmMode::from_choice(Some("echo")), LlmMode::Echo);
     }
     #[test] fn stub_decodes_fixture_in_every_mode_but_off() {
-        for m in [AsrMode::Stub, AsrMode::Interim] {
+        for m in [AsrMode::Stub, AsrMode::Interim, AsrMode::Vosk] {
             assert_eq!(PhoneTurnAsr::new(m).transcribe(&fx("how are you")).unwrap(), ("how are you".into(), AsrSource::StubFixture));
         }
         assert!(matches!(PhoneTurnAsr::new(AsrMode::Off).transcribe(&fx("hi")), Err(PhoneError::AsrUnratified(_))));
     }
-    #[test] fn default_refuses_real_speech_and_points_at_policy() {
+    #[test] fn default_refuses_real_speech_without_inventing_words() {
         let e = PhoneTurnAsr::new(AsrMode::Stub).transcribe(&voice(1.5)).unwrap_err();
-        assert!(matches!(e, PhoneError::AsrUnratified(m) if m.contains(RATIFY_DOC) && m.contains("A/B/C")));
+        assert!(matches!(e, PhoneError::AsrUnratified(m) if m.contains("docs/asr/VOSK.md") && m.contains("No transcript was invented")));
+    }
+    #[test] fn interim_env_is_not_the_production_path() {
+        let mut a = PhoneTurnAsr::new(AsrMode::from_choice(Some("interim")));
+        let err = a.transcribe(&voice(1.5)).unwrap_err();
+        assert!(matches!(err, PhoneError::AsrUnratified(_)));
+        let rendered = err.to_string();
+        for phrase in INTERIM_TRANSCRIPTS { assert_ne!(rendered, phrase); }
+        assert_eq!(from_env_without("GALION_ASR"), AsrMode::Stub);
     }
     #[test] fn interim_is_labelled_placeholder() {
-        let a = PhoneTurnAsr::new(AsrMode::Interim);
+        let mut a = PhoneTurnAsr::new(AsrMode::Interim);
         assert_eq!(a.transcribe(&voice(0.5)).unwrap(), ("hello".into(), AsrSource::InterimPlaceholder));
         assert_eq!(a.transcribe(&voice(1.5)).unwrap().0, "hello how are you");
         assert_eq!(a.transcribe(&voice(4.0)).unwrap().0, "can you hear me");
         assert!(!AsrSource::InterimPlaceholder.is_recognised());
     }
     #[test] fn silence_and_empty_are_empty() {
-        for m in [AsrMode::Stub, AsrMode::Interim] {
+        for m in [AsrMode::Stub, AsrMode::Interim, AsrMode::Vosk] {
             assert_eq!(PhoneTurnAsr::new(m).transcribe(&[]), Err(PhoneError::Empty));
             assert_eq!(PhoneTurnAsr::new(m).transcribe(&vec![0; 16_000]), Err(PhoneError::Empty));
         }
+    }
+    #[test] fn vosk_missing_model_does_not_invent_a_transcript() {
+        let prev = std::env::var("GALION_VOSK_MODEL").ok();
+        std::env::set_var("GALION_VOSK_MODEL", "/no/such/galion-vosk-model");
+        let mut a = PhoneTurnAsr::new(AsrMode::Vosk);
+        let err = a.transcribe(&voice(0.4)).unwrap_err();
+        match err {
+            PhoneError::AsrUnavailable(m) => {
+                assert!(m.contains("docs/asr/VOSK.md"), "{m}");
+                assert!(m.contains("No transcript was invented"), "{m}");
+                for phrase in INTERIM_TRANSCRIPTS { assert!(!m.contains(phrase), "{m}"); }
+            }
+            other => panic!("{other}"),
+        }
+        match prev { Some(v) => std::env::set_var("GALION_VOSK_MODEL", v), None => std::env::remove_var("GALION_VOSK_MODEL") }
     }
     #[test] fn wav_parse_mono_stereo_resample() {
         let v = voice(1.0);

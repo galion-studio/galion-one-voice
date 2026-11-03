@@ -61,6 +61,12 @@ const INTENTS: &[(&[&str], &str)] = &[
     (&["no", "nope", "nah"], "Alright."),
 ];
 
+/// Phrases the optional Vosk grammar can constrain to. Not used unless
+/// `GALION_VOSK_GRAMMAR=intents`. Free decoding is the mic default.
+pub fn intent_grammar_phrases() -> Vec<&'static str> {
+    INTENTS.iter().flat_map(|(keys, _)| keys.iter().copied()).collect()
+}
+
 impl CannedLlm {
     pub fn new() -> Self { Self::default() }
 

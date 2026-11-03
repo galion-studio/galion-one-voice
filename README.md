@@ -41,11 +41,12 @@ phone  --https-->  ngrok now, Caddy later
 | **Plan V5** | How this stack would reach the VPS, and why it has not. [docs/ops/PLAN-V5.md](docs/ops/PLAN-V5.md). |
 
 English speech recognition on the phone: the owner chose **letter A** (Vosk,
-out of process). The sidecar is not in the tree. `GALION_ASR=interim`
-is still a labelled placeholder (a sentence chosen by how long you talked).
-It does not know the words, and it stays until a WER bar passes.
-[docs/policy/RATIFY-EN-ASR-PHONE-PATH.md](docs/policy/RATIFY-EN-ASR-PHONE-PATH.md).
-whisper.cpp is rejected.
+out of process). The worker is `galion-asr-vosk`. The live screen at
+`:7878` sets `GALION_ASR=vosk` when `vosk-model-small-en-us-0.15` is on
+disk. If the model is missing, mic turns error and typed text still works.
+The length-bucket placeholder is not the live path.
+[docs/asr/VOSK.md](docs/asr/VOSK.md).
+whisper.cpp is rejected. `LOCKS.toml` is unchanged.
 
 The reply you hear is a short canned line, spoken by Piper
 (`en_US-ljspeech-medium`, CPU, out of process) when that pack is on disk, else
@@ -78,6 +79,7 @@ are closed. The closed ingest outline is
 Loopback only. Rust 1.85 or newer.
 
 ```bash
+scripts/asr/fetch-vosk.sh         # once: small-en model + libvosk into weights/ (not vendored)
 scripts/a21/fetch-a21.sh          # once, optional: Piper pack into weights/ (sha256-pinned)
 scripts/run-v1-screen.sh          # http://127.0.0.1:7878/  for an hour
 scripts/run-v1-screen.sh --check  # page, /dot, /mic, /turn, security headers
@@ -93,9 +95,9 @@ Open the `https://` name, tap the orb, talk. The page posts a WAV to `/turn`
 when you pause, then plays `/reply/<id>.wav`. Speaking over the reply cuts it
 off. Notes: [docs/agent-v1-demo/EDGE-NGROK.md](docs/agent-v1-demo/EDGE-NGROK.md).
 
-The screen script sets `GALION_ASR=interim` and `GALION_LLM=canned` for that
-process. Export `GALION_ASR=off` beforehand if you want real speech to be
-refused instead of the placeholder.
+The screen script sets `GALION_LLM=canned`. It sets `GALION_ASR=vosk` when
+the small-en model is present, and `stub` when it is not. It refuses
+`GALION_ASR=interim`. A missing model does not invent a transcript.
 
 Headless V1 checks (no phone):
 

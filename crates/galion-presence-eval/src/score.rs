@@ -58,6 +58,7 @@ pub fn walk_keys(v: &Value) -> Result<(), String> {
 
 /// Interim and text injection must not be reported as recognition.
 /// A stub fixture is an exact codec decode; the report still does not call that recognition.
+/// Vosk is recognition: the report may say so.
 pub fn claims_recognition(asr: AsrSource) -> bool {
     let id = asr.id();
     if id.contains("recognition") || id.contains("recognised") {
@@ -66,6 +67,7 @@ pub fn claims_recognition(asr: AsrSource) -> bool {
     match asr {
         AsrSource::InterimPlaceholder | AsrSource::TextInject => asr.is_recognised(),
         AsrSource::StubFixture => false,
+        AsrSource::Vosk => true,
     }
 }
 
@@ -109,5 +111,8 @@ mod tests {
         assert!(!claims_recognition(AsrSource::TextInject));
         assert!(!claims_recognition(AsrSource::StubFixture));
         assert!(AsrSource::StubFixture.is_recognised());
+        assert!(claims_recognition(AsrSource::Vosk));
+        assert!(AsrSource::Vosk.is_recognised());
+        assert_eq!(AsrSource::Vosk.id(), "vosk");
     }
 }

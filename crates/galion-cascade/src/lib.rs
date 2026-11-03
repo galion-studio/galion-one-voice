@@ -106,7 +106,8 @@ pub fn mock_cascade() -> Cascade<MockAsr, MockEmotion, MockLlm, MockTts> {
 pub use canned::{CannedLlm, ProsodyEmotion, ReplyLlm};
 #[cfg(feature = "cascade")]
 pub use phone::{
-    phone_turn, phone_turn_wav, AsrMode, AsrSource, LlmMode, PhoneConfig, PhoneError, PhoneLane, PhoneTurn, PhoneTurnAsr,
+    phone_turn, phone_turn_wav, stub_fixture_pcm16, AsrMode, AsrSource, LlmMode, PhoneConfig, PhoneError, PhoneLane,
+    PhoneTurn, PhoneTurnAsr,
 };
 
 #[cfg(test)]
