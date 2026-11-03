@@ -80,7 +80,7 @@ texture_default = "on"
 texture_stripped = false
 denoise = false
 placeholder = "docs/galion-voice-v2/personas/refs/jarvis.placeholder"
-note = "Current model reference. Not clean speech: Tony Stark hub virtual texture (clicks, alarms, ambience) is character. Do not strip, denoise, or clean. WAV only, gitignored. Also $GALION_CLIP_STORE/jarvis/reference.wav. Never an MP3. Public demo stays closed."
+note = "Current model reference. Not clean speech: Tony Stark hub virtual texture (clicks, alarms, ambience) is character. Do not strip, denoise, or clean. WAV only, gitignored. Also $GALION_CLIP_STORE/jarvis/reference.wav. Never an MP3. Public demo stays closed. Hub clicks, alarms, and ambience are also a separate toggleable layer (GALION_JARVIS_TEXTURE, see symphony/JARVIS-TEXTURE.md); the toggle does not denoise the asset."
 
 [worker]
 binding = "galion.clone.worker"
