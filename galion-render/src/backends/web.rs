@@ -471,6 +471,8 @@ struct Shared {
     turns: TurnInbox,
     replies: ReplyBox,
     page: Option<&'static str>,
+    v2_page: Option<&'static str>,
+    floor: Arc<Mutex<crate::v2_persona::Floor>>,
     edge: EdgeCfg,
     sessions: Arc<SessionStore>,
     /// First accepted `/turn` of this process already carried the Art. 50 line.
@@ -506,6 +508,8 @@ impl WebSurface {
             turns: TurnInbox::default(),
             replies: ReplyBox::default(),
             page: None,
+            v2_page: None,
+            floor: Arc::new(Mutex::new(crate::v2_persona::Floor::new())),
             sessions: Arc::new(SessionStore::new(edge.session_ttl)),
             disclosure_sent: Arc::new(AtomicBool::new(false)),
             edge,
@@ -528,6 +532,11 @@ impl WebSurface {
     /// Serve `html` at `/` and `/screen` (set before `open()`).
     pub fn with_page(mut self, html: &'static str) -> Self {
         self.sh.page = Some(html);
+        self
+    }
+    /// Serve the Samantha / Jarvis one-dot page at `/v2` (set before `open()`).
+    pub fn with_v2_page(mut self, html: &'static str) -> Self {
+        self.sh.v2_page = Some(html);
         self
     }
     /// Exact `GALION_CORS_ORIGINS` value. Empty keeps the V1 wildcard.
@@ -694,6 +703,22 @@ fn route(req: &mut Request, sh: &Shared) -> (&'static str, &'static str, Vec<u8>
             zeroise_bytes(&mut req.body);
             ("204 No Content", "text/plain", Vec::new())
         }
+        ("POST", "/v2/say") => {
+            if req.body.is_empty() {
+                return ("400 Bad Request", "text/plain", txt("empty body"));
+            }
+            let raw = String::from_utf8_lossy(&req.body);
+            let text = crate::v2_persona::json_field_string(&raw, "text").unwrap_or_default();
+            let barge = crate::v2_persona::json_field_bool(&raw, "barge");
+            let e = crate::v2_persona::json_field_f32(&raw, "e");
+            let sense = crate::v2_persona::json_field_bool(&raw, "sense");
+            let json = match sh.floor.lock() {
+                Ok(mut floor) => floor.say_json(&text, barge, e, sense),
+                Err(_) => "{\"persona\":\"samantha\",\"reply\":\"\",\"silence\":true,\"film_voice\":false}".to_string(),
+            };
+            zeroise_bytes(&mut req.body);
+            ("200 OK", "application/json", json.into_bytes())
+        }
         ("POST", "/turn") => {
             if req.header("content-length").is_none() {
                 zeroise_bytes(&mut req.body);
@@ -728,7 +753,18 @@ fn route(req: &mut Request, sh: &Shared) -> (&'static str, &'static str, Vec<u8>
                 }
                 "/dot" => {
                     let d = sh.latest_dot.lock().map(|g| g.clone()).unwrap_or_default();
-                    ("200 OK", "application/json", dot_with_reply(&d, sh.replies.latest_json().as_deref()).into_bytes())
+                    let (persona, mood) = sh.floor.lock().map(|g| (g.id().to_string(), g.mood().to_string())).unwrap_or_else(|_| ("samantha".into(), "calm".into()));
+                    // Persona and mood sit beside the golden. `reply` stays the last field.
+                    let body = dot_with_reply(&crate::v2_persona::annotate_dot(&d, &persona, &mood), sh.replies.latest_json().as_deref());
+                    ("200 OK", "application/json", body.into_bytes())
+                }
+                "/v2" if sh.v2_page.is_some() => {
+                    let html = sh.v2_page.unwrap_or_default();
+                    ("200 OK", "text/html; charset=utf-8", html.as_bytes().to_vec())
+                }
+                "/v2/state" => {
+                    let json = sh.floor.lock().map(|g| g.state_json()).unwrap_or_else(|_| "{}".into());
+                    ("200 OK", "application/json", json.into_bytes())
                 }
                 "/mic" => ("200 OK", "application/json", sh.latest_mic.lock().map(|g| g.clone()).unwrap_or_else(|_| "{\"rms\":0}".into()).into_bytes()),
                 "/health" => ("200 OK", "text/plain", txt("ok")),
@@ -897,6 +933,33 @@ mod tests {
         assert!(r.contains("\"emotion\"") && r.contains("\"sense\":false"), "{r}");
         assert!(!r.contains("#B695CF"), "empathy hue is not a circle fill");
         assert!(r.trim_end().ends_with('}'));
+        assert!(r.contains("\"persona\":\"samantha\""), "{r}");
+        w.close().unwrap();
+    }
+
+    #[test]
+    fn v2_say_routes_personas_and_keeps_the_hold() {
+        let mut w = WebSurface::serve("127.0.0.1:0".parse().unwrap()).with_v2_page("<!doctype html><canvas id=\"s\"></canvas>");
+        w.open().unwrap();
+        let a = w.local_addr().unwrap();
+        let page = get(a, "/v2");
+        assert!(page.contains("HTTP/1.1 200") && page.contains("canvas"), "{page}");
+        let state = get(a, "/v2/state");
+        assert!(state.contains("\"rights\":\"hold\"") && state.contains("\"film_voice\":false"), "{state}");
+        assert!(state.contains("\"warmth_e0\":0.62") && state.contains("\"pre_pause_e0\":80"), "{state}");
+        let body = b"{\"text\":\"My mother died this morning.\"}";
+        let mut s = std::net::TcpStream::connect(a).unwrap();
+        s.write_all(format!("POST /v2/say HTTP/1.1\r\nHost: x\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n", body.len()).as_bytes()).unwrap();
+        s.write_all(body).unwrap();
+        let mut out = String::new();
+        s.read_to_string(&mut out).unwrap();
+        assert!(out.contains("HTTP/1.1 200"), "{out}");
+        assert!(out.contains("Your mother died this morning."));
+        assert!(out.contains("\"mood\":\"grief\""));
+        assert!(!out.to_ascii_lowercase().contains("i hear you"));
+        assert!(out.contains("\"film_voice\":false"));
+        let dot = get(a, "/dot");
+        assert!(dot.contains("\"persona\":\"samantha\""), "{dot}");
         w.close().unwrap();
     }
 

@@ -181,9 +181,9 @@ pub fn bind_decision(
 pub fn route_is_sensitive(method: &str, path: &str) -> bool {
     let method = if method == "HEAD" { "GET" } else { method };
     match (method, path) {
-        ("POST", "/turn" | "/mic" | "/session") => true,
+        ("POST", "/turn" | "/mic" | "/session" | "/v2/say") => true,
         ("GET", p) if p.starts_with("/reply/") => true,
-        ("OPTIONS", "/turn" | "/mic" | "/session") => true,
+        ("OPTIONS", "/turn" | "/mic" | "/session" | "/v2/say") => true,
         ("OPTIONS", p) if p.starts_with("/reply/") => true,
         _ => false,
     }
@@ -193,7 +193,7 @@ pub fn route_is_sensitive(method: &str, path: &str) -> bool {
 /// does not require one. `OPTIONS` is a preflight and does not require one.
 pub fn route_needs_session(method: &str, path: &str) -> bool {
     match (method, path) {
-        ("POST", "/turn" | "/mic") => true,
+        ("POST", "/turn" | "/mic" | "/v2/say") => true,
         ("GET" | "HEAD", p) if p.starts_with("/reply/") => true,
         _ => false,
     }

@@ -1,7 +1,8 @@
 # Galion Voice V2 — Samantha voice config (draft)
 # Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
 #
-# Docs only. Nothing in the tree reads this file. No clip, no weights.
+# The /v2 demo route reads this file for prosody, wash, tags, and the
+# rights hold. The clone worker does not. No clip, no weights.
 # Register numbers are the design table in SAMANTHA-V2.md §4.
 # Rights hold: ../VOICE-CLONING.md. Clearance, if it ever exists, is a
 # LEDGER.md line. This draft does not write that line.
@@ -10,7 +11,7 @@ schema = 1
 status = "draft"
 program = "Galion Voice V2"
 id = "samantha"
-wired = false
+wired = true
 session_default = true
 
 [register]
