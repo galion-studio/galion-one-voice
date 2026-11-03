@@ -316,13 +316,21 @@ pub enum ClonePlan {
     /// Samantha cores 0-2, Jarvis cores 3-5, 3 threads each; 6-7 reserved
     /// for ASR, Piper and the call loop.
     Split3,
+    /// V2 fully local: both voices share cores 0-3 at 2 threads each (never
+    /// more threads than cores, even when both speak at once); cores 4-7 are
+    /// the local LLM's (4 threads). ASR and Piper are not pinned.
+    Local,
 }
 
 /// Plan `auto` picks on a dedicated host with at least [`DEDICATED_MIN_CPUS`]
 /// usable cores. Chosen from the measured matrix in 02-core-pinning.md.
 pub const DEDICATED_PLAN: ClonePlan = ClonePlan::Split4;
-/// Both split plans index cores 0-7.
+/// Plan `auto` picks when `GALION_LLM_LOCAL` is set (V2 fully local).
+pub const LOCAL_LLM_PLAN: ClonePlan = ClonePlan::Local;
+/// The dedicated plans index cores 0-7.
 pub const DEDICATED_MIN_CPUS: usize = 8;
+/// Local LLM placement under [`ClonePlan::Local`]: cores 4-7, 4 threads.
+pub const LOCAL_LLM_THREADS: u32 = 4;
 
 impl ClonePlan {
     pub fn as_str(self) -> &'static str {
@@ -330,12 +338,22 @@ impl ClonePlan {
             ClonePlan::Session => "session",
             ClonePlan::Split4 => "split4",
             ClonePlan::Split3 => "split3",
+            ClonePlan::Local => "local",
         }
     }
 
-    /// `session`, `split4`, `split3`; `auto` (or empty) resolves by core count.
+    /// `session`, `split4`, `split3`, `local`; `auto` (or empty) resolves by
+    /// core count (local LLM hosts: see [`ClonePlan::auto`]).
     pub fn parse(s: &str, usable_cpus: usize) -> Option<Self> {
+        Self::parse_with(s, usable_cpus, false)
+    }
+
+    /// `auto` with the local-LLM flag: [`LOCAL_LLM_PLAN`] on a dedicated host
+    /// that also runs the LLM, [`DEDICATED_PLAN`] when the LLM is remote.
+    pub fn parse_with(s: &str, usable_cpus: usize, local_llm: bool) -> Option<Self> {
         match s.trim().to_ascii_lowercase().as_str() {
+            "local" => Some(ClonePlan::Local),
+            "" | "auto" if local_llm && usable_cpus >= DEDICATED_MIN_CPUS => Some(LOCAL_LLM_PLAN),
             "session" | "1" => Some(ClonePlan::Session),
             "split4" | "4+4" => Some(ClonePlan::Split4),
             "split3" | "3+3" => Some(ClonePlan::Split3),
@@ -352,7 +370,17 @@ impl ClonePlan {
     pub fn reserved_cpus(self) -> Vec<usize> {
         match self {
             ClonePlan::Split3 => vec![6, 7],
+            ClonePlan::Local => vec![4, 5, 6, 7],
             _ => Vec::new(),
+        }
+    }
+
+    /// Where a local LLM server should run under this plan (cores, threads).
+    /// Pin it with [`apply_affinity`] and pass the thread count (`-t`).
+    pub fn llm_placement(self) -> Option<(Vec<usize>, u32)> {
+        match self {
+            ClonePlan::Local => Some(((4..8).collect(), LOCAL_LLM_THREADS)),
+            _ => None,
         }
     }
 }
@@ -388,6 +416,7 @@ impl ClonePlacement {
                 },
                 3,
             ),
+            ClonePlan::Local => ((0..4).collect(), 2),
         };
         if plan != ClonePlan::Session && usable_cpus < DEDICATED_MIN_CPUS {
             // A split plan on a small host would pin onto cores that are not there.
@@ -407,7 +436,11 @@ impl ClonePlacement {
     pub fn from_env(persona: &str) -> Self {
         let n = usable_cpus();
         let get = |k: &str| std::env::var(k).ok();
-        let plan = ClonePlan::parse(get("GALION_CLONE_CPU_PLAN").as_deref().unwrap_or(""), n)
+        let local_llm = get("GALION_LLM_LOCAL").is_some_and(|v| {
+            !matches!(v.trim().to_ascii_lowercase().as_str(), "" | "0" | "false" | "no")
+        });
+        let plan_env = get("GALION_CLONE_CPU_PLAN");
+        let plan = ClonePlan::parse_with(plan_env.as_deref().unwrap_or(""), n, local_llm)
             .unwrap_or(ClonePlan::Session);
         let mut p = Self::for_persona(plan, persona, n);
         if p.plan == ClonePlan::Session {
@@ -428,6 +461,9 @@ impl ClonePlacement {
         if let Some(t) = get("GALION_CLONE_THREADS").and_then(|t| t.trim().parse::<u32>().ok()) {
             let cap = if p.cpus.is_empty() {
                 n as u32
+            } else if p.plan == ClonePlan::Local {
+                // Both voices share these cores: half each, so two at once fit.
+                (p.cpus.len() / 2) as u32
             } else {
                 p.cpus.len() as u32
             };
@@ -1614,6 +1650,16 @@ mod tests {
         assert_eq!((s3.cpu_list().as_str(), s3.threads), ("0-2", 3));
         assert_eq!((j3.cpu_list().as_str(), j3.threads), ("3-5", 3));
         assert_eq!(ClonePlan::Split3.reserved_cpus(), vec![6, 7]);
+        assert_eq!(ClonePlan::parse_with("auto", 8, true), Some(LOCAL_LLM_PLAN));
+        assert_eq!(ClonePlan::parse_with("auto", 4, true), Some(ClonePlan::Session));
+        let sl = ClonePlacement::for_persona(ClonePlan::Local, "samantha", 8);
+        let jl = ClonePlacement::for_persona(ClonePlan::Local, "jarvis", 8);
+        assert_eq!((sl.cpu_list().as_str(), sl.threads), ("0-3", 2));
+        assert_eq!(sl.cpus, jl.cpus);
+        assert!(sl.threads + jl.threads <= sl.cpus.len() as u32, "both speaking never oversubscribe");
+        let (llm, t) = ClonePlan::Local.llm_placement().unwrap();
+        assert_eq!((format_cpu_list(&llm).as_str(), t), ("4-7", 4));
+        assert!(llm.iter().all(|c| !sl.cpus.contains(c)));
         for (a, b) in [(&s4, &j4), (&s3, &j3)] {
             assert!(a.cpus.iter().all(|c| !b.cpus.contains(c)), "disjoint");
             assert!(a.threads as usize <= a.cpus.len() && b.threads as usize <= b.cpus.len());
@@ -1683,7 +1729,7 @@ plan = os.environ.get("GALION_CLONE_CPU_PLAN", "")
 if not want.isdigit() or int(want) < 1 or any(os.environ.get(k) != want for k in keys):
     sys.stderr.write("galion-clone-refuse: cpu pin missing\n")
     sys.exit(3)
-if plan not in ("session", "split4", "split3") or (plan == "session" and want != "1"):
+if plan not in ("session", "split4", "split3", "local") or (plan == "session" and want != "1"):
     sys.stderr.write("galion-clone-refuse: cpu plan missing\n")
     sys.exit(3)
 if plan != "session" and int(want) > len(os.sched_getaffinity(0)):
