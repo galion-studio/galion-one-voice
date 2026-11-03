@@ -17,6 +17,7 @@ use galion_heartbeat::{FRAME_MS, SAMPLE_RATE};
 use galion_render::backends::web::{MicTap, ReplyBox, SayInbox, SpokenLine, Turn, TurnInbox, WebSurface};
 use galion_render::v2_persona::Floor;
 
+use crate::auto_workflow::{proceed, Proceed, ProceedSource};
 use crate::bus::{pcm16_to_bytes, BusMsg, ProcessBus};
 use crate::turn_worker::{TurnJob, TurnReply, TurnWorker};
 
@@ -48,6 +49,10 @@ pub struct PhoneHost {
     /// Heartbeat frames observed on [`Self::drive_you`]. `t_ms = frame * 80`.
     frame: u64,
     t_ms: u64,
+    /// Last proceed for an accepted mic take. Starts as the auto program.
+    last_proceed: Proceed,
+    /// Accepted mic takes handed to `auto_workflow::proceed`. Not incremented on the 80 ms tick.
+    proceeded: u64,
 }
 
 impl PhoneHost {
@@ -69,7 +74,19 @@ impl PhoneHost {
             phase: 0.0,
             frame: 0,
             t_ms: 0,
+            last_proceed: Proceed::Program,
+            proceeded: 0,
         }
+    }
+
+    /// Proceed chosen for the newest accepted mic take.
+    pub fn last_proceed(&self) -> &Proceed {
+        &self.last_proceed
+    }
+
+    /// How many accepted mic takes have proceeded. Quiet frames do not count.
+    pub fn proceeded(&self) -> u64 {
+        self.proceeded
     }
 
     pub fn bus(&self) -> &ProcessBus {
@@ -272,6 +289,9 @@ impl PhoneHost {
         if let Some((rate, ch, pcm)) = t.pcm16() {
             let pcm = downmix(&pcm, ch);
             let turn_id = t.id;
+            // The page does not send a skill token. Live path is the auto program.
+            self.last_proceed = proceed(ProceedSource::Mic, None);
+            self.proceeded = self.proceeded.saturating_add(1);
             let _ = self
                 .bus
                 .try_send(BusMsg::barge_in(self.bus.alloc_id(), turn_id, self.t_ms));
@@ -415,6 +435,8 @@ mod tests {
             .bus()
             .try_recv_utterance()
             .expect("utterance on the bus");
+        assert_eq!(host.proceeded(), 1);
+        assert_eq!(host.last_proceed(), &crate::auto_workflow::Proceed::Program);
         assert_eq!(utt.turn_id, 1);
         assert_eq!(utt.t_ms, u64::from(galion_heartbeat::FRAME_MS));
         match utt.body {

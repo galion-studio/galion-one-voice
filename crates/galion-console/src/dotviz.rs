@@ -443,6 +443,10 @@ mod tests {
         assert!(SCREEN_HTML.contains("not a film clone"));
         assert!(!SCREEN_HTML.contains("I hear you"));
         assert!(SCREEN_HTML.contains("POST /turn"));
+        assert!(SCREEN_HTML.contains("function proceedTurn"));
+        assert!(SCREEN_HTML.contains("X-Galion-Proceed"));
+        assert!(!SCREEN_HTML.contains("id=\"workflow\""));
+        assert!(!SCREEN_HTML.contains("id=\"chat\""));
         assert!(SCREEN_HTML.contains("function spring"));
         assert!(SCREEN_HTML.contains("samplePlayEnv"));
         assert!(SCREEN_HTML.contains("function empathy"));

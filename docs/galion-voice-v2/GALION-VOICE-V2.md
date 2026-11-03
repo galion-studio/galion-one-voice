@@ -114,6 +114,7 @@ phone browser                         loopback 127.0.0.1:7878
   AudioWorklet → 16 kHz VAD
   POST /mic   {rms}        ───────►  MicTap            (latest only)
   POST /turn  WAV          ───────►  TurnInbox         (≤ 8, RAM)
+  X-Galion-Proceed: auto   ───────►  proceed(Mic, None) → auto program
                                      PhoneHost::drive_me   every 80 ms, try_*
                                          │
                                          ▼
@@ -130,6 +131,9 @@ phone browser                         loopback 127.0.0.1:7878
   AnalyserNode envelope → orb spring
   you speak during playback → stop, new /turn, worker supersede
 ```
+
+`proceed` runs once per accepted take. Quiet 80 ms frames leave it alone. Detail:
+`docs/galion-voice-v2/symphony/AUTO-WORKFLOW.md`.
 
 The heartbeat thread only calls `try_submit` and `try_recv`. Piper cold-start
 and synthesis happen on `galion-turn-worker`. A newer turn id cancels an older

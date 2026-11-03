@@ -26,7 +26,10 @@
 //! [`phone_host`] (same feature) is what the screen demo polls each tick.
 //! The [`bus`] module (same feature) is the V2-S1 envelope: `BusMsg` lanes next to
 //! that worker, `try_send` only, cancel checked before ASR and before reply publish.
+//! [`auto_workflow`] names the proceed after a `/` mic take: skill slot or auto program.
+//! It does not add a surface.
 
+pub mod auto_workflow;
 #[cfg(feature = "phone-turn")]
 pub mod bus;
 #[cfg(feature = "dot-viz")]
