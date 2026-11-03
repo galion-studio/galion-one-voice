@@ -12,7 +12,7 @@ Rule: where origin or licence could not be determined from the repo or local pac
 | Component | Origin | Licence | How used in Galion Voice |
 |---|---|---|---|
 | Piper runtime `piper_linux_x86_64` 2023.11.14-2 | rhasspy/piper (Michael Hansen) — https://github.com/rhasspy/piper | MIT (`weights/runtime/piper/PIPER-LICENSE.md`, © 2022 Michael Hansen) | A21 CPU TTS decoder, fetched sha256-pinned by `scripts/a21/fetch-a21.sh` to `weights/runtime/piper/`; run out of process by `A21WeightTts`. Not vendored (weights/.gitignore ignores all). |
-| onnxruntime 1.14.1 (bundled in Piper tarball) | Microsoft ONNX Runtime — https://github.com/microsoft/onnxruntime | MIT (per fetch-a21.sh / A21-BLOCKERS.md) | Inference runtime inside Piper, out of process, CPU. Owner-approved exception to `formats.foreign_runtime_allowed=false` (LOCKS not amended). |
+| onnxruntime 1.14.1 (bundled in Piper tarball) | Microsoft ONNX Runtime — https://github.com/microsoft/onnxruntime | MIT (per fetch-a21.sh / A21-BLOCKERS.md) | Inference runtime inside Piper, out of process, CPU. Scoped sunset exception `[formats.exceptions.a21_piper]` (sunset 2027-02-01). Not an in-tree `ort` dependency. |
 | espeak-ng 1.52 (libespeak-ng + espeak-ng-data, bundled in Piper tarball) | espeak-ng project — https://github.com/espeak-ng/espeak-ng | GPL-3 (per fetch-a21.sh / A21-BLOCKERS.md) | Phonemizer used by Piper. Separate process, not linked into Galion code. **Open: counsel decision required** (A21-BLOCKERS #2). |
 | Voice model `en_US-ljspeech-medium.onnx` + `.onnx.json` | rhasspy/piper-voices on Hugging Face — https://huggingface.co/rhasspy/piper-voices (repo sha b4e358ffcb232591bf73a540e70f7de528e4174a) | MIT (repo, per A21-BLOCKERS.md) | Piper VITS 22.05 kHz voice for the A21 EN reply; fetched to `weights/tts/`, sha256-pinned, not vendored. |
 | LJSpeech dataset (training data of the above voice) | LJ Speech Dataset (Keith Ito) — https://keithito.com/LJ-Speech-Dataset/ | Public domain (per A21-BLOCKERS.md) | Indirect only: the voice was trained on it. Voice choice/consent confirmation still open (A21-BLOCKERS #3). |
@@ -111,7 +111,7 @@ Default build of most crates is zero-dependency; these come in only through opti
 ## 3. Open items
 
 - espeak-ng GPL-3 (out of process via Piper) — counsel decision.
-- `.onnx` + onnxruntime exception — LOCKS ratification.
+- `.onnx` + onnxruntime — Piper pin written (`[formats.exceptions.a21_piper]`, sunset 2027-02-01). Do not widen it.
 - Mimi / Moshiko CC-BY-4.0 checklist and PersonaPlex P-A sign-off — A21-COUNSEL-MEMO.
 - Unknowns: libflite1 / CMU Flite 2.2 (voice `cmu_us_slt` etc.), SenseVoice-Small, softbuffer + winit, minifb, SpeechT5, Pocket-TTS, sherpa-onnx, `crossterm_winapi`, `redox_syscall`, `wasi`, `winapi`, `winapi-i686-pc-windows-gnu`, `winapi-x86_64-pc-windows-gnu`, `windows-link`, `windows-sys`, `windows-targets`, `windows_aarch64_gnullvm`, `windows_aarch64_msvc`, `windows_i686_gnu`, `windows_i686_gnullvm`, `windows_i686_msvc`, `windows_x86_64_gnu`, `windows_x86_64_gnullvm`, `windows_x86_64_msvc`.
 

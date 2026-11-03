@@ -3,6 +3,13 @@
 Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
 The name is Galion. The product is Galion Voice.
 
+## Slogan
+
+"The seamless connection with the human being, on the voice only."
+
+That sentence is the public description. It is one line, not a stack of slogans.
+The mark stays one dot. The slogan is not printed on the user surface.
+
 ## Name and voice
 
 Galion Voice is a full-duplex voice that runs on the machine in front of you.
@@ -16,8 +23,8 @@ that voice. Until ASR is ratified, the demo must not be described as
 understanding the caller's words. The interim path is a placeholder and is
 labelled.
 
-Tone of the writing around it: plain, specific, no slogan stack. The product
-can be quiet. The dot is the interface.
+Tone of the writing around it: plain and specific. The master slogan above
+is the only slogan. The product can be quiet. The dot is the interface.
 
 ## The mark
 
