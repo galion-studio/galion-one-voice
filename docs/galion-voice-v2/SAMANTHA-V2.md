@@ -37,6 +37,8 @@ Samantha, here, is the conversational register already written in
 This spec is how the session behaves. It is not a clone, and it does not
 say the Piper checkpoint is a person.
 
+Runtime character instructions: [`personas/`](personas/README.md).
+
 ## 2. Technical mapping
 
 The empathy sector (PR #13, `galion-emotion` `StubExpressor::voice_color`)

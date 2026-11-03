@@ -79,4 +79,6 @@
 3. **Persona.** PR #7 is on main (`5ab3d38`). `BusBody::Persona` is on that bus: depth 1, session opens as Samantha, explicit `turn_id` 0 survives barge-in, empathy needs `sense` and a cancelled turn restores the floor, a lower source does not override a higher one. `Heartbeat::step` does not send it. The turn worker reads the id onto the reply and does not draw it. Not a film voice.
 4. **Flash.** `docs/galion-voice-v2/FLASH-EVAL.md` and `scripts/eval/flash-ttfa.sh`. Default JSON is `measured: false` and has no `ttfa_ms`. No CPU number is claimed here.
 
+**2026-11-03 · Voice persona instructions.** Runtime character files under `docs/galion-voice-v2/personas/`: Galion One (main product voice), Galion Research (product voice, ex-Hermes Research), Samantha and Jarvis (**TEST / INTERNAL**, clone-capability only, not shipping personas). Index: `personas/README.md`. One-line pointers from `GALION-VOICE-V2.md` and `SAMANTHA-V2.md`. Empathy stays the OKLCH weight plus prosody (`EMPATHY.md`); the instruction files forbid canned empathy lines. No audio assets. No clip. Rights not cleared. LOCKS.toml not edited. No weights. No clone worker. Signed Maciej Grajczyk.
+
 — Maciej Grajczyk
