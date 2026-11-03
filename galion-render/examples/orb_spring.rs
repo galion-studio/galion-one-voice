@@ -1,8 +1,8 @@
 //! cargo run -p galion-render --example orb_spring
 //!
-//! One second of the orb spring at 240 Hz. Targets are [`DotParams`] (the
-//! discrete golden) and change with the 80 ms heartbeat. The spring's dt
-//! is the display frame. No window, no audio, no files.
+//! One second of the Luti orb spring at 240 Hz. Targets are [`DotParams`]
+//! (the discrete golden) and change with the 80 ms heartbeat. The spring's
+//! dt is the display frame. No window, no audio, no files.
 use galion_render::{DisplayHz, DotParams, DotState, OrbEngine};
 
 fn main() {

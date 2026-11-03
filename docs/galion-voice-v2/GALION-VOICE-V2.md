@@ -132,9 +132,10 @@ Piper on a `PhoneLane` is one out-of-process worker for the life of that lane
 caller turn does not pay process start. Cold vs warm first-clause PCM is
 `scripts/bench-piper-warmth.sh`. See V2-S6.
 
-What is deliberately missing: a real ASR engine, a `.gq` reply model, wiring
-the orb integrator into the surfaces (the step itself is in `galion-render`;
-the page still draws the phone), and any path that opens SSH.
+What is deliberately missing: a real ASR engine, a `.gq` reply model, pointing
+PNG or the window at the spring (the page still draws the phone; `/dot`
+`engine` is a one-step Luti witness beside the `DotParams` golden), and any
+path that opens SSH.
 
 ## 5. Sectors
 
@@ -197,13 +198,19 @@ Listening radius tracks mic energy. Thinking is the wait between accept and
 playback. Speaking radius tracks an `AnalyserNode` on the playback graph.
 The server drains reply PCM into the me band so `/dot` hears the reply too.
 The same spring is in `galion-render` (`OrbEngine`, design in
-`ANIMATION-ENGINE.md`). Surfaces still draw the discrete golden.
+`ANIMATION-ENGINE.md`). The easing profile is named **Luti** (one-UI:
+`docs/galion-voice-v2/ONE-UI.md`). PNG, the terminal, and `NullSurface`
+still draw the discrete golden. `/dot` adds an in-process `engine` account
+(frames, last dt, settle error, cost hint) from one 240 Hz Luti step per
+handoff. That account is not a second product and not a scrape endpoint.
 
 **Still open.** PNG, terminal, and the future softbuffer window do not
-sample the spring yet. `NullSurface` still records `DotParams`, so this
-landing does not re-bless G4. Switching a surface over is an owner step,
-and it re-blesses G4 only if the recorded dot stops being `DotParams`.
-A shader is a later engine step, not a requirement for the phone to feel alive.
+sample the spring yet. `WebSurface::present` steps one Luti frame at 240 Hz
+for the `/dot` account only; the published radius stays `DotParams`.
+`NullSurface` still records `DotParams`, so this landing does not re-bless
+G4. Switching a drawn surface over is an owner step, and it re-blesses G4
+only if the recorded dot stops being `DotParams`. A shader is a later
+engine step, not a requirement for the phone to feel alive.
 
 **Acceptance.**
 
