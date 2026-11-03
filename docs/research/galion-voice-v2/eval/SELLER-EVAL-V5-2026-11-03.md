@@ -84,7 +84,7 @@ What does not: real ASR, warm Piper persistence, typed bus, virtual-user scores,
 - Master research (local): `/workspace/galion-voice-research/master/GALION-VOICE-V2-RESEARCH-BRIEF.md`
 - All-nighter runbook: `/workspace/galion-voice-research/allnighter/RUNBOOK-2026-11-03.md` (not part of this landing)
 
-Landed copies, docs only: `docs/research/galion-voice-v2/eval/SELLER-EVAL-V5-2026-11-03.md`, `docs/research/galion-voice-v2/eval/EVALUATION-V2-2026-11-03.md`, `docs/research/galion-voice-v2/master/GALION-VOICE-V2-RESEARCH-BRIEF.md`. Domain briefs were not uploaded; stubs are `docs/research/galion-voice-v2/domains/`.
+Landed copies, docs only: `docs/research/galion-voice-v2/eval/SELLER-EVAL-V5-2026-11-03.md`, `docs/research/galion-voice-v2/eval/EVALUATION-V2-2026-11-03.md`, `docs/research/galion-voice-v2/master/GALION-VOICE-V2-RESEARCH-BRIEF.md`, and the ten domain briefs in `docs/research/galion-voice-v2/domains/`. LOCKS.toml overrides any conflicting domain text.
 
 — Maciej Grajczyk
 

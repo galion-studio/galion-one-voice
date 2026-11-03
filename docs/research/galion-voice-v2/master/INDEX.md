@@ -22,6 +22,6 @@ Master brief: [GALION-VOICE-V2-RESEARCH-BRIEF.md](GALION-VOICE-V2-RESEARCH-BRIEF
 | 10 | [domains/10-hardware-edge.md](../domains/10-hardware-edge.md) | Stay on the CPU VPS and measure steal time; move to bare metal on jitter or >2–3 sessions; NPU is R&D only; skip GStreamer/VAAPI; profiles are not tiers. | whisper.cpp/faster-whisper advice **void** (GGML lock); provider OVH vs Hetzner unverified |
 | — | [eval/EVALUATION-V2-2026-11-03.md](../eval/EVALUATION-V2-2026-11-03.md) | V2 program at 36%; V2-S4 ASR at 5% and V2-S1 bus at 12% are the critical gaps; next build is the S1 bus plus letter A prep. | Source of the sector baselines |
 
-Seller snapshot, same date: [SELLER-EVAL-V5-2026-11-03.md](../eval/SELLER-EVAL-V5-2026-11-03.md). Domain rows 01–10 resolve to stubs; the source briefs were not in the upload.
+Seller snapshot, same date: [SELLER-EVAL-V5-2026-11-03.md](../eval/SELLER-EVAL-V5-2026-11-03.md). Domain rows 01–10 are the source briefs. LOCKS.toml overrides any conflicting text in them.
 
 — Maciej Grajczyk

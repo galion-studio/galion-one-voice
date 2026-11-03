@@ -32,11 +32,11 @@ snapshot.
 
 ## Domain briefs
 
-The ten domain files were **not** in the upload set. `domains/` holds stubs.
-Each stub points at the master and repeats the index one-liner. Do not cite a
-stub as if it were the missing brief.
+`domains/` holds the ten source briefs. Each page keeps the LOCKS precedence
+banner. Citations are only those written in the source. None were added on
+landing. On domain 10, any whisper.cpp or faster-whisper recommendation is void.
 
-| # | Stub |
+| # | Brief |
 |---|---|
 | 01 | [domains/01-asr-stt.md](domains/01-asr-stt.md) |
 | 02 | [domains/02-tts-prosody.md](domains/02-tts-prosody.md) |
@@ -49,8 +49,6 @@ stub as if it were the missing brief.
 | 09 | [domains/09-competitive.md](domains/09-competitive.md) |
 | 10 | [domains/10-hardware-edge.md](domains/10-hardware-edge.md) |
 
-On domain 10, any whisper.cpp or faster-whisper recommendation is void.
-
 ## Provenance
 
 The local paths named inside the briefs were:
@@ -58,7 +56,7 @@ The local paths named inside the briefs were:
 - `/workspace/galion-voice-research/master/GALION-VOICE-V2-RESEARCH-BRIEF.md`
 - `/workspace/galion-voice-research/eval/EVALUATION-V2-2026-11-03.md`
 - `/workspace/galion-voice-research/eval/SELLER-EVAL-V5-2026-11-03.md`
-- `/workspace/galion-voice-research/domains/` (not uploaded; stubs only)
+- `/workspace/galion-voice-research/domains/` (landed as `domains/01`–`10`)
 
 Layout here keeps `master/`, `eval/`, and `domains/` so the brief's
 `../domains/` and `../eval/` links still resolve. The all-nighter runbook was
