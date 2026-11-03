@@ -30,7 +30,7 @@ use std::time::{Duration, Instant};
 
 use galion_console::dotviz::{demo_band, DemoPump, DemoSeg, DotConsole, PanelOpts};
 use galion_console::live::{AffectFeed, StubAffect, StubTiming, TimingFeed};
-use galion_emotion::{DefaultConsentGate, Purpose};
+use galion_emotion::{DefaultConsentGate, EmotionFrame, Purpose};
 use galion_heartbeat::{FrameIn, Heartbeat, HeartbeatConfig, FRAME_MS, FRAME_SAMPLES, RIKA_BITS, SAMPLE_RATE};
 use galion_render::{PngSeqConfig, PngSeqSurface};
 
@@ -140,6 +140,8 @@ fn run<T: TimingFeed, A: AffectFeed>(args: &[String], mut pump: DemoPump<T, A>, 
 
     let mut you = vec![0.0f32; FRAME_SAMPLES];
     let mut me = vec![0.0f32; FRAME_SAMPLES];
+    // Previous tick's consented reading. The feeling decision itself runs inside step.
+    let mut held_affect: Option<EmotionFrame> = None;
     let mut rng = Lcg(13);
     let mut me_voiced_prev = false;
     let mut yielded = false;
@@ -166,9 +168,13 @@ fn run<T: TimingFeed, A: AffectFeed>(args: &[String], mut pump: DemoPump<T, A>, 
                 fill_you(&mut you, i, s, barge, &mut rng);
             }
         }
+        #[cfg(feature = "phone-turn")]
+        if let Some(host) = phone.as_ref() {
+            hb.set_persona(host.voice_persona());
+        }
         let inp = FrameIn {
             you_pcm: &you,
-            affect: None,
+            affect: if sense { held_affect } else { None },
             tension: None,
             consent_bits: bits,
             purpose: Purpose::PersonalAssistant,
@@ -207,7 +213,27 @@ fn run<T: TimingFeed, A: AffectFeed>(args: &[String], mut pump: DemoPump<T, A>, 
                 fill_me(&mut me, i, me_voiced, out.me_gain());
             }
         }
+        // Persona loudness from this frame's feeling. Rika's me_gain is already in the synthetic fill.
+        let loud = out.feeling.prosody.energy;
+        if loud != 1.0 {
+            for s in me.iter_mut() {
+                *s = (*s * loud).clamp(-1.0, 1.0);
+            }
+        }
         let snap = pump.pump(i, &you, SAMPLE_RATE);
+        held_affect = if snap.sense {
+            snap.affect.map(|a| EmotionFrame {
+                seq: i as u32,
+                t_ms: (i as u32).saturating_mul(FRAME_MS),
+                dur_ms: FRAME_MS as u16,
+                valence: a.valence,
+                arousal: a.arousal,
+                dominance: 0.5,
+                confidence: a.confidence,
+            })
+        } else {
+            None
+        };
         dc.frame(&out, &you, &me, me_voiced, &snap, step_us);
         me_voiced_prev = me_voiced;
 
