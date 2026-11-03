@@ -1,10 +1,16 @@
-# Galion Voice V2-S14 clone weights. sha256 pins only. The files are not in git.
+# Galion Voice V2-S14 clone weights. Content sha256 pins. The files are not in git.
+# columns: rel sha256 size hf_repo hf_path release_asset
+# Release tag: clone-weights-v1
+#   https://github.com/galion-studio/galion-one-voice/releases/download/clone-weights-v1/<release_asset>
 # Hugging Face LFS oids read 2026-11-03 from the tree API. This file is not a download.
 # nano tree 71ccd1d0081b430592cea481f4307e764e07bc64
 # turbo tree 749d1c1a46eb10492095d68fbcf55691ccf137cd
-# shared tensors match across both repos. .pt is not pinned. No reference audio.
-shared/s3gen.safetensors 2b78103c654207393955e4900aac14a12de8ef25f4b09424f1ef91941f161d4e 1056484620 ResembleAI/chatterbox-nano s3gen.safetensors
-shared/s3gen_meanflow.safetensors d65cb687a2ed581ee6cc297e919ffefa63386944f42364ae13b78a594945514f 1064875036 ResembleAI/chatterbox-nano s3gen_meanflow.safetensors
-shared/ve.safetensors f0921cab452fa278bc25cd23ffd59d36f816d7dc5181dd1bef9751a7fb61f63c 5695784 ResembleAI/chatterbox-nano ve.safetensors
-nano/t3_nano_v1.safetensors 72b110185087d945dbdf54dee4e333848e1811bdd5fd6cb16ceb8da50006f0c9 869899204 ResembleAI/chatterbox-nano t3_nano_v1.safetensors
-turbo/t3_turbo_v1.safetensors fcf1f8c1d651bb7e3acd69ee5be269b4ac10c02980b7708213d598bc9f7cdf87 1915480052 ResembleAI/chatterbox-turbo t3_turbo_v1.safetensors
+# shared tensors match across both repos. .pt is not pinned.
+# Samantha and Jarvis reference audio is not a row and is not a release asset.
+# Nano (shared + nano/) is 2996954644 bytes. All five rows are 4912434696 bytes.
+# Each file is under 2 GiB. Do not pack them into one archive.
+shared/s3gen.safetensors 2b78103c654207393955e4900aac14a12de8ef25f4b09424f1ef91941f161d4e 1056484620 ResembleAI/chatterbox-nano s3gen.safetensors galion-clone-shared-s3gen.safetensors
+shared/s3gen_meanflow.safetensors d65cb687a2ed581ee6cc297e919ffefa63386944f42364ae13b78a594945514f 1064875036 ResembleAI/chatterbox-nano s3gen_meanflow.safetensors galion-clone-shared-s3gen_meanflow.safetensors
+shared/ve.safetensors f0921cab452fa278bc25cd23ffd59d36f816d7dc5181dd1bef9751a7fb61f63c 5695784 ResembleAI/chatterbox-nano ve.safetensors galion-clone-shared-ve.safetensors
+nano/t3_nano_v1.safetensors 72b110185087d945dbdf54dee4e333848e1811bdd5fd6cb16ceb8da50006f0c9 869899204 ResembleAI/chatterbox-nano t3_nano_v1.safetensors galion-clone-nano-t3_nano_v1.safetensors
+turbo/t3_turbo_v1.safetensors fcf1f8c1d651bb7e3acd69ee5be269b4ac10c02980b7708213d598bc9f7cdf87 1915480052 ResembleAI/chatterbox-turbo t3_turbo_v1.safetensors galion-clone-turbo-t3_turbo_v1.safetensors

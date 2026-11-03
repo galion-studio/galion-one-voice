@@ -54,7 +54,8 @@ cleared and written in `LEDGER.md`:
 `audio_prompt`, `audio_prompt_path`, or `clip` as exit 3 and writes no
 PCM (`CLONE-WORKER.md`). `scripts/clone/fetch-clone-weights.sh` fetches
 pinned `.safetensors` only when `GALION_CLONE_FETCH=1`, and it refuses
-audio suffixes. A LEDGER clearance does not flip the lock and does not
+audio suffixes and persona filenames. The release in `CLONE-WEIGHTS.md`
+is that same list. A LEDGER clearance does not flip the lock and does not
 set that flag. An owner edits the lock later, in its own commit, after
 the clearance line is real.
 

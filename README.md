@@ -139,6 +139,7 @@ docs/brand/GALION-VOICE-BRAND.md
 ```
 
 `weights/` is gitignored. Fetch the A21 pack; do not commit it.
+Chatterbox safetensors are fetched on demand into `weights/clone/` ([CLONE-WEIGHTS.md](docs/galion-voice-v2/CLONE-WEIGHTS.md)).
 
 ## Licence
 
