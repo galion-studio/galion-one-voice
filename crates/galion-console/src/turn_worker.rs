@@ -16,7 +16,7 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use galion_cascade::en_lane::{wav_bytes, LANE_RATE_HZ};
-use galion_cascade::{PhoneError, PhoneLane};
+use galion_cascade::{PhoneConfig, PhoneError, PhoneLane};
 
 /// One utterance handed to the worker: mono PCM16 at `rate` (the lane resamples to 16 kHz).
 pub struct TurnJob {
@@ -57,7 +57,12 @@ pub struct TurnWorker {
 }
 
 impl TurnWorker {
-    pub fn spawn() -> Self {
+    /// Env-configured lane (`GALION_ASR`, `GALION_LLM`).
+    pub fn spawn() -> Self { Self::spawn_with(PhoneConfig::from_env()) }
+
+    /// Same worker with an explicit lane config.
+    /// The presence-eval harness uses this so a barge-in probe does not mutate `GALION_ASR`.
+    pub fn spawn_with(cfg: PhoneConfig) -> Self {
         let (tx, jrx) = sync_channel::<TurnJob>(1);
         let (rtx, rx) = sync_channel::<TurnReply>(4);
         let current = Arc::new(AtomicU64::new(0));
@@ -65,7 +70,7 @@ impl TurnWorker {
         std::thread::Builder::new()
             .name("galion-turn-worker".into())
             .spawn(move || {
-                let mut lane = PhoneLane::from_env();
+                let mut lane = PhoneLane::new(cfg);
                 while let Ok(job) = jrx.recv() {
                     if job.id < cur.load(Ordering::Acquire) {
                         continue; // superseded (barge-in) before we started

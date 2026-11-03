@@ -25,3 +25,5 @@ jobs:
         run: cargo test -p galion-cascade --features cascade --lib
       - name: Turn worker
         run: cargo test -p galion-console --features phone-turn --lib
+      - name: Presence-eval virtual user
+        run: scripts/eval/virtual-user.sh

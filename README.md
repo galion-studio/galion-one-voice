@@ -81,6 +81,12 @@ Headless V1 checks (no phone):
 scripts/run-v1-demo.sh --headless
 ```
 
+Virtual user (no network, no phone). Text or a fixture WAV goes into PhoneLane. The report lands in `galion-gates/results/presence-eval/`. Interim is not called recognition. See [docs/eval/PRESENCE-EVAL.md](docs/eval/PRESENCE-EVAL.md).
+
+```bash
+scripts/eval/virtual-user.sh
+```
+
 Full runbook: [docs/V1-DEMO.md](docs/V1-DEMO.md).
 
 ## Layout
@@ -96,6 +102,8 @@ galion-emotion/             affect, consent, Rika
 crates/galion-ml-voice      Piper slot + flite fallback (feature speech)
 galion-student/             distillation plan only; no weights
 galion-gates/               local gates; R0–R3 pending SSH
+crates/galion-presence-eval  virtual user; loopback T0–T2
+scripts/eval/virtual-user.sh
 scripts/run-v1-screen.sh
 scripts/check-phone-pipeline.sh
 docs/galion-voice-v2/       V2 sector plan
@@ -134,6 +142,7 @@ cargo test --workspace
 cargo test -p galion-render --features web
 cargo test -p galion-cascade --features cascade
 cargo test -p galion-console --features phone-turn
+scripts/eval/virtual-user.sh
 scripts/run-v1-screen.sh --check
 ```
 
