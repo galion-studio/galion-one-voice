@@ -379,6 +379,15 @@ mod tests {
         assert!(SCREEN_HTML.contains("samplePlayEnv"));
         assert!(SCREEN_HTML.contains("V2 orb"));
         assert!(SCREEN_HTML.contains("id=\"s\""));
+        assert!(SCREEN_HTML.contains("data-mark=\"orb\""));
+        assert!(SCREEN_HTML.contains("data-profile=\"luti\""));
+        assert!(SCREEN_HTML.contains("const LUTI="));
+        assert!(SCREEN_HTML.contains("const SPRING=LUTI"));
+        assert!(SCREEN_HTML.contains(&format!("LUTI_COST={}", galion_render::Luti::STEP_COST)));
+        assert!(SCREEN_HTML.contains("ellipse"));
+        assert!(SCREEN_HTML.contains("240 Hz"));
+        assert!(!SCREEN_HTML.contains("react") && !SCREEN_HTML.contains("vue") && !SCREEN_HTML.contains("svelte"));
+        assert!(!SCREEN_HTML.contains("from \"react\"") && !SCREEN_HTML.contains("from 'vue'"));
         assert!(SCREEN_HTML.contains("Razgovarate s umjetnom inteligencijom. Galion je AI asistent, a ne osoba."));
         assert!(SCREEN_HTML.contains("You are talking to an AI. Galion is an AI assistant, not a person."));
         assert!(SCREEN_HTML.contains("function discloseAi"));

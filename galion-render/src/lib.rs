@@ -22,8 +22,10 @@
 //! headless CI/gate sink (G4) and records the dot it would have drawn.
 //!
 //! [`OrbEngine`] is the display-rate spring between those discrete targets
-//! (60 / 120 / 240 Hz, variable `dt`). Surfaces do not call it, so the G4
-//! golden stays [`DotParams`]. It must not run inside `Heartbeat::step`.
+//! (60 / 120 / 240 Hz, variable `dt`), on the [`Luti`] easing profile.
+//! PNG, the terminal, and [`NullSurface`] do not call it, so the G4 golden
+//! stays [`DotParams`]. The web `/dot` object may carry a one-step Luti
+//! account beside that golden. The engine must not run inside `Heartbeat::step`.
 //!
 //! `galion-console` owns *what* is shown (layout, panels, colors); `galion-render` owns
 //! *where* it is shown. Console builds a `VizFrame`, render delivers it.
@@ -45,7 +47,7 @@ pub use frame::{Band, BandState, Emotion, VizFrame};
 pub use surface::{Fanout, NullSurface, RenderError, RenderSurface, SurfaceCaps, SurfaceKind};
 pub use dot::{DotParams, DotState};
 pub use spring::{Spring, SpringGain, SpringStep};
-pub use orb_engine::{DisplayHz, OrbEngine, OrbMotion, OrbSample};
+pub use orb_engine::{DisplayHz, Luti, OrbAccount, OrbEngine, OrbMotion, OrbSample};
 pub use palette::Rgb;
 pub use backends::png_seq::{PngSeqConfig, PngSeqSurface};
 

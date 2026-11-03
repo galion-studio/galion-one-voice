@@ -18,6 +18,10 @@
 //!                      galion-console, this crate only serves the bytes); 404 otherwise
 //! `/dot` also carries `"mode"` (idle|listening|speaking|rika), `"lean"` (Rika lean-in 0..1)
 //! and `"level"` (0..1, the band driving the state) so the page can animate on its own clock.
+//! `"engine"` is the in-process Luti account: one [`crate::OrbEngine`] step at
+//! [`crate::DisplayHz::Hz240`] per `present`, beside the [`crate::DotParams`] golden.
+//! `radius` and `brightness` stay that golden. The account is `profile`, `hz`,
+//! `frames`, `dt_s`, `settle_err`, and `cost_hint`. It is not a second service.
 //! When the host has published a reply, `/dot` additionally carries
 //! `"reply":{"id":"<id>","url":"/reply/<id>.wav","ms":<duration ms>}` (latest reply only;
 //! the page should play it once per new `id`). Absent when no reply was set / after
@@ -466,6 +470,9 @@ pub struct WebSurface {
     stop: Arc<AtomicBool>,
     local_addr: Option<SocketAddr>,
     worker: Option<JoinHandle<()>>,
+    /// Witness integrator. One Luti step per `present`, at 240 Hz `dt`.
+    /// Not the phone's display loop, and not `Heartbeat::step`.
+    engine: crate::OrbEngine,
 }
 
 impl WebSurface {
@@ -483,7 +490,14 @@ impl WebSurface {
             disclosure_sent: Arc::new(AtomicBool::new(false)),
             edge,
         };
-        Self { bind: None, sh, stop: Arc::new(AtomicBool::new(false)), local_addr: None, worker: None }
+        Self {
+            bind: None,
+            sh,
+            stop: Arc::new(AtomicBool::new(false)),
+            local_addr: None,
+            worker: None,
+            engine: crate::OrbEngine::idle(),
+        }
     }
     /// Serve on `addr` (use "127.0.0.1:0" for an ephemeral port).
     pub fn serve(addr: SocketAddr) -> Self {
@@ -755,7 +769,10 @@ impl RenderSurface for WebSurface {
         Ok(())
     }
     fn present(&mut self, f: &VizFrame) -> Result<(), RenderError> {
-        let mut d = crate::dot::DotParams::from_frame(f).to_json(f.t_ms);
+        let dot = crate::dot::DotParams::from_frame(f);
+        let hz = crate::DisplayHz::Hz240;
+        let sample = self.engine.step_toward_dot(&dot, hz.dt_s());
+        let mut d = dot.to_json(f.t_ms);
         if d.ends_with('}') {
             d.pop();
             let level = match crate::dot::DotState::from_frame(f) {
@@ -764,7 +781,13 @@ impl RenderSurface for WebSurface {
                 crate::dot::DotState::Idle => 0.0,
             };
             let level = if level.is_finite() { level.clamp(0.0, 1.0) } else { 0.0 };
-            d.push_str(&format!(",\"mode\":\"{}\",\"lean\":{:.3},\"level\":{:.3}}}", crate::dot::screen_mode(f), crate::dot::lean_in_of(f), level));
+            d.push_str(&format!(
+                ",\"mode\":\"{}\",\"lean\":{:.3},\"level\":{:.3},\"engine\":{}}}",
+                crate::dot::screen_mode(f),
+                crate::dot::lean_in_of(f),
+                level,
+                sample.account.to_json(hz.hz())
+            ));
         }
         if let Ok(mut g) = self.sh.latest_dot.lock() { *g = d; }
         Ok(())
@@ -898,6 +921,24 @@ mod tests {
         let mut out = String::new();
         s.read_to_string(&mut out).unwrap();
         assert!(out.contains("\"state\":\"speaking\"") && out.contains("\"level\":"), "{out}");
+        assert!(out.contains("\"engine\":{\"profile\":\"luti\",\"hz\":240,\"frames\":1"), "{out}");
+        assert!(out.contains("\"cost_hint\":48"), "{out}");
+        assert!(out.contains("\"settle_err\":"), "{out}");
+        let body = out.split("\r\n\r\n").nth(1).unwrap_or("");
+        let mut depth = 0i32;
+        for c in body.chars() {
+            match c {
+                '{' => depth += 1,
+                '}' => depth -= 1,
+                _ => {}
+            }
+            assert!(depth >= 0, "{body}");
+        }
+        assert_eq!(depth, 0, "{body}");
+        w.present(&f).unwrap();
+        let again = get(w.local_addr().unwrap(), "/dot");
+        assert!(again.contains("\"frames\":2"), "{again}");
+        assert!(again.contains("\"state\":\"speaking\""), "{again}");
         w.close().unwrap();
     }
 

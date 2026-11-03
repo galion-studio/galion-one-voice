@@ -5,9 +5,12 @@
 //! `softbuffer` + `winit` (pure-Rust CPU framebuffer, no GPU/wgpu), event loop on its own
 //! thread, frames handed over via a single-slot mailbox (latest wins) so `present` never
 //! blocks. That thread is where [`crate::OrbEngine`] steps, at the vsync `dt`
-//! (60 / 120 / 240 Hz when the display allows). `present()` only stores the latest
-//! [`VizFrame`]. It does not integrate the spring, and the spring does not run
-//! inside `Heartbeat::step`. Galion OS builds can swap in a direct `/dev/fb0` /
+//! (60 / 120 / 240 Hz when the display allows), on the Luti profile.
+//! `present()` only stores the latest [`VizFrame`]. It does not integrate
+//! the spring, and the spring does not run inside `Heartbeat::step`.
+//! The phone page integrates Luti on `requestAnimationFrame`. `/dot` may
+//! carry a one-step witness account; this stub still does not.
+//! Galion OS builds can swap in a direct `/dev/fb0` /
 //! DRM dumb-buffer writer behind the same trait without any windowing system.
 
 use crate::frame::VizFrame;
