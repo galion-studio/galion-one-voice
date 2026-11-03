@@ -77,22 +77,17 @@ Reported by the coordinator. Not re-labeled as a different run.
 
 `GALION_SPEECH=a21 scripts/eval/clone-stream-ttfa.sh` on this CPU after
 `scripts/a21/fetch-a21.sh`. Cold spawn, first PCM byte. Not the
-SpeechStack clock above.
+SpeechStack clock above. Two runs, not averaged.
 
-| | |
-|---|---|
-| ttfa_ms | 379.0 |
-| utt_ms | 379.1 |
-| warm_ttfa_ms | 67.1 |
-| pcm_bytes | 25088 |
-| voice | `en_US-ljspeech-medium` |
-| sample | `scripts/eval/sample-voices/pdx-voice.wav` |
-| engine | `piper` |
-| product_claim | true |
-| piper_measured | true |
-| model_measured | false |
-| stub | false |
-| gate | PASS |
+| run | ttfa_ms | utt_ms | warm_ttfa_ms | pcm_bytes |
+|---|---|---|---|---|
+| 1 | 379.0 | 379.1 | 67.1 | 25088 |
+| 2 | 331.8 | 331.8 | 37.8 | 25088 |
+
+Both runs: voice `en_US-ljspeech-medium`, sample
+`scripts/eval/sample-voices/pdx-voice.wav`, engine `piper`,
+`product_claim` true, `piper_measured` true, `model_measured` false,
+`stub` false, gate PASS.
 
 Without `GALION_SPEECH=a21` the same script exits 2 and prints `FAIL`.
 That is the stub rejection, not a pass.
