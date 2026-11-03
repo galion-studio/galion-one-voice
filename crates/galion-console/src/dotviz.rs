@@ -19,6 +19,8 @@
 //!
 //! Nothing here runs inside `Heartbeat::step()`; it is called after it, on the
 //! host's loop, and every surface is best-effort (Fanout drops a failing one).
+//! The showcase outline ([`crate::v2v::DuplexOutline`]) is the same kind of
+//! host call: one feeling frame, then a reply, then playback. It is not `step`.
 
 use std::collections::VecDeque;
 
