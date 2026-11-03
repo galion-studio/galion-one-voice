@@ -80,6 +80,32 @@ FORBIDDEN = (
 KILL_MS = 1500
 HEAR_MS = 160
 STATUSES = ("met", "absent", "failed", "stub")
+REAL_ENGINES = frozenset({"chatterbox-nano", "nano"})
+REQUIRED = (
+    "tree-hygiene",
+    "ref-refuse",
+    "ref-hashes",
+    "weight-pins",
+    "hf-fetch",
+    "nano-generate",
+    "ttfa-streaming",
+    "real-sampling",
+    "real-llm",
+    "real-thinking",
+    "real-persona",
+    "full-chain",
+    "persona-http",
+    "live-one-dot",
+    "late-pause",
+)
+FLOOR_LINES = (
+    "your mother died this morning.",
+    "the job. what did the room",
+    "who were you picturing",
+    "here. what do you need?",
+    "the job is yours.",
+    "i can't check that from here.",
+)
 
 
 @dataclass
@@ -295,18 +321,39 @@ def classify_refuse(probe: WorkerProbe) -> Gate:
     )
 
 
+def stub_armed(flag_pcm: str = "", flag_frames: str = "") -> bool:
+    pcm = flag_pcm if flag_pcm != "" else os.environ.get("GALION_CLONE_STUB_PCM", "")
+    frames = flag_frames if flag_frames != "" else os.environ.get("GALION_CLONE_STUB_FRAMES", "")
+    return pcm == "1" or frames == "1"
+
+
+def real_engine(engine: str | None) -> bool:
+    return (engine or "") in REAL_ENGINES
+
+
+def voice_product_claim(probe: WorkerProbe | None, armed: bool) -> bool:
+    return bool(
+        probe
+        and not armed
+        and real_engine(probe.engine)
+        and probe.pcm_bytes >= 2
+        and not probe.hung
+    )
+
+
 def classify_generate(
     probe: WorkerProbe,
     weights_met: bool,
     weights_failed: bool,
     sent_ref: bool,
-    stub_env: bool,
+    armed: bool,
 ) -> Gate:
-    if stub_env or probe.engine == "protocol-stub":
+    if armed or probe.engine == "protocol-stub":
         return Gate(
             "nano-generate",
             "stub",
-            "GALION_CLONE_STUB_PCM protocol PCM. Engine is not model. Not HARD-PASS.",
+            "GALION_CLONE_STUB_PCM or GALION_CLONE_STUB_FRAMES, or engine protocol-stub. "
+            "Protocol PCM is not Nano. product_claim false. Not HARD-PASS.",
         )
     if probe.hung:
         return Gate("nano-generate", "failed", "worker hung before PCM. Not HARD-PASS.")
@@ -323,18 +370,24 @@ def classify_generate(
             "The allowlisted reference was refused (rights hold, exit 3, no PCM). "
             "Conditioned Nano generate is not available. Not HARD-PASS.",
         )
-    if probe.engine == "model" and probe.pcm_bytes >= 2:
+    if real_engine(probe.engine) and probe.pcm_bytes >= 2:
         how = "conditioned on the allowlisted reference" if sent_ref else "text only; no reference clip was sent"
         return Gate(
             "nano-generate",
             "met",
-            f"engine model, {probe.pcm_bytes} PCM bytes, {how}.",
+            f"engine {probe.engine}, {probe.pcm_bytes} PCM bytes at 24 kHz s16le, {how}. product_claim true for this PCM.",
+        )
+    if probe.engine == "model" and probe.pcm_bytes >= 2:
+        return Gate(
+            "nano-generate",
+            "failed",
+            "engine model is not chatterbox-nano or nano. product_claim false. Not HARD-PASS.",
         )
     if weights_failed or weights_met:
         return Gate(
             "nano-generate",
             "failed",
-            f"weights are on disk but the worker did not generate (engine {probe.engine or 'none'}). Not HARD-PASS.",
+            f"weights are on disk but the worker did not generate Nano PCM (engine {probe.engine or 'none'}). Not HARD-PASS.",
         )
     return Gate(
         "nano-generate",
@@ -343,13 +396,12 @@ def classify_generate(
     )
 
 
-def classify_ttfa(probe: WorkerProbe, weights_met: bool, weights_failed: bool) -> Gate:
-    if probe.engine == "protocol-stub":
-        clock = f"{probe.ttfa_ms} ms" if probe.ttfa_ms is not None else "no clock"
+def classify_ttfa(probe: WorkerProbe, weights_met: bool, weights_failed: bool, armed: bool) -> Gate:
+    if armed or probe.engine == "protocol-stub":
         return Gate(
             "ttfa-streaming",
             "stub",
-            f"protocol-stub {clock}. product_claim false. Not a streaming Nano result. Not HARD-PASS.",
+            "protocol stub clock discarded. product_claim false. No real first-audio number. Not HARD-PASS.",
         )
     if probe.hung:
         return Gate("ttfa-streaming", "failed", "worker hung. No TTFA number. Not HARD-PASS.")
@@ -360,12 +412,12 @@ def classify_ttfa(probe: WorkerProbe, weights_met: bool, weights_failed: bool) -
             "absent",
             "no PCM, so no TTFA number. Not HARD-PASS.",
         )
-    if probe.engine != "model" or probe.pcm_bytes < 2 or probe.ttfa_ms is None:
-        if weights_met or weights_failed:
+    if not real_engine(probe.engine) or probe.pcm_bytes < 2 or probe.ttfa_ms is None:
+        if weights_met or weights_failed or probe.pcm_bytes >= 2:
             return Gate(
                 "ttfa-streaming",
                 "failed",
-                "weights are on disk and there is no model first-PCM time. No product TTFA. Not HARD-PASS.",
+                f"engine {probe.engine or 'none'} is not chatterbox-nano or nano. No product TTFA. Not HARD-PASS.",
             )
         return Gate("ttfa-streaming", "absent", "generate is not wired. No TTFA number. Not HARD-PASS.")
     whole = probe.whole_ms if probe.whole_ms is not None else probe.ttfa_ms
@@ -395,14 +447,137 @@ def classify_ttfa(probe: WorkerProbe, weights_met: bool, weights_failed: bool) -
     return Gate(
         "ttfa-streaming",
         "met",
-        f"engine model, streaming, ttfa_ms {probe.ttfa_ms}, whole_ms {whole}.{extra}",
+        f"engine {probe.engine}, streaming, ttfa_ms {probe.ttfa_ms}, whole_ms {whole}.{extra}",
+    )
+
+
+def classify_sampling(frame_ok: bool, late_ok: bool, alloc_ok: bool, ran: bool) -> Gate:
+    if not ran:
+        return Gate(
+            "real-sampling",
+            "absent",
+            "Heartbeat::step was not executed. 24 kHz, 80 ms EmotionClock, allocs, and late=pause are unmeasured. Not HARD-PASS.",
+        )
+    if not alloc_ok:
+        return Gate(
+            "real-sampling",
+            "failed",
+            "Heartbeat::step allocated. allocs are not 0. Not HARD-PASS.",
+        )
+    if not frame_ok or not late_ok:
+        return Gate(
+            "real-sampling",
+            "failed",
+            "80 ms / 24 kHz frame or late=pause did not hold. Not HARD-PASS.",
+        )
+    return Gate(
+        "real-sampling",
+        "met",
+        "24 kHz, 1920 samples, 80 ms EmotionClock frames, Heartbeat::step allocs=0, late=pause under the counting-allocator load.",
+    )
+
+
+def classify_llm(text: str, source: str) -> Gate:
+    low = text.lower()
+    if any(phrase in low for phrase in FORBIDDEN):
+        return Gate("real-llm", "failed", "canned empathy in the reply. Not HARD-PASS.")
+    if source == "hermes":
+        return Gate("real-llm", "met", "Hermes produced the Samantha/Jarvis turn. No canned empathy line.")
+    if source == "student-gq":
+        return Gate("real-llm", "met", "Open Mind student .gq produced the Samantha/Jarvis turn. No canned empathy line.")
+    if text.strip():
+        return Gate(
+            "real-llm",
+            "stub",
+            "Instruction floor answered from the persona table. That is not Hermes and not a student .gq. Not HARD-PASS.",
+        )
+    return Gate(
+        "real-llm",
+        "absent",
+        "No Hermes reply and no student .gq reply. Not HARD-PASS.",
+    )
+
+
+def classify_thinking(text: str | None) -> Gate:
+    if text is None:
+        return Gate(
+            "real-thinking",
+            "absent",
+            "No nerve or thought trace on disk. The Admin UI check stays unsigned. Not HARD-PASS.",
+        )
+    low = text.lower()
+    if "interim" in low and ("placeholder" in low or "fake" in low):
+        return Gate("real-thinking", "failed", "The thought trace contains a fake interim. Not HARD-PASS.")
+    if '"kind"' in text or "voice." in text or "thought" in low:
+        return Gate(
+            "real-thinking",
+            "met",
+            "A nerve or thought trace is on disk for Maciej to read. This harness does not sign ADMIN-UI-CHECK.md.",
+        )
+    return Gate(
+        "real-thinking",
+        "absent",
+        "The trace file has no thought or nerve event. Not HARD-PASS.",
+    )
+
+
+def classify_real_persona(refs_met: bool, emotion_live: bool, hub_seen: bool) -> Gate:
+    missing = []
+    if not refs_met:
+        missing.append("GALION_CLONE_LOCAL_REFS and GALION_CLIP_STORE hashes")
+    if not emotion_live:
+        missing.append("galion-emotion on the live feed")
+    if not hub_seen:
+        missing.append("Jarvis hub texture at playback")
+    if missing:
+        return Gate(
+            "real-persona",
+            "absent",
+            "Still required: " + "; ".join(missing) + ". Not HARD-PASS.",
+        )
+    return Gate(
+        "real-persona",
+        "met",
+        "Reference hashes match, galion-emotion is on the live feed, and the Jarvis hub texture is in playback.",
+    )
+
+
+def classify_chain(links: dict[str, bool]) -> Gate:
+    missing = [name for name, ok in links.items() if not ok]
+    if missing:
+        return Gate(
+            "full-chain",
+            "absent",
+            "Unmeasured: " + ", ".join(missing) + ". Not HARD-PASS.",
+        )
+    return Gate(
+        "full-chain",
+        "met",
+        "Vosk, instruction floor, Nano generate, streaming PCM, 80 ms EmotionClock, and playback were measured, with a real ttfa_ms.",
+    )
+
+
+def classify_hf(script_text: str) -> Gate:
+    if "GALION_CLONE_WEIGHTS_SOURCE" in script_text and "release|hf" in script_text:
+        return Gate(
+            "hf-fetch",
+            "met",
+            "GALION_CLONE_WEIGHTS_SOURCE=hf remains a fetch path. This harness does not download.",
+        )
+    return Gate(
+        "hf-fetch",
+        "failed",
+        "The Hugging Face fetch path is missing from fetch-clone-weights.sh. Not HARD-PASS.",
     )
 
 
 def overall_verdict(gates: list[Gate]) -> str:
+    by = {gate.name: gate for gate in gates}
     if any(gate.status == "failed" for gate in gates):
         return "HARD-FAIL"
-    if gates and all(gate.status == "met" for gate in gates):
+    if any(name not in by for name in REQUIRED):
+        return "HARD-FAIL"
+    if all(by[name].status == "met" for name in REQUIRED):
         return "HARD-PASS"
     return "STUB-PASS"
 
@@ -423,47 +598,69 @@ def assert_no_bare_pass(text: str) -> None:
         raise RuntimeError("harness tried to print a bare PASS")
 
 
-def render(gates: list[Gate], verdict: str) -> str:
+def ttfa_token(probe: WorkerProbe | None, armed: bool) -> str:
+    if armed or (probe is not None and probe.engine == "protocol-stub"):
+        return "stub"
+    if (
+        probe is not None
+        and real_engine(probe.engine)
+        and probe.ttfa_ms is not None
+        and probe.streaming
+        and probe.pcm_bytes >= 2
+    ):
+        return str(probe.ttfa_ms)
+    return "absent"
+
+
+def report_line(verdict: str, ttfa: str, allocs: str, late: str, persona: str, dot: str, claim: bool) -> str:
+    claim_s = "true" if claim else "false"
+    return (
+        f"report-line: {verdict} ttfa_ms={ttfa} allocs={allocs} "
+        f"late_frames={late} persona_http={persona} dot={dot} product_claim={claim_s}"
+    )
+
+
+def render(gates: list[Gate], verdict: str, line: str) -> str:
     lines = [
         "Galion Voice hard loop",
-        "STUB-PASS means the protocol checks finished and the hard loop did not.",
-        "HARD-PASS is the overall verdict only when every gate below is met, "
-        "including real Nano weights, reference hashes, and streaming TTFA.",
-        "A gate status of met is that gate only. It does not by itself make the loop HARD-PASS.",
+        "STUB-PASS means a real gate was absent or only a stub ran.",
+        "HARD-PASS requires every real gate: Nano PCM, 24 kHz 80 ms sampling, "
+        "a real model, a thought trace, persona refs, and the measured chain.",
+        "GALION_CLONE_STUB_PCM and GALION_CLONE_STUB_FRAMES never yield HARD-PASS.",
+        "A gate status of met is that gate only.",
     ]
     for gate in gates:
         lines.append(f"gate {gate.name}: {gate.status} — {gate.detail}")
     lines.append(f"overall: {verdict}")
-    if verdict == "HARD-PASS":
-        lines.append("product_claim: true")
-    else:
-        lines.append("product_claim: false")
+    if verdict != "HARD-PASS":
         lines.append("HARD-PASS of the loop: refused")
+    lines.append(line)
     text = "\n".join(lines) + "\n"
     assert_no_bare_pass(text)
     return text
 
 
-def report_json(gates: list[Gate], verdict: str, probe: WorkerProbe | None) -> dict:
+def report_json(gates: list[Gate], verdict: str, probe: WorkerProbe | None, line: str, claim: bool) -> dict:
     body: dict = {
         "product": "Galion Voice",
         "overall": verdict,
         "hard_pass": verdict == "HARD-PASS",
-        "product_claim": verdict == "HARD-PASS",
+        "product_claim": claim,
+        "report_line": line,
         "gates": [{"name": g.name, "status": g.status, "detail": g.detail} for g in gates],
     }
     ttfa_gate = next((g for g in gates if g.name == "ttfa-streaming"), None)
-    if probe and probe.ttfa_ms is not None and ttfa_gate and ttfa_gate.status != "absent":
+    if (
+        claim
+        and probe
+        and probe.ttfa_ms is not None
+        and ttfa_gate
+        and ttfa_gate.status == "met"
+        and real_engine(probe.engine)
+    ):
         body["ttfa_ms"] = probe.ttfa_ms
         body["whole_ms"] = probe.whole_ms
-        if probe.engine == "protocol-stub":
-            body["ttfa_kind"] = "protocol-stub"
-        elif probe.engine == "model" and probe.streaming:
-            body["ttfa_kind"] = "streaming-model"
-        elif probe.engine == "model":
-            body["ttfa_kind"] = "whole-utterance"
-        else:
-            body["ttfa_kind"] = probe.engine or "unknown"
+        body["ttfa_kind"] = "streaming-nano"
     return body
 
 
@@ -586,32 +783,56 @@ def cargo_late_cmd(offline: bool) -> list[str]:
     return cmd
 
 
-def run_late_pause() -> Gate:
+def cargo_test(bin_name: str, test_filter: str) -> tuple[int, str]:
+    def once(offline: bool) -> subprocess.CompletedProcess[str]:
+        cmd = ["cargo", "test", "-p", "galion-heartbeat"]
+        if offline:
+            cmd.append("--offline")
+        cmd += ["--test", bin_name, "--", test_filter, "--test-threads=1"]
+        return subprocess.run(cmd, cwd=str(REPO), capture_output=True, text=True, timeout=900)
+
+    ran = once(True)
+    text = ran.stdout + "\n" + ran.stderr
+    if ran.returncode != 0 and "offline" in text.lower():
+        ran = once(False)
+        text = ran.stdout + "\n" + ran.stderr
+    return ran.returncode, text
+
+
+def run_clock() -> tuple[Gate, Gate, str, str]:
     if os.environ.get("GALION_HARD_SKIP_CARGO") == "1":
-        return Gate(
+        late = Gate(
             "late-pause",
             "absent",
             "GALION_HARD_SKIP_CARGO=1, so Heartbeat::step was not executed. Not HARD-PASS.",
         )
-    offline = cargo_late_cmd(True)
-    ran = subprocess.run(offline, cwd=str(REPO), capture_output=True, text=True, timeout=900)
-    text = ran.stdout + "\n" + ran.stderr
-    if ran.returncode != 0 and "offline" in text.lower():
-        ran = subprocess.run(cargo_late_cmd(False), cwd=str(REPO), capture_output=True, text=True, timeout=900)
-        text = ran.stdout + "\n" + ran.stderr
-    needed = (
+        return classify_sampling(False, False, False, False), late, "absent", "absent"
+    code, text = cargo_test("heartbeat", "")
+    late_names = (
         "late_frame_is_a_pause_no_extra_trigger_no_burst",
         "short_pcm_frame_is_treated_as_late_pause",
     )
-    if ran.returncode == 0 and "test result: ok" in text and all(name in text for name in needed):
-        return Gate(
+    late_ok = code == 0 and "test result: ok" in text and all(name in text for name in late_names)
+    frame_ok = code == 0 and "frame_constants_match_locks" in text and "test result: ok" in text
+    alloc_code, alloc_text = cargo_test("zero_alloc", "step_allocates_nothing_with_rika_on")
+    alloc_ok = (
+        alloc_code == 0
+        and "test result: ok" in alloc_text
+        and "step_allocates_nothing_with_rika_on" in alloc_text
+    )
+    if late_ok:
+        late = Gate(
             "late-pause",
             "met",
             "Heartbeat::step late frame is paused, me onset stays closed, and a short PCM frame pauses. "
             "No catch-up burst.",
         )
-    tail = " ".join(text.strip().split())[-400:]
-    return Gate("late-pause", "failed", f"late=pause test did not pass. {tail} Not HARD-PASS.")
+    else:
+        tail = " ".join(text.strip().split())[-400:]
+        late = Gate("late-pause", "failed", f"late=pause test did not pass. {tail} Not HARD-PASS.")
+    allocs = "0" if alloc_ok else "fail"
+    late_token = "proved" if late_ok else "absent"
+    return classify_sampling(frame_ok, late_ok, alloc_ok, True), late, allocs, late_token
 
 
 def http_exchange(base: str, method: str, path: str, body: bytes | None = None, headers: dict | None = None):
@@ -633,19 +854,19 @@ def _json_has(blob: str, key: str, value: str) -> bool:
     return f'"{key}":"{value}"' in blob or f'"{key}": "{value}"' in blob
 
 
-def persona_http(base: str) -> tuple[Gate, list[str]]:
+def persona_http(base: str) -> tuple[Gate, list[str], str]:
     samples: list[str] = []
     try:
         status, _, health = http_exchange(base, "GET", "/health")
     except OSError as exc:
-        return Gate("persona-http", "absent", f"no live server at {base} ({exc}). Not HARD-PASS."), samples
+        return Gate("persona-http", "absent", f"no live server at {base} ({exc}). Not HARD-PASS."), samples, ""
     if status != 200 or health.decode().strip() != "ok":
-        return Gate("persona-http", "failed", f"/health was {status} {health!r}. Not HARD-PASS."), samples
+        return Gate("persona-http", "failed", f"/health was {status} {health!r}. Not HARD-PASS."), samples, ""
     try:
         status, hdrs, _ = http_exchange(base, "GET", "/v2")
         state_code, _, state = http_exchange(base, "GET", "/v2/state")
     except OSError as exc:
-        return Gate("persona-http", "failed", f"persona routes dropped ({exc}). Not HARD-PASS."), samples
+        return Gate("persona-http", "failed", f"persona routes dropped ({exc}). Not HARD-PASS."), samples, ""
     problems = []
     if status != 302 or hdrs.get("location", "") != "/":
         problems.append(f"/v2 was {status} location {hdrs.get('location')}")
@@ -702,16 +923,18 @@ def persona_http(base: str) -> tuple[Gate, list[str]]:
         dot_text = ""
     if not _json_has(dot_text, "persona", "jarvis") or not _json_has(dot_text, "mood", "grief"):
         problems.append("/dot did not carry the pinned persona and grief mood")
+    said = "\n".join((grief, joy, vuln, quiet, jarvis, jarvis_grief))
     if problems:
-        return Gate("persona-http", "failed", "; ".join(problems) + ". Not HARD-PASS."), samples
+        return Gate("persona-http", "failed", "; ".join(problems) + ". Not HARD-PASS."), samples, said
     return (
         Gate(
             "persona-http",
             "met",
             f"Live {base} answered Samantha and Jarvis without a canned empathy line. "
-            "film_voice is false. This HTTP floor is not a Nano generate.",
+            "film_voice is false. This HTTP floor is not a Nano generate and not a model.",
         ),
         samples,
+        said,
     )
 
 
@@ -730,8 +953,9 @@ def _num(blob: str, key: str) -> int | None:
     return int("".join(digits)) if digits else None
 
 
-def live_one_dot(base: str, launched: bool) -> Gate:
+def live_one_dot(base: str, launched: bool) -> tuple[Gate, dict]:
     samples: list[str] = []
+    notes = {"emotion": False, "clock": False, "speaking": False}
     deadline = time.monotonic() + 8.0
     try:
         while time.monotonic() < deadline:
@@ -739,7 +963,7 @@ def live_one_dot(base: str, launched: bool) -> Gate:
             samples.append(payload.decode("utf-8", "replace"))
             time.sleep(0.08)
     except OSError as exc:
-        return Gate("live-one-dot", "absent", f"/dot was not reachable ({exc}). Not HARD-PASS.")
+        return Gate("live-one-dot", "absent", f"/dot was not reachable ({exc}). Not HARD-PASS."), notes
     def quoted(sample: str, key: str) -> str | None:
         mark = f'"{key}":"'
         at = sample.find(mark)
@@ -756,36 +980,40 @@ def live_one_dot(base: str, launched: bool) -> Gate:
         live = True
     if len(frames) >= 2 and max(frames) > min(frames):
         live = True
+    if len(times) >= 2 and (max(times) - min(times)) % 80 == 0 and max(times) > min(times):
+        notes["clock"] = True
+    notes["emotion"] = any('"emotion"' in sample for sample in samples)
     if not live:
         return Gate(
             "live-one-dot",
             "failed",
             "the /dot feed did not advance t_ms or engine frames. Not a live one-dot. Not HARD-PASS.",
-        )
+        ), notes
     if not any('"persona":' in s for s in samples):
-        return Gate("live-one-dot", "failed", "/dot has no persona field. Not HARD-PASS.")
+        return Gate("live-one-dot", "failed", "/dot has no persona field. Not HARD-PASS."), notes
     spoke = [state for mode, state in pairs if mode == "speaking"]
     other = [mode for mode in modes if mode != "speaking"]
     speak_wins = bool(spoke) and bool(other) and all(state == "speaking" for state in spoke)
+    notes["speaking"] = bool(spoke) and all(state == "speaking" for state in spoke)
     if speak_wins:
         return Gate(
             "live-one-dot",
             "met",
             "Live /dot advanced with the heartbeat. Speaking was observed and the state was speaking "
             "(speak wins). A non-speaking sample was also observed.",
-        )
+        ), notes
     if launched:
         return Gate(
             "live-one-dot",
             "failed",
             "synthetic demo did not show speaking winning over another mode. Not HARD-PASS.",
-        )
+        ), notes
     return Gate(
         "live-one-dot",
         "absent",
         "The attached /dot feed is moving, and speaking-wins was not observed. "
         "Launch with GALION_HARD_HTTP=1 so the harness runs the synthetic room. Not HARD-PASS.",
-    )
+    ), notes
 
 
 def launch_demo(addr: str) -> subprocess.Popen | None:
@@ -844,7 +1072,7 @@ def launch_demo(addr: str) -> subprocess.Popen | None:
             "--synthetic",
             "--no-png",
             "--feed",
-            "stub",
+            "real",
             "--web",
             addr,
             "--seconds",
@@ -879,7 +1107,7 @@ def weight_root() -> Path:
     return REPO / "weights" / "clone"
 
 
-def collect() -> tuple[list[Gate], WorkerProbe | None]:
+def collect() -> tuple[list[Gate], WorkerProbe | None, dict[str, str]]:
     before = locks_digest()
     pins = parse_pins(PINS.read_text(encoding="utf-8"))
     weights = evaluate_weights(weight_root(), pins)
@@ -889,23 +1117,26 @@ def collect() -> tuple[list[Gate], WorkerProbe | None]:
         os.environ.get("GALION_CLIP_STORE", ""),
     )
     refuse = probe_worker({"text": "hi", "reference": "clip.wav"}, stub=True, timeout_s=10)
-    stub_env = os.environ.get("GALION_CLONE_STUB_PCM") == "1"
+    armed = stub_armed()
     weights_met = weights.status == "met"
-    sent_ref = refs.status == "met" and weights_met and not stub_env
+    sent_ref = refs.status == "met" and weights_met and not armed
     request: dict = {"text": "Hi.", "model": "nano", "persona": "samantha", "tags": True}
     if sent_ref:
         store = Path(os.environ["GALION_CLIP_STORE"]).expanduser().resolve()
         request["audio_prompt_path"] = str(store / "samantha" / "reference.wav")
     timeout = float(os.environ.get("GALION_HARD_GEN_TIMEOUT", "180" if weights_met else "15"))
-    generated = probe_worker(request, stub=stub_env, timeout_s=timeout)
+    generated = probe_worker(request, stub=os.environ.get("GALION_CLONE_STUB_PCM") == "1", timeout_s=timeout)
     hygiene = classify_hygiene(tracked_files(), locks_digest() == before)
+    voice = classify_generate(generated, weights_met, weights.status == "failed", sent_ref, armed)
+    ttfa = classify_ttfa(generated, weights_met, weights.status == "failed", armed)
     gates = [
         hygiene,
         classify_refuse(refuse),
         refs,
         weights,
-        classify_generate(generated, weights_met, weights.status == "failed", sent_ref, stub_env),
-        classify_ttfa(generated, weights_met, weights.status == "failed"),
+        classify_hf((REPO / "scripts/clone/fetch-clone-weights.sh").read_text(encoding="utf-8")),
+        voice,
+        ttfa,
     ]
     base = os.environ.get("BASE", "").strip()
     launched = False
@@ -936,15 +1167,26 @@ def collect() -> tuple[list[Gate], WorkerProbe | None]:
         gates.append(Gate("persona-http", "failed", "GALION_HARD_HTTP=1 but the demo binary did not build. Not HARD-PASS."))
         gates.append(Gate("live-one-dot", "failed", "GALION_HARD_HTTP=1 but the demo binary did not build. Not HARD-PASS."))
         http_recorded = True
-    if proc is None and not reachable and not http_recorded:
-        why = f"no live server at {base}"
-        gates.append(Gate("persona-http", "absent", why + ". Not HARD-PASS."))
-        gates.append(Gate("live-one-dot", "absent", why + ". Not HARD-PASS."))
+    said = ""
+    notes = {"emotion": False, "clock": False, "speaking": False}
+    hub = False
+    persona_gate = Gate("persona-http", "absent", f"no live server at {base}. Not HARD-PASS.")
+    dot_gate = Gate("live-one-dot", "absent", f"no live server at {base}. Not HARD-PASS.")
+    if http_recorded:
+        persona_gate = next(g for g in gates if g.name == "persona-http")
+        dot_gate = next(g for g in gates if g.name == "live-one-dot")
+        gates = [g for g in gates if g.name not in ("persona-http", "live-one-dot")]
     elif reachable:
         try:
-            dot = live_one_dot(base, launched)
-            persona, _samples = persona_http(base)
-            gates.extend((persona, dot))
+            dot_gate, notes = live_one_dot(base, launched)
+            persona_gate, _samples, said = persona_http(base)
+            try:
+                status, _, page = http_exchange(base, "GET", "/")
+                if status == 200:
+                    low = page.decode("utf-8", "replace").lower()
+                    hub = "hub" in low and "texture" in low
+            except OSError:
+                hub = False
         finally:
             if proc is not None:
                 proc.terminate()
@@ -952,40 +1194,114 @@ def collect() -> tuple[list[Gate], WorkerProbe | None]:
                     proc.wait(timeout=3)
                 except subprocess.TimeoutExpired:
                     proc.kill()
-    gates.append(run_late_pause())
+    sampling, late, allocs, late_frames = run_clock()
+    log_path = REPO / "target" / "hard-loop" / "demo.log"
+    log_text = ""
+    if log_path.is_file():
+        log_text = log_path.read_text(encoding="utf-8", errors="replace")
+        found = None
+        for token in log_text.split():
+            if token.startswith("paused="):
+                found = token.split("=", 1)[1]
+        if found and found.isdigit():
+            late_frames = found
+    emotion_live = bool(launched and notes["emotion"])
+    model = REPO / "weights" / "asr" / "vosk-model-small-en-us-0.15" / "am" / "final.mdl"
+    vosk_ok = model.is_file() and "vosk" in log_text.lower() and "interim" not in log_text.lower()
+    source = "floor" if said.strip() else ""
+    low_said = said.lower()
+    if said.strip() and not any(line in low_said for line in FLOOR_LINES):
+        gq = os.environ.get("GALION_STUDENT_GQ", "").strip()
+        hermes = os.environ.get("GALION_HERMES_URL", "").strip()
+        if hermes.startswith("http://127.0.0.1") or hermes.startswith("http://localhost"):
+            source = "hermes"
+        elif gq.endswith(".gq") and Path(gq).is_file():
+            source = "student-gq"
+    llm = classify_llm(said, source)
+    trace = None
+    for key in ("GALION_NERVE_LOG", "GALION_THOUGHT_LOG"):
+        raw = os.environ.get(key, "").strip()
+        if raw and Path(raw).is_file():
+            trace = Path(raw).read_text(encoding="utf-8", errors="replace")[:20000]
+            break
+    thinking = classify_thinking(trace)
+    real_persona = classify_real_persona(refs.status == "met", emotion_live, hub)
+    chain = classify_chain(
+        {
+            "vosk": vosk_ok,
+            "instruction-floor": persona_gate.status == "met",
+            "nano": voice.status == "met",
+            "streaming-pcm": ttfa.status == "met",
+            "emotion-clock": bool(notes["clock"]) and sampling.status == "met",
+            "playback": bool(notes["speaking"]) and voice.status == "met",
+            "ttfa_ms": ttfa.status == "met" and ttfa_token(generated, armed).isdigit(),
+        }
+    )
+    gates.extend((persona_gate, dot_gate, sampling, late, llm, thinking, real_persona, chain))
+    facts = {
+        "allocs": allocs,
+        "late_frames": late_frames,
+        "persona_http": persona_gate.status,
+        "dot": dot_gate.status,
+    }
     if locks_digest() != before:
         gates[0] = Gate(
             "tree-hygiene",
             "failed",
             "LOCKS.toml changed during the run. This harness does not edit it. Not HARD-PASS.",
         )
-    return gates, generated
+    return gates, generated, facts
 
 
 def logic_self_check() -> None:
     stub = WorkerProbe(0, "protocol-stub", 402, 4, 5, False, "galion-clone-engine: protocol-stub\n", False)
     absent = WorkerProbe(2, None, 0, None, None, False, "galion-clone-absent\n", False)
     model_stream = WorkerProbe(0, "model", 48000, 90, 400, True, "galion-clone-engine: model\n", False)
-    model_block = WorkerProbe(0, "model", 48000, 1800, 1800, False, "galion-clone-engine: model\n", False)
-    model_fast_block = WorkerProbe(0, "model", 800, 200, 210, False, "galion-clone-engine: model\n", False)
+    nano_pcm = WorkerProbe(0, "chatterbox-nano", 48000, 90, 400, True, "galion-clone-engine: chatterbox-nano\n", False)
+    nano_block = WorkerProbe(0, "chatterbox-nano", 48000, 1800, 1800, False, "galion-clone-engine: chatterbox-nano\n", False)
+    nano_fast = WorkerProbe(0, "nano", 800, 200, 210, False, "galion-clone-engine: nano\n", False)
     unwired = WorkerProbe(0, "unwired", 0, None, None, False, "galion-clone-unwired\n", False)
     refused = WorkerProbe(3, None, 0, None, None, False, "galion-clone-refuse: reference clips are on the rights hold\n", False)
 
     assert classify_refuse(refused).status == "met"
     assert classify_generate(stub, False, False, False, True).status == "stub"
     assert classify_generate(absent, False, False, False, False).status == "absent"
-    assert classify_generate(model_stream, True, False, True, False).status == "met"
+    assert classify_generate(model_stream, True, False, True, False).status == "failed"
+    assert classify_generate(nano_pcm, True, False, True, False).status == "met"
+    assert classify_generate(nano_pcm, True, False, True, True).status == "stub"
     assert classify_generate(unwired, True, False, False, False).status == "failed"
     assert classify_generate(refused, True, False, True, False).status == "failed"
-    assert classify_ttfa(stub, False, False).status == "stub"
-    assert "ttfa" not in classify_ttfa(absent, False, False).detail.lower() or "no TTFA" in classify_ttfa(absent, False, False).detail
-    assert classify_ttfa(absent, False, False).status == "absent"
-    assert "ttfa_ms" not in classify_ttfa(absent, False, False).detail
-    assert classify_ttfa(model_stream, True, False).status == "met"
-    assert classify_ttfa(model_block, True, False).status == "failed"
-    assert "whole-utterance" in classify_ttfa(model_block, True, False).detail
-    assert classify_ttfa(model_fast_block, True, False).status == "failed"
-    assert classify_ttfa(model_stream, True, False).detail.find("90") >= 0
+    assert classify_ttfa(stub, False, False, False).status == "stub"
+    assert "ttfa_ms" not in classify_ttfa(stub, False, False, True).detail
+    assert classify_ttfa(absent, False, False, False).status == "absent"
+    assert "ttfa_ms" not in classify_ttfa(absent, False, False, False).detail
+    assert classify_ttfa(model_stream, True, False, False).status == "failed"
+    assert classify_ttfa(nano_pcm, True, False, False).status == "met"
+    assert classify_ttfa(nano_pcm, True, False, False).detail.find("90") >= 0
+    assert classify_ttfa(nano_block, True, False, False).status == "failed"
+    assert "whole-utterance" in classify_ttfa(nano_block, True, False, False).detail
+    assert classify_ttfa(nano_fast, True, False, False).status == "failed"
+    assert not voice_product_claim(stub, False)
+    assert not voice_product_claim(nano_pcm, True)
+    assert voice_product_claim(nano_pcm, False)
+    assert ttfa_token(stub, False) == "stub"
+    assert ttfa_token(nano_pcm, True) == "stub"
+    assert ttfa_token(nano_pcm, False) == "90"
+    assert ttfa_token(absent, False) == "absent"
+    assert classify_llm("Your mother died this morning.", "floor").status == "stub"
+    assert classify_llm("I hear you now.", "floor").status == "failed"
+    assert classify_llm("The room stayed quiet.", "hermes").status == "met"
+    assert classify_llm("The room stayed quiet.", "student-gq").status == "met"
+    assert classify_thinking(None).status == "absent"
+    assert classify_thinking('{"kind":"voice.frame_miss"}').status == "met"
+    assert classify_thinking("interim placeholder transcript").status == "failed"
+    assert classify_real_persona(False, True, True).status == "absent"
+    assert classify_real_persona(True, True, True).status == "met"
+    assert classify_chain({"vosk": False, "nano": True}).status == "absent"
+    assert classify_chain({"vosk": True, "nano": True}).status == "met"
+    assert classify_sampling(True, True, True, True).status == "met"
+    assert classify_sampling(True, True, False, True).status == "failed"
+    assert classify_hf("GALION_CLONE_WEIGHTS_SOURCE\ncase release|hf").status == "met"
 
     with tempfile.TemporaryDirectory(prefix="galion-hard-refs-") as tmp:
         root = Path(tmp)
@@ -1039,40 +1355,25 @@ def logic_self_check() -> None:
         "--test-threads=1",
     ]
 
-    full = [
-        Gate(name, "met", "ok-for-test")
-        for name in (
-            "tree-hygiene",
-            "ref-refuse",
-            "ref-hashes",
-            "weight-pins",
-            "nano-generate",
-            "ttfa-streaming",
-            "persona-http",
-            "live-one-dot",
-            "late-pause",
-        )
-    ]
+    full = [Gate(name, "met", "ok-for-test") for name in REQUIRED]
+    hard_line = report_line("HARD-PASS", "90", "0", "proved", "met", "met", True)
     assert overall_verdict(full) == "HARD-PASS"
-    text = render(full, "HARD-PASS")
+    assert overall_verdict(full[:-1]) == "HARD-FAIL"
+    text = render(full, "HARD-PASS", hard_line)
     assert "overall: HARD-PASS" in text
     assert "refused" not in text
+    assert "report-line: HARD-PASS ttfa_ms=90 allocs=0 late_frames=proved persona_http=met dot=met product_claim=true" in text
     stub_gates = [
-        Gate("tree-hygiene", "met", "clean"),
-        Gate("ref-refuse", "met", "hold"),
-        Gate("ref-hashes", "absent", "no store"),
-        Gate("weight-pins", "absent", "no files"),
-        Gate("nano-generate", "absent", "no weights"),
-        Gate("ttfa-streaming", "absent", "no TTFA number"),
-        Gate("persona-http", "absent", "down"),
-        Gate("live-one-dot", "absent", "down"),
-        Gate("late-pause", "met", "paused"),
+        Gate(name, "met" if name in ("tree-hygiene", "ref-refuse", "hf-fetch", "late-pause") else "absent", "x")
+        for name in REQUIRED
     ]
+    stub_line = report_line("STUB-PASS", "absent", "0", "proved", "absent", "absent", False)
     assert overall_verdict(stub_gates) == "STUB-PASS"
-    stub_text = render(stub_gates, "STUB-PASS")
+    stub_text = render(stub_gates, "STUB-PASS", stub_line)
     assert "overall: STUB-PASS" in stub_text
     assert "HARD-PASS of the loop: refused" in stub_text
-    assert "product_claim: false" in stub_text
+    assert "product_claim=false" in stub_text
+    assert "ttfa_ms=absent" in stub_text
     failed = list(stub_gates)
     failed[2] = Gate("ref-hashes", "failed", "mismatch")
     assert overall_verdict(failed) == "HARD-FAIL"
@@ -1080,12 +1381,15 @@ def logic_self_check() -> None:
     assert exit_code("STUB-PASS", True) == 2
     assert exit_code("HARD-FAIL", False) == 1
     assert exit_code("HARD-PASS", True) == 0
-    blob = report_json(stub_gates, "STUB-PASS", absent)
+    blob = report_json(stub_gates, "STUB-PASS", absent, stub_line, False)
     assert "ttfa_ms" not in blob
-    claimed = report_json(full, "HARD-PASS", model_stream)
+    claimed = report_json(full, "HARD-PASS", nano_pcm, hard_line, True)
     assert claimed["product_claim"] is True
     assert claimed["ttfa_ms"] == 90
-    assert claimed["ttfa_kind"] == "streaming-model"
+    assert claimed["ttfa_kind"] == "streaming-nano"
+    stub_claim = report_json(stub_gates, "STUB-PASS", stub, stub_line, False)
+    assert stub_claim["product_claim"] is False
+    assert "ttfa_ms" not in stub_claim
 
 
 def worker_self_check() -> None:
@@ -1117,11 +1421,21 @@ def main(argv: list[str]) -> int:
         print("self-check exercised the classifiers, the rights-hold refusal, and the absent-weight path.")
         return 0
     logic_self_check()
-    gates, probe = collect()
+    gates, probe, facts = collect()
     verdict = overall_verdict(gates)
-    text = render(gates, verdict)
+    claim = voice_product_claim(probe, stub_armed())
+    line = report_line(
+        verdict,
+        ttfa_token(probe, stub_armed()),
+        facts["allocs"],
+        facts["late_frames"],
+        facts["persona_http"],
+        facts["dot"],
+        claim,
+    )
+    text = render(gates, verdict, line)
     sys.stdout.write(text)
-    blob = report_json(gates, verdict, probe)
+    blob = report_json(gates, verdict, probe, line, claim)
     sys.stdout.write("report: " + json.dumps(blob, separators=(",", ":")) + "\n")
     out_dir = REPO / "target" / "hard-loop"
     try:

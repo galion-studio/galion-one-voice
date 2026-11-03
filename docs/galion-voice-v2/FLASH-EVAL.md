@@ -67,10 +67,13 @@ Until those lines exist, this document's only number is the absence of one.
 ## Stub versus hard
 
 A run of this page, including a protocol-stub clock, is **STUB-PASS**.
-It is not **HARD-PASS**. The hard loop is `scripts/eval/v2-hard-loop.sh`,
-written up in `HARD-LOOP.md`. That harness refuses `HARD-PASS` unless
-reference hashes match and engine `model` streams a first PCM. The Admin
-UI check of generations and LLM thoughts is `ADMIN-UI-CHECK.md`. Maciej
-Grajczyk has to sign that page. This file does not.
+It is not **HARD-PASS**. `GALION_CLONE_STUB_PCM=1` and
+`GALION_CLONE_STUB_FRAMES=1` never yield **HARD-PASS**. `product_claim`
+is true only for PCM whose engine is `chatterbox-nano` or `nano`.
+The hard loop is `scripts/eval/v2-hard-loop.sh`, written up in
+`HARD-LOOP.md` and `HARD-REAL.md`. Fetch stays
+`GALION_CLONE_WEIGHTS_SOURCE=hf` or `release`. The harness does not
+call it. The Admin UI check is `ADMIN-UI-CHECK.md`. Maciej Grajczyk
+has to sign that page. This file does not.
 
 — Maciej Grajczyk

@@ -13,8 +13,14 @@
 #       scripts/eval/v2-hard-loop.sh
 #   GALION_HARD_HTTP=1 scripts/eval/v2-hard-loop.sh
 #
-# HARD-PASS is printed only when reference hashes, pinned Nano weights, a
-# model generate, and streaming TTFA all met, and the live gates met too.
+# HARD-PASS is printed only when every real gate is met: Chatterbox Nano
+# PCM (engine chatterbox-nano or nano), 24 kHz / 80 ms sampling with
+# allocs=0 and late=pause, a real model (Hermes or student .gq), a thought
+# trace, reference clips plus live emotion and Jarvis hub texture, and the
+# measured Vosk → floor → Nano → stream → EmotionClock → playback chain.
+# GALION_CLONE_STUB_PCM and GALION_CLONE_STUB_FRAMES never yield HARD-PASS.
+# GALION_CLONE_WEIGHTS_SOURCE=hf stays the Hugging Face fetch path. This
+# script does not call it.
 # This script does not download weights, does not commit WAV or safetensors,
 # and does not read or edit LOCKS.toml.
 set -euo pipefail
