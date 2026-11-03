@@ -1,0 +1,103 @@
+# Galion Voice V2 — Jarvis voice config (draft)
+# Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+#
+# Docs only. Nothing in the tree reads this file. No clip, no weights.
+# Register numbers are the design table in SAMANTHA-V2.md §4.
+# A British accent is the intended register, not a fact about
+# en_US-ljspeech-medium. Rights hold: ../VOICE-CLONING.md.
+
+schema = 1
+status = "draft"
+program = "Galion Voice V2"
+id = "jarvis"
+wired = false
+session_default = false
+
+[register]
+label = "command"
+summary = "Calm, precise, command and interface. Short lines. Test register. Not a shipped film voice."
+lines = "one sentence; a second only for a number, a limit, or a refusal"
+accent_claim = "intended-not-checkpoint"
+prosody_source = "docs/galion-voice-v2/SAMANTHA-V2.md#4-mid-session-personality-switching"
+
+[register.prosody.e0]
+pitch_st = -0.3
+pitch_range = 0.92
+rate = 0.96
+loudness = 0.92
+warmth = 0.42
+pre_pause_ms = 80
+
+[register.prosody.e1]
+pitch_st = -0.4
+pitch_range = 0.90
+rate = 0.94
+loudness = 0.88
+warmth = 0.55
+pre_pause_ms = 120
+
+[register.wash]
+amber_e0 = 0.28
+amber_e1 = 0.50
+
+# Proposal in SAMANTHA-V2.md §4. The named Luti table stays the source.
+[register.luti]
+status = "proposal"
+w_e0 = 1.08
+w_e1 = 0.90
+z_e1 = 0.92
+
+[tags]
+enabled = false
+on_clone = false
+on_piper = false
+on_flite = false
+allowed = []
+strip_brackets = true
+unknown_tags = "off"
+note = "Tags stay off on every backend. The clone stub strips bracket tags when persona is jarvis."
+
+[reference]
+rights = "hold"
+ingest = false
+present = false
+duration_target_s = 10
+min_duration_s = 5
+clip_path = ""
+placeholder = "docs/galion-voice-v2/personas/refs/jarvis.placeholder"
+note = "placeholder is a text marker. It is not audio. Do not commit a wav, and do not put this path on the worker request line."
+
+[worker]
+binding = "galion.clone.worker"
+kind = "clone"
+bound = true
+process = "out-of-process"
+script = "scripts/clone/chatterbox_worker.py"
+env_persona = "GALION_CLONE_PERSONA"
+env_model = "GALION_CLONE_MODEL"
+env_worker = "GALION_CLONE_WORKER"
+model = "nano"
+quality_option = "turbo"
+request_persona = "jarvis"
+request_tags = false
+send_reference = false
+rate_hz = 24000
+pcm = "s16le"
+weights_vendored = false
+weights_dir = "weights/clone"
+
+[fallback]
+order = ["piper", "flite"]
+
+[fallback.piper]
+engine = "piper"
+voice = "en_US-ljspeech-medium"
+artifact = "weights/tts/en_US-ljspeech-medium.onnx"
+when = "clone worker absent, unwired, or dead; rights hold still closed"
+tags = false
+is_film_voice = false
+
+[fallback.flite]
+engine = "flite"
+when = "A21 Piper pack missing"
+tags = false
