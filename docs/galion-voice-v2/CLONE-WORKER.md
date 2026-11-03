@@ -111,6 +111,11 @@ worker does not edit it.
 time outside that step. Piper (`en_US-ljspeech-medium`), then flite,
 still speaks when this slot is absent, unwired, or the child dies.
 
+`GALION_CLONE_STUB_FRAMES` is not the symphony feed and not a voice.
+When `GALION_SPEECH=a21`, `A21RingFeed` reads real Piper PCM, resamples it
+to 24 kHz, and the heartbeat step drains one 1920-sample frame. See
+`symphony/HEARTBEAT-WIRE.md`.
+
 `SpeechStack` selects this slot only when `weights_ready` is true (size and
 sha256 against `scripts/clone/PINS.sha256`). CI does not have those files
 and does not set `GALION_CLONE_LOCAL_REFS`. `GALION_SPEECH=auto` therefore

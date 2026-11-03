@@ -38,6 +38,9 @@ Apache-licensed source is copied into this file.
 
 GALION_CLONE_STUB_PCM=1 stays protocol PCM (not a model, not a Flash
 result). It does not load torch.
+
+GALION_CLONE_STUB_FRAMES=N (1..8) makes the stub emit N heartbeat frames of
+protocol PCM (1920 samples at 24 kHz, 80 ms each) with progress on stderr.
 """
 
 from __future__ import annotations
@@ -86,6 +89,8 @@ THREAD_KEYS = (
 SESSION_VCPU = 1
 BURST_VCPU = 4
 RAM_GB = "0.65-1.15"
+# One Galion heartbeat frame: 80 ms at 24 kHz.
+FRAME = 1920
 
 
 def pin_cpu() -> str:
@@ -140,6 +145,19 @@ def refuse(why: str) -> None:
     raise SystemExit(3)
 
 
+def stub_frame_count() -> int:
+    raw = os.environ.get("GALION_CLONE_STUB_FRAMES", "").strip()
+    if not raw:
+        return 0
+    try:
+        n = int(raw)
+    except ValueError:
+        return 0
+    if n <= 0:
+        return 0
+    return min(n, 8)
+
+
 def absent(why: str) -> None:
     sys.stderr.write(f"galion-clone-absent: {why}\n")
     sys.stderr.flush()
@@ -187,11 +205,16 @@ def write_all(fd: int, data: bytes) -> None:
         view = view[n:]
 
 
-def frame_utterance(pcm_fd: int, pcm: bytes, engine: str, persona: str) -> None:
-    """Marker first, then PCM. Stderr is flushed before the first PCM byte."""
+def frame_utterance(
+    pcm_fd: int, pcm: bytes, engine: str, persona: str, announce: int | None = None
+) -> None:
+    """Marker first, then PCM. Stderr is flushed before the first PCM byte.
+
+    `announce` lets a streamed utterance state its byte count before frames follow.
+    """
     sys.stderr.write(f"galion-clone-engine: {engine}\n")
     sys.stderr.write(f"galion-clone-persona: {persona}\n")
-    sys.stderr.write(f"galion-clone-utt: {len(pcm)}\n")
+    sys.stderr.write(f"galion-clone-utt: {len(pcm) if announce is None else announce}\n")
     sys.stderr.flush()
     if pcm:
         write_all(pcm_fd, pcm)
@@ -675,8 +698,17 @@ def run_stub(pcm_fd: int) -> None:
         text = " ".join(text.split())
         n = max(1, min(len(text), 32767))
         tone = 1000 + (n % 50)
-        pcm = struct.pack("<h", n) + struct.pack("<200h", *([tone] * 200))
+        frames = stub_frame_count()
         sys.stderr.write("galion-clone-emit: galion-vc\n")
+        if frames:
+            one = struct.pack("<h", tone) * FRAME
+            frame_utterance(pcm_fd, b"", "protocol-stub", persona, announce=len(one) * frames)
+            for i in range(frames):
+                sys.stderr.write(f"galion-clone-progress: {i}\n")
+                sys.stderr.flush()
+                write_all(pcm_fd, one)
+            continue
+        pcm = struct.pack("<h", n) + struct.pack("<200h", *([tone] * 200))
         frame_utterance(pcm_fd, pcm, "protocol-stub", persona)
 
 

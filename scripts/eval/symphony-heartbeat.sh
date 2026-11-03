@@ -45,10 +45,24 @@ run test -p galion-console --features phone-turn --lib drain_takes_one_heartbeat
 c4=$?
 run test -p galion-live-demo --features dot-viz --test live -- --test-threads=1
 c5=$?
+set +e
+plog=$(run test -p galion-ml-voice --features speech --test piper_drain -- --test-threads=1 --nocapture 2>&1)
+c6=$?
 set -e
-if [[ $c1 -ne 0 || $c2 -ne 0 || $c3 -ne 0 || $c4 -ne 0 || $c5 -ne 0 ]]; then
-  echo "verdict=FAIL clone=$c1 sectors=$c2 persona=$c3 drain=$c4 live=$c5"
+printf '%s\n' "$plog"
+if [[ $c6 -ne 0 ]]; then
+  echo "verdict=FAIL clone=$c1 sectors=$c2 persona=$c3 drain=$c4 live=$c5 piper=$c6"
   exit 1
 fi
-echo "verdict=PASS"
-exit 0
+if [[ $c1 -ne 0 || $c2 -ne 0 || $c3 -ne 0 || $c4 -ne 0 || $c5 -ne 0 ]]; then
+  echo "verdict=FAIL clone=$c1 sectors=$c2 persona=$c3 drain=$c4 live=$c5 piper=$c6"
+  exit 1
+fi
+if printf '%s\n' "$plog" | grep -q 'piper_measured=true'; then
+  echo "verdict=PASS"
+  printf '%s\n' "$plog" | grep 'piper_measured=true' | tail -1
+  exit 0
+fi
+echo "verdict=FAIL reason=stub-frames-are-not-a-voice"
+echo "piper_measured=false reason=pack-absent"
+exit 1
