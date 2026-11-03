@@ -8,7 +8,8 @@
 //! * `Speculate` after `spec_ms` of silence (default 60): start the LLM on
 //!   the transcript we have. Cheap to undo: if voice comes back first we
 //!   emit `Resume` and the caller cancels the request (one wasted 8b call).
-//! * `Commit` after `commit_ms` (default 200), or `hold_ms` (default 600)
+//! * `Commit` after `commit_ms` (default 160, same as the old fixed hang, so
+//!   cut-offs never get worse than before), or `hold_ms` (default 500)
 //!   when the transcript ends on a word that usually means "not finished"
 //!   ("and", "the", "um", ...). Only a committed turn may play audio, so a
 //!   mid-sentence pause shorter than the commit window never cuts the user
@@ -18,7 +19,7 @@ use crate::vad::{Vad, VadEv};
 
 #[derive(Clone, Copy, Debug)]
 pub struct EndpointCfg { pub spec_ms: f64, pub commit_ms: f64, pub hold_ms: f64 }
-impl Default for EndpointCfg { fn default() -> Self { Self { spec_ms: 60.0, commit_ms: 200.0, hold_ms: 600.0 } } }
+impl Default for EndpointCfg { fn default() -> Self { Self { spec_ms: 60.0, commit_ms: 160.0, hold_ms: 500.0 } } }
 impl EndpointCfg {
     pub fn from_env() -> Self {
         let g = |k: &str, d: f64| std::env::var(k).ok().and_then(|v| v.parse().ok()).unwrap_or(d);
@@ -79,7 +80,7 @@ mod t {
         let sp = evs.iter().position(|e| *e == EpEv::Speculate).unwrap();
         let cm = evs.iter().position(|e| *e == EpEv::Commit).unwrap();
         assert_eq!(sp, 20 + 2); // 60 ms of silence = 3rd silent frame
-        assert_eq!(cm, 20 + 9); // 200 ms
+        assert_eq!(cm, 20 + 7); // 160 ms
     }
     #[test]
     fn resume_cancels_and_hold_extends() {
@@ -88,7 +89,7 @@ mod t {
         let mut evs = vec![];
         for _ in 0..12 { evs.push(e.push(&vec![0; 320], 20.0, "i went to the")); }
         assert!(evs.contains(&EpEv::Speculate));
-        assert!(!evs.contains(&EpEv::Commit), "unfinished transcript must hold past 200 ms");
+        assert!(!evs.contains(&EpEv::Commit), "unfinished transcript must hold past 160 ms");
         assert_eq!(e.push(&tone(320), 20.0, "i went to the"), EpEv::Resume);
         assert!(sounds_unfinished("so I said um") && !sounds_unfinished("that was great"));
     }

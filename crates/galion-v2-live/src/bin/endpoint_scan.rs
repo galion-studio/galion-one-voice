@@ -109,9 +109,17 @@ fn main() {
         eprintln!("{row}");
         res.push(row);
     }
+    // When does the streaming partial reach its converged text (what the forced final will say)?
+    let settle: Vec<f64> = clips.iter().map(|c| {
+        let last = galion_v2_live::endpoint::norm(c.transcript.last().unwrap());
+        let mut k = c.transcript.len() - 1;
+        while k > 0 && galion_v2_live::endpoint::norm(&c.transcript[k - 1]) == last { k -= 1; }
+        k as f64 * 20.0 - c.eos
+    }).collect();
     let speech_s: f64 = clips.iter().map(|c| c.secs).sum();
     let rep = json!({"tool": "v2-endpoint-scan", "clips": clips.len(), "speech_s": r1(speech_s), "frame_ms": 20,
-        "transcripts": clips.iter().map(|c| json!({"clip": c.name, "eos_ms": c.eos, "text": c.transcript.last()})).collect::<Vec<_>>(), "grid": res});
+        "partial_settle_after_eos_ms": {"p50": r1(pct(&settle, 50.0)), "p90": r1(pct(&settle, 90.0)), "p95": r1(pct(&settle, 95.0)), "max": r1(settle.iter().cloned().fold(f64::MIN, f64::max))},
+        "transcripts": clips.iter().zip(&settle).map(|(c, st)| json!({"clip": c.name, "eos_ms": c.eos, "text": c.transcript.last(), "partial_settle_ms": st})).collect::<Vec<_>>(), "grid": res});
     std::fs::write(format!("{out}/endpoint-scan.json"), serde_json::to_string_pretty(&rep).unwrap()).unwrap();
     eprintln!("wrote {out}/endpoint-scan.json");
 }
