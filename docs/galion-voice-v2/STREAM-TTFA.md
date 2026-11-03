@@ -61,8 +61,12 @@ is not vendored.
 
 ## Clock and gate
 
-`GALION_SPEECH=a21 scripts/eval/clone-stream-ttfa.sh` is the live gate.
-Piper is the hard path. Nano streaming stays in `scripts/clone/nano_stream.py`.
+`scripts/eval/piper-stream-ttfa.sh` is the hard live path (t301). It is
+the same measurement as PR #58: real Piper CPU PCM, `stub` false,
+`product_claim` true, and a measured `warm_first_pcm_ms`. Nano streaming
+stays in `scripts/clone/nano_stream.py`. `scripts/eval/clone-stream-ttfa.sh`
+rejects a protocol-stub clock first (exit 2, `product_claim` false, no
+`ttfa_ms`), then accepts that Piper script when the A21 pack is on disk.
 
 The gate prints `PASS` only when Piper `en_US-ljspeech-medium` has written
 real PCM, `engine` is `piper`, `product_claim` is true, and
@@ -70,8 +74,9 @@ real PCM, `engine` is `piper`, `product_claim` is true, and
 clock, is `FAIL`. `product_claim` stays false for that clock. `stub` on
 the Piper report stays false.
 
-CC0 source URLs are listed in `scripts/eval/sample-voices/SAMPLE-VOICES.md`.
-The audio files are not in git. Piper does not condition on them.
+CC0 clips and their sources are in `scripts/eval/sample-voices/`
+(`SAMPLE-VOICES.md`). Piper does not condition on them. They are not
+Samantha or Jarvis.
 
 ## Why Nano has no real clock on this box
 
@@ -102,6 +107,24 @@ Reported by the coordinator. Not re-labeled as a different run.
 | product_claim | true |
 | stub | false |
 
+### This box, `scripts/eval/piper-stream-ttfa.sh`, 2026-11-03
+
+One run of the t301 script. Real Piper child. `stub` false.
+`product_claim` true. Not a stub clock.
+
+| field | value |
+|---|---|
+| engine | `piper` |
+| voice | `en_US-ljspeech-medium` |
+| cold_first_pcm_ms (SpeechStack) | 340 |
+| warm_first_pcm_ms (SpeechStack) | 19 |
+| cold_spawn_first_pcm_byte_ms | 327.9 |
+| raw warm line, first PCM byte | 19.0 |
+| drain late_ticks | 0 |
+| drain late_policy | pause |
+
+### Earlier cold-spawn bytes on this CPU, previous gate
+
 ### This agent, same gate, 2026-11-03
 
 `GALION_SPEECH=a21 scripts/eval/clone-stream-ttfa.sh` on this CPU after
@@ -114,7 +137,7 @@ SpeechStack clock above. Two runs, not averaged.
 | 2 | 331.8 | 331.8 | 37.8 | 25088 |
 | 3 | 315.0 | 319.4 | 39.3 | 25088 |
 
-Both runs are real Piper PCM on this box. Voice
+Those earlier runs are real Piper PCM on this box. Voice
 `en_US-ljspeech-medium`, engine `piper`, `product_claim` true,
 `piper_measured` true, `model_measured` false, `stub` false. They are
 not an 80 ms claim. Admin t298 and t299 still hold merge. A stub clock

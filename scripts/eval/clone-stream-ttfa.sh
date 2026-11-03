@@ -2,13 +2,14 @@
 # Galion Voice — Perpetual Open MIT License
 # Copyright (c) 2026 Maciej Grajczyk.
 #
-# Stream TTFA gate.
-#   GALION_SPEECH=a21 scripts/eval/clone-stream-ttfa.sh
+# Stream TTFA gate. Piper is the hard live path (t301).
+# Nano streaming stays in scripts/clone/nano_stream.py.
 #
-# The live pass is real Piper PCM (engine=piper, product_claim true,
-# piper_measured true). A protocol-stub clock is FAIL and is not a pass.
-# Nano streaming stays in scripts/clone/nano_stream.py. This script does
-# not download weights and does not write a WAV.
+#   scripts/eval/clone-stream-ttfa.sh
+#
+# A protocol-stub clock, including a 15 ms first-PCM figure, is FAIL.
+# product_claim stays false for that clock. The live pass is
+# scripts/eval/piper-stream-ttfa.sh when the A21 pack is on disk.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 
@@ -23,18 +24,29 @@ if [ "$stub_code" = 1 ]; then
 fi
 if [ "$stub_code" != 2 ]; then
   echo "FAIL" >&2
-  echo "clone stream hook returned ${stub_code}, want 2 when the stub clock is rejected" >&2
+  echo "stub clock was not rejected (exit ${stub_code})" >&2
   exit 1
 fi
 printf '%s\n' "$stub_out" | grep -q '"gate": "FAIL"'
 printf '%s\n' "$stub_out" | grep -q '"hard_pass": false'
 printf '%s\n' "$stub_out" | grep -q '"product_claim": false'
 printf '%s\n' "$stub_out" | grep -q '"stub_clock": "FAIL"'
+# A 15 ms stub must not be reported as ttfa_ms.
+if printf '%s\n' "$stub_out" | grep -q '"ttfa_ms"'; then
+  echo "FAIL: stub report carried ttfa_ms" >&2
+  exit 1
+fi
 
-if [ "${GALION_SPEECH:-}" = "a21" ]; then
-  exec python3 scripts/eval/piper_stream_ttfa.py
+if [ -x weights/runtime/piper/piper ] && [ -f weights/tts/en_US-ljspeech-medium.onnx ]; then
+  out=$(scripts/eval/piper-stream-ttfa.sh)
+  printf '%s\n' "$out"
+  printf '%s\n' "$out" | grep -q '"engine": "piper"'
+  printf '%s\n' "$out" | grep -q '"stub": false'
+  printf '%s\n' "$out" | grep -q '"product_claim": true'
+  printf '%s\n' "$out" | grep -q '"measured": true'
+  exit 0
 fi
 
 echo "FAIL"
-echo '{"engine":null,"gate":"FAIL","hard_pass":false,"model_measured":false,"note":"GALION_SPEECH is not a21. Protocol-stub clocks stay FAIL.","piper_measured":false,"product_claim":false,"stub":false}'
+echo '{"engine":null,"gate":"FAIL","hard_pass":false,"measured":false,"model_measured":false,"note":"Piper pack absent. Protocol-stub clocks stay FAIL. product_claim is false.","piper_measured":false,"product_claim":false,"stub":false}'
 exit 2

@@ -23,18 +23,13 @@ jobs:
         run: cargo test -p galion-ml-voice --features speech
       - name: Flash TTFA harness (no number without a run)
         run: scripts/eval/flash-ttfa.sh
-      - name: Stream TTFA (stub clock must fail; not a HARD-PASS)
+      - name: Stream TTFA (stub 15 ms fails; Piper is the live path)
         run: |
           set +e
-          if [ -x weights/runtime/piper/piper ] && [ -f weights/tts/en_US-ljspeech-medium.onnx ]; then
-            GALION_SPEECH=a21 scripts/eval/clone-stream-ttfa.sh
-            code=$?
-            exit "$code"
-          fi
           scripts/eval/clone-stream-ttfa.sh
           code=$?
           if [ "$code" = 2 ]; then
-            echo "NOT A HARD-PASS. This runner has no Piper pack. The stub clock is FAIL and product_claim is false. Merge needs real Piper or Nano PCM on the box (STREAM-TTFA.md)."
+            echo "NOT A HARD-PASS. No Piper pack on this runner. Stub clock is FAIL and product_claim is false. Live path is scripts/eval/piper-stream-ttfa.sh when the A21 pack is present."
             exit 0
           fi
           exit "$code"
