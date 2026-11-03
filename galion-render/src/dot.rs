@@ -409,6 +409,17 @@ mod tests {
     }
 
     #[test]
+    fn empathy_weight_does_not_change_dot_params() {
+        let mut f = frame(false, false, 0);
+        let a = DotParams::from_frame(&f);
+        f.empathy = 1.0;
+        let b = DotParams::from_frame(&f);
+        assert_eq!(a, b);
+        assert_eq!(b.color(), palette::DOT.scaled(b.brightness));
+        assert_eq!(palette::DOT_HEX, "#F5F5F7");
+    }
+
+    #[test]
     fn web_json_shape() {
         let j = DotParams::compute(DotState::Idle, 0.0, 0).to_json(0);
         assert!(j.contains("\"state\":\"idle\"") && j.contains("\"base\":\"#0A0A0C\""));

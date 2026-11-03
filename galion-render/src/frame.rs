@@ -51,6 +51,9 @@ pub struct VizFrame {
     pub latency_ms: f32,
     /// Real-time factor of the model step (<1.0 = faster than real time).
     pub rtf: f32,
+    /// Empathy weight 0..=1 from `galion-emotion` for this frame. 0 leaves the
+    /// background wash on its clock. It does not change [`crate::dot::DotParams`].
+    pub empathy: f32,
 }
 
 impl VizFrame {

@@ -16,8 +16,9 @@
 //!   GET / , /screen -> the caller's single-screen HTML page, only when one was set with
 //!                      [`WebSurface::with_page`] (V1-01; the page itself is owned by
 //!                      galion-console, this crate only serves the bytes); 404 otherwise
-//! `/dot` also carries `"mode"` (idle|listening|speaking|rika), `"lean"` (Rika lean-in 0..1)
-//! and `"level"` (0..1, the band driving the state) so the page can animate on its own clock.
+//! `/dot` also carries `"mode"` (idle|listening|speaking|rika), `"lean"` (Rika lean-in 0..1),
+//! `"level"` (0..1, the band driving the state) and `"e"` (empathy weight 0..1, background
+//! wash only) so the page can animate on its own clock.
 //! When the host has published a reply, `/dot` additionally carries
 //! `"reply":{"id":"<id>","url":"/reply/<id>.wav","ms":<duration ms>}` (latest reply only;
 //! the page should play it once per new `id`). Absent when no reply was set / after
@@ -764,7 +765,14 @@ impl RenderSurface for WebSurface {
                 crate::dot::DotState::Idle => 0.0,
             };
             let level = if level.is_finite() { level.clamp(0.0, 1.0) } else { 0.0 };
-            d.push_str(&format!(",\"mode\":\"{}\",\"lean\":{:.3},\"level\":{:.3}}}", crate::dot::screen_mode(f), crate::dot::lean_in_of(f), level));
+            let empathy = if f.empathy.is_finite() { f.empathy.clamp(0.0, 1.0) } else { 0.0 };
+            d.push_str(&format!(
+                ",\"mode\":\"{}\",\"lean\":{:.3},\"level\":{:.3},\"e\":{:.3}}}",
+                crate::dot::screen_mode(f),
+                crate::dot::lean_in_of(f),
+                level,
+                empathy
+            ));
         }
         if let Ok(mut g) = self.sh.latest_dot.lock() { *g = d; }
         Ok(())
@@ -846,6 +854,8 @@ mod tests {
         w.present(&f).unwrap();
         let r = get(a, "/dot");
         assert!(r.contains("\"state\":\"idle\"") && r.contains("\"mode\":\"rika\"") && r.contains("\"lean\":0.500"), "{r}");
+        assert!(r.contains("\"e\":0.000") && r.contains("\"dot\":\"#"), "{r}");
+        assert!(!r.contains("#B695CF"), "empathy hue is not a circle fill");
         assert!(r.trim_end().ends_with('}'));
         w.close().unwrap();
     }
