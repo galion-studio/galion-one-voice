@@ -604,6 +604,8 @@ def _flat_ckpt_ok(ckpt: str) -> bool:
 
 def load_nano(ckpt: str):
     os.environ.setdefault("HF_HUB_DISABLE_PROGRESS_BARS", "1")
+    os.environ.setdefault("HF_HUB_OFFLINE", "1")
+    os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
     os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
     os.environ.setdefault("TQDM_DISABLE", "1")
     sys.stderr.write("galion-clone-load: chatterbox-nano\n")
@@ -685,6 +687,36 @@ def read_request() -> dict | None:
     return msg
 
 
+# #56: numeric 80 ms prosody is logged only; Nano generate does not take it.
+def log_prosody(msg: dict) -> None:
+    raw = msg.get("prosody")
+    if not isinstance(raw, dict):
+        return
+    def num(key: str, default: float) -> float:
+        try:
+            value = float(raw.get(key, default))
+        except (TypeError, ValueError):
+            return default
+        if value != value or value in (float("inf"), float("-inf")):
+            return default
+        return value
+    try:
+        pause = int(raw.get("pre_pause_ms", 0))
+    except (TypeError, ValueError):
+        pause = 0
+    sys.stderr.write(
+        "galion-clone-prosody: pitch_st=%.4f range=%.4f rate=%.4f energy=%.4f warmth=%.4f pre_pause_ms=%d\n"
+        % (
+            num("pitch_st", 0.0),
+            num("range", 1.0),
+            num("rate", 1.0),
+            num("energy", 1.0),
+            num("warmth", 0.5),
+            pause,
+        )
+    )
+
+
 def guard(msg: dict, persona: str) -> tuple[dict, dict | None]:
     """Main's landing checks: texture layer, denoise, device, GGUF, MP3, pinned path."""
     layer = texture_layer_state(msg, persona)
@@ -710,6 +742,7 @@ def run_stub(pcm_fd: int) -> None:
             return
         text = str(msg.get("text", ""))
         persona = normalize_persona(msg.get("persona", "samantha"))
+        log_prosody(msg)
         guard(msg, persona)
         if persona == "jarvis":
             text = TAG.sub("", text)
@@ -768,6 +801,7 @@ def run_nano(pcm_fd: int, allow: dict[str, tuple[str, str]]) -> None:
         if msg is None:
             return
         persona = normalize_persona(msg.get("persona", "samantha"))
+        log_prosody(msg)
         for key in ("denoise", "strip", "clean", "normalize"):
             if truthy(msg.get(key)):
                 refuse("denoise refused; texture is character")
@@ -816,6 +850,7 @@ def run_stream(pcm_fd: int, allow: dict[str, tuple[str, str]]) -> None:
         if msg is None:
             return
         persona = normalize_persona(msg.get("persona", "samantha"))
+        log_prosody(msg)
         for key in ("denoise", "strip", "clean", "normalize"):
             if truthy(msg.get(key)):
                 refuse("denoise refused; texture is character")

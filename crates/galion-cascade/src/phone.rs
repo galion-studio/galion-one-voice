@@ -43,6 +43,8 @@ use crate::canned::CannedLlm;
 use crate::en_lane::{spoken_text, to_f32, to_pcm16, wav_bytes, LANE_RATE_HZ};
 use crate::{CascadeError, Emotion, Lang, Llm, MockLlm, Transcript};
 use galion_ml_voice::speech::{resample, SpeechStack};
+
+pub use galion_ml_voice::speech::FrameProsody;
 use galion_ml_voice::stub::SAMPLES_PER_CHAR;
 use galion_ml_voice::VoiceError;
 use std::sync::atomic::AtomicU64;
@@ -344,8 +346,15 @@ impl PhoneLane {
 
     /// True when S6 can produce spoken words on this machine.
     pub fn can_speak(&self) -> bool { self.speech.can_speak() }
-    /// `(id, label)` of the speech backend.
-    pub fn speech_backend(&self) -> (&'static str, String) { (self.speech.backend.id(), self.speech.backend.label()) }
+    /// `(id, label)` of the speech backend that last produced PCM.
+    /// Before the first speak, this is the selected backend.
+    pub fn speech_backend(&self) -> (&'static str, String) { self.speech.reported() }
+
+    /// Persona register and the latest 80 ms prosody. Numbers only. No reply text.
+    pub fn set_delivery(&mut self, persona: &str, prosody: FrameProsody) {
+        self.speech.set_persona(persona);
+        self.speech.set_frame_prosody(prosody);
+    }
 
     /// `(pid, spawn count)` of the warm Piper worker. Pid is `None` for flite / off.
     /// Spawn count `1` means every turn reused the process started with the lane.

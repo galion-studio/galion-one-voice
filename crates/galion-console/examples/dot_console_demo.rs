@@ -190,6 +190,13 @@ fn run<T: TimingFeed, A: AffectFeed>(args: &[String], mut pump: DemoPump<T, A>, 
         let out = hb.step(&inp);
         let step_us = ts.elapsed().as_secs_f32() * 1e6;
         let emit = wire.me_emit(&out, me.len());
+        // Outside step. Prosody is galion-emotion's 80 ms voice_color, then Rika's apply.
+        // No empathy sentence is written from this frame.
+        #[cfg(feature = "phone-turn")]
+        if let Some(p) = phone.as_mut() {
+            let color = galion_emotion::StubExpressor.voice_color(hb.last_caller_frame().as_ref());
+            p.note_prosody(out.prosody(color.prosody));
+        }
         if out.yield_now() {
             yielded = true;
         }

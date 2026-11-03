@@ -30,7 +30,7 @@ Both files use the same keys.
 
 | Key | Meaning |
 |---|---|
-| `id`, `status`, `wired`, `session_default` | Draft id. `wired` is true because `/v2` reads the file. The clone worker is still not live. The session default in the spec is Samantha. |
+| `id`, `status`, `wired`, `session_default` | Draft id. `wired` is true because `/v2` reads the file. Nano is live only behind `NANO-BACKEND.md`. The session default is Samantha. |
 | `[register]` | Label, line length, accent claim. Prosody at `e = 0` and `e = 1` copies the design table in `SAMANTHA-V2.md` §4 (pitch, pitch range, rate, loudness, warmth, pre-pause). Wash amber and the Luti `w`/`z` scales sit beside that table. Luti is marked `proposal`. |
 | `[tags]` | Samantha: `enabled = true`, allowed `[laugh]` and `[chuckle]`, and only on the clone worker. Jarvis: `enabled = false`, `strip_brackets = true`, empty allow-list. Piper and flite never receive tags. |
 | `[reference]` | `present = true`. `clip_path` is the gitignored wav. `ingest` stays false (this tree does not fetch). `denoise = false`. Rights value `owner-t273` is the local send, not a public demo. Jarvis `texture` is `preserve-hub`. |
@@ -48,5 +48,10 @@ draft. The runbook is [`../../symphony/CLONE-LANDING.md`](../../symphony/CLONE-L
 | `[texture]` | Jarvis only. Hub bed, default on, toggle `GALION_JARVIS_TEXTURE=0`. The file is not stripped. |
 
 `../refs/` ignores audio. A gitignored WAV may sit there. The worker reads `$GALION_CLIP_STORE`, not that directory. Do not commit the WAV. `LOCKS.toml` `reference_clips` stays false until the owner flips it.
+| `[worker]` | Binding `galion.clone.worker`. Script `scripts/clone/chatterbox_worker.py`. Env `GALION_CLONE_PERSONA`, `GALION_CLONE_MODEL`, `GALION_CLONE_WORKER`, `GALION_CLONE_LOCAL_REFS`, `GALION_CLIP_STORE`. Model `nano`, quality option `turbo`. `send_reference = false`: the request line has no clip field. A non-empty reference on that line still exits 3. The child opens the store path itself when the sha sidecar matches. PCM is 24 kHz s16le. Weights are not vendored. |
+| `[fallback]` | Order `piper`, then `flite`. Piper voice is `en_US-ljspeech-medium` (`weights/tts/en_US-ljspeech-medium.onnx`). It speaks when Nano is absent, unwired, the persona ref is not allowlisted, or the child dies. It is not the film voice. Flite speaks only when that Piper pack is missing. Tags stay off on both. |
+
+`../refs/` ignores common audio and weight suffixes. Do not put a clip there.
+Do not commit a wav or a weight. The local runbook is `../NANO-BACKEND.md`.
 
 — Maciej Grajczyk

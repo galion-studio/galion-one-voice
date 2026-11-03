@@ -40,6 +40,14 @@ A reference path is sent only when `symphony/CLIP-STORE.md` opens the
 gate. CI does not set `GALION_CLIP_STORE`, so this harness sends none
 unless that store is present. `reference_clips` in `LOCKS.toml` is still
 false until the owner flips it.
+- label: `engine` from the child (`protocol-stub`, `unwired`, `chatterbox-nano`, `chatterbox-turbo`)
+
+`product_claim` is true only for `engine=model`. A `chatterbox-*` clock is
+a local generate time. It is not a published Flash result until someone
+writes it in `LEDGER.md`. A protocol-stub clock is a test of the pipe.
+
+The JSON line still has no reference field. A local clip is opened only
+under `NANO-BACKEND.md`. Film audio stays on the rights hold.
 
 ## Harness
 

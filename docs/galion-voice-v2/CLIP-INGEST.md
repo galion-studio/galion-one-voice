@@ -65,6 +65,7 @@ into a fetch script, no call to a dropped clone API.
 | 5 | Counsel when the paper is not a direct grant from the rightsholder. The operator does not self-clear. | LEDGER, or a counsel memo the line cites | Not requested here. |
 | 6 | `reference_clips = false` has been changed by a later owner decision | `LOCKS.toml` `[formats.exceptions.v2s14_chatterbox]` | Still false. A LEDGER line alone does not flip it. |
 | 7 | The worker contract has been changed to accept a path | `CLONE-WORKER.md`, `scripts/clone/chatterbox_worker.py` | Default is still exit 3. `GALION_CLONE_LOCAL_REFS=1` plus `REFS.sha256` accepts one allowlisted local file. `reference_clips` stays false. |
+| 7 | The worker accepts a clip path on the JSON line | `CLONE-WORKER.md`, `scripts/clone/chatterbox_worker.py` | Still a refusal. Exit 3, no PCM. A local file is opened only from `GALION_CLIP_STORE` when `GALION_CLONE_LOCAL_REFS=1` and the sha sidecar matches. The lock stays false. |
 
 The comparison `VOICE-CLONING.md` requires stays in force. In May 2024
 OpenAI withdrew the Sky voice after Scarlett Johansson said it resembled
@@ -100,6 +101,9 @@ that directory. The weight fetch already refuses those suffixes.
 This tree does not create the store. `chatterbox_worker.py` reads
 `$GALION_CLIP_STORE/<persona>/reference.wav` only when
 `GALION_CLONE_LOCAL_REFS=1`, and only when the sha256 is allowlisted:
+The repository does not create this store and does not put a default under
+the work tree. `chatterbox_worker.py` reads it only when `GALION_CLIP_STORE`
+is set and `GALION_CLONE_LOCAL_REFS=1`:
 
 ```text
 $GALION_CLIP_STORE/                 # absolute path outside the git work tree
@@ -201,6 +205,20 @@ no PCM on stdout. With the variable, the child opens one local file whose
 sha256 is allowlisted for that persona (`CLONE-WORKER.md`). Jarvis still
 forces `tags` false on the Rust line. An unknown persona name is still
 treated as Samantha.
+What the worker does now (`CLONE-WORKER.md`, `NANO-BACKEND.md`):
+
+The stdin line is `{"text","model","persona","tags","prosody"}`. `prosody`
+is numbers from the 80 ms `galion-emotion` frame. A non-empty `reference`,
+`audio_prompt`, `audio_prompt_path`, or `clip` makes `chatterbox_worker.py`
+exit 3 with `galion-clone-refuse: reference clips are on the rights hold`,
+and with no PCM on stdout. Jarvis still forces `tags` false. An unknown
+persona name is still treated as Samantha.
+
+The child does not take a path from that line. When `GALION_CLONE_LOCAL_REFS=1`
+it opens `$GALION_CLIP_STORE/<persona>/reference.wav` only if the bytes match
+the sidecar sha. Otherwise it writes `galion-clone-unwired` and the host
+speaks with Piper. `reference_clips` in the lock stays `false`. This is not
+a rights grant and not a fetch.
 
 `BusBody::Persona` carries `id` and `source`. It does not carry samples
 or a filesystem path. `Utterance` is the caller's turn. A film clip does
@@ -212,6 +230,12 @@ flite. A refused clip does not become a cloned voice on the way down.
 The child still does not fetch. It does not rewrite the wav. Stdout stays
 raw 24 kHz s16le. No wav of the reply is written. The public demo is
 still closed. Generate is still not called.
+The local gate does not close the rows above it. Gates 1–6 are still absent.
+The child still does not fetch. It opens one path outside the work tree.
+That path is not an HTTP body, not a git blob, and not a log of the samples.
+Stdout stays raw 24 kHz s16le. No wav of the reply is written. A failed sha
+check skips the child. Piper speaks. The JSON line still does not carry the
+four keys the worker refuses.
 
 ## Art. 50 and the watermark
 

@@ -2,6 +2,8 @@
 
 Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
 Europe/Zagreb. Nano generate is wired in the child. A run still needs weights and an allowlisted reference on that machine. This file is not a claim that a number was measured here.
+Europe/Zagreb. Nano speaks only behind the env gate in `NANO-BACKEND.md`.
+Piper speaks otherwise. Not a claim that a film voice shipped.
 
 The spelling is **Galion**. The product is Galion Voice.
 
@@ -162,6 +164,52 @@ and does not set `GALION_CLONE_LOCAL_REFS`. `GALION_SPEECH=auto` therefore
 stays on Piper or flite. `GALION_SPEECH=clone` with the pack absent falls
 through to Piper, then flite. A dead clone child on a later speak does
 the same handoff without restarting the lane.
+Request line, written by `clone_worker::request_line_prosody`. There is no
+reference field. A child that sees a non-empty `reference`, `audio_prompt`,
+`audio_prompt_path`, or `clip` exits 3 and writes no PCM. The clip path is
+not on this line. The child resolves it from `GALION_CLIP_STORE` when the
+env gate is open.
+
+{"text":"Hello.","model":"nano","persona":"samantha","tags":true,"prosody":{"pitch_st":0.0000,"range":1.0000,"rate":1.0000,"energy":1.0000,"warmth":0.5000,"pre_pause_ms":0}}
+
+`prosody` is the latest 80 ms `galion-emotion` decision (pause and loudness
+are applied to the PCM; the other numbers are logged). It is not an emotion
+name and not a sentence.
+
+`persona` is `samantha` or `jarvis`. Jarvis sets `tags` false and the worker
+strips bracket tags from the text. Samantha may keep them. An unknown persona
+name is treated as Samantha.
+
+## When Nano runs
+
+`scripts/clone/chatterbox_worker.py` calls `ChatterboxTurboTTS.from_local`
+on CPU only when all of these are true:
+
+- pinned safetensors match `scripts/clone/PINS.sha256`
+- `tokenizer.json` is on disk (`GALION_CLONE_TOKENIZER`, `GALION_CLONE_CKPT`, or `weights/clone/tokenizer`)
+- `GALION_CLONE_LOCAL_REFS=1`
+- `$GALION_CLIP_STORE/<persona>/reference.wav` matches `reference.wav.sha256`
+
+The child sets `HF_HUB_OFFLINE=1` and does not call `from_pretrained`.
+Progress is stderr (`galion-clone-progress:`). PCM is stdout after generate.
+Library prints during generate are pointed at stderr so they cannot enter
+the PCM pipe.
+
+Without `GALION_CLONE_STUB_PCM=1`, and without the weight files on disk,
+the process exits 2 (`galion-clone-absent`). A sha miss, a missing
+tokenizer, or a missing `chatterbox` install is `galion-clone-unwired` and
+no samples. The host then speaks with Piper. Protocol PCM
+(`GALION_CLONE_STUB_PCM=1`) is not a voice and not a Flash result.
+
+`SpeechStack` selects this slot only when weights, tokenizer, and at least
+one allowlisted persona ref are all present. CI has none of those.
+`GALION_SPEECH=auto` therefore stays on Piper or flite. `GALION_SPEECH=clone`
+with the gate closed falls through to Piper, then flite. A dead clone child
+on a later speak does the same handoff without restarting the lane. A
+persona whose own sidecar does not match speaks that utterance with Piper
+and leaves the Nano child up.
+
+The runbook is `NANO-BACKEND.md`. `LOCKS.toml` `reference_clips` stays false.
 
 ## Fetch
 
@@ -213,6 +261,10 @@ stays closed. `LOCKS.toml` `reference_clips` is still false and still
 needs an owner flip. The clip store is `symphony/CLIP-STORE.md`.
 This scaffold does not fetch film audio and does not call generate.
 The older ingest outline is `CLIP-INGEST.md`.
+A conditioning file, when the operator already has one, lives outside git
+and is opened only under the sha gate in `NANO-BACKEND.md`. This tree does
+not fetch film audio. The ingest outline is `CLIP-INGEST.md`. Gates 1–6
+there stay closed.
 
 — Maciej Grajczyk
 
@@ -227,3 +279,15 @@ same reference gate (`GALION_CLONE_LOCAL_REFS=1` plus the sha256 allowlist)
 and the same one-thread CPU pin. Older sentences above that say the worker
 "does not call generate" describe the pre-#53 stub. Only the stream path
 with real Nano PCM is a TTFA product claim (`FlashReport::from_pcm`).
+
+### Merge note: #56 (Nano V2 backend) onto main
+- The host keeps main's generate worker and gqvoice landing. #56 adds the following on top:
+  - `GALION_CLONE_LOCAL_REFS=1` and a sidecar/REFS ref pre-check (`ref_allowlisted`, `CloneTts::ref_ok`);
+  - a protocol-stub refusal in `try_new`;
+  - a tokenizer gate that accepts either main's pinned vocab.json+merges.txt or a tokenizer.json;
+  - a flat `GALION_CLONE_CKPT` weight root;
+  - HF offline env;
+  - per-utterance `set_persona` and `set_prosody`. The worker logs the prosody numbers as `galion-clone-prosody`.
+- Frame prosody (pause and loudness) is applied to Piper and flite PCM. Clone PCM is not rewritten after the child, because the landed `.gqvoice` must equal the playback buffer.
+- Fixed a pre-existing bug: a Jarvis request that carried a reference produced invalid JSON (the `reference` string was never closed), so the worker answered "bad json".
+- HOLD check: the merged SpeechStack produced real local Nano speech, CPU only, with no stub and no cloud path. The test allowlist of CC0 donors was local only and was not committed. Each output sat closest to its own donor on ECAPA: Samantha 0.476 vs amy, Jarvis 0.587 vs alan.

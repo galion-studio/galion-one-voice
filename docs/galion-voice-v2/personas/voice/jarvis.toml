@@ -91,6 +91,8 @@ script = "scripts/clone/chatterbox_worker.py"
 env_persona = "GALION_CLONE_PERSONA"
 env_model = "GALION_CLONE_MODEL"
 env_worker = "GALION_CLONE_WORKER"
+env_refs = "GALION_CLONE_LOCAL_REFS"
+env_store = "GALION_CLIP_STORE"
 model = "nano"
 quality_option = "turbo"
 request_persona = "jarvis"
@@ -115,7 +117,7 @@ order = ["piper", "flite"]
 engine = "piper"
 voice = "en_US-ljspeech-medium"
 artifact = "weights/tts/en_US-ljspeech-medium.onnx"
-when = "clone worker absent, unwired, or dead"
+when = "clone worker absent, unwired, ref not allowlisted, or dead"
 tags = false
 is_film_voice = false
 

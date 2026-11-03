@@ -47,7 +47,7 @@
 //! generate. The host calls it beside `Heartbeat::step`, not inside it.
 #![allow(unsafe_code)]
 
-use super::sha256;
+use super::{sha256, FrameProsody};
 use crate::{Audio, LanguageId, TtsEngine, VoiceError};
 use std::cell::UnsafeCell;
 use std::io::{Read, Write};
@@ -431,15 +431,106 @@ fn clone_root() -> PathBuf {
     }
 }
 
-fn pin_matches(root: &Path, pin: &Pin) -> bool {
-    let path = root.join(&pin.rel);
-    let Ok(meta) = std::fs::metadata(&path) else {
+fn file_matches(path: &Path, pin: &Pin) -> bool {
+    let Ok(meta) = std::fs::metadata(path) else {
         return false;
     };
-    if meta.len() != pin.size {
+    if !meta.is_file() || meta.len() != pin.size {
         return false;
     }
-    sha256::file_hex(&path).ok().as_deref() == Some(pin.sha.as_str())
+    sha256::file_hex(path).ok().as_deref() == Some(pin.sha.as_str())
+}
+
+/// #56: a pin matches at `root/<rel>` or flat at `root/<file name>` (a staged ckpt dir).
+fn pin_matches(root: &Path, pin: &Pin) -> bool {
+    let flat = Path::new(&pin.rel)
+        .file_name()
+        .map(|name| root.join(name))
+        .unwrap_or_else(|| root.join(&pin.rel));
+    file_matches(&root.join(&pin.rel), pin) || file_matches(&flat, pin)
+}
+
+fn weight_roots() -> Vec<PathBuf> {
+    let mut roots = vec![clone_root()];
+    if let Ok(p) = std::env::var("GALION_CLONE_CKPT") {
+        let path = PathBuf::from(p.trim());
+        if path.is_dir() && !roots.iter().any(|r| r == &path) {
+            roots.push(path);
+        }
+    }
+    roots
+}
+
+pub fn local_refs_enabled() -> bool {
+    std::env::var("GALION_CLONE_LOCAL_REFS").ok().as_deref() == Some("1")
+}
+
+/// `$store/<persona>/reference.wav` matches its `.sha256` sidecar.
+pub fn persona_ref_ok(store: &Path, persona: &str) -> bool {
+    let name = persona_name(persona);
+    let wav = store.join(name).join("reference.wav");
+    let side = store.join(name).join("reference.wav.sha256");
+    sha_sidecar_matches(&wav, &side)
+}
+
+fn sha_sidecar_matches(wav: &Path, side: &Path) -> bool {
+    let Ok(text) = std::fs::read_to_string(side) else {
+        return false;
+    };
+    let expect = text.split_whitespace().next().unwrap_or("").trim().to_ascii_lowercase();
+    if expect.len() != 64 || !expect.chars().all(|c| c.is_ascii_hexdigit()) {
+        return false;
+    }
+    sha256::file_hex(wav).ok().as_deref() == Some(expect.as_str())
+}
+
+/// Clone speaks for `persona` only with a local ref the host can vouch for:
+/// `GALION_CLONE_LOCAL_REFS=1` plus a sidecar-matched clip under
+/// `GALION_CLIP_STORE`, or the owner-pinned reference main resolves. The
+/// worker still enforces `REFS.sha256` itself; this is the host pre-check.
+pub fn ref_allowlisted(persona: &str) -> bool {
+    if !local_refs_enabled() {
+        return false;
+    }
+    if matches!(resolve_reference(persona), Ok(Some(_))) {
+        return true;
+    }
+    let Ok(store) = std::env::var("GALION_CLIP_STORE") else {
+        return false;
+    };
+    let store = store.trim();
+    !store.is_empty() && persona_ref_ok(Path::new(store), persona)
+}
+
+fn tokenizer_json() -> Option<PathBuf> {
+    let mut dirs = Vec::new();
+    for key in ["GALION_CLONE_TOKENIZER", "GALION_CLONE_CKPT"] {
+        if let Ok(p) = std::env::var(key) {
+            let p = p.trim();
+            if !p.is_empty() {
+                dirs.push(PathBuf::from(p));
+            }
+        }
+    }
+    dirs.push(clone_root().join("tokenizer"));
+    // Main pins the GPT-2 file set (TOKENIZER.sha256: vocab.json + merges.txt ...);
+    // #56 staged a single tokenizer.json. Either layout is a local tokenizer.
+    dirs.into_iter().find_map(|d| {
+        let json = d.join("tokenizer.json");
+        if json.is_file() {
+            return Some(json);
+        }
+        let vocab = d.join("vocab.json");
+        (vocab.is_file() && d.join("merges.txt").is_file()).then_some(vocab)
+    })
+}
+
+pub fn tokenizer_ready() -> bool {
+    tokenizer_json().is_some()
+}
+
+pub fn protocol_stub_armed() -> bool {
+    std::env::var("GALION_CLONE_STUB_PCM").ok().as_deref() == Some("1")
 }
 
 /// True when the shared tensors and this model's T3 file match [`PINS_TEXT`].
@@ -449,17 +540,18 @@ pub fn weights_ready(model: CloneModel) -> bool {
     if table.is_empty() {
         return false;
     }
-    let root = clone_root();
     let need = [
         "shared/s3gen.safetensors",
         "shared/s3gen_meanflow.safetensors",
         "shared/ve.safetensors",
         model.t3_rel(),
     ];
-    need.iter().all(|rel| {
-        table
-            .iter()
-            .any(|pin| pin.rel == *rel && pin_matches(&root, pin))
+    weight_roots().into_iter().any(|root| {
+        need.iter().all(|rel| {
+            table
+                .iter()
+                .any(|pin| pin.rel == *rel && pin_matches(&root, pin))
+        })
     })
 }
 
@@ -512,6 +604,7 @@ pub struct CloneWorker {
     warm_ms: Option<u32>,
     model: CloneModel,
     persona: &'static str,
+    prosody: FrameProsody,
     engine: String,
 }
 
@@ -560,6 +653,9 @@ impl CloneWorker {
             cmd.env(key, value);
         }
         apply_cpu_budget(&mut cmd);
+        cmd.env("HF_HUB_OFFLINE", "1")
+            .env("TRANSFORMERS_OFFLINE", "1")
+            .env("HF_HUB_DISABLE_TELEMETRY", "1");
         let mut child = cmd.spawn().map_err(|e| {
             VoiceError::Backend(format!("clone worker spawn {}: {e}", script.display()))
         })?;
@@ -602,6 +698,7 @@ impl CloneWorker {
             warm_ms: None,
             model,
             persona,
+            prosody: FrameProsody::identity(),
             engine: String::new(),
         })
     }
@@ -624,6 +721,16 @@ impl CloneWorker {
     pub fn persona(&self) -> &'static str {
         self.persona
     }
+    /// #56: next request speaks as this persona. Same process.
+    pub fn set_persona(&mut self, persona: &str) {
+        self.persona = persona_name(persona);
+    }
+
+    /// #56: 80 ms prosody numbers ride on the next request (logged by the worker).
+    pub fn set_prosody(&mut self, prosody: FrameProsody) {
+        self.prosody = prosody.clamped();
+    }
+
     pub fn engine(&self) -> &str {
         &self.engine
     }
@@ -780,12 +887,15 @@ impl CloneWorker {
     pub fn synthesize(&mut self, text: &str) -> Result<Vec<i16>, VoiceError> {
         let t0 = Instant::now();
         let resolved = resolve_reference(self.persona)?;
-        let line = request_line(
-            text,
-            self.model,
-            self.persona,
-            resolved.as_ref(),
-            jarvis_texture_enabled(self.persona),
+        let line = with_prosody(
+            request_line(
+                text,
+                self.model,
+                self.persona,
+                resolved.as_ref(),
+                jarvis_texture_enabled(self.persona),
+            ),
+            self.prosody,
         );
         {
             let stdin = self
@@ -989,6 +1099,10 @@ pub struct CloneTts {
     script: PathBuf,
     model: CloneModel,
     persona: &'static str,
+    prosody: FrameProsody,
+    /// Host ref pre-check per utterance. `try_new` slots only; a test
+    /// harness that hands in its own worker has no store to check.
+    ref_gate: bool,
     worker: Option<CloneWorker>,
     frames: Arc<CloneFrameDrain>,
     spawns: u32,
@@ -1005,14 +1119,28 @@ impl CloneTts {
             .and_then(CloneModel::parse)
             .unwrap_or(CloneModel::Nano);
         let persona = persona_name(&std::env::var("GALION_CLONE_PERSONA").unwrap_or_default());
+        if protocol_stub_armed() {
+            return Err("GALION_CLONE_STUB_PCM=1 is protocol PCM, not the clone slot; HARD-PASS measures Piper".into());
+        }
         let script = worker_script().ok_or("clone worker script missing")?;
         if !weights_ready(model) {
             return Err(format!("clone weights absent for {} (scripts/clone/fetch-clone-weights.sh; GALION_CLONE_FETCH=1)", model.as_str()));
+        }
+        if !local_refs_enabled() {
+            return Err("GALION_CLONE_LOCAL_REFS is not 1; clone slot stays closed and Piper speaks".into());
+        }
+        if !ref_allowlisted("samantha") && !ref_allowlisted("jarvis") {
+            return Err("no allowlisted samantha or jarvis reference (GALION_CLIP_STORE sidecar or REFS.sha256)".into());
+        }
+        if !tokenizer_ready() {
+            return Err("clone tokenizer missing: tokenizer.json or vocab.json+merges.txt (GALION_CLONE_TOKENIZER, GALION_CLONE_CKPT, or weights/clone/tokenizer)".into());
         }
         Ok(Self {
             script,
             model,
             persona,
+            prosody: FrameProsody::identity(),
+            ref_gate: true,
             worker: None,
             frames: Arc::new(CloneFrameDrain::new()),
             spawns: 0,
@@ -1027,6 +1155,8 @@ impl CloneTts {
             script: PathBuf::from("test"),
             model: worker.model(),
             persona: worker.persona(),
+            prosody: FrameProsody::identity(),
+            ref_gate: false,
             frames: worker.frames(),
             worker: Some(worker),
             spawns: 1,
@@ -1068,17 +1198,39 @@ impl CloneTts {
         self.spawns
     }
 
+    /// #56: may this slot speak its current persona? See [`ref_allowlisted`].
+    pub fn ref_ok(&self) -> bool {
+        !self.ref_gate || ref_allowlisted(self.persona)
+    }
+
+    /// #56: persona for the next utterance. The child stays up.
+    pub fn set_persona(&mut self, persona: &str) {
+        self.persona = persona_name(persona);
+        if let Some(worker) = self.worker.as_mut() {
+            worker.set_persona(self.persona);
+        }
+    }
+
+    /// #56: prosody numbers for the next utterance.
+    pub fn set_prosody(&mut self, prosody: FrameProsody) {
+        self.prosody = prosody.clamped();
+        if let Some(worker) = self.worker.as_mut() {
+            worker.set_prosody(self.prosody);
+        }
+    }
+
     fn ensure(&mut self) -> Result<(), VoiceError> {
         let alive = self.worker.as_mut().is_some_and(CloneWorker::is_alive);
         if alive {
             return Ok(());
         }
-        let worker = CloneWorker::spawn_ring(
+        let mut worker = CloneWorker::spawn_ring(
             &self.script,
             self.model,
             self.persona,
             Arc::clone(&self.frames),
         )?;
+        worker.set_prosody(self.prosody);
         self.worker = Some(worker);
         self.spawns += 1;
         Ok(())
@@ -1267,6 +1419,19 @@ pub(crate) fn ref_sha(persona: &str) -> Option<String> {
     ref_pins().into_iter().find(|p| p.persona == persona).map(|p| p.sha)
 }
 
+/// #56: append the clamped 80 ms prosody object to a request line.
+fn with_prosody(line: String, prosody: FrameProsody) -> String {
+    let p = prosody.clamped();
+    let extra = format!(
+        ",\"prosody\":{{\"pitch_st\":{:.4},\"range\":{:.4},\"rate\":{:.4},\"energy\":{:.4},\"warmth\":{:.4},\"pre_pause_ms\":{}}}",
+        p.pitch_st, p.pitch_range, p.rate, p.energy, p.warmth, p.pre_pause_ms
+    );
+    match line.strip_suffix("}\n") {
+        Some(stripped) => format!("{stripped}{extra}}}\n"),
+        None => line,
+    }
+}
+
 fn request_line(
     text: &str,
     model: CloneModel,
@@ -1301,8 +1466,11 @@ fn request_line(
         push_json_str(&mut s, &path);
         s.push_str("\",\"reference\":\"");
         push_json_str(&mut s, &path);
+        s.push('"');
+        // Jarvis already carries `"texture":"preserve-hub"` above. The quote
+        // that closes `reference` was missing on this branch (bad json).
         if persona != "jarvis" {
-            s.push_str("\",\"texture\":\"");
+            s.push_str(",\"texture\":\"");
             push_json_str(&mut s, &reference.texture);
             s.push('"');
         }
@@ -1424,6 +1592,59 @@ fn set_nonblock(fd: i32) -> std::io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn protocol_stub_does_not_open_the_clone_slot() {
+        struct Guard(Option<String>);
+        impl Drop for Guard {
+            fn drop(&mut self) {
+                match self.0.take() {
+                    Some(v) => std::env::set_var("GALION_CLONE_STUB_PCM", v),
+                    None => std::env::remove_var("GALION_CLONE_STUB_PCM"),
+                }
+            }
+        }
+        let guard = Guard(std::env::var("GALION_CLONE_STUB_PCM").ok());
+        std::env::set_var("GALION_CLONE_STUB_PCM", "1");
+        assert!(protocol_stub_armed());
+        let err = match CloneTts::try_new() {
+            Err(e) => e,
+            Ok(_) => panic!("protocol stub must not construct the slot"),
+        };
+        assert!(err.contains("STUB_PCM"), "{err}");
+        assert!(err.contains("Piper"), "{err}");
+        drop(guard);
+    }
+
+    #[test]
+    fn prosody_rides_on_the_request_line_without_a_ref_or_emotion() {
+        let base = request_line("hello", CloneModel::Nano, "samantha", None, false);
+        let with = with_prosody(base, FrameProsody { pitch_st: -0.5, pre_pause_ms: 80, ..FrameProsody::identity() });
+        assert!(with.ends_with("}\n"), "{with}");
+        assert!(with.contains("\"prosody\":"));
+        assert!(with.contains("\"pre_pause_ms\":80"));
+        assert!(!with.contains("audio_prompt"));
+        assert!(!with.contains("emotion"));
+    }
+
+    #[test]
+    fn persona_ref_needs_a_matching_sidecar() {
+        let store = std::env::temp_dir().join(format!("galion-clone-ref-{}", std::process::id()));
+        let wav_dir = store.join("samantha");
+        std::fs::create_dir_all(&wav_dir).unwrap();
+        let bytes = b"galion-local-ref-not-a-film-file";
+        std::fs::write(wav_dir.join("reference.wav"), bytes).unwrap();
+        let mut hasher = sha256::Sha256::new();
+        hasher.update(bytes);
+        let digest = hasher.hex();
+        std::fs::write(wav_dir.join("reference.wav.sha256"), format!("{digest}\n")).unwrap();
+        assert!(persona_ref_ok(&store, "samantha"));
+        assert!(!persona_ref_ok(&store, "jarvis"));
+        std::fs::write(wav_dir.join("reference.wav.sha256"), format!("deadbeef{:0<56}\n", "")).unwrap();
+        assert!(!persona_ref_ok(&store, "samantha"), "a mismatched sidecar is not allowlisted");
+        // Scratch dir under temp; renamed rather than deleted.
+        let _ = std::fs::rename(&store, store.with_extension("off"));
+    }
     use std::os::unix::fs::PermissionsExt;
     use std::process::{Command, Stdio};
 
@@ -1512,6 +1733,7 @@ mod tests {
         assert!(sent.contains("\"denoise\":false"));
         assert!(sent.contains("\"tags\":false"));
         assert!(!sent.contains("mp3"));
+        assert!(sent.ends_with("\"reference\":\"docs/galion-voice-v2/personas/refs/jarvis.wav\"}\n"), "jarvis line must be valid json: {sent}");
     }
 
     #[test]
