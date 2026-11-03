@@ -675,20 +675,27 @@ impl FlashReport {
         }
     }
 
-    /// A number from a run. `product_claim` is true only for engine `model`
-    /// on `path=stream`. A whole-utterance clock is not a claim.
-    pub fn from_pcm(engine: &str, path: &str, ttfa_ms: u32, utt_ms: u32) -> Self {
-        let model = engine == "model" && path == "stream";
-        let note = if model {
-            "CPU time to the first streamed PCM chunk. Record it in LEDGER before calling it a Flash result."
-        } else if path == "stream" {
-            "protocol stream clock. First chunk, not the whole utterance. Not a product claim."
+    /// A number from a run. `product_claim` is true only when `real_nano_pcm`
+    /// is set, the child said `nano`, and `path` is `stream`. A protocol
+    /// stub, a turbo label, and a whole-utterance clock are not claims.
+    pub fn from_pcm(
+        engine: &str,
+        path: &str,
+        ttfa_ms: u32,
+        utt_ms: u32,
+        real_nano_pcm: bool,
+    ) -> Self {
+        let claim = real_nano_pcm && engine == "nano" && path == "stream";
+        let note = if claim {
+            "CPU time to the first streamed Nano PCM chunk. Record it in LEDGER before calling it a Flash result."
+        } else if engine == "protocol-stub" {
+            "STUB. Protocol PCM only. Not a Nano measurement and not a product claim."
         } else {
-            "protocol-stub clock only. Not a Flash result and not a product claim."
+            "Not real Nano PCM. Not a product claim."
         };
         Self {
             measured: true,
-            product_claim: model,
+            product_claim: claim,
             engine: Some(engine.to_string()),
             path: Some(path.to_string()),
             ttfa_ms: Some(ttfa_ms),
@@ -755,7 +762,13 @@ pub fn flash_from_env() -> FlashReport {
         Ok(pcm) if !pcm.is_empty() && worker.engine() != "unwired" => {
             let ttfa = worker.first_pcm_ms().unwrap_or_else(|| elapsed_ms(t0));
             let utt = worker.utt_ms().unwrap_or(ttfa);
-            FlashReport::from_pcm(worker.engine(), worker.path(), ttfa, utt)
+            FlashReport::from_pcm(
+                worker.engine(),
+                worker.path(),
+                ttfa,
+                utt,
+                worker.engine() == "nano" && worker.path() == "stream" && nano_speech(pcm.as_slice()),
+            )
         }
         Ok(_) => FlashReport::absent("generate is not wired; no TTFA number"),
         Err(e) => FlashReport::absent(format!("worker returned no PCM ({e}); no TTFA number")),
@@ -815,6 +828,31 @@ fn tail(s: &str) -> String {
 
 fn elapsed_ms(t0: Instant) -> u32 {
     t0.elapsed().as_millis().min(u32::MAX as u128) as u32
+}
+
+/// True for a buffer that can be Nano speech: at least one 80 ms frame,
+/// a real peak, and more than one amplitude. The protocol stub is 201
+/// samples of a constant tone and returns false.
+fn nano_speech(pcm: &[i16]) -> bool {
+    if pcm.len() < CLONE_FRAME_SAMPLES {
+        return false;
+    }
+    let head = &pcm[..pcm.len().min(4_000)];
+    let mut peak = 0i32;
+    let mut first = head[0];
+    let mut varied = false;
+    for sample in head.iter().skip(1) {
+        let value = i32::from(*sample);
+        if value.abs() > peak {
+            peak = value.abs();
+        }
+        if *sample != first {
+            varied = true;
+        } else {
+            first = *sample;
+        }
+    }
+    varied && peak >= 100
 }
 
 #[derive(Clone, Copy)]
@@ -907,15 +945,18 @@ mod tests {
         assert!(json.contains("\"measured\":false"));
         assert!(json.contains("\"product_claim\":false"));
         assert!(!json.contains("ttfa"));
-        let stub = FlashReport::from_pcm("protocol-stub", "stream", 12, 40);
+        let stub = FlashReport::from_pcm("protocol-stub", "stream", 12, 40, false);
         assert!(stub.json().contains("\"ttfa_ms\":12"));
         assert!(stub.json().contains("\"path\":\"stream\""));
         assert!(stub.json().contains("\"utt_ms\":40"));
         assert!(!stub.product_claim);
-        let model = FlashReport::from_pcm("model", "stream", 4, 90);
-        assert!(!model.note.is_empty());
-        assert!(model.product_claim);
-        assert!(!FlashReport::from_pcm("model", "whole", 1800, 1800).product_claim);
+        assert!(stub.note.contains("STUB"));
+        let labeled = FlashReport::from_pcm("nano", "stream", 4, 90, false);
+        assert!(!labeled.product_claim);
+        let nano = FlashReport::from_pcm("nano", "stream", 4, 90, true);
+        assert!(nano.product_claim);
+        assert!(!FlashReport::from_pcm("model", "whole", 1800, 1800, true).product_claim);
+        assert!(!FlashReport::from_pcm("piper", "stream", 40, 80, false).product_claim);
     }
 
     #[test]
@@ -1020,6 +1061,7 @@ mod tests {
             w.path(),
             w.first_pcm_ms().unwrap_or(w.warm_ms().unwrap()),
             w.utt_ms().unwrap_or(w.warm_ms().unwrap()),
+            false,
         );
         assert!(!report.product_claim);
         assert!(report.json().contains("protocol-stub"));

@@ -125,10 +125,13 @@ def main() -> None:
             nano_stream.write_unwired(sys.stderr, "empty text")
             continue
         try:
+            kind = os.environ.get("GALION_CLONE_MODEL", "nano").strip().lower()
+            if kind != "turbo":
+                kind = "nano"
             nano_stream.write_chunks(
                 pcm,
                 nano_stream.iter_pcm(model, text, ref_path),
-                engine="model",
+                engine=kind,
                 persona=persona,
                 path="stream",
                 err=sys.stderr,

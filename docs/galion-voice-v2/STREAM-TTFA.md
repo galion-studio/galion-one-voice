@@ -46,32 +46,59 @@ is not vendored.
 
 ## Clock and gate
 
-`scripts/eval/clone-stream-ttfa.sh` prints one JSON object and exits 1 on
-FAIL.
+`GALION_SPEECH=a21 scripts/eval/clone-stream-ttfa.sh` is the live gate.
+Piper is the hard path. Nano streaming stays in `scripts/clone/nano_stream.py`.
 
-| Check | FAIL when |
+The gate prints `PASS` only when Piper `en_US-ljspeech-medium` has written
+real PCM, `engine` is `piper`, `product_claim` is true, and
+`piper_measured` is true. A protocol-stub clock, including a 15 ms pipe
+clock, is `FAIL`. `product_claim` stays false for that clock. `stub` on
+the Piper report stays false.
+
+CC0 clips live in `scripts/eval/sample-voices/` (`SAMPLE-VOICES.md`). The
+gate checks they are RIFF/WAVE. The named sample on a pass is
+`scripts/eval/sample-voices/pdx-voice.wav`. Piper does not condition on it.
+
+### Coordinator box (t301)
+
+Reported by the coordinator. Not re-labeled as a different run.
+
+| | |
 |---|---|
-| Source | `.generate(` appears in the worker or `nano_stream.py` |
-| Path | stderr `galion-clone-path` is not `stream`, or no chunk marker precedes `galion-clone-utt:` |
-| Whole utterance | first PCM is at or after 1500 ms, or it arrives with a finished utterance that long |
-| Heartbeat | `crates/galion-heartbeat` names `generate(`, `chatterbox`, or `CloneFrameDrain` |
-| Reference | a clip without the local flag does not exit 3 with an empty stdout |
-| Fixture | an in-script whole-utterance child is not judged FAIL |
+| cold spawn, first PCM byte | 393.2 ms |
+| SpeechStack cold first clause | 530 ms |
+| SpeechStack warm first clause | 18 ms |
+| voice | `en_US-ljspeech-medium` |
+| engine | `piper` |
+| product_claim | true |
+| stub | false |
 
-The protocol stub splits its old tone into two writes with a 50 ms gap.
-That proves the pipe. It is not a Nano TTFA. `model_measured` stays false
-until `GALION_CLONE_STREAM_EVAL=1` and the child reports `engine=model`.
-Do not copy the stub's `ttfa_ms` into `LEDGER.md`.
+### This agent, same gate, 2026-11-03
 
-The 80–160 ms band is the budget for the first hearable chunk: one
-heartbeat of speech tokens, plus the lookahead and one short meanflow
-pass. The smoke's RTF was about 0.49 on CPU, so the token loop is the
-part that used to be hidden behind the vocoder. Whether a given box lands
-inside 80–160 ms is a measured `engine=model` run, not a number this tree
-invents.
+`GALION_SPEECH=a21 scripts/eval/clone-stream-ttfa.sh` on this CPU after
+`scripts/a21/fetch-a21.sh`. Cold spawn, first PCM byte. Not the
+SpeechStack clock above.
 
-`examples/flash_ttfa.rs` uses the same first-byte clock. `product_claim`
-is true only for `engine=model` and `path=stream`.
+| | |
+|---|---|
+| ttfa_ms | 379.0 |
+| utt_ms | 379.1 |
+| warm_ttfa_ms | 67.1 |
+| pcm_bytes | 25088 |
+| voice | `en_US-ljspeech-medium` |
+| sample | `scripts/eval/sample-voices/pdx-voice.wav` |
+| engine | `piper` |
+| product_claim | true |
+| piper_measured | true |
+| model_measured | false |
+| stub | false |
+| gate | PASS |
+
+Without `GALION_SPEECH=a21` the same script exits 2 and prints `FAIL`.
+That is the stub rejection, not a pass.
+
+`Heartbeat::step` is unchanged. A late frame stays a pause. `drain_frame`
+copies one 1920-sample frame outside `step` and does not generate.
 
 ## Heartbeat
 

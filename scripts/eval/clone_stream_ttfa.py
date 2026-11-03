@@ -1,18 +1,11 @@
 #!/usr/bin/env python3
 # Galion Voice — Perpetual Open MIT License
 # Copyright (c) 2026 Maciej Grajczyk.
-"""TTFA gate for the Chatterbox Nano stream hook.
+"""TTFA gate for the clone stream hook.
 
-PASS when the worker emits a stream path: a chunk marker, then PCM, then
-later the utterance marker, and the source has no whole-utterance
-``generate()`` call. FAIL when the only path is a finished utterance, when
-``path`` is not ``stream``, or when the first PCM is at or after 1500 ms
-on this protocol clock.
-
-The protocol stub is not a model measurement. ``model_measured`` stays
-false unless ``GALION_CLONE_STREAM_EVAL=1`` and a loaded worker reports
-``engine=model``. This script does not download weights and does not
-write a WAV.
+A protocol-stub clock is FAIL. It is not a pass and not a product claim.
+Real Piper PCM is measured by ``piper_stream_ttfa.py``. This script does
+not download weights and does not write a WAV.
 """
 
 from __future__ import annotations
@@ -111,8 +104,10 @@ def logic_gate() -> list:
         fails.append("whole-utterance report was not failed")
     if judge({"path": "stream", "chunks": 1, "ttfa_ms": 1800, "utt_ms": 2400, "hook": "stream"}) != "FAIL":
         fails.append("1500 ms first-audio was not failed")
-    if judge({"path": "stream", "chunks": 2, "ttfa_ms": 40, "utt_ms": 90, "hook": "stream"}) != "PASS":
-        fails.append("a short streamed clock was not passed")
+    if judge({"path": "stream", "chunks": 2, "ttfa_ms": 15, "utt_ms": 65, "engine": "protocol-stub"}) != "FAIL":
+        fails.append("a 15 ms protocol-stub clock was not failed")
+    if judge({"path": "stream", "chunks": 2, "ttfa_ms": 40, "utt_ms": 90, "engine": "piper", "real_pcm": True}) != "PASS":
+        fails.append("real piper PCM was not accepted")
     return fails
 
 
@@ -161,17 +156,20 @@ class _Mem:
 
 
 def judge(rep: dict) -> str:
+    """PASS only for real Piper or Nano PCM on a stream path under 1500 ms.
+
+    A protocol-stub clock is FAIL even when the pipe is fast.
+    """
+    engine = rep.get("engine") or ""
     path = rep.get("path")
     chunks = int(rep.get("chunks") or 0)
     ttfa = rep.get("ttfa_ms")
-    utt = rep.get("utt_ms")
-    if rep.get("hook") not in (None, "stream") and path != "stream":
+    real = bool(rep.get("real_pcm"))
+    if engine == "protocol-stub" or not real:
         return "FAIL"
-    if path != "stream" or chunks < 1 or ttfa is None:
+    if engine not in ("piper", "nano"):
         return "FAIL"
-    if ttfa >= WHOLE_UTT_FAIL_MS:
-        return "FAIL"
-    if utt is not None and utt - ttfa < 5 and utt >= WHOLE_UTT_FAIL_MS:
+    if path != "stream" or chunks < 1 or ttfa is None or ttfa >= WHOLE_UTT_FAIL_MS:
         return "FAIL"
     return "PASS"
 
@@ -229,8 +227,22 @@ def measure(argv: list, env: dict, line: bytes, timeout: float = 5.0) -> dict:
         "ttfa_ms": ttfa,
         "utt_ms": utt,
         "pcm_bytes": len(pcm),
+        "real_pcm": _real_pcm(pcm, engine),
         "stderr": text.strip().splitlines()[-8:],
     }
+
+
+def _real_pcm(pcm: bytes, engine: str | None) -> bool:
+    if engine in (None, "", "protocol-stub", "unwired"):
+        return False
+    if len(pcm) < 1920 * 2:
+        return False
+    import struct
+
+    count = min(len(pcm) // 2, 4000)
+    samples = struct.unpack("<" + "h" * count, pcm[: count * 2])
+    peak = max(abs(s) for s in samples)
+    return peak >= 100 and len(set(samples[:500])) >= 8
 
 
 def _last(text: str, key: str):
@@ -297,8 +309,8 @@ def main() -> None:
     if stub["ttfa_ms"] is not None and stub["utt_ms"] is not None:
         gap = stub["utt_ms"] - stub["ttfa_ms"]
     stub_judge = judge(stub)
-    if stub_judge != "PASS":
-        fails.append(f"protocol stream clock failed: {stub}")
+    if stub_judge != "FAIL":
+        fails.append(f"protocol stub clock was not failed: {stub}")
     if stub.get("chunks", 0) < 2:
         fails.append(f"protocol stream wrote fewer than 2 chunks: {stub}")
     if gap is None or gap < GAP_MS:
@@ -320,44 +332,64 @@ def main() -> None:
             b'{"text":"Hi.","persona":"samantha"}\n',
             timeout=120.0,
         )
-        model_measured = model.get("engine") == "model" and model.get("path") == "stream"
+        model_measured = model.get("engine") == "nano" and model.get("real_pcm") and model.get("path") == "stream"
         if model.get("path") == "whole" or (model.get("ttfa_ms") is not None and model["ttfa_ms"] >= WHOLE_UTT_FAIL_MS):
             fails.append(f"model clock is whole-utterance: {model}")
         if not model_measured and judge(model) == "FAIL" and model.get("engine") not in (None, "unwired"):
             fails.append(f"model stream eval failed: {model}")
+    product_claim = bool(
+        model_measured
+        and model
+        and model.get("engine") == "nano"
+        and model.get("real_pcm")
+        and judge(model) == "PASS"
+    )
+    if fails:
+        gate = "FAIL"
+    elif product_claim:
+        gate = "PASS"
+    else:
+        gate = "FAIL"
     report = {
-        "gate": "FAIL" if fails else "PASS",
+        "gate": gate,
+        "hard_pass": gate == "PASS",
         "fails": fails,
-        "path": stub.get("path"),
-        "engine": stub.get("engine"),
-        "chunks": stub.get("chunks"),
-        "ttfa_ms": stub.get("ttfa_ms"),
-        "utt_ms": stub.get("utt_ms"),
-        "gap_ms": gap,
+        "path": None if not product_claim else model.get("path"),
+        "engine": None if not product_claim else "nano",
+        "chunks": None if not product_claim else model.get("chunks"),
         "target_ms": [TARGET_LO_MS, TARGET_HI_MS],
         "whole_utt_fail_ms": WHOLE_UTT_FAIL_MS,
-        "model_measured": model_measured,
-        "product_claim": False,
-        "heartbeat_step": "unchanged; drain_frame is outside step and does not generate",
+        "model_measured": model_measured and product_claim,
+        "product_claim": product_claim,
+        "stub_clock": "FAIL",
+        "stub_engine": stub.get("engine"),
+        "stub_gap_ms": gap,
+        "heartbeat_step": "unchanged; late frame stays a pause; drain_frame is outside step",
         "piper_fallback": "SpeechStack still hands a dead clone to Piper",
         "whole_utt_fixture": judge(whole),
         "note": (
-            "Protocol clock only. Target 80-160 ms is the Nano chunk budget "
-            "(2 speech tokens at 25 Hz, after a 3-token lookahead). "
-            "A model TTFA is absent until GALION_CLONE_STREAM_EVAL=1 returns engine=model."
+            "Protocol-stub clocks are FAIL. They are not ttfa_ms and not a product claim. "
+            "Real Piper PCM is scripts/eval/piper_stream_ttfa.py."
         ),
     }
-    if model is not None:
-        report["model"] = {
+    if product_claim and model is not None:
+        report["ttfa_ms"] = model.get("ttfa_ms")
+        report["utt_ms"] = model.get("utt_ms")
+    if model is not None and not product_claim:
+        report["model_attempt"] = {
             "engine": model.get("engine"),
             "path": model.get("path"),
-            "ttfa_ms": model.get("ttfa_ms"),
-            "utt_ms": model.get("utt_ms"),
-            "chunks": model.get("chunks"),
+            "real_pcm": model.get("real_pcm"),
         }
+    text = json.dumps(report, sort_keys=True)
     if fails:
-        die(report)
-    ok(report)
+        sys.stdout.write("FAIL\n" + text + "\n")
+        raise SystemExit(1)
+    if gate != "PASS":
+        sys.stdout.write("FAIL\n" + text + "\n")
+        raise SystemExit(2)
+    sys.stdout.write("PASS\n" + text + "\n")
+    raise SystemExit(0)
 
 
 if __name__ == "__main__":
