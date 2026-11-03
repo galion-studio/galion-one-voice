@@ -116,7 +116,8 @@ reply before publish. That cancel is the seed of the V2 barge-in token.
 What is deliberately missing: a real ASR engine, a `.gq` reply model, a warm
 Piper process across turns (the stack is built once per worker, which already
 avoids per-turn process start when the backend allows it; Piper today is still
-out of process per `speak`), an orb integrator inside `galion-render`, and
+out of process per `speak`), wiring that orb integrator into the surfaces
+(the step itself is in `galion-render`; the page still draws the phone), and
 any path that opens SSH.
 
 ## 5. Sectors
@@ -170,10 +171,14 @@ the reply WAV the page already plays.
 Listening radius tracks mic energy. Thinking is the wait between accept and
 playback. Speaking radius tracks an `AnalyserNode` on the playback graph.
 The server drains reply PCM into the me band so `/dot` hears the reply too.
+The same spring is in `galion-render` (`OrbEngine`, design in
+`ANIMATION-ENGINE.md`). Surfaces still draw the discrete golden.
 
-**Still open.** Move the integrator into `galion-render` so PNG and terminal
-use the same spring. Do not do that until G4 is re-blessed on purpose. A
-shader is a later engine step, not a requirement for the phone to feel alive.
+**Still open.** PNG, terminal, and the future softbuffer window do not
+sample the spring yet. `NullSurface` still records `DotParams`, so this
+landing does not re-bless G4. Switching a surface over is an owner step,
+and it re-blesses G4 only if the recorded dot stops being `DotParams`.
+A shader is a later engine step, not a requirement for the phone to feel alive.
 
 **Acceptance.**
 
@@ -194,7 +199,8 @@ it must not pretend the lock already lists that state.
 
 **Owner decision.** Whether `thinking` becomes a locked state. Whether the
 hint sentence is allowed on the user surface or must be replaced by motion
-alone. Whether the spring moves into `galion-render` (that re-blesses G4).
+alone. Whether PNG and the window sample `OrbEngine` (the module is in the
+crate; surfaces still use `DotParams`, so G4 stays put until that switch).
 
 ### V2-S3 · Secure edge
 
@@ -550,6 +556,8 @@ lock key lists languages; the code does.
 - `PhoneHost` so the screen demo drains turns on the 80 ms loop without
   blocking it, and plays reply PCM into the me band.
 - V2 orb foundation on that same page (spring, mic energy, playback envelope).
+- Rust spring foundation in `galion-render` (`ANIMATION-ENGINE.md`). Not
+  sampled by `NullSurface`. G4 golden not re-blessed.
 - Security headers, CORS allowlist switch, retention note.
 - `scripts/check-phone-pipeline.sh` and a thicker `run-v1-screen.sh --check`.
 - This plan, Plan V5, the brand doc, the README.

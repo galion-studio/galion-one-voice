@@ -41,10 +41,11 @@ for a client that is not running this page.
 
 ## What this is not
 
-Not a shader engine, not a scene graph, not V3. The next graphic step, when
-an owner wants it, is to move this spring into `galion-render` so terminal,
-PNG, and web share one integrator. Until then the page is the place the phone
-sees, and `DotParams` stays the golden for G4.
+Not a shader engine, not a scene graph, not V3. The shared integrator lives
+in `galion-render` (`spring`, `OrbEngine`). Design:
+`docs/galion-voice-v2/ANIMATION-ENGINE.md`. Surfaces do not call it yet.
+The page is still what the phone sees, and `DotParams` stays the golden
+for G4. Pointing PNG or the window at the spring is a later owner step.
 
 ## Acceptance
 
@@ -54,5 +55,7 @@ sees, and `DotParams` stays the golden for G4.
 3. During playback, radius changes inside a syllable, not only on the 80 ms grid.
 4. One canvas, one filled mark, background still `#0A0A0C` with the amber → violet wash.
 5. G4 NullSurface golden unchanged, because `dot.rs` was not retuned.
+6. `OrbEngine` steps at 1/60, 1/120, and 1/240 without NaNs, and
+   `NullSurface` still records `DotParams`.
 
 — Maciej Grajczyk

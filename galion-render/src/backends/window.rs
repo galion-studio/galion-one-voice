@@ -4,8 +4,11 @@
 //! to terminal. Planned backend (added as an optional dep under this feature only):
 //! `softbuffer` + `winit` (pure-Rust CPU framebuffer, no GPU/wgpu), event loop on its own
 //! thread, frames handed over via a single-slot mailbox (latest wins) so `present` never
-//! blocks. Galion OS builds can swap in a direct `/dev/fb0` / DRM dumb-buffer writer
-//! behind the same trait without any windowing system.
+//! blocks. That thread is where [`crate::OrbEngine`] steps, at the vsync `dt`
+//! (60 / 120 / 240 Hz when the display allows). `present()` only stores the latest
+//! [`VizFrame`]. It does not integrate the spring, and the spring does not run
+//! inside `Heartbeat::step`. Galion OS builds can swap in a direct `/dev/fb0` /
+//! DRM dumb-buffer writer behind the same trait without any windowing system.
 
 use crate::frame::VizFrame;
 use crate::surface::{RenderError, RenderSurface, SurfaceCaps, SurfaceKind};

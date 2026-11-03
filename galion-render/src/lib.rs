@@ -21,6 +21,10 @@
 //! The gradient is background only and never touches the dot. [`NullSurface`] is the
 //! headless CI/gate sink (G4) and records the dot it would have drawn.
 //!
+//! [`OrbEngine`] is the display-rate spring between those discrete targets
+//! (60 / 120 / 240 Hz, variable `dt`). Surfaces do not call it, so the G4
+//! golden stays [`DotParams`]. It must not run inside `Heartbeat::step`.
+//!
 //! `galion-console` owns *what* is shown (layout, panels, colors); `galion-render` owns
 //! *where* it is shown. Console builds a `VizFrame`, render delivers it.
 
@@ -29,6 +33,8 @@
 pub mod frame;
 pub mod palette;
 pub mod dot;
+pub mod spring;
+pub mod orb_engine;
 pub mod surface;
 pub mod backends;
 pub mod png;
@@ -38,6 +44,8 @@ pub mod wav;
 pub use frame::{Band, BandState, Emotion, VizFrame};
 pub use surface::{Fanout, NullSurface, RenderError, RenderSurface, SurfaceCaps, SurfaceKind};
 pub use dot::{DotParams, DotState};
+pub use spring::{Spring, SpringGain, SpringStep};
+pub use orb_engine::{DisplayHz, OrbEngine, OrbMotion, OrbSample};
 pub use palette::Rgb;
 pub use backends::png_seq::{PngSeqConfig, PngSeqSurface};
 
