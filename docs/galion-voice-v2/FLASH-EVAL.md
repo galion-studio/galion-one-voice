@@ -25,7 +25,7 @@ engine, because generate is not wired. A protocol-stub clock is a test of
 the pipe. It is not a Flash result. Do not copy a number into `LEDGER.md`
 or a demo until a model run is actually recorded there.
 
-No reference clip is sent. Film audio stays on the rights hold.
+The default Flash harness does not require a reference. Consented local wavs are the clone-landing path in `symphony/CLONE-LANDING.md` (owner t273). A protocol-stub clock is still not a Flash result, and a public demo stays closed.
 
 ## Harness
 

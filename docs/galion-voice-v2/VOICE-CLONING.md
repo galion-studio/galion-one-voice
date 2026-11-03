@@ -71,15 +71,20 @@ under that. The Python stub does not call generate and refuses a reference
 clip. Weights are fetched only with `GALION_CLONE_FETCH=1`. The build plan
 for wiring `generate`, and for `audio_prompt_path` after rights, is
 `CHATTERBOX-WORKER.md`. That plan does not edit `LOCKS.toml`.
+under that. The Python child does not call generate. It accepts a reference only for
+the two current wavs after owner t273, and only when the sha256 matches
+(`symphony/CLONE-LANDING.md`). It is CPU-only, one vCPU, and it does not
+denoise. Weights are fetched only with `GALION_CLONE_FETCH=1`.
 
 **Personas.**
 
 - **Samantha** — conversational and emotional. Paralinguistic tags are for her. The slogan's "seamless connection" is her register: warmth, timing, pauses. The film voice is a research target under the legal hold.
 - **Jarvis** — calm, precise, command and interface. Short lines. Tags off. The film voice is a research target under the same hold.
 
-Voice binding for those two ids is a draft, not a loader:
-`docs/galion-voice-v2/personas/voice/`. The reference slots there are empty
-text markers. This file still does not fetch a clip.
+Voice binding for those two ids is
+`docs/galion-voice-v2/personas/voice/`. `clip_path` names the gitignored
+wav. `send_reference` is true for local send. This file still does not
+fetch a clip. The public demo stays closed.
 
 ## CPU and memory
 
@@ -98,6 +103,8 @@ Piper pin is unchanged. Global `foreign_runtime_allowed` stays false.
 - `in_tree_ort`, `in_tree_ggml`, and `in_tree_llama` are false on that pin. A community ONNX export does not ride the Piper pin. A GGML-family port is still the wrong shape.
 - `weights_vendored = false`. Do not commit Nano or Turbo weights. `scripts/clone/fetch-clone-weights.sh` refuses unless `GALION_CLONE_FETCH=1`. The release layout is `CLONE-WEIGHTS.md`.
 - `reference_clips = false`. No film audio.
+- `weights_vendored = false`. Do not commit Nano or Turbo weights. `scripts/clone/fetch-clone-weights.sh` refuses unless `GALION_CLONE_FETCH=1`.
+- `reference_clips = false` remains in the lock file. Local send of the two pinned wavs is the t273 worker path, not a flip of that key. No GGUF.
 - Do not "temporarily" port the net onto candle.
 
 ## Dropped external APIs
@@ -129,7 +136,7 @@ or ingest a clip. Replaces the external-API swarm, which is dropped.
 | 5 | Zero-shot ~10 s conditioning, no fine-tune | `docs/galion-voice-v2/CHATTERBOX-WORKER.md` | plan written; `reference_clips` stays false; seat not spawned |
 | 6 | Jarvis research-target mapping | `docs/galion-voice-v2/VOICE-CLONING.md` | planned-not-spawned |
 | 7 | Samantha tags and emotional register | `docs/galion-voice-v2/VOICE-CLONING.md` | planned-not-spawned |
-| 8 | Rights, consent, licence gate | `docs/galion-voice-v2/RIGHTS-CLEARANCE.md` and `docs/galion-voice-v2/CLIP-INGEST.md` | checklist written; both gates closed; ingest outline only, gate not opened |
+| 8 | Rights, consent, licence gate | `docs/galion-voice-v2/RIGHTS-CLEARANCE.md` and `docs/galion-voice-v2/CLIP-INGEST.md` | owner t273 local send recorded; counsel boxes and public demo stay closed; lock key not flipped |
 | 9 | Art. 50 watermark note (no Perth vendor) | `docs/galion-voice-v2/VOICE-CLONING.md` | planned-not-spawned |
 | 10 | Piper fallback and warm-worker shape | `docs/galion-voice-v2/CLONE-WORKER.md` | scaffolded; Piper speaks when the clone slot is absent |
 | 11 | TTFA eval plan (no measurement) | `docs/galion-voice-v2/FLASH-EVAL.md` | harness prints `measured: false` until a flagged run |
