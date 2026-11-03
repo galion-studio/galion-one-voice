@@ -18,14 +18,14 @@ One number, when a run happens:
 - start: the worker has accepted one JSON line (`text`, model, persona)
 - stop: the first PCM sample is in the parent's buffer
 - machine: this CPU, not a phone, not a VPS, not PSTN
-- label: `engine` from the child (`protocol-stub`, `unwired`, or a future `model`)
+- label: `engine` from the child (`protocol-stub`, `unwired`, `chatterbox-nano`, `chatterbox-turbo`)
 
-`product_claim` is true only for `engine=model`. This tree never sets that
-engine, because generate is not wired. A protocol-stub clock is a test of
-the pipe. It is not a Flash result. Do not copy a number into `LEDGER.md`
-or a demo until a model run is actually recorded there.
+`product_claim` is true only for `engine=model`. A `chatterbox-*` clock is
+a local generate time. It is not a published Flash result until someone
+writes it in `LEDGER.md`. A protocol-stub clock is a test of the pipe.
 
-No reference clip is sent. Film audio stays on the rights hold.
+The JSON line still has no reference field. A local clip is opened only
+under `NANO-BACKEND.md`. Film audio stays on the rights hold.
 
 ## Harness
 

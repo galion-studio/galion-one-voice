@@ -54,7 +54,7 @@ into a fetch script, no call to a dropped clone API.
 | 4 | `public_demo` explicit. Default is no. A demo that speaks the voice needs its own yes. | The same line | Absent. |
 | 5 | Counsel when the paper is not a direct grant from the rightsholder. The operator does not self-clear. | LEDGER, or a counsel memo the line cites | Not requested here. |
 | 6 | `reference_clips = false` has been changed by a later owner decision | `LOCKS.toml` `[formats.exceptions.v2s14_chatterbox]` | Still false. A LEDGER line alone does not flip it. |
-| 7 | The worker contract has been changed to accept a path | `CLONE-WORKER.md`, `scripts/clone/chatterbox_worker.py` | Still a refusal. Exit 3, no PCM. |
+| 7 | The worker accepts a clip path on the JSON line | `CLONE-WORKER.md`, `scripts/clone/chatterbox_worker.py` | Still a refusal. Exit 3, no PCM. A local file is opened only from `GALION_CLIP_STORE` when `GALION_CLONE_LOCAL_REFS=1` and the sha sidecar matches. The lock stays false. |
 
 The comparison `VOICE-CLONING.md` requires stays in force. In May 2024
 OpenAI withdrew the Sky voice after Scarlett Johansson said it resembled
@@ -85,7 +85,9 @@ submodule, a fixture, a CI artifact, and a commit on a side branch.
 ignores everything under `weights/` except itself. Audio does not go in
 that directory. The weight fetch already refuses those suffixes.
 
-The store this outline names is not created, and no program here reads it:
+The repository does not create this store and does not put a default under
+the work tree. `chatterbox_worker.py` reads it only when `GALION_CLIP_STORE`
+is set and `GALION_CLONE_LOCAL_REFS=1`:
 
 ```text
 $GALION_CLIP_STORE/                 # absolute path outside the git work tree
@@ -167,15 +169,20 @@ reference.
 
 ## Clone-worker handoff
 
-What the scaffold does now (`CLONE-WORKER.md`):
+What the worker does now (`CLONE-WORKER.md`, `NANO-BACKEND.md`):
 
-The stdin line is `{"text","model","persona","tags"}`. `request_line`
-emits those four fields. A non-empty `reference`, `audio_prompt`,
-`audio_prompt_path`, or `clip` makes `chatterbox_worker.py` exit 3 with
-`galion-clone-refuse: reference clips are on the rights hold`, and with
-no PCM on stdout. Jarvis still forces `tags` false. An unknown persona
-name is still treated as Samantha. That refusal is the handoff. There
-is no path to pass.
+The stdin line is `{"text","model","persona","tags","prosody"}`. `prosody`
+is numbers from the 80 ms `galion-emotion` frame. A non-empty `reference`,
+`audio_prompt`, `audio_prompt_path`, or `clip` makes `chatterbox_worker.py`
+exit 3 with `galion-clone-refuse: reference clips are on the rights hold`,
+and with no PCM on stdout. Jarvis still forces `tags` false. An unknown
+persona name is still treated as Samantha.
+
+The child does not take a path from that line. When `GALION_CLONE_LOCAL_REFS=1`
+it opens `$GALION_CLIP_STORE/<persona>/reference.wav` only if the bytes match
+the sidecar sha. Otherwise it writes `galion-clone-unwired` and the host
+speaks with Piper. `reference_clips` in the lock stays `false`. This is not
+a rights grant and not a fetch.
 
 `BusBody::Persona` carries `id` and `source`. It does not carry samples
 or a filesystem path. `Utterance` is the caller's turn. A film clip does
@@ -184,17 +191,12 @@ not ride either body, and it does not ride `POST /turn`.
 If the clone slot is absent, Piper (`en_US-ljspeech-medium`) speaks, then
 flite. A refused clip does not become a cloned voice on the way down.
 
-A later handoff is a new owner decision. It is not this outline, and it
-still has to pass the gates above, including the lock. The shape, if
-that decision is ever written:
-
-- The child still does not fetch.
-- It opens one path outside the work tree. The path is an argument to that process, not an HTTP body, not a git blob, not a log of the samples.
-- The sha256 matches the LEDGER line, the grant is inside its term, and `public_demo` matches the call.
-- Stdout stays raw 24 kHz s16le. No wav of the reply is written.
-- Any failed check skips the child. Piper speaks.
-
-This outline does not add the four keys the stub refuses.
+The local gate does not close the rows above it. Gates 1–6 are still absent.
+The child still does not fetch. It opens one path outside the work tree.
+That path is not an HTTP body, not a git blob, and not a log of the samples.
+Stdout stays raw 24 kHz s16le. No wav of the reply is written. A failed sha
+check skips the child. Piper speaks. The JSON line still does not carry the
+four keys the worker refuses.
 
 ## Art. 50 and the watermark
 

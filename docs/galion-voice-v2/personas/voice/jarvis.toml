@@ -2,7 +2,9 @@
 # Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
 #
 # The /v2 demo route reads this file for prosody, wash, tags, and the
-# rights hold. The clone worker does not. No clip, no weights.
+# rights hold. The clone worker resolves a local ref only from
+# GALION_CLIP_STORE when GALION_CLONE_LOCAL_REFS=1 and the sha sidecar
+# matches. It does not read this file. No clip and no weights are in git.
 # Register numbers are the design table in SAMANTHA-V2.md §4.
 # A British accent is the intended register, not a fact about
 # en_US-ljspeech-medium. Rights hold: ../VOICE-CLONING.md.
@@ -77,6 +79,8 @@ script = "scripts/clone/chatterbox_worker.py"
 env_persona = "GALION_CLONE_PERSONA"
 env_model = "GALION_CLONE_MODEL"
 env_worker = "GALION_CLONE_WORKER"
+env_refs = "GALION_CLONE_LOCAL_REFS"
+env_store = "GALION_CLIP_STORE"
 model = "nano"
 quality_option = "turbo"
 request_persona = "jarvis"
@@ -94,7 +98,7 @@ order = ["piper", "flite"]
 engine = "piper"
 voice = "en_US-ljspeech-medium"
 artifact = "weights/tts/en_US-ljspeech-medium.onnx"
-when = "clone worker absent, unwired, or dead; rights hold still closed"
+when = "clone worker absent, unwired, ref not allowlisted, or dead; rights hold still closed"
 tags = false
 is_film_voice = false
 

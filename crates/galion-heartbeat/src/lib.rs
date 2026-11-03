@@ -153,12 +153,18 @@ pub struct Heartbeat<G: ConsentGate> {
     index: u32,
     pending: RikaOutput,
     paused_frames: u32,
+    /// Caller affect from the frame that just ran, when the consent gate let
+    /// the feature closure run. `None` when Rika is off. Fixed-size. Not a label.
+    last_caller: Option<EmotionFrame>,
 }
 
 impl<G: ConsentGate> Heartbeat<G> {
     pub fn new(cfg: HeartbeatConfig, gate: G) -> Self {
         let rika = Rika::new(cfg.rika.clone());
-        Self { cfg, gate, rika, detector: EnergyStubDetector::default(), index: 0, pending: neutral_output(0, Some(OffReason::Disabled)), paused_frames: 0 }
+        Self {
+            cfg, gate, rika, detector: EnergyStubDetector::default(), index: 0,
+            pending: neutral_output(0, Some(OffReason::Disabled)), paused_frames: 0, last_caller: None,
+        }
     }
 
     /// Fresh session state (hang-up / new call). Wipes all affect-derived state.
@@ -169,6 +175,14 @@ impl<G: ConsentGate> Heartbeat<G> {
         self.index = 0;
         self.pending = neutral_output(0, Some(OffReason::Disabled));
         self.paused_frames = 0;
+        self.last_caller = None;
+    }
+
+    /// Caller frame from the last `step`, if consent let the 80 ms read run.
+    /// Hosts use this outside `step` for [`galion_emotion::StubExpressor::voice_color`].
+    /// There is no second estimator here.
+    pub fn last_caller_frame(&self) -> Option<EmotionFrame> {
+        self.last_caller
     }
 
     pub fn gate(&self) -> &G {
@@ -222,16 +236,20 @@ impl<G: ConsentGate> Heartbeat<G> {
         let stub = self.cfg.stub_affect && input.affect.is_none();
         let (gate, detector) = (&self.gate, &mut self.detector);
         // The feature closure (the PCM read) runs only after Rika's consent gate passes.
+        // `caller` is a Copy of that same frame. Assigning it does not allocate.
+        let mut caller: Option<EmotionFrame> = None;
         let decided = self.rika.step(ctx, gate, || {
             let affect = match input.affect {
                 Some(a) => Some(a),
                 None if stub => detector.detect(pcm, SAMPLE_RATE, idx.wrapping_mul(FRAME_MS), gate, input.purpose).ok(),
                 None => None,
             };
+            caller = affect;
             let mut f = FrameFeatures::from_pcm(pcm).with_affect(affect);
             f.tension = input.tension;
             f
         });
+        self.last_caller = if decided.off.is_some() { None } else { caller };
         if decided.off.is_some() {
             // OFF → no affect-derived state survives (detector EMA included).
             self.detector.reset();

@@ -19,12 +19,38 @@
 use std::sync::mpsc::{sync_channel, Receiver, RecvTimeoutError, SyncSender, TryRecvError, TrySendError};
 use std::time::Instant;
 
+use std::sync::{Arc, Mutex};
+
 use galion_cascade::en_lane::{wav_bytes, LANE_RATE_HZ};
+use galion_cascade::phone::FrameProsody;
 use galion_cascade::{PhoneConfig, PhoneError, PhoneLane};
 
 use crate::bus::{
     bytes_to_pcm16, pcm16_to_bytes, BusBody, BusGate, BusMsg, ProcessBus, WORKER_REPLY_DEPTH,
 };
+
+/// Latest 80 ms prosody, written by the screen loop and read when a turn speaks.
+/// The heartbeat does not lock this. Identity until the host stores a frame.
+#[derive(Clone)]
+pub struct ProsodySlot {
+    inner: Arc<Mutex<FrameProsody>>,
+}
+
+impl ProsodySlot {
+    pub fn identity() -> Self {
+        Self { inner: Arc::new(Mutex::new(FrameProsody::identity())) }
+    }
+
+    pub fn store(&self, prosody: FrameProsody) {
+        if let Ok(mut slot) = self.inner.lock() {
+            *slot = prosody;
+        }
+    }
+
+    pub fn load(&self) -> FrameProsody {
+        self.inner.lock().map(|slot| *slot).unwrap_or_else(|_| FrameProsody::identity())
+    }
+}
 
 /// One utterance handed to the worker: mono PCM16 at `rate` (the lane resamples to 16 kHz).
 pub struct TurnJob {
@@ -137,17 +163,22 @@ impl TurnWorker {
     /// submitted as soon as `spawn` returns is not stuck behind model load in
     /// the one-slot queue. The 80 ms loop never calls this.
     pub fn spawn_with(cfg: PhoneConfig) -> Self {
-        Self::spawn_on_with(ProcessBus::new(), cfg)
+        Self::spawn_on_with(ProcessBus::new(), cfg, ProsodySlot::identity())
     }
 
     /// `bus` is shared with the host. The lane is read from the environment.
     /// The worker thread holds only the cancel gate, so dropping this handle
     /// disconnects the job lane and the thread exits.
     pub fn spawn_on(bus: ProcessBus) -> Self {
-        Self::spawn_on_with(bus, PhoneConfig::from_env())
+        Self::spawn_linked(bus, ProsodySlot::identity())
     }
 
-    fn spawn_on_with(bus: ProcessBus, cfg: PhoneConfig) -> Self {
+    /// Same as [`spawn_on`] with the host's prosody slot. The 80 ms loop writes it.
+    pub fn spawn_linked(bus: ProcessBus, prosody: ProsodySlot) -> Self {
+        Self::spawn_on_with(bus, PhoneConfig::from_env(), prosody)
+    }
+
+    fn spawn_on_with(bus: ProcessBus, cfg: PhoneConfig, prosody: ProsodySlot) -> Self {
         let job_rx = bus.take_job_rx().expect("job receiver taken once");
         let gate = bus.gate();
         let (rtx, reply_rx) = sync_channel::<TurnReply>(WORKER_REPLY_DEPTH);
@@ -165,7 +196,7 @@ impl TurnWorker {
                             if !gate.admit_asr(turn_id) {
                                 continue;
                             }
-                            let Some(reply) = respond_speak(&mut lane, job, &gate) else {
+                            let Some(reply) = respond_speak(&mut lane, job, &gate, &prosody) else {
                                 let _ = gate.admit_publish(turn_id);
                                 continue;
                             };
@@ -187,7 +218,7 @@ impl TurnWorker {
                                 continue; // superseded (barge-in) before ASR
                             }
                             let job = turn_job_from(msg);
-                            let Some(reply) = respond(&mut lane, job, &gate) else {
+                            let Some(reply) = respond(&mut lane, job, &gate, &prosody) else {
                                 let _ = gate.admit_publish(turn_id);
                                 continue; // superseded while synthesizing, before publish
                             };
@@ -273,9 +304,10 @@ fn turn_job_from(msg: BusMsg) -> TurnJob {
     }
 }
 
-fn respond_speak(lane: &mut PhoneLane, mut job: SpeakJob, gate: &BusGate) -> Option<TurnReply> {
+fn respond_speak(lane: &mut PhoneLane, mut job: SpeakJob, gate: &BusGate, prosody: &ProsodySlot) -> Option<TurnReply> {
     let persona = gate.persona_id().as_str();
     let id = job.id;
+    lane.set_delivery(persona, prosody.load());
     lane.arm_cancel(gate.cancel_token(), id);
     let t0 = Instant::now();
     let mut text = std::mem::take(&mut job.text);
@@ -328,8 +360,9 @@ fn respond_speak(lane: &mut PhoneLane, mut job: SpeakJob, gate: &BusGate) -> Opt
     }
 }
 
-fn respond(lane: &mut PhoneLane, mut job: TurnJob, gate: &BusGate) -> Option<TurnReply> {
+fn respond(lane: &mut PhoneLane, mut job: TurnJob, gate: &BusGate, prosody: &ProsodySlot) -> Option<TurnReply> {
     let persona = gate.persona_id().as_str();
+    lane.set_delivery(persona, prosody.load());
     lane.arm_cancel(gate.cancel_token(), job.id);
     let t0 = Instant::now();
     let in_ms = (job.pcm.len() as u64 * 1000 / job.rate.max(1) as u64) as u32;

@@ -17,8 +17,10 @@ use galion_heartbeat::{FRAME_MS, SAMPLE_RATE};
 use galion_render::backends::web::{MicTap, ReplyBox, SayInbox, SpokenLine, Turn, TurnInbox, WebSurface};
 use galion_render::v2_persona::Floor;
 
+use galion_emotion::ProsodyControl;
+
 use crate::bus::{pcm16_to_bytes, BusMsg, ProcessBus};
-use crate::turn_worker::{TurnJob, TurnReply, TurnWorker};
+use crate::turn_worker::{ProsodySlot, TurnJob, TurnReply, TurnWorker};
 
 /// What the phone path overrode on this tick.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -38,6 +40,7 @@ pub struct PhoneHost {
     floor: Arc<Mutex<Floor>>,
     bus: ProcessBus,
     worker: TurnWorker,
+    prosody: ProsodySlot,
     /// Remaining reply samples at 24 kHz.
     play: VecDeque<i16>,
     /// A turn the worker could not accept yet (channel full). Newest wins.
@@ -55,13 +58,15 @@ impl PhoneHost {
     /// the surface into a `Box<dyn RenderSurface>`.
     pub fn from_surface(web: &WebSurface) -> Self {
         let bus = ProcessBus::new();
+        let prosody = ProsodySlot::identity();
         Self {
             mic: web.mic_tap(),
             turns: web.turn_inbox(),
             says: web.say_inbox(),
             replies: web.reply_box(),
             floor: web.persona_floor(),
-            worker: TurnWorker::spawn_on(bus.clone()),
+            worker: TurnWorker::spawn_linked(bus.clone(), prosody.clone()),
+            prosody,
             bus,
             play: VecDeque::new(),
             pending: None,
@@ -74,6 +79,19 @@ impl PhoneHost {
 
     pub fn bus(&self) -> &ProcessBus {
         &self.bus
+    }
+
+    /// Store the prosody from the 80 ms frame that just finished.
+    /// Called by the screen loop after `Heartbeat::step`, not inside it.
+    pub fn note_prosody(&mut self, prosody: ProsodyControl) {
+        self.prosody.store(galion_cascade::phone::FrameProsody {
+            pitch_st: prosody.pitch_shift_st,
+            pitch_range: prosody.pitch_range,
+            rate: prosody.rate,
+            energy: prosody.energy,
+            warmth: prosody.warmth,
+            pre_pause_ms: prosody.pre_pause_ms,
+        });
     }
 
     /// Replace `you` when the browser posted a fresh RMS above the room floor.

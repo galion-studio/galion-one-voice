@@ -11,11 +11,14 @@
 //! Weights are not vendored. [`weights_ready`] is false until the pinned
 //! safetensors are on disk. Nothing here downloads them.
 //!
-//! The Python stub does not call Chatterbox generate and refuses a reference
-//! clip. `GALION_CLONE_STUB_PCM=1` is protocol PCM, not a Flash result.
+//! The child calls Chatterbox `from_local` only when the pinned safetensors,
+//! a tokenizer, and a sha-allowlisted local reference are all present.
+//! `GALION_CLONE_LOCAL_REFS=1` is that ref gate. It does not read or change
+//! `LOCKS.toml`. A reference path on the JSON line is still a refusal.
+//! `GALION_CLONE_STUB_PCM=1` is protocol PCM, not a Flash result.
 #![allow(unsafe_code)]
 
-use super::sha256;
+use super::{sha256, FrameProsody};
 use crate::{Audio, LanguageId, TtsEngine, VoiceError};
 use std::io::{Read, Write};
 use std::os::unix::io::AsRawFd;
@@ -114,15 +117,33 @@ fn clone_root() -> PathBuf {
     }
 }
 
-fn pin_matches(root: &Path, pin: &Pin) -> bool {
-    let path = root.join(&pin.rel);
-    let Ok(meta) = std::fs::metadata(&path) else {
+fn file_matches(path: &Path, pin: &Pin) -> bool {
+    let Ok(meta) = std::fs::metadata(path) else {
         return false;
     };
-    if meta.len() != pin.size {
+    if !meta.is_file() || meta.len() != pin.size {
         return false;
     }
-    sha256::file_hex(&path).ok().as_deref() == Some(pin.sha.as_str())
+    sha256::file_hex(path).ok().as_deref() == Some(pin.sha.as_str())
+}
+
+fn pin_matches(root: &Path, pin: &Pin) -> bool {
+    let flat = std::path::Path::new(&pin.rel)
+        .file_name()
+        .map(|name| root.join(name))
+        .unwrap_or_else(|| root.join(&pin.rel));
+    file_matches(&root.join(&pin.rel), pin) || file_matches(&flat, pin)
+}
+
+fn weight_roots() -> Vec<PathBuf> {
+    let mut roots = vec![clone_root()];
+    if let Ok(p) = std::env::var("GALION_CLONE_CKPT") {
+        let path = PathBuf::from(p.trim());
+        if path.is_dir() && !roots.iter().any(|r| r == &path) {
+            roots.push(path);
+        }
+    }
+    roots
 }
 
 /// True when the shared tensors and this model's T3 file match [`PINS_TEXT`].
@@ -132,18 +153,80 @@ pub fn weights_ready(model: CloneModel) -> bool {
     if table.is_empty() {
         return false;
     }
-    let root = clone_root();
     let need = [
         "shared/s3gen.safetensors",
         "shared/s3gen_meanflow.safetensors",
         "shared/ve.safetensors",
         model.t3_rel(),
     ];
-    need.iter().all(|rel| {
-        table
-            .iter()
-            .any(|pin| pin.rel == *rel && pin_matches(&root, pin))
+    weight_roots().into_iter().any(|root| {
+        need.iter().all(|rel| {
+            table
+                .iter()
+                .any(|pin| pin.rel == *rel && pin_matches(&root, pin))
+        })
     })
+}
+
+/// `GALION_CLONE_LOCAL_REFS=1`. Anything else leaves the ref gate closed.
+pub fn local_refs_enabled() -> bool {
+    std::env::var("GALION_CLONE_LOCAL_REFS").ok().as_deref() == Some("1")
+}
+
+/// True when `store/<persona>/reference.wav` matches the hex in the sidecar.
+/// The persona argument is normalised to `samantha` or `jarvis`.
+pub fn persona_ref_ok(store: &Path, persona: &str) -> bool {
+    let name = persona_name(persona);
+    let wav = store.join(name).join("reference.wav");
+    let side = store.join(name).join("reference.wav.sha256");
+    sha_sidecar_matches(&wav, &side)
+}
+
+fn sha_sidecar_matches(wav: &Path, side: &Path) -> bool {
+    let Ok(text) = std::fs::read_to_string(side) else {
+        return false;
+    };
+    let expect = text.split_whitespace().next().unwrap_or("").trim().to_ascii_lowercase();
+    if expect.len() != 64 || !expect.chars().all(|c| c.is_ascii_hexdigit()) {
+        return false;
+    }
+    sha256::file_hex(wav).ok().as_deref() == Some(expect.as_str())
+}
+
+/// Env gate plus the sidecar sha. Closed when the env is unset, even if the wav exists.
+pub fn ref_allowlisted(persona: &str) -> bool {
+    if !local_refs_enabled() {
+        return false;
+    }
+    let Ok(store) = std::env::var("GALION_CLIP_STORE") else {
+        return false;
+    };
+    let store = store.trim();
+    if store.is_empty() {
+        return false;
+    }
+    persona_ref_ok(Path::new(store), persona)
+}
+
+fn tokenizer_json() -> Option<PathBuf> {
+    let mut dirs = Vec::new();
+    for key in ["GALION_CLONE_TOKENIZER", "GALION_CLONE_CKPT"] {
+        if let Ok(p) = std::env::var(key) {
+            let p = p.trim();
+            if !p.is_empty() {
+                dirs.push(PathBuf::from(p));
+            }
+        }
+    }
+    dirs.push(clone_root().join("tokenizer"));
+    dirs.into_iter()
+        .map(|d| d.join("tokenizer.json"))
+        .find(|p| p.is_file())
+}
+
+/// `tokenizer.json` for `from_local`. Absent means the slot stays closed.
+pub fn tokenizer_ready() -> bool {
+    tokenizer_json().is_some()
 }
 
 pub fn worker_script() -> Option<PathBuf> {
@@ -172,6 +255,7 @@ pub struct CloneWorker {
     warm_ms: Option<u32>,
     model: CloneModel,
     persona: &'static str,
+    prosody: FrameProsody,
     engine: String,
 }
 
@@ -182,6 +266,9 @@ impl CloneWorker {
             .arg(script)
             .env("GALION_CLONE_MODEL", model.as_str())
             .env("GALION_CLONE_PERSONA", persona)
+            .env("HF_HUB_OFFLINE", "1")
+            .env("TRANSFORMERS_OFFLINE", "1")
+            .env("HF_HUB_DISABLE_TELEMETRY", "1")
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
@@ -218,6 +305,7 @@ impl CloneWorker {
             warm_ms: None,
             model,
             persona,
+            prosody: FrameProsody::identity(),
             engine: String::new(),
         })
     }
@@ -240,6 +328,12 @@ impl CloneWorker {
     pub fn persona(&self) -> &'static str {
         self.persona
     }
+    pub fn set_persona(&mut self, persona: &str) {
+        self.persona = persona_name(persona);
+    }
+    pub fn set_prosody(&mut self, prosody: FrameProsody) {
+        self.prosody = prosody.clamped();
+    }
     pub fn engine(&self) -> &str {
         &self.engine
     }
@@ -254,7 +348,7 @@ impl CloneWorker {
     /// One clause in, one PCM buffer out. Same process on every call.
     pub fn synthesize(&mut self, text: &str) -> Result<Vec<i16>, VoiceError> {
         let t0 = Instant::now();
-        let line = request_line(text, self.model, self.persona);
+        let line = request_line_prosody(text, self.model, self.persona, self.prosody);
         {
             let stdin = self
                 .stdin
@@ -413,6 +507,7 @@ pub struct CloneTts {
     script: PathBuf,
     model: CloneModel,
     persona: &'static str,
+    prosody: FrameProsody,
     worker: Option<CloneWorker>,
     spawns: u32,
 }
@@ -429,13 +524,37 @@ impl CloneTts {
         if !weights_ready(model) {
             return Err(format!("clone weights absent for {} (scripts/clone/fetch-clone-weights.sh; GALION_CLONE_FETCH=1)", model.as_str()));
         }
+        if !local_refs_enabled() {
+            return Err("GALION_CLONE_LOCAL_REFS is not 1; clone slot stays closed and Piper speaks".into());
+        }
+        if !ref_allowlisted("samantha") && !ref_allowlisted("jarvis") {
+            return Err("no sha-allowlisted samantha or jarvis reference under GALION_CLIP_STORE".into());
+        }
+        if !tokenizer_ready() {
+            return Err("clone tokenizer.json missing (GALION_CLONE_TOKENIZER, GALION_CLONE_CKPT, or weights/clone/tokenizer)".into());
+        }
         Ok(Self {
             script,
             model,
             persona,
+            prosody: FrameProsody::identity(),
             worker: None,
             spawns: 0,
         })
+    }
+
+    pub fn set_persona(&mut self, persona: &str) {
+        self.persona = persona_name(persona);
+        if let Some(worker) = self.worker.as_mut() {
+            worker.set_persona(self.persona);
+        }
+    }
+
+    pub fn set_prosody(&mut self, prosody: FrameProsody) {
+        self.prosody = prosody.clamped();
+        if let Some(worker) = self.worker.as_mut() {
+            worker.set_prosody(self.prosody);
+        }
     }
 
     pub fn model_name(&self) -> &'static str {
@@ -456,7 +575,8 @@ impl CloneTts {
         if alive {
             return Ok(());
         }
-        let worker = CloneWorker::spawn(&self.script, self.model, self.persona)?;
+        let mut worker = CloneWorker::spawn(&self.script, self.model, self.persona)?;
+        worker.set_prosody(self.prosody);
         self.worker = Some(worker);
         self.spawns += 1;
         Ok(())
@@ -505,11 +625,13 @@ impl FlashReport {
         }
     }
 
-    /// A number from a run. `product_claim` is true only for engine `model`.
-    /// This tree does not produce that engine: generate is not wired.
+    /// A number from a run. `product_claim` stays true only for the name `model`.
+    /// A `chatterbox-*` engine is a local generate clock, not a published Flash result.
     pub fn from_pcm(engine: &str, ttfa_ms: u32) -> Self {
         let model = engine == "model";
-        let note = if model {
+        let note = if engine.starts_with("chatterbox-") {
+            "CPU time to first PCM from the local Chatterbox worker. Not a published Flash result until it is written in the ledger."
+        } else if model {
             "CPU time to first PCM. Record it in LEDGER before calling it a Flash result."
         } else {
             "protocol-stub clock only. Not a Flash result and not a product claim."
@@ -605,6 +727,19 @@ fn request_line(text: &str, model: CloneModel, persona: &str) -> String {
     s.push_str(tags);
     s.push_str("}\n");
     s
+}
+
+fn request_line_prosody(text: &str, model: CloneModel, persona: &str, prosody: FrameProsody) -> String {
+    let prosody = prosody.clamped();
+    let mut line = request_line(text, model, persona);
+    let extra = format!(
+        ",\"prosody\":{{\"pitch_st\":{:.4},\"range\":{:.4},\"rate\":{:.4},\"energy\":{:.4},\"warmth\":{:.4},\"pre_pause_ms\":{}}}",
+        prosody.pitch_st, prosody.pitch_range, prosody.rate, prosody.energy, prosody.warmth, prosody.pre_pause_ms
+    );
+    if let Some(stripped) = line.strip_suffix("}\n") {
+        line = format!("{stripped}{extra}}}\n");
+    }
+    line
 }
 
 fn line_value(log: &str, key: &str) -> Option<String> {
@@ -711,6 +846,14 @@ mod tests {
         assert!(line.contains("\"tags\":true"));
         assert!(!line.contains("reference"));
         assert!(!line.contains("audio_prompt"));
+        assert!(!line.contains("emotion"));
+        let with = request_line_prosody("hello", CloneModel::Nano, "samantha", FrameProsody { pitch_st: -0.5, pre_pause_ms: 80, ..FrameProsody::identity() });
+        assert!(with.contains("\"prosody\":"));
+        assert!(with.contains("\"pre_pause_ms\":80"));
+        assert!(!with.contains("reference"));
+        assert!(!with.contains("audio_prompt"));
+        assert!(!with.contains("\"clip\""));
+        assert!(!with.contains("emotion"));
         let jarvis = request_line("hello", CloneModel::Turbo, "jarvis");
         assert!(jarvis.contains("\"model\":\"turbo\""));
         assert!(jarvis.contains("\"tags\":false"));
@@ -779,6 +922,77 @@ mod tests {
         let err = String::from_utf8_lossy(&out.stderr);
         assert!(err.contains("rights hold"), "{err}");
         assert!(out.stdout.is_empty(), "a refused clip must not produce PCM");
+
+        let store = std::env::temp_dir().join(format!("galion-clone-ref-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&store);
+        let wav_dir = store.join("samantha");
+        std::fs::create_dir_all(&wav_dir).unwrap();
+        let bytes = b"galion-local-ref-not-a-film-file";
+        std::fs::write(wav_dir.join("reference.wav"), bytes).unwrap();
+        let mut hasher = sha256::Sha256::new();
+        hasher.update(bytes);
+        let digest = hasher.hex();
+        std::fs::write(wav_dir.join("reference.wav.sha256"), format!("{digest}\n")).unwrap();
+        assert!(persona_ref_ok(&store, "samantha"));
+        assert!(!persona_ref_ok(&store, "jarvis"));
+        std::fs::write(wav_dir.join("reference.wav.sha256"), format!("deadbeef{:0<56}\n", "")).unwrap();
+        assert!(!persona_ref_ok(&store, "samantha"), "a mismatched sidecar is not allowlisted");
+        std::fs::write(wav_dir.join("reference.wav.sha256"), format!("{digest}\n")).unwrap();
+
+        let weights = store.join("weights");
+        for rel in [
+            "shared/s3gen.safetensors",
+            "shared/s3gen_meanflow.safetensors",
+            "shared/ve.safetensors",
+            "nano/t3_nano_v1.safetensors",
+        ] {
+            let path = weights.join(rel);
+            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+            std::fs::write(&path, b"not-weights").unwrap();
+        }
+        let mut child = Command::new("python3")
+            .arg(&script)
+            .env("GALION_CLONE_LOCAL_REFS", "1")
+            .env("GALION_CLIP_STORE", &store)
+            .env("GALION_CLONE_WEIGHTS", &weights)
+            .env_remove("GALION_CLONE_STUB_PCM")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap();
+        {
+            let mut stdin = child.stdin.take().unwrap();
+            stdin.write_all(b"{\"text\":\"hello\",\"reference\":\"clip.wav\"}\n").unwrap();
+        }
+        let refused = child.wait_with_output().unwrap();
+        assert_eq!(refused.status.code(), Some(3), "{}", String::from_utf8_lossy(&refused.stderr));
+        assert!(refused.stdout.is_empty());
+
+        let mut child = Command::new("python3")
+            .arg(&script)
+            .env("GALION_CLONE_LOCAL_REFS", "1")
+            .env("GALION_CLIP_STORE", &store)
+            .env("GALION_CLONE_WEIGHTS", &weights)
+            .env_remove("GALION_CLONE_STUB_PCM")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap();
+        {
+            let mut stdin = child.stdin.take().unwrap();
+            stdin.write_all(b"{\"text\":\"hello\",\"persona\":\"samantha\",\"model\":\"nano\",\"tags\":true}\n").unwrap();
+        }
+        let gated = child.wait_with_output().unwrap();
+        let err = String::from_utf8_lossy(&gated.stderr);
+        assert!(gated.status.success(), "{err}");
+        assert!(gated.stdout.is_empty(), "unpinned files must not become PCM");
+        assert!(err.contains("galion-clone-unwired"), "{err}");
+        assert!(!err.to_ascii_lowercase().contains("huggingface"));
+        assert!(!err.contains("snapshot_download"), "{err}");
+        assert!(!err.contains("I understand"), "{err}");
+        let _ = std::fs::remove_dir_all(&store);
 
         let absent = Command::new("python3")
             .arg(&script)
