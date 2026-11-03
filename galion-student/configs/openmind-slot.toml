@@ -66,6 +66,7 @@ approved_required = true
 [hooks]
 retrieval_injection = "turn_boundary"   # MoshiRAG-style, rate limited
 nerve_kinds = ["voice.frame_miss", "voice.fallback", "voice.backend_up"]
+# Emitted by crates/galion-openmind (docs/galion-voice-v2/OPENMIND-NERVE-CORTEX.md). Kind strings unchanged.
 
 [gates]                         # all MUST pass before slot admits a model
 gate_file = "eval.toml"
