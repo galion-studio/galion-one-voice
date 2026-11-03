@@ -3,6 +3,12 @@
 Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
 Europe/Zagreb. The spelling is **Galion**. The product is Galion Voice.
 
+## Ready for Maciej
+
+The schedule is open. This page is ready for Maciej Grajczyk to review and
+sign in person. Agents must not sign. Every checklist box stays unchecked.
+The date stays blank. This page does not claim HARD-PASS.
+
 **Schedule.** This check is scheduled for **Maciej Grajczyk**. It was
 opened 2026-11-03. It is not started, and it is not done. A cloud agent
 must not tick a box and must not write the date. **Maciej Grajczyk must
