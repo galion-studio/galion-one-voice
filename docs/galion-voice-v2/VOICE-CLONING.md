@@ -68,7 +68,9 @@ packet. Nano is the primary. Turbo is the option on the
 same stdin line. If the pinned weights are missing, Piper
 (`en_US-ljspeech-medium`) speaks. Flite remains the pack-missing fallback
 under that. The Python stub does not call generate and refuses a reference
-clip. Weights are fetched only with `GALION_CLONE_FETCH=1`.
+clip. Weights are fetched only with `GALION_CLONE_FETCH=1`. The build plan
+for wiring `generate`, and for `audio_prompt_path` after rights, is
+`CHATTERBOX-WORKER.md`. That plan does not edit `LOCKS.toml`.
 
 **Personas.**
 
@@ -124,7 +126,7 @@ or ingest a clip. Replaces the external-API swarm, which is dropped.
 | 2 | Nano 110M CPU worker contract | `docs/galion-voice-v2/CLONE-WORKER.md` | scaffolded, no weights, no generate |
 | 3 | Turbo quality option, same process | `docs/galion-voice-v2/CLONE-WORKER.md` | scaffolded, same stub |
 | 4 | CPU streaming / Flash eval plan (no run) | `docs/galion-voice-v2/FLASH-EVAL.md` | plan + harness stub, no number |
-| 5 | Zero-shot ~10 s conditioning, no fine-tune | `docs/galion-voice-v2/VOICE-CLONING.md` | planned-not-spawned |
+| 5 | Zero-shot ~10 s conditioning, no fine-tune | `docs/galion-voice-v2/CHATTERBOX-WORKER.md` | plan written; `reference_clips` stays false; seat not spawned |
 | 6 | Jarvis research-target mapping | `docs/galion-voice-v2/VOICE-CLONING.md` | planned-not-spawned |
 | 7 | Samantha tags and emotional register | `docs/galion-voice-v2/VOICE-CLONING.md` | planned-not-spawned |
 | 8 | Rights, consent, licence gate | `docs/galion-voice-v2/RIGHTS-CLEARANCE.md` and `docs/galion-voice-v2/CLIP-INGEST.md` | checklist written; both gates closed; ingest outline only, gate not opened |

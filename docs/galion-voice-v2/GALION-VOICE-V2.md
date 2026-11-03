@@ -662,6 +662,7 @@ S3Gen and a vocoder emit audio. No training step in that API.
 - **Watermark:** upstream `generate()` applies a Perth watermark. The Nano path should keep a watermark beside the Art. 50 disclosure. Perth's own licence was not read in this session. Do not vendor it yet.
 - **Worker:** the scaffold in `CLONE-WORKER.md` is one out-of-process process, same shape as the warm Piper worker. Piper speaks if the clone worker is absent. No PCM on disk. Generate is not wired. No film audio.
 - **Weights:** gitignored under `weights/clone/`. CloudAgents fetch tag `clone-weights-v1` with `scripts/clone/fetch-clone-weights.sh`. The layout and the admin upload are `CLONE-WEIGHTS.md`. A clean clone does not contain the blobs.
+- **Worker:** the scaffold in `CLONE-WORKER.md` is one out-of-process process, same shape as the warm Piper worker. Piper speaks if the clone worker is absent. No PCM on disk. Generate is not wired. No film audio. The build plan is `CHATTERBOX-WORKER.md`. It leaves `reference_clips` false.
 
 **CPU and memory (t204u, t205u).** Admin approves full threading, SIMD, and
 maximum memory for Chatterbox Nano/Turbo workers, for every Galion Voice
