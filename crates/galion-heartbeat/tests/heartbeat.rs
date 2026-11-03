@@ -2,7 +2,9 @@
 mod common;
 use common::*;
 use galion_emotion::band::consent_bits;
-use galion_emotion::{ConsentDecision, Cue, DefaultConsentGate, OffReason, ProsodyControl, Purpose, RikaState};
+use galion_emotion::{
+    ConsentDecision, Cue, DefaultConsentGate, EmotionFrame, Manner, OffReason, ProsodyControl, Purpose, RikaState, VoicePersona,
+};
 use galion_heartbeat::{FrameIn, FrameOut, Heartbeat, HeartbeatConfig, FRAME_SAMPLES, RIKA_BITS};
 
 fn granted() -> DefaultConsentGate {
@@ -183,6 +185,119 @@ fn reset_starts_a_fresh_session() {
     assert_eq!(hb.frames(), 0);
     assert_eq!(hb.lean_in_ms(), None);
     assert_eq!(hb.rika().state(), RikaState::Off);
+}
+
+fn tired() -> EmotionFrame {
+    EmotionFrame { seq: 1, t_ms: 80, dur_ms: 80, valence: -0.6, arousal: 0.2, dominance: 0.4, confidence: 1.0 }
+}
+
+fn frame_with(pcm: &[f32], affect: Option<EmotionFrame>, bits: u8, late: bool) -> FrameIn<'_> {
+    FrameIn {
+        you_pcm: pcm,
+        affect,
+        tension: None,
+        consent_bits: bits,
+        purpose: Purpose::PersonalAssistant,
+        session_open: true,
+        me_speaking: false,
+        late,
+    }
+}
+
+#[test]
+fn feeling_tracks_live_empathy_inside_step() {
+    let pcm = vec![0.0f32; FRAME_SAMPLES];
+    let mut hb = Heartbeat::new(HeartbeatConfig::default(), granted());
+    let off = hb.step(&frame_with(&pcm, Some(tired()), consent_bits::SENSE, false));
+    assert_eq!(off.decided.state, RikaState::Off, "feeling does not require Rika");
+    assert!((off.feeling.e - 1.0).abs() < 1e-6);
+    assert_eq!(off.feeling.manner, Manner::Answered);
+    assert_eq!(off.feeling.persona, VoicePersona::Samantha);
+    assert!(!off.feeling.hub.enabled);
+    assert_eq!(off.voice_prosody().pre_pause_ms, 250);
+    assert_eq!(galion_heartbeat::FRAME_MS, 80);
+
+    hb.set_persona(VoicePersona::Jarvis);
+    let jar = hb.step(&frame_with(&pcm, Some(tired()), consent_bits::SENSE, false));
+    assert_eq!(jar.feeling.persona, VoicePersona::Jarvis);
+    assert!(jar.feeling.hub.enabled);
+    assert!((jar.feeling.prosody.warmth - 0.55).abs() < 1e-4);
+    assert_eq!(jar.feeling.prosody.pre_pause_ms, 120);
+    assert!((jar.voice_prosody().pitch_shift_st - -0.4).abs() < 1e-4);
+    assert!((off.voice_prosody().pitch_shift_st - -0.5).abs() < 1e-4);
+    assert!(jar.voice_prosody().warmth < off.voice_prosody().warmth);
+
+    let quiet = hb.step(&frame_with(&pcm, Some(tired()), 0, false));
+    assert_eq!(quiet.feeling.e, 0.0, "no SENSE, no empathy");
+    assert_eq!(quiet.feeling.manner, Manner::Plain);
+}
+
+#[test]
+fn feeling_hub_toggle_leaves_user_audio_and_prosody() {
+    let you = vec![0.2f32; FRAME_SAMPLES];
+    let snapshot = you.clone();
+    let mut hb = Heartbeat::new(HeartbeatConfig::default(), granted());
+    hb.set_persona(VoicePersona::Jarvis);
+    let on = hb.step(&frame_with(&you, Some(tired()), consent_bits::SENSE, false));
+    assert!(on.feeling.hub.enabled);
+    let mut me = vec![0.0f32; 128];
+    on.feeling.hub.mix_me(&mut me);
+    assert!(me.iter().any(|s| *s != 0.0));
+    assert_eq!(you, snapshot);
+
+    hb.set_hub_layer(false);
+    let off = hb.step(&frame_with(&you, Some(tired()), consent_bits::SENSE, false));
+    assert!(!off.feeling.hub.enabled);
+    assert_eq!(off.feeling.e, on.feeling.e);
+    assert_eq!(off.feeling.prosody, on.feeling.prosody);
+    let mut muted = vec![0.0f32; 128];
+    off.feeling.hub.mix_me(&mut muted);
+    assert!(muted.iter().all(|s| *s == 0.0));
+    assert_eq!(you, snapshot);
+
+    hb.set_persona(VoicePersona::Samantha);
+    hb.set_hub_layer(true);
+    let sam = hb.step(&frame_with(&you, Some(tired()), consent_bits::SENSE, false));
+    assert!(!sam.feeling.hub.enabled);
+    assert_eq!(you, snapshot);
+}
+
+#[test]
+fn feeling_late_frame_holds() {
+    let pcm = vec![0.0f32; FRAME_SAMPLES];
+    let mut hb = Heartbeat::new(HeartbeatConfig::default(), granted());
+    let first = hb.step(&frame_with(&pcm, Some(tired()), consent_bits::SENSE, false));
+    assert!((first.feeling.e - 1.0).abs() < 1e-6);
+    let joy = EmotionFrame { seq: 2, t_ms: 160, dur_ms: 80, valence: 0.8, arousal: 0.4, dominance: 0.5, confidence: 1.0 };
+    let held = hb.step(&frame_with(&pcm, Some(joy), consent_bits::SENSE, true));
+    assert!(held.paused);
+    assert!((held.feeling.e - 1.0).abs() < 1e-6, "a late frame does not retune the voice");
+    assert_eq!(held.feeling.manner, Manner::Answered);
+}
+
+#[test]
+fn feeling_step_fits_the_cpu_tick() {
+    let pcm = vec![0.0f32; FRAME_SAMPLES];
+    let mut hb = Heartbeat::new(HeartbeatConfig::default(), granted());
+    hb.set_persona(VoicePersona::Jarvis);
+    let input = frame_with(&pcm, Some(tired()), consent_bits::SENSE, false);
+    for _ in 0..16 {
+        let _ = hb.step(&input);
+    }
+    let n = 200u32;
+    let t0 = std::time::Instant::now();
+    for _ in 0..n {
+        let out = hb.step(&input);
+        assert!(out.feeling.hub.enabled);
+        assert!(out.feeling.e > 0.9);
+    }
+    let elapsed = t0.elapsed();
+    let avg_ns = elapsed.as_nanos() / u128::from(n);
+    eprintln!("feeling steps={n} elapsed={elapsed:?} avg_ns={avg_ns}");
+    assert!(
+        elapsed.as_millis() < 50,
+        "200 feeling steps took {elapsed:?} (avg {avg_ns} ns); the non-inference tick has to stay inside the 80 ms frame"
+    );
 }
 
 #[test]

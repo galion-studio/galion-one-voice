@@ -18,8 +18,11 @@ use galion_render::backends::web::{MicTap, ReplyBox, SayInbox, SpokenLine, Turn,
 use galion_render::v2_persona::Floor;
 
 use crate::auto_workflow::{proceed, Proceed, ProceedSource};
+use galion_emotion::VoicePersona;
+
 use crate::bus::{pcm16_to_bytes, BusMsg, ProcessBus};
 use crate::turn_worker::{TurnJob, TurnReply, TurnWorker};
+use crate::workflow::{next_step, Next};
 
 /// What the phone path overrode on this tick.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -53,6 +56,9 @@ pub struct PhoneHost {
     last_proceed: Proceed,
     /// Accepted mic takes handed to `auto_workflow::proceed`. Not incremented on the 80 ms tick.
     proceeded: u64,
+    /// Last workflow step. The turn id is 0 until an utterance is recorded.
+    last_next: Next,
+    last_next_turn: u64,
 }
 
 impl PhoneHost {
@@ -76,6 +82,8 @@ impl PhoneHost {
             t_ms: 0,
             last_proceed: Proceed::Program,
             proceeded: 0,
+            last_next: Next::Speak,
+            last_next_turn: 0,
         }
     }
 
@@ -87,6 +95,19 @@ impl PhoneHost {
     /// How many accepted mic takes have proceeded. Quiet frames do not count.
     pub fn proceeded(&self) -> u64 {
         self.proceeded
+    }
+
+    /// Register the one-dot floor is speaking in. Read outside `Heartbeat::step`.
+    pub fn voice_persona(&self) -> VoicePersona {
+        match self.floor.lock() {
+            Ok(floor) if floor.id() == "jarvis" => VoicePersona::Jarvis,
+            _ => VoicePersona::Samantha,
+        }
+    }
+
+    /// Turn id and the step chosen for it. No transcript is kept.
+    pub fn workflow(&self) -> (u64, Next) {
+        (self.last_next_turn, self.last_next)
     }
 
     pub fn bus(&self) -> &ProcessBus {
@@ -262,6 +283,7 @@ impl PhoneHost {
             let _ = self.bus.try_send_reply(text);
         }
         if !r.transcript.trim().is_empty() {
+            self.note_transcript(r.id, &r.transcript);
             if let Ok(mut floor) = self.floor.lock() {
                 let _ = floor.say(&r.transcript, false, 0.0, false);
             }
@@ -334,7 +356,21 @@ impl PhoneHost {
                 rate,
                 pcm,
             });
+            self.note_recorded(turn_id);
         }
+    }
+
+    fn note_recorded(&mut self, turn_id: u64) {
+        self.last_next = Next::Recorded;
+        self.last_next_turn = turn_id;
+    }
+
+    fn note_transcript(&mut self, turn_id: u64, transcript: &str) {
+        if transcript.trim().is_empty() {
+            return;
+        }
+        self.last_next = next_step(transcript);
+        self.last_next_turn = turn_id;
     }
 
     fn enqueue(&mut self, job: TurnJob) {
@@ -470,6 +506,7 @@ mod tests {
         }
         let mut me = vec![0.0f32; 8];
         let _ = host.drive_me(&mut me);
+        assert_eq!(host.workflow(), (1, crate::workflow::Next::Recorded));
         assert_eq!(host.bus().cancel(), 1);
         let utt = host
             .bus()
@@ -528,5 +565,20 @@ mod tests {
         let floor = floor.lock().unwrap();
         assert!(floor.mood_from_turn());
         assert_eq!(floor.mood(), "grief");
+    }
+
+    #[test]
+    fn words_choose_a_program_without_a_second_screen() {
+        std::env::set_var("GALION_ASR", "off");
+        let web = WebSurface::mailbox();
+        let mut host = PhoneHost::from_surface(&web);
+        assert_eq!(host.voice_persona(), galion_emotion::VoicePersona::Samantha);
+        assert_eq!(host.workflow(), (0, crate::workflow::Next::Speak));
+        host.note_transcript(4, "please start the heartbeat");
+        assert_eq!(host.workflow(), (4, crate::workflow::Next::Program("heartbeat")));
+        host.note_transcript(5, "I hear you");
+        assert_eq!(host.workflow().1, crate::workflow::Next::Speak);
+        host.note_transcript(6, "skill presence");
+        assert_eq!(host.workflow(), (6, crate::workflow::Next::Skill("presence")));
     }
 }
