@@ -18,14 +18,15 @@ One number, when a run happens:
 - start: the worker has accepted one JSON line (`text`, model, persona)
 - stop: the first PCM sample is in the parent's buffer
 - machine: this CPU, not a phone, not a VPS, not PSTN
-- label: `engine` from the child (`protocol-stub`, `unwired`, or a future `model`)
+- label: `engine` from the child (`protocol-stub`, `unwired`, `chatterbox-nano`, or a future `model`)
 
-`product_claim` is true only for `engine=model`. This tree never sets that
-engine, because generate is not wired. A protocol-stub clock is a test of
-the pipe. It is not a Flash result. Do not copy a number into `LEDGER.md`
-or a demo until a model run is actually recorded there.
-
-No reference clip is sent. Film audio stays on the rights hold.
+`product_claim` is true only for `engine=model`. A Nano generate reports
+`chatterbox-nano`, which is not that label, so a clock from it is still
+not a product claim. The default harness does not set
+`GALION_CLONE_LOCAL_REFS` and does not send a reference, so CI stays on
+`measured: false`. A protocol-stub clock is a test of the pipe. Do not
+copy a number into `LEDGER.md` until a model run is actually recorded
+there. `generate()` still returns the whole utterance.
 
 ## Harness
 
@@ -57,8 +58,8 @@ refuses unless `GALION_CLONE_FETCH=1`.
 ## What a real run would add, later
 
 1. Pinned safetensors on disk, fetched with `GALION_CLONE_FETCH=1` from release `clone-weights-v1` (`CLONE-WEIGHTS.md`).
-2. The child actually calls generate, still out of process, still with no reference clip until rights are cleared.
-3. The stderr engine line says `model`.
+2. The child calls generate, still out of process. Nano does that when `GALION_CLONE_LOCAL_REFS=1` and the sha allowlist matches. The default harness still sends no clip.
+3. A product claim wants the stderr engine line `model`. The worker reports `chatterbox-nano` and writes PCM. Protocol-stub PCM stays `product_claim: false`.
 4. Three CPU runs, cold and warm, phrase fixed, written into `LEDGER.md` with the host and the model id.
 5. Still no film audio. Still no celebrity demo.
 

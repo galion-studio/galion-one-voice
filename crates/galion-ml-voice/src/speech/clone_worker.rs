@@ -11,8 +11,11 @@
 //! Weights are not vendored. [`weights_ready`] is false until the pinned
 //! safetensors are on disk. Nothing here downloads them.
 //!
-//! The Python stub does not call Chatterbox generate and refuses a reference
-//! clip. `GALION_CLONE_STUB_PCM=1` is protocol PCM, not a Flash result.
+//! The child calls Chatterbox Nano `generate` only when
+//! `GALION_CLONE_LOCAL_REFS=1` and the reference sha256 is allowlisted for
+//! that persona (`scripts/clone/REFS.sha256`). Otherwise a reference is
+//! refused. `GALION_CLONE_STUB_PCM=1` is protocol PCM, not a Flash result.
+//! Generate stays in this child. `Heartbeat::step` does not call it.
 #![allow(unsafe_code)]
 
 use super::sha256;
@@ -338,24 +341,38 @@ impl CloneWorker {
             if let Some(engine) = line_value(&self.err_log[mark..], "galion-clone-engine:") {
                 self.engine = engine;
             }
-            if self.err_log[mark..].contains("galion-clone-utt:") {
-                if self.stdout.as_ref().is_some() {
-                    let _ = self.drain(Pipe::Out);
-                }
-                break;
-            }
             if self.err_log[mark..].contains("galion-clone-refuse:") {
                 return Err(VoiceError::Backend(format!(
                     "clone worker refused ({})",
                     tail(&self.err_log)
                 )));
             }
+            // The marker may arrive before the PCM. Keep reading stdout until
+            // that many bytes are in, so a full pipe cannot deadlock a reader.
+            if let Some(n) = announced_utt(&self.err_log[mark..]) {
+                if self.stdout.as_ref().is_some() {
+                    let _ = self.drain(Pipe::Out);
+                }
+                if self.pcm_buf.len() >= n {
+                    self.pcm_buf.truncate(n);
+                    break;
+                }
+            }
             let exited = matches!(self.child.as_mut().map(|c| c.try_wait()), Some(Ok(Some(_))));
             if exited {
                 let _ = self.drain(Pipe::Out);
                 let _ = self.drain(Pipe::Err);
-                if self.err_log[mark..].contains("galion-clone-utt:") {
-                    break;
+                if self.err_log[mark..].contains("galion-clone-refuse:") {
+                    return Err(VoiceError::Backend(format!(
+                        "clone worker refused ({})",
+                        tail(&self.err_log)
+                    )));
+                }
+                if let Some(n) = announced_utt(&self.err_log[mark..]) {
+                    if self.pcm_buf.len() >= n {
+                        self.pcm_buf.truncate(n);
+                        break;
+                    }
                 }
                 return Err(VoiceError::Backend(format!(
                     "clone worker exited ({})",
@@ -509,7 +526,7 @@ impl FlashReport {
     }
 
     /// A number from a run. `product_claim` is true only for engine `model`.
-    /// This tree does not produce that engine: generate is not wired.
+    /// Nano generate reports `chatterbox-nano`, which is not that label.
     pub fn from_pcm(engine: &str, ttfa_ms: u32) -> Self {
         let model = engine == "model";
         let note = if model {
@@ -608,6 +625,25 @@ fn request_line(text: &str, model: CloneModel, persona: &str) -> String {
     s.push_str(tags);
     s.push_str("}\n");
     s
+}
+
+/// Byte count from a finished `galion-clone-utt: N` line. A partial line
+/// (no newline yet) is ignored so a split integer cannot truncate the PCM.
+fn announced_utt(log: &str) -> Option<usize> {
+    let mut found = None;
+    for line in log.split_inclusive('\n') {
+        let Some(line) = line.strip_suffix('\n') else {
+            continue;
+        };
+        let line = line.trim_end_matches('\r').trim();
+        let Some(rest) = line.strip_prefix("galion-clone-utt:") else {
+            continue;
+        };
+        if let Ok(n) = rest.trim().parse::<usize>() {
+            found = Some(n);
+        }
+    }
+    found
 }
 
 fn line_value(log: &str, key: &str) -> Option<String> {
@@ -844,6 +880,98 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
     }
 
+    #[test]
+    fn marker_before_large_pcm_does_not_deadlock() {
+        let dir = std::env::temp_dir().join(format!("galion-clone-marker-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let script = dir.join("marker-first.py");
+        std::fs::write(&script, MARKER_FIRST).unwrap();
+        let mut perm = std::fs::metadata(&script).unwrap().permissions();
+        perm.set_mode(0o755);
+        std::fs::set_permissions(&script, perm).unwrap();
+        let mut w = CloneWorker::spawn(&script, CloneModel::Nano, "samantha").unwrap();
+        let pcm = w.synthesize("hi").unwrap();
+        assert_eq!(pcm.len(), 40_000, "80 KiB of s16le");
+        assert!(pcm.iter().all(|s| *s == 1));
+        assert_eq!(w.engine(), "marker-first");
+        drop(w);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn real_stub_pcm_survives_the_stdout_redirect() {
+        let script = worker_script().expect("worker script");
+        std::env::set_var("GALION_CLONE_STUB_PCM", "1");
+        std::env::remove_var("GALION_CLONE_LOCAL_REFS");
+        let mut w = CloneWorker::spawn(&script, CloneModel::Nano, "samantha").unwrap();
+        std::env::remove_var("GALION_CLONE_STUB_PCM");
+        let pcm = w.synthesize("Hi.").unwrap();
+        assert_eq!(w.engine(), "protocol-stub");
+        assert_eq!(pcm.len(), 201);
+        assert_eq!(pcm[0], 3);
+        drop(w);
+    }
+
+    #[test]
+    fn clone_gate_unit_tests_do_not_need_weights() {
+        let script =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../scripts/clone/test_worker_gate.py");
+        let out = Command::new("python3")
+            .arg(&script)
+            .env_remove("GALION_CLONE_FETCH")
+            .env_remove("GALION_CLONE_LOCAL_REFS")
+            .env_remove("GALION_CLONE_WEIGHTS")
+            .output()
+            .expect("python3");
+        assert!(
+            out.status.success(),
+            "stdout:\n{}\nstderr:\n{}",
+            String::from_utf8_lossy(&out.stdout),
+            String::from_utf8_lossy(&out.stderr)
+        );
+    }
+
+    #[test]
+    fn locks_stay_false_and_ref_pins_are_not_full_digests() {
+        let locks = include_str!("../../../../LOCKS.toml");
+        let section = locks
+            .split("[formats.exceptions.v2s14_chatterbox]")
+            .nth(1)
+            .expect("chatterbox pin");
+        let section = section.split("\n[").next().unwrap();
+        assert!(section.contains("reference_clips = false"), "{section}");
+        let refs = include_str!("../../../../scripts/clone/REFS.sha256");
+        assert!(refs.contains("samantha bdcb0c29 c7a8693"));
+        assert!(refs.contains("jarvis c2200b59 4b532c60"));
+        for token in refs.split_whitespace() {
+            let hex = token.chars().all(|c| c.is_ascii_hexdigit());
+            assert!(
+                !(token.len() == 64 && hex),
+                "full digest does not belong in the reference allowlist: {token}"
+            );
+        }
+        let tok = include_str!("../../../../scripts/clone/TOKENIZER.sha256");
+        assert!(tok.contains("tokenizer/vocab.json"));
+        for line in tok.lines() {
+            let line = line.split('#').next().unwrap().trim();
+            if line.is_empty() {
+                continue;
+            }
+            let rel = line.split_whitespace().next().unwrap();
+            assert!(rel.ends_with(".json") || rel.ends_with(".txt"), "{rel}");
+            assert!(!rel.contains("wav") && !rel.ends_with(".pt"), "{rel}");
+        }
+    }
+
+    #[test]
+    fn heartbeat_step_does_not_name_the_clone_worker() {
+        let src = include_str!("../../../galion-heartbeat/src/lib.rs");
+        assert!(!src.contains("chatterbox"));
+        assert!(!src.contains("CloneWorker"));
+        assert!(!src.contains("clone_worker"));
+    }
+
     fn entries(dir: &Path) -> Vec<String> {
         let mut v: Vec<String> = std::fs::read_dir(dir)
             .unwrap()
@@ -874,5 +1002,24 @@ while True:
     sys.stderr.write("galion-clone-engine: protocol-stub\n")
     sys.stderr.write("galion-clone-utt: %d\n" % len(pcm))
     sys.stderr.flush()
+"#;
+
+    const MARKER_FIRST: &str = r#"#!/usr/bin/env python3
+import sys
+line = sys.stdin.buffer.readline()
+if not line:
+    sys.exit(0)
+n = 80000
+sys.stderr.write("galion-clone-engine: marker-first\n")
+sys.stderr.write("galion-clone-utt: %d\n" % n)
+sys.stderr.flush()
+chunk = b"\x01\x00" * 1024
+left = n
+while left:
+    take = min(len(chunk), left)
+    sys.stdout.buffer.write(chunk[:take])
+    sys.stdout.buffer.flush()
+    left -= take
+sys.stdin.buffer.readline()
 "#;
 }

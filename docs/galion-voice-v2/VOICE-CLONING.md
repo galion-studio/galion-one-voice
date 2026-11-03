@@ -60,13 +60,15 @@ watermark before returning samples.
 Output rate in the public ports is described as 24 kHz, which matches the
 Galion clock. That match was not re-measured.
 
-**Worker.** The scaffold is `docs/galion-voice-v2/CLONE-WORKER.md`: one
+**Worker.** The contract is `docs/galion-voice-v2/CLONE-WORKER.md`: one
 long-lived process, the same idea as the warm Piper worker. Text in, PCM
-out, no file of samples. Nano is the primary. Turbo is the option on the
-same stdin line. If the pinned weights are missing, Piper
-(`en_US-ljspeech-medium`) speaks. Flite remains the pack-missing fallback
-under that. The Python stub does not call generate and refuses a reference
-clip. Weights are fetched only with `GALION_CLONE_FETCH=1`.
+out, no file of samples. Nano is the primary and the generate path. Turbo
+stays on the same stdin line and is unwired. If the pinned weights are
+missing, Piper (`en_US-ljspeech-medium`) speaks. Flite remains the
+pack-missing fallback under that. `generate` runs only when
+`GALION_CLONE_LOCAL_REFS=1` and the reference sha256 is allowlisted for
+that persona. Otherwise a clip is still refused. Weights are fetched only
+with `GALION_CLONE_FETCH=1`. `Heartbeat::step` does not call the child.
 
 **Personas.**
 

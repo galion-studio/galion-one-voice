@@ -1,0 +1,10 @@
+# Galion Voice — local reference allowlist. Not a download. No audio in this file.
+# Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+#
+# persona  prefix  suffix
+# A file is accepted only when GALION_CLONE_LOCAL_REFS=1 and its sha256 is
+# 64 hex characters, starts with prefix, and ends with suffix, for that persona.
+# Documented 2026-11-03 from the clone smoke. The full digest was not published.
+# Samantha and Jarvis are bound to their own row. LOCKS.toml is not this file.
+samantha bdcb0c29 c7a8693
+jarvis c2200b59 4b532c60
