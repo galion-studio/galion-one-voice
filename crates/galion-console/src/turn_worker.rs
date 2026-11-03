@@ -10,15 +10,21 @@
 //! unset/stub/off, `NoSpeech`) are reported in [`TurnReply::error`] and a clear two-tone WAV is
 //! published instead, so the phone still hears that its turn arrived.
 //! `GALION_SPEECH=off` is that path: two-tone WAV, `backend=tone`, `error` set.
-//! A superseded turn drops Piper clauses that have not started and does not kill the worker.
+//!
+//! The job slot is the V2-S1 bus lane ([`crate::bus::JOB_DEPTH`] = 1, `try_send` only).
+//! Cancel is [`crate::bus::ProcessBus::supersede`]. A stale `turn_id` is dropped before
+//! ASR and again before the reply is handed back. The same token drops Piper clauses
+//! that have not started. The thread and the Piper process are not killed.
 
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::mpsc::{sync_channel, Receiver, SyncSender, TryRecvError, TrySendError};
-use std::sync::Arc;
+use std::sync::mpsc::{sync_channel, Receiver, TryRecvError};
 use std::time::Instant;
 
 use galion_cascade::en_lane::{wav_bytes, LANE_RATE_HZ};
 use galion_cascade::{PhoneConfig, PhoneError, PhoneLane};
+
+use crate::bus::{
+    bytes_to_pcm16, pcm16_to_bytes, BusBody, BusGate, BusMsg, ProcessBus, WORKER_REPLY_DEPTH,
+};
 
 /// One utterance handed to the worker: mono PCM16 at `rate` (the lane resamples to 16 kHz).
 pub struct TurnJob {
@@ -96,17 +102,18 @@ fn wipe_string(s: &mut String) {
     std::hint::black_box(v.as_slice());
 }
 
-/// Handle owned by the heartbeat loop.
+/// Handle owned by the heartbeat loop. The loop only calls [`Self::try_submit`] and
+/// [`Self::try_recv`]; both return immediately.
 pub struct TurnWorker {
-    tx: SyncSender<TurnJob>,
-    rx: Receiver<TurnReply>,
-    /// Latest id the heartbeat cares about; the worker skips jobs older than this.
-    current: Arc<AtomicU64>,
+    bus: ProcessBus,
+    reply_rx: Receiver<TurnReply>,
 }
 
 impl TurnWorker {
     /// Env-configured lane (`GALION_ASR`, `GALION_LLM`).
-    pub fn spawn() -> Self { Self::spawn_with(PhoneConfig::from_env()) }
+    pub fn spawn() -> Self {
+        Self::spawn_with(PhoneConfig::from_env())
+    }
 
     /// Same worker with an explicit lane config.
     /// The presence-eval harness uses this so a barge-in probe does not mutate `GALION_ASR`.
@@ -115,63 +122,104 @@ impl TurnWorker {
     /// submitted as soon as `spawn` returns is not stuck behind model load in
     /// the one-slot queue. The 80 ms loop never calls this.
     pub fn spawn_with(cfg: PhoneConfig) -> Self {
-        let (tx, jrx) = sync_channel::<TurnJob>(1);
-        let (rtx, rx) = sync_channel::<TurnReply>(4);
+        Self::spawn_on_with(ProcessBus::new(), cfg)
+    }
+
+    /// `bus` is shared with the host. The lane is read from the environment.
+    /// The worker thread holds only the cancel gate, so dropping this handle
+    /// disconnects the job lane and the thread exits.
+    pub fn spawn_on(bus: ProcessBus) -> Self {
+        Self::spawn_on_with(bus, PhoneConfig::from_env())
+    }
+
+    fn spawn_on_with(bus: ProcessBus, cfg: PhoneConfig) -> Self {
+        let job_rx = bus.take_job_rx().expect("job receiver taken once");
+        let gate = bus.gate();
+        let (rtx, reply_rx) = sync_channel::<TurnReply>(WORKER_REPLY_DEPTH);
         let (ready_tx, ready_rx) = std::sync::mpsc::channel::<()>();
-        let current = Arc::new(AtomicU64::new(0));
-        let cur = current.clone();
         std::thread::Builder::new()
             .name("galion-turn-worker".into())
             .spawn(move || {
                 let mut lane = PhoneLane::new(cfg);
                 let _ = ready_tx.send(());
-                while let Ok(job) = jrx.recv() {
-                    if job.id < cur.load(Ordering::Acquire) {
-                        continue; // superseded (barge-in) before we started
+                while let Ok(msg) = job_rx.recv() {
+                    let turn_id = msg.turn_id;
+                    if !gate.admit_asr(turn_id) {
+                        continue; // superseded (barge-in) before ASR
                     }
-                    let Some(r) = respond(&mut lane, job, &cur) else { continue };
-                    if r.id < cur.load(Ordering::Acquire) {
-                        continue; // superseded while synthesizing
+                    let job = turn_job_from(msg);
+                    let Some(reply) = respond(&mut lane, job, &gate) else {
+                        let _ = gate.admit_publish(turn_id);
+                        continue; // superseded while synthesizing, before publish
+                    };
+                    if !gate.admit_publish(reply.id) {
+                        continue;
                     }
-                    if rtx.try_send(r).is_err() {
-                        // heartbeat gone or backed up: drop, never block
+                    if rtx.try_send(reply).is_err() {
+                        // depth 4 and full, or the host is gone: drop, never block
+                        gate.note_worker_reply_dropped();
                     }
                 }
             })
             .expect("spawn turn worker");
         ready_rx.recv().expect("turn worker stopped during lane start");
-        Self { tx, rx, current }
+        Self { bus, reply_rx }
     }
 
-    /// Mark `id` as the only turn whose reply is still wanted (cancels older in-flight work).
+    pub fn bus(&self) -> &ProcessBus {
+        &self.bus
+    }
+
+    /// Mark `id` as the newest turn whose reply is still wanted.
+    /// Older in-flight work is dropped. The thread keeps running.
     pub fn supersede(&self, id: u64) {
-        self.current.store(id, Ordering::Release);
+        self.bus.supersede(id);
     }
 
-    /// Non-blocking submit. `Err(job)` when the worker is busy with another turn.
+    /// Non-blocking submit. `Err(job)` when the depth-1 job lane is full.
+    /// An older id does not rewind the cancel token.
     pub fn try_submit(&self, job: TurnJob) -> Result<(), TurnJob> {
         self.supersede(job.id);
-        match self.tx.try_send(job) {
+        let msg = BusMsg::utterance(
+            self.bus.alloc_id(),
+            job.id,
+            0,
+            self.bus.cancel(),
+            job.rate,
+            pcm16_to_bytes(&job.pcm),
+        );
+        match self.bus.try_send_job(msg) {
             Ok(()) => Ok(()),
-            Err(TrySendError::Full(j)) | Err(TrySendError::Disconnected(j)) => Err(j),
+            Err(msg) => Err(turn_job_from(msg)),
         }
     }
 
-    /// Non-blocking poll for a finished reply that is still current.
+    /// Non-blocking poll. A reply that went stale after it was queued is dropped.
     pub fn try_recv(&self) -> Option<TurnReply> {
         loop {
-            match self.rx.try_recv() {
-                Ok(r) if r.id >= self.current.load(Ordering::Acquire) => return Some(r),
-                Ok(_) => continue, // stale
+            match self.reply_rx.try_recv() {
+                Ok(r) if self.bus.admit_publish(r.id) => return Some(r),
+                Ok(_) => continue,
                 Err(TryRecvError::Empty) | Err(TryRecvError::Disconnected) => return None,
             }
         }
     }
 }
 
-fn respond(lane: &mut PhoneLane, mut job: TurnJob, current: &Arc<AtomicU64>) -> Option<TurnReply> {
-    if job.id < current.load(Ordering::Acquire) { return None; }
-    lane.arm_cancel(Arc::clone(current), job.id);
+fn turn_job_from(msg: BusMsg) -> TurnJob {
+    let (rate, pcm) = match msg.body {
+        BusBody::Utterance { rate, pcm } => (rate, bytes_to_pcm16(&pcm)),
+        _ => (16_000, Vec::new()),
+    };
+    TurnJob {
+        id: msg.turn_id,
+        rate,
+        pcm,
+    }
+}
+
+fn respond(lane: &mut PhoneLane, mut job: TurnJob, gate: &BusGate) -> Option<TurnReply> {
+    lane.arm_cancel(gate.cancel_token(), job.id);
     let t0 = Instant::now();
     let in_ms = (job.pcm.len() as u64 * 1000 / job.rate.max(1) as u64) as u32;
     let mut wav_in = wav_bytes(&job.pcm, job.rate);
@@ -186,10 +234,22 @@ fn respond(lane: &mut PhoneLane, mut job: TurnJob, current: &Arc<AtomicU64>) -> 
             let pcm = reply_pcm(&t.wav_bytes);
             let ms = (pcm.len() as u64 * 1000 / LANE_RATE_HZ as u64) as u32;
             Some(TurnReply {
-                id: job.id, transcript: t.transcript, text: t.reply_text, pcm, wav: t.wav_bytes, ms,
-                backend: t.speech_backend, asr: t.asr.id(), llm: t.llm,
-                stages: format!("asr={} llm={} tts={} tts_first={}", t.stage_ms.asr, t.stage_ms.llm, t.stage_ms.tts, t.stage_ms.tts_first_pcm),
-                error: None, in_ms, took_ms: t0.elapsed().as_millis() as u32,
+                id: job.id,
+                transcript: t.transcript,
+                text: t.reply_text,
+                pcm,
+                wav: t.wav_bytes,
+                ms,
+                backend: t.speech_backend,
+                asr: t.asr.id(),
+                llm: t.llm,
+                stages: format!(
+                    "asr={} llm={} tts={} tts_first={}",
+                    t.stage_ms.asr, t.stage_ms.llm, t.stage_ms.tts, t.stage_ms.tts_first_pcm
+                ),
+                error: None,
+                in_ms,
+                took_ms: t0.elapsed().as_millis() as u32,
             })
         }
         Err(PhoneError::Superseded) => None,
@@ -204,9 +264,19 @@ fn respond(lane: &mut PhoneLane, mut job: TurnJob, current: &Arc<AtomicU64>) -> 
             let pcm = tone();
             let ms = (pcm.len() as u64 * 1000 / LANE_RATE_HZ as u64) as u32;
             Some(TurnReply {
-                id: job.id, transcript: String::new(), text: String::new(), wav: wav_bytes(&pcm, LANE_RATE_HZ), pcm, ms,
-                backend: "tone", asr: "none", llm: "none", stages: String::new(),
-                error: Some(format!("{kind}: {e}")), in_ms, took_ms: t0.elapsed().as_millis() as u32,
+                id: job.id,
+                transcript: String::new(),
+                text: String::new(),
+                wav: wav_bytes(&pcm, LANE_RATE_HZ),
+                pcm,
+                ms,
+                backend: "tone",
+                asr: "none",
+                llm: "none",
+                stages: String::new(),
+                error: Some(format!("{kind}: {e}")),
+                in_ms,
+                took_ms: t0.elapsed().as_millis() as u32,
             })
         }
     }
@@ -219,7 +289,10 @@ fn reply_pcm(b: &[u8]) -> Vec<i16> {
         let n = u32::from_le_bytes([b[i + 4], b[i + 5], b[i + 6], b[i + 7]]) as usize;
         if &b[i..i + 4] == b"data" {
             let d = &b[i + 8..(i + 8 + n).min(b.len())];
-            return d.chunks_exact(2).map(|c| i16::from_le_bytes([c[0], c[1]])).collect();
+            return d
+                .chunks_exact(2)
+                .map(|c| i16::from_le_bytes([c[0], c[1]]))
+                .collect();
         }
         i += 8 + n + (n & 1);
     }
@@ -291,16 +364,58 @@ mod tests {
         let _lock = env_lock();
         let _env = EnvGuard::set(&[("GALION_ASR", "off")]); // -> AsrUnratified -> tone fallback
         let w = TurnWorker::spawn();
-        assert!(w.try_submit(TurnJob { id: 1, rate: 16_000, pcm: vec![0; 160] }).is_ok());
+        assert!(w
+            .try_submit(TurnJob {
+                id: 1,
+                rate: 16_000,
+                pcm: vec![0; 160]
+            })
+            .is_ok());
         let t0 = Instant::now();
         let mut got = None;
-        while got.is_none() && t0.elapsed().as_secs() < 5 { got = w.try_recv(); std::thread::sleep(std::time::Duration::from_millis(5)); }
+        while got.is_none() && t0.elapsed().as_secs() < 5 {
+            got = w.try_recv();
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
         let r = got.expect("reply");
         assert_eq!((r.id, r.backend), (1, "tone"));
-        assert!(r.error.as_deref().is_some_and(|e| e.starts_with("AsrUnratified")));
+        assert!(r
+            .error
+            .as_deref()
+            .is_some_and(|e| e.starts_with("AsrUnratified")));
         assert_eq!(reply_pcm(&r.wav), r.pcm);
         assert!(r.wav.starts_with(b"RIFF"));
         w.supersede(9); // barge-in: anything older than 9 is stale
+        assert_eq!(w.bus().cancel(), 9);
+        assert!(w.try_recv().is_none());
+    }
+
+    #[test]
+    fn older_submit_does_not_rewind_cancel_and_is_dropped_before_asr() {
+        let _lock = env_lock();
+        let _env = EnvGuard::set(&[("GALION_ASR", "off")]);
+        let w = TurnWorker::spawn();
+        w.supersede(9);
+        assert!(w
+            .try_submit(TurnJob {
+                id: 3,
+                rate: 16_000,
+                pcm: vec![1, 0]
+            })
+            .is_ok());
+        assert_eq!(
+            w.bus().cancel(),
+            9,
+            "an older submit must not rewind cancel"
+        );
+        let t0 = Instant::now();
+        while w.bus().dropped_before_asr() == 0 && t0.elapsed().as_secs() < 5 {
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+        assert!(
+            w.bus().dropped_before_asr() >= 1,
+            "turn 3 was not dropped before ASR"
+        );
         assert!(w.try_recv().is_none());
     }
 

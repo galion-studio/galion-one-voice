@@ -128,6 +128,7 @@ scripts/run-v1-screen.sh
 scripts/check-phone-pipeline.sh
 docs/galion-voice-v2/       V2 sector plan
 docs/galion-voice-v2/ONE-UI.md   one mark, Luti, no framework, no venv
+docs/research/galion-voice-v2/  V2 research synthesis (2026-11-03); LOCKS win
 docs/ops/PLAN-V5.md
 docs/brand/GALION-VOICE-BRAND.md
 ```
@@ -173,6 +174,7 @@ scripts/run-v1-screen.sh --check
    `WebSurface` will reject the bind.
 
 Further: [V2 plan](docs/galion-voice-v2/GALION-VOICE-V2.md) ·
+[V2 research (2026-11-03)](docs/research/galion-voice-v2/README.md) ·
 [Open Mind nerve and cortex](docs/galion-voice-v2/OPENMIND-NERVE-CORTEX.md) ·
 [animation engine](docs/galion-voice-v2/ANIMATION-ENGINE.md) ·
 [one-UI](docs/galion-voice-v2/ONE-UI.md) ·
