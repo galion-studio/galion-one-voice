@@ -11,8 +11,16 @@
 //! Weights are not vendored. [`weights_ready`] is false until the pinned
 //! safetensors are on disk. Nothing here downloads them.
 //!
-//! The Python stub does not call Chatterbox generate and refuses a reference
-//! clip. `GALION_CLONE_STUB_PCM=1` is protocol PCM, not a Flash result.
+//! The child is CPU-only Chatterbox Nano (Turbo remains the quality option,
+//! not a swap), pinned to one thread: the ~1 vCPU voice-session budget.
+//! No GPU. No GGUF. PyTorch stays in that process and is not linked here.
+//!
+//! A reference is attached only for the owner-cleared Samantha and Jarvis
+//! wavs (t273) when the file is present and its sha256 matches
+//! `scripts/clone/REFS.sha256`. Missing files are omitted (CI skip). A
+//! mismatch, an MP3, or a denoise request is an error. Jarvis hub texture
+//! is character and is not cleaned. The stub still does not call generate.
+//! `GALION_CLONE_STUB_PCM=1` is protocol PCM, not a Flash result.
 #![allow(unsafe_code)]
 
 use super::sha256;
@@ -27,6 +35,22 @@ use std::time::{Duration, Instant};
 pub const CLONE_RATE_HZ: u32 = 24_000;
 
 const PINS_TEXT: &str = include_str!("../../../../scripts/clone/PINS.sha256");
+const REFS_TEXT: &str = include_str!("../../../../scripts/clone/REFS.sha256");
+
+/// This child asks for one hardware thread. That is the voice-session
+/// budget (~1 vCPU). The cascade burst of ~4 is not this process.
+pub const CLONE_SESSION_VCPU: u32 = 1;
+pub const CLONE_BURST_VCPU: u32 = 4;
+
+const CPU_THREAD_KEYS: &[&str] = &[
+    "OMP_NUM_THREADS",
+    "OPENBLAS_NUM_THREADS",
+    "MKL_NUM_THREADS",
+    "NUMEXPR_NUM_THREADS",
+    "VECLIB_MAXIMUM_THREADS",
+    "TORCH_NUM_THREADS",
+    "GALION_CLONE_THREADS",
+];
 
 /// Which Chatterbox pack the child was asked for. Nano is the default.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -98,6 +122,179 @@ fn pins() -> Vec<Pin> {
         });
     }
     out
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct RefPin {
+    persona: String,
+    sha: String,
+    duration_s: String,
+    rate_hz: u32,
+    channels: u32,
+    bits: u32,
+    repo_rel: String,
+    store_rel: String,
+    texture: String,
+}
+
+fn ref_pins() -> Vec<RefPin> {
+    let mut out = Vec::new();
+    for line in REFS_TEXT.lines() {
+        let line = line.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        let mut parts = line.split_whitespace();
+        let Some(persona) = parts.next() else { continue };
+        let Some(sha) = parts.next() else { continue };
+        let Some(duration_s) = parts.next() else { continue };
+        let Some(rate_hz) = parts.next().and_then(|s| s.parse().ok()) else { continue };
+        let Some(channels) = parts.next().and_then(|s| s.parse().ok()) else { continue };
+        let Some(bits) = parts.next().and_then(|s| s.parse().ok()) else { continue };
+        let Some(repo_rel) = parts.next() else { continue };
+        let Some(store_rel) = parts.next() else { continue };
+        let Some(texture) = parts.next() else { continue };
+        if !repo_rel.ends_with(".wav") || !store_rel.ends_with(".wav") {
+            continue;
+        }
+        if !texture.starts_with("preserve") {
+            continue;
+        }
+        out.push(RefPin {
+            persona: persona.to_string(),
+            sha: sha.to_string(),
+            duration_s: duration_s.to_string(),
+            rate_hz,
+            channels,
+            bits,
+            repo_rel: repo_rel.to_string(),
+            store_rel: store_rel.to_string(),
+            texture: texture.to_string(),
+        });
+    }
+    out
+}
+
+fn repo_root() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
+}
+
+/// `true` only when the persona TOML both allows a send and is not still
+/// on `rights = "hold"`. A missing file means do not send.
+fn send_reference_enabled(repo: &Path, persona: &str) -> bool {
+    let path = repo.join(format!("docs/galion-voice-v2/personas/voice/{persona}.toml"));
+    let Ok(text) = std::fs::read_to_string(path) else {
+        return false;
+    };
+    let mut in_worker = false;
+    let mut in_reference = false;
+    let mut send = false;
+    let mut present = false;
+    let mut rights_hold = false;
+    let mut denoise = false;
+    for line in text.lines() {
+        let line = line.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        if let Some(header) = line.strip_prefix('[') {
+            let header = header.trim_end_matches(']');
+            in_worker = header == "worker";
+            in_reference = header == "reference";
+            continue;
+        }
+        let Some((k, v)) = line.split_once('=') else { continue };
+        let v = v.split('#').next().unwrap_or(v).trim().trim_matches('"');
+        if in_worker && k.trim() == "send_reference" && v == "true" {
+            send = true;
+        }
+        if in_reference && k.trim() == "present" && v == "true" {
+            present = true;
+        }
+        if in_reference && k.trim() == "rights" && v == "hold" {
+            rights_hold = true;
+        }
+        if in_reference && k.trim() == "denoise" && v == "true" {
+            denoise = true;
+        }
+    }
+    send && present && !rights_hold && !denoise
+}
+
+/// A consented wav the child may condition on. The bytes are not copied.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ResolvedRef {
+    pub persona: String,
+    pub path: PathBuf,
+    pub sha256: String,
+    pub texture: String,
+}
+
+fn clip_store_from(raw: Option<&str>) -> Option<PathBuf> {
+    let raw = raw?.trim();
+    if raw.is_empty() {
+        None
+    } else {
+        Some(PathBuf::from(raw))
+    }
+}
+
+fn resolve_reference_at(
+    persona: &str,
+    store: Option<&Path>,
+    repo: &Path,
+) -> Result<Option<ResolvedRef>, VoiceError> {
+    let persona = persona_name(persona);
+    if !send_reference_enabled(repo, persona) {
+        return Ok(None);
+    }
+    let Some(pin) = ref_pins().into_iter().find(|p| p.persona == persona) else {
+        return Ok(None);
+    };
+    let mut candidates = Vec::new();
+    if let Some(store) = store {
+        candidates.push(store.join(&pin.store_rel));
+    }
+    candidates.push(repo.join(&pin.repo_rel));
+    for path in candidates {
+        if !path.is_file() {
+            continue;
+        }
+        let name = path.file_name().and_then(|s| s.to_str()).unwrap_or("");
+        let lower = name.to_ascii_lowercase();
+        if !lower.ends_with(".wav") || lower.contains("mp3") {
+            return Err(VoiceError::Backend("mp3 is not a clone reference".into()));
+        }
+        let got = sha256::file_hex(&path)
+            .map_err(|e| VoiceError::Backend(format!("reference hash: {e}")))?;
+        if got != pin.sha {
+            return Err(VoiceError::Backend(format!(
+                "reference sha256 mismatch for {persona}"
+            )));
+        }
+        return Ok(Some(ResolvedRef {
+            persona: persona.to_string(),
+            path,
+            sha256: got,
+            texture: pin.texture,
+        }));
+    }
+    Ok(None)
+}
+
+fn resolve_reference(persona: &str) -> Result<Option<ResolvedRef>, VoiceError> {
+    let store = clip_store_from(std::env::var("GALION_CLIP_STORE").ok().as_deref());
+    resolve_reference_at(persona, store.as_deref(), &repo_root())
+}
+
+fn apply_cpu_budget(cmd: &mut Command) {
+    for key in CPU_THREAD_KEYS {
+        cmd.env(key, CLONE_SESSION_VCPU.to_string());
+    }
+    cmd.env("GALION_CLONE_DEVICE", "cpu");
+    cmd.env("CUDA_VISIBLE_DEVICES", "");
+    cmd.env("HIP_VISIBLE_DEVICES", "");
+    cmd.env("GALION_CLONE_DENOISE", "0");
 }
 
 fn clone_root() -> PathBuf {
@@ -178,14 +375,15 @@ pub struct CloneWorker {
 impl CloneWorker {
     pub fn spawn(script: &Path, model: CloneModel, persona: &str) -> Result<Self, VoiceError> {
         let persona = persona_name(persona);
-        let mut child = Command::new("python3")
-            .arg(script)
+        let mut cmd = Command::new("python3");
+        cmd.arg(script)
             .env("GALION_CLONE_MODEL", model.as_str())
             .env("GALION_CLONE_PERSONA", persona)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
+            .stderr(Stdio::piped());
+        apply_cpu_budget(&mut cmd);
+        let mut child = cmd.spawn()
             .map_err(|e| {
                 VoiceError::Backend(format!("clone worker spawn {}: {e}", script.display()))
             })?;
@@ -254,7 +452,14 @@ impl CloneWorker {
     /// One clause in, one PCM buffer out. Same process on every call.
     pub fn synthesize(&mut self, text: &str) -> Result<Vec<i16>, VoiceError> {
         let t0 = Instant::now();
-        let line = request_line(text, self.model, self.persona);
+        let resolved = resolve_reference(self.persona)?;
+        let line = request_line(
+            text,
+            self.model,
+            self.persona,
+            resolved.as_ref(),
+            jarvis_texture_enabled(self.persona),
+        );
         {
             let stdin = self
                 .stdin
@@ -544,7 +749,9 @@ impl FlashReport {
 }
 
 /// Default harness path. No number unless `GALION_FLASH_EVAL=1` and a worker
-/// returns PCM. Does not download and does not send a reference clip.
+/// returns PCM. Does not download. A consented reference is attached only
+/// when the pinned wav is present and the hash matches. This is not a model
+/// TTFA.
 pub fn flash_from_env() -> FlashReport {
     if std::env::var("GALION_FLASH_EVAL").ok().as_deref() != Some("1") {
         return FlashReport::absent("GALION_FLASH_EVAL is not 1; no TTFA number");
@@ -580,14 +787,7 @@ pub fn flash_from_env() -> FlashReport {
     }
 }
 
-fn request_line(text: &str, model: CloneModel, persona: &str) -> String {
-    let tags = if tags_allowed(persona) {
-        "true"
-    } else {
-        "false"
-    };
-    let mut s = String::with_capacity(text.len() + 64);
-    s.push_str("{\"text\":\"");
+fn push_json_str(s: &mut String, text: &str) {
     for c in text.chars() {
         match c {
             '"' => s.push_str("\\\""),
@@ -597,12 +797,69 @@ fn request_line(text: &str, model: CloneModel, persona: &str) -> String {
             c => s.push(c),
         }
     }
+}
+
+/// Jarvis hub layer toggle. Unset means on. `0` / `false` / `off` leaves the
+/// layer in the clip and does not apply it. Samantha has no hub layer.
+pub fn jarvis_texture_enabled(persona: &str) -> bool {
+    if persona_name(persona) != "jarvis" {
+        return false;
+    }
+    match std::env::var("GALION_JARVIS_TEXTURE")
+        .ok()
+        .as_deref()
+        .map(str::trim)
+    {
+        Some("0") | Some("false") | Some("off") => false,
+        _ => true,
+    }
+}
+
+pub(crate) fn ref_sha(persona: &str) -> Option<String> {
+    let persona = persona_name(persona);
+    ref_pins().into_iter().find(|p| p.persona == persona).map(|p| p.sha)
+}
+
+fn request_line(
+    text: &str,
+    model: CloneModel,
+    persona: &str,
+    reference: Option<&ResolvedRef>,
+    texture_layer: bool,
+) -> String {
+    let persona = persona_name(persona);
+    let texture_layer = texture_layer && persona == "jarvis";
+    let tags = if tags_allowed(persona) {
+        "true"
+    } else {
+        "false"
+    };
+    let mut s = String::with_capacity(text.len() + 96);
+    s.push_str("{\"text\":\"");
+    push_json_str(&mut s, text);
     s.push_str("\",\"model\":\"");
     s.push_str(model.as_str());
     s.push_str("\",\"persona\":\"");
     s.push_str(persona_name(persona));
     s.push_str("\",\"tags\":");
     s.push_str(tags);
+    s.push_str(",\"device\":\"cpu\",\"denoise\":false,\"texture_layer\":");
+    s.push_str(if texture_layer { "true" } else { "false" });
+    if persona == "jarvis" {
+        s.push_str(",\"texture\":\"preserve-hub\"");
+    }
+    if let Some(reference) = reference {
+        let path = reference.path.to_string_lossy();
+        s.push_str(",\"audio_prompt_path\":\"");
+        push_json_str(&mut s, &path);
+        s.push_str("\",\"reference\":\"");
+        push_json_str(&mut s, &path);
+        if persona != "jarvis" {
+            s.push_str("\",\"texture\":\"");
+            push_json_str(&mut s, &reference.texture);
+            s.push('"');
+        }
+    }
     s.push_str("}\n");
     s
 }
@@ -705,17 +962,139 @@ mod tests {
     }
 
     #[test]
-    fn request_line_has_no_reference_and_jarvis_tags_are_off() {
-        let line = request_line("say \"hi\"", CloneModel::Nano, "samantha");
+    fn request_line_omits_a_missing_reference_and_jarvis_tags_are_off() {
+        let line = request_line("say \"hi\"", CloneModel::Nano, "samantha", None, true);
         assert!(line.contains("\"model\":\"nano\""));
         assert!(line.contains("\"tags\":true"));
+        assert!(line.contains("\"device\":\"cpu\""));
+        assert!(line.contains("\"denoise\":false"));
         assert!(!line.contains("reference"));
         assert!(!line.contains("audio_prompt"));
-        let jarvis = request_line("hello", CloneModel::Turbo, "jarvis");
+        assert!(!line.contains("gguf"));
+        let jarvis = request_line("hello", CloneModel::Turbo, "jarvis", None, false);
         assert!(jarvis.contains("\"model\":\"turbo\""));
         assert!(jarvis.contains("\"tags\":false"));
+        assert!(jarvis.contains("\"texture_layer\":false"));
+        assert!(jarvis.contains("\"texture\":\"preserve-hub\""));
+        assert!(!jarvis.contains("reference"));
         assert!(!tags_allowed("jarvis"));
         assert_eq!(persona_name("other"), "samantha");
+        let attach = ResolvedRef {
+            persona: "jarvis".into(),
+            path: PathBuf::from("docs/galion-voice-v2/personas/refs/jarvis.wav"),
+            sha256: "c2200b59fa78b3c98d13ac5dc7db3a6c14e802310dca73033d7770bd4b532c60".into(),
+            texture: "preserve-hub".into(),
+        };
+        let sent = request_line("hello", CloneModel::Nano, "jarvis", Some(&attach), true);
+        assert!(sent.contains("\"audio_prompt_path\":\"docs/galion-voice-v2/personas/refs/jarvis.wav\""));
+        assert!(sent.contains("\"texture\":\"preserve-hub\""));
+        assert!(sent.contains("\"texture_layer\":true"));
+        assert_eq!(sent.matches("\"texture\":").count(), 1);
+        assert!(sent.contains("\"denoise\":false"));
+        assert!(sent.contains("\"tags\":false"));
+        assert!(!sent.contains("mp3"));
+    }
+
+    #[test]
+    fn reference_pins_keep_the_current_wavs_and_jarvis_texture() {
+        let table = ref_pins();
+        assert_eq!(table.len(), 2, "{table:?}");
+        let sam = table.iter().find(|p| p.persona == "samantha").unwrap();
+        let jar = table.iter().find(|p| p.persona == "jarvis").unwrap();
+        assert_eq!(sam.sha, "bdcb0c2903bb91c7b0fda0cf79a42406fdaa662fd8d31f6eaed3895d9c7a8693");
+        assert_eq!(sam.duration_s, "17.41");
+        assert_eq!(sam.rate_hz, 44_100);
+        assert_eq!(sam.channels, 2);
+        assert_eq!(sam.bits, 16);
+        assert_eq!(sam.texture, "preserve");
+        assert!(sam.repo_rel.ends_with("samantha.wav"));
+        assert_eq!(sam.store_rel, "samantha/reference.wav");
+        assert_eq!(jar.sha, "c2200b59fa78b3c98d13ac5dc7db3a6c14e802310dca73033d7770bd4b532c60");
+        assert_eq!(jar.duration_s, "15.95");
+        assert_eq!(jar.rate_hz, 48_000);
+        assert_eq!(jar.channels, 2);
+        assert_eq!(jar.bits, 16);
+        assert_eq!(jar.texture, "preserve-hub");
+        assert!(jar.repo_rel.ends_with("jarvis.wav"));
+        assert_eq!(jar.store_rel, "jarvis/reference.wav");
+        for pin in &table {
+            assert!(!pin.repo_rel.contains("mp3") && !pin.store_rel.contains("mp3"));
+            assert!(pin.texture.starts_with("preserve"));
+        }
+        assert_eq!(CLONE_SESSION_VCPU, 1);
+        assert_eq!(CLONE_BURST_VCPU, 4);
+    }
+
+    #[test]
+    fn toml_sends_the_pinned_wav_and_does_not_swap_the_model() {
+        let root = repo_root();
+        for persona in ["samantha", "jarvis"] {
+            let text = std::fs::read_to_string(
+                root.join(format!("docs/galion-voice-v2/personas/voice/{persona}.toml")),
+            )
+            .unwrap();
+            let pin = ref_pins().into_iter().find(|p| p.persona == persona).unwrap();
+            assert!(text.contains(&format!("clip_path = \"{}\"", pin.repo_rel)), "{persona}");
+            assert!(text.contains(&pin.sha), "{persona}");
+            assert!(text.contains("present = true"), "{persona}");
+            assert!(text.contains("send_reference = true"), "{persona}");
+            assert!(text.contains("denoise = false"), "{persona}");
+            assert!(text.contains("ingest = false"), "{persona}");
+            assert!(text.contains("model = \"nano\""), "{persona}");
+            assert!(text.contains("device = \"cpu\""), "{persona}");
+            assert!(text.contains("threads = 1"), "{persona}");
+            assert!(send_reference_enabled(&root, persona), "{persona}");
+        }
+        let jarvis = std::fs::read_to_string(
+            root.join("docs/galion-voice-v2/personas/voice/jarvis.toml"),
+        )
+        .unwrap();
+        assert!(jarvis.contains("preserve-hub"));
+        assert!(jarvis.contains("clicks"));
+        assert!(jarvis.contains("GALION_JARVIS_TEXTURE"));
+        assert!(jarvis.contains("texture_stripped = false"));
+        let worker = std::fs::read_to_string(
+            root.join("scripts/clone/chatterbox_worker.py"),
+        )
+        .unwrap();
+        assert!(!worker.contains("import torch"));
+        assert!(!worker.contains("import gguf") && !worker.contains(".gguf"));
+        assert!(!worker.contains("ffmpeg") && !worker.contains("noisereduce"));
+        assert!(worker.contains("CUDA_VISIBLE_DEVICES"));
+        assert!(worker.contains("denoise refused"));
+    }
+
+    #[test]
+    fn absent_reference_is_skipped_and_a_bad_file_is_refused() {
+        let root = repo_root();
+        let store = clip_store_from(None);
+        let got = resolve_reference_at("samantha", store.as_deref(), &root).unwrap();
+        if let Some(found) = got {
+            assert_eq!(found.sha256, "bdcb0c2903bb91c7b0fda0cf79a42406fdaa662fd8d31f6eaed3895d9c7a8693");
+            assert_eq!(found.texture, "preserve");
+            assert!(found.path.ends_with("samantha.wav"));
+        }
+        let dir = std::env::temp_dir().join(format!("galion-clone-ref-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let voice = dir.join("docs/galion-voice-v2/personas/voice");
+        let refs = dir.join("docs/galion-voice-v2/personas/refs");
+        std::fs::create_dir_all(&voice).unwrap();
+        std::fs::create_dir_all(&refs).unwrap();
+        std::fs::write(
+            voice.join("samantha.toml"),
+            "[reference]\nrights = \"owner-t273\"\npresent = true\ndenoise = false\n[worker]\nsend_reference = true\n",
+        )
+        .unwrap();
+        std::fs::write(refs.join("samantha.wav"), b"not-the-clip").unwrap();
+        let err = resolve_reference_at("samantha", None, &dir).unwrap_err();
+        assert!(err.to_string().contains("sha256 mismatch"), "{err}");
+        std::fs::write(
+            voice.join("samantha.toml"),
+            "[reference]\nrights = \"hold\"\npresent = true\ndenoise = false\n[worker]\nsend_reference = true\n",
+        )
+        .unwrap();
+        assert!(resolve_reference_at("samantha", None, &dir).unwrap().is_none());
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
@@ -778,6 +1157,9 @@ mod tests {
         );
         let err = String::from_utf8_lossy(&out.stderr);
         assert!(err.contains("rights hold"), "{err}");
+        assert!(err.contains("threads=1"), "{err}");
+        assert!(err.contains("device=cpu"), "{err}");
+        assert!(err.contains("gguf=false"), "{err}");
         assert!(out.stdout.is_empty(), "a refused clip must not produce PCM");
 
         let absent = Command::new("python3")
@@ -787,7 +1169,60 @@ mod tests {
             .output()
             .unwrap();
         assert_eq!(absent.status.code(), Some(2));
-        assert!(String::from_utf8_lossy(&absent.stderr).contains("galion-clone-absent"));
+        let absent_err = String::from_utf8_lossy(&absent.stderr);
+        assert!(absent_err.contains("galion-clone-absent"), "{absent_err}");
+        assert!(absent_err.contains("session_vcpu=1"), "{absent_err}");
+
+        let denoise = Command::new("python3")
+            .arg(&script)
+            .env("GALION_CLONE_STUB_PCM", "1")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap();
+        let mut denoise = denoise;
+        {
+            let mut stdin = denoise.stdin.take().unwrap();
+            stdin
+                .write_all(b"{\"text\":\"hi\",\"persona\":\"jarvis\",\"denoise\":true}\n")
+                .unwrap();
+        }
+        let denied = denoise.wait_with_output().unwrap();
+        assert_eq!(denied.status.code(), Some(3));
+        assert!(denied.stdout.is_empty());
+        assert!(String::from_utf8_lossy(&denied.stderr).contains("denoise refused"));
+
+        let gpu = Command::new("python3")
+            .arg(&script)
+            .env("GALION_CLONE_DEVICE", "cuda")
+            .env("GALION_CLONE_STUB_PCM", "1")
+            .output()
+            .unwrap();
+        assert_eq!(gpu.status.code(), Some(3));
+        assert!(String::from_utf8_lossy(&gpu.stderr).contains("CPU-only"));
+        assert!(gpu.stdout.is_empty());
+
+        let threads = Command::new("python3")
+            .arg(&script)
+            .env("GALION_CLONE_THREADS", "8")
+            .env("GALION_CLONE_STUB_PCM", "1")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap();
+        let mut threads = threads;
+        {
+            let mut stdin = threads.stdin.take().unwrap();
+            stdin.write_all(b"{\"text\":\"hi\",\"persona\":\"jarvis\"}\n").unwrap();
+        }
+        let clamped = threads.wait_with_output().unwrap();
+        assert!(clamped.status.success(), "{}", String::from_utf8_lossy(&clamped.stderr));
+        let clog = String::from_utf8_lossy(&clamped.stderr);
+        assert!(clog.contains("threads=1"), "{clog}");
+        assert!(clog.contains("asked=8 applied=1"), "{clog}");
+        assert!(!clamped.stdout.is_empty());
     }
 
     #[test]
@@ -833,16 +1268,30 @@ mod tests {
     }
 
     const FAKE_CLONE: &str = r#"#!/usr/bin/env python3
-import json, struct, sys
+import json, os, struct, sys
+keys = ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS", "TORCH_NUM_THREADS", "GALION_CLONE_THREADS")
+if any(os.environ.get(k) != "1" for k in keys):
+    sys.stderr.write("galion-clone-refuse: cpu pin missing\n")
+    sys.exit(3)
+if os.environ.get("GALION_CLONE_DEVICE") != "cpu" or os.environ.get("CUDA_VISIBLE_DEVICES") != "" or os.environ.get("GALION_CLONE_DENOISE") != "0":
+    sys.stderr.write("galion-clone-refuse: cpu pin missing\n")
+    sys.exit(3)
 while True:
     line = sys.stdin.buffer.readline()
     if not line:
         break
     msg = json.loads(line.decode())
-    if msg.get("reference") or msg.get("audio_prompt") or msg.get("audio_prompt_path"):
-        sys.stderr.write("galion-clone-refuse: reference clips are on the rights hold\n")
-        sys.stderr.flush()
+    if msg.get("denoise") in (True, "true", "1", 1):
+        sys.stderr.write("galion-clone-refuse: denoise refused\n")
         sys.exit(3)
+    if msg.get("device") not in (None, "", "cpu"):
+        sys.stderr.write("galion-clone-refuse: CPU-only\n")
+        sys.exit(3)
+    for key in ("reference", "audio_prompt", "audio_prompt_path", "clip"):
+        value = msg.get(key) or ""
+        if str(value).lower().endswith(".mp3"):
+            sys.stderr.write("galion-clone-refuse: mp3 is not a clone reference\n")
+            sys.exit(3)
     text = msg.get("text", "")
     if msg.get("persona") == "jarvis":
         text = text.replace("[laugh]", "").replace("[chuckle]", "")

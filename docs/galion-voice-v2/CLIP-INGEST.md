@@ -167,15 +167,18 @@ reference.
 
 ## Clone-worker handoff
 
-What the scaffold does now (`CLONE-WORKER.md`):
+Owner t273 opens local send. The runbook is `symphony/CLONE-LANDING.md`.
+`LOCKS.toml` is not edited here, so `reference_clips` stays false. The
+worker accepts a path anyway, and only the pinned one.
 
-The stdin line is `{"text","model","persona","tags"}`. `request_line`
-emits those four fields. A non-empty `reference`, `audio_prompt`,
-`audio_prompt_path`, or `clip` makes `chatterbox_worker.py` exit 3 with
-`galion-clone-refuse: reference clips are on the rights hold`, and with
-no PCM on stdout. Jarvis still forces `tags` false. An unknown persona
-name is still treated as Samantha. That refusal is the handoff. There
-is no path to pass.
+The stdin line is `{"text","model","persona","tags","device","denoise"}`.
+`device` is `cpu`. `denoise` is false. When the pinned wav is on disk and
+the sha256 matches, the line also carries `audio_prompt_path` and
+`reference` set to that same path, plus `texture`. A missing file omits
+those keys (CI skip). A foreign path, an MP3, a hash mismatch, a GPU
+device, or a denoise flag exits 3 with no PCM. Jarvis still forces `tags`
+false. Hub texture is not cleaned. An unknown persona name is still
+treated as Samantha.
 
 `BusBody::Persona` carries `id` and `source`. It does not carry samples
 or a filesystem path. `Utterance` is the caller's turn. A film clip does
@@ -184,17 +187,9 @@ not ride either body, and it does not ride `POST /turn`.
 If the clone slot is absent, Piper (`en_US-ljspeech-medium`) speaks, then
 flite. A refused clip does not become a cloned voice on the way down.
 
-A later handoff is a new owner decision. It is not this outline, and it
-still has to pass the gates above, including the lock. The shape, if
-that decision is ever written:
-
-- The child still does not fetch.
-- It opens one path outside the work tree. The path is an argument to that process, not an HTTP body, not a git blob, not a log of the samples.
-- The sha256 matches the LEDGER line, the grant is inside its term, and `public_demo` matches the call.
-- Stdout stays raw 24 kHz s16le. No wav of the reply is written.
-- Any failed check skips the child. Piper speaks.
-
-This outline does not add the four keys the stub refuses.
+The child still does not fetch. It does not rewrite the wav. Stdout stays
+raw 24 kHz s16le. No wav of the reply is written. The public demo is
+still closed. Generate is still not called.
 
 ## Art. 50 and the watermark
 
@@ -242,18 +237,17 @@ copy does not stay in the repo as evidence.
 
 | Check | State |
 |---|---|
-| LEDGER fetch-allowed for `samantha` | Absent |
-| LEDGER fetch-allowed for `jarvis` | Absent |
-| `reference_clips` | `false` |
-| Worker accepts a clip key | No. Exit 3, no PCM. |
-| `GALION_CLIP_STORE` | Unset. Not read. |
-| Clip bytes in git | None |
-| sha256 of a clip | Not computed |
+| LEDGER local send, owner t273 | Written. Not a counsel opinion. Not a public demo. |
+| `reference_clips` | `false`. Lock file not edited. |
+| Worker accepts a clip key | Only the two pinned wavs, and only when the sha256 matches. Anything else exits 3 with no PCM. |
+| `GALION_CLIP_STORE` | Read when set. Unset falls through to the gitignored repo path, then skips if that is absent too. |
+| Clip bytes in git | None. |
+| sha256 of a clip | Pinned in `scripts/clone/REFS.sha256` from the owner's digests. Recomputed when a file is present. |
 
-## What this change did not do
+## What the landing still does not do
 
-- No fetch, no store, no hash, no worker edit, no LOCKS edit.
-- No Perth package. No model download. No paid API.
-- No public demo in either film voice.
+- No fetch of the wavs. No commit of the wavs. No LOCKS edit.
+- No Perth package. No model download. No paid API. No GGUF. No GPU.
+- No public demo in either film voice. No denoise of the Jarvis hub.
 
 — Maciej Grajczyk

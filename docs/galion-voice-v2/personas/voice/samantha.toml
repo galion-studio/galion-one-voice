@@ -1,11 +1,12 @@
 # Galion Voice V2 — Samantha voice config (draft)
 # Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
 #
-# The /v2 demo route reads this file for prosody, wash, tags, and the
-# rights hold. The clone worker does not. No clip, no weights.
-# Register numbers are the design table in SAMANTHA-V2.md §4.
-# Rights hold: ../VOICE-CLONING.md. Clearance, if it ever exists, is a
-# LEDGER.md line. This draft does not write that line.
+# The /v2 demo route reads this file for prosody, wash, and tags.
+# The clone worker reads the reference table and the worker table when
+# it builds a request. The public page is still not a film voice. Weights are not
+# vendored. Register numbers are the design table in SAMANTHA-V2.md §4.
+# Local reference send is owner t273, recorded in LEDGER.md. No counsel
+# name is in this file. Public demo stays closed.
 
 schema = 1
 status = "draft"
@@ -60,14 +61,22 @@ unknown_tags = "off"
 note = "GALION-VOICE-V2.md names these two. The rest of any Turbo/Nano tag set is not copied here."
 
 [reference]
-rights = "hold"
+rights = "owner-t273"
 ingest = false
-present = false
+present = true
 duration_target_s = 10
 min_duration_s = 5
-clip_path = ""
+duration_s = 17.41
+sample_rate_hz = 44100
+channels = 2
+bits = 16
+sha256 = "bdcb0c2903bb91c7b0fda0cf79a42406fdaa662fd8d31f6eaed3895d9c7a8693"
+clip_path = "docs/galion-voice-v2/personas/refs/samantha.wav"
+store_rel = "samantha/reference.wav"
+texture = "preserve"
+denoise = false
 placeholder = "docs/galion-voice-v2/personas/refs/samantha.placeholder"
-note = "placeholder is a text marker. It is not audio. Do not commit a wav, and do not put this path on the worker request line."
+note = "Current model reference. WAV only, gitignored. Also $GALION_CLIP_STORE/samantha/reference.wav. Do not trim, denoise, or replace with an MP3. The worker sends this path only when the sha256 matches. Public demo stays closed."
 
 [worker]
 binding = "galion.clone.worker"
@@ -82,7 +91,14 @@ model = "nano"
 quality_option = "turbo"
 request_persona = "samantha"
 request_tags = true
-send_reference = false
+send_reference = true
+device = "cpu"
+threads = 1
+session_vcpu = 1
+burst_vcpu_note = "cascade planning ceiling, not this child"
+env_clip_store = "GALION_CLIP_STORE"
+env_threads = "GALION_CLONE_THREADS"
+denoise = false
 rate_hz = 24000
 pcm = "s16le"
 weights_vendored = false
@@ -95,7 +111,7 @@ order = ["piper", "flite"]
 engine = "piper"
 voice = "en_US-ljspeech-medium"
 artifact = "weights/tts/en_US-ljspeech-medium.onnx"
-when = "clone worker absent, unwired, or dead; rights hold still closed"
+when = "clone worker absent, unwired, or dead"
 tags = false
 is_film_voice = false
 

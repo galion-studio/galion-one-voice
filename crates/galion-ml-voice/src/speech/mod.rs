@@ -20,9 +20,13 @@
 //!
 //! Env: `GALION_SPEECH=auto|clone|a21|flite|off` (default `auto`: clone if the
 //!      pinned pack is on disk, else a21, else flite),
-//!      `GALION_CLONE_MODEL=nano|turbo`, `GALION_CLONE_PERSONA=samantha|jarvis`,
+//!      `GALION_CLONE_MODEL=nano|turbo` (nano stays the landing model),
+//!      `GALION_CLONE_PERSONA=samantha|jarvis`,
+//!      `GALION_CLIP_STORE` (optional dir of `{persona}/reference.wav`),
+//!      `GALION_CLONE_THREADS` (clamped to 1; this child is one vCPU),
 //!      `GALION_A21_RUNTIME` (Piper exe), `GALION_A21_NOISE=natural` (sampled prosody),
 //!      `GALION_FLITE_VOICE=slt|kal16|awb|rms|kal` (default `slt`).
+//! The clone child is CPU-only. It does not see a GPU and it does not load GGUF.
 
 use crate::{Audio, LanguageId, TtsEngine, VoiceError};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -31,6 +35,7 @@ use std::time::Instant;
 
 pub mod clause;
 pub mod clone_worker;
+pub mod galion_clip;
 pub mod flite;
 pub mod piper_worker;
 pub mod sha256;

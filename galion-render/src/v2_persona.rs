@@ -925,8 +925,8 @@ mod tests {
         assert!((b.jarvis.e0.luti_w - 1.08).abs() < 1e-3);
         assert!(!b.samantha.tags_on_piper && b.samantha.tags_enabled);
         assert!(!b.jarvis.tags_enabled && !b.jarvis.tags_on_piper);
-        assert!(!b.samantha.ingest && b.samantha.clip_path_empty);
-        assert!(!b.jarvis.ingest && b.jarvis.clip_path_empty);
+        assert!(!b.samantha.ingest && !b.samantha.clip_path_empty);
+        assert!(!b.jarvis.ingest && !b.jarvis.clip_path_empty);
         assert!(b.samantha.wired && b.jarvis.wired);
     }
 

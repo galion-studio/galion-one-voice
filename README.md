@@ -69,9 +69,12 @@ Nothing here has been deployed to the VPS. Access is approved-pending-setup:
 per-user anonymized codes, installed by a human. No shared key. Priority 1
 for V2 voice work is local Chatterbox cloning, not a cloud API
 ([VOICE-CLONING.md](docs/galion-voice-v2/VOICE-CLONING.md)). No film audio
-is in this repo. The clearance checklist for those two film voices is
-[RIGHTS-CLEARANCE.md](docs/galion-voice-v2/RIGHTS-CLEARANCE.md). Both gates
-are closed. The closed ingest outline is
+is in this repo. Owner t273 clears local send of the current Samantha and
+Jarvis wavs; the runbook is
+[CLONE-LANDING.md](docs/galion-voice-v2/symphony/CLONE-LANDING.md). The
+public-demo gates in
+[RIGHTS-CLEARANCE.md](docs/galion-voice-v2/RIGHTS-CLEARANCE.md) stay closed.
+`LOCKS.toml` was not edited. The ingest notes are
 [CLIP-INGEST.md](docs/galion-voice-v2/CLIP-INGEST.md).
 
 ## Run the demo

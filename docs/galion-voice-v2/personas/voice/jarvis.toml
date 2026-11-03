@@ -1,11 +1,13 @@
 # Galion Voice V2 — Jarvis voice config (draft)
 # Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
 #
-# The /v2 demo route reads this file for prosody, wash, tags, and the
-# rights hold. The clone worker does not. No clip, no weights.
-# Register numbers are the design table in SAMANTHA-V2.md §4.
+# The /v2 demo route reads this file for prosody, wash, and tags.
+# The clone worker reads the reference table and the worker table when
+# it builds a request. The public page is still not a film voice. Weights are not
+# vendored. Register numbers are the design table in SAMANTHA-V2.md §4.
 # A British accent is the intended register, not a fact about
-# en_US-ljspeech-medium. Rights hold: ../VOICE-CLONING.md.
+# en_US-ljspeech-medium. Local reference send is owner t273.
+# The wav is the Tony Stark hub texture. Do not clean it.
 
 schema = 1
 status = "draft"
@@ -59,14 +61,26 @@ unknown_tags = "off"
 note = "Tags stay off on every backend. The clone stub strips bracket tags when persona is jarvis."
 
 [reference]
-rights = "hold"
+rights = "owner-t273"
 ingest = false
-present = false
+present = true
 duration_target_s = 10
 min_duration_s = 5
-clip_path = ""
+duration_s = 15.95
+sample_rate_hz = 48000
+channels = 2
+bits = 16
+sha256 = "c2200b59fa78b3c98d13ac5dc7db3a6c14e802310dca73033d7770bd4b532c60"
+clip_path = "docs/galion-voice-v2/personas/refs/jarvis.wav"
+store_rel = "jarvis/reference.wav"
+texture = "preserve-hub"
+texture_layer = "jarvis-hub"
+texture_toggle = "GALION_JARVIS_TEXTURE"
+texture_default = "on"
+texture_stripped = false
+denoise = false
 placeholder = "docs/galion-voice-v2/personas/refs/jarvis.placeholder"
-note = "placeholder is a text marker. It is not audio. Do not commit a wav, and do not put this path on the worker request line."
+note = "Current model reference. Not clean speech: Tony Stark hub virtual texture (clicks, alarms, ambience) is character. Do not strip, denoise, or clean. WAV only, gitignored. Also $GALION_CLIP_STORE/jarvis/reference.wav. Never an MP3. Public demo stays closed."
 
 [worker]
 binding = "galion.clone.worker"
@@ -81,7 +95,14 @@ model = "nano"
 quality_option = "turbo"
 request_persona = "jarvis"
 request_tags = false
-send_reference = false
+send_reference = true
+device = "cpu"
+threads = 1
+session_vcpu = 1
+burst_vcpu_note = "cascade planning ceiling, not this child"
+env_clip_store = "GALION_CLIP_STORE"
+env_threads = "GALION_CLONE_THREADS"
+denoise = false
 rate_hz = 24000
 pcm = "s16le"
 weights_vendored = false
@@ -94,7 +115,7 @@ order = ["piper", "flite"]
 engine = "piper"
 voice = "en_US-ljspeech-medium"
 artifact = "weights/tts/en_US-ljspeech-medium.onnx"
-when = "clone worker absent, unwired, or dead; rights hold still closed"
+when = "clone worker absent, unwired, or dead"
 tags = false
 is_film_voice = false
 
