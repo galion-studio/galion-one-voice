@@ -79,7 +79,9 @@ Voice.
 ## Storage layout
 
 Film audio stays out of git. That covers the work tree, Git LFS, a
-submodule, a fixture, a CI artifact, and a commit on a side branch.
+submodule, a fixture, a CI artifact, a commit on a side branch, and a
+GitHub Release asset. `clone-weights-v1` carries safetensors only
+(`CLONE-WEIGHTS.md`).
 
 `weights/clone/` is the Chatterbox safetensors store. `weights/.gitignore`
 ignores everything under `weights/` except itself. Audio does not go in

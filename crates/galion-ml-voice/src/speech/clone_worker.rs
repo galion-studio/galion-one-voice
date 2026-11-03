@@ -80,6 +80,9 @@ struct Pin {
 
 fn pins() -> Vec<Pin> {
     let mut out = Vec::new();
+    // Columns after size are the Hugging Face repo, the remote path, and the
+    // GitHub Release asset. scripts/clone/fetch-clone-weights.sh reads those.
+    // This check uses the path, the content sha256, and the byte size.
     for line in PINS_TEXT.lines() {
         let line = line.trim();
         if line.is_empty() || line.starts_with('#') {
@@ -750,6 +753,24 @@ mod tests {
         let err = String::from_utf8_lossy(&out.stderr);
         assert!(err.contains("GALION_CLONE_FETCH"), "{err}");
         assert!(!err.to_ascii_lowercase().contains("http"));
+    }
+
+    #[test]
+    fn fetch_script_release_pins_stay_local() {
+        let script = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../scripts/clone/fetch-clone-weights.test.sh");
+        let out = Command::new("bash")
+            .arg(&script)
+            .env_remove("GALION_CLONE_FETCH")
+            .env_remove("GALION_CLONE_PUBLISH")
+            .output()
+            .expect("run fetch pin tests");
+        assert!(
+            out.status.success(),
+            "stdout:\n{}\nstderr:\n{}",
+            String::from_utf8_lossy(&out.stdout),
+            String::from_utf8_lossy(&out.stderr)
+        );
     }
 
     #[test]

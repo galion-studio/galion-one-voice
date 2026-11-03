@@ -57,14 +57,18 @@ on a later speak does the same handoff without restarting the lane.
 ## Fetch
 
 `scripts/clone/fetch-clone-weights.sh` refuses unless `GALION_CLONE_FETCH=1`,
-including `--check`. It downloads only the five pinned `.safetensors` files
-into `weights/clone/`, which git ignores. A hash mismatch deletes the
-partial. `.pt` and audio suffixes are refused. The pins were read from the
-Hugging Face tree API on 2026-11-03 (LFS oids). They are records, not blobs.
+including `--check`. It downloads the pinned `.safetensors` into
+`weights/clone/`, which git ignores. The bytes are GitHub Release assets on
+tag `clone-weights-v1` (`CLONE-WEIGHTS.md`). A hash mismatch deletes the
+partial. `.pt`, audio suffixes, and Samantha or Jarvis filenames are refused.
+The content hashes were read from the Hugging Face tree API on 2026-11-03
+(LFS oids). They are records, not blobs.
 
-Nano: `t3_nano_v1.safetensors` plus shared `s3gen`, `s3gen_meanflow`, `ve`.
-Turbo swaps in `t3_turbo_v1.safetensors`. Repo ids: `ResembleAI/chatterbox-nano`,
-`ResembleAI/chatterbox-turbo`.
+Nano (`--nano`): `t3_nano_v1.safetensors` plus shared `s3gen`,
+`s3gen_meanflow`, `ve`. Turbo adds `t3_turbo_v1.safetensors`. The release is
+not in a clean clone. Until the admin upload lands, the script exits 1 with
+`BLOCKED`. `GALION_CLONE_WEIGHTS_SOURCE=hf` still reads the same pins from
+Hugging Face (`ResembleAI/chatterbox-nano`, `ResembleAI/chatterbox-turbo`).
 
 ## Rights
 
