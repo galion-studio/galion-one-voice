@@ -22,7 +22,10 @@ did not follow the sound coming out of the speaker.
 replaces the lerp with a spring-damper.
 
 - State is position and velocity for radius and for brightness (`spring()`).
-- Each mode has its own stiffness and damping (`SPRING`).
+- The easing profile is **Luti**. Each mode has its own stiffness and damping
+  (`LUTI` on the page; `SPRING` is the same object). The Rust gain set is
+  `galion-render` `Luti`. The numbers are the ones below. They are not a
+  `LOCKS.toml` value.
 - Idle is a slow breath (soft spring, low frequency).
 - Listening couples radius to microphone energy, local RMS first, `/dot` level
   as well. The mark grows while you talk, before the server round trip.
@@ -35,19 +38,50 @@ replaces the lerp with a spring-damper.
   envelope, so the orb moves with the voice the phone is actually playing.
   Server `/dot` radius is only the fallback when nothing is playing locally yet.
 - A little velocity becomes ellipse aspect (`aspect`). Still one filled shape.
-  No second ring, no face, no caption on the mark.
+  The mark is one vector ellipse (`canvas` path, not a sprite). No second
+  ring, no face, no caption on the mark.
 
 The server me band is the other half. `PhoneHost::drive_me` drains reply PCM
 into the 24 kHz heartbeat frame, so `/dot` `level` moves with the reply even
 for a client that is not running this page.
 
+## Luti
+
+Luti is the name of that spring-damper. It is not a second curve, and it is
+not a CSS easing keyword. It is the gain table the page and `OrbEngine`
+already shared, now named so a later change cannot retune it by accident.
+
+| Motion | `w` (rad/s) | `z` |
+|---|---|---|
+| idle | 2.4 | 0.86 |
+| listening | 11 | 0.70 |
+| thinking | 6.5 | 0.48 |
+| speaking | 18 | 0.58 |
+| offline | 3.2 | 1.05 |
+
+Brightness uses `w * 0.85` and `min(1.2, z + 0.08)`, as the page does.
+`DotParams` stays the 80 ms golden. Luti eases toward it. The gains are not
+in `DotParams::to_json`, so the G4 hash does not move.
+
+`DisplayHz::Hz240` is unchanged (`1/240` s). That step sits inside the
+integrator clamp (`0.001..=0.05` s), same as 60 Hz and 120 Hz. The phone
+loop is `requestAnimationFrame`: a 240 Hz panel is integrated at the `dt`
+the panel just delivered, not resampled onto 80 ms.
+
+One screen. The graphic is the one mark. The hint and the Art. 50 line are
+the existing phone-path text, not a second shape. Detail:
+`docs/galion-voice-v2/ONE-UI.md`.
+
 ## What this is not
 
 Not a shader engine, not a scene graph, not V3. The shared integrator lives
-in `galion-render` (`spring`, `OrbEngine`). Design:
-`docs/galion-voice-v2/ANIMATION-ENGINE.md`. Surfaces do not call it yet.
-The page is still what the phone sees, and `DotParams` stays the golden
-for G4. Pointing PNG or the window at the spring is a later owner step.
+in `galion-render` (`spring`, `OrbEngine`, profile Luti). Design:
+`docs/galion-voice-v2/ANIMATION-ENGINE.md`. PNG, the terminal, and
+`NullSurface` do not call it. `WebSurface::present` takes one 240 Hz Luti
+step so `/dot` can carry the in-process account; the radius it publishes
+is still `DotParams`. The page is still what the phone sees, and
+`DotParams` stays the golden for G4. Pointing PNG or the window at the
+spring is a later owner step.
 
 ## Acceptance
 
@@ -59,5 +93,7 @@ for G4. Pointing PNG or the window at the spring is a later owner step.
 5. G4 NullSurface golden unchanged, because `dot.rs` was not retuned.
 6. `OrbEngine` steps at 1/60, 1/120, and 1/240 without NaNs, and
    `NullSurface` still records `DotParams`.
+7. The gain set is named Luti (`Luti::radius` matches the table above,
+   `LUTI` on the page). `DisplayHz::Hz240` is still 240.
 
 — Maciej Grajczyk

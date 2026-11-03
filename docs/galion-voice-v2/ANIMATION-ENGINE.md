@@ -70,7 +70,8 @@ third spring. A little radius velocity becomes ellipse squash, then an
 exponential ease (`dt` in milliseconds, time constant 90 ms), clamped at
 draw to `0.82..=1.18`. Still one filled shape.
 
-Gains, from the page's `SPRING` table:
+Gains are the **Luti** profile (the page's `LUTI` table; `SPRING` is the
+same object). `Luti::radius` / `Luti::brightness` in `orb_engine.rs`:
 
 | Motion | `w` | `z` | What it feels like |
 |---|---|---|---|
@@ -103,20 +104,22 @@ a bad number cannot wind the spring up.
 Code, always compiled, no feature flag, no new dependency:
 
 - `galion-render/src/spring.rs` — one degree of freedom.
-- `galion-render/src/orb_engine.rs` — radius, brightness, aspect, `DisplayHz`, `OrbEngine::step_toward_dot`.
+- `galion-render/src/orb_engine.rs` — Luti gains, radius, brightness, aspect, `DisplayHz`, `OrbEngine::step_toward_dot`, `OrbAccount`.
 - `galion-render/examples/orb_spring.rs` — one second at 240 Hz, targets from `DotParams`, stdout JSON only.
 
-`OrbSample::to_json` is a draw snapshot (`motion`, `radius`, `brightness`,
-`aspect`, velocities, `dt_s`). It is how a later client can share state
-without a framebuffer. Wasm of the same functions can replace the page's
-`spring()` later. Neither is wired in this change.
+`OrbSample::to_json` is a draw snapshot (`motion`, `profile` `luti`,
+`radius`, `brightness`, `aspect`, velocities, `dt_s`, plus the in-process
+account: `frames`, `settle_err`, `cost_hint`). It is how a later client can
+share state without a framebuffer. Wasm of the same functions can replace
+the page's `spring()` later. The page still draws. `/dot` carries a witness
+account; it does not carry the spring's radius.
 
 ## What draws the pixels
 
 CPU. One circle. The wash is background.
 
 The page already does the cheap version: the wash is painted at 96×54 and
-scaled, then one arc is filled. A future `softbuffer` + `winit` backend
+scaled, then one vector ellipse is filled. A future `softbuffer` + `winit` backend
 (the `window` feature is still a stub, zero dependencies, no wgpu, no glow,
 no skia) should copy that structure:
 
@@ -172,6 +175,30 @@ Animation is outside that budget.
 - The display thread may fall behind. It integrates the `dt` it has, up
   to the 50 ms clamp, and moves on. It never blocks the voice to catch up.
 
+## One-percent power
+
+The integrator is the analytics. There is no second agent, no Prometheus
+scrape, and no telemetry host. Each accepted `OrbEngine::step` updates an
+`OrbAccount` in the same struct:
+
+| Field | Meaning |
+|---|---|
+| `frames` | Accepted display steps. A refused `dt` or a non-finite target does not increment it. |
+| `dt_s` | Seconds actually integrated on the last call. `0` when the call was refused. |
+| `settle_err` | After the last accepted step, the larger of `|radius − target|` and `|brightness − target|`. |
+| `cost_hint` | `Luti::STEP_COST` (`48`) when the last call integrated, else `0`. A fixed stand-in for a few dozen flops. Not a timer. |
+
+`/dot` adds `"engine"` from one Luti step at `DisplayHz::Hz240` inside
+`WebSurface::present`. That is a witness next to the heartbeat handoff, not
+the phone's vsync loop, and not `Heartbeat::step`. `radius` and `brightness`
+in that JSON stay `DotParams`. The page keeps its own account on the canvas
+(`data-profile="luti"`, `data-luti` = frames, dt, settle error, cost) because
+the panel, not the server, knows the real frame time. Neither account is
+drawn. The mark stays one ellipse.
+
+Work stays on the animation side of the 60 ms budget. One step is the whole
+sample. Catching the display up inside the audio clock is still forbidden.
+
 ## G4
 
 `NullSurface::present` still stores `DotParams::from_frame`. PNG, the
@@ -197,6 +224,9 @@ Landed with the foundation:
 6. `cargo run -p galion-render --example orb_spring` prints JSON samples
    for one second at 240 Hz and writes nothing else.
 7. G4 golden file is untouched.
+8. `Luti::NAME` is `luti`. An accepted 240 Hz step increments `frames` and
+   charges `cost_hint`. A refused step does neither. `/dot` `engine.hz` is
+   `240` and the golden `state` is still `DotParams`.
 
 Still the page's job, not this crate's yet:
 

@@ -3,6 +3,7 @@
 //! This is the same semi-implicit Euler step as `function spring` in
 //! `crates/galion-console/assets/v1-screen.html`: acceleration from a
 //! stiffness and a damping term, then velocity, then position.
+//! The gain set is the Luti profile ([`crate::orb_engine::Luti`]).
 //!
 //! `dt` is seconds of display time. It is not the 80 ms heartbeat.
 //! Steps at 1/60, 1/120, and 1/240 all fall inside the page's clamp
