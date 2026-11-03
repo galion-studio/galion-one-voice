@@ -29,6 +29,10 @@ and written in `LEDGER.md`:
 
 This change does not fetch audio and does not add a clip.
 
+The boxes for each persona, and the LEDGER lines to paste when a gate
+actually opens, are `docs/galion-voice-v2/RIGHTS-CLEARANCE.md`. Writing
+that checklist does not clear Samantha or Jarvis.
+
 ## What was chosen
 
 Resemble AI **Chatterbox**, used as architecture to borrow, run later out of
@@ -116,7 +120,7 @@ or ingest a clip. Replaces the external-API swarm, which is dropped.
 | 5 | Zero-shot ~10 s conditioning, no fine-tune | `docs/galion-voice-v2/VOICE-CLONING.md` | planned-not-spawned |
 | 6 | Jarvis research-target mapping | `docs/galion-voice-v2/VOICE-CLONING.md` | planned-not-spawned |
 | 7 | Samantha tags and emotional register | `docs/galion-voice-v2/VOICE-CLONING.md` | planned-not-spawned |
-| 8 | Rights, consent, licence gate | `LEDGER.md` | planned-not-spawned |
+| 8 | Rights, consent, licence gate | `docs/galion-voice-v2/RIGHTS-CLEARANCE.md` | checklist written; both gates closed |
 | 9 | Art. 50 watermark note (no Perth vendor) | `docs/galion-voice-v2/VOICE-CLONING.md` | planned-not-spawned |
 | 10 | Piper fallback and warm-worker shape | `docs/galion-voice-v2/CLONE-WORKER.md` | scaffolded; Piper speaks when the clone slot is absent |
 | 11 | TTFA eval plan (no measurement) | `docs/galion-voice-v2/FLASH-EVAL.md` | harness prints `measured: false` until a flagged run |
