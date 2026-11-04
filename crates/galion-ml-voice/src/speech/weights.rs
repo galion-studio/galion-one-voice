@@ -158,6 +158,11 @@ pub struct A21WeightTts {
     voice: String,
     worker: Option<PiperWorker>,
     spawns: u32,
+    /// Persona-mood plan for the next utterances (`None` = V1 neutral path, unchanged).
+    plan: Option<galion_emotion::PiperProsodyVector>,
+    speaker_id: Option<u32>,
+    /// Reused output buffer for the pitch/energy shaper (grows once, then reused).
+    shaped: Vec<i16>,
 }
 
 impl A21WeightTts {
@@ -172,7 +177,7 @@ impl A21WeightTts {
                 let cfg = std::fs::read_to_string(&config).map_err(|e| format!("{}: {e}", config.display()))?;
                 let rate = json_u32(&cfg, "sample_rate").ok_or_else(|| format!("{}: no audio.sample_rate", config.display()))?;
                 let voice = path.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
-                Ok(Self { model: path.clone(), config, runtime, rate, voice, worker: None, spawns: 0 })
+                Ok(Self { model: path.clone(), config, runtime, rate, voice, worker: None, spawns: 0, plan: None, speaker_id: None, shaped: Vec::new() })
             }
             other => Err(other.summary()),
         }
@@ -185,15 +190,67 @@ impl A21WeightTts {
     pub fn piper_spawns(&self) -> u32 { self.spawns }
     pub fn worker_alive(&mut self) -> bool { self.worker.as_mut().is_some_and(PiperWorker::is_alive) }
 
+    /// Pack sample rate (Hz).
+    pub fn sample_rate(&self) -> u32 { self.rate }
+    /// Multi-speaker packs: which speaker to use (per line, no respawn).
+    pub fn set_speaker(&mut self, id: Option<u32>) {
+        self.speaker_id = id;
+        if let Some(w) = self.worker.as_mut() { w.set_speaker(id); }
+    }
+    /// Current persona plan, if any.
+    pub fn plan(&self) -> Option<&galion_emotion::PiperProsodyVector> { self.plan.as_ref() }
+    /// Drop the persona plan: back to the V1 neutral scales.
+    pub fn clear_plan(&mut self) { self.plan = None; }
+
+    /// Scales the worker should run with right now.
+    fn wanted_prosody(&self) -> PiperProsody {
+        match &self.plan {
+            Some(v) => PiperProsody::from_vector(v),
+            // Neutral is the phone default (consent deny). The hook does not change scales.
+            None => PiperProsody::from_env().with_emotion("Neutral"),
+        }
+    }
+
+    /// Start the worker if needed. Piper reads its scales once, at spawn, so a
+    /// persona plan whose (2-decimal) scales differ restarts it here — between
+    /// utterances, never mid-clause. Call [`Self::prepare`] while the user is
+    /// still speaking to pay that restart off the reply's critical path.
     fn ensure(&mut self) -> Result<(), VoiceError> {
+        let want = self.wanted_prosody();
         let alive = self.worker.as_mut().is_some_and(PiperWorker::is_alive);
-        if alive { return Ok(()); }
-        // Neutral is the phone default (consent deny). The hook does not change scales.
-        let prosody = PiperProsody::from_env().with_emotion("Neutral");
-        let worker = PiperWorker::spawn(&self.runtime, &self.model, &self.config, &prosody)?;
+        if alive && self.worker.as_ref().is_some_and(|w| *w.prosody() == want) { return Ok(()); }
+        self.worker = None;
+        let mut worker = PiperWorker::spawn(&self.runtime, &self.model, &self.config, &want)?;
+        worker.set_speaker(self.speaker_id);
         self.worker = Some(worker);
         self.spawns += 1;
         Ok(())
+    }
+
+    /// Spawn (if the plan changed) and warm the worker with one short line, so the
+    /// next reply's first clause does not pay process start or model load.
+    pub fn prepare(&mut self) -> Result<(), VoiceError> {
+        let fresh = !self.worker.as_mut().is_some_and(PiperWorker::is_alive)
+            || self.worker.as_ref().is_some_and(|w| *w.prosody() != self.wanted_prosody());
+        self.ensure()?;
+        if fresh { self.worker.as_mut().unwrap().synthesize("Okay.")?; }
+        Ok(())
+    }
+
+    /// Persona-conditioned PCM at the pack rate: pre-pause silence, Piper with
+    /// the persona scales, then the post-synthesis pitch/energy shaper. Without
+    /// a plan this is the V1 PCM, untouched.
+    pub fn synthesize_pcm(&mut self, text: &str) -> Result<Vec<i16>, VoiceError> {
+        self.ensure()?;
+        let pcm = self.worker.as_mut().unwrap().synthesize(text)?;
+        let Some(plan) = self.plan else { return Ok(pcm) };
+        let mut shaper = crate::emotive::EmotiveShaper::new(plan.pitch_shift_st, plan.energy);
+        let pause = (plan.pre_pause_ms as u64 * self.rate as u64 / 1000) as usize;
+        let need = pause + shaper.max_out(pcm.len());
+        if self.shaped.len() < need { self.shaped.resize(need, 0); }
+        let p = crate::emotive::EmotiveShaper::silence(plan.pre_pause_ms as u32, self.rate, &mut self.shaped[..pause]);
+        let n = shaper.process(&pcm, &mut self.shaped[p..need]);
+        Ok(self.shaped[..p + n].to_vec())
     }
 
     /// Start a new process after the previous one died. Not used for barge-in.
@@ -210,6 +267,14 @@ fn json_u32(s: &str, key: &str) -> Option<u32> {
     rest.chars().take_while(|c| c.is_ascii_digit()).collect::<String>().parse().ok()
 }
 
+/// Persona + mood + user emotion → Piper. Stores the plan only (no I/O, no
+/// allocation); the scales take effect at the next [`A21WeightTts::prepare`] or utterance.
+impl galion_emotion::ConditionedDecoder for A21WeightTts {
+    fn condition(&mut self, c: &galion_emotion::PersonaConditioning) {
+        self.plan = Some(c.piper());
+    }
+}
+
 impl TtsEngine for A21WeightTts {
     fn languages(&self) -> &[LanguageId] { LanguageId::ALL }
     fn synthesize(&mut self, text: &str, lang: LanguageId) -> Result<Audio, VoiceError> {
@@ -217,9 +282,8 @@ impl TtsEngine for A21WeightTts {
         let (_, body) = crate::split_lang_token(text);
         let body = body.trim().replace(['\n', '\r'], " ");
         if body.is_empty() { return Err(VoiceError::EmptyInput); }
-        self.ensure()?;
         let rate = self.rate;
-        let pcm = self.worker.as_mut().unwrap().synthesize(&body)?;
+        let pcm = self.synthesize_pcm(&body)?;
         let f: Vec<f32> = pcm.iter().map(|&s| s as f32 / 32768.0).collect();
         Ok(Audio { sample_rate: super::SPEECH_RATE, samples: super::resample(&f, rate, super::SPEECH_RATE) })
     }

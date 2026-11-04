@@ -30,6 +30,8 @@ required-features = ["speech"]
 # Reader only. Default features stay off so this crate does not pull rayon.
 # The .gq writer for voice clips lives here, not in galion-tensor.
 galion-tensor = { path = "../galion-tensor", default-features = false }
+# Persona-mood conditioning (zero-dependency crate) for the Piper path.
+galion-emotion = { path = "../../galion-emotion" }
 
 [dev-dependencies]
 galion-heartbeat = { path = "../galion-heartbeat", default-features = false }
@@ -37,3 +39,7 @@ galion-heartbeat = { path = "../galion-heartbeat", default-features = false }
 [[bin]]
 name = "galion-voice-compile"
 path = "src/bin/galion-voice-compile.rs"
+
+[[example]]
+name = "emotion_sweep"
+required-features = ["speech"]
