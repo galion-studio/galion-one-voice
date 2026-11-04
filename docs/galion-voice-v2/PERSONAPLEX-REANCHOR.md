@@ -102,7 +102,7 @@ elicited. A reward that correlates with them is a bug. The feeling band may cond
 make the model steer the user's affect.
 
 Data: synthetic dialogues generated with open models plus Piper, the same way PersonaPlex built its set
-(arXiv 2602.06053 §3), and no NC data (`galion-student/configs/data.toml`). Fisher English (PersonaPlex's real-data
+(arXiv 2602.06053), and no NC data (`galion-student/configs/data.toml`). Fisher English (PersonaPlex's real-data
 source) is LDC-licensed, so it needs counsel before use.
 
 ## 4. CPU feasibility (8-core AVX-512, 16 GB, no GPU)
@@ -137,6 +137,10 @@ Measured on this box:
   that 8 LLM threads on 8 cores slow Piper (p95 262 vs 166 ms at 4 threads). A core split has to be part of
   the gate.
 - **Training is not feasible on this box.** KD and RL need GPUs. This needs a budget decision (D3).
+
+Published reference (PersonaPlex HF card, Full-Duplex-Bench, A100 80 GB, *not* measured here): smooth
+turn-taking TOR 0.908 / latency 0.170 s; user interruption TOR 0.950 / latency 0.240 s; pause handling TOR
+0.358 (synthetic); backchannel TOR 0.273. These are the targets M1 scores our cascade against.
 
 ## 5. Milestones (each closes only on a measured gate written to `symphony/SELF-EVAL.md`)
 
