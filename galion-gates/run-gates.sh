@@ -5,6 +5,7 @@
 #   G1 tensor correct   : cargo test --workspace (all crates) + G0 scalar reference self-checks
 #   G2 GGUF absence     : case-insensitive grep over the code workspace (zero hits)
 #   G3 purity denylist  : candle/ort/tract/burn/llama/ggml/gguf absent from manifests + cargo tree
+#                         (one owner exception, t613s2992: `ort` in runtimes/galion-piper-rt only, own workspace)
 #   --- soft gates (A16): recorded in JSON/summary; FAIL only counts if GALION_GATES_HARD=1 ---
 #   G4 render snapshot  : galion-gates/g4-render.sh (NullSurface dot + terminal snapshot vs golden)
 #   G6 Rika R1–R9       : galion-gates/g6-rika.sh (slot; A10 owns)
@@ -75,7 +76,18 @@ DOCHITS="$(grep -RIli --exclude-dir=galion-voice-code --exclude-dir=target --exc
 say "G2 advisory: $DOCHITS non-code files under /workspace mention 'gguf' (docs/research; not gated)"
 
 # ---------- G3 purity denylist ----------
+# Owner exception t613s2992 (2026-11-04, LOCKS formats.exceptions.a21_piper): exactly one
+# manifest may name `ort`: the out-of-process Piper runtime runtimes/galion-piper-rt. It must
+# be its own cargo workspace, excluded from (never a member of) the main one, and load
+# onnxruntime at runtime (`load-dynamic`). Any other denylisted line, there or anywhere, fails.
+PIPER_RT_MANIFEST="$ROOT/runtimes/galion-piper-rt/Cargo.toml"
+piper_rt_ok(){ [ -f "$PIPER_RT_MANIFEST" ] && grep -qE '^\[workspace\]' "$PIPER_RT_MANIFEST" \
+  && grep -qE '^ort = \{.*"load-dynamic"' "$PIPER_RT_MANIFEST" \
+  && grep -qE '^exclude = \[.*"runtimes/galion-piper-rt"' "$ROOT/Cargo.toml" \
+  && ! grep -qE '^members = .*runtimes/galion-piper-rt' "$ROOT/Cargo.toml"; }
 MHITS="$(grep -RInE --include=Cargo.toml -e "^\s*($DENY)[-a-z0-9_]*\s*=" -e "package\s*=\s*\"($DENY)" "$ROOT" | grep -v '/target/' || true)"
+if [ -n "$MHITS" ] && piper_rt_ok; then MHITS="$(echo "$MHITS" | grep -vF "$PIPER_RT_MANIFEST:" || true)"
+  MHITS="$(printf '%s\n%s\n' "$MHITS" "$(grep -nE "^\s*($DENY)[-a-z0-9_]*\s*=" "$PIPER_RT_MANIFEST" | grep -vE '^[0-9]+:ort = ' | sed "s|^|$PIPER_RT_MANIFEST:|")" | sed '/^$/d')"; fi
 G3N=""; G3F=0
 if [ -n "$MHITS" ]; then say "$MHITS"; G3F=1; G3N="denylisted dep in Cargo.toml; "; else G3N="manifests clean; "; fi
 TREE="$( cd "$ROOT" && cargo tree --workspace -e normal,build --prefix none --format '{p}' --offline 2>/dev/null || cargo tree --workspace -e normal,build --prefix none --format '{p}' 2>/dev/null )"

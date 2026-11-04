@@ -371,8 +371,10 @@ impl SpeechStack {
             return;
         }
         // lat240: three lines of different lengths at call start. The first
-        // pays process spawn + model load (cold, ~330 ms); the next two take the
-        // first-run cost of new input lengths so no caller turn sees either.
+        // pays process spawn + model load (legacy piper ~0.4 s cold; galion-piper-rt
+        // ~1.4 s, because it loads ORT 1.31 and runs its own two warm-ups before the
+        // first line); the next two take the first-run cost of new input lengths
+        // so no caller turn sees either.
         let mut ok = false;
         for line in PREWARM_LINES {
             ok |= self.speak(line).is_ok();

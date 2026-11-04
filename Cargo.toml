@@ -1,6 +1,9 @@
 # Galion Voice — Perpetual Open MIT License
 [workspace]
 resolver = "2"
+# Separate cargo workspace (out-of-process Piper runtime on onnxruntime 1.31, owner approval t613s2992):
+# never a member, so `cargo tree --workspace` stays free of ort (LOCKS a21_piper).
+exclude = ["runtimes/galion-piper-rt"]
 members = ["crates/galion-tensor", "crates/galion-sideband", "crates/galion-openmind", "crates/galion-console", "galion-render", "galion-emotion", "crates/galion-mimi", "crates/galion-presence", "crates/galion-presence-eval", "crates/galion-heartbeat", "crates/galion-cascade", "crates/galion-asr-vosk", "crates/galion-student-backend", "crates/galion-ml-voice", "crates/galion-live-demo", "crates/galion-symphony"]
 
 [workspace.package]

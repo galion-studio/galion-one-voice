@@ -118,10 +118,7 @@ impl PiperWorker {
     pub fn warm_ms(&self) -> Option<u32> { self.warm_ms }
 
     pub fn is_alive(&mut self) -> bool {
-        match self.child.as_mut().map(|c| c.try_wait()) {
-            Some(Ok(None)) => true,
-            _ => false,
-        }
+        matches!(self.child.as_mut().map(|c| c.try_wait()), Some(Ok(None)))
     }
 
     /// One JSON line on stdin. Does not read stdout. The ring feed calls this,
