@@ -1,13 +1,35 @@
-# 06 · Core map v3 (Piper gets 6-7; pins for LLM, Vosk and bus in code)
+# 06 · Core map v3 (owner map, fully in-house reasoning)
 
-Branch `swarm/core-map-v3`, stacked on `swarm/lat240-core-pinning`. Written 2026-11-04, Europe/Zagreb (CET).
-Host: 8 cores, no SMT. Every timed number ran under `flock latency-240/BENCH.lock`.
-Raw lines: `06-core-map-v3.bench.ndjson`. Labels there: `v3` and `v3nospin` are the time-share 4-7 runs (named before the decision); `v3p2` and `v3final` are the shipped v3; `v2b` and `offb` are run 3.
+Branch `swarm/core-map-v3`. Updated 2026-11-04 (CET) after the owner ruling of 2026-11-04 20:45 CET.
+
+## Owner ruling (in force)
+No Qwen anywhere in the architecture, and no fallback to it. Qwen, Groq and any cloud LLM count as third party. The reasoning sector is fully local and in-house: the S0 student (~0.5B, `.gq`, W8A8) on `crates/galion-tensor`, with `CannedLlm` until trained weights exist. The S0 teacher / training source is an **open owner decision** (no third-party model is assumed).
+
+## Map v3 (default when the map is on)
+| core | role | threads | applied by |
+|---|---|---|---|
+| 0 | bus / heartbeat / audio I/O / VAD-endpoint / orchestrator | 1 | `galion_cores::pin_current_thread_to(Bus)` in `dot_console_demo` |
+| 0 | retrieval / context worker, low priority | 1 | `CoreRole::Retrieval` (no process yet; placement reserved) |
+| 1 | Vosk ASR | 1 | `VoskClient::open` |
+| 2-5 | in-house reasoning (S0 on galion-tensor; CannedLlm until weights) | 4 | `CoreRole::Reasoning` / `galion-pin reasoning` |
+| 6 | Piper, Samantha voice | 1 | `PiperWorker::spawn` (`CoreRole::PiperSamantha`) |
+| 7 | Piper, Jarvis voice | 1 | `PiperWorker::spawn` (`CoreRole::PiperJarvis`, chosen when the model path names jarvis) |
+| — | clone workers | 0 | `ClonePlan::Off`: no clone workers during a live call |
+
+Knobs: `GALION_CORE_MAP=v3|v2|off|auto` (auto = v3 with `GALION_REASONING_LOCAL` or `GALION_LLM_LOCAL` on 8+ cores), `GALION_CORES_<ROLE>`, `GALION_THREADS_<ROLE>`.
+Removed: the llama-server pin wiring. `scripts/bench-core-map-v3.sh` and `examples/core_map_bench.rs` were renamed to `.off` (not deleted), since both started or called a Qwen llama-server.
+
+Not measured yet: Piper with one core per voice under S0 load. The historical numbers below were 1 Piper on 6-7 next to a third-party LLM, so they do not predict this map.
+
+---
+
+# Historical / superseded: v3 A/B with a third-party LLM (Qwen2.5-1.5B on llama-server)
+Everything below was measured before the ruling. It is kept as history only. It is not the architecture.
 
 ## Problem
 The v2 map put Piper alone on core 6. galion-piper-rt needs ~4 cores at burst: a 4-word clause took 79 ms (lane 01) / 88-102 ms (here), against ~40 ms unpinned.
 
-## Map v3 (default when the map is on)
+## Old map (superseded: third-party LLM on 2-5, one Piper on 6-7)
 | core | role | threads | applied by |
 |---|---|---|---|
 | 0 | heartbeat / bus / call loop | 1 | `galion_cores::pin_current_thread_to(Bus)` in `dot_console_demo` (pins the loop thread only; web and turn-worker threads keep 0-7) |
@@ -47,7 +69,7 @@ Clauses: 4w "That sounds really hard." and 12w. First PCM = request write to fir
 
 The host loadavg was 1-6 during the runs. The bench adds part of that, so compare rows within a run first.
 
-## Decision
+## Decision (historical, superseded by the owner ruling)
 **v3 = LLM 2-5 (4 threads), Piper 6-7 (2 threads).** Against v2 in the same run, Piper with the LLM decoding went from 92.6 to 56.8 ms at 4 words (-39 %) and from 214.7 to 123.2 ms at 12 words (-43 %). LLM decode stayed at 26 tok/s and prompt eval at ~108 ms.
 
 - **Time-sharing 4-7 was measured and rejected.** llama.cpp keeps 4 threads hot through the decode, so Piper got about half the cores: 138 ms at 4 words, worse than v2.

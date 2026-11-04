@@ -2,44 +2,35 @@
 // Copyright (c) 2026 Maciej Grajczyk.
 //! V2 live-call core map, shared by every process launcher on the voice host.
 //!
-//! **v3** is the default when the map is on. Piper gets two cores of its own:
+//! **v3** (owner ruling 2026-11-04 20:45 CET): the reasoning sector is fully
+//! local and in-house. No Qwen, no llama-server, no Groq or other cloud LLM, and
+//! no fallback to any of them. Reasoning is the S0 student (~0.5B, `.gq`, W8A8)
+//! on `galion-tensor`, with `CannedLlm` until trained weights exist.
 //!
 //! | core | role | threads |
 //! |---|---|---|
-//! | 0 | heartbeat / bus / call loop | 1 |
+//! | 0 | bus / heartbeat / audio I/O / VAD-endpoint / orchestrator | 1 |
+//! | 0 | retrieval / context worker (low priority, shares core 0) | 1 |
 //! | 1 | Vosk ASR | 1 |
-//! | 2-5 | local LLM (llama-server `-t 4`) | 4 |
-//! | 2-5 | retrieval (runs before the LLM prompt, so it shares the LLM cores in sequence) | 4 |
-//! | 6-7 | Piper (galion-piper-rt, 2 intra-op threads) | 2 |
-//!
-//! Why: Piper needs more than one core at burst. Pinned alone to core 6 (the
-//! v2 map), a 4-word clause took ~100 ms. Measured A/B under BENCH.lock, with
-//! the LLM decoding while Piper speaks (`examples/core_map_bench` in
-//! galion-ml-voice; `docs/galion-voice-v2/latency-240/06-core-map-v3.md`):
-//!
-//! | map | Piper 4w first PCM p50 with LLM | LLM decode tok/s |
-//! |---|---|---|
-//! | v2: LLM 2-5, Piper 6 | 108 ms | 24.6 |
-//! | LLM + Piper time-share 4-7 | 138 ms | 22.1 |
-//! | LLM 2-4 (3t), Piper 5-7 (3t) | 44-50 ms | 19-20 |
-//! | **v3: LLM 2-5 (4t), Piper 6-7 (2t)** | **57 ms** | **25.8** |
-//!
-//! Time-sharing 4-7 lost: llama.cpp keeps all 4 threads hot through the decode,
-//! so Piper got half the cores. 3+3 has the fastest Piper but costs the LLM 20 %
-//! of its decode rate and ~30 ms of prompt eval. That is more first-audio time
-//! than Piper saves.
-//!
-//! **v2** (bus 0, Vosk 1, LLM 2-5, Piper 6, retrieval 7) stays selectable for A/B
-//! with `GALION_CORE_MAP=v2`.
-//!
-//! `GALION_CORE_MAP`: `v3` / `v2` / `off` / `auto` (default). `auto` turns on
-//! v3 when `GALION_LLM_LOCAL` is set and the host has 8+ usable cores. `off`
-//! keeps every child on the inherited mask. Per-role overrides:
-//! `GALION_CORES_<ROLE>` (`BUS`, `ASR`, `LLM`, `PIPER`, `RETRIEVAL`), e.g. `4-7`,
-//! and `GALION_THREADS_<ROLE>` (clamped to the role's cores).
+//! | 2-5 | in-house reasoning (S0 on galion-tensor) | 4 |
+//! | 6 | Piper, Samantha voice | 1 |
+//! | 7 | Piper, Jarvis voice | 1 |
 //!
 //! Clone workers get no cores during a live call (`ClonePlan::Off` in
-//! galion-ml-voice). That rule does not change here.
+//! galion-ml-voice).
+//!
+//! History (superseded, not in force): the earlier v3 A/B put a third-party
+//! llama-server LLM on 2-5 and one Piper on 6-7 (2 threads). Those numbers are
+//! kept in `docs/galion-voice-v2/latency-240/06-core-map-v3.md`, labelled
+//! historical. **v2** (bus 0, Vosk 1, reasoning 2-5, Piper 6, retrieval 7)
+//! stays selectable for A/B with `GALION_CORE_MAP=v2`.
+//!
+//! `GALION_CORE_MAP`: `v3` / `v2` / `off` / `auto` (default). `auto` turns on
+//! v3 when `GALION_REASONING_LOCAL` (or the older `GALION_LLM_LOCAL`) is set
+//! and the host has 8+ usable cores. `off` keeps every child on the inherited
+//! mask. Per-role overrides: `GALION_CORES_<ROLE>` (`BUS`, `ASR`, `REASONING`,
+//! `PIPER_SAMANTHA`, `PIPER_JARVIS`, `RETRIEVAL`), e.g. `4-7`, and
+//! `GALION_THREADS_<ROLE>` (clamped to the role's cores).
 #![allow(unsafe_code)]
 
 use std::process::Command;
@@ -51,8 +42,12 @@ pub const CORE_MAP_MIN_CPUS: usize = 8;
 pub enum CoreRole {
     Bus,
     Asr,
-    Llm,
-    Piper,
+    /// In-house reasoning (S0 student on galion-tensor). Parses from `llm` too.
+    Reasoning,
+    /// Piper for the Samantha voice.
+    PiperSamantha,
+    /// Piper for the Jarvis voice.
+    PiperJarvis,
     Retrieval,
 }
 
@@ -75,11 +70,12 @@ impl CoreMap {
 }
 
 impl CoreRole {
-    pub const ALL: [CoreRole; 5] = [
+    pub const ALL: [CoreRole; 6] = [
         CoreRole::Bus,
         CoreRole::Asr,
-        CoreRole::Llm,
-        CoreRole::Piper,
+        CoreRole::Reasoning,
+        CoreRole::PiperSamantha,
+        CoreRole::PiperJarvis,
         CoreRole::Retrieval,
     ];
 
@@ -87,15 +83,32 @@ impl CoreRole {
         match self {
             CoreRole::Bus => "bus",
             CoreRole::Asr => "asr",
-            CoreRole::Llm => "llm",
-            CoreRole::Piper => "piper",
+            CoreRole::Reasoning => "reasoning",
+            CoreRole::PiperSamantha => "piper_samantha",
+            CoreRole::PiperJarvis => "piper_jarvis",
             CoreRole::Retrieval => "retrieval",
+        }
+    }
+
+    /// Piper role for a voice: `jarvis` gets core 7, anything else core 6.
+    pub fn piper_for_voice(voice: &str) -> Self {
+        if voice.to_ascii_lowercase().contains("jarvis") {
+            CoreRole::PiperJarvis
+        } else {
+            CoreRole::PiperSamantha
         }
     }
 
     pub fn parse(s: &str) -> Option<Self> {
         let s = s.trim().to_ascii_lowercase();
-        Self::ALL.into_iter().find(|r| r.as_str() == s || (s == "vosk" && *r == CoreRole::Asr))
+        let s = match s.as_str() {
+            "vosk" => "asr",
+            "llm" => "reasoning",
+            "piper" | "samantha" => "piper_samantha",
+            "jarvis" => "piper_jarvis",
+            other => other,
+        };
+        Self::ALL.into_iter().find(|r| r.as_str() == s)
     }
 
     /// The v2 map (one role per core). Kept for A/B.
@@ -103,19 +116,21 @@ impl CoreRole {
         match self {
             CoreRole::Bus => vec![0],
             CoreRole::Asr => vec![1],
-            CoreRole::Llm => (2..6).collect(),
-            CoreRole::Piper => vec![6],
+            CoreRole::Reasoning => (2..6).collect(),
+            CoreRole::PiperSamantha | CoreRole::PiperJarvis => vec![6],
             CoreRole::Retrieval => vec![7],
         }
     }
 
-    /// The v3 map: Piper owns 6-7, LLM 2-5 (retrieval shares 2-5 in sequence).
+    /// The v3 map: bus + retrieval 0, Vosk 1, in-house reasoning 2-5,
+    /// Piper Samantha 6, Piper Jarvis 7.
     pub fn v3_cpus(self) -> Vec<usize> {
         match self {
-            CoreRole::Bus => vec![0],
+            CoreRole::Bus | CoreRole::Retrieval => vec![0],
             CoreRole::Asr => vec![1],
-            CoreRole::Llm | CoreRole::Retrieval => (2..6).collect(),
-            CoreRole::Piper => vec![6, 7],
+            CoreRole::Reasoning => (2..6).collect(),
+            CoreRole::PiperSamantha => vec![6],
+            CoreRole::PiperJarvis => vec![7],
         }
     }
 
@@ -216,9 +231,12 @@ fn truthy(v: &str) -> bool {
     !matches!(v.trim().to_ascii_lowercase().as_str(), "" | "0" | "false" | "no")
 }
 
-/// `GALION_LLM_LOCAL` is set to something truthy.
+/// The in-house reasoning sector runs on this host: `GALION_REASONING_LOCAL`
+/// (or the older `GALION_LLM_LOCAL`) is set to something truthy.
 pub fn local_llm_env() -> bool {
-    std::env::var("GALION_LLM_LOCAL").is_ok_and(|v| truthy(&v))
+    ["GALION_REASONING_LOCAL", "GALION_LLM_LOCAL"]
+        .iter()
+        .any(|k| std::env::var(k).is_ok_and(|v| truthy(&v)))
 }
 
 /// Usable cores for this process (respects an inherited affinity mask).
@@ -336,27 +354,23 @@ mod tests {
     use super::*;
 
     #[test]
-    fn v2_map_gives_every_role_its_own_cores() {
-        let mut seen = Vec::new();
-        for r in CoreRole::ALL {
-            for c in r.v2_cpus() {
-                assert!(c < CORE_MAP_MIN_CPUS);
-                assert!(!seen.contains(&c), "core {c} has two roles");
-                seen.push(c);
-            }
-        }
-        seen.sort_unstable();
-        assert_eq!(seen, (0..8).collect::<Vec<_>>(), "all 8 cores assigned");
-        assert_eq!(CoreRole::Piper.v2_cpus(), vec![6]);
+    fn v2_map_is_kept_for_ab() {
+        assert_eq!(CoreRole::PiperSamantha.v2_cpus(), vec![6]);
+        assert_eq!(CoreRole::Retrieval.v2_cpus(), vec![7]);
+        assert_eq!(format_cpu_list(&CoreRole::Reasoning.v2_cpus()), "2-5");
     }
 
     #[test]
-    fn v3_map_gives_piper_two_cores_of_its_own() {
-        assert_eq!(format_cpu_list(&CoreRole::Llm.v3_cpus()), "2-5");
-        assert_eq!(CoreRole::Llm.v3_cpus().len(), 4, "llama-server -t 4");
-        assert_eq!(CoreRole::Piper.v3_cpus(), vec![6, 7]);
-        // Piper, the bus and Vosk never share a core with anything.
-        for solo in [CoreRole::Piper, CoreRole::Bus, CoreRole::Asr] {
+    fn v3_map_is_the_owner_map() {
+        assert_eq!(CoreRole::Bus.v3_cpus(), vec![0]);
+        assert_eq!(CoreRole::Retrieval.v3_cpus(), vec![0], "retrieval shares core 0, low priority");
+        assert_eq!(CoreRole::Asr.v3_cpus(), vec![1]);
+        assert_eq!(format_cpu_list(&CoreRole::Reasoning.v3_cpus()), "2-5");
+        assert_eq!(CoreRole::Reasoning.v3_cpus().len(), 4, "S0 on galion-tensor, 4 threads");
+        assert_eq!(CoreRole::PiperSamantha.v3_cpus(), vec![6]);
+        assert_eq!(CoreRole::PiperJarvis.v3_cpus(), vec![7]);
+        // Vosk, reasoning and each Piper never share a core with anything.
+        for solo in [CoreRole::Asr, CoreRole::Reasoning, CoreRole::PiperSamantha, CoreRole::PiperJarvis] {
             for other in CoreRole::ALL.into_iter().filter(|r| *r != solo) {
                 assert!(solo.v3_cpus().iter().all(|c| !other.v3_cpus().contains(c)), "{solo:?} vs {other:?}");
             }
@@ -368,12 +382,21 @@ mod tests {
     }
 
     #[test]
+    fn role_names() {
+        assert_eq!(CoreRole::parse("llm"), Some(CoreRole::Reasoning));
+        assert_eq!(CoreRole::parse("piper"), Some(CoreRole::PiperSamantha));
+        assert_eq!(CoreRole::parse("jarvis"), Some(CoreRole::PiperJarvis));
+        assert_eq!(CoreRole::piper_for_voice("voices/jarvis/voice.onnx"), CoreRole::PiperJarvis);
+        assert_eq!(CoreRole::piper_for_voice("voices/samantha/voice.onnx"), CoreRole::PiperSamantha);
+    }
+
+    #[test]
     fn map_switch() {
         assert_eq!(active_map_with(Some("v2"), false, 8), CoreMap::V2);
         assert_eq!(active_map_with(Some("v3"), false, 8), CoreMap::V3);
         assert_eq!(active_map_with(Some("v3"), true, 4), CoreMap::Off, "small host never pins");
         assert_eq!(active_map_with(Some("off"), true, 8), CoreMap::Off);
-        assert_eq!(active_map_with(None, true, 8), CoreMap::V3, "auto + local LLM = v3");
+        assert_eq!(active_map_with(None, true, 8), CoreMap::V3, "auto + local reasoning = v3");
         assert_eq!(active_map_with(Some("auto"), true, 8), CoreMap::V3);
         assert_eq!(active_map_with(None, false, 8), CoreMap::Off);
         assert!(core_map_active_with(Some("v2"), false, 8));
@@ -381,13 +404,13 @@ mod tests {
 
     #[test]
     fn overrides_and_thread_clamp() {
-        let p = placement_with(CoreRole::Piper, CoreMap::V3, None, None, 8);
-        assert_eq!((p.cpu_list(), p.threads), ("6-7".into(), 2));
-        let p = placement_with(CoreRole::Piper, CoreMap::V3, Some("5-7"), Some("9"), 8);
+        let p = placement_with(CoreRole::PiperJarvis, CoreMap::V3, None, None, 8);
+        assert_eq!((p.cpu_list(), p.threads), ("7".into(), 1));
+        let p = placement_with(CoreRole::PiperSamantha, CoreMap::V3, Some("5-7"), Some("9"), 8);
         assert_eq!((p.cpu_list(), p.threads), ("5-7".into(), 3), "threads clamp to cores");
-        let p = placement_with(CoreRole::Llm, CoreMap::V3, Some("4-11"), None, 8);
+        let p = placement_with(CoreRole::Reasoning, CoreMap::V3, Some("4-11"), None, 8);
         assert_eq!(p.cpu_list(), "2-5", "out-of-range override ignored");
-        let p = placement_with(CoreRole::Llm, CoreMap::Off, Some("0"), Some("2"), 8);
+        let p = placement_with(CoreRole::Reasoning, CoreMap::Off, Some("0"), Some("2"), 8);
         assert!(!p.pinned() && p.threads == 0);
         assert_eq!(CoreRole::parse("vosk"), Some(CoreRole::Asr));
     }

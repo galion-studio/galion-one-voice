@@ -26,10 +26,6 @@ required-features = ["speech"]
 name = "gqvoice"
 required-features = ["speech"]
 
-[[example]]
-name = "core_map_bench"
-required-features = ["speech"]
-
 [dependencies]
 # Reader only. Default features stay off so this crate does not pull rayon.
 # The .gq writer for voice clips lives here, not in galion-tensor.

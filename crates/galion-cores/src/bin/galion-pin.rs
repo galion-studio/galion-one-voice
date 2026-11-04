@@ -3,12 +3,12 @@
 //! `galion-pin <role> [--] <program> [args...]`
 //!
 //! Pins this process to the core-map placement for `role` (bus, asr/vosk,
-//! llm, piper, retrieval), then execs `program`. Any argument equal to
-//! `{threads}` becomes the role's thread count, so a local llama-server
-//! starts with exactly its cores:
+//! reasoning, piper_samantha, piper_jarvis, retrieval), then execs `program`.
+//! Any argument equal to `{threads}` becomes the role's thread count, so an
+//! in-house reasoning process starts with exactly its cores:
 //!
 //! ```text
-//! GALION_LLM_LOCAL=1 galion-pin llm -- llama-server -m qwen.gguf -t {threads} --host 127.0.0.1 --port 18080
+//! GALION_REASONING_LOCAL=1 galion-pin reasoning -- <in-house S0 runner> --threads {threads}
 //! ```
 //!
 //! With the map off it execs unpinned, and `{threads}` becomes
@@ -19,7 +19,7 @@ use std::os::unix::process::CommandExt;
 use std::process::Command;
 
 fn usage() -> ! {
-    eprintln!("usage: galion-pin <bus|asr|llm|piper|retrieval> [--] <program> [args...]");
+    eprintln!("usage: galion-pin <bus|asr|reasoning|piper_samantha|piper_jarvis|retrieval> [--] <program> [args...]");
     std::process::exit(2);
 }
 
