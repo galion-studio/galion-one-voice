@@ -13,6 +13,7 @@ Context: Q2 says the EN reply must say words. That is **met by A21**: a neural T
   - runtime tarball `piper_linux_x86_64.tar.gz` (2023.11.14-2) `a50cb45f355b7af1f6d758c1b360717877ba0a398cc8cbe6d2a7a3a26e225992`
 - [x] **Decoder wired (CPU, no GPU).** The `A21WeightTts` slot runs the Piper runtime in a separate process from `weights/runtime/piper/piper`, or from `$GALION_A21_RUNTIME`.
   - The Piper runtime is MIT and uses onnxruntime 1.14.1 (MIT) on CPU.
+  - Since t613s2992 (2026-11-04) the default runtime is `runtimes/galion-piper-rt` (Rust, separate process) on onnxruntime 1.31.1 (MIT, loaded at runtime), built and installed by `scripts/a21/build-piper-rt.sh`. The legacy piper CLI above stays as the fallback (`GALION_PIPER_LEGACY=1`). Same voice pack.
   - Output is deterministic: `noise_scale=0`, `noise_w=0`. `GALION_A21_NOISE=natural` opts into sampled prosody.
   - Output is resampled from 22.05 to 24 kHz.
   - There is no `ort` or candle crate in the tree, so `check-no-forbidden` stays green.

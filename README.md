@@ -101,6 +101,26 @@ off. Notes: [docs/agent-v1-demo/EDGE-NGROK.md](docs/agent-v1-demo/EDGE-NGROK.md)
 The screen script sets `GALION_LLM=canned`. It sets `GALION_ASR=vosk` when
 the small-en model is present, and `stub` when it is not. It refuses
 `GALION_ASR=interim`. A missing model does not invent a transcript.
+The screen script sets `GALION_ASR=interim` (a labelled placeholder, not
+recognition). Export `GALION_ASR=off` beforehand if you want real speech to be
+refused instead of the placeholder.
+
+Replies think when a Hermes gateway is listening. The client is std HTTP to
+numeric loopback only (no TLS). `GALION_LLM` becomes `hermes` when
+`GALION_LLM_URL` is set and the mode was not chosen. `GALION_LLM=canned` is
+an explicit opt-in for tests.
+
+```bash
+GALION_LLM_URL=http://127.0.0.1:8642/v1/chat/completions \
+GALION_LLM_MODEL=hermes-agent \
+GALION_LLM_TIMEOUT_MS=3000 \
+scripts/run-v1-screen.sh
+```
+
+`GALION_LLM_KEY`, when set, is sent as `Authorization: Bearer` and is not
+written into the repo. If nothing is listening, the spoken line is
+`model can't be reached`. That failure does not fall back to a canned reply.
+The gateway itself is installed on the host. This tree does not download it.
 
 Headless V1 checks (no phone):
 

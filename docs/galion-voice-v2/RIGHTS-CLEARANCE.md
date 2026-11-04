@@ -50,13 +50,17 @@ cleared and written in `LEDGER.md`:
 - a public demo that speaks in either voice
 
 `LOCKS.toml` `[formats.exceptions.v2s14_chatterbox]` sets
-`reference_clips = false`. The worker treats a non-empty `reference`,
-`audio_prompt`, `audio_prompt_path`, or `clip` as exit 3 and writes no
-PCM (`CLONE-WORKER.md`). `scripts/clone/fetch-clone-weights.sh` fetches
-pinned `.safetensors` only when `GALION_CLONE_FETCH=1`, and it refuses
-audio suffixes and persona filenames. The release in `CLONE-WEIGHTS.md`
-is that same list. A LEDGER clearance does not flip the lock and does not
-set that flag. An owner edits the lock later, in its own commit, after
+`reference_clips = false`. Without `GALION_CLONE_LOCAL_REFS=1`, the
+worker treats a non-empty `reference`, `audio_prompt`,
+`audio_prompt_path`, or `clip` as exit 3 and writes no PCM
+(`CLONE-WORKER.md`). With that variable, a local file is accepted only
+when its sha256 matches `scripts/clone/REFS.sha256` for the requested
+persona. That env gate is not this checklist, and it does not flip the
+lock. `scripts/clone/fetch-clone-weights.sh` fetches pinned safetensors
+only when `GALION_CLONE_FETCH=1`, and it refuses audio suffixes and
+persona filenames. The release in `CLONE-WEIGHTS.md` is that same list.
+A LEDGER clearance does not flip the lock and does not set either flag.
+An owner edits the lock later, in its own commit, after
 the clearance line is real.
 
 Chatterbox code is MIT, copyright 2025 Resemble AI, read 2026-11-03.
@@ -296,7 +300,7 @@ Leave this group unchecked for a private clearance.
 2. Paste the private LEDGER template for that persona. Fill every field.
 3. Only then may a human place the one clip on the owner's machine, off git.
 4. Compute duration and sha256. Amend the LEDGER line with those two facts. Do not invent them in advance.
-5. A later owner commit may set `reference_clips` true for that persona. This file does not edit `LOCKS.toml`. The worker keeps refusing a clip until that commit exists.
+5. A later owner commit may set `reference_clips` true for that persona. This file does not edit `LOCKS.toml`. t287 records the PRIVATE CLEARED path in `LEDGER.md` without that flip: `reference_clips` stays false until the owner edits the lock. The worker `send_reference` gate is `symphony/CLIP-STORE.md`. Checklist boxes that need a counsel name stay unchecked. No counsel name is invented.
 6. A public demo waits for its own LEDGER line, after the private line, with login, exact CORS, Art. 50, and the imitation sentence.
 7. Weight fetch (`GALION_CLONE_FETCH=1`) is a different decision. Clearance of a voice does not download Nano or Turbo. This file does not set the flag.
 
@@ -362,5 +366,24 @@ groups stay closed. No clip is committed. The digests the owner supplied
 are pinned in `scripts/clone/REFS.sha256` and checked again when a file
 is present. `reference_clips` remains false because `LOCKS.toml` is not
 edited here. The worker path is `symphony/CLONE-LANDING.md`.
+2026-11-03, Europe/Zagreb. t287 records the PRIVATE CLEARED path for
+Samantha and Jarvis in `LEDGER.md` (owner decision t273). Every box
+above stays unchecked. A counsel name was not supplied, and this file
+does not invent one. A ticked box still needs the instrument. Both
+public-demo groups stay unchecked. No clip is in the tree. No sha256
+of a clip is recorded here, because no landing WAV was in this tree to
+hash. `reference_clips` remains false until the owner flips
+`LOCKS.toml`. The worker path is `symphony/CLIP-STORE.md`.
+
+The same day, the owner directed the Chatterbox Nano worker to be built.
+That direction is not an instrument, and it does not fill a field above.
+The clone-time consent gate (`crates/galion-consent`, Rust, in process;
+the retired `consent.py` is in `tools/legacy/`) reads a `consent.txt` the operator places
+outside git. The required keys are the ones in this checklist (date,
+persona, work, performer, grantor, instrument, grantee, scope,
+public_demo, expiry, operator, withdrawal, counsel, sha256, duration_s).
+An empty key, a bracket, or a placeholder word is a refusal. The worker
+still refuses `op: condition` while `reference_clips` is false. No box
+in this file was ticked. No LEDGER template was pasted.
 
 — Maciej Grajczyk

@@ -5,7 +5,7 @@
 //! 80 ms primary path).
 //!
 //! ```text
-//!  pcm16k ──S4 PhoneTurnAsr──▶ transcript ──S5 CannedLlm──▶ reply_text ──S6 SpeechStack──▶ wav_bytes (24 kHz)
+//!  pcm16k ──S4 PhoneTurnAsr──▶ transcript ──S5 Hermes or CannedLlm──▶ reply_text ──S6 SpeechStack──▶ wav_bytes (24 kHz)
 //! ```
 //!
 //! # S4 ASR — letter A, Vosk, out of process
@@ -23,9 +23,14 @@
 //! Every [`PhoneTurn`] carries `asr` so a UI can tell a Vosk transcript from a fixture.
 //!
 //! # S5 LLM
-//! Phone turns default to [`CannedLlm`] (`GALION_LLM=canned` or unset). `GALION_LLM=echo`
-//! selects the old `MockLlm` echo. Emotion is fixed `Neutral`: inferring affect from
-//! the caller's voice is the LOCKS `[consent] sense` bit (default deny).
+//! Phone turns default to [`CannedLlm`] when `GALION_LLM` is unset or `canned`
+//! (explicit test opt-in). `GALION_LLM=echo` selects the old `MockLlm` echo.
+//! `GALION_LLM=hermes` selects [`crate::HermesLlm`]: a loopback OpenAI chat
+//! completion (`GALION_LLM_URL`, default `http://127.0.0.1:8642/v1/chat/completions`).
+//! Any other value is [`PhoneError::UnknownLlm`]. It is not canned.
+//! A timeout or a dead gateway speaks `model can't be reached` and does not
+//! fall back to the rule table. Emotion is fixed `Neutral`: inferring affect
+//! from the caller's voice is the LOCKS `[consent] sense` bit (default deny).
 //!
 //! # S6 TTS
 //! [`SpeechStack::detect`] (A21 Piper VITS `en_US-ljspeech-medium` if the sha256-verified
@@ -41,8 +46,11 @@
 
 use crate::canned::CannedLlm;
 use crate::en_lane::{spoken_text, to_f32, to_pcm16, wav_bytes, LANE_RATE_HZ};
+use crate::hermes::HermesLlm;
 use crate::{CascadeError, Emotion, Lang, Llm, MockLlm, Transcript};
 use galion_ml_voice::speech::{resample, SpeechStack};
+
+pub use galion_ml_voice::speech::FrameProsody;
 use galion_ml_voice::stub::SAMPLES_PER_CHAR;
 use galion_ml_voice::VoiceError;
 use std::sync::atomic::AtomicU64;
@@ -74,14 +82,25 @@ impl AsrMode {
     }
 }
 
-/// S5 LLM mode (`GALION_LLM`). Phone default is `Canned`.
+/// S5 LLM mode (`GALION_LLM`). Unset and `canned` are the rule table.
+/// `hermes` is the loopback gateway. Anything else is an error.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum LlmMode { Canned, Echo }
+pub enum LlmMode { Canned, Echo, Hermes }
 
 impl LlmMode {
-    pub fn from_env() -> Self { Self::from_choice(std::env::var("GALION_LLM").ok().as_deref()) }
-    pub fn from_choice(v: Option<&str>) -> Self {
-        match v.map(|s| s.trim().to_ascii_lowercase()).as_deref() { Some("echo") | Some("mock") => LlmMode::Echo, _ => LlmMode::Canned }
+    pub fn from_env() -> Result<Self, PhoneError> {
+        Self::from_choice(std::env::var("GALION_LLM").ok().as_deref())
+    }
+    /// `None`, `""`, and `canned` → [`LlmMode::Canned`]. `echo` / `mock` → echo.
+    /// `hermes` → [`LlmMode::Hermes`]. Every other value is [`PhoneError::UnknownLlm`].
+    pub fn from_choice(v: Option<&str>) -> Result<Self, PhoneError> {
+        let raw = v.unwrap_or("").trim();
+        match raw.to_ascii_lowercase().as_str() {
+            "" | "canned" => Ok(LlmMode::Canned),
+            "echo" | "mock" => Ok(LlmMode::Echo),
+            "hermes" => Ok(LlmMode::Hermes),
+            _ => Err(PhoneError::UnknownLlm(raw.to_string())),
+        }
     }
 }
 
@@ -90,8 +109,10 @@ impl LlmMode {
 pub struct PhoneConfig { pub asr: AsrMode, pub llm: LlmMode }
 
 impl PhoneConfig {
-    /// `GALION_ASR` + `GALION_LLM`.
-    pub fn from_env() -> Self { Self { asr: AsrMode::from_env(), llm: LlmMode::from_env() } }
+    /// `GALION_ASR` + `GALION_LLM`. Unknown `GALION_LLM` is an error.
+    pub fn from_env() -> Result<Self, PhoneError> {
+        Ok(Self { asr: AsrMode::from_env(), llm: LlmMode::from_env()? })
+    }
 }
 impl Default for PhoneConfig { fn default() -> Self { Self { asr: AsrMode::Stub, llm: LlmMode::Canned } } }
 
@@ -113,6 +134,8 @@ pub enum PhoneError {
     Superseded,
     /// Error from the cascade (LLM / route).
     Cascade(CascadeError),
+    /// `GALION_LLM` is not `canned`, `echo`/`mock`, or `hermes`. Not a canned fallback.
+    UnknownLlm(String),
 }
 
 impl std::fmt::Display for PhoneError {
@@ -125,6 +148,7 @@ impl std::fmt::Display for PhoneError {
             PhoneError::NoSpeech(m) => write!(f, "no speech backend: {m}"),
             PhoneError::Superseded => write!(f, "turn superseded before speech finished"),
             PhoneError::Cascade(e) => write!(f, "cascade: {e:?}"),
+            PhoneError::UnknownLlm(m) => write!(f, "unknown GALION_LLM '{m}'; use canned, echo, or hermes"),
         }
     }
 }
@@ -331,21 +355,36 @@ fn ms_since(t: Instant) -> u32 { t.elapsed().as_millis().min(u32::MAX as u128) a
 
 impl PhoneLane {
     /// Env-configured lane (`GALION_ASR`, `GALION_LLM`, `GALION_SPEECH`, …).
-    pub fn from_env() -> Self { Self::new(PhoneConfig::from_env()) }
+    pub fn from_env() -> Result<Self, PhoneError> { Ok(Self::new(PhoneConfig::from_env()?)) }
 
     pub fn new(cfg: PhoneConfig) -> Self { Self::with_speech(cfg, SpeechStack::detect()) }
 
     /// Lane around an existing stack. Pre-warms Piper when that stack is A21.
     pub fn with_speech(cfg: PhoneConfig, mut speech: SpeechStack) -> Self {
-        let llm: Box<dyn Llm + Send> = match cfg.llm { LlmMode::Canned => Box::new(CannedLlm::new()), LlmMode::Echo => Box::new(MockLlm) };
+        let llm: Box<dyn Llm + Send> = match cfg.llm {
+            LlmMode::Canned => Box::new(CannedLlm::new()),
+            LlmMode::Echo => Box::new(MockLlm),
+            LlmMode::Hermes => Box::new(HermesLlm::from_env()),
+        };
         speech.prewarm();
         Self { cfg, asr: PhoneTurnAsr::new(cfg.asr), llm, speech }
     }
 
+    /// Register for the next Hermes completion (`samantha` or `jarvis`).
+    /// Canned and echo ignore it.
+    pub fn set_persona(&mut self, id: &str) { self.llm.set_persona(id); }
+
     /// True when S6 can produce spoken words on this machine.
     pub fn can_speak(&self) -> bool { self.speech.can_speak() }
-    /// `(id, label)` of the speech backend.
-    pub fn speech_backend(&self) -> (&'static str, String) { (self.speech.backend.id(), self.speech.backend.label()) }
+    /// `(id, label)` of the speech backend that last produced PCM.
+    /// Before the first speak, this is the selected backend.
+    pub fn speech_backend(&self) -> (&'static str, String) { self.speech.reported() }
+
+    /// Persona register and the latest 80 ms prosody. Numbers only. No reply text.
+    pub fn set_delivery(&mut self, persona: &str, prosody: FrameProsody) {
+        self.speech.set_persona(persona);
+        self.speech.set_frame_prosody(prosody);
+    }
 
     /// `(pid, spawn count)` of the warm Piper worker. Pid is `None` for flite / off.
     /// Spawn count `1` means every turn reused the process started with the lane.
@@ -440,9 +479,9 @@ impl PhoneLane {
 }
 
 /// One-shot phone turn from 16 kHz mono PCM16 (env-configured).
-pub fn phone_turn(pcm16k: &[i16]) -> Result<PhoneTurn, PhoneError> { PhoneLane::from_env().turn(pcm16k) }
+pub fn phone_turn(pcm16k: &[i16]) -> Result<PhoneTurn, PhoneError> { PhoneLane::from_env()?.turn(pcm16k) }
 /// One-shot phone turn from WAV bytes (env-configured).
-pub fn phone_turn_wav(wav: &[u8]) -> Result<PhoneTurn, PhoneError> { PhoneLane::from_env().turn_wav(wav) }
+pub fn phone_turn_wav(wav: &[u8]) -> Result<PhoneTurn, PhoneError> { PhoneLane::from_env()?.turn_wav(wav) }
 
 #[cfg(test)]
 mod tests {
@@ -472,9 +511,13 @@ mod tests {
         assert_eq!(AsrMode::from_choice(Some("whisper")), AsrMode::Stub);
         assert_ne!(AsrMode::from_choice(None), AsrMode::Interim);
         assert_ne!(AsrMode::from_choice(Some("interim")), AsrMode::Interim);
-        assert_eq!(LlmMode::from_choice(None), LlmMode::Canned);
-        assert_eq!(LlmMode::from_choice(Some("canned")), LlmMode::Canned);
-        assert_eq!(LlmMode::from_choice(Some("echo")), LlmMode::Echo);
+        assert_eq!(LlmMode::from_choice(None).unwrap(), LlmMode::Canned);
+        assert_eq!(LlmMode::from_choice(Some("canned")).unwrap(), LlmMode::Canned);
+        assert_eq!(LlmMode::from_choice(Some("echo")).unwrap(), LlmMode::Echo);
+        assert_eq!(LlmMode::from_choice(Some(" Hermes ")).unwrap(), LlmMode::Hermes);
+        assert!(matches!(LlmMode::from_choice(Some("gpt")), Err(PhoneError::UnknownLlm(m)) if m == "gpt"));
+        assert!(matches!(LlmMode::from_choice(Some("openai")), Err(PhoneError::UnknownLlm(_))));
+        assert!(matches!(LlmMode::from_choice(Some("hermes-agent")), Err(PhoneError::UnknownLlm(_))));
     }
     #[test] fn stub_decodes_fixture_in_every_mode_but_off() {
         for m in [AsrMode::Stub, AsrMode::Interim, AsrMode::Vosk] {
@@ -606,5 +649,61 @@ mod tests {
         let e = l.turn(&voice(1.5)).unwrap_err();
         assert!(matches!(e, PhoneError::NoSpeech(ref m) if m.contains("GALION_SPEECH=off")), "{e}");
         assert_eq!(l.piper_worker().0, None);
+    }
+
+    #[test]
+    fn hermes_lane_uses_the_model_and_not_the_rule_table() {
+        use crate::hermes::{HermesLlm, LLM_NAME};
+        use std::io::{Read, Write};
+        use std::net::TcpListener;
+        use std::sync::{Arc, Mutex};
+        use std::time::Duration;
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        let seen = Arc::new(Mutex::new(String::new()));
+        let seen_w = seen.clone();
+        std::thread::spawn(move || {
+            let (mut sock, _) = listener.accept().unwrap();
+            let _ = sock.set_read_timeout(Some(Duration::from_millis(500)));
+            let mut buf = [0u8; 8192];
+            let mut got = Vec::new();
+            loop {
+                match sock.read(&mut buf) {
+                    Ok(0) => break,
+                    Ok(n) => {
+                        got.extend_from_slice(&buf[..n]);
+                        if got.windows(4).any(|w| w == b"\r\n\r\n") { break; }
+                    }
+                    Err(_) => break,
+                }
+            }
+            if let Ok(s) = String::from_utf8(got) { *seen_w.lock().unwrap() = s; }
+            let payload = "{\"choices\":[{\"message\":{\"content\":\"She died this morning.\"}}]}";
+            let resp = format!(
+                "HTTP/1.0 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{payload}",
+                payload.len()
+            );
+            let _ = sock.write_all(resp.as_bytes());
+        });
+        let mut l = PhoneLane::with_speech(
+            PhoneConfig { asr: AsrMode::Stub, llm: LlmMode::Hermes },
+            galion_ml_voice::speech::SpeechStack::silent("hermes-test"),
+        );
+        l.llm = Box::new(HermesLlm::new(
+            &format!("http://{addr}/v1/chat/completions"),
+            LLM_NAME,
+            "",
+            Duration::from_millis(1000),
+        ));
+        l.set_persona("jarvis");
+        let (t, src, r) = l.inject_text("My mother died this morning.").unwrap();
+        assert_eq!(t, "My mother died this morning.");
+        assert_eq!(src, AsrSource::TextInject);
+        assert_eq!(r, "She died this morning.");
+        assert_ne!(r, "Your mother died this morning.");
+        assert!(!r.contains("doing well"));
+        assert_eq!(l.llm.name(), LLM_NAME);
+        let seen = seen.lock().unwrap().clone();
+        assert!(seen.contains("Jarvis"), "{seen}");
     }
 }

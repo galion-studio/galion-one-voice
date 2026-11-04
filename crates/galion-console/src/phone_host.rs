@@ -13,13 +13,16 @@ use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use galion_heartbeat::{FRAME_MS, SAMPLE_RATE};
+use galion_heartbeat::{FRAME_MS, FRAME_SAMPLES, SAMPLE_RATE};
 use galion_render::backends::web::{MicTap, ReplyBox, SayInbox, SpokenLine, Turn, TurnInbox, WebSurface};
 use galion_render::v2_persona::Floor;
 
 use crate::auto_workflow::{proceed, Proceed, ProceedSource};
+use galion_emotion::{ProsodyControl, VoicePersona};
+
 use crate::bus::{pcm16_to_bytes, BusMsg, ProcessBus};
-use crate::turn_worker::{TurnJob, TurnReply, TurnWorker};
+use crate::turn_worker::{ProsodySlot, TurnJob, TurnReply, TurnWorker};
+use crate::workflow::{next_step, Next};
 
 /// What the phone path overrode on this tick.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -39,6 +42,7 @@ pub struct PhoneHost {
     floor: Arc<Mutex<Floor>>,
     bus: ProcessBus,
     worker: TurnWorker,
+    prosody: ProsodySlot,
     /// Remaining reply samples at 24 kHz.
     play: VecDeque<i16>,
     /// A turn the worker could not accept yet (channel full). Newest wins.
@@ -53,6 +57,9 @@ pub struct PhoneHost {
     last_proceed: Proceed,
     /// Accepted mic takes handed to `auto_workflow::proceed`. Not incremented on the 80 ms tick.
     proceeded: u64,
+    /// Last workflow step. The turn id is 0 until an utterance is recorded.
+    last_next: Next,
+    last_next_turn: u64,
 }
 
 impl PhoneHost {
@@ -60,13 +67,15 @@ impl PhoneHost {
     /// the surface into a `Box<dyn RenderSurface>`.
     pub fn from_surface(web: &WebSurface) -> Self {
         let bus = ProcessBus::new();
+        let prosody = ProsodySlot::identity();
         Self {
             mic: web.mic_tap(),
             turns: web.turn_inbox(),
             says: web.say_inbox(),
             replies: web.reply_box(),
             floor: web.persona_floor(),
-            worker: TurnWorker::spawn_on(bus.clone()),
+            worker: TurnWorker::spawn_linked(bus.clone(), prosody.clone()),
+            prosody,
             bus,
             play: VecDeque::new(),
             pending: None,
@@ -76,6 +85,8 @@ impl PhoneHost {
             t_ms: 0,
             last_proceed: Proceed::Program,
             proceeded: 0,
+            last_next: Next::Speak,
+            last_next_turn: 0,
         }
     }
 
@@ -89,8 +100,34 @@ impl PhoneHost {
         self.proceeded
     }
 
+    /// Register the one-dot floor is speaking in. Read outside `Heartbeat::step`.
+    pub fn voice_persona(&self) -> VoicePersona {
+        match self.floor.lock() {
+            Ok(floor) if floor.id() == "jarvis" => VoicePersona::Jarvis,
+            _ => VoicePersona::Samantha,
+        }
+    }
+
+    /// Turn id and the step chosen for it. No transcript is kept.
+    pub fn workflow(&self) -> (u64, Next) {
+        (self.last_next_turn, self.last_next)
+    }
+
     pub fn bus(&self) -> &ProcessBus {
         &self.bus
+    }
+
+    /// Store the prosody from the 80 ms frame that just finished.
+    /// Called by the screen loop after `Heartbeat::step`, not inside it.
+    pub fn note_prosody(&mut self, prosody: ProsodyControl) {
+        self.prosody.store(galion_cascade::phone::FrameProsody {
+            pitch_st: prosody.pitch_shift_st,
+            pitch_range: prosody.pitch_range,
+            rate: prosody.rate,
+            energy: prosody.energy,
+            warmth: prosody.warmth,
+            pre_pause_ms: prosody.pre_pause_ms,
+        });
     }
 
     /// Replace `you` when the browser posted a fresh RMS above the room floor.
@@ -119,8 +156,15 @@ impl PhoneHost {
     }
 
     /// Take at most the newest utterance and the newest typed line, publish any
-    /// finished reply, drain one frame of reply PCM into `me`.
+    /// finished reply, drain one heartbeat frame of reply PCM into `me`.
     pub fn drive_me(&mut self, me: &mut [f32]) -> bool {
+        self.poll_me(me, true)
+    }
+
+    /// Poll the worker, then optionally copy one [`FRAME_SAMPLES`] frame.
+    /// `emit == false` still polls and does not pop PCM: a late heartbeat is a pause.
+    /// A buffer longer than one frame does not catch up.
+    pub fn poll_me(&mut self, me: &mut [f32], emit: bool) -> bool {
         self.flush_submit();
         let turn = self.turns.take_latest();
         let say = self.pending_line.take().or_else(|| self.says.take_latest());
@@ -142,14 +186,33 @@ impl PhoneHost {
         if let Some(r) = self.worker.try_recv() {
             self.publish(r);
         }
-        if self.play.is_empty() {
+        if !emit || self.play.is_empty() {
             return false;
         }
-        for x in me.iter_mut() {
-            *x = pop_pcm(&mut self.play).map(|s| s as f32 / 32768.0).unwrap_or(0.0);
-        }
-        true
+        copy_one_frame(&mut self.play, me)
     }
+
+    /// Drop queued reply PCM. Call this on a yield, before the next poll,
+    /// so a reply published on that same tick is not wiped.
+    pub fn release_me(&mut self) {
+        wipe_play(&mut self.play);
+    }
+}
+
+/// Copy at most one heartbeat frame. Does not allocate.
+fn copy_one_frame(play: &mut VecDeque<i16>, me: &mut [f32]) -> bool {
+    if play.is_empty() {
+        return false;
+    }
+    let n = me.len().min(FRAME_SAMPLES);
+    for (i, x) in me.iter_mut().enumerate() {
+        if i < n {
+            *x = pop_pcm(play).map(|s| s as f32 / 32768.0).unwrap_or(0.0);
+        } else {
+            *x = 0.0;
+        }
+    }
+    true
 }
 
 impl Drop for PhoneHost {
@@ -236,6 +299,7 @@ impl PhoneHost {
             let _ = self.bus.try_send_reply(text);
         }
         if !r.transcript.trim().is_empty() {
+            self.note_transcript(r.id, &r.transcript);
             if let Ok(mut floor) = self.floor.lock() {
                 let _ = floor.say(&r.transcript, false, 0.0, false);
             }
@@ -308,7 +372,21 @@ impl PhoneHost {
                 rate,
                 pcm,
             });
+            self.note_recorded(turn_id);
         }
+    }
+
+    fn note_recorded(&mut self, turn_id: u64) {
+        self.last_next = Next::Recorded;
+        self.last_next_turn = turn_id;
+    }
+
+    fn note_transcript(&mut self, turn_id: u64, transcript: &str) {
+        if transcript.trim().is_empty() {
+            return;
+        }
+        self.last_next = next_step(transcript);
+        self.last_next_turn = turn_id;
     }
 
     fn enqueue(&mut self, job: TurnJob) {
@@ -399,6 +477,20 @@ mod tests {
     }
 
     #[test]
+    fn drain_takes_one_heartbeat_frame_and_leaves_the_tail() {
+        let mut play = VecDeque::from(vec![16_000i16; FRAME_SAMPLES + 4]);
+        let mut me = vec![0.0f32; FRAME_SAMPLES + 4];
+        assert!(copy_one_frame(&mut play, &mut me));
+        assert_eq!(play.len(), 4, "the next frame stays queued");
+        assert!(me[..FRAME_SAMPLES].iter().all(|s| (*s - 16_000.0 / 32_768.0).abs() < 1e-6));
+        assert!(me[FRAME_SAMPLES..].iter().all(|s| *s == 0.0), "no second frame in this tick");
+        let mut short_play = VecDeque::from(vec![1_000i16; 100]);
+        let mut short = [0.0f32; 8];
+        assert!(copy_one_frame(&mut short_play, &mut short));
+        assert_eq!(short_play.len(), 92, "a short buffer still takes only its own length");
+    }
+
+    #[test]
     fn reply_queue_is_zeroised_on_wipe() {
         let mut q = VecDeque::from(vec![1i16, -2, 3000]);
         assert_eq!(pop_pcm(&mut q), Some(1));
@@ -433,6 +525,7 @@ mod tests {
         }
         let mut me = vec![0.0f32; 8];
         let _ = host.drive_me(&mut me);
+        assert_eq!(host.workflow(), (1, crate::workflow::Next::Recorded));
         assert_eq!(host.bus().cancel(), 1);
         let utt = host
             .bus()
@@ -491,5 +584,20 @@ mod tests {
         let floor = floor.lock().unwrap();
         assert!(floor.mood_from_turn());
         assert_eq!(floor.mood(), "grief");
+    }
+
+    #[test]
+    fn words_choose_a_program_without_a_second_screen() {
+        std::env::set_var("GALION_ASR", "off");
+        let web = WebSurface::mailbox();
+        let mut host = PhoneHost::from_surface(&web);
+        assert_eq!(host.voice_persona(), galion_emotion::VoicePersona::Samantha);
+        assert_eq!(host.workflow(), (0, crate::workflow::Next::Speak));
+        host.note_transcript(4, "please start the heartbeat");
+        assert_eq!(host.workflow(), (4, crate::workflow::Next::Program("heartbeat")));
+        host.note_transcript(5, "I hear you");
+        assert_eq!(host.workflow().1, crate::workflow::Next::Speak);
+        host.note_transcript(6, "skill presence");
+        assert_eq!(host.workflow(), (6, crate::workflow::Next::Skill("presence")));
     }
 }
