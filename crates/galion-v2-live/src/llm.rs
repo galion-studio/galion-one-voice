@@ -24,8 +24,46 @@ impl LlmCfg {
     }
 }
 
+
+/// GALION_LLM=canned: no network, no third-party LLM. A local `sh` child
+/// reads the request body to EOF, waits GALION_CANNED_TTFT_MS (default 0),
+/// then streams a fixed OpenAI-style SSE reply with Llama-style " word"
+/// tokens, so the rest of the loop (clauser, Piper, timing) is unchanged.
+pub fn canned() -> bool { std::env::var("GALION_LLM").map(|v| v == "canned").unwrap_or(false) }
+pub const CANNED_REPLY: &str = "That sounds like a lovely idea, and I would be glad to help you plan it out step by step.";
+pub fn canned_cmd() -> Command {
+    let ttft: f64 = std::env::var("GALION_CANNED_TTFT_MS").ok().and_then(|v| v.parse().ok()).unwrap_or(0.0);
+    let mut script = String::from("cat >/dev/null; ");
+    if ttft > 0.0 { script.push_str(&format!("sleep {:.3}; ", ttft / 1000.0)); }
+    let mut first = true;
+    for w in CANNED_REPLY.split(' ') {
+        let tok = if first { w.to_string() } else { format!(" {w}") }; first = false;
+        let line = serde_json::json!({"provider": "canned", "choices": [{"delta": {"content": tok}}]}).to_string();
+        script.push_str(&format!("printf 'data: %s\\n' '{}'; ", line.replace('\'', "'\\''")));
+    }
+    script.push_str("printf 'data: [DONE]\\n'");
+    let mut c = Command::new("sh"); c.arg("-c").arg(script); c
+}
+
 /// Start a streaming completion; events arrive on the returned channel.
 pub fn stream(cfg: &LlmCfg, messages: serde_json::Value) -> Result<Receiver<LlmEv>, String> {
+    if canned() {
+        let mut child = canned_cmd().stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::null()).spawn().map_err(|e| format!("spawn canned: {e}"))?;
+        let out = child.stdout.take().unwrap();
+        let (tx, rx) = channel();
+        std::thread::spawn(move || {
+            for line in BufReader::new(out).lines().map_while(Result::ok) {
+                let t = now_ms();
+                let Some(d) = line.strip_prefix("data: ") else { continue };
+                if d.trim() == "[DONE]" { break; }
+                let Ok(v) = serde_json::from_str::<serde_json::Value>(d) else { continue };
+                if let Some(c) = v["choices"][0]["delta"]["content"].as_str() { let _ = tx.send(LlmEv::Token(t, c.to_string())); }
+            }
+            let _ = child.wait();
+            let _ = tx.send(LlmEv::Done(now_ms(), Some(0.0), "canned".into()));
+        });
+        let _ = messages; return Ok(rx);
+    }
     let key = std::env::var("OPENROUTER_API_KEY").map_err(|_| "OPENROUTER_API_KEY not set; no LLM call made".to_string())?;
     let mut body = serde_json::json!({"model": cfg.model, "messages": messages, "stream": true,
         "max_tokens": cfg.max_tokens, "temperature": 0.7, "usage": {"include": true}});

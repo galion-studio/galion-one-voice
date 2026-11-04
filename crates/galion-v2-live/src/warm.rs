@@ -46,6 +46,13 @@ impl Prompt {
 pub struct Warm { child: Child, stdin: ChildStdin, stdout: ChildStdout, pub born_ms: f64 }
 impl Warm {
     pub fn spawn(url: &str) -> Result<Self, String> {
+        if crate::llm::canned() {
+            let born_ms = now_ms();
+            let mut child = crate::llm::canned_cmd().stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::null())
+                .spawn().map_err(|e| format!("spawn canned: {e}"))?;
+            let stdin = child.stdin.take().unwrap(); let stdout = child.stdout.take().unwrap();
+            return Ok(Self { child, stdin, stdout, born_ms });
+        }
         if std::env::var_os("OPENROUTER_API_KEY").is_none() { return Err("OPENROUTER_API_KEY not set; no LLM call made".into()); }
         let born_ms = now_ms();
         let mut child = Command::new("curl")
