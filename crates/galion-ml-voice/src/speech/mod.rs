@@ -60,6 +60,7 @@ use std::time::Instant;
 
 pub mod clause;
 pub mod clip_store;
+pub mod clone_cache;
 pub mod clone_worker;
 pub mod galion_clip;
 pub mod flite;

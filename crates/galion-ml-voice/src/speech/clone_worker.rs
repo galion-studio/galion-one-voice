@@ -47,6 +47,7 @@
 //! generate. The host calls it beside `Heartbeat::step`, not inside it.
 #![allow(unsafe_code)]
 
+use super::clone_cache::{self, CondCtx, CondPlan, SaveTicket};
 use super::{sha256, FrameProsody};
 use crate::{Audio, LanguageId, TtsEngine, VoiceError};
 use std::cell::UnsafeCell;
@@ -606,6 +607,10 @@ pub struct CloneWorker {
     persona: &'static str,
     prosody: FrameProsody,
     engine: String,
+    /// Item 10: on-disk conditioning cache. `None` = recompute from the wav.
+    cond: Option<CondCtx>,
+    cond_ticket: Option<SaveTicket>,
+    cond_note: String,
 }
 
 impl CloneWorker {
@@ -700,7 +705,45 @@ impl CloneWorker {
             persona,
             prosody: FrameProsody::identity(),
             engine: String::new(),
+            cond: None,
+            cond_ticket: None,
+            cond_note: String::new(),
         })
+    }
+
+    /// Item 10: reuse saved conditioning from `$GALION_CLIP_STORE/<persona>/cond/`.
+    pub fn set_cond_cache(&mut self, ctx: Option<CondCtx>) {
+        self.cond = ctx;
+    }
+
+    /// Last cache action (`load …`, `saved …`, `skip …`), for logs and tests.
+    pub fn cond_note(&self) -> &str {
+        &self.cond_note
+    }
+
+    fn cond_plan(&mut self, reference: Option<&ResolvedRef>) -> Option<CondPlan> {
+        let (ctx, reference) = (self.cond.as_ref()?, reference?);
+        let plan = ctx.plan(self.model.as_str(), self.persona, &reference.sha256, galion_consent::global());
+        self.cond_note = match &plan {
+            CondPlan::Load { path, .. } => format!("load {}", path.display()),
+            CondPlan::Save(t) => format!("save {}", t.tmp.display()),
+            CondPlan::Skip(why) => format!("skip {why}"),
+        };
+        Some(plan)
+    }
+
+    fn cond_after(&mut self, mark: usize) {
+        let Some(ticket) = self.cond_ticket.take() else { return };
+        let log = self.err_log.get(mark..).unwrap_or("");
+        if clone_cache::saved_in(log, &ticket) {
+            self.cond_note = match clone_cache::commit(&ticket) {
+                Ok(p) => format!("saved {}", p.display()),
+                Err(why) => format!("skip commit refused: {why}"),
+            };
+        } else if ticket.tmp.exists() {
+            let _ = clone_cache::quarantine(&ticket.tmp);
+            self.cond_note = "skip worker did not confirm the save".into();
+        }
     }
 
     pub fn pid(&self) -> u32 {
@@ -887,7 +930,8 @@ impl CloneWorker {
     pub fn synthesize(&mut self, text: &str) -> Result<Vec<i16>, VoiceError> {
         let t0 = Instant::now();
         let resolved = resolve_reference(self.persona)?;
-        let line = with_prosody(
+        let plan = self.cond_plan(resolved.as_ref());
+        let mut line = with_prosody(
             request_line(
                 text,
                 self.model,
@@ -897,6 +941,12 @@ impl CloneWorker {
             ),
             self.prosody,
         );
+        if let Some(plan) = plan {
+            line = with_fields(line, &clone_cache::request_fields(&plan));
+            if let CondPlan::Save(t) = plan {
+                self.cond_ticket = Some(t);
+            }
+        }
         {
             let stdin = self
                 .stdin
@@ -915,7 +965,10 @@ impl CloneWorker {
         self.utt_ms = None;
         self.path.clear();
         self.engine.clear();
-        let pcm = self.read_utterance(t0, Duration::from_secs(60))?;
+        let mark = self.err_log.len();
+        let pcm = self.read_utterance(t0, Duration::from_secs(60));
+        self.cond_after(mark);
+        let pcm = pcm?;
         self.utt_ms = Some(elapsed_ms(t0));
         let ms = elapsed_ms(t0);
         self.calls += 1;
@@ -1117,6 +1170,8 @@ pub struct CloneTts {
     /// slot was built (clone time), `[samantha, jarvis]`. A turn reads this;
     /// it does not re-run consent or hash the reference again.
     approved: [bool; 2],
+    /// The gate's approvals, kept so the conditioning cache may write.
+    approvals: Vec<galion_consent::Approval>,
     worker: Option<CloneWorker>,
     frames: Arc<CloneFrameDrain>,
     spawns: u32,
@@ -1150,10 +1205,14 @@ impl CloneTts {
         // is refused with the gate's reason. Turns only read `approved`.
         let env = galion_consent::Env::process();
         let mut approved = [false; 2];
+        let mut approvals = Vec::new();
         let mut refused = Vec::new();
         for (i, voice) in ["samantha", "jarvis"].into_iter().enumerate() {
             match galion_consent::clone_gate(voice, &env) {
-                Ok(_) if ref_allowlisted(voice) => approved[i] = true,
+                Ok(a) if ref_allowlisted(voice) => {
+                    approved[i] = true;
+                    approvals.push(a);
+                }
                 Ok(_) => refused.push(format!("{voice}: reference not allowlisted (GALION_CLIP_STORE sidecar or REFS.sha256)")),
                 Err(e) => refused.push(e.to_string()),
             }
@@ -1171,6 +1230,7 @@ impl CloneTts {
             prosody: FrameProsody::identity(),
             ref_gate: true,
             approved,
+            approvals,
             worker: None,
             frames: Arc::new(CloneFrameDrain::new()),
             spawns: 0,
@@ -1197,6 +1257,7 @@ impl CloneTts {
             prosody: FrameProsody::identity(),
             ref_gate: false,
             approved: [true; 2],
+            approvals: Vec::new(),
             frames: worker.frames(),
             worker: Some(worker),
             spawns: 1,
@@ -1280,6 +1341,9 @@ impl CloneTts {
             Arc::clone(&self.frames),
         )?;
         worker.set_prosody(self.prosody);
+        let store = clip_store_from(std::env::var("GALION_CLIP_STORE").ok().as_deref());
+        let enabled = clone_cache::cache_enabled(std::env::var("GALION_CLONE_COND_CACHE").ok().as_deref());
+        worker.set_cond_cache(CondCtx::new(store.as_deref(), enabled, &repo_root(), self.approvals.clone()));
         self.worker = Some(worker);
         self.spawns += 1;
         Ok(())
@@ -1477,6 +1541,17 @@ fn with_prosody(line: String, prosody: FrameProsody) -> String {
     );
     match line.strip_suffix("}\n") {
         Some(stripped) => format!("{stripped}{extra}}}\n"),
+        None => line,
+    }
+}
+
+/// Append raw JSON fields (leading comma) to a request line.
+fn with_fields(line: String, fields: &str) -> String {
+    if fields.is_empty() {
+        return line;
+    }
+    match line.strip_suffix("}\n") {
+        Some(stripped) => format!("{stripped}{fields}}}\n"),
         None => line,
     }
 }
