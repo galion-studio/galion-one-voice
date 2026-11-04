@@ -92,7 +92,7 @@ refuses unless `GALION_CLONE_FETCH=1`.
 3. The stderr engine line says `nano` and the path line says `stream`. `ttfa_ms` is the first chunk. `utt_ms` is the closing marker. The live CPU pass today is Piper, `GALION_SPEECH=a21`.
 1. Pinned safetensors on disk, fetched by a human with `GALION_CLONE_FETCH=1`.
 2. The child actually calls generate, still out of process. A reference WAV is the clip-store path in `symphony/CLIP-STORE.md`, not a file in git.
-2. The child calls generate, out of process, on CPU. A reference is sent only as `op: condition`, and only after `consent.py` accepts it.
+2. The child calls generate, out of process, on CPU. A reference is sent only as `op: condition`, and only after the clone-time consent gate (`crates/galion-consent`) accepts it.
 3. The stderr engine line says `model`.
 4. Three CPU runs, cold and warm, phrase fixed, written into `LEDGER.md` with the host and the model id.
 5. Still no film audio. Still no celebrity demo.

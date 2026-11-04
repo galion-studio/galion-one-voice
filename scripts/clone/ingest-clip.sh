@@ -16,13 +16,16 @@
 # Exit: 0 ready for the worker (the lock must also be true) · 1 bad clip · 2 refused
 set -euo pipefail
 cd "$(dirname "$0")/../.."
+# Rust consent gate (crates/galion-consent). consent.py is retired to
+# tools/legacy/consent.py.bak; no Python runs here.
+consent() { cargo run --quiet --offline -p galion-consent -- "$@"; }
 persona="${1:-}"
 case "$persona" in
   samantha|jarvis) ;;
   *)
     echo "usage: GALION_CLIP_STORE=/absolute/outside/repo $0 samantha|jarvis" >&2
     echo "required consent fields:" >&2
-    python3 scripts/clone/consent.py fields >&2
+    consent fields >&2
     exit 2
     ;;
 esac
@@ -30,9 +33,9 @@ if [ -z "${GALION_CLIP_STORE:-}" ]; then
   echo "ingest: GALION_CLIP_STORE is unset. There is no default path and this script does not fetch a wav." >&2
   echo "Place one mono 16-bit PCM wav of about 10 seconds (8–12 s) at \$GALION_CLIP_STORE/$persona/reference.wav" >&2
   echo "required consent fields:" >&2
-  python3 scripts/clone/consent.py fields >&2
+  consent fields >&2
   exit 2
 fi
-python3 scripts/clone/consent.py measure --persona "$persona"
+consent measure --persona "$persona"
 echo "--- check ---"
-python3 scripts/clone/consent.py check --persona "$persona"
+consent check --persona "$persona"

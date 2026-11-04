@@ -46,6 +46,10 @@ galion-cascade = { path = "../galion-cascade", optional = true, default-features
 # Pinned to 0.29 (MSRV 1.74) — box toolchain is rustc 1.85. ratatui re-exports crossterm.
 ratatui = { version = "0.29", default-features = false, features = ["crossterm"] }
 
+[dev-dependencies]
+# Test-only: assert a turn never evaluates consent (owner decision 2026-11-04).
+galion-consent = { path = "../galion-consent" }
+
 [[example]]
 name = "dot_console_demo"
 required-features = ["dot-viz"]

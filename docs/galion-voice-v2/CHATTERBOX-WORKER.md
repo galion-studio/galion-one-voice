@@ -302,7 +302,9 @@ The first run prints `duration_s` and `sha256` measured from the wav. Copy those
 3. The wav and `consent.txt` pass the checker.
 4. `reference_clips` is true in `[formats.exceptions.v2s14_chatterbox]`.
 
-Otherwise the field is false and `clone_block` names the first miss (`store`, `wav`, `mono`, `duration`, `consent`, `sha`, `lock`, `weights`, `worker`). `rights` stays `hold` until that gate is open, then `cleared`. `film_voice` stays false unless `public_demo` is `yes`. The page mouth stays the browser. The flag is readiness, not a claim that the dot is speaking the film.
+Otherwise the field is false and `clone_block` names the first miss (`store`, `wav`, `mono`, `duration`, `consent`, `expired`, `celebrity`, `sha`, `lock`, `weights`, `worker`, or `pending` when a store is set but no voice has been cloned in this process yet).
+
+Since 2026-11-04 (owner decision: consent is checked only when a voice is cloned) this is computed once, at clone time, by the Rust gate in `crates/galion-consent` when the clone slot is built (`CloneTts::try_new`), by `ingest-clip.sh`, and before the `gqvoice` example spawns a real clone. The verdict is kept in memory; `/v2/state` and every turn only read it. No turn runs a consent check or spawns a process for it. `rights` stays `hold` until that gate is open, then `cleared`. `film_voice` stays false unless `public_demo` is `yes`. The page mouth stays the browser. The flag is readiness, not a claim that the dot is speaking the film.
 
 Today the lock is false, so a placed wav still reports `clone_block` `lock` and `clone_live` false. Opening the lock is an owner edit of `LOCKS.toml`. This change does not make it.
 

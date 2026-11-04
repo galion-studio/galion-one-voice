@@ -24,6 +24,8 @@ full = ["terminal", "window", "web"]
 # Std-only sibling. Hermes chat is a loopback TcpStream in galion-cascade (no TLS,
 # no weights). Heavy GUI/web deps stay optional behind `window` / `web`.
 galion-cascade = { path = "../crates/galion-cascade", default-features = false }
+# Std-only, zero deps. Clone-time consent verdicts; the floor reads them in memory.
+galion-consent = { path = "../crates/galion-consent" }
 
 [[example]]
 name = "demo"

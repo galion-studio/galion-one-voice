@@ -377,7 +377,8 @@ hash. `reference_clips` remains false until the owner flips
 
 The same day, the owner directed the Chatterbox Nano worker to be built.
 That direction is not an instrument, and it does not fill a field above.
-`scripts/clone/consent.py` reads a `consent.txt` the operator places
+The clone-time consent gate (`crates/galion-consent`, Rust, in process;
+the retired `consent.py` is in `tools/legacy/`) reads a `consent.txt` the operator places
 outside git. The required keys are the ones in this checklist (date,
 persona, work, performer, grantor, instrument, grantee, scope,
 public_demo, expiry, operator, withdrawal, counsel, sha256, duration_s).
