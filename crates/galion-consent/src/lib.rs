@@ -555,10 +555,15 @@ pub fn weight_files(model: &str) -> Vec<String> {
 }
 
 /// Size match against the pin table. The speech slot still hashes before it speaks.
+/// Tokenizer rows live in `TOKENIZER.sha256` beside `PINS.sha256` (the same
+/// split chatterbox_worker.py and clone_worker.rs read), so both tables are merged.
 pub fn weights_sized(env: &Env) -> bool {
-    let Some(table) = pins(&env.pins) else {
+    let Some(mut table) = pins(&env.pins) else {
         return false;
     };
+    if let Some(tok) = env.pins.parent().and_then(|d| pins(&d.join("TOKENIZER.sha256"))) {
+        table.extend(tok);
+    }
     weight_files(env.model).iter().all(|rel| {
         let Some((_, size)) = table.iter().find(|(k, _)| k == rel) else {
             return false;
