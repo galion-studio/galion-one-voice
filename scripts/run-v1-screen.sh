@@ -15,8 +15,19 @@
 #      GALION_ASR=vosk when weights/asr/vosk-model-small-en-us-0.15 is on disk,
 #      otherwise stub (typed text works; mic does not invent a transcript).
 #      GALION_ASR=interim is refused here (test-only placeholder).
-#      GALION_LLM=canned · GALION_SPEECH=auto · RELEASE=1
+#      GALION_LLM=canned|echo|hermes · GALION_SPEECH=auto · RELEASE=1
 #      Model: docs/asr/VOSK.md · scripts/asr/fetch-vosk.sh
+#
+# Hermes (approved gateway, OpenAI-compatible, numeric loopback, no TLS):
+#   GALION_LLM_URL=http://127.0.0.1:8642/v1/chat/completions \
+#   GALION_LLM_MODEL=hermes-agent \
+#   GALION_LLM_KEY=... \
+#   GALION_LLM_TIMEOUT_MS=3000 \
+#   scripts/run-v1-screen.sh
+# GALION_LLM defaults to hermes when GALION_LLM_URL is set and GALION_LLM is unset.
+# GALION_LLM=canned is an explicit opt-in for tests. It is not the demo default.
+# If the gateway is down the spoken line is "model can't be reached".
+# That failure does not fall back to a canned reply.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -33,7 +44,10 @@ while [[ $# -gt 0 ]]; do
 done
 URL="http://$ADDR/"
 PROFILE=(); [[ "${RELEASE:-0}" == "1" ]] && PROFILE=(--release)
-export GALION_LLM="${GALION_LLM:-canned}"
+# Canned is opt-in (`GALION_LLM=canned`). A gateway URL with no mode selects Hermes.
+if [[ -z "${GALION_LLM:-}" && -n "${GALION_LLM_URL:-}" ]]; then
+  export GALION_LLM=hermes
+fi
 
 mkdir -p "$OUT"
 cargo build -q "${PROFILE[@]}" --offline -p galion-console --features dot-viz-web --example dot_console_demo
@@ -82,9 +96,16 @@ if [[ "$CHECK" == "1" ]]; then
   v2hdr=$(curl -sI "${URL}v2")
   grep -q '302' <<<"$v2hdr" && grep -qi 'location: /' <<<"$v2hdr" && echo "  /v2 : redirect OK" || { echo "  /v2 : FAIL ($v2hdr)"; exit 1; }
   state=$(curl -fsS "${URL}v2/state")
-  grep -q '"rights":"hold"' <<<"$state" && grep -q '"film_voice":false' <<<"$state" && echo "  /v2/state : rights hold OK" || { echo "  /v2/state : FAIL ($state)"; exit 1; }
+  grep -q '"rights":"hold"' <<<"$state" && grep -q '"film_voice":false' <<<"$state" && grep -q '"llm"' <<<"$state" && echo "  /v2/state : rights hold OK" || { echo "  /v2/state : FAIL ($state)"; exit 1; }
   say=$(curl -fsS -X POST -H 'Content-Type: application/json' --data '{"text":"My mother died this morning."}' "${URL}v2/say")
-  grep -q 'Your mother died this morning.' <<<"$say" && ! grep -qi 'i hear you' <<<"$say" && echo "  POST /v2/say : matter, no canned empathy" || { echo "  POST /v2/say : FAIL ($say)"; exit 1; }
+  if grep -qi 'i hear you' <<<"$say"; then echo "  POST /v2/say : FAIL canned empathy ($say)"; exit 1; fi
+  if ! grep -q '"llm"' <<<"$say"; then echo "  POST /v2/say : FAIL missing llm ($say)"; exit 1; fi
+  if [[ -z "${GALION_LLM_URL:-}" && "${GALION_LLM:-}" != "hermes" ]]; then
+    grep -q "model can't be reached" <<<"$say" || { echo "  POST /v2/say : FAIL ($say)"; exit 1; }
+    echo "  POST /v2/say : no gateway, plain unreachable, no canned empathy"
+  else
+    echo "  POST /v2/say : hermes path, no canned empathy"
+  fi
   seen=""
   for _ in $(seq 1 150); do seen+=" $(curl -fsS "${URL}dot" 2>/dev/null | sed -n 's/.*"mode":"\([a-z]*\)".*/\1/p')"; sleep 0.07; done
   echo "  /dot modes over ~12 s:$(tr ' ' '\n' <<<"$seen" | sort -u | tr '\n' ' ')"

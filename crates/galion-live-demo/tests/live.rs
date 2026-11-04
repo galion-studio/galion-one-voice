@@ -2,9 +2,10 @@
 //! W21-01 integration: the live demo frame loop on the real Heartbeat + RikaReplayBackend path.
 use galion_emotion::band::consent_bits;
 use galion_emotion::Purpose;
+use galion_heartbeat::symphony::NanoPcmRing;
 use galion_heartbeat::FRAME_SAMPLES;
 use galion_live_demo::mimi::{MimiMode, MimiVoice};
-use galion_live_demo::{run_demo, run_frames, synth_you, Config, FrameRecord, FrameSink, RunCfg, ToneVoice};
+use galion_live_demo::{run_demo, run_frames, run_frames_draining, synth_you, Config, FrameRecord, FrameSink, RunCfg, ToneVoice};
 use galion_presence::wav;
 use std::path::PathBuf;
 
@@ -169,4 +170,19 @@ fn reply_words_hold_me_voiced_and_yield_on_barge_in() {
         if m { r += 1 } else if r > 0 { runs.push(r); r = 0 }
     }
     assert!(runs.iter().any(|&r| r < 24), "barge-in yields mid-reply: runs {runs:?}");
+}
+
+#[test]
+fn live_loop_drains_one_nano_frame_and_leaves_the_tail() {
+    let you = vec![0.0f32; FRAME_SAMPLES * 3];
+    let mut ring = NanoPcmRing::new();
+    let mut pcm = vec![0.25f32; FRAME_SAMPLES * 2 + 10];
+    pcm[FRAME_SAMPLES..FRAME_SAMPLES * 2].fill(0.5);
+    assert_eq!(ring.push(&pcm), pcm.len());
+    let (me, summary) = run_frames_draining(&you, &RunCfg::default(), &mut ToneVoice::default(), &mut [], Some(&mut ring));
+    assert_eq!(summary.frames, 3);
+    assert_eq!(summary.paused_frames, 0);
+    assert!(me[..FRAME_SAMPLES].iter().all(|s| (*s - 0.25).abs() < 1e-6));
+    assert!(me[FRAME_SAMPLES..2 * FRAME_SAMPLES].iter().all(|s| (*s - 0.5).abs() < 1e-6));
+    assert_eq!(ring.queued(), 10, "the tail waits for a later frame");
 }

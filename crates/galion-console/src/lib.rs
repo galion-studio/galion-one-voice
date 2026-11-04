@@ -28,6 +28,8 @@
 //! that worker, `try_send` only, cancel checked before ASR and before reply publish.
 //! [`auto_workflow`] names the proceed after a `/` mic take: skill slot or auto program.
 //! It does not add a surface.
+//! [`workflow`] (same feature) is the one-dot hook: a recorded utterance becomes
+//! speak, a skill, or a program. It does not add a screen.
 
 pub mod auto_workflow;
 #[cfg(feature = "phone-turn")]
@@ -46,10 +48,14 @@ pub mod phone_host;
 pub mod source;
 #[cfg(feature = "phone-turn")]
 pub mod turn_worker;
+#[cfg(feature = "phone-turn")]
+pub mod workflow;
 pub mod ui;
 
 #[cfg(feature = "phone-turn")]
 pub use bus::{BusBody, BusMsg, OrbMode, PersonaId, PersonaSource, ProcessBus};
+#[cfg(feature = "phone-turn")]
+pub use workflow::{next_step, Next};
 pub use heartbeat::{Answer, HeartbeatEvent, YesNo, FRAME_MS};
 pub use live::{
     AffectFeed, AffectSample, AnswerLog, ComposedFeed, LiveFeed, LiveSource, LiveView, NoAffect,

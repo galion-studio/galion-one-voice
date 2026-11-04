@@ -1,0 +1,20 @@
+# Galion Voice — owner clearance record t273
+# Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+# Europe/Zagreb. Not a counsel opinion. Not legal advice.
+# counsel is empty on purpose. Do not invent a name.
+# This file does not edit LOCKS.toml.
+schema=1
+decision=t273
+owner=Maciej Grajczyk
+recorded=2026-11-03
+timezone=Europe/Zagreb
+personas=samantha,jarvis
+scope=local-zero-shot-conditioning
+public_demo=no
+private_cleared=yes
+counsel=
+wav_only=yes
+lock_edited=no
+send_reference=yes
+jarvis_texture=hub
+jarvis_texture_toggle=GALION_JARVIS_TEXTURE

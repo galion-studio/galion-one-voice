@@ -124,6 +124,78 @@ impl PiperWorker {
         }
     }
 
+    /// One JSON line on stdin. Does not read stdout. The ring feed calls this,
+    /// then [`Self::poll_pipes`], off `Heartbeat::step`.
+    pub fn write_text(&mut self, text: &str) -> Result<(), VoiceError> {
+        self.pcm_buf.clear();
+        self.err_log.clear();
+        let line = json_line(text);
+        let stdin = self.stdin.as_mut().ok_or_else(|| VoiceError::Backend("A21 piper stdin closed".into()))?;
+        stdin.write_all(line.as_bytes()).map_err(|e| VoiceError::Backend(format!("A21 piper stdin: {e}")))?;
+        stdin.flush().map_err(|e| VoiceError::Backend(format!("A21 piper stdin flush: {e}")))?;
+        Ok(())
+    }
+
+    /// Non-blocking read of stdout PCM and stderr. Does not wait for the utterance.
+    pub fn poll_pipes(&mut self) -> Result<(), VoiceError> {
+        for _ in 0..8 {
+            let stdout_fd = self.stdout.as_ref().map(|p| p.as_raw_fd()).unwrap_or(-1);
+            let stderr_fd = self.stderr.as_ref().map(|p| p.as_raw_fd()).unwrap_or(-1);
+            if stdout_fd < 0 && stderr_fd < 0 {
+                break;
+            }
+            let mut fds = [
+                PollFd { fd: stdout_fd, events: POLLIN, revents: 0 },
+                PollFd { fd: stderr_fd, events: POLLIN, revents: 0 },
+            ];
+            let nfds = if stdout_fd >= 0 && stderr_fd >= 0 { 2 } else { 1 };
+            if stdout_fd < 0 {
+                fds[0] = fds[1];
+            }
+            // SAFETY: fds holds pipe fds this process owns; timeout 0 does not wait.
+            let rc = unsafe { poll(fds.as_mut_ptr(), nfds, 0) };
+            if rc < 0 {
+                let err = std::io::Error::last_os_error();
+                if err.kind() == std::io::ErrorKind::Interrupted {
+                    continue;
+                }
+                return Err(VoiceError::Backend(format!("A21 piper poll: {err}")));
+            }
+            if rc == 0 {
+                break;
+            }
+            let mut progress = false;
+            if stdout_fd >= 0 && fds[0].revents & (POLLIN | POLLHUP) != 0 {
+                let before = self.pcm_buf.len();
+                self.drain(Pipe::Out)?;
+                if self.pcm_buf.len() != before {
+                    progress = true;
+                }
+            }
+            let err_i = if stdout_fd >= 0 { 1 } else { 0 };
+            if stderr_fd >= 0 && fds[err_i].revents & (POLLIN | POLLHUP) != 0 {
+                let before = self.err_log.len();
+                self.drain(Pipe::Err)?;
+                if self.err_log.len() != before {
+                    progress = true;
+                }
+            }
+            if !progress {
+                break;
+            }
+        }
+        Ok(())
+    }
+
+    /// Native-rate s16le gathered so far. Allocates. Not for `step`.
+    pub fn copy_i16(&self) -> Vec<i16> {
+        self.pcm_buf.chunks_exact(2).map(|b| i16::from_le_bytes([b[0], b[1]])).collect()
+    }
+
+    pub fn utterance_done(&self) -> bool {
+        self.err_log.contains("Real-time factor:")
+    }
+
     /// One clause in, one PCM buffer out. Same process on every call.
     pub fn synthesize(&mut self, text: &str) -> Result<Vec<i16>, VoiceError> {
         let mut all = Vec::new();
@@ -292,6 +364,7 @@ fn tail(s: &str) -> String {
 
 fn elapsed_ms(t0: Instant) -> u32 { t0.elapsed().as_millis().min(u32::MAX as u128) as u32 }
 
+#[derive(Clone, Copy)]
 #[repr(C)]
 struct PollFd { fd: i32, events: i16, revents: i16 }
 

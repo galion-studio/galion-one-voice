@@ -17,6 +17,11 @@
 //!   nothing catches up on the next frame. Rika is told (`late`) so it does not
 //!   advance hysteresis on scheduler artefacts (D20 §5.1, R9).
 //!
+//! [`symphony`] puts clone, persona, and the one dot on this same step.
+//! [`symphony::SymphonyWire::step`] never blocks and never allocates. It drains
+//! at most one Nano PCM frame from a ring the host already holds. The model
+//! call, persona reply text, and paint stay off both calls.
+//!
 //! Pipeline timing: the feeling-band decision made in frame *t* is **applied**
 //! (audible) in frame *t+1* ([`FrameOut::applied`]). With Rika's 2-frame
 //! hysteresis this gives evidence *t* → armed *t+1* → audible *t+2* = 160 ms
@@ -26,15 +31,24 @@
 //! Rika is **OFF by default** ([`HeartbeatConfig::default`]); it also needs an
 //! open session, SENSE **and** ADAPT consent bits and a permitted purpose from
 //! the [`ConsentGate`] every frame. Without SENSE no PCM is read for affect.
+//!
+//! The feeling band on each [`FrameOut`] is [`galion_emotion::Feeling`]: the
+//! live galion-emotion weight (OKLCH + persona prosody) for Samantha or Jarvis.
+//! It is computed inside [`Heartbeat::step`] from the consented caller frame.
+//! No phrase table. No accelerator. A missing SENSE bit clears it to rest.
+//! Jarvis's hub bed is a me-band layer. [`Heartbeat::set_hub_layer`] toggles it
+//! between frames. `step` does not mix it into `you_pcm`.
 
 use galion_emotion::band::consent_bits;
 use galion_emotion::{
-    AffectDetector, ConsentGate, Cue, EmotionFrame, EnergyStubDetector, FrameFeatures, OffReason, ProsodyControl, Purpose,
-    Rika, RikaConfig, RikaCtx, RikaOutput, RikaReport, RikaState,
+    AffectDetector, ConsentGate, Cue, EmotionFrame, EnergyStubDetector, Feeling, FrameFeatures, OffReason, ProsodyControl, Purpose,
+    Rika, RikaConfig, RikaCtx, RikaOutput, RikaReport, RikaState, VoicePersona,
 };
 
 #[cfg(feature = "presence")]
 pub mod presence;
+
+pub mod symphony;
 
 /// The heartbeat period. Locked (LOCKS.toml `[frame] frame_ms = 80`).
 pub const FRAME_MS: u32 = 80;
@@ -97,6 +111,8 @@ pub struct FrameOut {
     pub applied: RikaOutput,
     /// The me band may start a new onset in this frame.
     pub me_onset_allowed: bool,
+    /// Live persona conduct for this frame (you · me · feeling). Stack only.
+    pub feeling: Feeling,
 }
 
 impl FrameOut {
@@ -115,6 +131,11 @@ impl FrameOut {
     /// Linear me-band gain for this frame (1.0 exactly when neutral; never > 1).
     pub fn me_gain(&self) -> f32 {
         self.applied.me_gain()
+    }
+    /// Persona prosody for this frame, then the applied Rika lean-in.
+    /// This is the voice path. It is not a sentence.
+    pub fn voice_prosody(&self) -> ProsodyControl {
+        self.applied.apply_prosody(self.feeling.prosody)
     }
     /// You-band onset threshold delta in dB (≤ 0) for this frame.
     pub fn onset_threshold_db(&self) -> f32 {
@@ -153,12 +174,32 @@ pub struct Heartbeat<G: ConsentGate> {
     index: u32,
     pending: RikaOutput,
     paused_frames: u32,
+    persona: VoicePersona,
+    feeling: Feeling,
+    /// Jarvis hub bed. Default on. Samantha ignores it. Not applied to `you_pcm`.
+    hub_on: bool,
+    /// Caller affect from the frame that just ran, when the consent gate let
+    /// the feature closure run. `None` when Rika is off. Fixed-size. Not a label.
+    last_caller: Option<EmotionFrame>,
 }
 
 impl<G: ConsentGate> Heartbeat<G> {
     pub fn new(cfg: HeartbeatConfig, gate: G) -> Self {
         let rika = Rika::new(cfg.rika.clone());
-        Self { cfg, gate, rika, detector: EnergyStubDetector::default(), index: 0, pending: neutral_output(0, Some(OffReason::Disabled)), paused_frames: 0 }
+        let persona = VoicePersona::Samantha;
+        Self {
+            cfg,
+            gate,
+            rika,
+            detector: EnergyStubDetector::default(),
+            index: 0,
+            pending: neutral_output(0, Some(OffReason::Disabled)),
+            paused_frames: 0,
+            persona,
+            feeling: Feeling::rest(persona),
+            hub_on: true,
+            last_caller: None,
+        }
     }
 
     /// Fresh session state (hang-up / new call). Wipes all affect-derived state.
@@ -169,6 +210,34 @@ impl<G: ConsentGate> Heartbeat<G> {
         self.index = 0;
         self.pending = neutral_output(0, Some(OffReason::Disabled));
         self.paused_frames = 0;
+        self.feeling = Feeling::conduct(self.persona, None, self.hub_on);
+        self.last_caller = None;
+    }
+
+    /// Register for the next frames. Not called inside [`Self::step`].
+    pub fn set_persona(&mut self, persona: VoicePersona) {
+        self.persona = persona;
+    }
+
+    pub fn persona(&self) -> VoicePersona {
+        self.persona
+    }
+
+    /// Jarvis character bed. `false` mutes the layer. It does not denoise a
+    /// reference and it does not change caller audio. Not called inside [`Self::step`].
+    pub fn set_hub_layer(&mut self, on: bool) {
+        self.hub_on = on;
+    }
+
+    pub fn hub_layer_on(&self) -> bool {
+        self.hub_on
+    }
+
+    /// Caller frame from the last `step`, if consent let the 80 ms read run.
+    /// Hosts read it outside `step` for the expressor colour (galion-emotion).
+    /// There is no second estimator here.
+    pub fn last_caller_frame(&self) -> Option<EmotionFrame> {
+        self.last_caller
     }
 
     pub fn gate(&self) -> &G {
@@ -221,26 +290,47 @@ impl<G: ConsentGate> Heartbeat<G> {
         let pcm = input.you_pcm;
         let stub = self.cfg.stub_affect && input.affect.is_none();
         let (gate, detector) = (&self.gate, &mut self.detector);
+        // Host-supplied affect, replaced by the stub only when Rika's closure runs.
+        let mut seen = input.affect;
         // The feature closure (the PCM read) runs only after Rika's consent gate passes.
+        // `caller` is a Copy of that same frame. Assigning it does not allocate.
+        let mut caller: Option<EmotionFrame> = None;
         let decided = self.rika.step(ctx, gate, || {
             let affect = match input.affect {
                 Some(a) => Some(a),
                 None if stub => detector.detect(pcm, SAMPLE_RATE, idx.wrapping_mul(FRAME_MS), gate, input.purpose).ok(),
                 None => None,
             };
+            seen = affect;
+            caller = affect;
             let mut f = FrameFeatures::from_pcm(pcm).with_affect(affect);
             f.tension = input.tension;
             f
         });
+        self.last_caller = if decided.off.is_some() { None } else { caller };
         if decided.off.is_some() {
             // OFF → no affect-derived state survives (detector EMA included).
             self.detector.reset();
         }
 
+        // Feeling is the same 80 ms step. SENSE off → rest. A late frame holds.
+        let sense = input.consent_bits & consent_bits::SENSE != 0;
+        let hub_on = self.hub_on;
+        if !sense {
+            self.feeling = Feeling::conduct(self.persona, None, hub_on);
+        } else if !paused {
+            self.feeling = Feeling::conduct(self.persona, seen.as_ref(), hub_on);
+        } else if self.feeling.persona != self.persona {
+            self.feeling = Feeling::conduct(self.persona, None, hub_on);
+        } else {
+            self.feeling.hub = galion_emotion::HubLayer::character(self.persona, hub_on);
+        }
+
         let applied = core::mem::replace(&mut self.pending, decided);
         // Late frame = pause: nothing new starts. Held breath: no onset while armed/held.
         let me_onset_allowed = !paused && !decided.hold_me_onset && !applied.hold_me_onset;
-        FrameOut { index: idx, paused, decided, applied, me_onset_allowed }
+        let feeling = self.feeling;
+        FrameOut { index: idx, paused, decided, applied, me_onset_allowed, feeling }
     }
 
     /// Host reports whether it actually started a me-band onset this frame.

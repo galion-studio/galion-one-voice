@@ -5,6 +5,12 @@ Europe/Zagreb. Outline only. The gate is closed.
 
 Master slogan: "The seamless connection with the human being, on the voice only."
 
+Owner record t287 is later than this outline. The live store and the
+PRIVATE CLEARED ledger path are `symphony/CLIP-STORE.md`. Where this
+file and that one disagree about `send_reference`, CLIP-STORE.md is the
+later record. `LOCKS.toml` `reference_clips` is still false until the
+owner flips it.
+
 This file is the process for two reference clips, about ten seconds each:
 Samantha (*Her*, 2014) and Jarvis (an Iron Man film voice). It records the
 gates, the store, the consent line, the hash, the retention term, the
@@ -26,7 +32,11 @@ not a chapter, not a third voice.
 | Id | Research target | Length | Register |
 |---|---|---|---|
 | `samantha` | Voice of *Her* (2014) | about 10 s | Conversational. Paralinguistic tags may stay. |
-| `jarvis` | Iron Man film voice | about 10 s | Calm command. Tags off. |
+| `jarvis` | Iron Man film voice | about 10 s | Calm command. Tags off. Hub layer stays separate. |
+
+The Jarvis hub (clicks, alarms, virtual ambience) is a separate layer.
+The toggle mixes it. Turning it off does not denoise the asset. The ABI
+and the forbid-list are `symphony/JARVIS-TEXTURE.md`.
 
 About ten seconds is the owner target in `VOICE-CLONING.md`. Chatterbox
 Turbo's public code asserts a reference longer than five seconds, so the
@@ -54,7 +64,9 @@ into a fetch script, no call to a dropped clone API.
 | 4 | `public_demo` explicit. Default is no. A demo that speaks the voice needs its own yes. | The same line | Absent. |
 | 5 | Counsel when the paper is not a direct grant from the rightsholder. The operator does not self-clear. | LEDGER, or a counsel memo the line cites | Not requested here. |
 | 6 | `reference_clips = false` has been changed by a later owner decision | `LOCKS.toml` `[formats.exceptions.v2s14_chatterbox]` | Still false. A LEDGER line alone does not flip it. |
-| 7 | The worker contract has been changed to accept a path | `CLONE-WORKER.md`, `scripts/clone/chatterbox_worker.py` | Still a refusal. Exit 3, no PCM. |
+| 7 | The worker contract has been changed to accept a path | `CLONE-WORKER.md`, `scripts/clone/chatterbox_worker.py` | Default is still exit 3. `GALION_CLONE_LOCAL_REFS=1` plus `REFS.sha256` accepts one allowlisted local file. `reference_clips` stays false. |
+| 7 | The worker accepts a clip path on the JSON line | `CLONE-WORKER.md`, `scripts/clone/chatterbox_worker.py` | Still a refusal. Exit 3, no PCM. A local file is opened only from `GALION_CLIP_STORE` when `GALION_CLONE_LOCAL_REFS=1` and the sha sidecar matches. The lock stays false. |
+| 7 | The worker accepts a path only on `op: condition`, and only when consent fields, the 8–12 s wav, and `reference_clips` all pass | `CHATTERBOX-WORKER.md`, `scripts/clone/consent.py` | The speak line still exits 3. Condition exits 3 while the lock is false or consent is incomplete. |
 
 The comparison `VOICE-CLONING.md` requires stays in force. In May 2024
 OpenAI withdrew the Sky voice after Scarlett Johansson said it resembled
@@ -87,7 +99,13 @@ GitHub Release asset. `clone-weights-v1` carries safetensors only
 ignores everything under `weights/` except itself. Audio does not go in
 that directory. The weight fetch already refuses those suffixes.
 
-The store this outline names is not created, and no program here reads it:
+This tree does not create the store. `chatterbox_worker.py` reads
+`$GALION_CLIP_STORE/<persona>/reference.wav` only when
+`GALION_CLONE_LOCAL_REFS=1`, and only when the sha256 is allowlisted:
+The repository does not create this store and does not put a default under
+the work tree. `chatterbox_worker.py` reads it only when `GALION_CLIP_STORE`
+is set and `GALION_CLONE_LOCAL_REFS=1`:
+The store is not created by this tree. `scripts/clone/consent.py` reads it when `GALION_CLIP_STORE` is set, and treats an unset variable as absent:
 
 ```text
 $GALION_CLIP_STORE/                 # absolute path outside the git work tree
@@ -180,7 +198,29 @@ the sha256 matches, the line also carries `audio_prompt_path` and
 those keys (CI skip). A foreign path, an MP3, a hash mismatch, a GPU
 device, or a denoise flag exits 3 with no PCM. Jarvis still forces `tags`
 false. Hub texture is not cleaned. An unknown persona name is still
+The stdin line from Rust is `{"text","model","persona","tags"}`. `request_line`
+emits those four fields and still does not send a path. Without
+`GALION_CLONE_LOCAL_REFS=1`, a non-empty `reference`, `audio_prompt`,
+`audio_prompt_path`, or `clip` makes `chatterbox_worker.py` exit 3 with
+`galion-clone-refuse: reference clips are on the rights hold`, and with
+no PCM on stdout. With the variable, the child opens one local file whose
+sha256 is allowlisted for that persona (`CLONE-WORKER.md`). Jarvis still
+forces `tags` false on the Rust line. An unknown persona name is still
 treated as Samantha.
+What the worker does now (`CLONE-WORKER.md`, `NANO-BACKEND.md`):
+
+The stdin line is `{"text","model","persona","tags","prosody"}`. `prosody`
+is numbers from the 80 ms `galion-emotion` frame. A non-empty `reference`,
+`audio_prompt`, `audio_prompt_path`, or `clip` makes `chatterbox_worker.py`
+exit 3 with `galion-clone-refuse: reference clips are on the rights hold`,
+and with no PCM on stdout. Jarvis still forces `tags` false. An unknown
+persona name is still treated as Samantha.
+
+The child does not take a path from that line. When `GALION_CLONE_LOCAL_REFS=1`
+it opens `$GALION_CLIP_STORE/<persona>/reference.wav` only if the bytes match
+the sidecar sha. Otherwise it writes `galion-clone-unwired` and the host
+speaks with Piper. `reference_clips` in the lock stays `false`. This is not
+a rights grant and not a fetch.
 
 `BusBody::Persona` carries `id` and `source`. It does not carry samples
 or a filesystem path. `Utterance` is the caller's turn. A film clip does
@@ -192,6 +232,12 @@ flite. A refused clip does not become a cloned voice on the way down.
 The child still does not fetch. It does not rewrite the wav. Stdout stays
 raw 24 kHz s16le. No wav of the reply is written. The public demo is
 still closed. Generate is still not called.
+The local gate does not close the rows above it. Gates 1–6 are still absent.
+The child still does not fetch. It opens one path outside the work tree.
+That path is not an HTTP body, not a git blob, and not a log of the samples.
+Stdout stays raw 24 kHz s16le. No wav of the reply is written. A failed sha
+check skips the child. Piper speaks. The JSON line still does not carry the
+four keys the worker refuses.
 
 ## Art. 50 and the watermark
 
@@ -245,6 +291,16 @@ copy does not stay in the repo as evidence.
 | `GALION_CLIP_STORE` | Read when set. Unset falls through to the gitignored repo path, then skips if that is absent too. |
 | Clip bytes in git | None. |
 | sha256 of a clip | Pinned in `scripts/clone/REFS.sha256` from the owner's digests. Recomputed when a file is present. |
+| LEDGER fetch-allowed for `samantha` | Absent |
+| LEDGER fetch-allowed for `jarvis` | Absent |
+| `reference_clips` | `false` |
+| Worker accepts a clip key | Only with `GALION_CLONE_LOCAL_REFS=1` and the sha allowlist. Otherwise exit 3, no PCM. |
+| `GALION_CLIP_STORE` | Read when set, and only for `<persona>/reference.wav`. Unset in CI. |
+| Worker accepts a clip key on the speak line | No. Exit 3, no PCM. |
+| Worker accepts `op: condition` | Only when consent, duration, sha256, and `reference_clips` all pass. The lock is still false. |
+| `GALION_CLIP_STORE` | Read by `consent.py`. Unset means not ready. No default path. |
+| Clip bytes in git | None |
+| sha256 of a clip | Not computed |
 
 ## What the landing still does not do
 

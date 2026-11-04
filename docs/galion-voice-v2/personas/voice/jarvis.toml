@@ -58,7 +58,7 @@ on_flite = false
 allowed = []
 strip_brackets = true
 unknown_tags = "off"
-note = "Tags stay off on every backend. The clone stub strips bracket tags when persona is jarvis."
+note = "Tags stay off on the Rust request line (tags=false), so the Nano path strips bracket tags. The protocol stub also strips them when persona is jarvis. A request that omits the flag keeps the text."
 
 [reference]
 rights = "owner-t273"
@@ -80,7 +80,7 @@ texture_default = "on"
 texture_stripped = false
 denoise = false
 placeholder = "docs/galion-voice-v2/personas/refs/jarvis.placeholder"
-note = "Current model reference. Not clean speech: Tony Stark hub virtual texture (clicks, alarms, ambience) is character. Do not strip, denoise, or clean. WAV only, gitignored. Also $GALION_CLIP_STORE/jarvis/reference.wav. Never an MP3. Public demo stays closed."
+note = "Current model reference. Not clean speech: Tony Stark hub virtual texture (clicks, alarms, ambience) is character. Do not strip, denoise, or clean. WAV only, gitignored. Also $GALION_CLIP_STORE/jarvis/reference.wav. Never an MP3. Public demo stays closed. Hub clicks, alarms, and ambience are also a separate toggleable layer (GALION_JARVIS_TEXTURE, see symphony/JARVIS-TEXTURE.md); the toggle does not denoise the asset."
 
 [worker]
 binding = "galion.clone.worker"
@@ -91,6 +91,8 @@ script = "scripts/clone/chatterbox_worker.py"
 env_persona = "GALION_CLONE_PERSONA"
 env_model = "GALION_CLONE_MODEL"
 env_worker = "GALION_CLONE_WORKER"
+env_refs = "GALION_CLONE_LOCAL_REFS"
+env_store = "GALION_CLIP_STORE"
 model = "nano"
 quality_option = "turbo"
 request_persona = "jarvis"
@@ -115,7 +117,7 @@ order = ["piper", "flite"]
 engine = "piper"
 voice = "en_US-ljspeech-medium"
 artifact = "weights/tts/en_US-ljspeech-medium.onnx"
-when = "clone worker absent, unwired, or dead"
+when = "clone worker absent, unwired, ref not allowlisted, or dead"
 tags = false
 is_film_voice = false
 

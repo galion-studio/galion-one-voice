@@ -12,7 +12,7 @@ publish = false
 [features]
 # V1-03: real-speech path (A21 weight slot + interim system TTS via runtime dlopen of
 # libflite). Off by default: the default build stays no-I/O, no FFI.
-speech = []
+speech = ["dep:galion-heartbeat"]
 
 [[example]]
 name = "piper_warmth"
@@ -30,8 +30,10 @@ required-features = ["speech"]
 # Reader only. Default features stay off so this crate does not pull rayon.
 # The .gq writer for voice clips lives here, not in galion-tensor.
 galion-tensor = { path = "../galion-tensor", default-features = false }
+galion-heartbeat = { path = "../galion-heartbeat", optional = true, default-features = false }
 
 [dev-dependencies]
+galion-emotion = { path = "../../galion-emotion" }
 galion-heartbeat = { path = "../galion-heartbeat", default-features = false }
 
 [[bin]]

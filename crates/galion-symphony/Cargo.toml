@@ -1,7 +1,7 @@
 # Galion Voice — Perpetual Open MIT License
 [package]
 name = "galion-symphony"
-description = "Galion Voice symphony: V6 one-percent engine account on the 80 ms tick. Non-inference only. Stub and measured stay labelled."
+description = "Galion Voice symphony: V6 one-percent engine account on the 80 ms tick (non-inference only; stub and measured stay labelled), plus the V2 translator from clone safetensors interchange into the Rust .gq load path (CPU-only)."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -9,9 +9,16 @@ repository.workspace = true
 rust-version = "1.85"
 publish = false
 
+[[bin]]
+name = "galion-symphony"
+path = "src/main.rs"
+
 [dependencies]
 galion-emotion = { path = "../../galion-emotion" }
 galion-heartbeat = { path = "../galion-heartbeat", default-features = false }
+galion-tensor = { path = "../galion-tensor", default-features = false }
+galion-presence = { path = "../galion-presence" }
+galion-ml-voice = { path = "../galion-ml-voice" }
 
 [[example]]
 name = "one-percent"

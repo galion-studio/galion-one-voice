@@ -23,6 +23,7 @@
 //! Nothing here downloads anything (scripts/a21/fetch-a21.sh is the only fetcher).
 
 use super::piper_worker::{PiperProsody, PiperWorker};
+use galion_heartbeat::symphony::NanoPcmRing;
 use super::sha256;
 use crate::{Audio, LanguageId, TtsEngine, VoiceError};
 use std::path::{Path, PathBuf};
@@ -179,6 +180,8 @@ impl A21WeightTts {
     }
     /// Voice pack name, e.g. `en_US-ljspeech-medium`.
     pub fn voice(&self) -> &str { &self.voice }
+    /// Native pack rate before the ring resample (Piper ljspeech is 22050).
+    pub fn native_rate(&self) -> u32 { self.rate }
     /// Pid of the warm worker, once it has been started.
     pub fn piper_pid(&self) -> Option<u32> { self.worker.as_ref().map(PiperWorker::pid) }
     /// How many times the Piper process has been spawned. `1` means every turn reused it.
@@ -200,6 +203,64 @@ impl A21WeightTts {
     pub fn respawn(&mut self) -> Result<(), VoiceError> {
         self.worker = None;
         self.ensure()
+    }
+}
+
+/// What one [`A21RingFeed::poll`] moved into the ring.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct A21Poll {
+    /// 24 kHz samples stored in the ring on this call.
+    pub pushed: usize,
+    /// 24 kHz samples resampled from Piper so far.
+    pub samples_24k: usize,
+    pub utterance_done: bool,
+}
+
+/// Piper CPU feed for the symphony ring. Opens only when `GALION_SPEECH=a21`
+/// and the pinned pack can speak. `poll` resamples native s16le to 24 kHz
+/// and pushes it. That work is off `Heartbeat::step`. `GALION_CLONE_STUB_FRAMES`
+/// is not this feed and is not a voice.
+pub struct A21RingFeed {
+    tts: A21WeightTts,
+    pushed: usize,
+}
+
+impl A21RingFeed {
+    pub fn open() -> Result<Self, String> {
+        if std::env::var("GALION_SPEECH").ok().as_deref() != Some("a21") {
+            return Err("GALION_SPEECH is not a21; Piper does not feed the ring".into());
+        }
+        let status = WeightStatus::discover();
+        let tts = A21WeightTts::try_new(&status)?;
+        Ok(Self { tts, pushed: 0 })
+    }
+
+    pub fn voice(&self) -> &str { self.tts.voice() }
+    pub fn native_hz(&self) -> u32 { self.tts.native_rate() }
+
+    /// Ask the warm Piper process for one clause. Does not read PCM yet.
+    pub fn submit(&mut self, text: &str) -> Result<(), VoiceError> {
+        self.tts.ensure()?;
+        self.tts.worker.as_mut().unwrap().write_text(text)?;
+        self.pushed = 0;
+        Ok(())
+    }
+
+    /// Non-blocking. Resamples whatever native PCM has arrived to 24 kHz
+    /// ([`super::SPEECH_RATE`]) and pushes the new tail. Allocates. Not `step`.
+    pub fn poll(&mut self, ring: &mut NanoPcmRing) -> Result<A21Poll, VoiceError> {
+        self.tts.ensure()?;
+        let rate = self.tts.native_rate();
+        let worker = self.tts.worker.as_mut().unwrap();
+        worker.poll_pipes()?;
+        let done = worker.utterance_done();
+        let native = worker.copy_i16();
+        let f32s: Vec<f32> = native.iter().map(|s| *s as f32 / 32768.0).collect();
+        let up = super::resample(&f32s, rate, super::SPEECH_RATE);
+        let fresh = if up.len() > self.pushed { &up[self.pushed..] } else { &[] };
+        let pushed = ring.push(fresh);
+        self.pushed += pushed;
+        Ok(A21Poll { pushed, samples_24k: up.len(), utterance_done: done })
     }
 }
 

@@ -628,3 +628,43 @@ mod tests {
         assert_eq!(p99_ns(&eight), Some(50_000));
     }
 }
+
+// ---- PR #48: symphony load path (clone safetensors interchange -> .gq + .gclip). CPU only. ----
+pub mod clip;
+pub mod error;
+pub mod eval;
+pub mod gq_write;
+/// CPU classes the symphony pack records (PR #48 `cpu.rs`, renamed so it does not
+/// collide with the one-percent process-CPU reader `cpu`).
+pub mod host_cpu;
+pub mod json;
+pub mod load;
+pub mod manifest;
+pub mod persona;
+pub mod pins;
+pub mod safetensors;
+pub mod sha;
+pub mod translate;
+pub mod wav;
+
+pub use error::{Error, Result};
+pub use eval::{run as self_eval, Report as PackReport, Status};
+pub use load::{open, Loaded};
+pub use translate::{translate, TranslateOpts};
+
+/// Heartbeat period. Same value as `galion_heartbeat::FRAME_MS`.
+pub const CLOCK_MS: u32 = galion_heartbeat::FRAME_MS;
+/// Live you/me lane. Same value as `galion_heartbeat::SAMPLE_RATE` and
+/// `galion_ml_voice::stub::SAMPLE_RATE`. A reference clip may use another rate.
+pub const LANE_HZ: u32 = galion_heartbeat::SAMPLE_RATE;
+/// Samples in one 80 ms lane frame (PR #48 `FRAME_SAMPLES`, renamed: the one-percent
+/// engine already imports `galion_heartbeat::FRAME_SAMPLES`).
+pub const LANE_FRAME_SAMPLES: u32 = galion_heartbeat::FRAME_SAMPLES as u32;
+/// Presence report schema this pack names. The pack does not add a metric.
+pub const PRESENCE_SCHEMA: &str = galion_presence::REPORT_SCHEMA;
+pub const BANDS: &[&str] = &["you", "me", "feeling"];
+
+const _: () = assert!(galion_ml_voice::stub::SAMPLE_RATE == galion_heartbeat::SAMPLE_RATE);
+const _: () = assert!(galion_heartbeat::FRAME_MS == 80);
+const _: () = assert!(galion_heartbeat::FRAME_SAMPLES == 1920);
+const _: () = assert!(CLOCK_MS == 80 && LANE_HZ == 24_000 && LANE_FRAME_SAMPLES == 1920);
