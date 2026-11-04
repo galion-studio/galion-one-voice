@@ -7,9 +7,11 @@
 //! Reads the Samantha and Jarvis voice configs
 //! (`docs/galion-voice-v2/personas/voice/*.toml`) and answers in the register
 //! of `personas/SAMANTHA.md` and `personas/JARVIS.md`. This is the instruction
-//! layer. It does not call Chatterbox. `clone_live` is true only when
-//! `scripts/clone/consent.py` says the worker, the pinned weights, and that
-//! persona's consented reference are present. Otherwise it stays false.
+//! layer. It does not call Chatterbox. `clone_live` is true only when the
+//! clone-time consent gate (`galion-consent`, run where the clone slot is
+//! built) approved that persona's reference. Otherwise it stays false. A turn
+//! only reads that in-memory verdict: no consent check and no process per
+//! turn (owner decision 2026-11-04 02:39 CET).
 //! Piper and the browser must not be handed `[laugh]` tokens. Empathy lines
 //! from a script are refused.
 //!
@@ -137,8 +139,13 @@ pub struct Floor {
     /// Set once a turn has chosen the mood. Until then `/dot` keeps the heartbeat emotion.
     mood_from_turn: bool,
     books: Books,
-    samantha_gate: PersonaGate,
-    jarvis_gate: PersonaGate,
+    /// Clone-time verdicts. Written by the clone slot, read here per turn.
+    clones: &'static galion_consent::Registry,
+    /// `GALION_CLIP_STORE` was unset when the floor was built.
+    store_unset: bool,
+    /// Test override for one persona's gate. `None` reads [`Self::clones`].
+    samantha_gate: Option<PersonaGate>,
+    jarvis_gate: Option<PersonaGate>,
     hermes: Option<HermesLlm>,
     llm_label: String,
 }
@@ -169,16 +176,29 @@ impl Floor {
             books: Books::load(),
             hermes,
             llm_label,
-            samantha_gate: load_gate("samantha"),
-            jarvis_gate: load_gate("jarvis"),
+            clones: galion_consent::global(),
+            store_unset: std::env::var("GALION_CLIP_STORE").map(|s| s.trim().is_empty()).unwrap_or(true),
+            samantha_gate: None,
+            jarvis_gate: None,
         }
     }
 
-    fn gate(&self) -> &PersonaGate {
-        match self.id {
+    /// Read clone verdicts from `clones` instead of the process registry.
+    pub fn with_clone_registry(mut self, clones: &'static galion_consent::Registry) -> Self {
+        self.clones = clones;
+        self
+    }
+
+    /// In-memory read of the clone-time verdict. Never evaluates consent.
+    fn gate(&self) -> PersonaGate {
+        let fixed = match self.id {
             PersonaId::Samantha => &self.samantha_gate,
             PersonaId::Jarvis => &self.jarvis_gate,
+        };
+        if let Some(g) = fixed {
+            return g.clone();
         }
+        gate_from(self.clones.lookup(self.id.as_str()), self.store_unset)
     }
 
     /// Point content turns at a Hermes client. Unit tests use this so they do
@@ -648,43 +668,20 @@ fn json_token(s: &str) -> String {
         .collect()
 }
 
-/// `clone_live` follows the consent checker. An unset store does not spawn it.
-fn load_gate(persona: &str) -> PersonaGate {
-    let store = std::env::var("GALION_CLIP_STORE").unwrap_or_default();
-    if store.trim().is_empty() {
-        return PersonaGate::closed("store");
-    }
-    let script = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../scripts/clone/consent.py");
-    if !script.is_file() {
-        return PersonaGate::closed("worker");
-    }
-    let out = match std::process::Command::new("python3")
-        .arg(&script)
-        .arg("check")
-        .arg("--persona")
-        .arg(persona)
-        .output()
-    {
-        Ok(out) => out,
-        Err(_) => return PersonaGate::closed("worker"),
-    };
-    let text = String::from_utf8_lossy(&out.stdout);
-    let line = text.lines().next().unwrap_or("").trim();
-    if line.starts_with("galion-clip-ready:") {
-        return PersonaGate {
+/// `clone_live` follows the clone-time verdict. No verdict yet is closed:
+/// `store` when no clip store is configured, else `pending` (no voice cloned).
+fn gate_from(verdict: Option<galion_consent::Verdict>, store_unset: bool) -> PersonaGate {
+    match verdict {
+        Some(galion_consent::Verdict::Approved(a)) => PersonaGate {
             live: true,
             rights: "cleared",
             block: String::new(),
-            film: line.contains("public=yes"),
-        };
+            film: a.public,
+        },
+        Some(galion_consent::Verdict::Refused(reason)) => PersonaGate::closed(reason),
+        None if store_unset => PersonaGate::closed("store"),
+        None => PersonaGate::closed("pending"),
     }
-    let block = line.split_whitespace().last().unwrap_or("refs");
-    let block = match block {
-        "store" | "consent" | "duration" | "sha" | "lock" | "weights" | "worker" | "inside_repo"
-        | "persona" | "wav" | "mono" => block,
-        _ => "refs",
-    };
-    PersonaGate::closed(block)
 }
 
 fn fmt_f(n: f32) -> String {
@@ -1087,12 +1084,12 @@ mod tests {
         assert!(j.contains("\"clone_block\":\"store\""), "{j}");
         assert!(j.contains("\"rights\":\"hold\""), "{j}");
         assert!(j.contains("\"film_voice\":false"), "{j}");
-        f.samantha_gate = PersonaGate {
+        f.samantha_gate = Some(PersonaGate {
             live: true,
             rights: "cleared",
             block: String::new(),
             film: false,
-        };
+        });
         let live = f.state_json();
         assert!(live.contains("\"clone_live\":true"), "{live}");
         assert!(live.contains("\"rights\":\"cleared\""), "{live}");
@@ -1315,5 +1312,43 @@ mod tests {
         let clip = f.say_turn("Please ingest the Her clip.", false, 0.0, false);
         assert!(clip.reply.to_lowercase().contains("clip"));
         assert_ne!(clip.reply, REFUSED);
+    }
+
+    /// Owner decision 2026-11-04: consent runs once when a voice is cloned.
+    /// The floor only reads that verdict; a turn never evaluates consent.
+    #[test]
+    fn turns_read_the_clone_verdict_and_never_evaluate_consent() {
+        let reg: &'static galion_consent::Registry = Box::leak(Box::new(galion_consent::Registry::new()));
+        let mut f = Floor::new().with_clone_registry(reg);
+        reg.record("samantha", galion_consent::Verdict::Refused("expired"));
+        assert!(f.state_json().contains("\"clone_block\":\"expired\""));
+        reg.record(
+            "samantha",
+            galion_consent::Verdict::Approved(galion_consent::Approval {
+                persona: "samantha",
+                seconds: 10.0,
+                public: true,
+                wav: std::path::PathBuf::from("/clips/samantha/reference.wav"),
+                sha256: "0".repeat(64),
+            }),
+        );
+        let before = galion_consent::evaluations();
+        for _ in 0..25 {
+            let said = f.say_turn("Hi.", false, 0.0, false);
+            assert!(said.clone_live);
+            assert_eq!(said.rights, "cleared");
+            assert!(said.film_voice);
+        }
+        assert!(f.state_json().contains("\"clone_live\":true"));
+        assert_eq!(galion_consent::evaluations(), before, "a turn evaluated consent");
+    }
+
+    #[test]
+    fn floor_source_spawns_no_consent_process() {
+        let src = include_str!("v2_persona.rs");
+        let body = &src[..src.find("#[cfg(test)]").unwrap()];
+        for banned in [concat!("py", "thon3"), concat!("consent", ".py"), concat!("load", "_gate")] {
+            assert!(!body.contains(banned), "{banned} is back in the turn path");
+        }
     }
 }

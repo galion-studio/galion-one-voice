@@ -286,7 +286,8 @@ A conditioning file, when the operator already has one, lives outside git
 and is opened only under the sha gate in `NANO-BACKEND.md`. This tree does
 not fetch film audio. The ingest outline is `CLIP-INGEST.md`. Gates 1–6
 there stay closed.
-A film clip is a different object. `consent.py` accepts `op: condition`
+A film clip is a different object. The clone-time consent gate
+(`crates/galion-consent`) accepts `op: condition`
 only when `consent.txt` has every field from `RIGHTS-CLEARANCE.md`, the
 wav is mono 16-bit PCM of about 10 seconds (8–12), the sha256 matches,
 the store is outside git, and `reference_clips` is true. The lock is

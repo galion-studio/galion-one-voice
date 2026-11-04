@@ -66,7 +66,7 @@ into a fetch script, no call to a dropped clone API.
 | 6 | `reference_clips = false` has been changed by a later owner decision | `LOCKS.toml` `[formats.exceptions.v2s14_chatterbox]` | Still false. A LEDGER line alone does not flip it. |
 | 7 | The worker contract has been changed to accept a path | `CLONE-WORKER.md`, `scripts/clone/chatterbox_worker.py` | Default is still exit 3. `GALION_CLONE_LOCAL_REFS=1` plus `REFS.sha256` accepts one allowlisted local file. `reference_clips` stays false. |
 | 7 | The worker accepts a clip path on the JSON line | `CLONE-WORKER.md`, `scripts/clone/chatterbox_worker.py` | Still a refusal. Exit 3, no PCM. A local file is opened only from `GALION_CLIP_STORE` when `GALION_CLONE_LOCAL_REFS=1` and the sha sidecar matches. The lock stays false. |
-| 7 | The worker accepts a path only on `op: condition`, and only when consent fields, the 8–12 s wav, and `reference_clips` all pass | `CHATTERBOX-WORKER.md`, `scripts/clone/consent.py` | The speak line still exits 3. Condition exits 3 while the lock is false or consent is incomplete. |
+| 7 | The worker accepts a path only on `op: condition`, and only when consent fields, the 8–12 s wav, and `reference_clips` all pass | `CHATTERBOX-WORKER.md`, `crates/galion-consent` (clone-time gate) | The speak line still exits 3. Condition exits 3 while the lock is false or consent is incomplete. |
 
 The comparison `VOICE-CLONING.md` requires stays in force. In May 2024
 OpenAI withdrew the Sky voice after Scarlett Johansson said it resembled
@@ -105,7 +105,7 @@ This tree does not create the store. `chatterbox_worker.py` reads
 The repository does not create this store and does not put a default under
 the work tree. `chatterbox_worker.py` reads it only when `GALION_CLIP_STORE`
 is set and `GALION_CLONE_LOCAL_REFS=1`:
-The store is not created by this tree. `scripts/clone/consent.py` reads it when `GALION_CLIP_STORE` is set, and treats an unset variable as absent:
+The store is not created by this tree. The Rust consent gate (`crates/galion-consent`, run once at clone time) reads it when `GALION_CLIP_STORE` is set, and treats an unset variable as absent:
 
 ```text
 $GALION_CLIP_STORE/                 # absolute path outside the git work tree
@@ -298,7 +298,7 @@ copy does not stay in the repo as evidence.
 | `GALION_CLIP_STORE` | Read when set, and only for `<persona>/reference.wav`. Unset in CI. |
 | Worker accepts a clip key on the speak line | No. Exit 3, no PCM. |
 | Worker accepts `op: condition` | Only when consent, duration, sha256, and `reference_clips` all pass. The lock is still false. |
-| `GALION_CLIP_STORE` | Read by `consent.py`. Unset means not ready. No default path. |
+| `GALION_CLIP_STORE` | Read by the clone-time consent gate (`crates/galion-consent`). Unset means not ready. No default path. |
 | Clip bytes in git | None |
 | sha256 of a clip | Not computed |
 

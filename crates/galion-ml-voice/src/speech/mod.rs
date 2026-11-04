@@ -12,7 +12,9 @@
 //!    the pinned safetensors, a local tokenizer, and a sha-allowlisted reference
 //!    are on disk. Nano primary, Turbo via `GALION_CLONE_MODEL`. The ref gate is
 //!    `GALION_CLONE_LOCAL_REFS=1` plus `$GALION_CLIP_STORE/<persona>/reference.wav`
-//!    matching its `.sha256` sidecar. It does not flip `LOCKS.toml`. Absent
+//!    matching its `.sha256` sidecar, and the consent gate (`galion-consent`)
+//!    passing for that voice. Consent runs once, when the slot is built (clone
+//!    time); turns read the stored verdict. It does not flip `LOCKS.toml`. Absent
 //!    weights or refs skip this slot (no download). `GALION_CLONE_STUB_PCM=1`
 //!    does not open this slot. HARD-PASS on the CPU-only loop measures Piper.
 //!    A dead child falls back to A21.
@@ -495,7 +497,7 @@ impl SpeechStack {
                 if t.ref_ok() {
                     t.synthesize(text, LanguageId::En)
                 } else {
-                    Err(VoiceError::Backend("clone ref not allowlisted for persona".into()))
+                    Err(VoiceError::Backend("clone ref not allowlisted for persona (no clone-time consent approval)".into()))
                 }
             }
         };
@@ -817,6 +819,34 @@ mod tests {
                 samples: vec![0.2; 48],
             })
         }
+    }
+
+    /// Owner decision 2026-11-04: consent runs when the slot is built
+    /// (clone time). A turn reads the stored verdict: no consent evaluation,
+    /// no reference re-hash, no extra process.
+    #[test]
+    fn clone_turns_read_the_clone_time_verdict_only() {
+        let dir = std::env::temp_dir().join(format!("galion-consent-turn-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let script = dir.join("fake-clone.py");
+        std::fs::write(&script, FAKE_CLONE).unwrap();
+        let worker =
+            clone_worker::CloneWorker::spawn(&script, clone_worker::CloneModel::Nano, "samantha")
+                .unwrap();
+        let mut t = clone_worker::CloneTts::for_test(worker, dir.clone()).with_verdicts([true, false]);
+        let before = galion_consent::evaluations();
+        for _ in 0..100 {
+            assert!(t.ref_ok());
+        }
+        t.set_persona("jarvis");
+        assert!(!t.ref_ok(), "jarvis was refused at clone time");
+        t.set_persona("samantha");
+        let mut stack = SpeechStack::from_clone(t);
+        let spoke = stack.speak("Hello.").unwrap();
+        assert!(!spoke.samples.is_empty());
+        assert_eq!(galion_consent::evaluations(), before, "a turn evaluated consent");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

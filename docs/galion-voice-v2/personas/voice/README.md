@@ -8,7 +8,8 @@ means that route, not a live film clone. The public page is still not
 that voice.
 Europe/Zagreb. The `/v2` demo route reads these files for prosody,
 wash, and the tag rule. `wired` means that route. `clone_live` is not
-a key here. It is computed by `scripts/clone/consent.py` and stays
+a key here. It is the verdict the clone-time consent gate
+(`crates/galion-consent`) recorded when the voice was cloned, and stays
 false until the worker, the weights, and a consented reference are
 all present.
 
@@ -45,7 +46,7 @@ Both files use the same keys.
 | `[worker]` | Binding `galion.clone.worker`. Script `scripts/clone/chatterbox_worker.py`. Env `GALION_CLONE_PERSONA`, `GALION_CLONE_MODEL`, `GALION_CLONE_WORKER`. Model `nano`, quality option `turbo`. Request persona and tags match the id. `send_reference = false`: the landed request line has no clip field. Without `GALION_CLONE_LOCAL_REFS=1`, a non-empty reference makes the worker exit 3. With it, the child resolves an allowlisted local file by persona. PCM is 24 kHz s16le. Weights are not vendored. |
 | `[fallback]` | Order `piper`, then `flite`. Piper voice is `en_US-ljspeech-medium` (`weights/tts/en_US-ljspeech-medium.onnx`). It speaks when the clone worker is absent, unwired, or dead, and while the rights hold is closed. It is not the film voice. Flite speaks only when that Piper pack is missing. Tags stay off on both. |
 | `id`, `status`, `wired`, `session_default` | `wired` is true because `/v2` reads the file. That is not `clone_live`. The session default is Samantha. |
-| `[reference]` | `clip_path` is `""`. `present` and `ingest` are false. `placeholder` names a text marker under `../refs/`, not a wav. Target length is about 10 s, window 8–12 s (Turbo's public assert is longer than 5 s). `[reference.consent]` lists the fields `consent.py` requires. The store is `GALION_CLIP_STORE`, outside git. |
+| `[reference]` | `clip_path` is `""`. `present` and `ingest` are false. `placeholder` names a text marker under `../refs/`, not a wav. Target length is about 10 s, window 8–12 s (Turbo's public assert is longer than 5 s). `[reference.consent]` lists the fields the consent gate (`crates/galion-consent`) requires. The store is `GALION_CLIP_STORE`, outside git. |
 | `[worker]` | Binding `galion.clone.worker`. Script `scripts/clone/chatterbox_worker.py`. Env `GALION_CLONE_PERSONA`, `GALION_CLONE_MODEL`, `GALION_CLONE_WORKER`, `GALION_CLONE_GENERATE`. Model `nano`, quality option `turbo`, device CPU, no thread cap. `send_reference = false` on the speak line. `condition_op = true` is the separate stdin op. PCM is 24 kHz s16le. Weights are not vendored. |
 | `[fallback]` | Order `piper`, then `flite`. Piper voice is `en_US-ljspeech-medium`. It speaks when the clone worker is absent, unwired, or dead, and while the reference gate is closed. It is not the film voice. Flite speaks only when that Piper pack is missing. Tags stay off on both. |
 
