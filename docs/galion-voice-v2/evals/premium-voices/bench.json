@@ -1,0 +1,450 @@
+{
+ "quality": [
+  {
+   "persona": "samantha",
+   "model": "en_US-ljspeech-medium",
+   "speaker": null,
+   "sid": null,
+   "stoi": 0.9935193359851837,
+   "pesq": 3.696403920650482,
+   "sisdr": 26.110214710235596
+  },
+  {
+   "persona": "samantha",
+   "model": "en_US-ljspeech-high",
+   "speaker": null,
+   "sid": null,
+   "stoi": 0.9944194853305817,
+   "pesq": 3.8605507612228394,
+   "sisdr": 24.94907808303833
+  },
+  {
+   "persona": "samantha",
+   "model": "en_GB-cori-high",
+   "speaker": null,
+   "sid": null,
+   "stoi": 0.9932902902364731,
+   "pesq": 3.8118112683296204,
+   "sisdr": 26.430052280426025
+  },
+  {
+   "persona": "samantha",
+   "model": "en_US-kristin-medium",
+   "speaker": null,
+   "sid": null,
+   "stoi": 0.9964239448308945,
+   "pesq": 3.932057499885559,
+   "sisdr": 28.819664001464844
+  },
+  {
+   "persona": "samantha",
+   "model": "en_GB-alba-medium",
+   "speaker": null,
+   "sid": null,
+   "stoi": 0.9982930421829224,
+   "pesq": 4.02629154920578,
+   "sisdr": 28.756571292877197
+  },
+  {
+   "persona": "samantha",
+   "model": "en_GB-vctk-medium",
+   "speaker": "p225",
+   "sid": 107,
+   "stoi": 0.9987269937992096,
+   "pesq": 4.003703951835632,
+   "sisdr": 27.5623722076416
+  },
+  {
+   "persona": "samantha",
+   "model": "en_GB-vctk-medium",
+   "speaker": "p228",
+   "sid": 90,
+   "stoi": 0.9982977211475372,
+   "pesq": 4.037020206451416,
+   "sisdr": 27.235002994537354
+  },
+  {
+   "persona": "samantha",
+   "model": "en_GB-vctk-medium",
+   "speaker": "p229",
+   "sid": 85,
+   "stoi": 0.9988531172275543,
+   "pesq": 4.009970128536224,
+   "sisdr": 28.31969118118286
+  },
+  {
+   "persona": "samantha",
+   "model": "en_GB-vctk-medium",
+   "speaker": "p231",
+   "sid": 15,
+   "stoi": 0.9991192072629929,
+   "pesq": 3.7809093594551086,
+   "sisdr": 24.97105836868286
+  },
+  {
+   "persona": "samantha",
+   "model": "en_GB-vctk-medium",
+   "speaker": "p257",
+   "sid": 18,
+   "stoi": 0.9964425414800644,
+   "pesq": 3.5807063579559326,
+   "sisdr": 25.721911907196045
+  },
+  {
+   "persona": "samantha",
+   "model": "en_GB-vctk-medium",
+   "speaker": "p268",
+   "sid": 66,
+   "stoi": 0.9979278296232224,
+   "pesq": 3.9432530403137207,
+   "sisdr": 28.905795097351074
+  },
+  {
+   "persona": "samantha",
+   "model": "en_US-libritts_r-medium",
+   "speaker": "2882",
+   "sid": 185,
+   "stoi": 0.9950567781925201,
+   "pesq": 3.906396985054016,
+   "sisdr": 26.822462558746338
+  },
+  {
+   "persona": "samantha",
+   "model": "en_US-libritts_r-medium",
+   "speaker": "288",
+   "sid": 126,
+   "stoi": 0.9979500323534012,
+   "pesq": 4.089705944061279,
+   "sisdr": 28.205829620361328
+  },
+  {
+   "persona": "samantha",
+   "model": "en_US-libritts_r-medium",
+   "speaker": "3118",
+   "sid": 570,
+   "stoi": 0.9940802454948425,
+   "pesq": 3.910085082054138,
+   "sisdr": 28.322227001190186
+  },
+  {
+   "persona": "samantha",
+   "model": "en_US-libritts-high",
+   "speaker": "p3989",
+   "sid": 226,
+   "stoi": 0.9929191470146179,
+   "pesq": 3.550024449825287,
+   "sisdr": 21.48084783554077
+  },
+  {
+   "persona": "samantha",
+   "model": "en_US-libritts-high",
+   "speaker": "p7245",
+   "sid": 154,
+   "stoi": 0.9971613138914108,
+   "pesq": 3.9327237606048584,
+   "sisdr": 25.77489948272705
+  },
+  {
+   "persona": "samantha",
+   "model": "en_US-libritts-high",
+   "speaker": "p5604",
+   "sid": 579,
+   "stoi": 0.9977503716945648,
+   "pesq": 4.206638216972351,
+   "sisdr": 27.491348266601562
+  },
+  {
+   "persona": "samantha",
+   "model": "en_US-libritts-high",
+   "speaker": "p3003",
+   "sid": 63,
+   "stoi": 0.9951839298009872,
+   "pesq": 3.746136963367462,
+   "sisdr": 26.768218517303467
+  },
+  {
+   "persona": "jarvis",
+   "model": "en_GB-vctk-medium",
+   "speaker": "p226",
+   "sid": 95,
+   "stoi": 0.9982331693172455,
+   "pesq": 3.9756272435188293,
+   "sisdr": 26.683793544769287
+  },
+  {
+   "persona": "jarvis",
+   "model": "en_GB-vctk-medium",
+   "speaker": "p232",
+   "sid": 60,
+   "stoi": 0.9976390302181244,
+   "pesq": 3.8155402541160583,
+   "sisdr": 28.23977565765381
+  },
+  {
+   "persona": "jarvis",
+   "model": "en_GB-vctk-medium",
+   "speaker": "p243",
+   "sid": 81,
+   "stoi": 0.9981712698936462,
+   "pesq": 3.823759138584137,
+   "sisdr": 27.177727222442627
+  },
+  {
+   "persona": "jarvis",
+   "model": "en_GB-vctk-medium",
+   "speaker": "p254",
+   "sid": 76,
+   "stoi": 0.9995031952857971,
+   "pesq": 4.059056222438812,
+   "sisdr": 28.215944290161133
+  },
+  {
+   "persona": "jarvis",
+   "model": "en_GB-vctk-medium",
+   "speaker": "p258",
+   "sid": 57,
+   "stoi": 0.9992484599351883,
+   "pesq": 3.961550295352936,
+   "sisdr": 28.392191410064697
+  },
+  {
+   "persona": "jarvis",
+   "model": "en_GB-vctk-medium",
+   "speaker": "p274",
+   "sid": 10,
+   "stoi": 0.9988158345222473,
+   "pesq": 3.9745007157325745,
+   "sisdr": 28.61519145965576
+  },
+  {
+   "persona": "jarvis",
+   "model": "en_GB-vctk-medium",
+   "speaker": "p278",
+   "sid": 64,
+   "stoi": 0.9978056252002716,
+   "pesq": 4.0379785895347595,
+   "sisdr": 28.649817943572998
+  },
+  {
+   "persona": "jarvis",
+   "model": "en_GB-aru-medium",
+   "speaker": "02",
+   "sid": 9,
+   "stoi": 0.9980334490537643,
+   "pesq": 3.944780468940735,
+   "sisdr": 29.10737705230713
+  },
+  {
+   "persona": "jarvis",
+   "model": "en_GB-aru-medium",
+   "speaker": "01",
+   "sid": 3,
+   "stoi": 0.9967520534992218,
+   "pesq": 3.717652142047882,
+   "sisdr": 24.343514442443848
+  },
+  {
+   "persona": "jarvis",
+   "model": "en_GB-aru-medium",
+   "speaker": "05",
+   "sid": 7,
+   "stoi": 0.9971408545970917,
+   "pesq": 3.850610911846161,
+   "sisdr": 24.916574954986572
+  },
+  {
+   "persona": "jarvis",
+   "model": "en_GB-aru-medium",
+   "speaker": "12",
+   "sid": 8,
+   "stoi": 0.9979929774999619,
+   "pesq": 3.8752030730247498,
+   "sisdr": 26.07570791244507
+  },
+  {
+   "persona": "jarvis",
+   "model": "en_GB-aru-medium",
+   "speaker": "10",
+   "sid": 2,
+   "stoi": 0.9972956627607346,
+   "pesq": 3.891394793987274,
+   "sisdr": 27.685874938964844
+  },
+  {
+   "persona": "jarvis",
+   "model": "en_GB-aru-medium",
+   "speaker": "06",
+   "sid": 1,
+   "stoi": 0.9932939261198044,
+   "pesq": 3.6865007281303406,
+   "sisdr": 23.803203105926514
+  },
+  {
+   "persona": "jarvis",
+   "model": "en_US-norman-medium",
+   "speaker": null,
+   "sid": null,
+   "stoi": 0.9983234256505966,
+   "pesq": 4.017453610897064,
+   "sisdr": 29.38350200653076
+  },
+  {
+   "persona": "jarvis",
+   "model": "en_US-john-medium",
+   "speaker": null,
+   "sid": null,
+   "stoi": 0.997718557715416,
+   "pesq": 3.88774836063385,
+   "sisdr": 24.19926118850708
+  },
+  {
+   "persona": "jarvis",
+   "model": "en_US-joe-medium",
+   "speaker": null,
+   "sid": null,
+   "stoi": 0.9970240741968155,
+   "pesq": 3.833636224269867,
+   "sisdr": 27.601902961730957
+  },
+  {
+   "persona": "jarvis",
+   "model": "en_US-libritts_r-medium",
+   "speaker": "1748",
+   "sid": 564,
+   "stoi": 0.9970752596855164,
+   "pesq": 4.056894838809967,
+   "sisdr": 27.446210384368896
+  },
+  {
+   "persona": "jarvis",
+   "model": "en_US-libritts_r-medium",
+   "speaker": "7833",
+   "sid": 296,
+   "stoi": 0.9961413443088531,
+   "pesq": 4.1978617906570435,
+   "sisdr": 27.82162094116211
+  }
+ ],
+ "timing": {
+  "en_GB-alba-medium": {
+   "ttfa_p50": 51.935067982412875,
+   "ttfa_p95": 78.59809041547126,
+   "rtf1": 0.06342824140947009,
+   "size_mb": 63.201294,
+   "sr": 22050,
+   "quality": "medium",
+   "speakers": 1
+  },
+  "en_GB-aru-medium": {
+   "ttfa_p50": 50.55940803140402,
+   "ttfa_p95": 65.94836814329028,
+   "rtf1": 0.05615849745683393,
+   "size_mb": 76.754097,
+   "sr": 22050,
+   "quality": "medium",
+   "speakers": 12
+  },
+  "en_GB-cori-high": {
+   "ttfa_p50": 139.66719902236946,
+   "ttfa_p95": 167.59318186959717,
+   "rtf1": 0.21183760320970327,
+   "size_mb": 114.219352,
+   "sr": 22050,
+   "quality": "high",
+   "speakers": 1
+  },
+  "en_GB-vctk-medium": {
+   "ttfa_p50": 36.40955951414071,
+   "ttfa_p95": 52.836775127798326,
+   "rtf1": 0.05521258890483788,
+   "size_mb": 76.952753,
+   "sr": 22050,
+   "quality": "medium",
+   "speakers": 109
+  },
+  "en_US-joe-medium": {
+   "ttfa_p50": 41.986451513366774,
+   "ttfa_p95": 57.32659860223066,
+   "rtf1": 0.05575845685898294,
+   "size_mb": 63.201294,
+   "sr": 22050,
+   "quality": "medium",
+   "speakers": 1
+  },
+  "en_US-john-medium": {
+   "ttfa_p50": 56.15656447480433,
+   "ttfa_p95": 79.34662083571311,
+   "rtf1": 0.05531180217304316,
+   "size_mb": 63.531379,
+   "sr": 22050,
+   "quality": "medium",
+   "speakers": 1
+  },
+  "en_US-kristin-medium": {
+   "ttfa_p50": 44.698672980302945,
+   "ttfa_p95": 52.358123986050494,
+   "rtf1": 0.05427220616662083,
+   "size_mb": 63.531379,
+   "sr": 22050,
+   "quality": "medium",
+   "speakers": 1
+  },
+  "en_US-libritts-high": {
+   "ttfa_p50": 117.55003899452277,
+   "ttfa_p95": 153.68969893606845,
+   "rtf1": 0.20671070431848867,
+   "size_mb": 136.673811,
+   "sr": 22050,
+   "quality": "high",
+   "speakers": 904
+  },
+  "en_US-libritts_r-medium": {
+   "ttfa_p50": 31.66825050720945,
+   "ttfa_p95": 35.553050047019504,
+   "rtf1": 0.05419402072489525,
+   "size_mb": 78.580914,
+   "sr": 22050,
+   "quality": "medium",
+   "speakers": 904
+  },
+  "en_US-ljspeech-high": {
+   "ttfa_p50": 119.08493901137263,
+   "ttfa_p95": 138.45544361392967,
+   "rtf1": 0.20373172181631868,
+   "size_mb": 114.199011,
+   "sr": 22050,
+   "quality": "high",
+   "speakers": 1
+  },
+  "en_US-ljspeech-medium": {
+   "ttfa_p50": 42.6140750059858,
+   "ttfa_p95": 59.35985006799456,
+   "rtf1": 0.05653122933097583,
+   "size_mb": 63.531379,
+   "sr": 22050,
+   "quality": "medium",
+   "speakers": 1
+  },
+  "en_US-norman-medium": {
+   "ttfa_p50": 43.85339346481487,
+   "ttfa_p95": 55.914711076184176,
+   "rtf1": 0.05910235556989942,
+   "size_mb": 63.531379,
+   "sr": 22050,
+   "quality": "medium",
+   "speakers": 1
+  }
+ },
+ "load_before": [
+  4.50048828125,
+  5.23046875,
+  4.599609375
+ ],
+ "load_after": [
+  6.80859375,
+  5.76611328125,
+  4.83544921875
+ ],
+ "nproc": 8,
+ "date": "2026-11-04 21:56 CET"
+}

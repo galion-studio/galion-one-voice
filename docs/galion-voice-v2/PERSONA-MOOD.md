@@ -99,3 +99,28 @@ The Piper side reuses one shaped-PCM buffer.
   arousal/dominance from loudness only, and reports **valence unknown**. Valence comes from text. No SER model is faked.
 * The listening set uses synthetic user audio (Piper, loudness scaled per emotion), labelled as such.
 * Expressiveness is bounded by Piper: it is prosody shaping, not acted emotion.
+
+## Listening set (measured)
+
+Full table: [`evals/emotion-sweep/SWEEP.md`](evals/emotion-sweep/SWEEP.md) and `sweep.csv`.
+WAVs (box, not committed): `/workspace/swarm/voice-v2-sprint/results/emotion-sweep/`.
+That is 36 persona cases, plus 2 V1 baselines, 2 resting references and 6 synthetic user clips.
+Voices: Samantha `en_US-libritts_r-medium` sid 126; Jarvis `en_GB-vctk-medium` sid 95 (p226).
+Every case speaks the same reply line, and metrics are means over 8 renders. Measured ranges vs each persona's resting reference:
+
+| | Samantha | Jarvis |
+|---|---|---|
+| planned pitch shift | −0.53 … +1.25 st | −0.42 … −0.19 st (never above rest) |
+| measured ΔF0 | −1.27 … +0.99 st | −0.47 … −0.02 st |
+| planned length_scale | 0.947 … 1.103 | 1.048 … 1.081 |
+| planned energy | 0.84 … 1.06 | 0.88 … 0.91 |
+| measured ΔRMS | −1.5 … +1.2 dB | −1.1 … +0.3 dB |
+| pre-pause | 0 … 142 ms | 80 … 103 ms |
+
+* Samantha, happy user after joy: +1.0 st and about 8 % faster.
+* Samantha, sad user after distress: −1.3 st, length 1.10, −1.5 dB, and a 142 ms pause.
+* An angry user is *not* mirrored. Samantha softens (e = 0.49 ⇒ lower, slower, quieter). Jarvis stays at or below rest on
+  pitch, pace and loudness, which matches `JARVIS.md` ("anger is answered by steadiness").
+* The same user cue lands differently depending on mood history (rest / after-joy / after-distress). That is the
+  persistent-mood part.
+* Measured rate is noisy at about ±4 %, because VITS duration sampling is stochastic (noise_w). The planned length_scale is exact.
