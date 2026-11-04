@@ -47,6 +47,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod recut;
 pub mod sha256;
 
 use std::fmt;
