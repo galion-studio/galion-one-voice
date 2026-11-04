@@ -10,6 +10,9 @@
 //! ```
 //!
 //! `--try-new-only` stops after the gate and prints its verdict.
+//! CC0 voices also need the session's CC0 licence acceptance. The probe has
+//! no browser, so `GALION_PROBE_CC0_ACCEPT=1` stands in for the ticked box
+//! (session `probe`); without it a CC0 voice is refused at synthesize.
 
 use galion_ml_voice::speech::clone_worker::CloneTts;
 use galion_ml_voice::{LanguageId, TtsEngine};
@@ -58,11 +61,17 @@ fn main() -> ExitCode {
         eprintln!("usage: clone_probe OUT.wav TEXT | clone_probe --try-new-only");
         return ExitCode::from(64);
     };
+    let cc0_accept = std::env::var("GALION_PROBE_CC0_ACCEPT").is_ok_and(|v| v == "1");
+    let store = galion_consent::cc0_acceptances();
+    store.set_active(Some("probe"));
+    if cc0_accept {
+        store.accept("probe");
+    }
     let t1 = Instant::now();
     let audio = match tts.synthesize(text, LanguageId::En) {
         Ok(a) => a,
         Err(e) => {
-            println!("{{\"persona\":\"{persona}\",\"synth\":\"failed\",\"reason\":{:?}}}", e.to_string());
+            println!("{{\"persona\":\"{persona}\",\"cc0_accepted\":{cc0_accept},\"synth\":\"failed\",\"reason\":{:?}}}", e.to_string());
             return ExitCode::from(1);
         }
     };
@@ -73,7 +82,7 @@ fn main() -> ExitCode {
         return ExitCode::from(1);
     }
     println!(
-        "{{\"persona\":\"{persona}\",\"model\":\"{}\",\"gate_ms\":{gate_ms:.1},\"synth_ms\":{synth_ms:.1},\"audio_ms\":{audio_ms:.1},\"rtf\":{:.3},\"rate\":{},\"out\":{out:?}}}",
+        "{{\"persona\":\"{persona}\",\"cc0_accepted\":{cc0_accept},\"model\":\"{}\",\"gate_ms\":{gate_ms:.1},\"synth_ms\":{synth_ms:.1},\"audio_ms\":{audio_ms:.1},\"rtf\":{:.3},\"rate\":{},\"out\":{out:?}}}",
         tts.model_name(),
         synth_ms / audio_ms.max(1.0),
         audio.sample_rate

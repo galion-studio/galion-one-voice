@@ -1117,6 +1117,10 @@ pub struct CloneTts {
     /// slot was built (clone time), `[samantha, jarvis]`. A turn reads this;
     /// it does not re-run consent or hash the reference again.
     approved: [bool; 2],
+    /// Voices whose consent record is CC0 / public domain. Such a voice is
+    /// used only while the active session accepted CC0 (galion-consent
+    /// `cc0_acceptances`); otherwise the turn falls back to Piper.
+    cc0: [bool; 2],
     worker: Option<CloneWorker>,
     frames: Arc<CloneFrameDrain>,
     spawns: u32,
@@ -1150,10 +1154,14 @@ impl CloneTts {
         // is refused with the gate's reason. Turns only read `approved`.
         let env = galion_consent::Env::process();
         let mut approved = [false; 2];
+        let mut cc0 = [false; 2];
         let mut refused = Vec::new();
         for (i, voice) in ["samantha", "jarvis"].into_iter().enumerate() {
             match galion_consent::clone_gate(voice, &env) {
-                Ok(_) if ref_allowlisted(voice) => approved[i] = true,
+                Ok(a) if ref_allowlisted(voice) => {
+                    approved[i] = true;
+                    cc0[i] = a.cc0;
+                }
                 Ok(_) => refused.push(format!("{voice}: reference not allowlisted (GALION_CLIP_STORE sidecar or REFS.sha256)")),
                 Err(e) => refused.push(e.to_string()),
             }
@@ -1171,6 +1179,7 @@ impl CloneTts {
             prosody: FrameProsody::identity(),
             ref_gate: true,
             approved,
+            cc0,
             worker: None,
             frames: Arc::new(CloneFrameDrain::new()),
             spawns: 0,
@@ -1197,6 +1206,7 @@ impl CloneTts {
             prosody: FrameProsody::identity(),
             ref_gate: false,
             approved: [true; 2],
+            cc0: [false; 2],
             frames: worker.frames(),
             worker: Some(worker),
             spawns: 1,
@@ -1246,10 +1256,14 @@ impl CloneTts {
 
     /// Did `persona` pass the consent gate when this slot was built?
     pub fn voice_approved(&self, persona: &str) -> bool {
-        match persona_name(persona) {
-            "jarvis" => self.approved[1],
-            _ => self.approved[0],
-        }
+        let i = usize::from(persona_name(persona) == "jarvis");
+        self.approved[i] && (!self.cc0[i] || galion_consent::cc0_acceptances().active_accepted())
+    }
+
+    /// Test hook: mark voices as CC0 (needs the session's CC0 acceptance).
+    pub fn with_cc0(mut self, cc0: [bool; 2]) -> Self {
+        self.cc0 = cc0;
+        self
     }
 
     /// #56: persona for the next utterance. The child stays up.
@@ -1296,6 +1310,16 @@ impl TtsEngine for CloneTts {
         let body = body.trim().replace(['\n', '\r'], " ");
         if body.is_empty() {
             return Err(VoiceError::EmptyInput);
+        }
+        // Server-side CC0 gate (owner t628u): a CC0 voice is refused unless
+        // the active session ticked the CC0 licence box.
+        if self.ref_gate {
+            let i = usize::from(self.persona == "jarvis");
+            if self.approved[i] && self.cc0[i] && !galion_consent::cc0_acceptances().active_accepted() {
+                return Err(VoiceError::Backend(
+                    galion_consent::CloneRefused { persona: self.persona.to_string(), reason: "cc0_licence" }.to_string(),
+                ));
+            }
         }
         self.ensure()?;
         let pcm = self.worker.as_mut().unwrap().synthesize(&body)?;

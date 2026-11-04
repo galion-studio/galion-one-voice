@@ -39,3 +39,9 @@ release exists, and the file says so. It also records public_demo: no, expiry 20
 The ref-vs-ref cosine is 0.132. Piper vs refs is −0.026 / 0.031. Earlier clones from the shorter Voice Zero samples scored 0.62–0.79.
 Negative controls: LOCAL_REFS unset → refused. Old store → refused at duration.
 `try_new` takes about 120 s in a debug build because it hashes the 3 GB of weights.
+
+## CC0 licence checkbox (owner t628u, 2026-11-04 20:49 CET)
+CC0 donors are ON again (the 16:01 "off" was a wrong click). A CC0 voice is used only after the caller ticks the CC0 box.
+- UI: `crates/galion-console/assets/v1-screen.html` shows an unticked checkbox naming "CC0 1.0 Universal (Public Domain Dedication)" with a link to https://creativecommons.org/publicdomain/zero/1.0/. Ticking posts `POST /v2/cc0 {"accept":true}` with the session.
+- Server (Rust): `galion_consent::Cc0Acceptances` keeps acceptance per session in memory only (sha256 of the token; no token, no disk). `/turn` and `/v2/say` mark the active session. The persona floor reports `clone_block:"cc0_licence"` and `CloneTts::synthesize` refuses a CC0 voice until the active session accepted. The gate marks a voice CC0 when its consent.txt `instrument` / `grantor` names CC0 or a public-domain dedication.
+- Re-run 2026-11-04 20:54-21:04 CET (debug clone_probe, under BENCH.lock): unticked = refused (`cc0_licence`) for both voices; ticked = cloned. ECAPA clone vs own donor: Samantha 0.6886, Jarvis 0.7974; cross-speaker ≤0.135; Piper vs donor ≤0.03.
