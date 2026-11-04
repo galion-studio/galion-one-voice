@@ -83,6 +83,22 @@ FORBIDDEN_MIRROR = (
     "let's slow down",
     "i'm sorry",
     "i am sorry",
+    "i'm so sorry",
+    "i am so sorry",
+    "so sorry to hear",
+    "sorry to hear",
+    "sorry for your loss",
+    "my condolences",
+    "my deepest condolences",
+    "you are not alone",
+    "you're not alone",
+    "allow yourself to grieve",
+    "losing a loved one",
+    "i can only imagine",
+    "i can't imagine how",
+    "that must be so hard",
+    "that must be hard",
+    "that must be difficult",
 )
 
 
@@ -587,6 +603,10 @@ def classify_llm(text: str, source: str) -> Gate:
     )
 
 
+# galion-openmind VOICE_KINDS (NerveEvent v1).
+NERVE_KINDS = ("voice.frame_miss", "voice.fallback", "voice.backend_up")
+
+
 def classify_thinking(text: str | None) -> Gate:
     if text is None:
         return Gate(
@@ -597,17 +617,57 @@ def classify_thinking(text: str | None) -> Gate:
     low = text.lower()
     if "interim" in low and ("placeholder" in low or "fake" in low):
         return Gate("real-thinking", "failed", "The thought trace contains a fake interim. Not HARD-PASS.")
-    if '"kind"' in text or "voice." in text or "thought" in low:
+    kinds: dict[str, int] = {}
+    for line in text.splitlines():
+        line = line.strip()
+        if not line.startswith("{"):
+            continue
+        try:
+            ev = json.loads(line)
+        except ValueError:
+            continue
+        kind = ev.get("kind") if isinstance(ev, dict) else None
+        if isinstance(kind, str) and (kind in NERVE_KINDS or kind.startswith("thought")):
+            kinds[kind] = kinds.get(kind, 0) + 1
+    if kinds:
+        seen = ", ".join(f"{k}x{n}" for k, n in sorted(kinds.items()))
         return Gate(
             "real-thinking",
             "met",
-            "A nerve or thought trace is on disk for Maciej to read. This harness does not sign ADMIN-UI-CHECK.md.",
+            f"A nerve trace is on disk for Maciej to read ({seen}). This harness does not sign ADMIN-UI-CHECK.md.",
         )
     return Gate(
         "real-thinking",
         "absent",
         "The trace file has no thought or nerve event. Not HARD-PASS.",
     )
+
+
+def jarvis_hub_seen(base: str, wait_s: float = 8.0) -> bool:
+    """The page reads `hub_texture`, and a Jarvis reply WAV on /dot is marked
+    `"hub_texture":true` and is fetchable. A page string alone is not playback."""
+    try:
+        status, _, page = http_exchange(base, "GET", "/")
+    except OSError:
+        return False
+    if status != 200 or b"hub_texture" not in page:
+        return False
+    deadline = time.monotonic() + wait_s
+    while time.monotonic() < deadline:
+        try:
+            _, _, dot = http_exchange(base, "GET", "/dot")
+            text = dot.decode("utf-8", "replace")
+        except OSError:
+            text = ""
+        m = re.search(r'"reply":\{"id":"([A-Za-z0-9_-]{1,64})","url":"(/reply/[A-Za-z0-9_-]{1,64}\.wav)","ms":\d+,"hub_texture":true\}', text)
+        if m and _json_has(text, "persona", "jarvis"):
+            try:
+                st, _, wav = http_exchange(base, "GET", m.group(2))
+            except OSError:
+                return False
+            return st == 200 and wav[:4] == b"RIFF" and len(wav) > 44
+        time.sleep(0.2)
+    return False
 
 
 def classify_real_persona(refs_met: bool, emotion_live: bool, hub_seen: bool) -> Gate:
@@ -1003,6 +1063,7 @@ def persona_http(base: str) -> tuple[Gate, list[str], str, list[str]]:
     elif not names_fact(reply_of(jarvis_grief), MOTHER_WORDS):
         problems.append(f"pinned Jarvis did not name the fact (reply {reply_of(jarvis_grief)!r})")
     blob = " ".join((grief, joy, vuln, quiet, jarvis, jarvis_grief)).lower()
+    blob = " ".join(blob.replace("\u2019", "'").replace("\u2018", "'").split())
     for phrase in FORBIDDEN:
         if phrase in blob:
             problems.append(f"canned empathy {phrase!r}")
@@ -1154,6 +1215,11 @@ def launch_demo(addr: str) -> subprocess.Popen | None:
     log_dir = target_dir() / "hard-loop"
     log_dir.mkdir(parents=True, exist_ok=True)
     log = (log_dir / "demo.log").open("w", encoding="utf-8")
+    if not os.environ.get("GALION_NERVE_LOG", "").strip():
+        # Fresh thought trace per launched run; the demo's PhoneHost writes NerveEvent v1 here.
+        nerve = log_dir / "nerve.ndjson"
+        nerve.write_text("", encoding="utf-8")
+        os.environ["GALION_NERVE_LOG"] = str(nerve)
     env = demo_env(os.environ)
     return subprocess.Popen(
         [
@@ -1486,13 +1552,7 @@ def collect() -> tuple[list[Gate], dict[str, str]]:
             turn_wav = os.environ.get("GALION_HARD_TURN_WAV", "").strip()
             if turn_wav and Path(turn_wav).is_file() and launched:
                 turn_ok = post_turn(base, Path(turn_wav), target_dir() / "hard-loop" / "demo.log")
-            try:
-                status, _, page = http_exchange(base, "GET", "/")
-                if status == 200:
-                    low = page.decode("utf-8", "replace").lower()
-                    hub = "hub" in low and "texture" in low
-            except OSError:
-                hub = False
+            hub = jarvis_hub_seen(base)
         finally:
             if proc is not None:
                 proc.terminate()
@@ -1622,6 +1682,8 @@ def logic_self_check() -> None:
             os.environ["CARGO_TARGET_DIR"] = old_target
     assert classify_thinking(None).status == "absent"
     assert classify_thinking('{"kind":"voice.frame_miss"}').status == "met"
+    assert classify_thinking('voice. "kind" thought').status == "absent"
+    assert classify_thinking('{"kind":"voice.made_up"}').status == "absent"
     assert classify_thinking("interim placeholder transcript").status == "failed"
     assert classify_real_persona(False, True, True).status == "absent"
     assert classify_real_persona(True, True, True).status == "met"

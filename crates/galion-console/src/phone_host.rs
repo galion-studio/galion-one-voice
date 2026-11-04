@@ -19,6 +19,7 @@ use galion_render::v2_persona::Floor;
 
 use crate::auto_workflow::{proceed, Proceed, ProceedSource};
 use galion_emotion::{ProsodyControl, VoicePersona};
+use galion_openmind::{note_from_frame, NerveEmitter, VoiceBackendSlot, VoiceNote};
 
 use crate::bus::{pcm16_to_bytes, BusMsg, ProcessBus};
 use crate::turn_worker::{ProsodySlot, TurnJob, TurnReply, TurnWorker};
@@ -60,6 +61,10 @@ pub struct PhoneHost {
     /// Last workflow step. The turn id is 0 until an utterance is recorded.
     last_next: Next,
     last_next_turn: u64,
+    /// Thought trace (NerveEvent v1). `None` unless `GALION_NERVE_LOG` / `GALION_NERVE_URL` is set.
+    nerve: Option<NerveEmitter>,
+    /// `voice.backend_up` sent for the CPU pipeline.
+    nerve_up: bool,
 }
 
 impl PhoneHost {
@@ -87,6 +92,46 @@ impl PhoneHost {
             proceeded: 0,
             last_next: Next::Speak,
             last_next_turn: 0,
+            nerve: nerve_from_env(),
+            nerve_up: false,
+        }
+    }
+
+    /// Attach a thought-trace emitter (tests, or a host that builds its own).
+    pub fn with_nerve(mut self, nerve: NerveEmitter) -> Self {
+        self.nerve = Some(nerve);
+        self
+    }
+
+    /// NDJSON lines the thought trace has rendered so far. Allocates; not for the tick.
+    pub fn nerve_lines(&self) -> Vec<String> {
+        self.nerve.as_ref().map(NerveEmitter::lines).unwrap_or_default()
+    }
+
+    /// Call after `Heartbeat::step` with `FrameOut::paused`. A paused frame is
+    /// `voice.frame_miss`; a healthy frame sends nothing. Never blocks.
+    pub fn note_frame(&self, paused: bool) {
+        if let (Some(n), Some(note)) = (self.nerve.as_ref(), note_from_frame(paused, self.frame as u32)) {
+            let _ = n.note(note);
+        }
+    }
+
+    /// Backend decision for one published reply, as the nerve sees it.
+    fn note_reply_backend(&mut self, turn: u64, backend: &str) {
+        let Some(n) = self.nerve.as_ref() else { return };
+        let frame = self.frame as u32;
+        if backend == "tone" {
+            // Piper did not answer; the reply is the tone fallback.
+            let _ = n.note(VoiceNote::fallback(frame, turn, VoiceBackendSlot::CpuPipeline, VoiceBackendSlot::Mock));
+            return;
+        }
+        if !self.nerve_up {
+            let _ = n.note(VoiceNote::backend_up(frame, VoiceBackendSlot::CpuPipeline));
+            self.nerve_up = true;
+        }
+        if !student_present() {
+            // The S0 student slot is wanted first; with no `.gq` on disk the turn ran on the CPU pipeline.
+            let _ = n.note(VoiceNote::fallback(frame, turn, VoiceBackendSlot::Student, VoiceBackendSlot::CpuPipeline));
         }
     }
 
@@ -272,6 +317,58 @@ fn wipe_play(play: &mut VecDeque<i16>) {
     play.clear();
 }
 
+fn nerve_from_env() -> Option<NerveEmitter> {
+    let set = |k: &str| std::env::var(k).map(|v| !v.trim().is_empty()).unwrap_or(false);
+    if set("GALION_NERVE_LOG") || set("GALION_NERVE_URL") || set("NERVE_URL") {
+        Some(NerveEmitter::from_env())
+    } else {
+        None
+    }
+}
+
+/// `GALION_STUDENT_GQ` names an existing student checkpoint.
+fn student_present() -> bool {
+    std::env::var("GALION_STUDENT_GQ")
+        .ok()
+        .map(|p| p.trim().to_string())
+        .filter(|p| !p.is_empty())
+        .is_some_and(|p| std::path::Path::new(&p).is_file())
+}
+
+/// `GALION_JARVIS_HUB=0|off|false` mutes the hub bed on playback. Default is on.
+fn hub_playback_on() -> bool {
+    !matches!(
+        std::env::var("GALION_JARVIS_HUB").ok().map(|v| v.trim().to_ascii_lowercase()).as_deref(),
+        Some("0") | Some("off") | Some("false") | Some("no")
+    )
+}
+
+/// The Jarvis reply WAV with the galion-emotion hub bed (clicks, alarm, room tone)
+/// added per 80 ms frame through [`crate::v2v::mix_hub_playback`]. `pcm` is
+/// 24 kHz mono. `None` if the mix refuses (rate or length), so the caller keeps
+/// the plain WAV.
+pub fn jarvis_hub_wav(pcm: &[i16]) -> Option<Vec<u8>> {
+    use galion_cascade::en_lane::{wav_bytes, LANE_RATE_HZ};
+    use galion_emotion::persona::HubLayer;
+    let asset: Vec<f32> = pcm.iter().map(|&s| s as f32 / 32768.0).collect();
+    let mut layer = vec![0.0f32; asset.len()];
+    let bed = HubLayer::character(VoicePersona::Jarvis, true);
+    for frame in layer.chunks_mut(FRAME_SAMPLES) {
+        bed.mix_me(frame);
+    }
+    let mixed = crate::v2v::mix_hub_playback(
+        "jarvis",
+        &asset,
+        LANE_RATE_HZ,
+        &layer,
+        LANE_RATE_HZ,
+        crate::v2v::TextureToggle { enabled: true },
+    )
+    .ok()?;
+    let out: Vec<i16> = mixed.iter().map(|&x| (x.clamp(-1.0, 1.0) * 32767.0).round() as i16).collect();
+    Some(wav_bytes(&out, LANE_RATE_HZ))
+}
+
 impl PhoneHost {
     fn publish(&mut self, r: TurnReply) {
         let speech = BusMsg::speech_pcm(
@@ -314,7 +411,12 @@ impl PhoneHost {
                 fault_kind(err),
             ));
         }
-        let _ = self.replies.set_reply(r.id.to_string(), r.wav.clone(), r.ms);
+        // The browser plays the WAV. Jarvis gets the hub bed mixed in there; the
+        // me-band queue stays as spoken (the heartbeat mixes the hub into `me`).
+        let hub = r.persona == "jarvis" && hub_playback_on();
+        let wav = if hub { jarvis_hub_wav(&r.pcm).unwrap_or_else(|| r.wav.clone()) } else { r.wav.clone() };
+        let _ = self.replies.set_reply_hub(r.id.to_string(), wav, r.ms, hub);
+        self.note_reply_backend(r.id, r.backend);
         wipe_play(&mut self.play);
         self.play.extend(r.pcm.iter().copied());
         // Lengths and labels only. The helper cannot take PCM or the transcript.
@@ -600,4 +702,44 @@ mod tests {
         host.note_transcript(6, "skill presence");
         assert_eq!(host.workflow(), (6, crate::workflow::Next::Skill("presence")));
     }
+
+    #[test]
+    fn jarvis_hub_wav_adds_the_bed_and_keeps_length() {
+        let pcm: Vec<i16> = (0..FRAME_SAMPLES * 3).map(|i| ((i as f32 * 0.05).sin() * 8000.0) as i16).collect();
+        let plain = galion_cascade::en_lane::wav_bytes(&pcm, galion_cascade::en_lane::LANE_RATE_HZ);
+        let hub = jarvis_hub_wav(&pcm).expect("mix");
+        assert_eq!(hub.len(), plain.len());
+        assert_eq!(&hub[..44], &plain[..44]);
+        let diff = hub[44..].chunks_exact(2).zip(plain[44..].chunks_exact(2)).filter(|(a, b)| a != b).count();
+        // Click + alarm + room tone every 64 samples, per 80 ms frame.
+        assert!(diff >= 3 * (FRAME_SAMPLES / 64), "diff={diff}");
+        assert!(jarvis_hub_wav(&[]).is_some());
+    }
+
+
+    #[test]
+    fn thought_trace_records_backend_fallback_and_frame_miss() {
+        let web = WebSurface::mailbox();
+        let mut host = PhoneHost::from_surface(&web).with_nerve(NerveEmitter::local(16));
+        host.note_frame(false);
+        host.note_reply_backend(7, "piper");
+        host.note_reply_backend(8, "tone");
+        host.note_frame(true);
+        let mut lines = Vec::new();
+        for _ in 0..100 {
+            lines = host.nerve_lines();
+            if lines.len() >= 3 {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        let all = lines.join("\n");
+        assert!(all.contains("\"kind\":\"voice.backend_up\""), "{all}");
+        assert!(all.contains("\"kind\":\"voice.fallback\""), "{all}");
+        assert!(all.contains("\"kind\":\"voice.frame_miss\""), "{all}");
+        // A healthy frame is silence: one backend_up, fallback(s), one miss.
+        assert_eq!(lines.iter().filter(|l| l.contains("voice.frame_miss")).count(), 1);
+        assert_eq!(lines.iter().filter(|l| l.contains("voice.backend_up")).count(), 1);
+    }
+
 }

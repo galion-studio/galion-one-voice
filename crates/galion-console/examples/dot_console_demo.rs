@@ -196,6 +196,8 @@ fn run<T: TimingFeed, A: AffectFeed>(args: &[String], mut pump: DemoPump<T, A>, 
         if let Some(p) = phone.as_mut() {
             let color = galion_emotion::StubExpressor.voice_color(hb.last_caller_frame().as_ref());
             p.note_prosody(out.prosody(color.prosody));
+            // Thought trace after the step, never inside it (GALION_NERVE_LOG).
+            p.note_frame(out.paused);
         }
         if out.yield_now() {
             yielded = true;

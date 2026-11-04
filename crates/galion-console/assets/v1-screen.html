@@ -16,7 +16,8 @@
                     (~640 ms quiet after speech). That end is the auto-record. proceedTurn
                     posts the same /turn with X-Galion-Proceed: auto. No second page.
                     Headers: X-Turn-Id, X-Sample-Rate, X-Barge-In, X-Galion-Proceed.
-       reply      ← /dot JSON gains reply:{id,url,ms}; page fetches the WAV and plays it through
+       reply      ← /dot JSON gains reply:{id,url,ms[,hub_texture]}; page fetches the WAV and plays it through
+                    (hub_texture:true = the Jarvis hub bed is mixed into that WAV; body[data-hub-texture]),
                     the AudioContext unlocked by the tap. User speech during playback = barge-in:
                     playback stops at once and the new utterance is captured.
      V2-S3: AI Act Art. 50 disclosure (HR+EN) is visible and spoken on the first tap.
@@ -579,6 +580,7 @@ function postTurn(frames,barge){
 function onReply(rp){
   if(!rp||rp.id==null||!rp.url) return;
   const id=String(rp.id);
+  document.body.dataset.hubTexture = rp.hub_texture===true ? "on" : "off";
   if(!hearReplies||!micCtx){ seenReplies.add(id); return; }
   if(seenReplies.has(id)) return;
   seenReplies.add(id); if(seenReplies.size>64) seenReplies=new Set([...seenReplies].slice(-32));
