@@ -1,7 +1,7 @@
 // Galion Voice — Perpetual Open MIT License
 // Copyright (c) 2026 Maciej Grajczyk.
 //! V2 live lane. Every engine runs out of process (Piper, Vosk sidecar,
-//! clone worker, curl for the LLM). Nothing here is a stub: a missing
+//! clone worker, llama-server or curl for the LLM). Nothing here is a stub: a missing
 //! engine is an error, never a fake clock.
 pub mod audio;
 pub mod piper;
@@ -12,6 +12,7 @@ pub mod clone;
 pub mod stats;
 pub mod endpoint;
 pub mod warm;
+pub mod local;
 
 use std::time::Instant;
 use std::sync::OnceLock;

@@ -114,6 +114,15 @@ fn main() {
     let sam_sys = format!("You are Samantha, warm, playful and emotionally open, on a live voice call with your friend Jarvis. Speak naturally in 1-2 short sentences (under 25 words). React to what you actually heard; it is a speech transcript and may have recognition errors. {tag_note} Today: your rescue dog Biscuit came home after two days missing, and you're overjoyed; later you admit you're sad your best friend Lena moves to Lisbon on Friday.");
     let jar_sys = format!("You are Jarvis, dry, precise, quietly kind, with understated wit, on a live voice call with your friend Samantha. Speak in 1-2 short sentences (under 20 words). React to what you actually heard; it is a speech transcript and may have recognition errors. Ask a pointed question now and then. {tag_note}");
 
+    if cfg.is_local() {
+        // Local Qwen on loopback: open the keep-alive sockets and fill the prompt cache for both personas.
+        for (who, sys) in [("samantha", &sam_sys), ("jarvis", &jar_sys)] {
+            match galion_v2_live::local::prewarm(&cfg, sys) {
+                Ok(ms) => ev(&log, json!({"ev":"llm_prewarm","who":who,"backend":"local","ms":r1(ms)})),
+                Err(e) => { eprintln!("{e}"); std::process::exit(2) }
+            }
+        }
+    }
     // Spawn engines.
     let mut agents: Vec<Agent> = Vec::new();
     for (name, other, sys, voice_ref, iw) in [("samantha", "jarvis", sam_sys, refs.0.clone(), 40usize), ("jarvis", "samantha", jar_sys, refs.1.clone(), 24usize)] {

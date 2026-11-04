@@ -1,8 +1,13 @@
 // Galion Voice — Perpetual Open MIT License
 // Copyright (c) 2026 Maciej Grajczyk.
-//! Streaming chat completions via a `curl` child (no TLS stack in tree).
-//! The key is read from OPENROUTER_API_KEY and handed to curl on stdin as
-//! a config line, so it never appears in argv, logs, or output.
+//! Streaming chat completions.
+//!
+//! A loopback `GALION_LLM_URL` (the local llama-server with Qwen2.5-1.5B) goes
+//! through the in-process keep-alive client in [`crate::local`]. It uses no
+//! key, no curl, and no provider field. Any other URL goes through a `curl`
+//! child (no TLS stack in tree). The key is read from OPENROUTER_API_KEY and
+//! handed to curl on stdin as a config line, so it never appears in argv,
+//! logs, or output.
 use crate::now_ms;
 use std::io::{BufRead, BufReader, Write};
 use std::process::{Command, Stdio};
@@ -11,24 +16,49 @@ use std::sync::mpsc::{channel, Receiver};
 #[derive(Debug)]
 pub enum LlmEv { Thought(f64, String), Token(f64, String), Done(f64, Option<f64>, String) }
 
-pub struct LlmCfg { pub url: String, pub model: String, pub max_tokens: u32, pub reasoning: Option<&'static str>, pub provider_order: Vec<String> }
+#[derive(Clone, Debug)]
+pub struct LlmCfg { pub url: String, pub model: String, pub max_tokens: u32, pub reasoning: Option<&'static str>, pub provider_order: Vec<String>, pub temperature: f64 }
 impl LlmCfg {
     pub fn from_env() -> Self {
+        let url = std::env::var("GALION_LLM_URL").unwrap_or_else(|_| "https://openrouter.ai/api/v1/chat/completions".into());
+        let local = crate::local::split_local(&url).is_some();
         Self {
-            url: std::env::var("GALION_LLM_URL").unwrap_or_else(|_| "https://openrouter.ai/api/v1/chat/completions".into()),
-            model: std::env::var("GALION_LLM_MODEL").unwrap_or_else(|_| "meta-llama/llama-3.1-8b-instruct".into()),
+            model: std::env::var("GALION_LLM_MODEL").unwrap_or_else(|_| if local { "qwen2.5-1.5b-instruct".into() } else { "meta-llama/llama-3.1-8b-instruct".into() }),
             max_tokens: std::env::var("GALION_LLM_MAX_TOKENS").ok().and_then(|v| v.parse().ok()).unwrap_or(60),
             reasoning: None,
-            provider_order: std::env::var("GALION_LLM_PROVIDER").map(|s| s.split(',').map(str::to_string).collect()).unwrap_or_else(|_| vec!["Groq".into()]),
+            provider_order: provider_order(std::env::var("GALION_LLM_PROVIDER").ok().as_deref(), local),
+            temperature: std::env::var("GALION_LLM_TEMPERATURE").ok().and_then(|v| v.parse().ok()).unwrap_or(0.7),
+            url,
         }
+    }
+    /// True when the URL is the loopback llama-server (in-process client).
+    pub fn is_local(&self) -> bool { crate::local::split_local(&self.url).is_some() }
+}
+
+/// `GALION_LLM_PROVIDER`: a comma list. Empty entries are dropped, so `""`
+/// (or `" , "`) means **no provider field at all**. The old code sent
+/// `provider:{order:[""]}`. Unset means `Groq` for OpenRouter and nothing for a
+/// local server.
+pub fn provider_order(env: Option<&str>, local: bool) -> Vec<String> {
+    match env {
+        Some(s) => s.split(',').map(str::trim).filter(|p| !p.is_empty()).map(str::to_string).collect(),
+        None if local => Vec::new(),
+        None => vec!["Groq".into()],
     }
 }
 
 /// Start a streaming completion; events arrive on the returned channel.
 pub fn stream(cfg: &LlmCfg, messages: serde_json::Value) -> Result<Receiver<LlmEv>, String> {
-    let key = std::env::var("OPENROUTER_API_KEY").map_err(|_| "OPENROUTER_API_KEY not set; no LLM call made".to_string())?;
+    // GALION_LLM_CLIENT=curl forces the old per-turn curl path (used for A/B timing against the same local server).
+    let force_curl = std::env::var("GALION_LLM_CLIENT").as_deref() == Ok("curl");
+    if cfg.is_local() && !force_curl { return crate::local::stream(cfg, messages); }
+    let key = match std::env::var("OPENROUTER_API_KEY") {
+        Ok(k) => Some(k),
+        Err(_) if cfg.is_local() => None,
+        Err(_) => return Err("OPENROUTER_API_KEY not set; no LLM call made".to_string()),
+    };
     let mut body = serde_json::json!({"model": cfg.model, "messages": messages, "stream": true,
-        "max_tokens": cfg.max_tokens, "temperature": 0.7, "usage": {"include": true}});
+        "max_tokens": cfg.max_tokens, "temperature": cfg.temperature, "usage": {"include": true}});
     if !cfg.provider_order.is_empty() { body["provider"] = serde_json::json!({"order": cfg.provider_order, "allow_fallbacks": true}); }
     if let Some(r) = cfg.reasoning { body["reasoning"] = serde_json::json!({"effort": r}); }
     let tmp = std::env::temp_dir().join(format!("galion-llm-{}-{}.json", std::process::id(), (now_ms() * 1000.0) as u64));
@@ -40,7 +70,7 @@ pub fn stream(cfg: &LlmCfg, messages: serde_json::Value) -> Result<Receiver<LlmE
         .spawn().map_err(|e| format!("spawn curl: {e}"))?;
     {
         let mut si = child.stdin.take().unwrap();
-        si.write_all(format!("header = \"Authorization: Bearer {key}\"\n").as_bytes()).map_err(|e| e.to_string())?;
+        if let Some(key) = key { si.write_all(format!("header = \"Authorization: Bearer {key}\"\n").as_bytes()).map_err(|e| e.to_string())?; }
     }
     let out = child.stdout.take().unwrap();
     let (tx, rx) = channel();
@@ -122,7 +152,19 @@ impl Clauser {
 
 #[cfg(test)]
 mod t {
-    use super::Clauser;
+    use super::{provider_order, Clauser};
+    #[test]
+    fn empty_provider_env_sends_no_provider() {
+        assert!(provider_order(Some(""), false).is_empty(), "GALION_LLM_PROVIDER=\"\" must not send order:[\"\"]");
+        assert!(provider_order(Some(" , "), false).is_empty());
+        assert_eq!(provider_order(Some("Groq, Cerebras"), false), vec!["Groq".to_string(), "Cerebras".to_string()]);
+        assert_eq!(provider_order(None, false), vec!["Groq".to_string()]);
+        assert!(provider_order(None, true).is_empty(), "local server: no provider by default");
+        let cfg = super::LlmCfg { url: "https://x/v1".into(), model: "m".into(), max_tokens: 4, reasoning: None, provider_order: provider_order(Some(""), false), temperature: 0.7 };
+        let p = crate::warm::Prompt::new(&cfg, "s", 0.7);
+        let v: serde_json::Value = serde_json::from_str(&p.body("u")).unwrap();
+        assert!(v.get("provider").is_none(), "{v}");
+    }
     #[test]
     fn capped_first_clause() {
         let mut c = Clauser::capped(3);

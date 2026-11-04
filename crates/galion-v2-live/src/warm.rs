@@ -118,7 +118,7 @@ impl Drop for WarmPool { fn drop(&mut self) { for w in self.spares.drain(..) { w
 mod t {
     #[test]
     fn prompt_body_is_valid_json_with_escaped_user() {
-        let cfg = crate::llm::LlmCfg { url: "x".into(), model: "m".into(), max_tokens: 40, reasoning: None, provider_order: vec!["Groq".into()] };
+        let cfg = crate::llm::LlmCfg { url: "x".into(), model: "m".into(), max_tokens: 40, reasoning: None, provider_order: vec!["Groq".into()], temperature: 0.7 };
         let p = super::Prompt::new(&cfg, "sys \"q\"", 0.7);
         let v: serde_json::Value = serde_json::from_str(&p.body("he said \"hi\"\n")).unwrap();
         assert_eq!(v["messages"][1]["content"], "he said \"hi\"\n");

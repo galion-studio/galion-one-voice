@@ -112,7 +112,12 @@ fn true_eos_ms(x: &[i16]) -> f64 {
 fn full_loop(paths: &PiperPaths, runs: usize, out_dir: &str) -> serde_json::Value {
     let root = galion_v2_live::repo_root();
     let sdir = std::env::var("GALION_SAMPLES").unwrap_or_else(|_| root.join("../samples").display().to_string());
-    let clips = ["voicezero-amy_koenig.wav", "voicezero-alan_davis_drake.wav", "armstrong-en.wav", "pdx-voice.wav"];
+    // GALION_LAT_CLIPS (comma list) overrides the input clips.
+    let clips_env = std::env::var("GALION_LAT_CLIPS").ok();
+    let clips: Vec<&str> = match clips_env.as_deref() {
+        Some(s) => s.split(',').map(str::trim).filter(|c| !c.is_empty()).collect(),
+        None => vec!["voicezero-amy_koenig.wav", "voicezero-alan_davis_drake.wav", "armstrong-en.wav", "pdx-voice.wav"],
+    };
     let mut pcm16 = Vec::new();
     for c in clips {
         let w = audio::read_wav(&format!("{sdir}/{c}")).unwrap_or_else(|e| { eprintln!("{e}"); std::process::exit(2) });
@@ -128,7 +133,14 @@ fn full_loop(paths: &PiperPaths, runs: usize, out_dir: &str) -> serde_json::Valu
     // latency-240: one pre-connected HTTP/2 curl (TLS done, headers sent, waiting for
     // the body) replaces the per-turn curl spawn + TCP + TLS. GALION_WARM=0 = old path.
     const SYSTEM: &str = "You are Samantha, a warm voice companion on a live call. Reply in one or two short spoken sentences. Start with a short reaction.";
-    let use_warm = std::env::var("GALION_WARM").map(|v| v != "0").unwrap_or(true);
+    // A loopback llama-server URL uses the in-process keep-alive client instead
+    // (llm::stream → local::stream). There is no curl to pre-connect; the warm-up
+    // fills the server's prompt cache with SYSTEM.
+    let use_warm = !cfg.is_local() && std::env::var("GALION_WARM").map(|v| v != "0").unwrap_or(true);
+    if cfg.is_local() {
+        let ms = galion_v2_live::local::prewarm(&cfg, SYSTEM).unwrap_or_else(|e| { eprintln!("{e}"); std::process::exit(2) });
+        eprintln!("local LLM: keep-alive client, prompt cache warmed in {ms:.1} ms");
+    }
     let prompt = Prompt::new(&cfg, SYSTEM, 0.7);
     let mut pool = if use_warm { Some(WarmPool::new(&cfg, 1).unwrap_or_else(|e| { eprintln!("{e}"); std::process::exit(2) })) } else { None };
     let mut bc_wait = Vec::new();
