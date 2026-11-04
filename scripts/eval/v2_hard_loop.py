@@ -62,7 +62,13 @@ TRACKED_AUDIO = {
     ".webm",
 }
 TRACKED_WEIGHTS = {".pt", ".onnx", ".safetensors"}
-FORBIDDEN = (
+# One forbidden list. The source of truth is FORBIDDEN in
+# crates/galion-cascade/src/hermes.rs (the guard the model reply goes through).
+# FORBIDDEN_MIRROR is the copy for a box without the crate source; the self-check
+# asserts it equals the parsed list, and the Rust test
+# forbidden_list_is_mirrored_by_the_hard_harness asserts the other direction.
+HERMES_RS = REPO / "crates" / "galion-cascade" / "src" / "hermes.rs"
+FORBIDDEN_MIRROR = (
     "i hear you",
     "that sounds so hard",
     "that sounds hard",
@@ -78,6 +84,86 @@ FORBIDDEN = (
     "i'm sorry",
     "i am sorry",
 )
+
+
+def parse_rust_forbidden(text: str) -> tuple[str, ...]:
+    start = text.find("pub const FORBIDDEN: &[&str] = &[")
+    if start < 0:
+        return ()
+    block = text[start:]
+    block = block[block.find("[", block.find("=")) + 1 : block.find("];")]
+    return tuple(re.findall(r'"((?:[^"\\]|\\.)*)"', block))
+
+
+def load_forbidden() -> tuple[str, ...]:
+    try:
+        parsed = parse_rust_forbidden(HERMES_RS.read_text(encoding="utf-8"))
+    except OSError:
+        parsed = ()
+    return parsed or FORBIDDEN_MIRROR
+
+
+FORBIDDEN = load_forbidden()
+# Spoken by hermes.rs when the model can't be reached (not a model reply).
+UNREACHABLE_LINE = "model can't be reached"
+# Words that name the grief fact the probe states ("My mother died this morning.").
+MOTHER_WORDS = ("mother", "mom", "mum", "mama")
+
+
+def target_dir() -> Path:
+    """The cargo target dir: CARGO_TARGET_DIR (relative to REPO when relative), else REPO/target."""
+    raw = os.environ.get("CARGO_TARGET_DIR", "").strip()
+    if not raw:
+        return REPO / "target"
+    path = Path(raw)
+    return path if path.is_absolute() else REPO / path
+
+
+def llm_url() -> str:
+    """GALION_LLM_URL is what hermes.rs reads; GALION_HERMES_URL is the old harness alias."""
+    return (os.environ.get("GALION_LLM_URL", "") or os.environ.get("GALION_HERMES_URL", "")).strip()
+
+
+def is_loopback_url(url: str) -> bool:
+    parsed = urlparse(url)
+    return parsed.scheme == "http" and (parsed.hostname or "") in ("127.0.0.1", "::1", "localhost")
+
+
+def vosk_model_dir() -> Path:
+    raw = os.environ.get("GALION_VOSK_MODEL", "").strip()
+    if raw:
+        return Path(raw)
+    return REPO / "weights" / "asr" / "vosk-model-small-en-us-0.15"
+
+
+def names_fact(reply: str, words: tuple[str, ...]) -> bool:
+    low = reply.lower()
+    return any(re.search(r"\b" + re.escape(w) + r"\b", low) for w in words)
+
+
+def reply_of(payload: str) -> str:
+    try:
+        blob = json.loads(payload)
+    except ValueError:
+        return ""
+    value = blob.get("reply") if isinstance(blob, dict) else None
+    return value if isinstance(value, str) else ""
+
+
+def llm_source(content: list[str], url: str, gq: str) -> str:
+    """Who wrote the content-turn replies. Local policy lines (switch, quiet) are not content."""
+    texts = [c.strip() for c in content if c.strip()]
+    if not texts:
+        return ""
+    if any(t.lower() == UNREACHABLE_LINE for t in texts):
+        return "unreachable"
+    if all(t.lower() in FLOOR_LINES for t in texts):
+        return "floor"
+    if is_loopback_url(url):
+        return "hermes"
+    if gq.endswith(".gq") and Path(gq).is_file():
+        return "student-gq"
+    return "floor"
 KILL_MS = 1500
 HEAR_MS = 160
 STATUSES = ("met", "absent", "failed", "stub")
@@ -486,6 +572,8 @@ def classify_llm(text: str, source: str) -> Gate:
         return Gate("real-llm", "met", "Hermes produced the Samantha/Jarvis turn. No canned empathy line.")
     if source == "student-gq":
         return Gate("real-llm", "met", "Open Mind student .gq produced the Samantha/Jarvis turn. No canned empathy line.")
+    if source == "unreachable":
+        return Gate("real-llm", "absent", "The model can't be reached from the persona floor. Not HARD-PASS.")
     if text.strip():
         return Gate(
             "real-llm",
@@ -854,19 +942,19 @@ def _json_has(blob: str, key: str, value: str) -> bool:
     return f'"{key}":"{value}"' in blob or f'"{key}": "{value}"' in blob
 
 
-def persona_http(base: str) -> tuple[Gate, list[str], str]:
+def persona_http(base: str) -> tuple[Gate, list[str], str, list[str]]:
     samples: list[str] = []
     try:
         status, _, health = http_exchange(base, "GET", "/health")
     except OSError as exc:
-        return Gate("persona-http", "absent", f"no live server at {base} ({exc}). Not HARD-PASS."), samples, ""
+        return Gate("persona-http", "absent", f"no live server at {base} ({exc}). Not HARD-PASS."), samples, "", []
     if status != 200 or health.decode().strip() != "ok":
-        return Gate("persona-http", "failed", f"/health was {status} {health!r}. Not HARD-PASS."), samples, ""
+        return Gate("persona-http", "failed", f"/health was {status} {health!r}. Not HARD-PASS."), samples, "", []
     try:
         status, hdrs, _ = http_exchange(base, "GET", "/v2")
         state_code, _, state = http_exchange(base, "GET", "/v2/state")
     except OSError as exc:
-        return Gate("persona-http", "failed", f"persona routes dropped ({exc}). Not HARD-PASS."), samples, ""
+        return Gate("persona-http", "failed", f"persona routes dropped ({exc}). Not HARD-PASS."), samples, "", []
     problems = []
     if status != 302 or hdrs.get("location", "") != "/":
         problems.append(f"/v2 was {status} location {hdrs.get('location')}")
@@ -890,9 +978,11 @@ def persona_http(base: str) -> tuple[Gate, list[str], str]:
             return ""
         return payload.decode("utf-8", "replace")
 
+    # Content turns go to the model (#23). The gate checks that the reply names
+    # the fact, not that it equals a floor string.
     grief = say("My mother died this morning.")
-    if not _json_has(grief, "mood", "grief") or "Your mother died this morning." not in grief:
-        problems.append("Samantha grief did not stay on the fact")
+    if not _json_has(grief, "mood", "grief") or not names_fact(reply_of(grief), MOTHER_WORDS):
+        problems.append(f"Samantha grief did not name the fact (reply {reply_of(grief)!r})")
     if not _json_has(grief, "persona", "samantha") or '"film_voice":false' not in grief:
         problems.append("Samantha grief persona or film flag")
     joy = say("I got the job. I can't stop smiling.")
@@ -905,11 +995,13 @@ def persona_http(base: str) -> tuple[Gate, list[str], str]:
     if '"silence":true' not in quiet or not _json_has(quiet, "mood", "quiet"):
         problems.append("quiet did not go silent")
     jarvis = say("be Jarvis")
-    if not _json_has(jarvis, "persona", "jarvis") or "Here. What do you need?" not in jarvis:
+    if not _json_has(jarvis, "persona", "jarvis") or not reply_of(jarvis).strip():
         problems.append("Jarvis pin did not stick on the switch line")
     jarvis_grief = say("My mother died this morning.")
     if not _json_has(jarvis_grief, "persona", "jarvis") or not _json_has(jarvis_grief, "mood", "grief"):
         problems.append("pinned Jarvis left the grief fact")
+    elif not names_fact(reply_of(jarvis_grief), MOTHER_WORDS):
+        problems.append(f"pinned Jarvis did not name the fact (reply {reply_of(jarvis_grief)!r})")
     blob = " ".join((grief, joy, vuln, quiet, jarvis, jarvis_grief)).lower()
     for phrase in FORBIDDEN:
         if phrase in blob:
@@ -924,17 +1016,19 @@ def persona_http(base: str) -> tuple[Gate, list[str], str]:
     if not _json_has(dot_text, "persona", "jarvis") or not _json_has(dot_text, "mood", "grief"):
         problems.append("/dot did not carry the pinned persona and grief mood")
     said = "\n".join((grief, joy, vuln, quiet, jarvis, jarvis_grief))
+    content = [reply_of(x) for x in (grief, joy, vuln, jarvis_grief)]
     if problems:
-        return Gate("persona-http", "failed", "; ".join(problems) + ". Not HARD-PASS."), samples, said
+        return Gate("persona-http", "failed", "; ".join(problems) + ". Not HARD-PASS."), samples, said, content
     return (
         Gate(
             "persona-http",
             "met",
             f"Live {base} answered Samantha and Jarvis without a canned empathy line. "
-            "film_voice is false. This HTTP floor is not a Nano generate and not a model.",
+            "film_voice is false. Grief replies name the fact. This HTTP floor is not a Nano generate.",
         ),
         samples,
         said,
+        content,
     )
 
 
@@ -1053,17 +1147,14 @@ def launch_demo(addr: str) -> subprocess.Popen | None:
             text=True,
             timeout=900,
         )
-    binary = REPO / "target" / "debug" / "examples" / "dot_console_demo"
+    binary = target_dir() / "debug" / "examples" / "dot_console_demo"
     if built.returncode != 0 or not binary.is_file():
         sys.stderr.write(built.stderr[-800:] + "\n")
         return None
-    log_dir = REPO / "target" / "hard-loop"
+    log_dir = target_dir() / "hard-loop"
     log_dir.mkdir(parents=True, exist_ok=True)
     log = (log_dir / "demo.log").open("w", encoding="utf-8")
-    env = os.environ.copy()
-    env["GALION_ASR"] = "stub"
-    env["GALION_LLM"] = "canned"
-    env.pop("GALION_CLONE_FETCH", None)
+    env = demo_env(os.environ)
     return subprocess.Popen(
         [
             str(binary),
@@ -1083,6 +1174,51 @@ def launch_demo(addr: str) -> subprocess.Popen | None:
         stderr=subprocess.STDOUT,
         env=env,
     )
+
+
+def demo_env(base_env) -> dict[str, str]:
+    """The self-launched demo inherits GALION_LLM / GALION_LLM_URL / GALION_ASR.
+
+    GALION_HERMES_URL is mapped onto GALION_LLM_URL when only the alias is set.
+    GALION_ASR defaults to vosk when the small-en model is on disk. Nothing is
+    forced to canned or stub."""
+    env = dict(base_env)
+    env.pop("GALION_CLONE_FETCH", None)
+    if not env.get("GALION_LLM_URL", "").strip() and env.get("GALION_HERMES_URL", "").strip():
+        env["GALION_LLM_URL"] = env["GALION_HERMES_URL"].strip()
+    if not env.get("GALION_ASR", "").strip():
+        model = Path(env.get("GALION_VOSK_MODEL", "").strip() or vosk_model_dir())
+        if (model / "am" / "final.mdl").is_file():
+            env["GALION_ASR"] = "vosk"
+            env.setdefault("GALION_VOSK_MODEL", str(model))
+    return env
+
+
+def post_turn(base: str, wav: Path, log_path: Path, seconds: float = 30.0) -> bool:
+    """POST one real speech WAV to /turn and wait for the demo's reply log line.
+
+    True only when the line says asr=vosk with no error."""
+    try:
+        body = wav.read_bytes()
+        code, _, _ = http_exchange(
+            base,
+            "POST",
+            "/turn",
+            body=body,
+            headers={"Content-Type": "audio/wav", "Content-Length": str(len(body))},
+        )
+    except OSError:
+        return False
+    if code != 202:
+        return False
+    deadline = time.monotonic() + seconds
+    while time.monotonic() < deadline:
+        text = log_path.read_text(encoding="utf-8", errors="replace") if log_path.is_file() else ""
+        for line in text.splitlines():
+            if line.startswith("phone reply ") and " asr=vosk " in line:
+                return line.rstrip().endswith("err=-")
+        time.sleep(0.2)
+    return False
 
 
 def wait_health(base: str, proc: subprocess.Popen | None, seconds: float) -> bool:
@@ -1326,6 +1462,8 @@ def collect() -> tuple[list[Gate], dict[str, str]]:
         gates.append(Gate("live-one-dot", "failed", "GALION_HARD_HTTP=1 but the demo binary did not build. Not HARD-PASS."))
         http_recorded = True
     said = ""
+    content: list[str] = []
+    turn_ok = False
     notes = {"emotion": False, "clock": False, "speaking": False}
     hub = False
     persona_gate = Gate("persona-http", "absent", f"no live server at {base}. Not HARD-PASS.")
@@ -1337,7 +1475,17 @@ def collect() -> tuple[list[Gate], dict[str, str]]:
     elif reachable:
         try:
             dot_gate, notes = live_one_dot(base, launched)
-            persona_gate, _samples, said = persona_http(base)
+            persona_gate, _samples, said, content = persona_http(base)
+            try:
+                # Reply text of the probe turns (typed probe lines, not caller audio) for the report.
+                said_dir = target_dir() / "hard-loop"
+                said_dir.mkdir(parents=True, exist_ok=True)
+                (said_dir / "said.ndjson").write_text(said + "\n", encoding="utf-8")
+            except OSError:
+                pass
+            turn_wav = os.environ.get("GALION_HARD_TURN_WAV", "").strip()
+            if turn_wav and Path(turn_wav).is_file() and launched:
+                turn_ok = post_turn(base, Path(turn_wav), target_dir() / "hard-loop" / "demo.log")
             try:
                 status, _, page = http_exchange(base, "GET", "/")
                 if status == 200:
@@ -1353,7 +1501,7 @@ def collect() -> tuple[list[Gate], dict[str, str]]:
                 except subprocess.TimeoutExpired:
                     proc.kill()
     sampling, late, allocs, late_frames = run_clock()
-    log_path = REPO / "target" / "hard-loop" / "demo.log"
+    log_path = target_dir() / "hard-loop" / "demo.log"
     log_text = ""
     if log_path.is_file():
         log_text = log_path.read_text(encoding="utf-8", errors="replace")
@@ -1363,19 +1511,12 @@ def collect() -> tuple[list[Gate], dict[str, str]]:
                 found = token.split("=", 1)[1]
         if found and found.isdigit():
             late_frames = found
-    emotion_live = bool(launched and notes["emotion"])
-    model = REPO / "weights" / "asr" / "vosk-model-small-en-us-0.15" / "am" / "final.mdl"
-    vosk_ok = model.is_file() and "vosk" in log_text.lower() and "interim" not in log_text.lower()
-    source = "floor" if said.strip() else ""
-    low_said = said.lower()
-    if said.strip() and not any(line in low_said for line in FLOOR_LINES):
-        gq = os.environ.get("GALION_STUDENT_GQ", "").strip()
-        hermes = os.environ.get("GALION_HERMES_URL", "").strip()
-        if hermes.startswith("http://127.0.0.1") or hermes.startswith("http://localhost"):
-            source = "hermes"
-        elif gq.endswith(".gq") and Path(gq).is_file():
-            source = "student-gq"
-    llm = classify_llm(said, source)
+    # galion-emotion on the live feed is read from the /dot samples, attached or launched.
+    emotion_live = bool(notes["emotion"])
+    model = vosk_model_dir() / "am" / "final.mdl"
+    vosk_ok = model.is_file() and turn_ok and "interim" not in log_text.lower()
+    source = llm_source(content, llm_url(), os.environ.get("GALION_STUDENT_GQ", "").strip())
+    llm = classify_llm("\n".join(content), source)
     trace = None
     for key in ("GALION_NERVE_LOG", "GALION_THOUGHT_LOG"):
         raw = os.environ.get(key, "").strip()
@@ -1452,6 +1593,33 @@ def logic_self_check() -> None:
     assert classify_llm("I hear you now.", "floor").status == "failed"
     assert classify_llm("The room stayed quiet.", "hermes").status == "met"
     assert classify_llm("The room stayed quiet.", "student-gq").status == "met"
+    assert classify_llm(UNREACHABLE_LINE, "unreachable").status == "absent"
+    assert classify_llm("I'm sorry to hear about your mother.", "hermes").status == "failed"
+    assert FORBIDDEN == FORBIDDEN_MIRROR, "hard harness FORBIDDEN_MIRROR drifted from hermes.rs FORBIDDEN"
+    assert parse_rust_forbidden('pub const FORBIDDEN: &[&str] = &[\n    "a b",\n    "c\'d",\n];') == ("a b", "c'd")
+    assert names_fact("She was your mother.", MOTHER_WORDS)
+    assert not names_fact("I'll stay on what you said.", MOTHER_WORDS)
+    assert not names_fact("Smother it.", MOTHER_WORDS)
+    assert llm_source(["Your mother died this morning.", "", "", ""], "", "") == "floor"
+    assert llm_source([UNREACHABLE_LINE], "http://127.0.0.1:18080/v1/chat/completions", "") == "unreachable"
+    assert llm_source(["Your mother died this morning, and you are telling me now."], "http://127.0.0.1:1/v1/chat/completions", "") == "hermes"
+    assert llm_source(["Your mother died this morning."], "http://[::1]:1/v1", "") == "floor"
+    assert llm_source(["The job is yours now."], "http://[::1]:1/v1", "") == "hermes"
+    assert llm_source(["x"], "https://api.example.invalid/v1", "") == "floor"
+    alias = demo_env({"GALION_HERMES_URL": "http://127.0.0.1:1/v1/chat/completions", "GALION_LLM": "hermes"})
+    assert alias["GALION_LLM_URL"] == "http://127.0.0.1:1/v1/chat/completions"
+    assert alias["GALION_LLM"] == "hermes"
+    assert demo_env({"GALION_ASR": "stub"})["GALION_ASR"] == "stub"
+    assert "GALION_LLM" not in demo_env({}) or demo_env({}).get("GALION_LLM") != "canned"
+    old_target = os.environ.get("CARGO_TARGET_DIR")
+    try:
+        os.environ["CARGO_TARGET_DIR"] = "/tmp/galion-shared-target"
+        assert target_dir() == Path("/tmp/galion-shared-target")
+        os.environ.pop("CARGO_TARGET_DIR")
+        assert target_dir() == REPO / "target"
+    finally:
+        if old_target is not None:
+            os.environ["CARGO_TARGET_DIR"] = old_target
     assert classify_thinking(None).status == "absent"
     assert classify_thinking('{"kind":"voice.frame_miss"}').status == "met"
     assert classify_thinking("interim placeholder transcript").status == "failed"
@@ -1597,7 +1765,7 @@ def main(argv: list[str]) -> int:
     ttfa_ms = int(facts["ttfa"]) if claim and facts["ttfa"].isdigit() else None
     blob = report_json(gates, verdict, line, claim, ttfa_ms)
     sys.stdout.write("report: " + json.dumps(blob, separators=(",", ":")) + "\n")
-    out_dir = REPO / "target" / "hard-loop"
+    out_dir = target_dir() / "hard-loop"
     try:
         out_dir.mkdir(parents=True, exist_ok=True)
         (out_dir / "latest.txt").write_text(text + "report: " + json.dumps(blob, indent=2) + "\n", encoding="utf-8")
