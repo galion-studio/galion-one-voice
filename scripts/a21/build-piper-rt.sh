@@ -38,8 +38,13 @@ if [ ! -f "$ORT_LIB" ]; then
 fi
 echo "ok   $ORT_LIB"
 if [ "$CHECK" = 0 ]; then
+  # runtimes/galion-piper-rt is its own cargo workspace, so with CARGO_TARGET_DIR unset cargo
+  # builds into runtimes/galion-piper-rt/target, not $PWD/target, and the cp below copied a
+  # stale (or missing) binary. Pin the target dir for the build and the copy alike.
   TD="${CARGO_TARGET_DIR:-$PWD/target}"
-  cargo build --release --manifest-path runtimes/galion-piper-rt/Cargo.toml
+  case "$TD" in /*) ;; *) TD="$PWD/$TD" ;; esac
+  CARGO_TARGET_DIR="$TD" cargo build --release --manifest-path runtimes/galion-piper-rt/Cargo.toml
+  [ -x "$TD/release/galion-piper-rt" ] || { echo "build-piper-rt: no binary at $TD/release/galion-piper-rt"; exit 1; }
   [ -f "$BIN" ] && mv -f "$BIN" "$BIN.bak"
   cp "$TD/release/galion-piper-rt" "$BIN"
 fi
