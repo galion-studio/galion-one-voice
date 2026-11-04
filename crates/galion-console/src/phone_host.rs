@@ -434,7 +434,24 @@ impl PhoneHost {
         );
     }
 
+    /// The person pinned a persona on the floor ("be Jarvis"): the mouth on the
+    /// bus follows it, so the reply is delivered (and hub-mixed) as that persona.
+    fn sync_persona(&self) {
+        let (id, pinned) = match self.floor.lock() {
+            Ok(f) => (f.id(), f.pinned()),
+            Err(_) => return,
+        };
+        if !pinned {
+            return;
+        }
+        let Some(want) = crate::bus::PersonaId::parse(id) else { return };
+        if self.bus.persona_id() != want {
+            let _ = self.bus.try_send(BusMsg::persona_explicit(self.bus.alloc_id(), self.t_ms, want));
+        }
+    }
+
     fn submit_say(&mut self, mut line: SpokenLine) {
+        self.sync_persona();
         if line.barge {
             wipe_play(&mut self.play);
         }
@@ -450,6 +467,7 @@ impl PhoneHost {
     }
 
     fn submit_turn(&mut self, t: Turn) {
+        self.sync_persona();
         // New utterance cancels whatever the speakers were playing (barge-in).
         wipe_play(&mut self.play);
         if let Some((rate, ch, pcm)) = t.pcm16() {
@@ -740,6 +758,17 @@ mod tests {
         // A healthy frame is silence: one backend_up, fallback(s), one miss.
         assert_eq!(lines.iter().filter(|l| l.contains("voice.frame_miss")).count(), 1);
         assert_eq!(lines.iter().filter(|l| l.contains("voice.backend_up")).count(), 1);
+    }
+
+
+    #[test]
+    fn pinned_jarvis_on_the_floor_moves_the_mouth_on_the_bus() {
+        let web = WebSurface::mailbox();
+        let mut host = PhoneHost::from_surface(&web);
+        assert_eq!(host.bus.persona_id(), crate::bus::PersonaId::Samantha);
+        let _ = web.persona_floor().lock().unwrap().say("be Jarvis", false, 0.0, false);
+        host.submit_say(SpokenLine { id: 3, reply: String::new(), silence: true, barge: false });
+        assert_eq!(host.bus.persona_id(), crate::bus::PersonaId::Jarvis);
     }
 
 }

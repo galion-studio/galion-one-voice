@@ -247,6 +247,11 @@ impl Floor {
         self.id.as_str()
     }
 
+    /// True once the person asked for a persona by name ("be Jarvis").
+    pub fn pinned(&self) -> bool {
+        self.pin
+    }
+
     /// Persona column at weight `e`. Words are not part of this read.
     pub fn prosody_at(&self, e: f32) -> Prosody {
         let e = if e.is_finite() { e.clamp(0.0, 1.0) } else { 0.0 };

@@ -1516,7 +1516,9 @@ def collect() -> tuple[list[Gate], dict[str, str]]:
         base = f"http://{addr}"
         proc = launch_demo(addr)
         launched = proc is not None
-        reachable = proc is not None and wait_health(base, proc, 60)
+        # A debug demo hashes the clone pins (~2 GB) before /health; that is ~2 min on this box.
+        wait_s = float(os.environ.get("GALION_HARD_WAIT_S", "").strip() or "240")
+        reachable = proc is not None and wait_health(base, proc, wait_s)
         if proc is not None and not reachable:
             proc.terminate()
             gates.append(Gate("persona-http", "failed", "demo process did not serve /health. Not HARD-PASS."))
@@ -1549,10 +1551,11 @@ def collect() -> tuple[list[Gate], dict[str, str]]:
                 (said_dir / "said.ndjson").write_text(said + "\n", encoding="utf-8")
             except OSError:
                 pass
+            # The pinned-Jarvis say reply is the newest WAV now; read it before /turn replaces it.
+            hub = jarvis_hub_seen(base)
             turn_wav = os.environ.get("GALION_HARD_TURN_WAV", "").strip()
             if turn_wav and Path(turn_wav).is_file() and launched:
                 turn_ok = post_turn(base, Path(turn_wav), target_dir() / "hard-loop" / "demo.log")
-            hub = jarvis_hub_seen(base)
         finally:
             if proc is not None:
                 proc.terminate()
