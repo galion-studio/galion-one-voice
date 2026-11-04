@@ -39,3 +39,7 @@ Galion Voice — Perpetual Open MIT License · © 2026 Maciej Grajczyk · 2026-1
 ## Files touched
 `scripts/run-v1-demo.sh` (headless EN turn, `--check` fallback rc) · `scripts/v1/soft-checks.sh` (C7/C9/C11 labels, C12) ·
 `docs/V1-DEMO.md` · new `FP-04-UX.md`, `FP-04-STATUS.md`, `FP-SUMMARY.md`. The backup of soft-checks is at `/tmp/fp04/soft-checks.sh.bak`.
+
+---
+
+© GOATSI — Galion Open Automated Technarchy Society Inc. All rights reserved and claims reserved. · CC0 voices: you must tick the consent box agreeing to the CC0 licence before using any CC0 voice; use is at your own responsibility. · No cookies. · De-Googled: no Google services. · All current Galion builds are open source under the Galion perpetual open MIT licence.

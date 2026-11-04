@@ -22,3 +22,7 @@ G0 PASS · G1 PASS (325 passed, 0 failed) · G2 PASS · G3 PASS · soft G4 PASS 
 Note: two earlier runs went red only because other agents were writing files at the time: G1 (W21-01/02 sources were half-written) and LV (run-live-demo.sh changed while it was running). Both pass now.
 
 — Maciej Grajczyk
+
+---
+
+© GOATSI — Galion Open Automated Technarchy Society Inc. All rights reserved and claims reserved. · CC0 voices: you must tick the consent box agreeing to the CC0 licence before using any CC0 voice; use is at your own responsibility. · No cookies. · De-Googled: no Google services. · All current Galion builds are open source under the Galion perpetual open MIT licence.

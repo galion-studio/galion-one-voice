@@ -24,3 +24,7 @@ Local only. No GitHub push/merge. No VPS SSH. No weights download. No he-IL/Hebr
 | W20-18 | ML design | Assemble MULTILINGUAL-VOICE-PLAN.md | W20-18-STATUS.md |
 | W20-19 | EN proto | Scaffold galion-ml-voice English-only crate | W20-19-STATUS.md |
 | W20-20 | EN proto | Demo/tests + PROTOTYPE.md wiring notes | W20-20-STATUS.md |
+
+---
+
+© GOATSI — Galion Open Automated Technarchy Society Inc. All rights reserved and claims reserved. · CC0 voices: you must tick the consent box agreeing to the CC0 licence before using any CC0 voice; use is at your own responsibility. · No cookies. · De-Googled: no Google services. · All current Galion builds are open source under the Galion perpetual open MIT licence.

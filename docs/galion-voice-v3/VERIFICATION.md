@@ -113,3 +113,7 @@ Recording the backlog does not close them. See [ADMIN-BACKLOG.md](ADMIN-BACKLOG.
 - A claim that the VPS is serving the demo. Plan V5's human steps are still the deploy. This checklist does not SSH.
 
 — Maciej Grajczyk
+
+---
+
+© GOATSI — Galion Open Automated Technarchy Society Inc. All rights reserved and claims reserved. · CC0 voices: you must tick the consent box agreeing to the CC0 licence before using any CC0 voice; use is at your own responsibility. · No cookies. · De-Googled: no Google services. · All current Galion builds are open source under the Galion perpetual open MIT licence.

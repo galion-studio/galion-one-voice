@@ -40,3 +40,7 @@ bash scripts/symphony/check-g-latency.sh
 It measures `galion-heartbeat` `FRAME_MS` on the stub path and fails if that p99 is over 800 µs. Inference (ASR, TTS, clone, LLM) is off that tick. The 1% ceiling is not a claim about those models' CPU share.
 
 — Maciej Grajczyk
+
+---
+
+© GOATSI — Galion Open Automated Technarchy Society Inc. All rights reserved and claims reserved. · CC0 voices: you must tick the consent box agreeing to the CC0 licence before using any CC0 voice; use is at your own responsibility. · No cookies. · De-Googled: no Google services. · All current Galion builds are open source under the Galion perpetual open MIT licence.

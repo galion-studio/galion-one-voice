@@ -7,3 +7,7 @@
 - **Finding:** `run-gates.sh` will SSH if `GALION_VPS_HOST` is set (single env-var gate) — suggest double opt-in.
 - No SSH, no VPS contact, no git push. No files besides these two docs changed.
 - Blocker: owner steps (root pw rotation, key-only SSH, `galion` user, K4).
+
+---
+
+© GOATSI — Galion Open Automated Technarchy Society Inc. All rights reserved and claims reserved. · CC0 voices: you must tick the consent box agreeing to the CC0 licence before using any CC0 voice; use is at your own responsibility. · No cookies. · De-Googled: no Google services. · All current Galion builds are open source under the Galion perpetual open MIT licence.

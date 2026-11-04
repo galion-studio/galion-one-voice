@@ -124,3 +124,7 @@ Exit `0` is pass, `1` is a red gate, `2` is usage or IO. Stdout is one JSON obje
 A passing stub run is recorded in [`SELF-EVAL.md`](SELF-EVAL.md). Section G is complete for the stub path. The measured path stays open until a file is supplied.
 
 2026-11-03 · Europe/Zagreb
+
+---
+
+© GOATSI — Galion Open Automated Technarchy Society Inc. All rights reserved and claims reserved. · CC0 voices: you must tick the consent box agreeing to the CC0 licence before using any CC0 voice; use is at your own responsibility. · No cookies. · De-Googled: no Google services. · All current Galion builds are open source under the Galion perpetual open MIT licence.

@@ -22,3 +22,7 @@ cargo test
 - `SyntheticEstimator` + `SyntheticMode` — deterministic fixtures with valence (`neutral`, `sweep`, `joy`, `angry`, `sad`, `tired`, `calm`, `valence:<v>`, `Script`).
 - `ReferenceEstimator` — replays an offline label track (`t_ms LABEL posterior`, SenseVoice-style tags accepted) via a fixed label → VAD table. This is the SenseVoice-Small **offline reference** seam: the track is produced off-box after licence review; nothing is downloaded or run here. `fixtures/affect-ref-synthetic.txt` is hand-written synthetic data, not model output.
 - Later: a learned affect head on student latents (`EstimatorKind::Learned`, `.gq` weights) drops in as another `AffectEstimator`.
+
+---
+
+© GOATSI — Galion Open Automated Technarchy Society Inc. All rights reserved and claims reserved. · CC0 voices: you must tick the consent box agreeing to the CC0 licence before using any CC0 voice; use is at your own responsibility. · No cookies. · De-Googled: no Google services. · All current Galion builds are open source under the Galion perpetual open MIT licence.

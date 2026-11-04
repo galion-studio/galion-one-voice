@@ -23,3 +23,7 @@ A21 licence (P1+), G5 `.gq` writer, R0–R3 VPS latency, H6 GPU (Stage B), PL da
 
 ## Owner decisions requested
 HR as T1 after PL; turn-boundary-only switching on the cascade; Piper-class as PL TTS default; optional Grok external reference run.
+
+---
+
+© GOATSI — Galion Open Automated Technarchy Society Inc. All rights reserved and claims reserved. · CC0 voices: you must tick the consent box agreeing to the CC0 licence before using any CC0 voice; use is at your own responsibility. · No cookies. · De-Googled: no Google services. · All current Galion builds are open source under the Galion perpetual open MIT licence.

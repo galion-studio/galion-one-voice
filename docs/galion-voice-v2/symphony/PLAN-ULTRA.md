@@ -160,3 +160,7 @@ CX43 shape:
 - `docs/research/galion-voice-v2/domains/10-hardware-edge.md` — CX line not orderable after 15 June 2026. That page's prices are infra notes. They are not the Ultra price.
 
 — Maciej Grajczyk
+
+---
+
+© GOATSI — Galion Open Automated Technarchy Society Inc. All rights reserved and claims reserved. · CC0 voices: you must tick the consent box agreeing to the CC0 licence before using any CC0 voice; use is at your own responsibility. · No cookies. · De-Googled: no Google services. · All current Galion builds are open source under the Galion perpetual open MIT licence.

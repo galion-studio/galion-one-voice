@@ -178,3 +178,7 @@ Read 2026-11-03. No model download. No API call that spends money.
 - Risk examples, not dependencies: [chatterbox.cpp](https://github.com/gianni-cor/chatterbox.cpp), [community ONNX](https://huggingface.co/onnx-community/chatterbox-ONNX)
 
 — Maciej Grajczyk
+
+---
+
+© GOATSI — Galion Open Automated Technarchy Society Inc. All rights reserved and claims reserved. · CC0 voices: you must tick the consent box agreeing to the CC0 licence before using any CC0 voice; use is at your own responsibility. · No cookies. · De-Googled: no Google services. · All current Galion builds are open source under the Galion perpetual open MIT licence.

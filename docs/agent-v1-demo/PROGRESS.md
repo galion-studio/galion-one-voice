@@ -20,3 +20,7 @@ The first V1 run was SOFTFAIL: a concurrent sibling `cargo build` swapped the li
 Limits (16:10 CET, FP-03): the me band is the A21 reply words (`--reply`, 1360 ms), played to the speakers. A21 is PRESENT (Piper, CPU). Still open: the LOCKS onnx exception needs ratifying, espeak-ng GPL-3 needs counsel, Mimi IS_STUB, StubAsr, MockLlm. See A21-BLOCKERS.md.
 
 — Maciej Grajczyk
+
+---
+
+© GOATSI — Galion Open Automated Technarchy Society Inc. All rights reserved and claims reserved. · CC0 voices: you must tick the consent box agreeing to the CC0 licence before using any CC0 voice; use is at your own responsibility. · No cookies. · De-Googled: no Google services. · All current Galion builds are open source under the Galion perpetual open MIT licence.

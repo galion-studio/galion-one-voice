@@ -20,3 +20,7 @@ Hermes is never on the 80 ms path: the hot loop only calls the two non-blocking 
 - Wire format (serde) still unchosen; the crate stays zero-dep until it is.
 - No test for the 3 s timeout path (it would add 3 s to CI); a test hook for injectable clock is a follow-up.
 - Not wired into the heartbeat/engine yet.
+
+---
+
+© GOATSI — Galion Open Automated Technarchy Society Inc. All rights reserved and claims reserved. · CC0 voices: you must tick the consent box agreeing to the CC0 licence before using any CC0 voice; use is at your own responsibility. · No cookies. · De-Googled: no Google services. · All current Galion builds are open source under the Galion perpetual open MIT licence.

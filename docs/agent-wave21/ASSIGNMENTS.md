@@ -10,3 +10,7 @@
 | W21-03 | 11 Cascade + ML EN | Runnable EN cascade/ml-voice demo lane callable from live demo | W21-03-STATUS.md |
 | W21-04 | 06 Render + 08 Console | One-dot window + live console feeds driven by heartbeat | W21-04-STATUS.md |
 | W21-05 | 15 Gates + docs | G2 scrub Wave-20 docs; LIVE-DEMO.md runbook; soft gate; refresh touched plans | W21-05-STATUS.md |
+
+---
+
+© GOATSI — Galion Open Automated Technarchy Society Inc. All rights reserved and claims reserved. · CC0 voices: you must tick the consent box agreeing to the CC0 licence before using any CC0 voice; use is at your own responsibility. · No cookies. · De-Googled: no Google services. · All current Galion builds are open source under the Galion perpetual open MIT licence.

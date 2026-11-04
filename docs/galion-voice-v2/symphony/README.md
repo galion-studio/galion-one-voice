@@ -247,3 +247,7 @@ The host plan is CPU only, no GPU. The flagship app node is an AMD EPYC 9655P. P
 The tick bar is [LATENCY.md](LATENCY.md). The ledger is [SELF-EVAL.md](SELF-EVAL.md). A section there is complete only when its check exits 0.
 
 — Maciej Grajczyk
+
+---
+
+© GOATSI — Galion Open Automated Technarchy Society Inc. All rights reserved and claims reserved. · CC0 voices: you must tick the consent box agreeing to the CC0 licence before using any CC0 voice; use is at your own responsibility. · No cookies. · De-Googled: no Google services. · All current Galion builds are open source under the Galion perpetual open MIT licence.

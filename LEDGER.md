@@ -121,3 +121,7 @@
 **2026-11-04 02:34 CET · A21 Piper runtime on onnxruntime 1.31.1 (t613s2992).** Owner approval: "Yes, update the LOCKS pin and wire the Rust onnxruntime 1.31 wrapper in for Piper." `LOCKS.toml` `formats.exceptions.a21_piper` widened once, Piper/TTS path only: onnxruntime 1.14.1 -> 1.31.1 (tarball sha256 `c849e36a1ef3e22d4ff217b9d1ce4a3cf5b9467b975610913ae959ad5b16bdc9`), run by `runtimes/galion-piper-rt` (Rust, separate process, its own cargo workspace excluded from the main one; ort crate `=2.0.0-rc.15` with `load-dynamic`). Same voice pack (`en_US-ljspeech-medium`, sha256 unchanged), same espeak-ng phonemizer; PCM parity against the legacy CLI on 8 sentences (correlation 1.000000, same sample counts, max |diff| 8 LSB). Legacy piper 2023.11.14-2 stays as fallback (`GALION_PIPER_LEGACY=1`, and automatically when the new runtime dies before its first audio). Global `forbidden_runtimes` still lists `ort`; candle, llama.cpp, ggml and GGUF are not touched. Gates G3 and check-no-forbidden allow exactly the one `ort` line in that manifest. Branch `swarm/lat240-streaming-tts` (agent 01, latency-240). Not deployed.
 
 — Maciej Grajczyk
+
+---
+
+© GOATSI — Galion Open Automated Technarchy Society Inc. All rights reserved and claims reserved. · CC0 voices: you must tick the consent box agreeing to the CC0 licence before using any CC0 voice; use is at your own responsibility. · No cookies. · De-Googled: no Google services. · All current Galion builds are open source under the Galion perpetual open MIT licence.

@@ -116,3 +116,7 @@ Default build of most crates is zero-dependency; these come in only through opti
 - Unknowns: libflite1 / CMU Flite 2.2 (voice `cmu_us_slt` etc.), SenseVoice-Small, softbuffer + winit, minifb, SpeechT5, Pocket-TTS, sherpa-onnx, `crossterm_winapi`, `redox_syscall`, `wasi`, `winapi`, `winapi-i686-pc-windows-gnu`, `winapi-x86_64-pc-windows-gnu`, `windows-link`, `windows-sys`, `windows-targets`, `windows_aarch64_gnullvm`, `windows_aarch64_msvc`, `windows_i686_gnu`, `windows_i686_gnullvm`, `windows_i686_msvc`, `windows_x86_64_gnu`, `windows_x86_64_gnullvm`, `windows_x86_64_msvc`.
 
 — Maciej Grajczyk
+
+---
+
+© GOATSI — Galion Open Automated Technarchy Society Inc. All rights reserved and claims reserved. · CC0 voices: you must tick the consent box agreeing to the CC0 licence before using any CC0 voice; use is at your own responsibility. · No cookies. · De-Googled: no Google services. · All current Galion builds are open source under the Galion perpetual open MIT licence.

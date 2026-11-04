@@ -19,3 +19,7 @@ cargo test -p galion-tensor --no-default-features   # pure scalar
 cargo test -p galion-tensor --features simd-avx2,simd-avx512,simd-neon  # SIMD vs scalar oracle
 ./scripts/check-no-forbidden.sh                     # format/runtime-dep gate
 ```
+
+---
+
+© GOATSI — Galion Open Automated Technarchy Society Inc. All rights reserved and claims reserved. · CC0 voices: you must tick the consent box agreeing to the CC0 licence before using any CC0 voice; use is at your own responsibility. · No cookies. · De-Googled: no Google services. · All current Galion builds are open source under the Galion perpetual open MIT licence.

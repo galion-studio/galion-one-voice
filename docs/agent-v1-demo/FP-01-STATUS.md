@@ -39,3 +39,7 @@ Rust LOC: tensor 4875 · emotion 3745 · console 3307 · mimi 2218 · presence 2
 - **FP-03 (TTS/A21):** build the A21 slot (CPU-only, MIT-licensed, e.g. Piper) to replace flite. Also delete the dead `V1_SPEECH_CMD`/`speech.sh` branch, or ship `speech.sh`. **UX bug:** the live `run-v1-demo.sh` loop never *plays* the reply. Only `run-en-cascade-demo.sh --play` calls paplay/aplay, so a person watching the dot hears nothing. The simplest fix that serves the one dot is to play the me-band/reply WAV locally (paplay/aplay) in sync with the turn. It should not be an HTML `<audio>` element, because that would need a user click and controls.
 - **FP-04 (E2E):** use the side-port trick (`V1_SCREEN_ADDR=127.0.0.1:<free>`) so parallel lanes don't fight over `:7878`. The `--check` above takes about 15 s.
 - Runbook: `docs/V1-DEMO.md` needs only the one URL. Deployment to 51.38.137.193 is NOT done (SSH tunnel later).
+
+---
+
+© GOATSI — Galion Open Automated Technarchy Society Inc. All rights reserved and claims reserved. · CC0 voices: you must tick the consent box agreeing to the CC0 licence before using any CC0 voice; use is at your own responsibility. · No cookies. · De-Googled: no Google services. · All current Galion builds are open source under the Galion perpetual open MIT licence.

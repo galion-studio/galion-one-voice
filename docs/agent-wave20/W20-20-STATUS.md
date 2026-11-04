@@ -17,3 +17,7 @@
 ## Open / handoff
 - An adapter layer in galion-cascade (behind the `cascade` feature) plus a 16↔24 kHz resampler. See PROTOTYPE.md "Next steps".
 - `LanguageId::from_code` accepts only `en`. Cascade accepts `en-US`/`en-GB`, so the two need aligning (W20-19's file; not changed here).
+
+---
+
+© GOATSI — Galion Open Automated Technarchy Society Inc. All rights reserved and claims reserved. · CC0 voices: you must tick the consent box agreeing to the CC0 licence before using any CC0 voice; use is at your own responsibility. · No cookies. · De-Googled: no Google services. · All current Galion builds are open source under the Galion perpetual open MIT licence.

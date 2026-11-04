@@ -17,3 +17,7 @@
 - None for this doc. A live comparison needs an XAI_API_KEY and an owner go-ahead.
 
 No git commit/push.
+
+---
+
+© GOATSI — Galion Open Automated Technarchy Society Inc. All rights reserved and claims reserved. · CC0 voices: you must tick the consent box agreeing to the CC0 licence before using any CC0 voice; use is at your own responsibility. · No cookies. · De-Googled: no Google services. · All current Galion builds are open source under the Galion perpetual open MIT licence.

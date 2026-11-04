@@ -73,3 +73,7 @@ D20 lean-in and barge-in yield show), `FEED_PORT=7878`, `SCREEN_PORT=7870`, `V1_
 - **Concurrent edits:** V1-04 edited `run-v1-demo.sh` while I was working in it. One of my line rewrites briefly broke the `screen-host` launch line in the `V1_SCREEN_HOST` block. I restored it and both `--check` modes pass again. V1-04 should re-read the file before its next edit.
 
 — Maciej Grajczyk
+
+---
+
+© GOATSI — Galion Open Automated Technarchy Society Inc. All rights reserved and claims reserved. · CC0 voices: you must tick the consent box agreeing to the CC0 licence before using any CC0 voice; use is at your own responsibility. · No cookies. · De-Googled: no Google services. · All current Galion builds are open source under the Galion perpetual open MIT licence.

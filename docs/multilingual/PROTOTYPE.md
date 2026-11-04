@@ -69,3 +69,7 @@ scripts/run-en-cascade-demo.sh [--test] [--play] [--text "..."] [--pin en] [--hi
 cargo run --offline -p galion-cascade --features cascade --example en_cascade -- --out-dir target/galion-demo
 ```
 Stable outputs for `scripts/run-live-demo.sh`: `target/galion-demo/en-cascade.wav` (audible earcon, 24 kHz mono PCM16, one 80 ms frame per char), `en-cascade-fixture.wav` (exact stub signal), `en-cascade.json` (turn summary), `en-roundtrip.wav` (this crate's `roundtrip` example). The script's last line is `GALION_EN_CASCADE_WAV=<path>`. Details: `docs/agent-wave21/W21-03-STATUS.md`.
+
+---
+
+© GOATSI — Galion Open Automated Technarchy Society Inc. All rights reserved and claims reserved. · CC0 voices: you must tick the consent box agreeing to the CC0 licence before using any CC0 voice; use is at your own responsibility. · No cookies. · De-Googled: no Google services. · All current Galion builds are open source under the Galion perpetual open MIT licence.

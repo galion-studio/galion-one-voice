@@ -48,3 +48,7 @@ Replace `canned_reply()` with a call into `crates/galion-tensor` (Rust) once the
 
 ## Golden (A14)
 `./golden.sh` → selftest + deterministic canned runs (`--canned`, RTF labelled "canned", no wall clock) in 4 variants (default no-consent, consented opener, workplace, education; workplace/education output must be byte-identical to default) + KD exports, hashed into `out/canned/demo.artifact` and checked against `../galion-gates/golden/demo.sha256`. Wired into `galion-gates/run-gates.sh` as soft gate **DG**. Unit tests: `python3 -m unittest discover -s tests`. See `docs/A14-kd-targets-and-opener.md`.
+
+---
+
+© GOATSI — Galion Open Automated Technarchy Society Inc. All rights reserved and claims reserved. · CC0 voices: you must tick the consent box agreeing to the CC0 licence before using any CC0 voice; use is at your own responsibility. · No cookies. · De-Googled: no Google services. · All current Galion builds are open source under the Galion perpetual open MIT licence.

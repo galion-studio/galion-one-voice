@@ -319,3 +319,7 @@ with real Nano PCM is a TTFA product claim (`FlashReport::from_pcm`).
 - Frame prosody (pause and loudness) is applied to Piper and flite PCM. Clone PCM is not rewritten after the child, because the landed `.gqvoice` must equal the playback buffer.
 - Fixed a pre-existing bug: a Jarvis request that carried a reference produced invalid JSON (the `reference` string was never closed), so the worker answered "bad json".
 - HOLD check: the merged SpeechStack produced real local Nano speech, CPU only, with no stub and no cloud path. The test allowlist of CC0 donors was local only and was not committed. Each output sat closest to its own donor on ECAPA: Samantha 0.476 vs amy, Jarvis 0.587 vs alan.
+
+---
+
+© GOATSI — Galion Open Automated Technarchy Society Inc. All rights reserved and claims reserved. · CC0 voices: you must tick the consent box agreeing to the CC0 licence before using any CC0 voice; use is at your own responsibility. · No cookies. · De-Googled: no Google services. · All current Galion builds are open source under the Galion perpetual open MIT licence.

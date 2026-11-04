@@ -26,3 +26,7 @@ Samantha and Jarvis are defined from publicly known character traits, in prose. 
 `SAMANTHA-V2.md` may pin the ids `samantha` and `jarvis` on the process bus while a call is alive. That pin selects a register for a test. It does not turn either id into a product voice. A product session that has not been pinned to a test id speaks as Galion One.
 
 — Maciej Grajczyk
+
+---
+
+© GOATSI — Galion Open Automated Technarchy Society Inc. All rights reserved and claims reserved. · CC0 voices: you must tick the consent box agreeing to the CC0 licence before using any CC0 voice; use is at your own responsibility. · No cookies. · De-Googled: no Google services. · All current Galion builds are open source under the Galion perpetual open MIT licence.

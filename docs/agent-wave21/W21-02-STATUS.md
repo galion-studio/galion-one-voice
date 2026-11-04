@@ -92,3 +92,7 @@ The demo widths are for demo use only. They are not Mimi hyper-parameters. The f
 ## Still blocking `IS_STUB = false` (unchanged)
 A21 licence clearance. A7 `.gq` → `WeightSource` adapter, including the `permute_qk_interleaved_to_neox` step. Golden frames.
 The `VERIFY` hyper-parameters. Real-time performance at full size (SIMD/parallel GEMV, int8).
+
+---
+
+© GOATSI — Galion Open Automated Technarchy Society Inc. All rights reserved and claims reserved. · CC0 voices: you must tick the consent box agreeing to the CC0 licence before using any CC0 voice; use is at your own responsibility. · No cookies. · De-Googled: no Google services. · All current Galion builds are open source under the Galion perpetual open MIT licence.

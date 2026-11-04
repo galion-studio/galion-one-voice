@@ -35,3 +35,7 @@ A spec may drive the you-band from audio instead of frame-scripted `you` segment
 `galion-gates/ps-presence.sh` runs as soft gate **PS** in `run-gates.sh`, after G6. It runs both spec files and writes `results/<ts>.presence.json` and `results/<ts>.presence-wav.json`. Exit codes: 0 PASS, 1 FAIL, 3 SKIP. With `GALION_GATES_HARD=1`, a failure counts toward the exit code.
 
 Perpetual Open MIT. © 2026 Maciej Grajczyk.
+
+---
+
+© GOATSI — Galion Open Automated Technarchy Society Inc. All rights reserved and claims reserved. · CC0 voices: you must tick the consent box agreeing to the CC0 licence before using any CC0 voice; use is at your own responsibility. · No cookies. · De-Googled: no Google services. · All current Galion builds are open source under the Galion perpetual open MIT licence.
