@@ -69,9 +69,14 @@ impl PiperWorker {
     /// The first [`synthesize`](Self::synthesize) therefore pays load + inference.
     pub fn spawn(runtime: &Path, model: &Path, config: &Path, prosody: &PiperProsody) -> Result<Self, VoiceError> {
         let mut cmd = Command::new(runtime);
-        // V2 core map: Piper's placement during a live call (no-op when the map is off).
-        // An explicit `GALION_PIPER_CPUS` below is applied after it and wins.
-        super::core_map::apply_affinity(&mut cmd, &super::core_map::placement(super::core_map::CoreRole::Piper).cpus);
+        // Core map (v3: cores 6-7, Piper only; no-op when the map is off).
+        // The rt gets one intra-op thread per placed core. An explicit
+        // `GALION_PIPER_CPUS` / `GALION_PIPER_THREADS` wins.
+        let placed = super::core_map::placement(super::core_map::CoreRole::Piper);
+        super::core_map::apply_affinity(&mut cmd, &placed.cpus);
+        if placed.threads > 0 && std::env::var_os("GALION_PIPER_THREADS").is_none() {
+            cmd.env("GALION_PIPER_THREADS", placed.threads.to_string());
+        }
         cmd.arg("--model").arg(model)
             .arg("--config").arg(config)
             .arg("--output_raw")
