@@ -1093,6 +1093,16 @@ impl Drop for CloneWorker {
     }
 }
 
+/// LOCKS no-celebrity rule at clone time: a requested voice id that names a
+/// blocked voice (Armstrong) is refused before anything else is read.
+pub fn refuse_blocked_voice(asked: &str) -> Result<(), String> {
+    let lowered = asked.trim().to_lowercase();
+    if galion_consent::BLOCKED_VOICES.iter().any(|b| lowered.contains(b)) {
+        return Err(galion_consent::CloneRefused { persona: lowered, reason: "celebrity" }.to_string());
+    }
+    Ok(())
+}
+
 /// Speech-stack slot. Constructible only when pinned weights and the script exist.
 /// The process starts on the first synthesis.
 pub struct CloneTts {
@@ -1100,9 +1110,13 @@ pub struct CloneTts {
     model: CloneModel,
     persona: &'static str,
     prosody: FrameProsody,
-    /// Host ref pre-check per utterance. `try_new` slots only; a test
-    /// harness that hands in its own worker has no store to check.
+    /// Host ref gate. `try_new` slots only; a test harness that hands in its
+    /// own worker has no store to check.
     ref_gate: bool,
+    /// Voices that passed the consent gate and the ref pre-check when this
+    /// slot was built (clone time), `[samantha, jarvis]`. A turn reads this;
+    /// it does not re-run consent or hash the reference again.
+    approved: [bool; 2],
     worker: Option<CloneWorker>,
     frames: Arc<CloneFrameDrain>,
     spawns: u32,
@@ -1118,7 +1132,9 @@ impl CloneTts {
             .as_deref()
             .and_then(CloneModel::parse)
             .unwrap_or(CloneModel::Nano);
-        let persona = persona_name(&std::env::var("GALION_CLONE_PERSONA").unwrap_or_default());
+        let asked = std::env::var("GALION_CLONE_PERSONA").unwrap_or_default();
+        refuse_blocked_voice(&asked)?;
+        let persona = persona_name(&asked);
         if protocol_stub_armed() {
             return Err("GALION_CLONE_STUB_PCM=1 is protocol PCM, not the clone slot; HARD-PASS measures Piper".into());
         }
@@ -1129,8 +1145,21 @@ impl CloneTts {
         if !local_refs_enabled() {
             return Err("GALION_CLONE_LOCAL_REFS is not 1; clone slot stays closed and Piper speaks".into());
         }
-        if !ref_allowlisted("samantha") && !ref_allowlisted("jarvis") {
-            return Err("no allowlisted samantha or jarvis reference (GALION_CLIP_STORE sidecar or REFS.sha256)".into());
+        // Clone time: the consent gate (galion-consent, in process, no
+        // subprocess) runs here once per voice. A voice without valid consent
+        // is refused with the gate's reason. Turns only read `approved`.
+        let env = galion_consent::Env::process();
+        let mut approved = [false; 2];
+        let mut refused = Vec::new();
+        for (i, voice) in ["samantha", "jarvis"].into_iter().enumerate() {
+            match galion_consent::clone_gate(voice, &env) {
+                Ok(_) if ref_allowlisted(voice) => approved[i] = true,
+                Ok(_) => refused.push(format!("{voice}: reference not allowlisted (GALION_CLIP_STORE sidecar or REFS.sha256)")),
+                Err(e) => refused.push(e.to_string()),
+            }
+        }
+        if !approved.iter().any(|a| *a) {
+            return Err(format!("no consented samantha or jarvis reference; {}", refused.join("; ")));
         }
         if !tokenizer_ready() {
             return Err("clone tokenizer missing: tokenizer.json or vocab.json+merges.txt (GALION_CLONE_TOKENIZER, GALION_CLONE_CKPT, or weights/clone/tokenizer)".into());
@@ -1141,12 +1170,22 @@ impl CloneTts {
             persona,
             prosody: FrameProsody::identity(),
             ref_gate: true,
+            approved,
             worker: None,
             frames: Arc::new(CloneFrameDrain::new()),
             spawns: 0,
             pending: Vec::new(),
             dir: super::gqvoice::gqvoice_dir(),
         })
+    }
+
+    /// Test slot with the ref gate on and these clone-time verdicts
+    /// (`[samantha, jarvis]`), as `try_new` would have recorded them.
+    #[cfg(test)]
+    pub fn with_verdicts(mut self, approved: [bool; 2]) -> Self {
+        self.ref_gate = true;
+        self.approved = approved;
+        self
     }
 
     #[cfg(test)]
@@ -1157,6 +1196,7 @@ impl CloneTts {
             persona: worker.persona(),
             prosody: FrameProsody::identity(),
             ref_gate: false,
+            approved: [true; 2],
             frames: worker.frames(),
             worker: Some(worker),
             spawns: 1,
@@ -1198,9 +1238,18 @@ impl CloneTts {
         self.spawns
     }
 
-    /// #56: may this slot speak its current persona? See [`ref_allowlisted`].
+    /// #56: may this slot speak its current persona? In-memory read of the
+    /// clone-time verdict. No consent call, no file hash, no process.
     pub fn ref_ok(&self) -> bool {
-        !self.ref_gate || ref_allowlisted(self.persona)
+        !self.ref_gate || self.voice_approved(self.persona)
+    }
+
+    /// Did `persona` pass the consent gate when this slot was built?
+    pub fn voice_approved(&self, persona: &str) -> bool {
+        match persona_name(persona) {
+            "jarvis" => self.approved[1],
+            _ => self.approved[0],
+        }
     }
 
     /// #56: persona for the next utterance. The child stays up.
@@ -1592,6 +1641,17 @@ fn set_nonblock(fd: i32) -> std::io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn armstrong_is_refused_at_clone_time() {
+        for asked in ["armstrong", " Neil Armstrong ", "ARMSTRONG"] {
+            let err = refuse_blocked_voice(asked).unwrap_err();
+            assert!(err.contains("clone refused") && err.contains("celebrity"), "{err}");
+        }
+        assert!(refuse_blocked_voice("samantha").is_ok());
+        assert!(refuse_blocked_voice("jarvis").is_ok());
+        assert!(refuse_blocked_voice("").is_ok());
+    }
 
     #[test]
     fn protocol_stub_does_not_open_the_clone_slot() {

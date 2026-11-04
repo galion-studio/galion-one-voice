@@ -437,6 +437,19 @@ mod tests {
         }
     }
 
+    /// Owner decision 2026-11-04: consent is checked when a voice is
+    /// cloned, never per turn. A duplex turn must not evaluate it.
+    #[test]
+    fn asr_final_turns_make_no_consent_call() {
+        let mut path = DuplexOutline::new();
+        path.set_sense(true);
+        let before = galion_consent::evaluations();
+        for line in ["Hi.", "How was your day?", "Tell me about the moon.", "Thanks."] {
+            let _ = path.on_asr_final(line);
+        }
+        assert_eq!(galion_consent::evaluations(), before, "a turn evaluated consent");
+    }
+
     #[test]
     fn eighty_millisecond_clock_reaches_heather_only_with_sense() {
         assert_eq!(FRAME_MS, 80);

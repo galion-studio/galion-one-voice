@@ -1,0 +1,17 @@
+# Galion Voice — Perpetual Open MIT License
+[package]
+name = "galion-consent"
+description = "Clone-time consent gate for a reference voice. Rust port of scripts/clone/consent.py (now tools/legacy/consent.py.bak). std only, zero dependencies, no subprocess."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version = "1.85"
+publish = false
+
+[dependencies]
+# Intentionally zero dependencies.
+
+[[bin]]
+name = "galion-consent"
+path = "src/bin/galion-consent.rs"

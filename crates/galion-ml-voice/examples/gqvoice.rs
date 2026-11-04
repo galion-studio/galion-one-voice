@@ -12,8 +12,15 @@
 //!
 //! `--pcm FILE` reads raw s16le already captured from the worker and does
 //! not spawn it. Protocol-stub PCM is not a film voice and not a Flash result.
+//!
+//! Clone at rest: a real (non-stub) generate is a clone, so the consent gate
+//! (`galion-consent`, in process) runs once before the worker is spawned. A
+//! voice without valid consent is refused with the gate's reason. A blocked
+//! (celebrity) voice id is refused on every path.
 
-use galion_ml_voice::speech::clone_worker::{worker_script, CloneModel, CloneWorker};
+use galion_ml_voice::speech::clone_worker::{
+    protocol_stub_armed, refuse_blocked_voice, worker_script, CloneModel, CloneWorker,
+};
 use galion_ml_voice::speech::gqvoice::{self, GqVoice};
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -60,6 +67,10 @@ fn main() -> ExitCode {
     if CloneModel::parse(&model).is_none() {
         eprintln!("gqvoice: --model is nano or turbo");
         return ExitCode::from(64);
+    }
+    if let Err(e) = refuse_blocked_voice(&persona) {
+        eprintln!("gqvoice: {e}");
+        return ExitCode::from(2);
     }
     let dir = out.map(PathBuf::from).unwrap_or_else(gqvoice::gqvoice_dir);
     let samples = match pcm {
@@ -114,6 +125,9 @@ fn main() -> ExitCode {
 fn speak(persona: &str, model: &str, text: &str) -> Result<Vec<i16>, String> {
     let script = worker_script().ok_or("clone worker script missing")?;
     let model = CloneModel::parse(model).ok_or("model must be nano or turbo")?;
+    if !protocol_stub_armed() {
+        galion_consent::clone_gate(persona, &galion_consent::Env::process()).map_err(|e| e.to_string())?;
+    }
     let mut worker = CloneWorker::spawn(&script, model, persona).map_err(|e| e.to_string())?;
     worker.synthesize(text).map_err(|e| e.to_string())
 }

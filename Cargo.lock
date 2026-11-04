@@ -181,10 +181,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "galion-consent"
+version = "0.0.1"
+
+[[package]]
 name = "galion-console"
 version = "0.0.1"
 dependencies = [
  "galion-cascade",
+ "galion-consent",
  "galion-emotion",
  "galion-heartbeat",
  "galion-presence",
@@ -228,6 +233,7 @@ dependencies = [
 name = "galion-ml-voice"
 version = "0.0.1"
 dependencies = [
+ "galion-consent",
  "galion-emotion",
  "galion-heartbeat",
  "galion-tensor",
@@ -259,6 +265,7 @@ name = "galion-render"
 version = "0.0.1"
 dependencies = [
  "galion-cascade",
+ "galion-consent",
 ]
 
 [[package]]
