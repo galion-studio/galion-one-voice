@@ -1,6 +1,12 @@
 # V2 re-anchor: a PersonaPlex-style integrated dual-band model, with RL
 
 Status: **plan only** (owner item 9, 2026-11-04 16:01 CET). No code, no weights, no training run.
+
+> **Owner ruling, 2026-11-04 20:45 CET.** No Qwen anywhere in the architecture, and no fallback to it.
+> Qwen, Groq and any cloud LLM are third party. The reasoning sector is fully local and in-house: the S0
+> student (~0.5B, `.gq`, W8A8) on `galion-tensor`, with `CannedLlm` until trained weights exist. This doc
+> assumes **no third-party teacher**. The S0 teacher / training source is an open owner decision (D2).
+> PersonaPlex and Moshi below are architecture references only.
 Every number below is either measured on the sprint box (the source is named) or published by
 NVIDIA or Kyutai (cited). Anything else is marked as **arithmetic**: an estimate derived from those
 numbers, not a measurement.
@@ -30,7 +36,7 @@ Galion already has the shape this needs:
   - `galion-mimi`: real kernels, no weights, `IS_STUB = true`;
   - `galion-tensor`: own CPU runtime, `.gq` later;
   - `galion-student-backend`: slot only, `LoadError::NotPlaced`;
-  - `galion-student/`: the distillation plan, PersonaPlex-7B teacher, owner pick S0 first.
+  - `galion-student/`: the distillation plan, owner pick S0 first. Its teacher / training source is open (D2).
 
 "Dual-band" in this doc means the model consumes the **you** band (user audio) and produces the
 **me** band (agent text plus agent audio tokens) in the same step. **feeling** stays Galion's own 8-byte
@@ -42,7 +48,7 @@ Today's live path (PRs #62–#69) is a cascade:
 
 1. Vosk ASR;
 2. endpoint (about 140–160 ms after end of speech);
-3. LLM (cloud, or local Qwen2.5-1.5B in #69);
+3. reasoning: in-house S0 on `galion-tensor` (CannedLlm until weights). The earlier cloud LLM and the local Qwen in #69 are superseded;
 4. clause buffer;
 5. Piper TTS;
 6. a separate backchannel path.
@@ -73,8 +79,8 @@ which Mimi decodes. That conflicts with "Piper stays the TTS engine" unless we s
 
 Training order (extends `galion-student/configs/distill.toml`):
 
-1. **Distil** (stages 0–5 as planned): KD from the teacher, then duplex KD, then persona KD, then Q8 QAT.
-   - Teacher options: PersonaPlex-7B, or Moshi as the CC-BY fallback; the licence check is risk R1, already in `distill.toml`.
+1. **Train S0** (stages 0–5 as planned): base training from the source Mate picks, then duplex, then persona, then Q8 QAT.
+   - Teacher / training source: **open owner decision (D2)**. No third-party model is assumed. If Mate picks KD, the teacher has to be cleared by him first.
    - This stage is supervised and RL-free.
 2. **Offline preference stage (DPO-style).** For each simulated dialogue context, sample several student
    continuations and rank them with the programmatic rewards below. Train on chosen/rejected pairs.
@@ -93,7 +99,7 @@ Rewards. All are programmatic and logged per frame, and no reward is a model gra
 | No takeover on pause | Agent does not start in a user pause inside a turn (Full-Duplex-Bench "pause handling" TOR) | Scenario labels |
 | Smooth turn-taking | Start latency after real turn end, penalised when late or early | Scenario labels |
 | Backchannel timing | Backchannels land in listener slots, not over content | Scenario labels |
-| Content | Agent text matches the persona prompt, grounded, short (the persona 1–2 sentence limit, which Qwen-1.5B breaks today) | Rubric checks plus an outer human-calibrated anchor (EUREKA rule 8) |
+| Content | Agent text matches the persona prompt, grounded, short (the persona 1–2 sentence limit) | Rubric checks plus an outer human-calibrated anchor (EUREKA rule 8) |
 | Text/audio agreement (D1 = B only) | ASR of the model's own audio equals its text stream | Vosk on box |
 | Voice match (D1 = B only) | Speaker-embedding cosine to the **approved** reference | ECAPA, only when the consent gate passed |
 
@@ -113,16 +119,16 @@ Measured on this box:
   - STREAM triad 13.1 GB/s single-thread, 98.0 GB/s best multi-thread;
   - runs 63.7 / 61.6 / 98.0 GB/s, mean 74.4, CV 27 %, so the G0 gate FAILs on stability;
   - 15.6 GiB RAM, no swap.
-- llama-bench, Qwen2.5-1.5B Q4_K_M (1.12 GB file), 2026-11-04 16:04 CET:
+- *Historical, superseded (third-party model, not in the architecture):* llama-bench, Qwen2.5-1.5B Q4_K_M (1.12 GB file), 2026-11-04 16:04 CET:
   - decode 21.7 ± 1.3 tok/s at 4 threads, and 22.9 ± 15.7 at 8 threads;
   - prefill 303.6 tok/s at 4 threads, 112.5 at 8 threads.
-- Same model in the live loop on all 8 cores, 2026-11-04 (#69 doc):
+- *Historical, superseded:* same model in the live loop on all 8 cores, 2026-11-04 (#69 doc):
   - decode p50 18–24 tok/s;
   - Piper first audio while the LLM decodes, p50 117–161 ms.
 
 **Arithmetic** from those numbers (not measured):
 
-- **Effective bandwidth.** CPU decode reads the whole weight set per step. Qwen-1.5B Q4 at about 22 tok/s × 1.12 GB
+- **Effective bandwidth** (from the historical run above; used only as a box bandwidth probe). CPU decode reads the whole weight set per step. That 1.5B Q4 run at about 22 tok/s × 1.12 GB
   is roughly 25 GB/s effective, about a third of the probe's mean triad.
 - **Model sizes.** A frame step must finish 12.5 times per second, and `[probe] realtime_headroom = 2.0` asks for 25.
   - **PersonaPlex-7B is not feasible on this box.** BF16 weights are about 16 GB (the card says 8B params), which does
@@ -149,7 +155,7 @@ turn-taking TOR 0.908 / latency 0.170 s; user interruption TOR 0.950 / latency 0
 | M0 | This plan, plus owner decisions D1–D4 | Mate signs off |
 | M1 | Turn-event harness: Full-Duplex-Bench-style scenarios (pause, backchannel, smooth turn, interruption) on the loopback virtual user, scored for **today's cascade** as the baseline | Baseline TOR and latency numbers recorded for the cascade, on the box |
 | M2 | `galion-mimi` + `galion-tensor` run a weight-loaded (licence-cleared) Mimi encode, and a random-init S0 temporal + depth step in Rust, timed | Measured S0 step time on 8 cores with Piper running: ≥ 25 steps/s, or S0 is cut |
-| M3 | Distilled S0 (stages 0–5) off-box, exported as safetensors / `.gq` | Beats nothing yet. Must reproduce the teacher's turn events on M1 within a set tolerance |
+| M3 | Trained S0 (stages 0–5) off-box, exported as safetensors / `.gq` | Beats nothing yet. Must reproduce the reference turn events on M1 within a set tolerance (reference = the training source Mate picks, D2) |
 | M4 | DPO stage, then GRPO stage, with the reward table above | Better than M3 and the cascade on M1, `barge_in_max_ms` holds, presence bans hold, outer human anchor agrees |
 | M5 | D1 = A in the live loop: S0 drives text and timing, Piper speaks, cascade as fallback lane | Live HARD-LOOP: eos→first content audio and barge-in no worse than the cascade's measured numbers |
 | M6 | (only if D1 = B) model audio plays, Piper is the fallback | Voice match on approved refs only, consent gate holds |
@@ -157,9 +163,9 @@ turn-taking TOR 0.908 / latency 0.170 s; user interruption TOR 0.950 / latency 0
 ## 6. Decisions for Mate
 
 - **D1:** Who makes the sound (A: Piper, keeps the ruling; B: model audio, Piper fallback).
-- **D2: Teacher licence.** NVIDIA Open Model License (PersonaPlex) vs Moshi as the CC-BY fallback. Fisher data needs counsel.
+- **D2: S0 teacher / training source (open, owner decision).** No third-party model is assumed. Options to rule on: train from Galion-owned data only, or name a teacher he clears. Fisher data needs counsel.
   Mimi weights need A21 clearance.
 - **D3: GPU training budget.** The box cannot train. No figure is given here because none was measured or quoted.
-- **D4: Lock conflict in today's path.** `[formats]` forbids `llama`/`ggml` runtimes and GGML containers. The local
-  Qwen GGUF via llama-server in #69 is outside that lock. It stays a measurement/fallback experiment unless Mate
-  writes an exception. The re-anchored student would run on `galion-tensor` with safetensors / `.gq`, inside the lock.
+- **D4: Lock conflict: closed by the ruling.** `[formats]` forbids `llama`/`ggml` runtimes and GGML containers. The local
+  Qwen GGUF via llama-server in #69 is out of the architecture (no runtime, no fallback); #69 stays unmerged pending
+  Mate's close decision. The student runs on `galion-tensor` with safetensors / `.gq`, inside the lock.
