@@ -328,7 +328,7 @@ mod tests {
         assert_eq!(clip.persona, "samantha");
         assert_eq!(
             clip.reference_sha256,
-            "e4bc60c33f697108cf5585dead213da1065979010f5be1d513574893584a4641"
+            "1636428272b85d4b4f6c67bb859bfe33d9983ff9439646519305ff13e6921005"
         );
         let mut broken = bytes.clone();
         // Samantha header stripped byte is index 24.

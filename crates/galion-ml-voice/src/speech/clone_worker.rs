@@ -1826,8 +1826,8 @@ mod tests {
         assert_eq!(table.len(), 2, "{table:?}");
         let sam = table.iter().find(|p| p.persona == "samantha").unwrap();
         let jar = table.iter().find(|p| p.persona == "jarvis").unwrap();
-        assert_eq!(sam.sha, "e4bc60c33f697108cf5585dead213da1065979010f5be1d513574893584a4641");
-        assert_eq!(sam.duration_s, "9.60");
+        assert_eq!(sam.sha, "1636428272b85d4b4f6c67bb859bfe33d9983ff9439646519305ff13e6921005");
+        assert_eq!(sam.duration_s, "11.41");
         assert_eq!(sam.rate_hz, 44_100);
         assert_eq!(sam.channels, 1);
         assert_eq!(sam.bits, 16);
@@ -1897,7 +1897,7 @@ mod tests {
         let store = clip_store_from(None);
         let got = resolve_reference_at("samantha", store.as_deref(), &root).unwrap();
         if let Some(found) = got {
-            assert_eq!(found.sha256, "e4bc60c33f697108cf5585dead213da1065979010f5be1d513574893584a4641");
+            assert_eq!(found.sha256, "1636428272b85d4b4f6c67bb859bfe33d9983ff9439646519305ff13e6921005");
             assert_eq!(found.texture, "preserve");
             assert!(found.path.ends_with("samantha.wav"));
         }
