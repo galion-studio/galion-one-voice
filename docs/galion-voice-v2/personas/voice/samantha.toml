@@ -61,22 +61,22 @@ unknown_tags = "off"
 note = "GALION-VOICE-V2.md names these two. The rest of any Turbo/Nano tag set is not copied here."
 
 [reference]
-rights = "cc0-public-domain-t623u"  # was owner-t273 (superseded 2026-11-04)
+rights = "owner-t273"
 ingest = false
 present = true
 duration_target_s = 10
 min_duration_s = 5
-duration_s = 9.60  # was 17.41
-sample_rate_hz = 44100  # was 44100
-channels = 1  # was 2
+duration_s = 17.41
+sample_rate_hz = 44100
+channels = 2
 bits = 16
-sha256 = "e4bc60c33f697108cf5585dead213da1065979010f5be1d513574893584a4641"  # was bdcb0c2903bb91c7b0fda0cf79a42406fdaa662fd8d31f6eaed3895d9c7a8693 (t273)
+sha256 = "bdcb0c2903bb91c7b0fda0cf79a42406fdaa662fd8d31f6eaed3895d9c7a8693"
 clip_path = "docs/galion-voice-v2/personas/refs/samantha.wav"
 store_rel = "samantha/reference.wav"
 texture = "preserve"
 denoise = false
 placeholder = "docs/galion-voice-v2/personas/refs/samantha.placeholder"
-note = "CC0 donor reference (t623u): Amy Koenig, LibriVox Love and Friendship, public domain / Voice Zero CC0; consent.txt beside the clip in the store. WAV only, gitignored. Also $GALION_CLIP_STORE/samantha/reference.wav. Do not trim, denoise, or replace with an MP3. The worker sends this path only when the sha256 matches. Public demo stays closed."
+note = "Current model reference. WAV only, gitignored. Also $GALION_CLIP_STORE/samantha/reference.wav. Do not trim, denoise, or replace with an MP3. The worker sends this path only when the sha256 matches. Public demo stays closed."
 
 [worker]
 binding = "galion.clone.worker"

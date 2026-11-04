@@ -1782,7 +1782,7 @@ mod tests {
         let attach = ResolvedRef {
             persona: "jarvis".into(),
             path: PathBuf::from("docs/galion-voice-v2/personas/refs/jarvis.wav"),
-            sha256: "60ad5457dac31af915a9679760705296f9aad17e15ee84885385509b58b8f6b6".into(),
+            sha256: "c2200b59fa78b3c98d13ac5dc7db3a6c14e802310dca73033d7770bd4b532c60".into(),
             texture: "preserve-hub".into(),
         };
         let sent = request_line("hello", CloneModel::Nano, "jarvis", Some(&attach), true);
@@ -1802,18 +1802,18 @@ mod tests {
         assert_eq!(table.len(), 2, "{table:?}");
         let sam = table.iter().find(|p| p.persona == "samantha").unwrap();
         let jar = table.iter().find(|p| p.persona == "jarvis").unwrap();
-        assert_eq!(sam.sha, "e4bc60c33f697108cf5585dead213da1065979010f5be1d513574893584a4641");
-        assert_eq!(sam.duration_s, "9.60");
+        assert_eq!(sam.sha, "bdcb0c2903bb91c7b0fda0cf79a42406fdaa662fd8d31f6eaed3895d9c7a8693");
+        assert_eq!(sam.duration_s, "17.41");
         assert_eq!(sam.rate_hz, 44_100);
-        assert_eq!(sam.channels, 1);
+        assert_eq!(sam.channels, 2);
         assert_eq!(sam.bits, 16);
         assert_eq!(sam.texture, "preserve");
         assert!(sam.repo_rel.ends_with("samantha.wav"));
         assert_eq!(sam.store_rel, "samantha/reference.wav");
-        assert_eq!(jar.sha, "60ad5457dac31af915a9679760705296f9aad17e15ee84885385509b58b8f6b6");
-        assert_eq!(jar.duration_s, "10.71");
-        assert_eq!(jar.rate_hz, 44_100);
-        assert_eq!(jar.channels, 1);
+        assert_eq!(jar.sha, "c2200b59fa78b3c98d13ac5dc7db3a6c14e802310dca73033d7770bd4b532c60");
+        assert_eq!(jar.duration_s, "15.95");
+        assert_eq!(jar.rate_hz, 48_000);
+        assert_eq!(jar.channels, 2);
         assert_eq!(jar.bits, 16);
         assert_eq!(jar.texture, "preserve-hub");
         assert!(jar.repo_rel.ends_with("jarvis.wav"));
@@ -1873,7 +1873,7 @@ mod tests {
         let store = clip_store_from(None);
         let got = resolve_reference_at("samantha", store.as_deref(), &root).unwrap();
         if let Some(found) = got {
-            assert_eq!(found.sha256, "e4bc60c33f697108cf5585dead213da1065979010f5be1d513574893584a4641");
+            assert_eq!(found.sha256, "bdcb0c2903bb91c7b0fda0cf79a42406fdaa662fd8d31f6eaed3895d9c7a8693");
             assert_eq!(found.texture, "preserve");
             assert!(found.path.ends_with("samantha.wav"));
         }
@@ -2166,23 +2166,21 @@ mod tests {
     }
 
     #[test]
-    fn locks_open_for_cc0_donors_and_ref_rows_pin_the_two_cc0_wavs() {
+    fn locks_stay_false_and_ref_rows_pin_the_two_cleared_wavs() {
         let locks = include_str!("../../../../LOCKS.toml");
         let section = locks
             .split("[formats.exceptions.v2s14_chatterbox]")
             .nth(1)
             .expect("chatterbox pin");
         let section = section.split("\n[").next().unwrap();
-        // t623u: opened for the CC0 / public-domain donors only.
-        assert!(section.contains("reference_clips = true"), "{section}");
-        assert!(section.contains("ref_clip_decision = \"t623u\""), "{section}");
+        assert!(section.contains("reference_clips = false"), "{section}");
         // Main pins the full t273 digests (symphony B). The worker allowlist
         // reads those rows, so prefix/suffix rows are no longer the file.
         let refs = include_str!("../../../../scripts/clone/REFS.sha256");
         let rows: Vec<&str> = refs.lines().filter(|l| !l.trim_start().starts_with('#') && !l.trim().is_empty()).collect();
         assert_eq!(rows.len(), 2, "{refs}");
-        assert!(rows.iter().any(|r| r.starts_with("samantha e4bc60c3") && r.split_whitespace().nth(1).unwrap().ends_with("84a4641")));
-        assert!(rows.iter().any(|r| r.starts_with("jarvis 60ad5457") && r.split_whitespace().nth(1).unwrap().ends_with("58b8f6b6")));
+        assert!(rows.iter().any(|r| r.starts_with("samantha bdcb0c29") && r.split_whitespace().nth(1).unwrap().ends_with("c7a8693")));
+        assert!(rows.iter().any(|r| r.starts_with("jarvis c2200b59") && r.split_whitespace().nth(1).unwrap().ends_with("4b532c60")));
         let tok = include_str!("../../../../scripts/clone/TOKENIZER.sha256");
         assert!(tok.contains("tokenizer/vocab.json"));
         for line in tok.lines() {

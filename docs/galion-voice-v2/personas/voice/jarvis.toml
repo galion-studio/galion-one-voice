@@ -61,16 +61,16 @@ unknown_tags = "off"
 note = "Tags stay off on the Rust request line (tags=false), so the Nano path strips bracket tags. The protocol stub also strips them when persona is jarvis. A request that omits the flag keeps the text."
 
 [reference]
-rights = "cc0-public-domain-t623u"  # was owner-t273 (superseded 2026-11-04)
+rights = "owner-t273"
 ingest = false
 present = true
 duration_target_s = 10
 min_duration_s = 5
-duration_s = 10.71  # was 15.95
-sample_rate_hz = 44100  # was 48000
-channels = 1  # was 2
+duration_s = 15.95
+sample_rate_hz = 48000
+channels = 2
 bits = 16
-sha256 = "60ad5457dac31af915a9679760705296f9aad17e15ee84885385509b58b8f6b6"  # was c2200b59fa78b3c98d13ac5dc7db3a6c14e802310dca73033d7770bd4b532c60 (t273)
+sha256 = "c2200b59fa78b3c98d13ac5dc7db3a6c14e802310dca73033d7770bd4b532c60"
 clip_path = "docs/galion-voice-v2/personas/refs/jarvis.wav"
 store_rel = "jarvis/reference.wav"
 texture = "preserve-hub"
@@ -80,7 +80,7 @@ texture_default = "on"
 texture_stripped = false
 denoise = false
 placeholder = "docs/galion-voice-v2/personas/refs/jarvis.placeholder"
-note = "CC0 donor reference (t623u): Alan Davis Drake, LibriVox Celebration of Dialects and Accents Vol 1 track 30, public domain / Voice Zero CC0; consent.txt beside the clip in the store. The clip is clean read speech; the hub texture (clicks, alarms, ambience) is NOT baked in and now comes only from the toggleable layer. Do not denoise. WAV only, gitignored. Also $GALION_CLIP_STORE/jarvis/reference.wav. Never an MP3. Public demo stays closed. Hub clicks, alarms, and ambience are also a separate toggleable layer (GALION_JARVIS_TEXTURE, see symphony/JARVIS-TEXTURE.md); the toggle does not denoise the asset."
+note = "Current model reference. Not clean speech: Tony Stark hub virtual texture (clicks, alarms, ambience) is character. Do not strip, denoise, or clean. WAV only, gitignored. Also $GALION_CLIP_STORE/jarvis/reference.wav. Never an MP3. Public demo stays closed. Hub clicks, alarms, and ambience are also a separate toggleable layer (GALION_JARVIS_TEXTURE, see symphony/JARVIS-TEXTURE.md); the toggle does not denoise the asset."
 
 [worker]
 binding = "galion.clone.worker"

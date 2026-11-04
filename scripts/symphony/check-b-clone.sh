@@ -34,8 +34,8 @@ grep -q 'galion-clone-refuse: reference clips are on the rights hold' "$TMP/err2
 REF_NOTE="$(python3 - <<'PY'
 import hashlib, os, sys
 pins = {
-    "samantha": "e4bc60c33f697108cf5585dead213da1065979010f5be1d513574893584a4641",
-    "jarvis": "60ad5457dac31af915a9679760705296f9aad17e15ee84885385509b58b8f6b6",
+    "samantha": "bdcb0c2903bb91c7b0fda0cf79a42406fdaa662fd8d31f6eaed3895d9c7a8693",
+    "jarvis": "c2200b59fa78b3c98d13ac5dc7db3a6c14e802310dca73033d7770bd4b532c60",
 }
 store = os.environ.get("GALION_CLIP_STORE", "").strip()
 found = 0

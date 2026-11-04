@@ -64,10 +64,10 @@ class AllowlistTests(unittest.TestCase):
         allow = MOD.load_allowlist(str(HERE / "REFS.sha256"))
         # REFS.sha256 now carries main's full t273 pin rows; the allowlist
         # reads the full digest as the prefix with an empty suffix.
-        self.assertTrue(allow["samantha"][0].startswith("e4bc60c3"))
-        self.assertTrue((allow["samantha"][0] + allow["samantha"][1]).endswith("84a4641"))
-        self.assertTrue(allow["jarvis"][0].startswith("60ad5457"))
-        self.assertTrue((allow["jarvis"][0] + allow["jarvis"][1]).endswith("58b8f6b6"))
+        self.assertTrue(allow["samantha"][0].startswith("bdcb0c29"))
+        self.assertTrue((allow["samantha"][0] + allow["samantha"][1]).endswith("c7a8693"))
+        self.assertTrue(allow["jarvis"][0].startswith("c2200b59"))
+        self.assertTrue((allow["jarvis"][0] + allow["jarvis"][1]).endswith("4b532c60"))
         self.assertEqual(set(allow), {"samantha", "jarvis"})
 
     def test_persona_binding(self) -> None:
