@@ -45,3 +45,7 @@ Exit codes for the V1 demo: `0` ok, `1` check failed, `64` bad argument, `69` po
 **BLOCKED** when Rust, a model file, or a speaker tool the command needs is absent. Say which one.
 
 — Maciej Grajczyk
+
+---
+
+© G.A.L.I.O.N. — General Autonomous Local Intelligence Open Network. All rights reserved and claims reserved. · CC0 voices: you must tick the consent box agreeing to the CC0 licence before using any CC0 voice; use is at your own responsibility. · No cookies. · De-Googled: no Google services. · All current Galion builds are open source under the Galion perpetual open MIT licence.

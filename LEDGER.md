@@ -123,3 +123,7 @@
 — Maciej Grajczyk
 
 **2026-11-04 20:49 CET · CC0 donors ON again (owner t628u).** Owner: the 16:01 "no CC0" was a wrong click. Revert of 4f28c0c restores `reference_clips = true` for the CC0 LibriVox / Voice Zero donors (Amy Koenig -> samantha, Alan Davis Drake -> jarvis). consent.txt states the true basis (public-domain dedication + CC0 1.0, no signed release, public_demo: no). New: CC0 licence checkbox in the voice page, enforced server-side per session in memory (`galion_consent::Cc0Acceptances`, floor `cc0_licence`, `CloneTts::synthesize`). No celebrity clone stays. Branch `swarm/clone-unblock`. Not deployed.
+
+---
+
+© G.A.L.I.O.N. — General Autonomous Local Intelligence Open Network. All rights reserved and claims reserved. · CC0 voices: you must tick the consent box agreeing to the CC0 licence before using any CC0 voice; use is at your own responsibility. · No cookies. · De-Googled: no Google services. · All current Galion builds are open source under the Galion perpetual open MIT licence.

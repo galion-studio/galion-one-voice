@@ -38,3 +38,7 @@ That is the reply words, including the cut-off replay after barge-in.
 | G7 | **The me band is the reply WAV, not a voice codec.** Mimi `IS_STUB` runs with `--mimi off`. | It sounds fine, but the duplex codec path is not exercised. | It waits on Mimi weights (counsel). |
 | G8 | **Loopback only.** Viewing remotely needs an SSH tunnel. The VPS is not reachable (SSH denied). | Single-machine demo only. | Deploy later. |
 | G9 | **The feed drops on a crash.** The page falls back to the local idle pulse after 1 s, so it is never dark, but it also gives no error sign. | A crashed demo looks like "idle forever". | Fine for V1, because the one-dot rule forbids an error UI. Check the terminal. |
+
+---
+
+© G.A.L.I.O.N. — General Autonomous Local Intelligence Open Network. All rights reserved and claims reserved. · CC0 voices: you must tick the consent box agreeing to the CC0 licence before using any CC0 voice; use is at your own responsibility. · No cookies. · De-Googled: no Google services. · All current Galion builds are open source under the Galion perpetual open MIT licence.

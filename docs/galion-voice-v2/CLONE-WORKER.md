@@ -354,3 +354,7 @@ on synthetic tensors shaped like Nano's, read back by the Rust reader
 (`python_written_file_verifies`, `#[ignore]`). **Not verified:** a real
 clone through the gate, because `reference_clips = false` and no consented
 reference exists, so `plan_save` is never reached in a live run.
+
+---
+
+© G.A.L.I.O.N. — General Autonomous Local Intelligence Open Network. All rights reserved and claims reserved. · CC0 voices: you must tick the consent box agreeing to the CC0 licence before using any CC0 voice; use is at your own responsibility. · No cookies. · De-Googled: no Google services. · All current Galion builds are open source under the Galion perpetual open MIT licence.
