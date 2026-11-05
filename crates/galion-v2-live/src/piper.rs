@@ -14,7 +14,14 @@ pub struct PiperPaths { pub bin: String, pub model: String }
 impl PiperPaths {
     pub fn from_repo() -> Result<Self, String> {
         let root = crate::repo_root();
-        let bin = std::env::var("GALION_A21_RUNTIME").unwrap_or_else(|_| root.join("weights/runtime/piper/piper").display().to_string());
+        // lat240 wt-14: prefer the in-tree Piper runtime (galion-piper-rt, same Piper
+        // ONNX voice, ORT thread count + pre-warm), as galion-ml-voice already does.
+        // Measured warm TTFA 29/33 ms vs 43/61 ms for the C++ CLI (n=20, BENCH.lock).
+        // GALION_PIPER_LEGACY=1 keeps the C++ piper CLI.
+        let rt = root.join("weights/runtime/piper-rt/galion-piper-rt");
+        let legacy = std::env::var("GALION_PIPER_LEGACY").map(|v| v == "1").unwrap_or(false);
+        let default_bin = if !legacy && rt.is_file() { rt } else { root.join("weights/runtime/piper/piper") };
+        let bin = std::env::var("GALION_A21_RUNTIME").unwrap_or_else(|_| default_bin.display().to_string());
         let model = std::env::var("GALION_TTS_MODEL").unwrap_or_else(|_| root.join("weights/tts/en_US-ljspeech-medium.onnx").display().to_string());
         if !std::path::Path::new(&bin).is_file() || !std::path::Path::new(&model).is_file() {
             return Err(format!("A21 Piper pack missing ({bin}, {model}); run scripts/a21/fetch-a21.sh"));
