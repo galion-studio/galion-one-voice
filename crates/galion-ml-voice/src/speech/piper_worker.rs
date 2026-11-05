@@ -25,6 +25,8 @@ pub struct PiperProsody {
     pub length_scale: String,
     pub noise_scale: String,
     pub noise_w: String,
+    /// Seconds of silence Piper puts after each sentence (`--sentence_silence`). V1 default `"0"`.
+    pub sentence_silence: String,
 }
 
 impl PiperProsody {
@@ -32,9 +34,23 @@ impl PiperProsody {
     pub fn from_env() -> Self {
         let natural = std::env::var("GALION_A21_NOISE").ok().as_deref() == Some("natural");
         if natural {
-            Self { length_scale: "1.0".into(), noise_scale: "0.667".into(), noise_w: "0.8".into() }
+            Self { length_scale: "1.0".into(), noise_scale: "0.667".into(), noise_w: "0.8".into(), sentence_silence: "0".into() }
         } else {
-            Self { length_scale: "1.0".into(), noise_scale: "0".into(), noise_w: "0".into() }
+            Self { length_scale: "1.0".into(), noise_scale: "0".into(), noise_w: "0".into(), sentence_silence: "0".into() }
+        }
+    }
+
+    /// Persona-conditioned scales (galion-emotion `PiperProsodyVector`).
+    /// `length_scale` is the pitch-compensated value, so the post-synthesis
+    /// pitch resample in [`crate::emotive::EmotiveShaper`] keeps the planned pace.
+    /// Values are rounded to 2 decimals so tiny mood drift does not respawn Piper.
+    pub fn from_vector(v: &galion_emotion::PiperProsodyVector) -> Self {
+        let r = |x: f32| format!("{:.2}", (x * 100.0).round() / 100.0);
+        Self {
+            length_scale: r(v.compensated_length_scale()),
+            noise_scale: r(v.noise_scale),
+            noise_w: r(v.noise_w),
+            sentence_silence: r(v.sentence_silence_s),
         }
     }
 
@@ -62,6 +78,8 @@ pub struct PiperWorker {
     cold_ms: Option<u32>,
     warm_ms: Option<u32>,
     first_chunk_ms: Option<u32>,
+    speaker_id: Option<u32>,
+    prosody: PiperProsody,
 }
 
 impl PiperWorker {
@@ -86,7 +104,7 @@ impl PiperWorker {
             .arg("--noise_scale").arg(&prosody.noise_scale)
             .arg("--noise_w").arg(&prosody.noise_w)
             .arg("--length_scale").arg(&prosody.length_scale)
-            .arg("--sentence_silence").arg("0")
+            .arg("--sentence_silence").arg(&prosody.sentence_silence)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
@@ -119,10 +137,16 @@ impl PiperWorker {
         Ok(Self {
             child: Some(child), stdin: Some(stdin), stdout: Some(stdout), stderr: Some(stderr),
             err_log: String::new(), pcm_buf: Vec::new(), pid, calls: 0, cold_ms: None, warm_ms: None, first_chunk_ms: None,
+            speaker_id: None, prosody: prosody.clone(),
         })
     }
 
     pub fn pid(&self) -> u32 { self.pid }
+    /// Scales this process was started with (Piper reads them once, at spawn).
+    pub fn prosody(&self) -> &PiperProsody { &self.prosody }
+    /// Speaker of a multi-speaker pack (e.g. VCTK, LibriTTS-R). Sent per line as
+    /// `speaker_id`; Piper 2023.11.14-2 honours it without a respawn.
+    pub fn set_speaker(&mut self, id: Option<u32>) { self.speaker_id = id; }
     pub fn calls(&self) -> u32 { self.calls }
     pub fn cold_ms(&self) -> Option<u32> { self.cold_ms }
     pub fn warm_ms(&self) -> Option<u32> { self.warm_ms }
@@ -136,7 +160,7 @@ impl PiperWorker {
     pub fn write_text(&mut self, text: &str) -> Result<(), VoiceError> {
         self.pcm_buf.clear();
         self.err_log.clear();
-        let line = json_line(text);
+        let line = json_line_speaker(text, self.speaker_id);
         let stdin = self.stdin.as_mut().ok_or_else(|| VoiceError::Backend("A21 piper stdin closed".into()))?;
         stdin.write_all(line.as_bytes()).map_err(|e| VoiceError::Backend(format!("A21 piper stdin: {e}")))?;
         stdin.flush().map_err(|e| VoiceError::Backend(format!("A21 piper stdin flush: {e}")))?;
@@ -218,7 +242,7 @@ impl PiperWorker {
     /// end-of-utterance marker. The first call is the first audio.
     pub fn synthesize_stream(&mut self, text: &str, on_pcm: &mut dyn FnMut(&[i16])) -> Result<(), VoiceError> {
         let t0 = Instant::now();
-        let line = json_line(text);
+        let line = json_line_speaker(text, self.speaker_id);
         {
             let stdin = self.stdin.as_mut().ok_or_else(|| VoiceError::Backend("A21 piper stdin closed".into()))?;
             stdin.write_all(line.as_bytes()).map_err(|e| VoiceError::Backend(format!("A21 piper stdin: {e}")))?;
@@ -348,9 +372,18 @@ impl Drop for PiperWorker {
 #[derive(Clone, Copy)]
 enum Pipe { Out, Err }
 
-fn json_line(text: &str) -> String {
-    let mut s = String::with_capacity(text.len() + 16);
-    s.push_str("{\"text\":\"");
+#[cfg(test)]
+fn json_line(text: &str) -> String { json_line_speaker(text, None) }
+
+fn json_line_speaker(text: &str, speaker: Option<u32>) -> String {
+    let mut s = String::with_capacity(text.len() + 40);
+    if let Some(id) = speaker {
+        s.push_str("{\"speaker_id\":");
+        s.push_str(&id.to_string());
+        s.push_str(",\"text\":\"");
+    } else {
+        s.push_str("{\"text\":\"");
+    }
     for c in text.chars() {
         match c {
             '"' => s.push_str("\\\""),
@@ -452,6 +485,17 @@ mod tests {
         assert!(!s[..s.len() - 1].contains('\n'));
     }
 
+    #[test]
+    fn speaker_line_and_vector_prosody() {
+        assert_eq!(json_line_speaker("hi", Some(12)), "{\"speaker_id\":12,\"text\":\"hi\"}\n");
+        let mut m = galion_emotion::PersonaMood::new(galion_emotion::Persona::Jarvis);
+        let v = m.conditioning(0).piper();
+        let p = PiperProsody::from_vector(&v);
+        let ls: f32 = p.length_scale.parse().unwrap();
+        assert!((ls - v.compensated_length_scale()).abs() <= 0.005);
+        assert!(p.sentence_silence.parse::<f32>().unwrap() > 0.0);
+    }
+
     /// Two syntheses, one process. The fake runtime speaks the same protocol
     /// as Piper 2023.11.14-2: raw s16le, then a `Real-time factor:` line.
     #[test]
@@ -471,7 +515,7 @@ mod tests {
         let before = entries(&dir);
 
         let mut w = PiperWorker::spawn(&script, &model, &config, &PiperProsody {
-            length_scale: "1.0".into(), noise_scale: "0".into(), noise_w: "0".into(),
+            length_scale: "1.0".into(), noise_scale: "0".into(), noise_w: "0".into(), sentence_silence: "0".into(),
         }).unwrap();
         let pid = w.pid();
         let a = w.synthesize("turn one").unwrap();

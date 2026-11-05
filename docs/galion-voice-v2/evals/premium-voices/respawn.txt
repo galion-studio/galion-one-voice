@@ -1,0 +1,3 @@
+en_US-libritts_r-medium spawn+warm('Okay.') ms: median 300  max 327  runs [327, 262, 285, 305, 300]
+en_GB-vctk-medium spawn+warm('Okay.') ms: median 330  max 370  runs [370, 330, 312, 292, 345]
+en_US-ljspeech-medium spawn+warm('Okay.') ms: median 396  max 490  runs [490, 377, 391, 396, 409]

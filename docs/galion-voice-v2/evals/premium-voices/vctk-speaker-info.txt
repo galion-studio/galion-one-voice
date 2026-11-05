@@ -1,0 +1,14 @@
+# Source: VCTK-Corpus-0.92 speaker-info.txt (CSTR, Univ. Edinburgh; CC BY 4.0), subset used for screening.
+p225 23 F English Southern England
+p226 22 M English Surrey
+p228 22 F English Southern England
+p229 23 F English Southern England
+p231 23 F English Southern England
+p232 23 M English Southern England
+p243 22 M English London
+p254 21 M English Surrey
+p257 24 F English Southern England
+p258 22 M English Southern England
+p268 23 F English Southern England
+p274 22 M English Essex
+p278 22 M English Cheshire
