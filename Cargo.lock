@@ -196,6 +196,7 @@ dependencies = [
  "galion-cores",
  "galion-emotion",
  "galion-heartbeat",
+ "galion-openmind",
  "galion-presence",
  "galion-render",
  "galion-tensor",

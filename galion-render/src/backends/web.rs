@@ -22,7 +22,7 @@
 //! `"engine"` (one Luti step), and `"emotion"` (sense, label, valence, arousal, lean)
 //! so the page can animate on its own clock. The circle fill stays the locked pigment.
 //! When the host has published a reply, `/dot` additionally carries
-//! `"reply":{"id":"<id>","url":"/reply/<id>.wav","ms":<duration ms>}` (latest reply only;
+//! `"reply":{"id":"<id>","url":"/reply/<id>.wav","ms":<duration ms>[,"hub_texture":<bool>]}` (latest reply only;
 //! the page should play it once per new `id`). Absent when no reply was set / after
 //! [`ReplyBox::clear_latest`].
 //!
@@ -265,7 +265,7 @@ impl SayInbox {
 // ---------------------------------------------------------------------------------------
 
 #[derive(Debug, Default)]
-struct ReplyState { store: VecDeque<(String, Arc<Vec<u8>>, u32)>, latest: Option<(String, u32)> }
+struct ReplyState { store: VecDeque<(String, Arc<Vec<u8>>, u32)>, latest: Option<(String, u32)>, hub: Option<bool> }
 
 /// Host-published reply audio. Clone freely; the HTTP threads read it.
 #[derive(Clone, Debug, Default)]
@@ -306,6 +306,14 @@ impl ReplyBox {
         }
         g.store.push_back((id.clone(), Arc::new(wav), ms));
         g.latest = Some((id, ms));
+        g.hub = None;
+        true
+    }
+    /// Like [`ReplyBox::set_reply`], and records whether the Jarvis hub texture is
+    /// mixed into this WAV. `/dot` then carries `"hub_texture":<hub>` on the reply.
+    pub fn set_reply_hub(&self, id: impl Into<String>, wav: Vec<u8>, ms: u32, hub: bool) -> bool {
+        if !self.set_reply(id, wav, ms) { return false; }
+        if let Ok(mut g) = self.0.lock() { g.hub = Some(hub); }
         true
     }
     /// Stop advertising a reply in `/dot` (stored WAVs stay fetchable until evicted).
@@ -318,7 +326,10 @@ impl ReplyBox {
     pub fn latest_json(&self) -> Option<String> {
         let g = self.0.lock().ok()?;
         let (id, ms) = g.latest.as_ref()?;
-        Some(format!("{{\"id\":\"{id}\",\"url\":\"/reply/{id}.wav\",\"ms\":{ms}}}"))
+        Some(match g.hub {
+            Some(h) => format!("{{\"id\":\"{id}\",\"url\":\"/reply/{id}.wav\",\"ms\":{ms},\"hub_texture\":{h}}}"),
+            None => format!("{{\"id\":\"{id}\",\"url\":\"/reply/{id}.wav\",\"ms\":{ms}}}"),
+        })
     }
 }
 
@@ -1638,4 +1649,19 @@ mod tests {
         assert!(t.bytes.iter().all(|&b| b == 0));
         assert!(!t.bytes.is_empty());
     }
+
+    #[test]
+    fn reply_box_marks_hub_texture_only_when_published_with_it() {
+        let b = ReplyBox::default();
+        assert!(b.set_reply("a1", b"RIFF0000WAVE".to_vec(), 120));
+        assert_eq!(b.latest_json().unwrap(), r#"{"id":"a1","url":"/reply/a1.wav","ms":120}"#);
+        assert!(b.set_reply_hub("j2", b"RIFF0000WAVE".to_vec(), 80, true));
+        assert_eq!(b.latest_json().unwrap(), r#"{"id":"j2","url":"/reply/j2.wav","ms":80,"hub_texture":true}"#);
+        assert!(b.set_reply_hub("s3", b"RIFF0000WAVE".to_vec(), 80, false));
+        assert!(b.latest_json().unwrap().ends_with(r#""hub_texture":false}"#));
+        assert!(b.set_reply("s4", b"RIFF0000WAVE".to_vec(), 80));
+        assert!(!b.latest_json().unwrap().contains("hub_texture"));
+        assert!(!b.set_reply_hub("bad id", Vec::new(), 1, true));
+    }
+
 }
