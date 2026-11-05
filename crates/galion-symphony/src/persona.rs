@@ -129,15 +129,15 @@ impl PersonaId {
     pub fn ref_expect(self) -> RefExpect {
         match self {
             PersonaId::Samantha => RefExpect {
-                sha256: "bdcb0c2903bb91c7b0fda0cf79a42406fdaa662fd8d31f6eaed3895d9c7a8693",
+                sha256: "1636428272b85d4b4f6c67bb859bfe33d9983ff9439646519305ff13e6921005",
                 sample_rate: 44_100,
-                channels: 2,
+                channels: 1,
                 bits: 16,
             },
             PersonaId::Jarvis => RefExpect {
-                sha256: "c2200b59fa78b3c98d13ac5dc7db3a6c14e802310dca73033d7770bd4b532c60",
-                sample_rate: 48_000,
-                channels: 2,
+                sha256: "60ad5457dac31af915a9679760705296f9aad17e15ee84885385509b58b8f6b6",
+                sample_rate: 44_100,
+                channels: 1,
                 bits: 16,
             },
         }

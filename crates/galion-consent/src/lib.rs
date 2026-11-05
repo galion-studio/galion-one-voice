@@ -47,6 +47,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod recut;
 pub mod sha256;
 
 use std::fmt;
@@ -186,13 +187,17 @@ pub struct Gate {
     pub reason: &'static str,
     pub seconds: Option<f64>,
     pub public: bool,
+    /// The consent record's instrument / grantor is CC0 or a public-domain
+    /// dedication (no individually signed release). Using such a voice needs
+    /// the caller's CC0 licence acceptance ([`cc0_use_gate`]).
+    pub cc0: bool,
     pub wav: Option<PathBuf>,
     pub sha256: Option<String>,
 }
 
 impl Gate {
     fn absent(reason: &'static str) -> Self {
-        Self { ok: false, reason, seconds: None, public: false, wav: None, sha256: None }
+        Self { ok: false, reason, seconds: None, public: false, cc0: false, wav: None, sha256: None }
     }
 }
 
@@ -212,6 +217,7 @@ pub fn reason_message(reason: &str) -> &'static str {
         "lock" => "LOCKS.toml does not allow reference clips (reference_clips is not true)",
         "worker" => "the clone worker is not in the tree",
         "weights" => "the pinned clone weights are not on disk at their pinned sizes",
+        "cc0_licence" => "this is a CC0 voice and the caller has not accepted the CC0 1.0 licence for this session",
         "ready" => "consent is valid",
         _ => "refused",
     }
@@ -244,6 +250,7 @@ pub struct Approval {
     pub persona: &'static str,
     pub seconds: f64,
     pub public: bool,
+    pub cc0: bool,
     pub wav: PathBuf,
     pub sha256: String,
 }
@@ -307,6 +314,7 @@ pub fn clone_gate_into(reg: &Registry, persona: &str, env: &Env) -> Result<Appro
             persona: name.unwrap_or("samantha"),
             seconds: gate.seconds.unwrap_or(0.0),
             public: gate.public,
+            cc0: gate.cc0,
             wav: gate.wav.clone().unwrap_or_default(),
             sha256: gate.sha256.clone().unwrap_or_default(),
         };
@@ -555,10 +563,15 @@ pub fn weight_files(model: &str) -> Vec<String> {
 }
 
 /// Size match against the pin table. The speech slot still hashes before it speaks.
+/// Tokenizer rows live in `TOKENIZER.sha256` beside `PINS.sha256` (the same
+/// split chatterbox_worker.py and clone_worker.rs read), so both tables are merged.
 pub fn weights_sized(env: &Env) -> bool {
-    let Some(table) = pins(&env.pins) else {
+    let Some(mut table) = pins(&env.pins) else {
         return false;
     };
+    if let Some(tok) = env.pins.parent().and_then(|d| pins(&d.join("TOKENIZER.sha256"))) {
+        table.extend(tok);
+    }
     weight_files(env.model).iter().all(|rel| {
         let Some((_, size)) = table.iter().find(|(k, _)| k == rel) else {
             return false;
@@ -656,6 +669,92 @@ pub fn expiry_date(value: &str) -> Option<(i32, u32, u32)> {
     Some((y, m, d))
 }
 
+/// SPDX-style name shown to the caller before a CC0 voice can be used.
+pub const CC0_LICENCE_NAME: &str = "CC0 1.0 Universal (Public Domain Dedication)";
+/// Licence text the UI links to.
+pub const CC0_LICENCE_URL: &str = "https://creativecommons.org/publicdomain/zero/1.0/";
+
+/// True when the record's `instrument` or `grantor` names CC0 or a
+/// public-domain dedication.
+pub fn consent_is_cc0(fields: &[(String, String)]) -> bool {
+    ["instrument", "grantor"].iter().any(|k| {
+        let v = field(fields, k).to_ascii_lowercase();
+        v.contains("cc0") || v.contains("public-domain") || v.contains("public domain") || v.contains("publicdomain")
+    })
+}
+
+/// Per-session CC0 licence acceptance, in memory only. Keys are the sha256
+/// of the session token, so the token itself is never kept; nothing is
+/// written to disk. `active` is the session of the turn in flight.
+#[derive(Debug, Default)]
+pub struct Cc0Acceptances {
+    inner: Mutex<(Vec<String>, Option<String>)>,
+}
+
+fn session_key(session: &str) -> Option<String> {
+    let t = session.trim();
+    if t.is_empty() {
+        return None;
+    }
+    let mut h = sha256::Sha256::new();
+    h.update(t.as_bytes());
+    Some(h.hex())
+}
+
+impl Cc0Acceptances {
+    pub const fn new() -> Self {
+        Self { inner: Mutex::new((Vec::new(), None)) }
+    }
+    /// The user ticked the CC0 checkbox in this session.
+    pub fn accept(&self, session: &str) -> bool {
+        let Some(k) = session_key(session) else { return false };
+        let mut g = self.inner.lock().unwrap_or_else(|e| e.into_inner());
+        if !g.0.contains(&k) {
+            g.0.push(k);
+        }
+        true
+    }
+    /// The user unticked it.
+    pub fn revoke(&self, session: &str) {
+        let Some(k) = session_key(session) else { return };
+        let mut g = self.inner.lock().unwrap_or_else(|e| e.into_inner());
+        g.0.retain(|x| *x != k);
+    }
+    pub fn accepted(&self, session: &str) -> bool {
+        let Some(k) = session_key(session) else { return false };
+        self.inner.lock().unwrap_or_else(|e| e.into_inner()).0.contains(&k)
+    }
+    /// The web layer calls this with the session of each turn it accepts.
+    pub fn set_active(&self, session: Option<&str>) {
+        let k = session.and_then(session_key);
+        self.inner.lock().unwrap_or_else(|e| e.into_inner()).1 = k;
+    }
+    /// Did the session of the turn in flight accept CC0? False when no
+    /// session is active.
+    pub fn active_accepted(&self) -> bool {
+        let g = self.inner.lock().unwrap_or_else(|e| e.into_inner());
+        g.1.as_ref().is_some_and(|k| g.0.contains(k))
+    }
+    pub fn clear(&self) {
+        *self.inner.lock().unwrap_or_else(|e| e.into_inner()) = (Vec::new(), None);
+    }
+}
+
+/// The process-wide CC0 acceptance store (web layer writes, clone slot reads).
+pub fn cc0_acceptances() -> &'static Cc0Acceptances {
+    static GLOBAL: OnceLock<Cc0Acceptances> = OnceLock::new();
+    GLOBAL.get_or_init(Cc0Acceptances::new)
+}
+
+/// Use-time gate: a CC0 voice is refused unless the caller accepted CC0.
+/// A non-CC0 approval passes unchanged.
+pub fn cc0_use_gate(approval: &Approval, accepted: bool) -> Result<(), CloneRefused> {
+    if approval.cc0 && !accepted {
+        return Err(CloneRefused { persona: approval.persona.to_string(), reason: "cc0_licence" });
+    }
+    Ok(())
+}
+
 /// The gate. See the crate docs for the order. Never spawns.
 pub fn evaluate(persona: &str, env: &Env, need_weights: bool) -> Gate {
     EVALUATIONS.fetch_add(1, Ordering::SeqCst);
@@ -748,6 +847,7 @@ pub fn evaluate(persona: &str, env: &Env, need_weights: bool) -> Gate {
         reason: "ready",
         seconds: Some(seconds),
         public: public == "yes",
+        cc0: consent_is_cc0(&fields),
         wav: Some(realpath(&wav)),
         sha256: Some(digest),
     }
@@ -794,5 +894,48 @@ mod tests {
         let err = clone_gate_into(&reg, "armstrong", &env).unwrap_err();
         assert!(err.to_string().contains("celebrity"), "{err}");
         assert!(reg.lookup("armstrong").is_none());
+    }
+
+    #[test]
+    fn cc0_voice_refused_until_the_session_ticks_the_box() {
+        let a = Approval { persona: "samantha", seconds: 9.6, public: false, cc0: true, wav: PathBuf::new(), sha256: String::new() };
+        let store = Cc0Acceptances::new();
+        store.set_active(Some("tok-1"));
+        // Unticked: refused.
+        let e = cc0_use_gate(&a, store.active_accepted()).unwrap_err();
+        assert_eq!(e.reason, "cc0_licence");
+        assert!(e.to_string().contains("CC0"));
+        // Ticked in another session: still refused for this one.
+        assert!(store.accept("tok-2"));
+        assert!(cc0_use_gate(&a, store.active_accepted()).is_err());
+        // Ticked in this session: allowed.
+        assert!(store.accept("tok-1"));
+        assert!(cc0_use_gate(&a, store.active_accepted()).is_ok());
+        // Unticked again: refused.
+        store.revoke("tok-1");
+        assert!(cc0_use_gate(&a, store.active_accepted()).is_err());
+        // No session: refused. Empty token never accepts.
+        assert!(!store.accept("  "));
+        store.set_active(None);
+        assert!(!store.active_accepted());
+        // A non-CC0 voice does not need the box.
+        let signed = Approval { cc0: false, ..a };
+        assert!(cc0_use_gate(&signed, false).is_ok());
+    }
+
+    #[test]
+    fn cc0_store_keeps_no_token() {
+        let store = Cc0Acceptances::new();
+        store.accept("secret-token-value");
+        let dbg = format!("{store:?}");
+        assert!(!dbg.contains("secret-token-value"), "{dbg}");
+    }
+
+    #[test]
+    fn cc0_is_read_from_the_consent_record() {
+        let cc0 = parse_consent("instrument: Public-domain dedication (LibriVox) plus CC0 1.0\ngrantor: x\n");
+        assert!(consent_is_cc0(&cc0));
+        let signed = parse_consent("instrument: signed release 2026-11-01\ngrantor: the performer\n");
+        assert!(!consent_is_cc0(&signed));
     }
 }

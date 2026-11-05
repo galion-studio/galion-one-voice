@@ -156,3 +156,17 @@ fn evaluation_counter_moves_once_per_gate() {
     let _ = evaluate("samantha", &t.env(), true);
     assert!(galion_consent::evaluations() > before);
 }
+
+#[test]
+fn tokenizer_rows_in_their_own_table_count_as_pinned() {
+    // The repo keeps tokenizer pins in scripts/clone/TOKENIZER.sha256, not PINS.sha256.
+    let t = Tree::new("toksplit");
+    let pins = t.repo.join("scripts/clone/PINS.sha256");
+    let text = fs::read_to_string(&pins).unwrap();
+    let (tok, rest): (Vec<&str>, Vec<&str>) = text.lines().partition(|l| l.starts_with("tokenizer/"));
+    assert!(!tok.is_empty());
+    fs::write(&pins, rest.join("\n") + "\n").unwrap();
+    assert!(!galion_consent::weights_sized(&t.env()), "tokenizer rows missing everywhere must not pass");
+    fs::write(t.repo.join("scripts/clone/TOKENIZER.sha256"), tok.join("\n") + "\n").unwrap();
+    assert!(galion_consent::weights_sized(&t.env()));
+}
