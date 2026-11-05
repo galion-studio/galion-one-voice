@@ -1,0 +1,13 @@
+# Galion Voice — Perpetual Open MIT License
+[package]
+name = "galion-clone-cbx"
+description = "Separate loopback-only cloning worker: Chatterbox Turbo ONNX fp32 through the cbx Rust CLI. Consent-gated at registration (galion-consent), refuses while a live call is active. std only."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version = "1.85"
+publish = false
+
+[dependencies]
+galion-consent = { path = "../galion-consent" }
