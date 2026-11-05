@@ -91,7 +91,7 @@ mod tests {
         assert_eq!(page.matches("<canvas").count(), 1);
         assert!(page.contains("function postTurn"));
         assert!(page.contains("fetch(\"turn\""));
-        assert!(page.contains("id=\"say\""));
+        assert!(!page.contains("id=\"say\""), "no text box: voice-to-voice only (owner t653u)");
         assert!(!page.to_ascii_lowercase().contains("<textarea"));
         assert!(v2.contains("url=/"));
         assert!(v2.contains("location.replace(\"/\")"));

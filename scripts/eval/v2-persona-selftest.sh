@@ -14,7 +14,7 @@ test -f docs/galion-voice-v2/personas/voice/samantha.toml
 test -f docs/galion-voice-v2/personas/voice/jarvis.toml
 curl -fsS "$BASE/health" | grep -qx ok
 curl -fsS "$BASE/" | grep -q 'const MOOD'
-curl -fsS "$BASE/" | grep -q 'id="say-text"'
+curl -fsS "$BASE/" | grep -q 'data-mark="orb"'
 curl -fsS "$BASE/" | grep -q 'data-persona="samantha"'
 v2hdr=$(curl -sI "$BASE/v2")
 grep -q '302' <<<"$v2hdr"

@@ -92,7 +92,7 @@ if [[ "$CHECK" == "1" ]]; then
   sleep 2
   page=$(curl -fsS "$URL")
   grep -q '<canvas id="s"' <<<"$page" && echo "  / : one canvas page OK ($(wc -c <<<"$page") bytes)" || { echo "  / : FAIL"; exit 1; }
-  grep -q 'data-persona="samantha"' <<<"$page" && grep -q 'id="say-text"' <<<"$page" && grep -q 'data-mouth="piper"' <<<"$page" && echo "  / : persona, mic page, text box OK" || { echo "  / : persona/text FAIL"; exit 1; }
+  grep -q 'data-persona="samantha"' <<<"$page" && grep -q 'data-mark="orb"' <<<"$page" && grep -q 'data-mouth="piper"' <<<"$page" && echo "  / : persona, mic page, orb OK" || { echo "  / : persona/text FAIL"; exit 1; }
   v2hdr=$(curl -sI "${URL}v2")
   grep -q '302' <<<"$v2hdr" && grep -qi 'location: /' <<<"$v2hdr" && echo "  /v2 : redirect OK" || { echo "  /v2 : FAIL ($v2hdr)"; exit 1; }
   state=$(curl -fsS "${URL}v2/state")
