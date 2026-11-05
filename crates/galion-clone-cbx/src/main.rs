@@ -304,9 +304,22 @@ fn handle(cfg: &Config, s: &mut TcpStream) {
                 return json_err(s, "409 Conflict", why);
             }
             let env = galion_consent::Env::from_process(&cfg.repo);
-            let approval = match galion_consent::clone_gate(persona, &env) {
-                Ok(a) => a,
-                Err(e) => return json_err(s, "403 Forbidden", e.reason),
+            // The full consent gate (persona, celebrity block, mono/duration,
+            // consent.txt fields, expiry, sha sidecar, LOCKS) without the Nano
+            // safetensors size check: this worker runs cbx's ONNX fp32 weights,
+            // not the in-tree Nano pack, so that check would refuse for the
+            // wrong reason.
+            let gate = galion_consent::evaluate(persona, &env, false);
+            if !gate.ok {
+                return json_err(s, "403 Forbidden", gate.reason);
+            }
+            let approval = galion_consent::Approval {
+                persona,
+                seconds: gate.seconds.unwrap_or(0.0),
+                public: gate.public,
+                cc0: gate.cc0,
+                wav: gate.wav.clone().unwrap_or_default(),
+                sha256: gate.sha256.clone().unwrap_or_default(),
             };
             if approval.cc0 && !cfg.accept_cc0 {
                 return json_err(s, "403 Forbidden", "cc0_licence");

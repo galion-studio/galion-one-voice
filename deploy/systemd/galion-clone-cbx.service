@@ -17,6 +17,9 @@ Environment=GALION_CBX_THREADS=4
 Environment=GALION_CBX_LIVE_PORT=7878
 Environment=GALION_CBX_LIVE_LOG=/opt/galion/voice/logs/galion-one-voice.log
 Environment=GALION_REPO=/opt/galion/voice/galion-one-voice
+Environment=GALION_CLIP_STORE=/opt/galion/voice/clip-store-cc0
+# CC0 donors (owner t623u decision, t661u enable).
+Environment=GALION_CBX_ACCEPT_CC0=1
 # Low priority so the live service always wins the CPU.
 Nice=19
 CPUWeight=10
