@@ -1,0 +1,312 @@
+Runtime:
+  available_cores: 8
+  intra_threads:   4
+  parallel_exec:   false
+  ep_requested:    cpu
+  ep_effective:    cpu
+  dtype:           fp32
+
+Saved voice profile: t648-jarvis-orig-fp32
+Voice cache dir: /home/box/.cache/huggingface/cbx/voices
+You can now run:
+  cbx speak --voice t648-jarvis-orig-fp32 --text "Hello" --out-wav out.wav
+Runtime:
+  available_cores: 8
+  intra_threads:   4
+  parallel_exec:   false
+  ep_requested:    cpu
+  ep_effective:    cpu
+  dtype:           fp32
+
+Model: ResembleAI/chatterbox-turbo-ONNX@main dtype=fp32
+Model cache paths:
+  tokenizer: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/tokenizer.json
+  conditional_decoder: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/conditional_decoder.onnx
+  speech_encoder: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/speech_encoder.onnx
+  embed_tokens: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/embed_tokens.onnx
+  language_model: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/language_model.onnx
+  snapshot_root: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf
+Voice cache dir: /home/box/.cache/huggingface/cbx/voices
+Voice: t648-jarvis-orig-fp32 (cached)
+Wrote /workspace/swarm/voice-v2-sprint/bakeoff-t648/out/C-fp32/jarvis-orig/s1-r1.wav
+Timings(ms): download=18 model_load=6086 voice_profile=2 synth=8826 total=14934 | tokenize=1 embed=30 lm=6390 decoder=2388 inner_total=8826
+Runtime:
+  available_cores: 8
+  intra_threads:   4
+  parallel_exec:   false
+  ep_requested:    cpu
+  ep_effective:    cpu
+  dtype:           fp32
+
+Model: ResembleAI/chatterbox-turbo-ONNX@main dtype=fp32
+Model cache paths:
+  tokenizer: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/tokenizer.json
+  conditional_decoder: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/conditional_decoder.onnx
+  speech_encoder: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/speech_encoder.onnx
+  embed_tokens: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/embed_tokens.onnx
+  language_model: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/language_model.onnx
+  snapshot_root: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf
+Voice cache dir: /home/box/.cache/huggingface/cbx/voices
+Voice: t648-jarvis-orig-fp32 (cached)
+Wrote /workspace/swarm/voice-v2-sprint/bakeoff-t648/out/C-fp32/jarvis-orig/s2-r1.wav
+Timings(ms): download=15 model_load=4584 voice_profile=1 synth=7881 total=12482 | tokenize=0 embed=21 lm=5775 decoder=2070 inner_total=7881
+Runtime:
+  available_cores: 8
+  intra_threads:   4
+  parallel_exec:   false
+  ep_requested:    cpu
+  ep_effective:    cpu
+  dtype:           fp32
+
+Model: ResembleAI/chatterbox-turbo-ONNX@main dtype=fp32
+Model cache paths:
+  tokenizer: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/tokenizer.json
+  conditional_decoder: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/conditional_decoder.onnx
+  speech_encoder: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/speech_encoder.onnx
+  embed_tokens: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/embed_tokens.onnx
+  language_model: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/language_model.onnx
+  snapshot_root: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf
+Voice cache dir: /home/box/.cache/huggingface/cbx/voices
+Voice: t648-jarvis-orig-fp32 (cached)
+Wrote /workspace/swarm/voice-v2-sprint/bakeoff-t648/out/C-fp32/jarvis-orig/s3-r1.wav
+Timings(ms): download=13 model_load=4047 voice_profile=1 synth=10162 total=14225 | tokenize=0 embed=22 lm=6456 decoder=3666 inner_total=10162
+Runtime:
+  available_cores: 8
+  intra_threads:   4
+  parallel_exec:   false
+  ep_requested:    cpu
+  ep_effective:    cpu
+  dtype:           fp32
+
+Model: ResembleAI/chatterbox-turbo-ONNX@main dtype=fp32
+Model cache paths:
+  tokenizer: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/tokenizer.json
+  conditional_decoder: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/conditional_decoder.onnx
+  speech_encoder: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/speech_encoder.onnx
+  embed_tokens: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/embed_tokens.onnx
+  language_model: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/language_model.onnx
+  snapshot_root: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf
+Voice cache dir: /home/box/.cache/huggingface/cbx/voices
+Voice: t648-jarvis-orig-fp32 (cached)
+Wrote /workspace/swarm/voice-v2-sprint/bakeoff-t648/out/C-fp32/jarvis-orig/s1-r2.wav
+Timings(ms): download=18 model_load=6215 voice_profile=1 synth=9944 total=16180 | tokenize=1 embed=25 lm=6324 decoder=3577 inner_total=9944
+Runtime:
+  available_cores: 8
+  intra_threads:   4
+  parallel_exec:   false
+  ep_requested:    cpu
+  ep_effective:    cpu
+  dtype:           fp32
+
+Model: ResembleAI/chatterbox-turbo-ONNX@main dtype=fp32
+Model cache paths:
+  tokenizer: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/tokenizer.json
+  conditional_decoder: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/conditional_decoder.onnx
+  speech_encoder: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/speech_encoder.onnx
+  embed_tokens: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/embed_tokens.onnx
+  language_model: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/language_model.onnx
+  snapshot_root: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf
+Voice cache dir: /home/box/.cache/huggingface/cbx/voices
+Voice: t648-jarvis-orig-fp32 (cached)
+Wrote /workspace/swarm/voice-v2-sprint/bakeoff-t648/out/C-fp32/jarvis-orig/s2-r2.wav
+Timings(ms): download=13 model_load=4252 voice_profile=1 synth=7789 total=12056 | tokenize=0 embed=18 lm=5756 decoder=1999 inner_total=7788
+Runtime:
+  available_cores: 8
+  intra_threads:   4
+  parallel_exec:   false
+  ep_requested:    cpu
+  ep_effective:    cpu
+  dtype:           fp32
+
+Model: ResembleAI/chatterbox-turbo-ONNX@main dtype=fp32
+Model cache paths:
+  tokenizer: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/tokenizer.json
+  conditional_decoder: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/conditional_decoder.onnx
+  speech_encoder: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/speech_encoder.onnx
+  embed_tokens: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/embed_tokens.onnx
+  language_model: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/language_model.onnx
+  snapshot_root: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf
+Voice cache dir: /home/box/.cache/huggingface/cbx/voices
+Voice: t648-jarvis-orig-fp32 (cached)
+Wrote /workspace/swarm/voice-v2-sprint/bakeoff-t648/out/C-fp32/jarvis-orig/s3-r2.wav
+Timings(ms): download=15 model_load=6385 voice_profile=2 synth=9615 total=16017 | tokenize=1 embed=36 lm=6699 decoder=2858 inner_total=9612
+Runtime:
+  available_cores: 8
+  intra_threads:   4
+  parallel_exec:   false
+  ep_requested:    cpu
+  ep_effective:    cpu
+  dtype:           fp32
+
+Model: ResembleAI/chatterbox-turbo-ONNX@main dtype=fp32
+Model cache paths:
+  tokenizer: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/tokenizer.json
+  conditional_decoder: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/conditional_decoder.onnx
+  speech_encoder: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/speech_encoder.onnx
+  embed_tokens: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/embed_tokens.onnx
+  language_model: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/language_model.onnx
+  snapshot_root: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf
+Voice cache dir: /home/box/.cache/huggingface/cbx/voices
+Voice: t648-jarvis-orig-fp32 (cached)
+Wrote /workspace/swarm/voice-v2-sprint/bakeoff-t648/out/C-fp32/jarvis-orig/s1-r3.wav
+Timings(ms): download=13 model_load=6283 voice_profile=3 synth=9297 total=15598 | tokenize=1 embed=19 lm=6646 decoder=2613 inner_total=9297
+Runtime:
+  available_cores: 8
+  intra_threads:   4
+  parallel_exec:   false
+  ep_requested:    cpu
+  ep_effective:    cpu
+  dtype:           fp32
+
+Model: ResembleAI/chatterbox-turbo-ONNX@main dtype=fp32
+Model cache paths:
+  tokenizer: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/tokenizer.json
+  conditional_decoder: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/conditional_decoder.onnx
+  speech_encoder: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/speech_encoder.onnx
+  embed_tokens: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/embed_tokens.onnx
+  language_model: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/language_model.onnx
+  snapshot_root: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf
+Voice cache dir: /home/box/.cache/huggingface/cbx/voices
+Voice: t648-jarvis-orig-fp32 (cached)
+Wrote /workspace/swarm/voice-v2-sprint/bakeoff-t648/out/C-fp32/jarvis-orig/s2-r3.wav
+Timings(ms): download=17 model_load=5588 voice_profile=1 synth=8365 total=13973 | tokenize=1 embed=18 lm=6009 decoder=2321 inner_total=8365
+Runtime:
+  available_cores: 8
+  intra_threads:   4
+  parallel_exec:   false
+  ep_requested:    cpu
+  ep_effective:    cpu
+  dtype:           fp32
+
+Model: ResembleAI/chatterbox-turbo-ONNX@main dtype=fp32
+Model cache paths:
+  tokenizer: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/tokenizer.json
+  conditional_decoder: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/conditional_decoder.onnx
+  speech_encoder: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/speech_encoder.onnx
+  embed_tokens: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/embed_tokens.onnx
+  language_model: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/language_model.onnx
+  snapshot_root: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf
+Voice cache dir: /home/box/.cache/huggingface/cbx/voices
+Voice: t648-jarvis-orig-fp32 (cached)
+Wrote /workspace/swarm/voice-v2-sprint/bakeoff-t648/out/C-fp32/jarvis-orig/s3-r3.wav
+Timings(ms): download=14 model_load=4598 voice_profile=1 synth=9160 total=13775 | tokenize=1 embed=79 lm=6540 decoder=2520 inner_total=9160
+Runtime:
+  available_cores: 8
+  intra_threads:   4
+  parallel_exec:   false
+  ep_requested:    cpu
+  ep_effective:    cpu
+  dtype:           fp32
+
+Model: ResembleAI/chatterbox-turbo-ONNX@main dtype=fp32
+Model cache paths:
+  tokenizer: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/tokenizer.json
+  conditional_decoder: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/conditional_decoder.onnx
+  speech_encoder: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/speech_encoder.onnx
+  embed_tokens: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/embed_tokens.onnx
+  language_model: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/language_model.onnx
+  snapshot_root: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf
+Voice cache dir: /home/box/.cache/huggingface/cbx/voices
+Voice: t648-jarvis-orig-fp32 (cached)
+Wrote /workspace/swarm/voice-v2-sprint/bakeoff-t648/out/C-fp32/jarvis-orig/s1-r4.wav
+Timings(ms): download=14 model_load=5295 voice_profile=1 synth=8837 total=14147 | tokenize=0 embed=18 lm=6335 decoder=2466 inner_total=8836
+Runtime:
+  available_cores: 8
+  intra_threads:   4
+  parallel_exec:   false
+  ep_requested:    cpu
+  ep_effective:    cpu
+  dtype:           fp32
+
+Model: ResembleAI/chatterbox-turbo-ONNX@main dtype=fp32
+Model cache paths:
+  tokenizer: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/tokenizer.json
+  conditional_decoder: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/conditional_decoder.onnx
+  speech_encoder: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/speech_encoder.onnx
+  embed_tokens: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/embed_tokens.onnx
+  language_model: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/language_model.onnx
+  snapshot_root: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf
+Voice cache dir: /home/box/.cache/huggingface/cbx/voices
+Voice: t648-jarvis-orig-fp32 (cached)
+Wrote /workspace/swarm/voice-v2-sprint/bakeoff-t648/out/C-fp32/jarvis-orig/s2-r4.wav
+Timings(ms): download=14 model_load=4484 voice_profile=1 synth=8498 total=12999 | tokenize=0 embed=17 lm=6168 decoder=2296 inner_total=8498
+Runtime:
+  available_cores: 8
+  intra_threads:   4
+  parallel_exec:   false
+  ep_requested:    cpu
+  ep_effective:    cpu
+  dtype:           fp32
+
+Model: ResembleAI/chatterbox-turbo-ONNX@main dtype=fp32
+Model cache paths:
+  tokenizer: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/tokenizer.json
+  conditional_decoder: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/conditional_decoder.onnx
+  speech_encoder: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/speech_encoder.onnx
+  embed_tokens: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/embed_tokens.onnx
+  language_model: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/language_model.onnx
+  snapshot_root: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf
+Voice cache dir: /home/box/.cache/huggingface/cbx/voices
+Voice: t648-jarvis-orig-fp32 (cached)
+Wrote /workspace/swarm/voice-v2-sprint/bakeoff-t648/out/C-fp32/jarvis-orig/s3-r4.wav
+Timings(ms): download=16 model_load=4850 voice_profile=2 synth=9100 total=13968 | tokenize=1 embed=19 lm=6610 decoder=2451 inner_total=9100
+Runtime:
+  available_cores: 8
+  intra_threads:   4
+  parallel_exec:   false
+  ep_requested:    cpu
+  ep_effective:    cpu
+  dtype:           fp32
+
+Model: ResembleAI/chatterbox-turbo-ONNX@main dtype=fp32
+Model cache paths:
+  tokenizer: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/tokenizer.json
+  conditional_decoder: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/conditional_decoder.onnx
+  speech_encoder: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/speech_encoder.onnx
+  embed_tokens: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/embed_tokens.onnx
+  language_model: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/language_model.onnx
+  snapshot_root: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf
+Voice cache dir: /home/box/.cache/huggingface/cbx/voices
+Voice: t648-jarvis-orig-fp32 (cached)
+Wrote /workspace/swarm/voice-v2-sprint/bakeoff-t648/out/C-fp32/jarvis-orig/s1-r5.wav
+Timings(ms): download=14 model_load=4874 voice_profile=1 synth=9061 total=13951 | tokenize=0 embed=18 lm=6558 decoder=2467 inner_total=9061
+Runtime:
+  available_cores: 8
+  intra_threads:   4
+  parallel_exec:   false
+  ep_requested:    cpu
+  ep_effective:    cpu
+  dtype:           fp32
+
+Model: ResembleAI/chatterbox-turbo-ONNX@main dtype=fp32
+Model cache paths:
+  tokenizer: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/tokenizer.json
+  conditional_decoder: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/conditional_decoder.onnx
+  speech_encoder: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/speech_encoder.onnx
+  embed_tokens: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/embed_tokens.onnx
+  language_model: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/language_model.onnx
+  snapshot_root: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf
+Voice cache dir: /home/box/.cache/huggingface/cbx/voices
+Voice: t648-jarvis-orig-fp32 (cached)
+Wrote /workspace/swarm/voice-v2-sprint/bakeoff-t648/out/C-fp32/jarvis-orig/s2-r5.wav
+Timings(ms): download=15 model_load=4576 voice_profile=1 synth=8110 total=12703 | tokenize=0 embed=16 lm=5813 decoder=2264 inner_total=8110
+Runtime:
+  available_cores: 8
+  intra_threads:   4
+  parallel_exec:   false
+  ep_requested:    cpu
+  ep_effective:    cpu
+  dtype:           fp32
+
+Model: ResembleAI/chatterbox-turbo-ONNX@main dtype=fp32
+Model cache paths:
+  tokenizer: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/tokenizer.json
+  conditional_decoder: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/conditional_decoder.onnx
+  speech_encoder: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/speech_encoder.onnx
+  embed_tokens: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/embed_tokens.onnx
+  language_model: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/language_model.onnx
+  snapshot_root: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf
+Voice cache dir: /home/box/.cache/huggingface/cbx/voices
+Voice: t648-jarvis-orig-fp32 (cached)
+Wrote /workspace/swarm/voice-v2-sprint/bakeoff-t648/out/C-fp32/jarvis-orig/s3-r5.wav
+Timings(ms): download=14 model_load=4173 voice_profile=1 synth=9313 total=13502 | tokenize=0 embed=16 lm=6656 decoder=2624 inner_total=9313

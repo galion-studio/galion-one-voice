@@ -1,0 +1,241 @@
+   Compiling zerofrom-derive v0.1.6
+   Compiling yoke-derive v0.8.1
+   Compiling openssl-macros v0.1.1
+   Compiling zerovec-derive v0.11.2
+   Compiling displaydoc v0.2.5
+   Compiling serde_derive v1.0.228
+   Compiling tokio-macros v2.6.0
+   Compiling openssl-sys v0.9.111
+   Compiling writeable v0.6.2
+   Compiling pin-utils v0.1.0
+   Compiling zerofrom v0.1.6
+   Compiling litemap v0.8.1
+   Compiling yoke v0.8.1
+   Compiling zerovec v0.11.5
+   Compiling tokio v1.48.0
+   Compiling autocfg v1.5.0
+   Compiling bitflags v2.10.0
+   Compiling zerocopy v0.8.31
+   Compiling tinystr v0.8.2
+   Compiling icu_locale_core v2.1.1
+   Compiling potential_utf v0.1.4
+   Compiling zerotrie v0.2.3
+   Compiling generic-array v0.14.7
+   Compiling typenum v1.19.0
+   Compiling serde v1.0.228
+   Compiling http v1.4.0
+   Compiling zerocopy-derive v0.8.31
+   Compiling futures-macro v0.3.31
+   Compiling icu_normalizer_data v2.1.1
+   Compiling icu_properties_data v2.1.2
+   Compiling futures-task v0.3.31
+   Compiling futures-io v0.3.31
+   Compiling futures-util v0.3.31
+   Compiling icu_provider v2.1.1
+   Compiling icu_collections v2.1.1
+   Compiling tracing-core v0.1.35
+   Compiling foreign-types-shared v0.1.1
+   Compiling crossbeam-utils v0.8.21
+   Compiling log v0.4.29
+   Compiling rustix v1.1.2
+   Compiling zeroize v1.8.2
+   Compiling percent-encoding v2.3.2
+   Compiling httparse v1.10.1
+   Compiling getrandom v0.3.4
+   Compiling foreign-types v0.3.2
+   Compiling rustls-pki-types v1.13.1
+   Compiling tracing v0.1.43
+   Compiling http-body v1.0.1
+   Compiling openssl v0.10.75
+   Compiling ring v0.17.14
+   Compiling fnv v1.0.7
+   Compiling linux-raw-sys v0.11.0
+   Compiling ident_case v1.0.1
+   Compiling base64ct v1.8.1
+   Compiling equivalent v1.0.2
+   Compiling bytes v1.11.0
+   Compiling ryu v1.0.20
+   Compiling itoa v1.0.15
+   Compiling once_cell v1.21.3
+   Compiling hashbrown v0.16.1
+   Compiling strsim v0.11.1
+   Compiling darling_core v0.20.11
+   Compiling indexmap v2.12.1
+   Compiling pem-rfc7468 v0.7.0
+   Compiling icu_properties v2.1.2
+   Compiling icu_normalizer v2.1.1
+   Compiling block-buffer v0.10.4
+   Compiling crypto-common v0.1.7
+   Compiling tokio-util v0.7.17
+   Compiling num-traits v0.2.19
+   Compiling native-tls v0.2.14
+   Compiling crc32fast v1.5.0
+   Compiling base64 v0.22.1
+   Compiling openssl-probe v0.1.6
+   Compiling tower-service v0.3.3
+   Compiling adler2 v2.0.1
+   Compiling try-lock v0.2.5
+   Compiling serde_json v1.0.145
+   Compiling atomic-waker v1.1.2
+   Compiling byteorder v1.5.0
+   Compiling simd-adler32 v0.3.8
+   Compiling miniz_oxide v0.8.9
+   Compiling socks v0.3.4
+   Compiling h2 v0.4.12
+   Compiling want v0.3.1
+   Compiling ureq-proto v0.5.3
+   Compiling digest v0.10.7
+   Compiling webpki-root-certs v1.0.4
+   Compiling crossbeam-epoch v0.9.18
+   Compiling idna_adapter v1.2.1
+   Compiling der v0.7.10
+   Compiling darling_macro v0.20.11
+   Compiling xattr v1.6.1
+   Compiling form_urlencoded v1.2.2
+   Compiling filetime v0.2.26
+   Compiling getrandom v0.2.16
+   Compiling rustversion v1.0.22
+   Compiling utf8_iter v1.0.4
+   Compiling utf-8 v0.7.6
+   Compiling untrusted v0.9.0
+   Compiling rayon-core v1.13.0
+   Compiling cpufeatures v0.2.17
+   Compiling sha2 v0.10.9
+   Compiling ureq v3.1.4
+   Compiling idna v1.1.0
+   Compiling tar v0.4.44
+   Compiling hyper v1.8.1
+   Compiling darling v0.20.11
+   Compiling crossbeam-deque v0.8.6
+   Compiling flate2 v1.1.5
+   Compiling rand_core v0.9.3
+   Compiling ppv-lite86 v0.2.21
+   Compiling matrixmultiply v0.3.10
+   Compiling sync_wrapper v1.0.2
+   Compiling onig_sys v69.9.1
+   Compiling portable-atomic v1.11.1
+   Compiling paste v1.0.15
+   Compiling tower-layer v0.3.3
+   Compiling thiserror v2.0.17
+   Compiling either v1.15.0
+   Compiling rustls v0.23.35
+   Compiling utf8parse v0.2.2
+   Compiling ipnet v2.11.0
+   Compiling anstyle-parse v0.2.7
+   Compiling hyper-util v0.1.19
+   Compiling tower v0.5.2
+   Compiling rand_chacha v0.9.0
+   Compiling ort-sys v2.0.0-rc.10
+   Compiling derive_builder_core v0.20.2
+   Compiling rustls-webpki v0.103.8
+   Compiling url v2.5.7
+   Compiling tokio-native-tls v0.3.1
+   Compiling webpki-roots v1.0.4
+   Compiling http-body-util v0.1.3
+   Compiling ahash v0.8.12
+   Compiling aho-corasick v1.1.4
+   Compiling thiserror-impl v2.0.17
+   Compiling anstyle v1.0.13
+   Compiling unicode-width v0.2.2
+   Compiling regex-syntax v0.8.8
+   Compiling anstyle-query v1.1.5
+   Compiling esaxx-rs v0.1.10
+   Compiling subtle v2.6.1
+   Compiling rawpointer v0.2.1
+   Compiling option-ext v0.2.0
+   Compiling is_terminal_polyfill v1.70.2
+   Compiling iri-string v0.7.9
+   Compiling minimal-lexical v0.2.1
+   Compiling colorchoice v1.0.4
+   Compiling anstream v0.6.21
+   Compiling nom v7.1.3
+   Compiling tower-http v0.6.8
+   Compiling regex-automata v0.4.13
+   Compiling dirs-sys v0.5.0
+   Compiling console v0.15.11
+   Compiling hyper-tls v0.6.0
+   Compiling webpki-roots v0.26.11
+   Compiling castaway v0.2.4
+   Compiling derive_builder_macro v0.20.2
+   Compiling rayon v1.11.0
+   Compiling rand v0.9.2
+   Compiling itertools v0.14.0
+   Compiling num-complex v0.4.6
+   Compiling num-integer v0.1.46
+   Compiling serde_urlencoded v0.7.1
+   Compiling futures-executor v0.3.31
+   Compiling encoding_rs v0.8.35
+   Compiling monostate-impl v0.1.18
+   Compiling clap_lex v0.7.6
+   Compiling unicode-segmentation v1.12.0
+   Compiling static_assertions v1.1.0
+   Compiling anyhow v1.0.100
+   Compiling base64 v0.13.1
+   Compiling number_prefix v0.4.0
+   Compiling heck v0.5.0
+   Compiling mime v0.3.17
+   Compiling macro_rules_attribute-proc_macro v0.2.2
+   Compiling macro_rules_attribute v0.2.2
+   Compiling reqwest v0.12.26
+   Compiling clap_builder v4.5.53
+   Compiling clap_derive v4.5.49
+   Compiling indicatif v0.17.11
+   Compiling spm_precompiled v0.1.4
+   Compiling compact_str v0.9.0
+   Compiling monostate v0.1.18
+   Compiling rayon-cond v0.4.0
+   Compiling futures v0.3.31
+   Compiling ndarray v0.16.1
+   Compiling ureq v2.12.1
+   Compiling derive_builder v0.20.2
+   Compiling regex v1.12.2
+   Compiling dirs v6.0.0
+   Compiling onig v6.5.1
+   Compiling half v2.7.1
+   Compiling dary_heap v0.3.8
+   Compiling unicode-normalization-alignments v0.1.12
+   Compiling num_cpus v1.17.0
+   Compiling smallvec v2.0.0-alpha.10
+   Compiling unicode_categories v0.1.1
+   Compiling tokenizers v0.22.2
+   Compiling ort v2.0.0-rc.10
+   Compiling hf-hub v0.4.3
+   Compiling clap v4.5.53
+   Compiling bincode v1.3.3
+   Compiling hound v3.5.1
+   Compiling urlencoding v2.1.3
+   Compiling chatterbox-rs v0.1.0 (/workspace/swarm/voice-v2-sprint/bakeoff-t648/src/cbx)
+warning: associated items `load` and `synthesize` are never used
+   --> src/chatterbox.rs:116:12
+    |
+115 | impl Chatterbox {
+    | --------------- associated items in this implementation
+116 |     pub fn load(paths: &hf::ChatterboxPaths) -> Result<Self> {
+    |            ^^^^
+...
+208 |     pub fn synthesize(
+    |            ^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `chatterbox-rs` (lib) generated 1 warning
+error: linking with `cc` failed: exit status: 1
+  |
+  = note:  "cc" "-m64" "/workspace/swarm/voice-v2-sprint/bakeoff-t648/src/cbx/target/release/deps/rustcTyxEqB/symbols.o" "<2 object files omitted>" "-Wl,--as-needed" "-Wl,-Bstatic" "/workspace/swarm/voice-v2-sprint/bakeoff-t648/src/cbx/target/release/deps/{libchatterbox_rs-bf02d182095fa60f,libbincode-bdda8ebf4ac7d10b,liburlencoding-0ecf149b571f0090,libhound-aaff9b171c9932e1,libclap-8fa6ebde508cf15b,libclap_builder-89ff6bee63d230cf,libstrsim-0efca37291e6b520,libanstream-ecaf424ae559660c,libanstyle_query-7be241654f8a67dd,libis_terminal_polyfill-736c6e46bc6c1772,libcolorchoice-87cdcc44102ee1fa,libanstyle_parse-a58cd6d8d7a3fed8,libutf8parse-04127f67d1e740e1,libclap_lex-08a12990d41ea3dc,libanstyle-eca21b7fbb6acc4e,libhf_hub-63db92e5124f569e,libdirs-410ef07a84a88925,libdirs_sys-2b16610893737a08,liboption_ext-a86428f97936154d,libnum_cpus-8c334abaddd3e46d,libureq-5c56725dea4b75bf,libwebpki_roots-48db6993530c11fd,libwebpki_roots-d0e10523609eab82,libsocks-f3d80a0f2b6c3921,libbyteorder-f4533d6e39b2fd29,libflate2-f0574eeed30837e7,libminiz_oxide-c58bdc213721f244,libsimd_adler32-a0d0c1ff7c38a51f,libcrc32fast-88490cdce2de2bb7,librustls-8040b09eeeda1d16,libsubtle-a146f6f1b0752ee2,libwebpki-5d5a29d7cdd2d521,libring-b4a1b8da4fc935b5,libgetrandom-858f1415d753fc94,libuntrusted-d60d81130374144d,libreqwest-d6495cd9bf621ffe,libserde_urlencoded-44f7d55dd7f55e8b,librustls_pki_types-6bd92e30a3e26df9,libzeroize-db57f94619f33834,libhyper_tls-541e2832a61f73f6,libtokio_native_tls-5cc5ab44d8d67ed1,libmime-6d90c1a54ceeffa3,libencoding_rs-362b6cd4a2b037f5,libtower_http-2a07bea56d83650a,libiri_string-eea7d87d7a062301,libtower-619874a49e72ed11,libtower_layer-5bcac36bc5c5ffc9,libnative_tls-d124342259e5e19c,libopenssl_probe-2260833caa2b15ac,libopenssl-3373d9ae04842146,libforeign_types-295101150aefbb9b,libforeign_types_shared-f77261546584d38c,libopenssl_sys-40e5192175fbbbe0,libhyper_util-90782aefde9e6bfe,libbase64-3c8ae60e1ec79d29,libipnet-92e9db29cbed995f,libtower_service-c7f3a292f0d439ca,libhyper-83319351c55a08b1,libwant-ae10edd4f2970edc,libtry_lock-7b5ad8ce6765cac7,libhttparse-1e2242f3a97db81d,libh2-abd8ab3f78f16ed5,libindexmap-60827adc4d72981c,libequivalent-98af79b631c9d18f,libhashbrown-dc608be519e69485,libfnv-3c7a2f41d215b820,libatomic_waker-9bd424d934baf608,libtokio_util-50bfe1a2c91d378a,libtokio-57725e9744f3aabc,libsocket2-f11282b182ca5f70,libmio-6aff72deacfb0a50,libhttp_body_util-11e763ad6d1c4f08,libhttp_body-d648675f31662cca,liburl-777525bf24258b07,libidna-38ed839e8e0b06dc,libutf8_iter-91d043f55382ec4a,libidna_adapter-1a011f6e8b66fe46,libicu_properties-78fbbddbe2ffadf1,libicu_properties_data-43653667ea2cb1fa,libicu_normalizer-eab8d4dbcd5212f5,libicu_normalizer_data-2b792ef1863e947d,libicu_collections-782f64ca5d445ea6,libpotential_utf-4a814902995af967,libicu_provider-b580f3f4e76e3b58,libicu_locale_core-6b2fb1df3f3629c3,libtinystr-b13c1a374e39ab78,liblitemap-e13ab21aeb26d74a,libwriteable-8c2c0912603c68f5,libzerovec-566f13a50ee4071b,libzerotrie-2f5388ce92d85cc5,libyoke-dc066be14fe024b1,libstable_deref_trait-3015cbdafd13eebc,libzerofrom-7a5544416adb0c38,libform_urlencoded-f38cf4be2f833ba7,libpercent_encoding-eefbb4bb1987f6af,libhttp-1a696bb09d227604,libbytes-f24d88849a452cfd,libsync_wrapper-ee0f5b8342a24dc1,libfutures-87ee1f93272a9589,libfutures_executor-dabe0e5cd1a40d9a,libfutures_util-0a7b2d7b969ce66d,libfutures_io-a1e094452ccb8893,libslab-38c24acb621e0d9c,libfutures_channel-654f21d5354bc62a,libfutures_sink-834cf12d42083af8,libfutures_task-b2a6c64432bbd9b7,libpin_utils-6a31bd82bb1e8551,libfutures_core-41cf383b460c42ca,libindicatif-d5758eb2cc96dd2f,libportable_atomic-c99f879558d36617,libnumber_prefix-a9a719a59b07368d,libconsole-9dc0f16d934bb586,libunicode_width-4caff79d64a4935e,libtokenizers-2c08b06ac2ebc3dc,libesaxx_rs-f9024b56314930fa,libthiserror-bd8a1e067104e25c,libregex-9c4e6bf4f5578697,libregex_automata-edcc025eb9f50d06,libaho_corasick-9c29c22f7c6084a5,libregex_syntax-37fe2714c6440a22,libunicode_normalization_alignments-e6c8c269927c5136,libsmallvec-9bd345ba99fdf8c6,libspm_precompiled-dc28048267240d17,libbase64-7a0bdfb5a661f6ff,libunicode_segmentation-c831d100000b840a,libnom-8f440489c732f90b,libunicode_categories-de2ed4d19ed1239f,librand-b8bd70d0799ad09c,librand_chacha-1f074e3f9a29581b,libppv_lite86-1c1439db63b5654a,librand_core-81d2ed0dedb95105,libdary_heap-ae24414f5002f9b2,libcompact_str-307f15892289dabb,libstatic_assertions-cb114ae2d5121859,libcastaway-d9b413b62252451e,libserde_json-5ee4b672499dd9e1,libmemchr-22a03bb3c9a46957,libitoa-3be2a21d9868c1c6,libryu-88c88dd6c166e430,libmonostate-eb71d077dc4b0764,libmacro_rules_attribute-434f5a958af9064a,librayon_cond-698d6b7780c9440d,libitertools-347b165ec48c2b60,librayon-000e8d427b8ec164,librayon_core-ae1440aeb06c8222,libcrossbeam_deque-0d73a689efdf62c3,libcrossbeam_epoch-4dff13596ab9898d,libcrossbeam_utils-763700043ac4756c,libeither-06cad9c01d9da61e,libonig-a665d51a8f9fa56a,libbitflags-578b6818bcff1d8c,libonig_sys-bb02ff8b2907ab19,libahash-75bfdf9ab98cae67,libgetrandom-531fa92b7d3c0f76,liblibc-c61451915f0a4cb3,libserde-6e1f3f96f34bf184,libserde_core-faf16ef3ee9cf614,libderive_builder-10c473b3e7f712b4,liblog-5e0562565446d3d0,libort-8c338a000ac5129a,libtracing-db82ee2bd3348362,libpin_project_lite-20ab16590a6f2350,libtracing_core-cd68c616ace48ae9,libonce_cell-d45c4b7e61132d0b,libort_sys-159527624cc1e026,libndarray-7180c1f3949db372,libmatrixmultiply-5f2db1efcafccc67,libnum_complex-178bc8394292416d,libnum_integer-b5680d5b1d19a54c,libnum_traits-040e56d0f4c679ab,librawpointer-6d51d3fffd83ef8d,libsmallvec-d78aa1755ff00e06,libhalf-c4bc0c3f54c0d1aa,libcfg_if-1c9c37f95103e69f,libzerocopy-fc208f8f0d93dcf9,libanyhow-eb09e02c579e5fe1}.rlib" "<sysroot>/lib/rustlib/x86_64-unknown-linux-gnu/lib/{libstd-*,libpanic_unwind-*,libobject-*,libmemchr-*,libaddr2line-*,libgimli-*,libcfg_if-*,librustc_demangle-*,libstd_detect-*,libhashbrown-*,librustc_std_workspace_alloc-*,libminiz_oxide-*,libadler2-*,libunwind-*,liblibc-*,librustc_std_workspace_core-*,liballoc-*,libcore-*,libcompiler_builtins-*}.rlib" "-Wl,-Bdynamic" "-lssl" "-lcrypto" "-lstdc++" "-lgcc_s" "-lutil" "-lrt" "-lpthread" "-lm" "-ldl" "-lc" "-L" "/workspace/swarm/voice-v2-sprint/bakeoff-t648/src/cbx/target/release/deps/rustcTyxEqB/raw-dylibs" "-B<sysroot>/lib/rustlib/x86_64-unknown-linux-gnu/bin/gcc-ld" "-fuse-ld=lld" "-Wl,--eh-frame-hdr" "-Wl,-z,noexecstack" "-L" "/workspace/swarm/voice-v2-sprint/bakeoff-t648/src/cbx/target/release/build/ring-dbc7a66db7c15909/out" "-L" "/workspace/swarm/voice-v2-sprint/bakeoff-t648/src/cbx/target/release/build/onig_sys-128fd35694bbb1bb/out" "-L" "/usr/lib/x86_64-linux-gnu" "-L" "/home/box/.cache/ort.pyke.io/dfbin/x86_64-unknown-linux-gnu/ED1716DE95974BF47AB0223CA33734A0B5A5D09A181225D0E8ED62D070AEA893/onnxruntime/lib" "-L" "<sysroot>/lib/rustlib/x86_64-unknown-linux-gnu/lib" "-o" "/workspace/swarm/voice-v2-sprint/bakeoff-t648/src/cbx/target/release/deps/cbx-e28070a94e91c1a1" "-Wl,--gc-sections" "-pie" "-Wl,-z,relro,-z,now" "-Wl,-O1" "-Wl,--strip-debug" "-nodefaultlibs"
+  = note: some arguments are omitted. use `--verbose` to show all linker arguments
+  = note: rust-lld: error: unable to find library -lstdc++
+          collect2: error: ld returned 1 exit status
+          
+
+error: linking with `cc` failed: exit status: 1
+  |
+  = note:  "cc" "-m64" "/workspace/swarm/voice-v2-sprint/bakeoff-t648/src/cbx/target/release/deps/rustcFLTo9E/symbols.o" "<2 object files omitted>" "-Wl,--as-needed" "-Wl,-Bstatic" "/workspace/swarm/voice-v2-sprint/bakeoff-t648/src/cbx/target/release/deps/{libchatterbox_rs-bf02d182095fa60f,libbincode-bdda8ebf4ac7d10b,liburlencoding-0ecf149b571f0090,libhound-aaff9b171c9932e1,libclap-8fa6ebde508cf15b,libclap_builder-89ff6bee63d230cf,libstrsim-0efca37291e6b520,libanstream-ecaf424ae559660c,libanstyle_query-7be241654f8a67dd,libis_terminal_polyfill-736c6e46bc6c1772,libcolorchoice-87cdcc44102ee1fa,libanstyle_parse-a58cd6d8d7a3fed8,libutf8parse-04127f67d1e740e1,libclap_lex-08a12990d41ea3dc,libanstyle-eca21b7fbb6acc4e,libhf_hub-63db92e5124f569e,libdirs-410ef07a84a88925,libdirs_sys-2b16610893737a08,liboption_ext-a86428f97936154d,libnum_cpus-8c334abaddd3e46d,libureq-5c56725dea4b75bf,libwebpki_roots-48db6993530c11fd,libwebpki_roots-d0e10523609eab82,libsocks-f3d80a0f2b6c3921,libbyteorder-f4533d6e39b2fd29,libflate2-f0574eeed30837e7,libminiz_oxide-c58bdc213721f244,libsimd_adler32-a0d0c1ff7c38a51f,libcrc32fast-88490cdce2de2bb7,librustls-8040b09eeeda1d16,libsubtle-a146f6f1b0752ee2,libwebpki-5d5a29d7cdd2d521,libring-b4a1b8da4fc935b5,libgetrandom-858f1415d753fc94,libuntrusted-d60d81130374144d,libreqwest-d6495cd9bf621ffe,libserde_urlencoded-44f7d55dd7f55e8b,librustls_pki_types-6bd92e30a3e26df9,libzeroize-db57f94619f33834,libhyper_tls-541e2832a61f73f6,libtokio_native_tls-5cc5ab44d8d67ed1,libmime-6d90c1a54ceeffa3,libencoding_rs-362b6cd4a2b037f5,libtower_http-2a07bea56d83650a,libiri_string-eea7d87d7a062301,libtower-619874a49e72ed11,libtower_layer-5bcac36bc5c5ffc9,libnative_tls-d124342259e5e19c,libopenssl_probe-2260833caa2b15ac,libopenssl-3373d9ae04842146,libforeign_types-295101150aefbb9b,libforeign_types_shared-f77261546584d38c,libopenssl_sys-40e5192175fbbbe0,libhyper_util-90782aefde9e6bfe,libbase64-3c8ae60e1ec79d29,libipnet-92e9db29cbed995f,libtower_service-c7f3a292f0d439ca,libhyper-83319351c55a08b1,libwant-ae10edd4f2970edc,libtry_lock-7b5ad8ce6765cac7,libhttparse-1e2242f3a97db81d,libh2-abd8ab3f78f16ed5,libindexmap-60827adc4d72981c,libequivalent-98af79b631c9d18f,libhashbrown-dc608be519e69485,libfnv-3c7a2f41d215b820,libatomic_waker-9bd424d934baf608,libtokio_util-50bfe1a2c91d378a,libtokio-57725e9744f3aabc,libsocket2-f11282b182ca5f70,libmio-6aff72deacfb0a50,libhttp_body_util-11e763ad6d1c4f08,libhttp_body-d648675f31662cca,liburl-777525bf24258b07,libidna-38ed839e8e0b06dc,libutf8_iter-91d043f55382ec4a,libidna_adapter-1a011f6e8b66fe46,libicu_properties-78fbbddbe2ffadf1,libicu_properties_data-43653667ea2cb1fa,libicu_normalizer-eab8d4dbcd5212f5,libicu_normalizer_data-2b792ef1863e947d,libicu_collections-782f64ca5d445ea6,libpotential_utf-4a814902995af967,libicu_provider-b580f3f4e76e3b58,libicu_locale_core-6b2fb1df3f3629c3,libtinystr-b13c1a374e39ab78,liblitemap-e13ab21aeb26d74a,libwriteable-8c2c0912603c68f5,libzerovec-566f13a50ee4071b,libzerotrie-2f5388ce92d85cc5,libyoke-dc066be14fe024b1,libstable_deref_trait-3015cbdafd13eebc,libzerofrom-7a5544416adb0c38,libform_urlencoded-f38cf4be2f833ba7,libpercent_encoding-eefbb4bb1987f6af,libhttp-1a696bb09d227604,libbytes-f24d88849a452cfd,libsync_wrapper-ee0f5b8342a24dc1,libfutures-87ee1f93272a9589,libfutures_executor-dabe0e5cd1a40d9a,libfutures_util-0a7b2d7b969ce66d,libfutures_io-a1e094452ccb8893,libslab-38c24acb621e0d9c,libfutures_channel-654f21d5354bc62a,libfutures_sink-834cf12d42083af8,libfutures_task-b2a6c64432bbd9b7,libpin_utils-6a31bd82bb1e8551,libfutures_core-41cf383b460c42ca,libindicatif-d5758eb2cc96dd2f,libportable_atomic-c99f879558d36617,libnumber_prefix-a9a719a59b07368d,libconsole-9dc0f16d934bb586,libunicode_width-4caff79d64a4935e,libtokenizers-2c08b06ac2ebc3dc,libesaxx_rs-f9024b56314930fa,libthiserror-bd8a1e067104e25c,libregex-9c4e6bf4f5578697,libregex_automata-edcc025eb9f50d06,libaho_corasick-9c29c22f7c6084a5,libregex_syntax-37fe2714c6440a22,libunicode_normalization_alignments-e6c8c269927c5136,libsmallvec-9bd345ba99fdf8c6,libspm_precompiled-dc28048267240d17,libbase64-7a0bdfb5a661f6ff,libunicode_segmentation-c831d100000b840a,libnom-8f440489c732f90b,libunicode_categories-de2ed4d19ed1239f,librand-b8bd70d0799ad09c,librand_chacha-1f074e3f9a29581b,libppv_lite86-1c1439db63b5654a,librand_core-81d2ed0dedb95105,libdary_heap-ae24414f5002f9b2,libcompact_str-307f15892289dabb,libstatic_assertions-cb114ae2d5121859,libcastaway-d9b413b62252451e,libserde_json-5ee4b672499dd9e1,libmemchr-22a03bb3c9a46957,libitoa-3be2a21d9868c1c6,libryu-88c88dd6c166e430,libmonostate-eb71d077dc4b0764,libmacro_rules_attribute-434f5a958af9064a,librayon_cond-698d6b7780c9440d,libitertools-347b165ec48c2b60,librayon-000e8d427b8ec164,librayon_core-ae1440aeb06c8222,libcrossbeam_deque-0d73a689efdf62c3,libcrossbeam_epoch-4dff13596ab9898d,libcrossbeam_utils-763700043ac4756c,libeither-06cad9c01d9da61e,libonig-a665d51a8f9fa56a,libbitflags-578b6818bcff1d8c,libonig_sys-bb02ff8b2907ab19,libahash-75bfdf9ab98cae67,libgetrandom-531fa92b7d3c0f76,liblibc-c61451915f0a4cb3,libserde-6e1f3f96f34bf184,libserde_core-faf16ef3ee9cf614,libderive_builder-10c473b3e7f712b4,liblog-5e0562565446d3d0,libort-8c338a000ac5129a,libtracing-db82ee2bd3348362,libpin_project_lite-20ab16590a6f2350,libtracing_core-cd68c616ace48ae9,libonce_cell-d45c4b7e61132d0b,libort_sys-159527624cc1e026,libndarray-7180c1f3949db372,libmatrixmultiply-5f2db1efcafccc67,libnum_complex-178bc8394292416d,libnum_integer-b5680d5b1d19a54c,libnum_traits-040e56d0f4c679ab,librawpointer-6d51d3fffd83ef8d,libsmallvec-d78aa1755ff00e06,libhalf-c4bc0c3f54c0d1aa,libcfg_if-1c9c37f95103e69f,libzerocopy-fc208f8f0d93dcf9,libanyhow-eb09e02c579e5fe1}.rlib" "<sysroot>/lib/rustlib/x86_64-unknown-linux-gnu/lib/{libstd-*,libpanic_unwind-*,libobject-*,libmemchr-*,libaddr2line-*,libgimli-*,libcfg_if-*,librustc_demangle-*,libstd_detect-*,libhashbrown-*,librustc_std_workspace_alloc-*,libminiz_oxide-*,libadler2-*,libunwind-*,liblibc-*,librustc_std_workspace_core-*,liballoc-*,libcore-*,libcompiler_builtins-*}.rlib" "-Wl,-Bdynamic" "-lssl" "-lcrypto" "-lstdc++" "-lgcc_s" "-lutil" "-lrt" "-lpthread" "-lm" "-ldl" "-lc" "-L" "/workspace/swarm/voice-v2-sprint/bakeoff-t648/src/cbx/target/release/deps/rustcFLTo9E/raw-dylibs" "-B<sysroot>/lib/rustlib/x86_64-unknown-linux-gnu/bin/gcc-ld" "-fuse-ld=lld" "-Wl,--eh-frame-hdr" "-Wl,-z,noexecstack" "-L" "/workspace/swarm/voice-v2-sprint/bakeoff-t648/src/cbx/target/release/build/ring-dbc7a66db7c15909/out" "-L" "/workspace/swarm/voice-v2-sprint/bakeoff-t648/src/cbx/target/release/build/onig_sys-128fd35694bbb1bb/out" "-L" "/usr/lib/x86_64-linux-gnu" "-L" "/home/box/.cache/ort.pyke.io/dfbin/x86_64-unknown-linux-gnu/ED1716DE95974BF47AB0223CA33734A0B5A5D09A181225D0E8ED62D070AEA893/onnxruntime/lib" "-L" "<sysroot>/lib/rustlib/x86_64-unknown-linux-gnu/lib" "-o" "/workspace/swarm/voice-v2-sprint/bakeoff-t648/src/cbx/target/release/deps/chatterbox_onnx-8eace034374aa024" "-Wl,--gc-sections" "-pie" "-Wl,-z,relro,-z,now" "-Wl,-O1" "-Wl,--strip-debug" "-nodefaultlibs"
+  = note: some arguments are omitted. use `--verbose` to show all linker arguments
+  = note: rust-lld: error: unable to find library -lstdc++
+          collect2: error: ld returned 1 exit status
+          
+
+error: could not compile `chatterbox-rs` (bin "cbx") due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `chatterbox-rs` (bin "chatterbox-onnx") due to 1 previous error
+EXIT 101

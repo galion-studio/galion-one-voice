@@ -1,0 +1,317 @@
+{
+ "bakeoff-t648/out/A/jarvis-orig/s1-r1.wav": {
+  "samantha_orig": 0.0442,
+  "jarvis_orig": 0.3994,
+  "samantha_alt": 0.0436,
+  "samantha_heldout": 0.048,
+  "jarvis_heldout": 0.3369
+ },
+ "bakeoff-t648/out/A/jarvis-orig/s1-r2.wav": {
+  "samantha_orig": 0.0496,
+  "jarvis_orig": 0.3646,
+  "samantha_alt": 0.055,
+  "samantha_heldout": 0.0524,
+  "jarvis_heldout": 0.3123
+ },
+ "bakeoff-t648/out/A/jarvis-orig/s1-r3.wav": {
+  "samantha_orig": 0.0409,
+  "jarvis_orig": 0.3693,
+  "samantha_alt": 0.0553,
+  "samantha_heldout": 0.0494,
+  "jarvis_heldout": 0.313
+ },
+ "bakeoff-t648/out/A/jarvis-orig/s1-r4.wav": {
+  "samantha_orig": 0.0283,
+  "jarvis_orig": 0.3886,
+  "samantha_alt": 0.0362,
+  "samantha_heldout": 0.0472,
+  "jarvis_heldout": 0.3281
+ },
+ "bakeoff-t648/out/A/jarvis-orig/s1-r5.wav": {
+  "samantha_orig": 0.0285,
+  "jarvis_orig": 0.3542,
+  "samantha_alt": 0.0364,
+  "samantha_heldout": 0.0362,
+  "jarvis_heldout": 0.3101
+ },
+ "bakeoff-t648/out/A/jarvis-orig/s2-r1.wav": {
+  "samantha_orig": 0.0467,
+  "jarvis_orig": 0.3545,
+  "samantha_alt": 0.046,
+  "samantha_heldout": 0.0814,
+  "jarvis_heldout": 0.3206
+ },
+ "bakeoff-t648/out/A/jarvis-orig/s2-r2.wav": {
+  "samantha_orig": 0.0549,
+  "jarvis_orig": 0.3675,
+  "samantha_alt": 0.0621,
+  "samantha_heldout": 0.107,
+  "jarvis_heldout": 0.3282
+ },
+ "bakeoff-t648/out/A/jarvis-orig/s2-r3.wav": {
+  "samantha_orig": 0.0604,
+  "jarvis_orig": 0.4104,
+  "samantha_alt": 0.0742,
+  "samantha_heldout": 0.1065,
+  "jarvis_heldout": 0.3741
+ },
+ "bakeoff-t648/out/A/jarvis-orig/s2-r4.wav": {
+  "samantha_orig": 0.062,
+  "jarvis_orig": 0.4093,
+  "samantha_alt": 0.0631,
+  "samantha_heldout": 0.1033,
+  "jarvis_heldout": 0.3729
+ },
+ "bakeoff-t648/out/A/jarvis-orig/s2-r5.wav": {
+  "samantha_orig": 0.0567,
+  "jarvis_orig": 0.3804,
+  "samantha_alt": 0.0653,
+  "samantha_heldout": 0.1115,
+  "jarvis_heldout": 0.3426
+ },
+ "bakeoff-t648/out/A/jarvis-orig/s3-r1.wav": {
+  "samantha_orig": 0.0361,
+  "jarvis_orig": 0.3369,
+  "samantha_alt": 0.0086,
+  "samantha_heldout": 0.07,
+  "jarvis_heldout": 0.2972
+ },
+ "bakeoff-t648/out/A/jarvis-orig/s3-r2.wav": {
+  "samantha_orig": 0.0256,
+  "jarvis_orig": 0.36,
+  "samantha_alt": 0.0084,
+  "samantha_heldout": 0.0742,
+  "jarvis_heldout": 0.3164
+ },
+ "bakeoff-t648/out/A/jarvis-orig/s3-r3.wav": {
+  "samantha_orig": 0.0381,
+  "jarvis_orig": 0.3837,
+  "samantha_alt": 0.024,
+  "samantha_heldout": 0.0829,
+  "jarvis_heldout": 0.3413
+ },
+ "bakeoff-t648/out/A/jarvis-orig/s3-r4.wav": {
+  "samantha_orig": 0.039,
+  "jarvis_orig": 0.3735,
+  "samantha_alt": 0.0134,
+  "samantha_heldout": 0.0719,
+  "jarvis_heldout": 0.3305
+ },
+ "bakeoff-t648/out/A/jarvis-orig/s3-r5.wav": {
+  "samantha_orig": 0.0373,
+  "jarvis_orig": 0.3594,
+  "samantha_alt": 0.0212,
+  "samantha_heldout": 0.0851,
+  "jarvis_heldout": 0.3273
+ },
+ "bakeoff-t648/out/A/samantha-ALT-src-17.84-29.25/s1-r1.wav": {
+  "samantha_orig": 0.279,
+  "jarvis_orig": -0.0783,
+  "samantha_alt": 0.2983,
+  "samantha_heldout": 0.2477,
+  "jarvis_heldout": -0.1228
+ },
+ "bakeoff-t648/out/A/samantha-ALT-src-17.84-29.25/s1-r2.wav": {
+  "samantha_orig": 0.2896,
+  "jarvis_orig": -0.0643,
+  "samantha_alt": 0.3155,
+  "samantha_heldout": 0.2389,
+  "jarvis_heldout": -0.1146
+ },
+ "bakeoff-t648/out/A/samantha-ALT-src-17.84-29.25/s1-r3.wav": {
+  "samantha_orig": 0.2802,
+  "jarvis_orig": -0.0698,
+  "samantha_alt": 0.2894,
+  "samantha_heldout": 0.2288,
+  "jarvis_heldout": -0.1164
+ },
+ "bakeoff-t648/out/A/samantha-ALT-src-17.84-29.25/s1-r4.wav": {
+  "samantha_orig": 0.2819,
+  "jarvis_orig": -0.0608,
+  "samantha_alt": 0.2914,
+  "samantha_heldout": 0.2282,
+  "jarvis_heldout": -0.1094
+ },
+ "bakeoff-t648/out/A/samantha-ALT-src-17.84-29.25/s1-r5.wav": {
+  "samantha_orig": 0.2855,
+  "jarvis_orig": -0.0705,
+  "samantha_alt": 0.2951,
+  "samantha_heldout": 0.2407,
+  "jarvis_heldout": -0.122
+ },
+ "bakeoff-t648/out/A/samantha-ALT-src-17.84-29.25/s2-r1.wav": {
+  "samantha_orig": 0.277,
+  "jarvis_orig": -0.0233,
+  "samantha_alt": 0.2974,
+  "samantha_heldout": 0.2472,
+  "jarvis_heldout": -0.079
+ },
+ "bakeoff-t648/out/A/samantha-ALT-src-17.84-29.25/s2-r2.wav": {
+  "samantha_orig": 0.2325,
+  "jarvis_orig": -0.0341,
+  "samantha_alt": 0.2646,
+  "samantha_heldout": 0.2037,
+  "jarvis_heldout": -0.0848
+ },
+ "bakeoff-t648/out/A/samantha-ALT-src-17.84-29.25/s2-r3.wav": {
+  "samantha_orig": 0.2772,
+  "jarvis_orig": -0.0399,
+  "samantha_alt": 0.3069,
+  "samantha_heldout": 0.2428,
+  "jarvis_heldout": -0.094
+ },
+ "bakeoff-t648/out/A/samantha-ALT-src-17.84-29.25/s2-r4.wav": {
+  "samantha_orig": 0.2526,
+  "jarvis_orig": -0.0222,
+  "samantha_alt": 0.2736,
+  "samantha_heldout": 0.2224,
+  "jarvis_heldout": -0.0785
+ },
+ "bakeoff-t648/out/A/samantha-ALT-src-17.84-29.25/s2-r5.wav": {
+  "samantha_orig": 0.2536,
+  "jarvis_orig": -0.0291,
+  "samantha_alt": 0.2886,
+  "samantha_heldout": 0.221,
+  "jarvis_heldout": -0.0794
+ },
+ "bakeoff-t648/out/A/samantha-ALT-src-17.84-29.25/s3-r1.wav": {
+  "samantha_orig": 0.3501,
+  "jarvis_orig": -0.0283,
+  "samantha_alt": 0.3327,
+  "samantha_heldout": 0.2393,
+  "jarvis_heldout": -0.1204
+ },
+ "bakeoff-t648/out/A/samantha-ALT-src-17.84-29.25/s3-r2.wav": {
+  "samantha_orig": 0.3457,
+  "jarvis_orig": -0.0197,
+  "samantha_alt": 0.335,
+  "samantha_heldout": 0.2618,
+  "jarvis_heldout": -0.1063
+ },
+ "bakeoff-t648/out/A/samantha-ALT-src-17.84-29.25/s3-r3.wav": {
+  "samantha_orig": 0.3533,
+  "jarvis_orig": -0.0142,
+  "samantha_alt": 0.3502,
+  "samantha_heldout": 0.2666,
+  "jarvis_heldout": -0.1011
+ },
+ "bakeoff-t648/out/A/samantha-ALT-src-17.84-29.25/s3-r4.wav": {
+  "samantha_orig": 0.332,
+  "jarvis_orig": -0.0038,
+  "samantha_alt": 0.3209,
+  "samantha_heldout": 0.2613,
+  "jarvis_heldout": -0.0922
+ },
+ "bakeoff-t648/out/A/samantha-ALT-src-17.84-29.25/s3-r5.wav": {
+  "samantha_orig": 0.332,
+  "jarvis_orig": -0.033,
+  "samantha_alt": 0.3408,
+  "samantha_heldout": 0.2471,
+  "jarvis_heldout": -0.122
+ },
+ "bakeoff-t648/out/A/samantha-orig/s1-r1.wav": {
+  "samantha_orig": 0.2703,
+  "jarvis_orig": -0.0292,
+  "samantha_alt": 0.2663,
+  "samantha_heldout": 0.206,
+  "jarvis_heldout": -0.0774
+ },
+ "bakeoff-t648/out/A/samantha-orig/s1-r2.wav": {
+  "samantha_orig": 0.2627,
+  "jarvis_orig": -0.0262,
+  "samantha_alt": 0.2585,
+  "samantha_heldout": 0.1948,
+  "jarvis_heldout": -0.0713
+ },
+ "bakeoff-t648/out/A/samantha-orig/s1-r3.wav": {
+  "samantha_orig": 0.2787,
+  "jarvis_orig": -0.0401,
+  "samantha_alt": 0.2873,
+  "samantha_heldout": 0.2179,
+  "jarvis_heldout": -0.0818
+ },
+ "bakeoff-t648/out/A/samantha-orig/s1-r4.wav": {
+  "samantha_orig": 0.28,
+  "jarvis_orig": -0.0335,
+  "samantha_alt": 0.277,
+  "samantha_heldout": 0.2284,
+  "jarvis_heldout": -0.0808
+ },
+ "bakeoff-t648/out/A/samantha-orig/s1-r5.wav": {
+  "samantha_orig": 0.28,
+  "jarvis_orig": -0.0347,
+  "samantha_alt": 0.26,
+  "samantha_heldout": 0.2034,
+  "jarvis_heldout": -0.0847
+ },
+ "bakeoff-t648/out/A/samantha-orig/s2-r1.wav": {
+  "samantha_orig": 0.2515,
+  "jarvis_orig": -0.0139,
+  "samantha_alt": 0.2621,
+  "samantha_heldout": 0.1963,
+  "jarvis_heldout": -0.0603
+ },
+ "bakeoff-t648/out/A/samantha-orig/s2-r2.wav": {
+  "samantha_orig": 0.2726,
+  "jarvis_orig": -0.0267,
+  "samantha_alt": 0.2776,
+  "samantha_heldout": 0.2122,
+  "jarvis_heldout": -0.0774
+ },
+ "bakeoff-t648/out/A/samantha-orig/s2-r3.wav": {
+  "samantha_orig": 0.2453,
+  "jarvis_orig": -0.0033,
+  "samantha_alt": 0.2519,
+  "samantha_heldout": 0.1826,
+  "jarvis_heldout": -0.0596
+ },
+ "bakeoff-t648/out/A/samantha-orig/s2-r4.wav": {
+  "samantha_orig": 0.2508,
+  "jarvis_orig": -0.0026,
+  "samantha_alt": 0.2618,
+  "samantha_heldout": 0.1939,
+  "jarvis_heldout": -0.0468
+ },
+ "bakeoff-t648/out/A/samantha-orig/s2-r5.wav": {
+  "samantha_orig": 0.2442,
+  "jarvis_orig": -0.0045,
+  "samantha_alt": 0.2566,
+  "samantha_heldout": 0.2008,
+  "jarvis_heldout": -0.057
+ },
+ "bakeoff-t648/out/A/samantha-orig/s3-r1.wav": {
+  "samantha_orig": 0.338,
+  "jarvis_orig": -0.0152,
+  "samantha_alt": 0.31,
+  "samantha_heldout": 0.2652,
+  "jarvis_heldout": -0.0908
+ },
+ "bakeoff-t648/out/A/samantha-orig/s3-r2.wav": {
+  "samantha_orig": 0.3325,
+  "jarvis_orig": -0.0067,
+  "samantha_alt": 0.3011,
+  "samantha_heldout": 0.26,
+  "jarvis_heldout": -0.0837
+ },
+ "bakeoff-t648/out/A/samantha-orig/s3-r3.wav": {
+  "samantha_orig": 0.3779,
+  "jarvis_orig": -0.0069,
+  "samantha_alt": 0.3427,
+  "samantha_heldout": 0.2824,
+  "jarvis_heldout": -0.0965
+ },
+ "bakeoff-t648/out/A/samantha-orig/s3-r4.wav": {
+  "samantha_orig": 0.3289,
+  "jarvis_orig": -0.0037,
+  "samantha_alt": 0.2881,
+  "samantha_heldout": 0.2392,
+  "jarvis_heldout": -0.0933
+ },
+ "bakeoff-t648/out/A/samantha-orig/s3-r5.wav": {
+  "samantha_orig": 0.3739,
+  "jarvis_orig": 0.0124,
+  "samantha_alt": 0.3425,
+  "samantha_heldout": 0.2941,
+  "jarvis_heldout": -0.0677
+ }
+}

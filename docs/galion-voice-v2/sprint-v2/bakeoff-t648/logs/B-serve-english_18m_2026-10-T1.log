@@ -1,0 +1,17 @@
+INFO: Loading model from config at english_18m_2026-10.yaml...
+INFO: Loading TTSModel weights from hf://kyutai/pocket-tts/languages/english_18m_2026-10/model.safetensors@db04f0e653473e5c7333c69686ac92b7460b0c1d
+INFO: Loading sentencepiece tokenizer from hf://kyutai/pocket-tts-without-voice-cloning/languages/english_18m_2026-10/tokenizer.model@08ffc58775e62aad9409511b9591c9af626270f3
+INFO: Started server process [2414806]
+INFO: Server running on http://127.0.0.1:18765 (Press CTRL+C to quit)
+INFO: Prompting text took 28 ms
+INFO: Average generation step time: 2 ms
+INFO: Generated: 7360 ms of audio in 516 ms so 14.26x faster than real-time
+INFO: Prompting text took 30 ms
+INFO: Average generation step time: 2 ms
+INFO: Generated: 6240 ms of audio in 392 ms so 15.92x faster than real-time
+INFO: Prompting text took 26 ms
+INFO: Average generation step time: 2 ms
+INFO: Generated: 6560 ms of audio in 506 ms so 12.96x faster than real-time
+INFO: Prompting text took 25 ms
+INFO: Average generation step time: 2 ms
+INFO: Generated: 7600 ms of audio in 474 ms so 16.03x faster than real-time

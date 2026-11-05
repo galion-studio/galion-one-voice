@@ -1,0 +1,104 @@
+{
+  "cpu": {
+    "avx2": true,
+    "avx512f": true,
+    "kernel": "6.12.94+",
+    "logical_cpus": 4,
+    "mem": "16386368 kB",
+    "model": "Intel(R) Xeon(R) Processor"
+  },
+  "full_loop": {
+    "bc_wait_before_first_clause": {
+      "max": 0.0,
+      "mean": 0.0,
+      "min": 0.0,
+      "n": 2,
+      "name": "bc wait",
+      "p50": 0.0,
+      "p95": 0.0
+    },
+    "endpoint_hang_ms": 160.0,
+    "eos_to_asr_final": {
+      "max": 168.4,
+      "mean": 160.6,
+      "min": 152.7,
+      "n": 2,
+      "name": "eos→asr final",
+      "p50": 160.6,
+      "p95": 167.6
+    },
+    "eos_to_backchannel_audio": {
+      "max": 278.0,
+      "mean": 249.8,
+      "min": 221.6,
+      "n": 2,
+      "name": "eos→backchannel audio",
+      "p50": 249.8,
+      "p95": 275.2
+    },
+    "eos_to_endpoint": {
+      "max": 140.2,
+      "mean": 130.2,
+      "min": 120.2,
+      "n": 2,
+      "name": "eos→endpoint",
+      "p50": 130.2,
+      "p95": 139.2
+    },
+    "eos_to_first_clause": {
+      "max": 574.6,
+      "mean": 521.2,
+      "min": 467.7,
+      "n": 2,
+      "name": "eos→first clause",
+      "p50": 521.2,
+      "p95": 569.2
+    },
+    "eos_to_first_content_audio": {
+      "max": 723.0,
+      "mean": 632.8,
+      "min": 542.6,
+      "n": 2,
+      "name": "eos→first content audio (FULL LOOP)",
+      "p50": 632.8,
+      "p95": 714.0
+    },
+    "eos_to_first_token": {
+      "max": 432.7,
+      "mean": 393.2,
+      "min": 353.7,
+      "n": 2,
+      "name": "eos→first token",
+      "p50": 393.2,
+      "p95": 428.8
+    },
+    "llm_cost_usd_total": 0.0,
+    "llm_model": "qwen2.5-1.5b-instruct",
+    "llm_provider_order": [],
+    "llm_ttft": {
+      "max": 264.3,
+      "mean": 232.6,
+      "min": 201.0,
+      "n": 2,
+      "name": "llm ttft",
+      "p50": 232.6,
+      "p95": 261.1
+    },
+    "piper_ttfa_in_loop": {
+      "max": 148.4,
+      "mean": 111.6,
+      "min": 74.8,
+      "n": 2,
+      "name": "piper ttfa in loop",
+      "p50": 111.6,
+      "p95": 144.8
+    },
+    "warm_http2": false
+  },
+  "piper": {
+    "bin": "rhasspy piper 2023.11.14-2 (A21 pin)",
+    "rate_hz": 22050,
+    "voice": "en_US-ljspeech-medium"
+  },
+  "runs": 2
+}

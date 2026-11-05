@@ -1,0 +1,132 @@
+Runtime:
+  available_cores: 8
+  intra_threads:   4
+  parallel_exec:   false
+  ep_requested:    cpu
+  ep_effective:    cpu
+  dtype:           quantized
+
+Error: failed to load conditional_decoder.onnx
+
+Caused by:
+    Load model from /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/conditional_decoder_quantized.onnx failed:This is an invalid model. In Node, ("/input_embedding/Gather_Quant", GatherBlockQuantized, "com.microsoft", -1) : ("input_embedding_weight_quant": tensor(uint8),"speech_tokens": tensor(int64),"input_embedding_weight_scales": tensor(float),"input_embedding_weight_zp": tensor(uint8),) -> ("/input_embedding/Gather_output_0": tensor(float),) , Error Unrecognized attribute: bits for operator GatherBlockQuantized
+Runtime:
+  available_cores: 8
+  intra_threads:   4
+  parallel_exec:   false
+  ep_requested:    cpu
+  ep_effective:    cpu
+  dtype:           quantized
+
+Model: ResembleAI/chatterbox-turbo-ONNX@main dtype=quantized
+Model cache paths:
+  tokenizer: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/tokenizer.json
+  conditional_decoder: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/conditional_decoder_quantized.onnx
+  speech_encoder: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/speech_encoder_quantized.onnx
+  embed_tokens: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/embed_tokens_quantized.onnx
+  language_model: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/language_model_quantized.onnx
+  snapshot_root: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf
+Error: failed to load conditional_decoder.onnx
+
+Caused by:
+    Load model from /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/conditional_decoder_quantized.onnx failed:This is an invalid model. In Node, ("/input_embedding/Gather_Quant", GatherBlockQuantized, "com.microsoft", -1) : ("input_embedding_weight_quant": tensor(uint8),"speech_tokens": tensor(int64),"input_embedding_weight_scales": tensor(float),"input_embedding_weight_zp": tensor(uint8),) -> ("/input_embedding/Gather_output_0": tensor(float),) , Error Unrecognized attribute: bits for operator GatherBlockQuantized
+Runtime:
+  available_cores: 8
+  intra_threads:   4
+  parallel_exec:   false
+  ep_requested:    cpu
+  ep_effective:    cpu
+  dtype:           quantized
+
+Model: ResembleAI/chatterbox-turbo-ONNX@main dtype=quantized
+Model cache paths:
+  tokenizer: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/tokenizer.json
+  conditional_decoder: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/conditional_decoder_quantized.onnx
+  speech_encoder: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/speech_encoder_quantized.onnx
+  embed_tokens: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/embed_tokens_quantized.onnx
+  language_model: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/language_model_quantized.onnx
+  snapshot_root: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf
+Error: failed to load conditional_decoder.onnx
+
+Caused by:
+    Load model from /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/conditional_decoder_quantized.onnx failed:This is an invalid model. In Node, ("/input_embedding/Gather_Quant", GatherBlockQuantized, "com.microsoft", -1) : ("input_embedding_weight_quant": tensor(uint8),"speech_tokens": tensor(int64),"input_embedding_weight_scales": tensor(float),"input_embedding_weight_zp": tensor(uint8),) -> ("/input_embedding/Gather_output_0": tensor(float),) , Error Unrecognized attribute: bits for operator GatherBlockQuantized
+Runtime:
+  available_cores: 8
+  intra_threads:   4
+  parallel_exec:   false
+  ep_requested:    cpu
+  ep_effective:    cpu
+  dtype:           quantized
+
+Model: ResembleAI/chatterbox-turbo-ONNX@main dtype=quantized
+Model cache paths:
+  tokenizer: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/tokenizer.json
+  conditional_decoder: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/conditional_decoder_quantized.onnx
+  speech_encoder: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/speech_encoder_quantized.onnx
+  embed_tokens: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/embed_tokens_quantized.onnx
+  language_model: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/language_model_quantized.onnx
+  snapshot_root: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf
+Error: failed to load conditional_decoder.onnx
+
+Caused by:
+    Load model from /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/conditional_decoder_quantized.onnx failed:This is an invalid model. In Node, ("/input_embedding/Gather_Quant", GatherBlockQuantized, "com.microsoft", -1) : ("input_embedding_weight_quant": tensor(uint8),"speech_tokens": tensor(int64),"input_embedding_weight_scales": tensor(float),"input_embedding_weight_zp": tensor(uint8),) -> ("/input_embedding/Gather_output_0": tensor(float),) , Error Unrecognized attribute: bits for operator GatherBlockQuantized
+Runtime:
+  available_cores: 8
+  intra_threads:   4
+  parallel_exec:   false
+  ep_requested:    cpu
+  ep_effective:    cpu
+  dtype:           quantized
+
+Model: ResembleAI/chatterbox-turbo-ONNX@main dtype=quantized
+Model cache paths:
+  tokenizer: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/tokenizer.json
+  conditional_decoder: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/conditional_decoder_quantized.onnx
+  speech_encoder: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/speech_encoder_quantized.onnx
+  embed_tokens: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/embed_tokens_quantized.onnx
+  language_model: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/language_model_quantized.onnx
+  snapshot_root: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf
+Error: failed to load conditional_decoder.onnx
+
+Caused by:
+    Load model from /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/conditional_decoder_quantized.onnx failed:This is an invalid model. In Node, ("/input_embedding/Gather_Quant", GatherBlockQuantized, "com.microsoft", -1) : ("input_embedding_weight_quant": tensor(uint8),"speech_tokens": tensor(int64),"input_embedding_weight_scales": tensor(float),"input_embedding_weight_zp": tensor(uint8),) -> ("/input_embedding/Gather_output_0": tensor(float),) , Error Unrecognized attribute: bits for operator GatherBlockQuantized
+Runtime:
+  available_cores: 8
+  intra_threads:   4
+  parallel_exec:   false
+  ep_requested:    cpu
+  ep_effective:    cpu
+  dtype:           quantized
+
+Model: ResembleAI/chatterbox-turbo-ONNX@main dtype=quantized
+Model cache paths:
+  tokenizer: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/tokenizer.json
+  conditional_decoder: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/conditional_decoder_quantized.onnx
+  speech_encoder: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/speech_encoder_quantized.onnx
+  embed_tokens: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/embed_tokens_quantized.onnx
+  language_model: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/language_model_quantized.onnx
+  snapshot_root: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf
+Error: failed to load conditional_decoder.onnx
+
+Caused by:
+    Load model from /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/conditional_decoder_quantized.onnx failed:This is an invalid model. In Node, ("/input_embedding/Gather_Quant", GatherBlockQuantized, "com.microsoft", -1) : ("input_embedding_weight_quant": tensor(uint8),"speech_tokens": tensor(int64),"input_embedding_weight_scales": tensor(float),"input_embedding_weight_zp": tensor(uint8),) -> ("/input_embedding/Gather_output_0": tensor(float),) , Error Unrecognized attribute: bits for operator GatherBlockQuantized
+Runtime:
+  available_cores: 8
+  intra_threads:   4
+  parallel_exec:   false
+  ep_requested:    cpu
+  ep_effective:    cpu
+  dtype:           quantized
+
+Model: ResembleAI/chatterbox-turbo-ONNX@main dtype=quantized
+Model cache paths:
+  tokenizer: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/tokenizer.json
+  conditional_decoder: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/conditional_decoder_quantized.onnx
+  speech_encoder: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/speech_encoder_quantized.onnx
+  embed_tokens: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/embed_tokens_quantized.onnx
+  language_model: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/language_model_quantized.onnx
+  snapshot_root: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf
+Error: failed to load conditional_decoder.onnx
+
+Caused by:
+    Load model from /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/conditional_decoder_quantized.onnx failed:This is an invalid model. In Node, ("/input_embedding/Gather_Quant", GatherBlockQuantized, "com.microsoft", -1) : ("input_embedding_weight_quant": tensor(uint8),"speech_tokens": tensor(int64),"input_embedding_weight_scales": tensor(float),"input_embedding_weight_zp": tensor(uint8),) -> ("/input_embedding/Gather_output_0": tensor(float),) , Error Unrecognized attribute: bits for operator GatherBlockQuantized
