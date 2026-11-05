@@ -16,3 +16,7 @@ ms fields) when the pack or runtime is missing. `--wav OUT` writes the drained
 24 kHz audio for listening — never commit WAVs.
 
 Relates to #54 (stream TTFA) and #55 (80 ms PCM drain).
+
+---
+
+© G.A.L.I.O.N. — General Autonomous Local Intelligence Open Network. All rights reserved and claims reserved. · CC0 voices: you must tick the consent box agreeing to the CC0 licence before using any CC0 voice; use is at your own responsibility. · No cookies. · De-Googled: no Google services. · All current Galion builds are open source under the Galion perpetual open MIT licence.

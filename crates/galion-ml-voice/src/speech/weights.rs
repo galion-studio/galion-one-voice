@@ -16,13 +16,18 @@
 //!   and espeak-ng GPL-3 for phonemes) run **out of process** on the **CPU**. Nothing is
 //!   linked into any Galion crate (check-no-forbidden stays green). One worker is
 //!   spawned for the life of this slot and reused across clauses and turns
-//!   (`--json-input --output_raw`). Runtime: `$GALION_A21_RUNTIME` or
-//!   `<repo>/weights/runtime/piper/piper`.
+//!   (`--json-input --output_raw`). Runtime ([`piper_runtime`]): `$GALION_A21_RUNTIME`, else
+//!   `galion-piper-rt` (same pack and phonemizer on onnxruntime 1.31.1, out of process;
+//!   owner approval t613s2992, `runtimes/galion-piper-rt`), else (or with
+//!   `GALION_PIPER_LEGACY=1`) the legacy CLI `<repo>/weights/runtime/piper/piper`.
 //! - `.safetensors` / `.gq` = future Galion-native decoder on galion-tensor:
 //!   [`GALION_NATIVE_DECODER_WIRED`] = `false`, so such packs report Present but inactive.
-//! Nothing here downloads anything (scripts/a21/fetch-a21.sh is the only fetcher).
+//!
+//! Nothing here downloads anything (scripts/a21/fetch-a21.sh and
+//! scripts/a21/build-piper-rt.sh are the only fetchers).
 
 use super::piper_worker::{PiperProsody, PiperWorker};
+use galion_heartbeat::symphony::NanoPcmRing;
 use super::sha256;
 use crate::{Audio, LanguageId, TtsEngine, VoiceError};
 use std::path::{Path, PathBuf};
@@ -30,29 +35,67 @@ use std::path::{Path, PathBuf};
 /// Flip to `true` only when a Galion-native decoder for `.gq`/`.safetensors` TTS packs
 /// is implemented in-tree on galion-tensor.
 pub const GALION_NATIVE_DECODER_WIRED: bool = false;
-/// Env var: path to the Piper runtime executable (default `<repo>/weights/runtime/piper/piper`).
+/// Env var: path to the Piper runtime executable. If set it is the only candidate.
 pub const RUNTIME_ENV: &str = "GALION_A21_RUNTIME";
+/// Env var: `1` selects the legacy piper 2023.11.14-2 CLI (onnxruntime 1.14.1)
+/// instead of the default `galion-piper-rt` (onnxruntime 1.31.1).
+pub const LEGACY_ENV: &str = "GALION_PIPER_LEGACY";
+/// Default Piper runtime, relative to `weights/` (scripts/a21/build-piper-rt.sh).
+pub const RT_REL: &str = "runtime/piper-rt/galion-piper-rt";
+/// onnxruntime the default runtime loads, relative to `weights/` (LOCKS `a21_piper.onnxruntime`).
+pub const RT_ORT_REL: &str = "runtime/ort/onnxruntime-linux-x64-1.31.1/lib/libonnxruntime.so.1.31.1";
+/// Legacy piper CLI, relative to `weights/` (scripts/a21/fetch-a21.sh). Also ships the
+/// espeak-ng library and data that both runtimes phonemize with.
+pub const LEGACY_REL: &str = "runtime/piper/piper";
 /// Pinned sha256 of known MIT voice packs (filename, sha256). Used when no env / `.sha256` file.
 pub const PINNED: &[(&str, &str)] = &[
     ("en_US-ljspeech-medium.onnx", "6f52a751e2349abe7a76735eb09dc1875298c77ea2342ffd2fef79ff81b87f22"),
     ("en_US-ljspeech-medium.onnx.json", "141d612cc0a95ed7efc1ca936b845c2364967f2e9217c5dbfcf69fc4d6c65860"),
 ];
 
+fn weights_dirs() -> [PathBuf; 2] {
+    [Path::new(env!("CARGO_MANIFEST_DIR")).join("../../weights"), PathBuf::from("weights")]
+}
+
+/// The legacy piper 2023.11.14-2 CLI (onnxruntime 1.14.1), if installed.
+pub fn piper_legacy_runtime() -> Option<PathBuf> {
+    weights_dirs().into_iter().map(|w| w.join(LEGACY_REL)).find(|p| p.is_file())
+}
+
+/// The default runtime `galion-piper-rt` (onnxruntime 1.31.1), if installed with
+/// everything it loads: the onnxruntime library and the Piper pack's espeak-ng.
+pub fn piper_rt_runtime() -> Option<PathBuf> {
+    weights_dirs().into_iter()
+        .find(|w| w.join(RT_REL).is_file() && w.join(RT_ORT_REL).is_file() && w.join(LEGACY_REL).is_file())
+        .map(|w| w.join(RT_REL))
+}
+
+/// True when `GALION_PIPER_LEGACY=1` (or `true`/`yes`).
+pub fn legacy_forced() -> bool {
+    matches!(std::env::var(LEGACY_ENV).ok().as_deref().map(str::trim), Some("1" | "true" | "yes"))
+}
+
 /// Locate the Piper runtime (CPU, out of process). `None` = not installed.
-/// If `$GALION_A21_RUNTIME` is set it is the only candidate (so it can also disable A21).
+/// Order: `$GALION_A21_RUNTIME` (only candidate when set, so it can also disable A21);
+/// `GALION_PIPER_LEGACY=1` -> legacy CLI; else `galion-piper-rt` if installed;
+/// else the legacy CLI.
 pub fn piper_runtime() -> Option<PathBuf> {
     if let Some(p) = std::env::var(RUNTIME_ENV).ok().filter(|s| !s.trim().is_empty()) {
         return Some(PathBuf::from(p)).filter(|p| p.is_file());
     }
-    [Path::new(env!("CARGO_MANIFEST_DIR")).join("../../weights/runtime/piper/piper"), PathBuf::from("weights/runtime/piper/piper")]
-        .into_iter()
-        .find(|p| p.is_file())
+    if legacy_forced() { return piper_legacy_runtime(); }
+    piper_rt_runtime().or_else(piper_legacy_runtime)
+}
+
+/// Human label for a runtime path.
+pub fn runtime_label(p: &Path) -> &'static str {
+    if p.file_name().is_some_and(|n| n == "galion-piper-rt") { "galion-piper-rt, onnxruntime 1.31.1" } else { "piper 2023.11.14-2, onnxruntime 1.14.1" }
 }
 
 /// Decoder that can run a pack of `format`, or why not.
 pub fn decoder_for(format: &str) -> Result<String, String> {
     match format {
-        "onnx" => piper_runtime().map(|p| format!("piper-cpu ({})", p.display())).ok_or_else(|| format!("Piper runtime missing (set ${RUNTIME_ENV} or run scripts/a21/fetch-a21.sh)")),
+        "onnx" => piper_runtime().map(|p| format!("piper-cpu ({}; {})", runtime_label(&p), p.display())).ok_or_else(|| format!("Piper runtime missing (set ${RUNTIME_ENV} or run scripts/a21/fetch-a21.sh and scripts/a21/build-piper-rt.sh)")),
         _ if GALION_NATIVE_DECODER_WIRED => Ok("galion-native".into()),
         _ => Err(format!("no Galion-native decoder for .{format} yet")),
     }
@@ -154,6 +197,9 @@ pub struct A21WeightTts {
     model: PathBuf,
     config: PathBuf,
     runtime: PathBuf,
+    /// Legacy CLI to fall back to when the default runtime cannot start or dies
+    /// before its first utterance. `None` once on the legacy runtime.
+    fallback: Option<PathBuf>,
     rate: u32,
     voice: String,
     worker: Option<PiperWorker>,
@@ -177,18 +223,24 @@ impl A21WeightTts {
                 let cfg = std::fs::read_to_string(&config).map_err(|e| format!("{}: {e}", config.display()))?;
                 let rate = json_u32(&cfg, "sample_rate").ok_or_else(|| format!("{}: no audio.sample_rate", config.display()))?;
                 let voice = path.file_stem().map(|s| s.to_string_lossy().into_owned()).unwrap_or_default();
-                Ok(Self { model: path.clone(), config, runtime, rate, voice, worker: None, spawns: 0, plan: None, speaker_id: None, shaped: Vec::new() })
+                let fallback = piper_legacy_runtime().filter(|l| *l != runtime && std::env::var(RUNTIME_ENV).is_err());
+                Ok(Self { model: path.clone(), config, runtime, fallback, rate, voice, worker: None, spawns: 0, plan: None, speaker_id: None, shaped: Vec::new() })
             }
             other => Err(other.summary()),
         }
     }
     /// Voice pack name, e.g. `en_US-ljspeech-medium`.
     pub fn voice(&self) -> &str { &self.voice }
+    /// Native pack rate before the ring resample (Piper ljspeech is 22050).
+    pub fn native_rate(&self) -> u32 { self.rate }
     /// Pid of the warm worker, once it has been started.
     pub fn piper_pid(&self) -> Option<u32> { self.worker.as_ref().map(PiperWorker::pid) }
     /// How many times the Piper process has been spawned. `1` means every turn reused it.
     pub fn piper_spawns(&self) -> u32 { self.spawns }
     pub fn worker_alive(&mut self) -> bool { self.worker.as_mut().is_some_and(PiperWorker::is_alive) }
+
+    /// Runtime executable this slot spawns now.
+    pub fn runtime(&self) -> &Path { &self.runtime }
 
     /// Pack sample rate (Hz).
     pub fn sample_rate(&self) -> u32 { self.rate }
@@ -220,11 +272,25 @@ impl A21WeightTts {
         let alive = self.worker.as_mut().is_some_and(PiperWorker::is_alive);
         if alive && self.worker.as_ref().is_some_and(|w| *w.prosody() == want) { return Ok(()); }
         self.worker = None;
-        let mut worker = PiperWorker::spawn(&self.runtime, &self.model, &self.config, &want)?;
+        let mut worker = match PiperWorker::spawn(&self.runtime, &self.model, &self.config, &want) {
+            Ok(w) => w,
+            Err(e) => {
+                if !self.use_fallback(&format!("{e}")) { return Err(e); }
+                PiperWorker::spawn(&self.runtime, &self.model, &self.config, &want)?
+            }
+        };
         worker.set_speaker(self.speaker_id);
         self.worker = Some(worker);
         self.spawns += 1;
         Ok(())
+    }
+
+    /// Switch to the legacy CLI. `false` when already on it.
+    fn use_fallback(&mut self, why: &str) -> bool {
+        let Some(legacy) = self.fallback.take() else { return false };
+        eprintln!("[a21] {} failed ({why}); falling back to {}", runtime_label(&self.runtime), runtime_label(&legacy));
+        self.runtime = legacy;
+        true
     }
 
     /// Spawn (if the plan changed) and warm the worker with one short line, so the
@@ -254,9 +320,72 @@ impl A21WeightTts {
     }
 
     /// Start a new process after the previous one died. Not used for barge-in.
+    /// A default runtime that died before producing any audio (missing library,
+    /// bad install) is replaced by the legacy CLI. `galion-piper-rt` re-warms
+    /// itself at load, so the next utterance is not a cold one.
     pub fn respawn(&mut self) -> Result<(), VoiceError> {
+        let never_spoke = self.worker.as_ref().is_some_and(|w| w.calls() == 0);
         self.worker = None;
+        if never_spoke { self.use_fallback("died before first audio"); }
         self.ensure()
+    }
+}
+
+/// What one [`A21RingFeed::poll`] moved into the ring.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct A21Poll {
+    /// 24 kHz samples stored in the ring on this call.
+    pub pushed: usize,
+    /// 24 kHz samples resampled from Piper so far.
+    pub samples_24k: usize,
+    pub utterance_done: bool,
+}
+
+/// Piper CPU feed for the symphony ring. Opens only when `GALION_SPEECH=a21`
+/// and the pinned pack can speak. `poll` resamples native s16le to 24 kHz
+/// and pushes it. That work is off `Heartbeat::step`. `GALION_CLONE_STUB_FRAMES`
+/// is not this feed and is not a voice.
+pub struct A21RingFeed {
+    tts: A21WeightTts,
+    pushed: usize,
+}
+
+impl A21RingFeed {
+    pub fn open() -> Result<Self, String> {
+        if std::env::var("GALION_SPEECH").ok().as_deref() != Some("a21") {
+            return Err("GALION_SPEECH is not a21; Piper does not feed the ring".into());
+        }
+        let status = WeightStatus::discover();
+        let tts = A21WeightTts::try_new(&status)?;
+        Ok(Self { tts, pushed: 0 })
+    }
+
+    pub fn voice(&self) -> &str { self.tts.voice() }
+    pub fn native_hz(&self) -> u32 { self.tts.native_rate() }
+
+    /// Ask the warm Piper process for one clause. Does not read PCM yet.
+    pub fn submit(&mut self, text: &str) -> Result<(), VoiceError> {
+        self.tts.ensure()?;
+        self.tts.worker.as_mut().unwrap().write_text(text)?;
+        self.pushed = 0;
+        Ok(())
+    }
+
+    /// Non-blocking. Resamples whatever native PCM has arrived to 24 kHz
+    /// ([`super::SPEECH_RATE`]) and pushes the new tail. Allocates. Not `step`.
+    pub fn poll(&mut self, ring: &mut NanoPcmRing) -> Result<A21Poll, VoiceError> {
+        self.tts.ensure()?;
+        let rate = self.tts.native_rate();
+        let worker = self.tts.worker.as_mut().unwrap();
+        worker.poll_pipes()?;
+        let done = worker.utterance_done();
+        let native = worker.copy_i16();
+        let f32s: Vec<f32> = native.iter().map(|s| *s as f32 / 32768.0).collect();
+        let up = super::resample(&f32s, rate, super::SPEECH_RATE);
+        let fresh = if up.len() > self.pushed { &up[self.pushed..] } else { &[] };
+        let pushed = ring.push(fresh);
+        self.pushed += pushed;
+        Ok(A21Poll { pushed, samples_24k: up.len(), utterance_done: done })
     }
 }
 
@@ -292,6 +421,40 @@ impl TtsEngine for A21WeightTts {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn exe(dir: &Path, name: &str, body: &str) -> PathBuf {
+        use std::os::unix::fs::PermissionsExt;
+        let p = dir.join(name);
+        std::fs::write(&p, body).unwrap();
+        std::fs::set_permissions(&p, std::fs::Permissions::from_mode(0o755)).unwrap();
+        p
+    }
+    const FAKE_LEGACY: &str = "#!/usr/bin/env python3\nimport json, struct, sys\nfor line in sys.stdin.buffer:\n    n = len(json.loads(line).get('text', ''))\n    sys.stdout.buffer.write(struct.pack('<200h', *([1000 + n] * 200))); sys.stdout.buffer.flush()\n    sys.stderr.write('Real-time factor: 0.1\\n'); sys.stderr.flush()\n";
+
+    /// lat240: a default runtime that dies before its first audio (here: exits at
+    /// once, like a missing onnxruntime library) is replaced by the legacy CLI
+    /// within the same synthesize call path; later turns stay on the legacy process.
+    #[test]
+    fn dead_default_runtime_falls_back_to_legacy() {
+        let d = tmp("rt-fallback");
+        let rt = exe(&d, "galion-piper-rt", "#!/bin/sh\nexit 1\n");
+        let legacy = exe(&d, "piper", FAKE_LEGACY);
+        let model = d.join("v.onnx"); std::fs::write(&model, b"x").unwrap();
+        let config = d.join("v.onnx.json"); std::fs::write(&config, b"{}").unwrap();
+        let mut t = A21WeightTts { model, config, runtime: rt, fallback: Some(legacy.clone()), rate: 22050, voice: "v".into(), plan: None, speaker_id: None, shaped: Vec::new(), worker: None, spawns: 0 };
+        let first = t.synthesize("hello", LanguageId::En);
+        assert!(first.is_err() && !t.worker_alive(), "dead runtime must report an error, not hang");
+        t.respawn().unwrap();
+        assert_eq!(t.runtime(), legacy.as_path());
+        let a = t.synthesize("hello", LanguageId::En).unwrap();
+        assert!(!a.samples.is_empty());
+        let pid = t.piper_pid();
+        t.synthesize("again", LanguageId::En).unwrap();
+        assert_eq!(t.piper_pid(), pid, "legacy process is reused");
+        assert_eq!(runtime_label(&legacy), "piper 2023.11.14-2, onnxruntime 1.14.1");
+        assert_eq!(runtime_label(Path::new("x/galion-piper-rt")), "galion-piper-rt, onnxruntime 1.31.1");
+        let _ = std::fs::remove_dir_all(&d);
+    }
     fn tmp(name: &str) -> PathBuf { let d = std::env::temp_dir().join(format!("galion-v103-{name}-{}", std::process::id())); let _ = std::fs::remove_dir_all(&d); std::fs::create_dir_all(&d).unwrap(); d }
     #[test] fn empty_dir_is_none() { assert_eq!(WeightStatus::inspect(&tmp("empty")), None); }
     #[test] fn bare_onnx_refused() {

@@ -97,22 +97,42 @@ sources = ["Q-RESEARCH.Q12", "Q-BUILD.Q7", "Q-BUILD.Q9", "Q-GATES.Q6", "Q-BRANDI
 
 # Owner exception t123u, written 2026-11-03 (Europe/Zagreb) at Maciej Grajczyk's
 # direction. Every value above this block is unchanged. This pin is not a
-# general ONNX allowance, not in-tree ort, and not an ASR exception.
-# Chatterbox is a separate pin below. Do not widen this one.
+# general ONNX allowance and not an ASR exception.
+# Chatterbox is a separate pin below.
+#
+# Widened once, owner approval t613s2992 (Maciej Grajczyk, 2026-11-04 02:34 CET):
+# "Yes, update the LOCKS pin and wire the Rust onnxruntime 1.31 wrapper in for Piper."
+# Scope of the widening, Piper/TTS path only: onnxruntime 1.14.1 -> 1.31.1 for the
+# same Piper voice pack (sha256 below unchanged), run by galion-piper-rt
+# (runtimes/galion-piper-rt: Rust, separate process, its own cargo workspace,
+# excluded from the main workspace; the ort crate loads libonnxruntime at runtime,
+# nothing links ORT into any Galion workspace crate). The legacy piper CLI stays as the
+# fallback (GALION_PIPER_LEGACY=1). Global `forbidden_runtimes` still lists "ort";
+# candle / llama.cpp / ggml / GGUF are untouched (that decision is open).
+# Do not widen this pin further.
 [formats.exceptions.a21_piper]
 artifact = "weights/tts/en_US-ljspeech-medium.onnx"
 json_artifact = "weights/tts/en_US-ljspeech-medium.onnx.json"
 sha256 = "6f52a751e2349abe7a76735eb09dc1875298c77ea2342ffd2fef79ff81b87f22"
 json_sha256 = "141d612cc0a95ed7efc1ca936b845c2364967f2e9217c5dbfcf69fc4d6c65860"
 runtime_tarball_sha256 = "a50cb45f355b7af1f6d758c1b360717877ba0a398cc8cbe6d2a7a3a26e225992"
-runtime = "piper 2023.11.14-2, CPU, separate process; onnxruntime 1.14.1 stays inside that process and is not linked"
+runtime = "galion-piper-rt (runtimes/galion-piper-rt), CPU, separate process; onnxruntime 1.31.1 loaded at runtime inside that process (ort =2.0.0-rc.15, load-dynamic), not linked into any Galion workspace crate"
+runtime_legacy = "piper 2023.11.14-2, CPU, separate process; onnxruntime 1.14.1 stays inside that process and is not linked (fallback, GALION_PIPER_LEGACY=1)"
+onnxruntime = "1.31.1"
+onnxruntime_tarball_sha256 = "c849e36a1ef3e22d4ff217b9d1ce4a3cf5b9467b975610913ae959ad5b16bdc9"
+onnxruntime_legacy = "1.14.1"
 lane = "A21 TTS only"
-in_tree_ort = false
+in_tree_ort = false                                   # main cargo workspace: no ort crate (G3 cargo tree)
+ort_crate_path = "runtimes/galion-piper-rt"           # the only manifest allowed to name ort
+ort_crate_workspace = "separate"                      # own [workspace]; root Cargo.toml `exclude`s it
+in_process = false
 weights_vendored = false
 sunset = "2027-02-01"
 decision = "t123u"
+decision_widen = "t613s2992"
+widened_at = "2026-11-04"
 owner = "Maciej Grajczyk"
-notes = "Sunset is 90 days from 2026-11-03. espeak-ng GPL-3 stays counsel-open. Do not widen this pin."
+notes = "Sunset is 90 days from 2026-11-03. espeak-ng GPL-3 stays counsel-open. Widened once (t613s2992, 2026-11-04): onnxruntime 1.31.1 for the Piper runtime only, same voice pack. Do not widen further."
 
 # Owner exception t230u, written 2026-11-03 (Europe/Zagreb) at Maciej Grajczyk's
 # direction. Out-of-process PyTorch for the V2-S14 Chatterbox worker only.
@@ -129,7 +149,9 @@ weights_vendored = false
 model_primary = "chatterbox-nano"
 model_option = "chatterbox-turbo"
 fallback = "formats.exceptions.a21_piper"
-reference_clips = false
+reference_clips = true
+ref_clip_decision = "t623u"
+ref_clip_scope = "CC0 / public-domain LibriVox donors only: Amy Koenig (samantha), Alan Davis Drake (jarvis). Store outside the tree with consent.txt + sha256 sidecar. No celebrity voice, no film audio, no Armstrong."
 sunset = "2027-02-01"
 decision = "t230u"
 owner = "Maciej Grajczyk"

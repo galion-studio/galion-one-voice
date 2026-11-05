@@ -34,3 +34,7 @@ S3 (done) → S6 reply store → S2 page → S1 headers → S5/S4 PhoneStub → 
 7. `galion-gates/run-gates.sh` passes with fails=0.
 
 — Maciej Grajczyk
+
+---
+
+© G.A.L.I.O.N. — General Autonomous Local Intelligence Open Network. All rights reserved and claims reserved. · CC0 voices: you must tick the consent box agreeing to the CC0 licence before using any CC0 voice; use is at your own responsibility. · No cookies. · De-Googled: no Google services. · All current Galion builds are open source under the Galion perpetual open MIT licence.

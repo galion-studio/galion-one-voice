@@ -82,6 +82,16 @@ eq("licence.code", "Perpetual Open MIT"); eq("licence.paid_tiers", False)
 
 # Owner pins. Global foreign_runtime_allowed stays false. These blocks do not widen it.
 eq("formats.exceptions.a21_piper.in_tree_ort", False)
+# t613s2992 (2026-11-04): onnxruntime 1.31.1 for the Piper runtime only, out of process,
+# one separate cargo workspace. The global ort ban above is unchanged.
+eq("formats.exceptions.a21_piper.onnxruntime", "1.31.1")
+eq("formats.exceptions.a21_piper.ort_crate_path", "runtimes/galion-piper-rt")
+eq("formats.exceptions.a21_piper.ort_crate_workspace", "separate")
+eq("formats.exceptions.a21_piper.in_process", False)
+eq("formats.exceptions.a21_piper.decision_widen", "t613s2992")
+fr = get("formats.forbidden_runtimes")
+if fr is KeyError or not {"candle", "ort", "tract", "burn", "llama", "ggml"} <= set(fr):
+    fails.append("formats.forbidden_runtimes must keep candle, ort, tract, burn, llama, ggml")
 eq("formats.exceptions.a21_piper.weights_vendored", False)
 eq("formats.exceptions.a21_piper.sunset", "2027-02-01")
 eq("formats.exceptions.a21_piper.sha256", "6f52a751e2349abe7a76735eb09dc1875298c77ea2342ffd2fef79ff81b87f22")
@@ -90,7 +100,9 @@ eq("formats.exceptions.v2s14_chatterbox.in_tree_ort", False)
 eq("formats.exceptions.v2s14_chatterbox.in_tree_ggml", False)
 eq("formats.exceptions.v2s14_chatterbox.in_tree_llama", False)
 eq("formats.exceptions.v2s14_chatterbox.weights_vendored", False)
-eq("formats.exceptions.v2s14_chatterbox.reference_clips", False)
+# t623u (owner Maciej Grajczyk, 2026-11-04): open for the CC0 / public-domain donors only.
+eq("formats.exceptions.v2s14_chatterbox.reference_clips", True)
+eq("formats.exceptions.v2s14_chatterbox.ref_clip_decision", "t623u")
 eq("formats.exceptions.v2s14_chatterbox.sunset", "2027-02-01")
 eq("formats.exceptions.v2s14_chatterbox.model_primary", "chatterbox-nano")
 eq("formats.exceptions.v2s14_chatterbox.model_option", "chatterbox-turbo")

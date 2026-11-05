@@ -28,6 +28,7 @@ pub mod express;
 pub mod film;
 pub mod frame;
 pub mod loudness;
+pub mod persona;
 pub mod persona_mood;
 pub mod rika;
 pub mod store;
@@ -45,6 +46,7 @@ pub use film::{
     FilmParams, PolicyViolation, StubFilm, FEELING_BUDGET_PCT, FRAME,
 };
 pub use frame::{Affect, EmotionFrame};
+pub use persona::{Feeling, HubLayer, Manner, VoicePersona, CANNED_EMPATHY, HUB_GAIN, STRIP_REFERENCE_TEXTURE};
 pub use loudness::{
     parse_reference_track, AffectEstimator, Estimate, EstimatorKind, GatedDetector, LoudnessEstimator, RefEntry, RefLabel,
     ReferenceEstimator, SyntheticEstimator, SyntheticMode,

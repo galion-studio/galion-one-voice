@@ -11,3 +11,7 @@
 ## Open / blockers
 - Model picks + licences → A21 table (W20-12); owner K15/K16/E9 confirmations.
 - No real backends, no latency measurement yet; hr/pl routing deferred.
+
+---
+
+© G.A.L.I.O.N. — General Autonomous Local Intelligence Open Network. All rights reserved and claims reserved. · CC0 voices: you must tick the consent box agreeing to the CC0 licence before using any CC0 voice; use is at your own responsibility. · No cookies. · De-Googled: no Google services. · All current Galion builds are open source under the Galion perpetual open MIT licence.

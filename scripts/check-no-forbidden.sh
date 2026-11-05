@@ -11,8 +11,16 @@ if grep -RIni --exclude-dir=target --exclude-dir=.git --exclude=check-no-forbidd
   echo "FAIL: forbidden format reference found"; fail=1
 fi
 # Runtime-dep gate on Cargo manifests.
-if grep -RInE --include=Cargo.toml -e '^\s*(candle[-a-z]*|ort|tract[-a-z]*|burn[-a-z]*|llama[-a-z_]*|ggml[-a-z]*)\s*=' "$SCOPE" Cargo.toml ; then
-  echo "FAIL: forbidden runtime dependency in Cargo.toml"; fail=1
+# Owner exception t613s2992 (2026-11-04, LOCKS formats.exceptions.a21_piper): the single
+# `ort = { ... "load-dynamic" ... }` line of runtimes/galion-piper-rt/Cargo.toml (its own
+# cargo workspace, out of process, excluded from the main workspace) is allowed. Nothing else.
+PIPER_RT="runtimes/galion-piper-rt/Cargo.toml"
+HITS="$(grep -RInE --include=Cargo.toml -e '^\s*(candle[-a-z]*|ort|tract[-a-z]*|burn[-a-z]*|llama[-a-z_]*|ggml[-a-z]*)\s*=' "$SCOPE" Cargo.toml || true)"
+if [ -f "$PIPER_RT" ] && grep -qE '^\[workspace\]' "$PIPER_RT" && grep -qE '^exclude = \[.*"runtimes/galion-piper-rt"' Cargo.toml; then
+  HITS="$(echo "$HITS" | grep -vE "^(\./)?$PIPER_RT:[0-9]+:ort = \{.*\"load-dynamic\"" || true)"
+fi
+if [ -n "$HITS" ]; then
+  echo "$HITS"; echo "FAIL: forbidden runtime dependency in Cargo.toml"; fail=1
 fi
 [ $fail -eq 0 ] && echo "OK: forbidden-format + forbidden-runtime gates pass"
 exit $fail

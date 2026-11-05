@@ -2,7 +2,7 @@
 //! Counting allocator: `Heartbeat::step` must allocate nothing (Rika ON, full R1 moment).
 mod common;
 use common::*;
-use galion_emotion::{DefaultConsentGate, Purpose};
+use galion_emotion::{DefaultConsentGate, EmotionFrame, Purpose, VoicePersona};
 use galion_heartbeat::{FrameIn, Heartbeat, HeartbeatConfig, RIKA_BITS};
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::cell::Cell;
@@ -63,4 +63,30 @@ fn step_allocates_nothing_with_rika_on() {
     ARMED.with(|a| a.set(false));
     assert_eq!(ALLOCS.load(Ordering::SeqCst), 0, "Heartbeat::step allocated");
     assert!(armed > 0, "the moment actually happened");
+}
+
+#[test]
+fn feeling_step_allocates_nothing() {
+    let mut g = DefaultConsentGate::default();
+    g.grant(0, "hr", Purpose::PersonalAssistant);
+    let mut hb = Heartbeat::new(HeartbeatConfig::default(), g);
+    hb.set_persona(VoicePersona::Jarvis);
+    let pcm = vec![0.0f32; galion_heartbeat::FRAME_SAMPLES];
+    let affect = EmotionFrame { seq: 1, t_ms: 0, dur_ms: 80, valence: -0.6, arousal: 0.2, dominance: 0.4, confidence: 1.0 };
+    ALLOCS.store(0, Ordering::SeqCst);
+    ARMED.with(|a| a.set(true));
+    for i in 0..32 {
+        let _ = hb.step(&FrameIn {
+            you_pcm: &pcm,
+            affect: Some(affect),
+            tension: None,
+            consent_bits: if i == 8 { 0 } else { galion_emotion::band::consent_bits::SENSE },
+            purpose: Purpose::PersonalAssistant,
+            session_open: true,
+            me_speaking: false,
+            late: i == 4,
+        });
+    }
+    ARMED.with(|a| a.set(false));
+    assert_eq!(ALLOCS.load(Ordering::SeqCst), 0, "feeling band inside step allocated");
 }

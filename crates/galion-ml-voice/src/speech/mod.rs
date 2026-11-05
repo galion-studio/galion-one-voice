@@ -9,6 +9,17 @@
 //!    Worker stdout is raw s16le. That is not the runtime format. [`gqvoice`] compiles
 //!    each landed utterance into `voices/gq/<persona>.gqvoice` and this slot plays
 //!    the packet it just wrote.
+//!    the pinned safetensors, a local tokenizer, and a sha-allowlisted reference
+//!    are on disk. Nano primary, Turbo via `GALION_CLONE_MODEL`. The ref gate is
+//!    `GALION_CLONE_LOCAL_REFS=1` plus `$GALION_CLIP_STORE/<persona>/reference.wav`
+//!    matching its `.sha256` sidecar, and the consent gate (`galion-consent`)
+//!    passing for that voice. Consent runs once, when the slot is built (clone
+//!    time); turns read the stored verdict. It does not flip `LOCKS.toml`. Absent
+//!    weights or refs skip this slot (no download). `GALION_CLONE_STUB_PCM=1`
+//!    does not open this slot. HARD-PASS on the CPU-only loop measures Piper.
+//!    A dead child falls back to A21.
+//!    A persona whose own ref is missing speaks that utterance with Piper and
+//!    leaves the clone child up.
 //! 1. [`weights::A21WeightTts`] — the A21 neural TTS slot (FP-03). Activates when a
 //!    sha256-verified voice pack is on disk (`GALION_TTS_WEIGHTS` /
 //!    `GALION_SPEECH_WEIGHTS` or `<repo>/weights/tts/`) AND a decoder for it exists
@@ -30,6 +41,17 @@
 //!      `GALION_A21_RUNTIME` (Piper exe), `GALION_A21_NOISE=natural` (sampled prosody),
 //!      `GALION_FLITE_VOICE=slt|kal16|awb|rms|kal` (default `slt`).
 //! The clone child is CPU-only. It does not see a GPU and it does not load GGUF.
+//!      pinned pack and an allowlisted ref are on disk, else a21, else flite),
+//!      `GALION_CLONE_MODEL=nano|turbo`, `GALION_CLONE_PERSONA=samantha|jarvis`,
+//!      `GALION_CLONE_LOCAL_REFS=1`, `GALION_CLIP_STORE`, `GALION_CLONE_WEIGHTS`,
+//!      `GALION_CLONE_CKPT`, `GALION_CLONE_TOKENIZER`,
+//!      `GALION_A21_RUNTIME` (Piper exe), `GALION_A21_NOISE=natural` (sampled prosody),
+//!      `GALION_FLITE_VOICE=slt|kal16|awb|rms|kal` (default `slt`).
+//!
+//! Prosody on a speak is [`FrameProsody`] from the latest 80 ms
+//! `galion-emotion` decision. Pause and loudness are applied to the PCM.
+//! Pitch, range, rate, and warmth are carried to the clone child and logged.
+//! No empathy sentence is added.
 
 use crate::{Audio, LanguageId, TtsEngine, VoiceError};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -37,7 +59,10 @@ use std::sync::Arc;
 use std::time::Instant;
 
 pub mod clause;
+pub mod clip_store;
+pub mod clone_cache;
 pub mod clone_worker;
+pub mod core_map;
 pub mod galion_clip;
 pub mod flite;
 pub mod gqvoice;
@@ -46,9 +71,81 @@ pub mod sha256;
 pub mod weights;
 
 pub use clause::{ClauseBuf, CLAUSE_WORDS};
+pub use weights::A21RingFeed;
 
 /// Output rate of every speech backend (Mimi-class 24 kHz lane bus).
 pub const SPEECH_RATE: u32 = crate::stub::SAMPLE_RATE;
+
+/// Numeric prosody from one 80 ms `galion-emotion` decision.
+///
+/// There is no emotion name on this struct. Identity leaves the PCM alone.
+/// [`apply_frame_prosody`] uses `pre_pause_ms` and `energy` only.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FrameProsody {
+    pub pitch_st: f32,
+    pub pitch_range: f32,
+    pub rate: f32,
+    pub energy: f32,
+    pub warmth: f32,
+    pub pre_pause_ms: u16,
+}
+
+impl Default for FrameProsody {
+    fn default() -> Self {
+        Self::identity()
+    }
+}
+
+impl FrameProsody {
+    /// No pause, unity loudness. Pitch and rate are the neutral marks.
+    pub fn identity() -> Self {
+        Self {
+            pitch_st: 0.0,
+            pitch_range: 1.0,
+            rate: 1.0,
+            energy: 1.0,
+            warmth: 0.5,
+            pre_pause_ms: 0,
+        }
+    }
+
+    /// Same clamps as `galion_emotion::ProsodyControl::clamped`.
+    pub fn clamped(self) -> Self {
+        Self {
+            pitch_st: finite(self.pitch_st, 0.0).clamp(-4.0, 4.0),
+            pitch_range: finite(self.pitch_range, 1.0).clamp(0.5, 1.5),
+            rate: finite(self.rate, 1.0).clamp(0.8, 1.2),
+            energy: finite(self.energy, 1.0).clamp(0.6, 1.2),
+            warmth: finite(self.warmth, 0.5).clamp(0.0, 1.0),
+            pre_pause_ms: self.pre_pause_ms.min(400),
+        }
+    }
+}
+
+fn finite(x: f32, fallback: f32) -> f32 {
+    if x.is_finite() { x } else { fallback }
+}
+
+/// Prepend silence and scale loudness. Pitch and rate are not rewritten here.
+pub fn apply_frame_prosody(samples: &mut Vec<f32>, rate: u32, prosody: FrameProsody) {
+    let prosody = prosody.clamped();
+    let energy = prosody.energy;
+    if (energy - 1.0).abs() > 1.0e-4 {
+        for s in samples.iter_mut() {
+            *s = (*s * energy).clamp(-1.0, 1.0);
+        }
+    }
+    if prosody.pre_pause_ms == 0 || rate == 0 {
+        return;
+    }
+    let n = ((u64::from(prosody.pre_pause_ms) * u64::from(rate)) / 1000) as usize;
+    if n == 0 {
+        return;
+    }
+    let mut out = vec![0.0; n];
+    out.append(samples);
+    *samples = out;
+}
 
 /// Which backend produced (or would produce) speech.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -94,6 +191,9 @@ impl SpeechBackend {
     }
 }
 
+/// Throwaway lines spoken (and discarded) by [`SpeechStack::prewarm`].
+pub const PREWARM_LINES: &[&str] = &["Hello.", "Okay, I hear you.", "That sounds good, tell me more about it."];
+
 /// Cold/warm first-clause PCM for one stack. Times are absent until that speak happens.
 /// No PCM is stored here.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -117,6 +217,11 @@ pub struct SpeechStack {
     pub backend: SpeechBackend,
     pub weights: weights::WeightStatus,
     engine: Option<Engine>,
+    /// Piper kept beside a live clone child for a persona whose ref is missing.
+    piper_side: Option<weights::A21WeightTts>,
+    frame_prosody: FrameProsody,
+    spoken_id: Option<&'static str>,
+    spoken_label: String,
     prewarmed: bool,
     utterances: u32,
     cold_first_pcm_ms: Option<u32>,
@@ -142,16 +247,10 @@ impl SpeechStack {
         engine: Option<Engine>,
     ) -> Self {
         Self {
-            backend,
-            weights,
-            engine,
-            prewarmed: false,
-            utterances: 0,
-            cold_first_pcm_ms: None,
-            warm_first_pcm_ms: None,
-            last_first_pcm_ms: None,
-            cancel: None,
-            turn_id: 0,
+            backend, weights, engine, piper_side: None, frame_prosody: FrameProsody::identity(),
+            spoken_id: None, spoken_label: String::new(), prewarmed: false, utterances: 0,
+            cold_first_pcm_ms: None, warm_first_pcm_ms: None, last_first_pcm_ms: None,
+            cancel: None, turn_id: 0,
         }
     }
 
@@ -245,15 +344,46 @@ impl SpeechStack {
         self.engine.is_some()
     }
 
+    /// Register for the next utterance. Clone only. Piper and flite ignore it.
+    pub fn set_persona(&mut self, persona: &str) {
+        if let Some(Engine::Clone(t)) = self.engine.as_mut() {
+            t.set_persona(persona);
+        }
+    }
+
+    /// 80 ms prosody for the next utterance. Identity until a host sets it.
+    pub fn set_frame_prosody(&mut self, prosody: FrameProsody) {
+        let prosody = prosody.clamped();
+        self.frame_prosody = prosody;
+        if let Some(Engine::Clone(t)) = self.engine.as_mut() {
+            t.set_prosody(prosody);
+        }
+    }
+
+    /// Who produced the last successful utterance. Before that, the selected backend.
+    pub fn reported(&self) -> (&'static str, String) {
+        match self.spoken_id {
+            Some(id) => (id, self.spoken_label.clone()),
+            None => (self.backend.id(), self.backend.label()),
+        }
+    }
+
     /// Discard one short synthesis so the first caller turn is not the cold start.
     /// No PCM is kept. Flite and `off` do nothing.
     pub fn prewarm(&mut self) {
         if self.prewarmed || !self.streams_clauses() {
             return;
         }
-        if self.speak("Hello.").is_ok() {
-            self.prewarmed = true;
+        // lat240: three lines of different lengths at call start. The first
+        // pays process spawn + model load (legacy piper ~0.4 s cold; galion-piper-rt
+        // ~1.4 s, because it loads ORT 1.31 and runs its own two warm-ups before the
+        // first line); the next two take the first-run cost of new input lengths
+        // so no caller turn sees either.
+        let mut ok = false;
+        for line in PREWARM_LINES {
+            ok |= self.speak(line).is_ok();
         }
+        self.prewarmed = ok;
     }
 
     /// Supersede gate shared with the turn worker. A stale `turn_id` drops
@@ -263,10 +393,23 @@ impl SpeechStack {
         self.turn_id = turn_id;
     }
 
+    /// Clone playback ring, when this stack selected the clone slot.
+    /// Take the `Arc` before the first speak. Draining it does not generate.
+    /// `Heartbeat::step` does not call this.
+    pub fn clone_frames(&self) -> Option<Arc<clone_worker::CloneFrameDrain>> {
+        match &self.engine {
+            Some(Engine::Clone(t)) => Some(t.frames()),
+            _ => None,
+        }
+    }
+
     pub fn warmth(&self) -> Warmth {
         let (piper_pid, piper_spawns, clone_pid, clone_spawns) = match &self.engine {
             Some(Engine::A21(t)) => (t.piper_pid(), t.piper_spawns(), None, 0),
-            Some(Engine::Clone(t)) => (None, 0, t.clone_pid(), t.clone_spawns()),
+            Some(Engine::Clone(t)) => {
+                let (pid, spawns) = self.piper_side.as_ref().map(|p| (p.piper_pid(), p.piper_spawns())).unwrap_or((None, 0));
+                (pid, spawns, t.clone_pid(), t.clone_spawns())
+            }
             _ => (None, 0, None, 0),
         };
         Warmth {
@@ -352,17 +495,48 @@ impl SpeechStack {
                     }
                 }
             }
-            Engine::Clone(t) => t.synthesize(text, LanguageId::En),
+            Engine::Clone(t) => {
+                if t.ref_ok() {
+                    t.synthesize(text, LanguageId::En)
+                } else {
+                    Err(VoiceError::Backend("clone ref not allowlisted for persona (no clone-time consent approval)".into()))
+                }
+            }
         };
-        let failed_clone = matches!(engine, Engine::Clone(_))
+        let clone_engine = matches!(engine, Engine::Clone(_));
+        let soft_ref = clone_engine && matches!(&result, Err(VoiceError::Backend(m)) if m.contains("not allowlisted"));
+        let failed_clone = clone_engine
             && result.is_err()
+            && !soft_ref
             && !matches!(result, Err(VoiceError::Cancelled));
         self.engine = Some(engine);
-        if failed_clone {
-            self.fallback_piper(text)
-        } else {
-            result
+        if soft_ref {
+            return self.piper_beside(text);
         }
+        if failed_clone {
+            return self.fallback_piper(text);
+        }
+        self.finish_audio(result, clone_engine)
+    }
+
+    /// Merge #56 + gqvoice: frame prosody (pause, loudness) is applied to
+    /// Piper and flite PCM here. Clone PCM is not rewritten after the child:
+    /// the landed `.gqvoice` packet must equal the playback buffer, and the
+    /// clone child already receives the prosody numbers (`set_prosody`).
+    fn finish_audio(
+        &mut self,
+        result: Result<Audio, VoiceError>,
+        clone_engine: bool,
+    ) -> Result<Audio, VoiceError> {
+        let mut audio = result?;
+        let id = self.backend.id();
+        let label = self.backend.label();
+        if !clone_engine {
+            apply_frame_prosody(&mut audio.samples, audio.sample_rate, self.frame_prosody);
+        }
+        self.spoken_id = Some(id);
+        self.spoken_label = label;
+        Ok(audio)
     }
 
     fn clear_clone_pending(&mut self) {
@@ -378,6 +552,33 @@ impl SpeechStack {
             Some(Engine::Clone(t)) => t.land_pending(),
             _ => Ok(None),
         }
+    }
+
+    /// One Piper utterance without retiring the clone child.
+    fn piper_beside(&mut self, text: &str) -> Result<Audio, VoiceError> {
+        self.clear_clone_pending();
+        if self.piper_side.is_none() {
+            let piper = weights::A21WeightTts::try_new(&self.weights).map_err(|_| {
+                VoiceError::Backend("clone ref not allowlisted and A21 piper is absent".into())
+            })?;
+            self.piper_side = Some(piper);
+        }
+        let piper = self.piper_side.as_mut().expect("piper side");
+        let first = piper.synthesize(text, LanguageId::En);
+        let audio = if first.is_ok() || piper.worker_alive() {
+            first
+        } else {
+            match piper.respawn() {
+                Ok(()) => piper.synthesize(text, LanguageId::En),
+                Err(e) => Err(e),
+            }
+        }?;
+        let label = format!("A21 neural TTS (Piper VITS {}; this utterance; clone ref not allowlisted)", piper.voice());
+        let mut audio = audio;
+        apply_frame_prosody(&mut audio.samples, audio.sample_rate, self.frame_prosody);
+        self.spoken_id = Some("a21-weights");
+        self.spoken_label = label;
+        Ok(audio)
     }
 
     /// Piper speaks when the clone child cannot. The lane is not restarted.
@@ -530,7 +731,18 @@ mod tests {
     use super::*;
     use std::sync::atomic::{AtomicU64, Ordering};
     #[test]
-    fn resample_len_and_identity() {
+    fn frame_prosody_identity_is_a_noop_and_pause_is_silence() {
+        let mut samples = vec![0.5, -0.25];
+        apply_frame_prosody(&mut samples, 24_000, FrameProsody::identity());
+        assert_eq!(samples, vec![0.5, -0.25]);
+        let mut quiet = vec![1.0];
+        apply_frame_prosody(&mut quiet, 24_000, FrameProsody { energy: 0.8, pre_pause_ms: 80, ..FrameProsody::identity() });
+        assert_eq!(quiet.len(), 1 + 24_000 * 80 / 1000);
+        assert!(quiet[..1920].iter().all(|s| *s == 0.0));
+        assert!((quiet[1920] - 0.8).abs() < 1.0e-5);
+    }
+
+    #[test] fn resample_len_and_identity() {
         let x: Vec<f32> = (0..1600).map(|i| (i as f32 * 0.01).sin()).collect();
         assert_eq!(resample(&x, 16_000, 24_000).len(), 2400);
         assert_eq!(resample(&x, 24_000, 24_000), x);
@@ -550,6 +762,7 @@ mod tests {
         assert!(off.speak("hello").is_err());
         off.prewarm();
         assert_eq!(off.warmth().piper_pid, None);
+        assert!(off.clone_frames().is_none());
     }
 
     #[test]
@@ -610,6 +823,60 @@ mod tests {
         }
     }
 
+    /// Owner decision 2026-11-04: consent runs when the slot is built
+    /// (clone time). A turn reads the stored verdict: no consent evaluation,
+    /// no reference re-hash, no extra process.
+    #[test]
+    fn clone_turns_read_the_clone_time_verdict_only() {
+        let dir = std::env::temp_dir().join(format!("galion-consent-turn-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let script = dir.join("fake-clone.py");
+        std::fs::write(&script, FAKE_CLONE).unwrap();
+        let worker =
+            clone_worker::CloneWorker::spawn(&script, clone_worker::CloneModel::Nano, "samantha")
+                .unwrap();
+        let mut t = clone_worker::CloneTts::for_test(worker, dir.clone()).with_verdicts([true, false]);
+        let before = galion_consent::evaluations();
+        for _ in 0..100 {
+            assert!(t.ref_ok());
+        }
+        t.set_persona("jarvis");
+        assert!(!t.ref_ok(), "jarvis was refused at clone time");
+        t.set_persona("samantha");
+        let mut stack = SpeechStack::from_clone(t);
+        let spoke = stack.speak("Hello.").unwrap();
+        assert!(!spoke.samples.is_empty());
+        assert_eq!(galion_consent::evaluations(), before, "a turn evaluated consent");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// Owner rule: a CC0 voice is selectable only after the CC0 licence was
+    /// registered at clone time. Not registered = refused (Piper speaks).
+    #[test]
+    fn cc0_clone_voice_needs_the_session_cc0_acceptance() {
+        let dir = std::env::temp_dir().join(format!("galion-cc0-turn-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let script = dir.join("fake-clone.py");
+        std::fs::write(&script, FAKE_CLONE).unwrap();
+        let worker =
+            clone_worker::CloneWorker::spawn(&script, clone_worker::CloneModel::Nano, "samantha")
+                .unwrap();
+        let t = clone_worker::CloneTts::for_test(worker, dir.clone())
+            .with_verdicts([true, true])
+            .with_cc0([true, false]);
+        let store = galion_consent::cc0_acceptances();
+        store.clear();
+        assert!(!t.ref_ok(), "not registered: CC0 samantha refused");
+        assert!(t.voice_approved("jarvis"), "a non-CC0 voice needs no box");
+        store.accept("cc0-test-session");
+        assert!(t.ref_ok(), "registered: CC0 samantha allowed");
+        store.revoke("cc0-test-session");
+        assert!(!t.ref_ok(), "withdrawn: refused");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
     #[test]
     fn landed_clone_is_compiled_before_the_stack_plays_it() {
         let dir = std::env::temp_dir().join(format!("galion-gqvoice-stack-{}", std::process::id()));
@@ -618,8 +885,7 @@ mod tests {
         let script = dir.join("fake-clone.py");
         std::fs::write(&script, FAKE_CLONE).unwrap();
         let worker =
-            clone_worker::CloneWorker::spawn(&script, clone_worker::CloneModel::Nano, "samantha")
-                .unwrap();
+            clone_worker::CloneWorker::spawn_for_test(&script, clone_worker::CloneModel::Nano, "samantha");
         let mut stack =
             SpeechStack::from_clone(clone_worker::CloneTts::for_test(worker, dir.clone()));
         let both = stack.speak("Hello! Go.").unwrap();
@@ -654,8 +920,7 @@ mod tests {
         let jdir = dir.join("jarvis");
         std::fs::create_dir_all(&jdir).unwrap();
         let jworker =
-            clone_worker::CloneWorker::spawn(&script, clone_worker::CloneModel::Turbo, "jarvis")
-                .unwrap();
+            clone_worker::CloneWorker::spawn_for_test(&script, clone_worker::CloneModel::Turbo, "jarvis");
         let mut jarvis =
             SpeechStack::from_clone(clone_worker::CloneTts::for_test(jworker, jdir.clone()));
         let tone = jarvis.speak("Systems ready.").unwrap();

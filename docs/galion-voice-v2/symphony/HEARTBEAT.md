@@ -34,3 +34,7 @@ The turn worker, Vosk, Piper, and the clone child are forbidden inside `step`. T
 **BLOCKED** when the crate does not build offline on the machine being scored.
 
 — Maciej Grajczyk
+
+---
+
+© G.A.L.I.O.N. — General Autonomous Local Intelligence Open Network. All rights reserved and claims reserved. · CC0 voices: you must tick the consent box agreeing to the CC0 licence before using any CC0 voice; use is at your own responsibility. · No cookies. · De-Googled: no Google services. · All current Galion builds are open source under the Galion perpetual open MIT licence.

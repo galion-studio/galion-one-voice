@@ -22,7 +22,7 @@
 //! `"engine"` (one Luti step), and `"emotion"` (sense, label, valence, arousal, lean)
 //! so the page can animate on its own clock. The circle fill stays the locked pigment.
 //! When the host has published a reply, `/dot` additionally carries
-//! `"reply":{"id":"<id>","url":"/reply/<id>.wav","ms":<duration ms>}` (latest reply only;
+//! `"reply":{"id":"<id>","url":"/reply/<id>.wav","ms":<duration ms>[,"hub_texture":<bool>]}` (latest reply only;
 //! the page should play it once per new `id`). Absent when no reply was set / after
 //! [`ReplyBox::clear_latest`].
 //!
@@ -265,7 +265,7 @@ impl SayInbox {
 // ---------------------------------------------------------------------------------------
 
 #[derive(Debug, Default)]
-struct ReplyState { store: VecDeque<(String, Arc<Vec<u8>>, u32)>, latest: Option<(String, u32)> }
+struct ReplyState { store: VecDeque<(String, Arc<Vec<u8>>, u32)>, latest: Option<(String, u32)>, hub: Option<bool> }
 
 /// Host-published reply audio. Clone freely; the HTTP threads read it.
 #[derive(Clone, Debug, Default)]
@@ -306,6 +306,14 @@ impl ReplyBox {
         }
         g.store.push_back((id.clone(), Arc::new(wav), ms));
         g.latest = Some((id, ms));
+        g.hub = None;
+        true
+    }
+    /// Like [`ReplyBox::set_reply`], and records whether the Jarvis hub texture is
+    /// mixed into this WAV. `/dot` then carries `"hub_texture":<hub>` on the reply.
+    pub fn set_reply_hub(&self, id: impl Into<String>, wav: Vec<u8>, ms: u32, hub: bool) -> bool {
+        if !self.set_reply(id, wav, ms) { return false; }
+        if let Ok(mut g) = self.0.lock() { g.hub = Some(hub); }
         true
     }
     /// Stop advertising a reply in `/dot` (stored WAVs stay fetchable until evicted).
@@ -318,7 +326,10 @@ impl ReplyBox {
     pub fn latest_json(&self) -> Option<String> {
         let g = self.0.lock().ok()?;
         let (id, ms) = g.latest.as_ref()?;
-        Some(format!("{{\"id\":\"{id}\",\"url\":\"/reply/{id}.wav\",\"ms\":{ms}}}"))
+        Some(match g.hub {
+            Some(h) => format!("{{\"id\":\"{id}\",\"url\":\"/reply/{id}.wav\",\"ms\":{ms},\"hub_texture\":{h}}}"),
+            None => format!("{{\"id\":\"{id}\",\"url\":\"/reply/{id}.wav\",\"ms\":{ms}}}"),
+        })
     }
 }
 
@@ -634,6 +645,13 @@ impl WebSurface {
     pub fn turn_inbox(&self) -> TurnInbox { self.sh.turns.clone() }
     /// Shared handle for publishing reply audio; take it before boxing the surface.
     pub fn reply_box(&self) -> ReplyBox { self.sh.replies.clone() }
+    /// Attach a Hermes client to the persona floor. The next `/v2/say` content
+    /// turn uses it, and the floor lock is not held during that call.
+    pub fn set_hermes(&self, client: galion_cascade::HermesLlm) {
+        if let Ok(mut floor) = self.sh.floor.lock() {
+            floor.set_hermes(client);
+        }
+    }
 }
 
 const V2_REDIRECT_HTML: &str = "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta http-equiv=\"refresh\" content=\"0; url=/\"><title>Galion Voice</title><script>location.replace(\"/\");</script></head><body><p><a href=\"/\">Galion Voice</a></p></body></html>";
@@ -731,6 +749,15 @@ fn mic_store_body(cleaned: &str) -> String {
     cleaned.to_string()
 }
 
+/// `/v2/cc0` reply: licence name, link, and this session's acceptance.
+fn cc0_json(accepted: bool) -> String {
+    format!(
+        "{{\"licence\":\"{}\",\"url\":\"{}\",\"accepted\":{accepted}}}",
+        galion_consent::CC0_LICENCE_NAME,
+        galion_consent::CC0_LICENCE_URL
+    )
+}
+
 fn route(req: &mut Request, sh: &Shared) -> (&'static str, &'static str, Vec<u8>) {
     let head = req.method == "HEAD";
     let method = if head { "GET" } else { req.method.as_str() };
@@ -762,6 +789,29 @@ fn route(req: &mut Request, sh: &Shared) -> (&'static str, &'static str, Vec<u8>
             zeroise_bytes(&mut req.body);
             ("204 No Content", "text/plain", Vec::new())
         }
+        ("GET", "/v2/cc0") => {
+            let mut s = presented_session(req.header("x-galion-session"), None, &[]);
+            let accepted = s.as_deref().is_some_and(|t| galion_consent::cc0_acceptances().accepted(t));
+            if let Some(ref mut t) = s { wipe_string(t); }
+            ("200 OK", "application/json", cc0_json(accepted).into_bytes())
+        }
+        // CC0 licence registration (clone time). In memory; the token is
+        // hashed, never stored. Body: {"accept":true|false} (+ "session" or the header).
+        ("POST", "/v2/cc0") => {
+            let mut s = presented_session(req.header("x-galion-session"), req.header("content-type"), &req.body);
+            let raw = String::from_utf8_lossy(&req.body).into_owned();
+            let accept = crate::v2_persona::json_field_bool(&raw, "accept");
+            zeroise_bytes(&mut req.body);
+            let Some(mut token) = s.take() else {
+                return ("400 Bad Request", "text/plain", txt("session required for CC0 acceptance"));
+            };
+            // Registration time: accept + one clone gate run (Rust, in
+            // process). Turns never re-check CC0.
+            if accept { galion_consent::cc0_register(&token, &galion_consent::Env::process()); } else { galion_consent::cc0_unregister(&token); }
+            let accepted = galion_consent::cc0_acceptances().accepted(&token);
+            wipe_string(&mut token);
+            ("200 OK", "application/json", cc0_json(accepted).into_bytes())
+        }
         ("POST", "/v2/say") => {
             if req.body.is_empty() {
                 return ("400 Bad Request", "text/plain", txt("empty body"));
@@ -771,8 +821,23 @@ fn route(req: &mut Request, sh: &Shared) -> (&'static str, &'static str, Vec<u8>
             let barge = crate::v2_persona::json_field_bool(&raw, "barge");
             let e = crate::v2_persona::json_field_f32(&raw, "e");
             let sense = crate::v2_persona::json_field_bool(&raw, "sense");
+            zeroise_bytes(&mut req.body);
+            // Classify under the lock, then drop it before the model call.
+            // A 3 s Hermes timeout must not stall GET /v2/state or /dot.
+            let prepared = match sh.floor.lock() {
+                Ok(mut floor) => Some(floor.begin_say(&text, barge, e, sense)),
+                Err(_) => None,
+            };
+            let Some(prepared) = prepared else {
+                return (
+                    "200 OK",
+                    "application/json",
+                    txt("{\"persona\":\"samantha\",\"reply\":\"\",\"silence\":true,\"film_voice\":false}"),
+                );
+            };
+            let model = prepared.model_reply();
             let json = match sh.floor.lock() {
-                Ok(mut floor) => floor.say_json(&text, barge, e, sense),
+                Ok(mut floor) => floor.finish_say_json(prepared, model),
                 Err(_) => "{\"persona\":\"samantha\",\"reply\":\"\",\"silence\":true,\"film_voice\":false}".to_string(),
             };
             let silence = crate::v2_persona::json_field_bool(&json, "silence");
@@ -1004,6 +1069,35 @@ mod tests {
     }
 
     #[test]
+    fn cc0_checkbox_is_per_session_and_in_memory() {
+        let mut w = WebSurface::serve("127.0.0.1:0".parse().unwrap()).with_page("<!doctype html><canvas id=\"s\"></canvas>");
+        w.open().unwrap();
+        let a = w.local_addr().unwrap();
+        let post = |hdr: &str, body: &str| {
+            let mut s = std::net::TcpStream::connect(a).unwrap();
+            s.write_all(format!("POST /v2/cc0 HTTP/1.1\r\nHost: x\r\n{hdr}Content-Type: application/json\r\nContent-Length: {}\r\n\r\n{body}", body.len()).as_bytes()).unwrap();
+            let mut out = String::new();
+            s.read_to_string(&mut out).unwrap();
+            out
+        };
+        let info = get(a, "/v2/cc0");
+        assert!(info.contains("CC0 1.0 Universal") && info.contains("creativecommons.org/publicdomain/zero/1.0"), "{info}");
+        assert!(info.contains("\"accepted\":false"), "{info}");
+        assert!(post("", "{\"accept\":true}").contains("400"), "no session, no acceptance");
+        let tok = "web-cc0-test-token";
+        let off = post(&format!("X-Galion-Session: {tok}\r\n"), "{\"accept\":false}");
+        assert!(off.contains("\"accepted\":false"), "{off}");
+        assert!(!galion_consent::cc0_acceptances().accepted(tok), "unticked = refused");
+        let on = post(&format!("X-Galion-Session: {tok}\r\n"), "{\"accept\":true}");
+        assert!(on.contains("\"accepted\":true") && !on.contains(tok), "{on}");
+        assert!(galion_consent::cc0_acceptances().accepted(tok), "ticked = allowed");
+        assert!(!galion_consent::cc0_acceptances().accepted("another-session"));
+        post(&format!("X-Galion-Session: {tok}\r\n"), "{\"accept\":false}");
+        assert!(!galion_consent::cc0_acceptances().accepted(tok));
+        w.close().unwrap();
+    }
+
+    #[test]
     fn v2_say_routes_personas_and_keeps_the_hold() {
         let mut w = WebSurface::serve("127.0.0.1:0".parse().unwrap()).with_page("<!doctype html><canvas id=\"s\"></canvas>");
         w.open().unwrap();
@@ -1015,6 +1109,7 @@ mod tests {
         assert!(state.contains("\"rights\":\"hold\"") && state.contains("\"film_voice\":false"), "{state}");
         assert!(state.contains("\"mouth\":\"piper\""), "{state}");
         assert!(state.contains("\"warmth_e0\":0.62") && state.contains("\"pre_pause_e0\":80"), "{state}");
+        assert!(state.contains("\"llm\":\"hermes-agent\""), "{state}");
         let mut hot = VizFrame::default();
         hot.listen.emotion = crate::frame::Emotion { label: "tense", intensity: 0.82, valence: -0.6 };
         w.present(&hot).unwrap();
@@ -1028,8 +1123,10 @@ mod tests {
         let mut out = String::new();
         s.read_to_string(&mut out).unwrap();
         assert!(out.contains("HTTP/1.1 200"), "{out}");
-        assert!(out.contains("Your mother died this morning."));
+        assert!(out.contains("model can't be reached"), "{out}");
+        assert!(!out.contains("Your mother died this morning."), "{out}");
         assert!(out.contains("\"mood\":\"grief\""));
+        assert!(out.contains("\"llm\":\"hermes-agent\""));
         assert!(!out.to_ascii_lowercase().contains("i hear you"));
         assert!(out.contains("\"film_voice\":false"));
         let dot = get(a, "/dot");
@@ -1039,8 +1136,74 @@ mod tests {
         assert!(dot.contains("\"valence\":-0.550"), "{dot}");
         assert!(!dot.contains("\"label\":\"tense\""), "{dot}");
         let line = w.say_inbox().take_latest().expect("reply queued for Piper");
-        assert_eq!(line.reply, "Your mother died this morning.");
+        assert_eq!(line.reply, "model can't be reached");
         assert!(!line.silence);
+        w.close().unwrap();
+    }
+
+    #[test]
+    fn v2_say_does_not_hold_the_floor_during_the_model_call() {
+        use std::sync::atomic::AtomicBool;
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let model = listener.local_addr().unwrap();
+        let release = Arc::new(AtomicBool::new(false));
+        let started = Arc::new(AtomicBool::new(false));
+        let release_w = release.clone();
+        let started_w = started.clone();
+        std::thread::spawn(move || {
+            let Ok((mut sock, _)) = listener.accept() else { return };
+            let mut buf = [0u8; 8192];
+            let _ = sock.read(&mut buf);
+            started_w.store(true, Ordering::SeqCst);
+            let deadline = Instant::now() + Duration::from_secs(2);
+            while !release_w.load(Ordering::SeqCst) && Instant::now() < deadline {
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            let payload = "{\"choices\":[{\"message\":{\"content\":\"She died this morning.\"}}]}";
+            let resp = format!(
+                "HTTP/1.0 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{payload}",
+                payload.len()
+            );
+            let _ = sock.write_all(resp.as_bytes());
+        });
+        let mut w = WebSurface::serve("127.0.0.1:0".parse().unwrap());
+        w.set_hermes(galion_cascade::HermesLlm::new(
+            &format!("http://{model}/v1/chat/completions"),
+            "hermes-agent",
+            "",
+            Duration::from_millis(2000),
+        ));
+        w.open().unwrap();
+        let a = w.local_addr().unwrap();
+        let say = std::thread::spawn(move || {
+            let body = b"{\"text\":\"My mother died this morning.\"}";
+            let mut s = std::net::TcpStream::connect(a).unwrap();
+            s.write_all(format!(
+                "POST /v2/say HTTP/1.1\r\nHost: x\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n",
+                body.len()
+            ).as_bytes()).unwrap();
+            s.write_all(body).unwrap();
+            let mut out = String::new();
+            s.read_to_string(&mut out).unwrap();
+            out
+        });
+        let wait_deadline = Instant::now() + Duration::from_secs(2);
+        while !started.load(Ordering::SeqCst) && Instant::now() < wait_deadline {
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        assert!(started.load(Ordering::SeqCst), "model call did not start");
+        let t = Instant::now();
+        let state = get(a, "/v2/state");
+        assert!(
+            t.elapsed() < Duration::from_millis(400),
+            "state blocked on the model call: {:?} {state}",
+            t.elapsed()
+        );
+        assert!(state.contains("\"llm\":\"hermes-agent\""), "{state}");
+        release.store(true, Ordering::SeqCst);
+        let out = say.join().unwrap();
+        assert!(out.contains("She died this morning."), "{out}");
+        assert!(!out.to_ascii_lowercase().contains("i hear you"), "{out}");
         w.close().unwrap();
     }
 
@@ -1486,4 +1649,19 @@ mod tests {
         assert!(t.bytes.iter().all(|&b| b == 0));
         assert!(!t.bytes.is_empty());
     }
+
+    #[test]
+    fn reply_box_marks_hub_texture_only_when_published_with_it() {
+        let b = ReplyBox::default();
+        assert!(b.set_reply("a1", b"RIFF0000WAVE".to_vec(), 120));
+        assert_eq!(b.latest_json().unwrap(), r#"{"id":"a1","url":"/reply/a1.wav","ms":120}"#);
+        assert!(b.set_reply_hub("j2", b"RIFF0000WAVE".to_vec(), 80, true));
+        assert_eq!(b.latest_json().unwrap(), r#"{"id":"j2","url":"/reply/j2.wav","ms":80,"hub_texture":true}"#);
+        assert!(b.set_reply_hub("s3", b"RIFF0000WAVE".to_vec(), 80, false));
+        assert!(b.latest_json().unwrap().ends_with(r#""hub_texture":false}"#));
+        assert!(b.set_reply("s4", b"RIFF0000WAVE".to_vec(), 80));
+        assert!(!b.latest_json().unwrap().contains("hub_texture"));
+        assert!(!b.set_reply_hub("bad id", Vec::new(), 1, true));
+    }
+
 }

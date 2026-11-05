@@ -30,7 +30,7 @@ dot-viz = ["dep:galion-render", "dep:galion-heartbeat", "dep:galion-emotion"]
 # Phone path (POST /turn, PhoneLane, turn worker) rides along so the screen demo matches the working loop.
 dot-viz-web = ["dot-viz", "galion-render/web", "phone-turn"]
 # S7: utterance worker off the 80 ms thread. Cascade feature pulls the EN speech stack.
-phone-turn = ["dot-viz", "galion-render/web", "dep:galion-cascade", "galion-cascade/cascade"]
+phone-turn = ["dot-viz", "galion-render/web", "dep:galion-cascade", "galion-cascade/cascade", "dep:galion-openmind"]
 # FP-02: `dot-viz-window` (stub window surface, open() -> Unsupported) deleted — one dot, one web page.
 
 [dependencies]
@@ -43,8 +43,16 @@ galion-render = { path = "../../galion-render", optional = true }
 galion-heartbeat = { path = "../galion-heartbeat", optional = true, default-features = false }
 # Phone lane only (feature `phone-turn`). Not in the default console build.
 galion-cascade = { path = "../galion-cascade", optional = true, default-features = false }
+# Std-only core map: the call loop pins itself to the bus core.
+galion-cores = { path = "../galion-cores" }
+# Phone lane thought trace: NerveEvent v1 NDJSON (`GALION_NERVE_LOG`). std + galion-sideband only.
+galion-openmind = { path = "../galion-openmind", optional = true }
 # Pinned to 0.29 (MSRV 1.74) — box toolchain is rustc 1.85. ratatui re-exports crossterm.
 ratatui = { version = "0.29", default-features = false, features = ["crossterm"] }
+
+[dev-dependencies]
+# Test-only: assert a turn never evaluates consent (owner decision 2026-11-04).
+galion-consent = { path = "../galion-consent" }
 
 [[example]]
 name = "dot_console_demo"

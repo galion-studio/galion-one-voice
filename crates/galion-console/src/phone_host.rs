@@ -13,13 +13,17 @@ use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use galion_heartbeat::{FRAME_MS, SAMPLE_RATE};
+use galion_heartbeat::{FRAME_MS, FRAME_SAMPLES, SAMPLE_RATE};
 use galion_render::backends::web::{MicTap, ReplyBox, SayInbox, SpokenLine, Turn, TurnInbox, WebSurface};
 use galion_render::v2_persona::Floor;
 
 use crate::auto_workflow::{proceed, Proceed, ProceedSource};
+use galion_emotion::{ProsodyControl, VoicePersona};
+use galion_openmind::{note_from_frame, NerveEmitter, VoiceBackendSlot, VoiceNote};
+
 use crate::bus::{pcm16_to_bytes, BusMsg, ProcessBus};
-use crate::turn_worker::{TurnJob, TurnReply, TurnWorker};
+use crate::turn_worker::{ProsodySlot, TurnJob, TurnReply, TurnWorker};
+use crate::workflow::{next_step, Next};
 
 /// What the phone path overrode on this tick.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -39,6 +43,7 @@ pub struct PhoneHost {
     floor: Arc<Mutex<Floor>>,
     bus: ProcessBus,
     worker: TurnWorker,
+    prosody: ProsodySlot,
     /// Remaining reply samples at 24 kHz.
     play: VecDeque<i16>,
     /// A turn the worker could not accept yet (channel full). Newest wins.
@@ -53,6 +58,13 @@ pub struct PhoneHost {
     last_proceed: Proceed,
     /// Accepted mic takes handed to `auto_workflow::proceed`. Not incremented on the 80 ms tick.
     proceeded: u64,
+    /// Last workflow step. The turn id is 0 until an utterance is recorded.
+    last_next: Next,
+    last_next_turn: u64,
+    /// Thought trace (NerveEvent v1). `None` unless `GALION_NERVE_LOG` / `GALION_NERVE_URL` is set.
+    nerve: Option<NerveEmitter>,
+    /// `voice.backend_up` sent for the CPU pipeline.
+    nerve_up: bool,
 }
 
 impl PhoneHost {
@@ -60,13 +72,15 @@ impl PhoneHost {
     /// the surface into a `Box<dyn RenderSurface>`.
     pub fn from_surface(web: &WebSurface) -> Self {
         let bus = ProcessBus::new();
+        let prosody = ProsodySlot::identity();
         Self {
             mic: web.mic_tap(),
             turns: web.turn_inbox(),
             says: web.say_inbox(),
             replies: web.reply_box(),
             floor: web.persona_floor(),
-            worker: TurnWorker::spawn_on(bus.clone()),
+            worker: TurnWorker::spawn_linked(bus.clone(), prosody.clone()),
+            prosody,
             bus,
             play: VecDeque::new(),
             pending: None,
@@ -76,6 +90,48 @@ impl PhoneHost {
             t_ms: 0,
             last_proceed: Proceed::Program,
             proceeded: 0,
+            last_next: Next::Speak,
+            last_next_turn: 0,
+            nerve: nerve_from_env(),
+            nerve_up: false,
+        }
+    }
+
+    /// Attach a thought-trace emitter (tests, or a host that builds its own).
+    pub fn with_nerve(mut self, nerve: NerveEmitter) -> Self {
+        self.nerve = Some(nerve);
+        self
+    }
+
+    /// NDJSON lines the thought trace has rendered so far. Allocates; not for the tick.
+    pub fn nerve_lines(&self) -> Vec<String> {
+        self.nerve.as_ref().map(NerveEmitter::lines).unwrap_or_default()
+    }
+
+    /// Call after `Heartbeat::step` with `FrameOut::paused`. A paused frame is
+    /// `voice.frame_miss`; a healthy frame sends nothing. Never blocks.
+    pub fn note_frame(&self, paused: bool) {
+        if let (Some(n), Some(note)) = (self.nerve.as_ref(), note_from_frame(paused, self.frame as u32)) {
+            let _ = n.note(note);
+        }
+    }
+
+    /// Backend decision for one published reply, as the nerve sees it.
+    fn note_reply_backend(&mut self, turn: u64, backend: &str) {
+        let Some(n) = self.nerve.as_ref() else { return };
+        let frame = self.frame as u32;
+        if backend == "tone" {
+            // Piper did not answer; the reply is the tone fallback.
+            let _ = n.note(VoiceNote::fallback(frame, turn, VoiceBackendSlot::CpuPipeline, VoiceBackendSlot::Mock));
+            return;
+        }
+        if !self.nerve_up {
+            let _ = n.note(VoiceNote::backend_up(frame, VoiceBackendSlot::CpuPipeline));
+            self.nerve_up = true;
+        }
+        if !student_present() {
+            // The S0 student slot is wanted first; with no `.gq` on disk the turn ran on the CPU pipeline.
+            let _ = n.note(VoiceNote::fallback(frame, turn, VoiceBackendSlot::Student, VoiceBackendSlot::CpuPipeline));
         }
     }
 
@@ -89,8 +145,34 @@ impl PhoneHost {
         self.proceeded
     }
 
+    /// Register the one-dot floor is speaking in. Read outside `Heartbeat::step`.
+    pub fn voice_persona(&self) -> VoicePersona {
+        match self.floor.lock() {
+            Ok(floor) if floor.id() == "jarvis" => VoicePersona::Jarvis,
+            _ => VoicePersona::Samantha,
+        }
+    }
+
+    /// Turn id and the step chosen for it. No transcript is kept.
+    pub fn workflow(&self) -> (u64, Next) {
+        (self.last_next_turn, self.last_next)
+    }
+
     pub fn bus(&self) -> &ProcessBus {
         &self.bus
+    }
+
+    /// Store the prosody from the 80 ms frame that just finished.
+    /// Called by the screen loop after `Heartbeat::step`, not inside it.
+    pub fn note_prosody(&mut self, prosody: ProsodyControl) {
+        self.prosody.store(galion_cascade::phone::FrameProsody {
+            pitch_st: prosody.pitch_shift_st,
+            pitch_range: prosody.pitch_range,
+            rate: prosody.rate,
+            energy: prosody.energy,
+            warmth: prosody.warmth,
+            pre_pause_ms: prosody.pre_pause_ms,
+        });
     }
 
     /// Replace `you` when the browser posted a fresh RMS above the room floor.
@@ -119,8 +201,15 @@ impl PhoneHost {
     }
 
     /// Take at most the newest utterance and the newest typed line, publish any
-    /// finished reply, drain one frame of reply PCM into `me`.
+    /// finished reply, drain one heartbeat frame of reply PCM into `me`.
     pub fn drive_me(&mut self, me: &mut [f32]) -> bool {
+        self.poll_me(me, true)
+    }
+
+    /// Poll the worker, then optionally copy one [`FRAME_SAMPLES`] frame.
+    /// `emit == false` still polls and does not pop PCM: a late heartbeat is a pause.
+    /// A buffer longer than one frame does not catch up.
+    pub fn poll_me(&mut self, me: &mut [f32], emit: bool) -> bool {
         self.flush_submit();
         let turn = self.turns.take_latest();
         let say = self.pending_line.take().or_else(|| self.says.take_latest());
@@ -142,14 +231,33 @@ impl PhoneHost {
         if let Some(r) = self.worker.try_recv() {
             self.publish(r);
         }
-        if self.play.is_empty() {
+        if !emit || self.play.is_empty() {
             return false;
         }
-        for x in me.iter_mut() {
-            *x = pop_pcm(&mut self.play).map(|s| s as f32 / 32768.0).unwrap_or(0.0);
-        }
-        true
+        copy_one_frame(&mut self.play, me)
     }
+
+    /// Drop queued reply PCM. Call this on a yield, before the next poll,
+    /// so a reply published on that same tick is not wiped.
+    pub fn release_me(&mut self) {
+        wipe_play(&mut self.play);
+    }
+}
+
+/// Copy at most one heartbeat frame. Does not allocate.
+fn copy_one_frame(play: &mut VecDeque<i16>, me: &mut [f32]) -> bool {
+    if play.is_empty() {
+        return false;
+    }
+    let n = me.len().min(FRAME_SAMPLES);
+    for (i, x) in me.iter_mut().enumerate() {
+        if i < n {
+            *x = pop_pcm(play).map(|s| s as f32 / 32768.0).unwrap_or(0.0);
+        } else {
+            *x = 0.0;
+        }
+    }
+    true
 }
 
 impl Drop for PhoneHost {
@@ -209,6 +317,58 @@ fn wipe_play(play: &mut VecDeque<i16>) {
     play.clear();
 }
 
+fn nerve_from_env() -> Option<NerveEmitter> {
+    let set = |k: &str| std::env::var(k).map(|v| !v.trim().is_empty()).unwrap_or(false);
+    if set("GALION_NERVE_LOG") || set("GALION_NERVE_URL") || set("NERVE_URL") {
+        Some(NerveEmitter::from_env())
+    } else {
+        None
+    }
+}
+
+/// `GALION_STUDENT_GQ` names an existing student checkpoint.
+fn student_present() -> bool {
+    std::env::var("GALION_STUDENT_GQ")
+        .ok()
+        .map(|p| p.trim().to_string())
+        .filter(|p| !p.is_empty())
+        .is_some_and(|p| std::path::Path::new(&p).is_file())
+}
+
+/// `GALION_JARVIS_HUB=0|off|false` mutes the hub bed on playback. Default is on.
+fn hub_playback_on() -> bool {
+    !matches!(
+        std::env::var("GALION_JARVIS_HUB").ok().map(|v| v.trim().to_ascii_lowercase()).as_deref(),
+        Some("0") | Some("off") | Some("false") | Some("no")
+    )
+}
+
+/// The Jarvis reply WAV with the galion-emotion hub bed (clicks, alarm, room tone)
+/// added per 80 ms frame through [`crate::v2v::mix_hub_playback`]. `pcm` is
+/// 24 kHz mono. `None` if the mix refuses (rate or length), so the caller keeps
+/// the plain WAV.
+pub fn jarvis_hub_wav(pcm: &[i16]) -> Option<Vec<u8>> {
+    use galion_cascade::en_lane::{wav_bytes, LANE_RATE_HZ};
+    use galion_emotion::persona::HubLayer;
+    let asset: Vec<f32> = pcm.iter().map(|&s| s as f32 / 32768.0).collect();
+    let mut layer = vec![0.0f32; asset.len()];
+    let bed = HubLayer::character(VoicePersona::Jarvis, true);
+    for frame in layer.chunks_mut(FRAME_SAMPLES) {
+        bed.mix_me(frame);
+    }
+    let mixed = crate::v2v::mix_hub_playback(
+        "jarvis",
+        &asset,
+        LANE_RATE_HZ,
+        &layer,
+        LANE_RATE_HZ,
+        crate::v2v::TextureToggle { enabled: true },
+    )
+    .ok()?;
+    let out: Vec<i16> = mixed.iter().map(|&x| (x.clamp(-1.0, 1.0) * 32767.0).round() as i16).collect();
+    Some(wav_bytes(&out, LANE_RATE_HZ))
+}
+
 impl PhoneHost {
     fn publish(&mut self, r: TurnReply) {
         let speech = BusMsg::speech_pcm(
@@ -236,6 +396,7 @@ impl PhoneHost {
             let _ = self.bus.try_send_reply(text);
         }
         if !r.transcript.trim().is_empty() {
+            self.note_transcript(r.id, &r.transcript);
             if let Ok(mut floor) = self.floor.lock() {
                 let _ = floor.say(&r.transcript, false, 0.0, false);
             }
@@ -250,7 +411,12 @@ impl PhoneHost {
                 fault_kind(err),
             ));
         }
-        let _ = self.replies.set_reply(r.id.to_string(), r.wav.clone(), r.ms);
+        // The browser plays the WAV. Jarvis gets the hub bed mixed in there; the
+        // me-band queue stays as spoken (the heartbeat mixes the hub into `me`).
+        let hub = r.persona == "jarvis" && hub_playback_on();
+        let wav = if hub { jarvis_hub_wav(&r.pcm).unwrap_or_else(|| r.wav.clone()) } else { r.wav.clone() };
+        let _ = self.replies.set_reply_hub(r.id.to_string(), wav, r.ms, hub);
+        self.note_reply_backend(r.id, r.backend);
         wipe_play(&mut self.play);
         self.play.extend(r.pcm.iter().copied());
         // Lengths and labels only. The helper cannot take PCM or the transcript.
@@ -268,7 +434,24 @@ impl PhoneHost {
         );
     }
 
+    /// The person pinned a persona on the floor ("be Jarvis"): the mouth on the
+    /// bus follows it, so the reply is delivered (and hub-mixed) as that persona.
+    fn sync_persona(&self) {
+        let (id, pinned) = match self.floor.lock() {
+            Ok(f) => (f.id(), f.pinned()),
+            Err(_) => return,
+        };
+        if !pinned {
+            return;
+        }
+        let Some(want) = crate::bus::PersonaId::parse(id) else { return };
+        if self.bus.persona_id() != want {
+            let _ = self.bus.try_send(BusMsg::persona_explicit(self.bus.alloc_id(), self.t_ms, want));
+        }
+    }
+
     fn submit_say(&mut self, mut line: SpokenLine) {
+        self.sync_persona();
         if line.barge {
             wipe_play(&mut self.play);
         }
@@ -284,6 +467,7 @@ impl PhoneHost {
     }
 
     fn submit_turn(&mut self, t: Turn) {
+        self.sync_persona();
         // New utterance cancels whatever the speakers were playing (barge-in).
         wipe_play(&mut self.play);
         if let Some((rate, ch, pcm)) = t.pcm16() {
@@ -308,7 +492,21 @@ impl PhoneHost {
                 rate,
                 pcm,
             });
+            self.note_recorded(turn_id);
         }
+    }
+
+    fn note_recorded(&mut self, turn_id: u64) {
+        self.last_next = Next::Recorded;
+        self.last_next_turn = turn_id;
+    }
+
+    fn note_transcript(&mut self, turn_id: u64, transcript: &str) {
+        if transcript.trim().is_empty() {
+            return;
+        }
+        self.last_next = next_step(transcript);
+        self.last_next_turn = turn_id;
     }
 
     fn enqueue(&mut self, job: TurnJob) {
@@ -399,6 +597,20 @@ mod tests {
     }
 
     #[test]
+    fn drain_takes_one_heartbeat_frame_and_leaves_the_tail() {
+        let mut play = VecDeque::from(vec![16_000i16; FRAME_SAMPLES + 4]);
+        let mut me = vec![0.0f32; FRAME_SAMPLES + 4];
+        assert!(copy_one_frame(&mut play, &mut me));
+        assert_eq!(play.len(), 4, "the next frame stays queued");
+        assert!(me[..FRAME_SAMPLES].iter().all(|s| (*s - 16_000.0 / 32_768.0).abs() < 1e-6));
+        assert!(me[FRAME_SAMPLES..].iter().all(|s| *s == 0.0), "no second frame in this tick");
+        let mut short_play = VecDeque::from(vec![1_000i16; 100]);
+        let mut short = [0.0f32; 8];
+        assert!(copy_one_frame(&mut short_play, &mut short));
+        assert_eq!(short_play.len(), 92, "a short buffer still takes only its own length");
+    }
+
+    #[test]
     fn reply_queue_is_zeroised_on_wipe() {
         let mut q = VecDeque::from(vec![1i16, -2, 3000]);
         assert_eq!(pop_pcm(&mut q), Some(1));
@@ -433,6 +645,7 @@ mod tests {
         }
         let mut me = vec![0.0f32; 8];
         let _ = host.drive_me(&mut me);
+        assert_eq!(host.workflow(), (1, crate::workflow::Next::Recorded));
         assert_eq!(host.bus().cancel(), 1);
         let utt = host
             .bus()
@@ -492,4 +705,70 @@ mod tests {
         assert!(floor.mood_from_turn());
         assert_eq!(floor.mood(), "grief");
     }
+
+    #[test]
+    fn words_choose_a_program_without_a_second_screen() {
+        std::env::set_var("GALION_ASR", "off");
+        let web = WebSurface::mailbox();
+        let mut host = PhoneHost::from_surface(&web);
+        assert_eq!(host.voice_persona(), galion_emotion::VoicePersona::Samantha);
+        assert_eq!(host.workflow(), (0, crate::workflow::Next::Speak));
+        host.note_transcript(4, "please start the heartbeat");
+        assert_eq!(host.workflow(), (4, crate::workflow::Next::Program("heartbeat")));
+        host.note_transcript(5, "I hear you");
+        assert_eq!(host.workflow().1, crate::workflow::Next::Speak);
+        host.note_transcript(6, "skill presence");
+        assert_eq!(host.workflow(), (6, crate::workflow::Next::Skill("presence")));
+    }
+
+    #[test]
+    fn jarvis_hub_wav_adds_the_bed_and_keeps_length() {
+        let pcm: Vec<i16> = (0..FRAME_SAMPLES * 3).map(|i| ((i as f32 * 0.05).sin() * 8000.0) as i16).collect();
+        let plain = galion_cascade::en_lane::wav_bytes(&pcm, galion_cascade::en_lane::LANE_RATE_HZ);
+        let hub = jarvis_hub_wav(&pcm).expect("mix");
+        assert_eq!(hub.len(), plain.len());
+        assert_eq!(&hub[..44], &plain[..44]);
+        let diff = hub[44..].chunks_exact(2).zip(plain[44..].chunks_exact(2)).filter(|(a, b)| a != b).count();
+        // Click + alarm + room tone every 64 samples, per 80 ms frame.
+        assert!(diff >= 3 * (FRAME_SAMPLES / 64), "diff={diff}");
+        assert!(jarvis_hub_wav(&[]).is_some());
+    }
+
+
+    #[test]
+    fn thought_trace_records_backend_fallback_and_frame_miss() {
+        let web = WebSurface::mailbox();
+        let mut host = PhoneHost::from_surface(&web).with_nerve(NerveEmitter::local(16));
+        host.note_frame(false);
+        host.note_reply_backend(7, "piper");
+        host.note_reply_backend(8, "tone");
+        host.note_frame(true);
+        let mut lines = Vec::new();
+        for _ in 0..100 {
+            lines = host.nerve_lines();
+            if lines.len() >= 3 {
+                break;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        let all = lines.join("\n");
+        assert!(all.contains("\"kind\":\"voice.backend_up\""), "{all}");
+        assert!(all.contains("\"kind\":\"voice.fallback\""), "{all}");
+        assert!(all.contains("\"kind\":\"voice.frame_miss\""), "{all}");
+        // A healthy frame is silence: one backend_up, fallback(s), one miss.
+        assert_eq!(lines.iter().filter(|l| l.contains("voice.frame_miss")).count(), 1);
+        assert_eq!(lines.iter().filter(|l| l.contains("voice.backend_up")).count(), 1);
+    }
+
+
+    #[test]
+    fn pinned_jarvis_on_the_floor_moves_the_mouth_on_the_bus() {
+        let web = WebSurface::mailbox();
+        let mut host = PhoneHost::from_surface(&web);
+        assert_eq!(host.bus.persona_id(), crate::bus::PersonaId::Samantha);
+        let _ = web.persona_floor().lock().unwrap().say("be Jarvis", false, 0.0, false);
+        host.submit_say(SpokenLine { id: 3, reply: String::new(), silence: true, barge: false });
+        assert_eq!(host.bus.persona_id(), crate::bus::PersonaId::Jarvis);
+    }
+
 }

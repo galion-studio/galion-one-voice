@@ -77,6 +77,7 @@ pub struct PiperWorker {
     calls: u32,
     cold_ms: Option<u32>,
     warm_ms: Option<u32>,
+    first_chunk_ms: Option<u32>,
     speaker_id: Option<u32>,
     prosody: PiperProsody,
 }
@@ -85,8 +86,18 @@ impl PiperWorker {
     /// Spawn Piper. The model loads inside the child before it reads stdin.
     /// The first [`synthesize`](Self::synthesize) therefore pays load + inference.
     pub fn spawn(runtime: &Path, model: &Path, config: &Path, prosody: &PiperProsody) -> Result<Self, VoiceError> {
-        let mut child = Command::new(runtime)
-            .arg("--model").arg(model)
+        let mut cmd = Command::new(runtime);
+        // Core map (v3: Samantha core 6, Jarvis core 7, one Piper per voice;
+        // no-op when the map is off). The voice comes from the model path.
+        // The rt gets one intra-op thread per placed core. An explicit
+        // `GALION_PIPER_CPUS` / `GALION_PIPER_THREADS` wins.
+        let role = super::core_map::CoreRole::piper_for_voice(&model.to_string_lossy());
+        let placed = super::core_map::placement(role);
+        super::core_map::apply_affinity(&mut cmd, &placed.cpus);
+        if placed.threads > 0 && std::env::var_os("GALION_PIPER_THREADS").is_none() {
+            cmd.env("GALION_PIPER_THREADS", placed.threads.to_string());
+        }
+        cmd.arg("--model").arg(model)
             .arg("--config").arg(config)
             .arg("--output_raw")
             .arg("--json-input")
@@ -96,7 +107,17 @@ impl PiperWorker {
             .arg("--sentence_silence").arg(&prosody.sentence_silence)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
+            .stderr(Stdio::piped());
+        // lat240: optional core pinning (`GALION_PIPER_CPUS=6-7`). The pinned Piper
+        // CLI starts one ONNX intra-op thread per core and exposes no thread
+        // setting, so affinity is the only CPU lever it has. Unset = inherit.
+        if let Some(cpus) = std::env::var("GALION_PIPER_CPUS").ok().and_then(|v| parse_cpus(&v)) {
+            use std::os::unix::process::CommandExt;
+            // SAFETY: pre_exec runs in the forked child before exec; sched_setaffinity
+            // is async-signal-safe and only touches the child's own mask.
+            unsafe { cmd.pre_exec(move || set_affinity(&cpus)); }
+        }
+        let mut child = cmd
             .spawn()
             .map_err(|e| VoiceError::Backend(format!("A21 piper spawn {}: {e}", runtime.display())))?;
         let pid = child.id();
@@ -115,7 +136,7 @@ impl PiperWorker {
         }
         Ok(Self {
             child: Some(child), stdin: Some(stdin), stdout: Some(stdout), stderr: Some(stderr),
-            err_log: String::new(), pcm_buf: Vec::new(), pid, calls: 0, cold_ms: None, warm_ms: None,
+            err_log: String::new(), pcm_buf: Vec::new(), pid, calls: 0, cold_ms: None, warm_ms: None, first_chunk_ms: None,
             speaker_id: None, prosody: prosody.clone(),
         })
     }
@@ -131,14 +152,95 @@ impl PiperWorker {
     pub fn warm_ms(&self) -> Option<u32> { self.warm_ms }
 
     pub fn is_alive(&mut self) -> bool {
-        match self.child.as_mut().map(|c| c.try_wait()) {
-            Some(Ok(None)) => true,
-            _ => false,
+        matches!(self.child.as_mut().map(|c| c.try_wait()), Some(Ok(None)))
+    }
+
+    /// One JSON line on stdin. Does not read stdout. The ring feed calls this,
+    /// then [`Self::poll_pipes`], off `Heartbeat::step`.
+    pub fn write_text(&mut self, text: &str) -> Result<(), VoiceError> {
+        self.pcm_buf.clear();
+        self.err_log.clear();
+        let line = json_line_speaker(text, self.speaker_id);
+        let stdin = self.stdin.as_mut().ok_or_else(|| VoiceError::Backend("A21 piper stdin closed".into()))?;
+        stdin.write_all(line.as_bytes()).map_err(|e| VoiceError::Backend(format!("A21 piper stdin: {e}")))?;
+        stdin.flush().map_err(|e| VoiceError::Backend(format!("A21 piper stdin flush: {e}")))?;
+        Ok(())
+    }
+
+    /// Non-blocking read of stdout PCM and stderr. Does not wait for the utterance.
+    pub fn poll_pipes(&mut self) -> Result<(), VoiceError> {
+        for _ in 0..8 {
+            let stdout_fd = self.stdout.as_ref().map(|p| p.as_raw_fd()).unwrap_or(-1);
+            let stderr_fd = self.stderr.as_ref().map(|p| p.as_raw_fd()).unwrap_or(-1);
+            if stdout_fd < 0 && stderr_fd < 0 {
+                break;
+            }
+            let mut fds = [
+                PollFd { fd: stdout_fd, events: POLLIN, revents: 0 },
+                PollFd { fd: stderr_fd, events: POLLIN, revents: 0 },
+            ];
+            let nfds = if stdout_fd >= 0 && stderr_fd >= 0 { 2 } else { 1 };
+            if stdout_fd < 0 {
+                fds[0] = fds[1];
+            }
+            // SAFETY: fds holds pipe fds this process owns; timeout 0 does not wait.
+            let rc = unsafe { poll(fds.as_mut_ptr(), nfds, 0) };
+            if rc < 0 {
+                let err = std::io::Error::last_os_error();
+                if err.kind() == std::io::ErrorKind::Interrupted {
+                    continue;
+                }
+                return Err(VoiceError::Backend(format!("A21 piper poll: {err}")));
+            }
+            if rc == 0 {
+                break;
+            }
+            let mut progress = false;
+            if stdout_fd >= 0 && fds[0].revents & (POLLIN | POLLHUP) != 0 {
+                let before = self.pcm_buf.len();
+                self.drain(Pipe::Out)?;
+                if self.pcm_buf.len() != before {
+                    progress = true;
+                }
+            }
+            let err_i = if stdout_fd >= 0 { 1 } else { 0 };
+            if stderr_fd >= 0 && fds[err_i].revents & (POLLIN | POLLHUP) != 0 {
+                let before = self.err_log.len();
+                self.drain(Pipe::Err)?;
+                if self.err_log.len() != before {
+                    progress = true;
+                }
+            }
+            if !progress {
+                break;
+            }
         }
+        Ok(())
+    }
+
+    /// Native-rate s16le gathered so far. Allocates. Not for `step`.
+    pub fn copy_i16(&self) -> Vec<i16> {
+        self.pcm_buf.chunks_exact(2).map(|b| i16::from_le_bytes([b[0], b[1]])).collect()
+    }
+
+    pub fn utterance_done(&self) -> bool {
+        self.err_log.contains("Real-time factor:")
     }
 
     /// One clause in, one PCM buffer out. Same process on every call.
     pub fn synthesize(&mut self, text: &str) -> Result<Vec<i16>, VoiceError> {
+        let mut all = Vec::new();
+        self.synthesize_stream(text, &mut |pcm: &[i16]| all.extend_from_slice(pcm))?;
+        if all.is_empty() {
+            return Err(VoiceError::Backend(format!("A21 piper returned no PCM ({})", tail(&self.err_log))));
+        }
+        Ok(all)
+    }
+
+    /// Streaming form: `on_pcm` gets each s16 chunk the moment it is read off
+    /// Piper's stdout (Piper flushes once per sentence), not after the
+    /// end-of-utterance marker. The first call is the first audio.
+    pub fn synthesize_stream(&mut self, text: &str, on_pcm: &mut dyn FnMut(&[i16])) -> Result<(), VoiceError> {
         let t0 = Instant::now();
         let line = json_line_speaker(text, self.speaker_id);
         {
@@ -147,8 +249,22 @@ impl PiperWorker {
             stdin.flush().map_err(|e| VoiceError::Backend(format!("A21 piper stdin flush: {e}")))?;
         }
         self.pcm_buf.clear();
-        let pcm = self.read_utterance(Duration::from_secs(60))?;
-        let ms = elapsed_ms(t0);
+        self.first_chunk_ms = None;
+        let mut first: Option<u32> = None;
+        let mut emit = |buf: &mut Vec<u8>| {
+            let whole = buf.len() & !1;
+            if whole == 0 { return; }
+            if first.is_none() { first = Some(elapsed_ms(t0)); }
+            let pcm: Vec<i16> = buf[..whole].chunks_exact(2).map(|b| i16::from_le_bytes([b[0], b[1]])).collect();
+            buf.drain(..whole);
+            on_pcm(&pcm);
+        };
+        self.read_utterance(Duration::from_secs(60), &mut emit)?;
+        self.first_chunk_ms = first;
+        if first.is_none() {
+            return Err(VoiceError::Backend(format!("A21 piper returned no PCM ({})", tail(&self.err_log))));
+        }
+        let ms = first.unwrap_or_else(|| elapsed_ms(t0));
         self.calls += 1;
         if self.calls == 1 { self.cold_ms = Some(ms); }
         else if self.calls == 2 { self.warm_ms = Some(ms); }
@@ -157,10 +273,13 @@ impl PiperWorker {
             while cut < self.err_log.len() && !self.err_log.is_char_boundary(cut) { cut += 1; }
             self.err_log.drain(..cut);
         }
-        Ok(pcm)
+        Ok(())
     }
 
-    fn read_utterance(&mut self, timeout: Duration) -> Result<Vec<i16>, VoiceError> {
+    /// Request write -> first PCM byte of the last utterance.
+    pub fn first_chunk_ms(&self) -> Option<u32> { self.first_chunk_ms }
+
+    fn read_utterance(&mut self, timeout: Duration, emit: &mut dyn FnMut(&mut Vec<u8>)) -> Result<(), VoiceError> {
         let deadline = Instant::now() + timeout;
         let mark = self.err_log.len();
         loop {
@@ -186,6 +305,7 @@ impl PiperWorker {
             if rc > 0 {
                 if fds[0].revents & (POLLIN | POLLHUP) != 0 {
                     self.drain(Pipe::Out)?;
+                    emit(&mut self.pcm_buf);
                     progress = true;
                 }
                 if fds[1].revents & (POLLIN | POLLHUP) != 0 {
@@ -197,12 +317,14 @@ impl PiperWorker {
                 if self.stdout.as_ref().is_some() {
                     // The marker is logged after stdout is flushed. Take any bytes still queued.
                     let _ = self.drain(Pipe::Out);
+                    emit(&mut self.pcm_buf);
                 }
                 break;
             }
             let exited = matches!(self.child.as_mut().map(|c| c.try_wait()), Some(Ok(Some(_))));
             if exited {
                 let _ = self.drain(Pipe::Out);
+                emit(&mut self.pcm_buf);
                 let _ = self.drain(Pipe::Err);
                 if self.err_log[mark..].contains("Real-time factor:") { break; }
                 return Err(VoiceError::Backend(format!("A21 piper exited ({})", tail(&self.err_log))));
@@ -211,11 +333,8 @@ impl PiperWorker {
                 std::thread::sleep(Duration::from_millis(5));
             }
         }
-        let bytes = std::mem::take(&mut self.pcm_buf);
-        if bytes.len() < 2 {
-            return Err(VoiceError::Backend(format!("A21 piper returned no PCM ({})", tail(&self.err_log))));
-        }
-        Ok(bytes.chunks_exact(2).map(|b| i16::from_le_bytes([b[0], b[1]])).collect())
+        self.pcm_buf.clear();
+        Ok(())
     }
 
     fn drain(&mut self, pipe: Pipe) -> Result<(), VoiceError> {
@@ -285,6 +404,7 @@ fn tail(s: &str) -> String {
 
 fn elapsed_ms(t0: Instant) -> u32 { t0.elapsed().as_millis().min(u32::MAX as u128) as u32 }
 
+#[derive(Clone, Copy)]
 #[repr(C)]
 struct PollFd { fd: i32, events: i16, revents: i16 }
 
@@ -297,6 +417,31 @@ const O_NONBLOCK: i32 = 0o4000;
 extern "C" {
     fn poll(fds: *mut PollFd, nfds: u64, timeout: i32) -> i32;
     fn fcntl(fd: i32, cmd: i32, arg: i32) -> i32;
+}
+
+/// `"6-7"`, `"7"`, `"0,2-3"` -> cpu list. `None` on any parse error.
+pub fn parse_cpus(s: &str) -> Option<Vec<usize>> {
+    let mut v = Vec::new();
+    for part in s.split(',').map(str::trim).filter(|p| !p.is_empty()) {
+        let (lo, hi) = part.split_once('-').unwrap_or((part, part));
+        let (lo, hi): (usize, usize) = (lo.trim().parse().ok()?, hi.trim().parse().ok()?);
+        if hi < lo || hi >= 1024 { return None; }
+        v.extend(lo..=hi);
+    }
+    if v.is_empty() { None } else { Some(v) }
+}
+
+extern "C" {
+    fn sched_setaffinity(pid: i32, cpusetsize: usize, mask: *const u64) -> i32;
+}
+
+fn set_affinity(cpus: &[usize]) -> std::io::Result<()> {
+    let mut mask = [0u64; 16]; // 1024 cpus, glibc cpu_set_t size
+    for &c in cpus { mask[c / 64] |= 1u64 << (c % 64); }
+    // SAFETY: mask is a 128-byte bitset that outlives the call; pid 0 = calling (child) process.
+    let rc = unsafe { sched_setaffinity(0, std::mem::size_of_val(&mask), mask.as_ptr()) };
+    if rc != 0 { return Err(std::io::Error::last_os_error()); }
+    Ok(())
 }
 
 fn set_nonblock(fd: i32) -> std::io::Result<()> {
@@ -321,6 +466,16 @@ mod tests {
         assert_eq!(p.with_emotion(""), p);
         // Voice identity is not a prosody field.
         assert!(p.length_scale == "1.0" || p.length_scale == "1");
+    }
+
+    #[test]
+    fn cpu_lists_parse() {
+        assert_eq!(parse_cpus("6-7"), Some(vec![6, 7]));
+        assert_eq!(parse_cpus("0,2-3"), Some(vec![0, 2, 3]));
+        assert_eq!(parse_cpus("7"), Some(vec![7]));
+        assert_eq!(parse_cpus("3-1"), None);
+        assert_eq!(parse_cpus("x"), None);
+        assert_eq!(parse_cpus(""), None);
     }
 
     #[test]
@@ -370,6 +525,13 @@ mod tests {
         assert_eq!(w.calls(), 2);
         assert!(w.cold_ms().is_some() && w.warm_ms().is_some());
         assert_ne!(a[0], b[0], "second turn must not replay the first PCM");
+        // Streaming form: chunks arrive through the callback, same samples as the buffered form.
+        let mut chunks = 0usize;
+        let mut got = Vec::new();
+        w.synthesize_stream("turn one", &mut |p: &[i16]| { chunks += 1; got.extend_from_slice(p); }).unwrap();
+        assert!(chunks >= 1);
+        assert_eq!(got, a, "streamed PCM differs from buffered PCM");
+        assert!(w.first_chunk_ms().is_some());
         assert!(a.iter().any(|&s| s != 0));
         // No PCM file appeared beside the fake runtime.
         let after = entries(&dir);

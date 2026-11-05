@@ -16,7 +16,8 @@
                     (~640 ms quiet after speech). That end is the auto-record. proceedTurn
                     posts the same /turn with X-Galion-Proceed: auto. No second page.
                     Headers: X-Turn-Id, X-Sample-Rate, X-Barge-In, X-Galion-Proceed.
-       reply      ← /dot JSON gains reply:{id,url,ms}; page fetches the WAV and plays it through
+       reply      ← /dot JSON gains reply:{id,url,ms[,hub_texture]}; page fetches the WAV and plays it through
+                    (hub_texture:true = the Jarvis hub bed is mixed into that WAV; body[data-hub-texture]),
                     the AudioContext unlocked by the tap. User speech during playback = barge-in:
                     playback stops at once and the new utterance is captured.
      V2-S3: AI Act Art. 50 disclosure (HR+EN) is visible and spoken on the first tap.
@@ -61,6 +62,8 @@ canvas{display:block;position:fixed;inset:0;width:100%;height:100%;width:100dvw;
   text-align:center;font:500 13px/1.35 -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
   color:#F5A524;pointer-events:none;opacity:0;transition:opacity .3s}
 #err.show{opacity:1}
+#cc0{position:fixed;left:12px;right:12px;bottom:4px;font:12px/1.4 system-ui,sans-serif;color:#9aa;text-align:center}
+#cc0 a{color:#bcd}
 </style></head>
 <body>
 <canvas id="s" data-mark="orb" data-profile="luti" data-persona="samantha" data-mouth="piper" data-film-voice="false" data-rights="hold"></canvas>
@@ -71,6 +74,13 @@ canvas{display:block;position:fixed;inset:0;width:100%;height:100%;width:100dvw;
   <span class="hold">This voice is not a film clone.</span>
 </div>
 <!--/galion-ai-disclosure-->
+<!-- CC0 voices (owner t628u): not usable until this box is ticked. The server
+     enforces it per session (POST /v2/cc0); unticked, Piper speaks. -->
+<div id="cc0" data-cc0-accepted="false">
+  <label><input type="checkbox" id="cc0-accept" name="cc0"> I agree to the
+  <a id="cc0-link" href="https://creativecommons.org/publicdomain/zero/1.0/" target="_blank" rel="noopener noreferrer">CC0 1.0 Universal (Public Domain Dedication)</a>
+  licence for the CC0 voices (Samantha, Jarvis). Unticked, those voices stay off.</label>
+</div>
 <div id="hint">Tap the dot to talk, or type below</div>
 <form id="say" autocomplete="off">
   <input id="say-text" type="text" name="text" enterkeyhint="send" maxlength="400" placeholder="Type to Galion" aria-label="Message" autocapitalize="sentences">
@@ -579,6 +589,7 @@ function postTurn(frames,barge){
 function onReply(rp){
   if(!rp||rp.id==null||!rp.url) return;
   const id=String(rp.id);
+  document.body.dataset.hubTexture = rp.hub_texture===true ? "on" : "off";
   if(!hearReplies||!micCtx){ seenReplies.add(id); return; }
   if(seenReplies.has(id)) return;
   seenReplies.add(id); if(seenReplies.size>64) seenReplies=new Set([...seenReplies].slice(-32));
@@ -620,4 +631,22 @@ document.addEventListener("visibilitychange",()=>{
 });
 
 pollOnce(); requestAnimationFrame(draw);
+// CC0 licence checkbox: the server keeps the acceptance per session, in memory.
+(function(){
+  const box=document.getElementById("cc0-accept"), wrap=document.getElementById("cc0");
+  if(!box||!wrap) return;
+  function show(on){ box.checked=!!on; wrap.dataset.cc0Accepted=on?"true":"false"; }
+  box.addEventListener("change", async ()=>{
+    const want=box.checked;
+    await ensureSession();
+    try{
+      const r=await fetch("v2/cc0",{method:"POST",cache:"no-store",headers:sessionHeaders({"Content-Type":"application/json"}),
+        body:JSON.stringify({accept:want})});
+      const j=r.ok?await r.json():null;
+      show(!!(j&&j.accepted));
+      if(!r.ok) showErr("CC0 choice not saved ("+r.status+").");
+    }catch(e){ show(false); showErr("CC0 choice not saved."); }
+  });
+  show(false);
+})();
 </script></body></html>

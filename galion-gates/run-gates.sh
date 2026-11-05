@@ -5,6 +5,7 @@
 #   G1 tensor correct   : cargo test --workspace (all crates) + G0 scalar reference self-checks
 #   G2 GGUF absence     : case-insensitive grep over the code workspace (zero hits)
 #   G3 purity denylist  : candle/ort/tract/burn/llama/ggml/gguf absent from manifests + cargo tree
+#                         (one owner exception, t613s2992: `ort` in runtimes/galion-piper-rt only, own workspace)
 #   --- soft gates (A16): recorded in JSON/summary; FAIL only counts if GALION_GATES_HARD=1 ---
 #   G4 render snapshot  : galion-gates/g4-render.sh (NullSurface dot + terminal snapshot vs golden)
 #   G6 Rika R1–R9       : galion-gates/g6-rika.sh (slot; A10 owns)
@@ -14,9 +15,10 @@
 #   LV live demo smoke  : galion-gates/lv-live-demo.sh (W21-05; scripts/run-live-demo.sh headless, SKIP if absent)
 #   V1 V1 demo smoke    : galion-gates/v1-demo.sh (V1-04; scripts/run-v1-demo.sh --headless, SKIP if absent)
 #   OP one-percent      : galion-gates/op-one-percent.sh (V6 engine account; stub vs measured)
+#   SY symphony frame   : galion-gates/sy-frame.sh (80 ms tick + 1% stub-step ceiling; GALION_GATES_NO_SY=1 skips)
 # Usage: galion-gates/run-gates.sh [--strict-cv]
 #   env GALION_VPS_HOST=user@host [GALION_VPS_KEY=path] enables remote gates.
-#   env GALION_GATES_HARD=1 makes soft-gate failures (G4/G6/PS/LK/DG/LV/V1/OP) count toward the exit code.
+#   env GALION_GATES_HARD=1 makes soft-gate failures (G4/G6/PS/LK/DG/LV/V1/OP/SY) count toward the exit code.
 set -uo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$HERE/.." && pwd)"
@@ -74,7 +76,18 @@ DOCHITS="$(grep -RIli --exclude-dir=galion-voice-code --exclude-dir=target --exc
 say "G2 advisory: $DOCHITS non-code files under /workspace mention 'gguf' (docs/research; not gated)"
 
 # ---------- G3 purity denylist ----------
+# Owner exception t613s2992 (2026-11-04, LOCKS formats.exceptions.a21_piper): exactly one
+# manifest may name `ort`: the out-of-process Piper runtime runtimes/galion-piper-rt. It must
+# be its own cargo workspace, excluded from (never a member of) the main one, and load
+# onnxruntime at runtime (`load-dynamic`). Any other denylisted line, there or anywhere, fails.
+PIPER_RT_MANIFEST="$ROOT/runtimes/galion-piper-rt/Cargo.toml"
+piper_rt_ok(){ [ -f "$PIPER_RT_MANIFEST" ] && grep -qE '^\[workspace\]' "$PIPER_RT_MANIFEST" \
+  && grep -qE '^ort = \{.*"load-dynamic"' "$PIPER_RT_MANIFEST" \
+  && grep -qE '^exclude = \[.*"runtimes/galion-piper-rt"' "$ROOT/Cargo.toml" \
+  && ! grep -qE '^members = .*runtimes/galion-piper-rt' "$ROOT/Cargo.toml"; }
 MHITS="$(grep -RInE --include=Cargo.toml -e "^\s*($DENY)[-a-z0-9_]*\s*=" -e "package\s*=\s*\"($DENY)" "$ROOT" | grep -v '/target/' || true)"
+if [ -n "$MHITS" ] && piper_rt_ok; then MHITS="$(echo "$MHITS" | grep -vF "$PIPER_RT_MANIFEST:" || true)"
+  MHITS="$(printf '%s\n%s\n' "$MHITS" "$(grep -nE "^\s*($DENY)[-a-z0-9_]*\s*=" "$PIPER_RT_MANIFEST" | grep -vE '^[0-9]+:ort = ' | sed "s|^|$PIPER_RT_MANIFEST:|")" | sed '/^$/d')"; fi
 G3N=""; G3F=0
 if [ -n "$MHITS" ]; then say "$MHITS"; G3F=1; G3N="denylisted dep in Cargo.toml; "; else G3N="manifests clean; "; fi
 TREE="$( cd "$ROOT" && cargo tree --workspace -e normal,build --prefix none --format '{p}' --offline 2>/dev/null || cargo tree --workspace -e normal,build --prefix none --format '{p}' 2>/dev/null )"
@@ -103,6 +116,7 @@ soft DG "$ROOT/galion-demo/golden.sh"   # A14 canned demo golden (galion-gates/g
 [ "${GALION_GATES_NO_LV:-0}" = 1 ] && mark LV SKIP "GALION_GATES_NO_LV=1" || soft LV "$HERE/lv-live-demo.sh"   # W21-05 live demo smoke (headless)
 [ "${GALION_GATES_NO_V1:-0}" = 1 ] && mark V1 SKIP "GALION_GATES_NO_V1=1" || soft V1 "$HERE/v1-demo.sh"   # V1-04 V1 demo smoke (headless)
 [ "${GALION_GATES_NO_OP:-0}" = 1 ] && mark OP SKIP "GALION_GATES_NO_OP=1" || soft OP "$HERE/op-one-percent.sh"   # V6 one-percent engine (symphony)
+[ "${GALION_GATES_NO_SY:-0}" = 1 ] && mark SY SKIP "GALION_GATES_NO_SY=1" || soft SY "$HERE/sy-frame.sh"   # symphony 80 ms / 1% tick
 
 # ---------- Remote R0–R3 (VPS) ----------
 if [ -n "${GALION_VPS_HOST:-}" ]; then
@@ -119,9 +133,9 @@ else for g in 0 1 2 3; do mark R$g PENDING "GALION_VPS_HOST not set — VPS not 
 
 # ---------- summary ----------
 FAILS=0; { echo "{\"ts\":\"$TS\",\"root\":\"$ROOT\",\"probe\":$PROBE_JSON,\"gates\":{"
-  first=1; for g in G0 G1 G2 G3 G4 G6 PS LK DG LV V1 OP R0 R1 R2 R3; do
+  first=1; for g in G0 G1 G2 G3 G4 G6 PS LK DG LV V1 OP SY R0 R1 R2 R3; do
     [ $first = 1 ] || echo ","; first=0
     printf '"%s":{"status":"%s","note":"%s"}' "$g" "${ST[$g]}" "$(echo "${NOTE[$g]}" | sed 's/"/\\"/g')"
     [ "${ST[$g]}" = FAIL ] && FAILS=$((FAILS+1)); done; echo "}}"; } > "$JSON"
-say "== SUMMARY: G0=${ST[G0]} G1=${ST[G1]} G2=${ST[G2]} G3=${ST[G3]} | soft G4=${ST[G4]} G6=${ST[G6]} PS=${ST[PS]} LK=${ST[LK]} DG=${ST[DG]} LV=${ST[LV]} V1=${ST[V1]} OP=${ST[OP]} | R0-R3=${ST[R0]}  fails=$FAILS  json=$JSON"
+say "== SUMMARY: G0=${ST[G0]} G1=${ST[G1]} G2=${ST[G2]} G3=${ST[G3]} | soft G4=${ST[G4]} G6=${ST[G6]} PS=${ST[PS]} LK=${ST[LK]} DG=${ST[DG]} LV=${ST[LV]} V1=${ST[V1]} OP=${ST[OP]} SY=${ST[SY]} | R0-R3=${ST[R0]}  fails=$FAILS  json=$JSON"
 exit $([ $FAILS = 0 ] && echo 0 || echo 1)

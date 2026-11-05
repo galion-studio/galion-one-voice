@@ -4,7 +4,9 @@
 //!
 //! Without `GALION_FLASH_EVAL=1` the object has `"measured": false` and no
 //! `ttfa_ms`. A protocol-stub run (both that flag and `GALION_CLONE_STUB_PCM=1`)
-//! may print a clock. `product_claim` stays false. This is not a Flash result.
+//! may print a clock of the first chunk, plus `utt_ms` for the closing
+//! marker. `product_claim` stays false unless `engine` is `model` and
+//! `path` is `stream`. This is not a Flash result.
 //! Nothing here downloads weights or sends a reference clip.
 //!
 //! ```text

@@ -71,6 +71,10 @@ The symphony standard for that clock is
 Gate results go in [`symphony/SELF-EVAL.md`](symphony/SELF-EVAL.md).
 Non-inference cost on that tick is the symphony account,
 `docs/galion-voice-v2/symphony/ONE-PERCENT.md`.
+is the clock. Clone, persona, and the one dot sit on that step
+(`symphony/HEARTBEAT-WIRE.md`). The clone sector drains one Nano PCM frame
+from a fixed ring. The model call stays off that step. The turn worker is
+forbidden to run inside that call.
 
 **Rika.** On silence and an in-breath, Rika leans in on the feeling band
 (about 160 ms in the stub measurement). It needs consent bits `sense` and
@@ -95,6 +99,14 @@ does not select the length-bucket placeholder. `GALION_LLM` defaults to
 `CannedLlm` on this lane. `TurnWorker` in `galion-console` (feature
 `phone-turn`) runs that lane on its own thread. `PhoneHost` polls it from
 the screen demo.
+(fixtures decode, real speech returns `AsrUnratified`). `interim` is a
+**placeholder**: canned English chosen by utterance length, labelled
+`interim-placeholder`, not recognition. `GALION_LLM` unset or `canned` is
+`CannedLlm` (explicit test opt-in). `hermes` is the loopback gateway
+(`GALION_LLM_URL`, default `http://127.0.0.1:8642/v1/chat/completions`,
+3 s cap). Unknown values error. A dead gateway says `model can't be reached`
+and does not fall back to canned. `TurnWorker` in `galion-console` (feature `phone-turn`) runs
+that lane on its own thread. `PhoneHost` polls it from the screen demo.
 `WebSurface` serves `POST /mic`, `POST /turn`, `GET /reply/<id>.wav`, and
 puts `reply` on `/dot`.
 
@@ -123,7 +135,7 @@ phone browser                         loopback 127.0.0.1:7878
                                      TurnWorker thread
                                        PhoneLane
                                          S4 PhoneTurnAsr
-                                         S5 CannedLlm (or echo)
+                                         S5 HermesLlm, or CannedLlm / echo when opted in
                                          S6 SpeechStack (Piper, else flite)
                                          │
                                          ▼
@@ -655,8 +667,11 @@ film *Her*) are **owner-directed research targets**. Rights, consent, and
 licence must be cleared before any clip is ingested or any public demo uses
 a clone. This repository does not fetch film audio and does not store a clip.
 The per-persona checklist and the LEDGER paste templates are
-`RIGHTS-CLEARANCE.md`. Both gates are closed. The closed outline of that
-ingest is `CLIP-INGEST.md`.
+`RIGHTS-CLEARANCE.md`. t287 records PRIVATE CLEARED for both personas
+in `LEDGER.md` (owner t273). Counsel is not named. The checklist boxes
+stay unchecked. `reference_clips` in `LOCKS.toml` is still false and
+needs an owner flip. The worker store is `symphony/CLIP-STORE.md`.
+The earlier outline is `CLIP-INGEST.md`.
 
 **Architecture to adopt, not to vendor.** Resemble AI Chatterbox, MIT for
 the code in `resemble-ai/chatterbox` (copyright 2025 Resemble AI, read
@@ -668,10 +683,12 @@ S3Gen and a vocoder emit audio. No training step in that API.
 - **Quality option:** Chatterbox-Turbo, listed at 350M, same family. Turbo's own code requires a reference longer than 5 seconds. The owner target is one clip of about 10 seconds per persona.
 - **Streaming eval:** the owner name is a Flash streaming eval on CPU. Upstream master exposes `generate()`, not a model named Flash. Open PR 528 proposes `ChatterboxTurboTTS.stream()` for near-real-time CPU playback and was still open when this note was written. The eval is planned. It is not run here.
 - **Samantha:** paralinguistic tags (`[laugh]`, `[chuckle]`, and the set Turbo/Nano already document) carry warmth. Jarvis stays calm and precise: short command lines, tags off.
+- **Jarvis hub:** clicks, alarms, and virtual ambience are a separate layer. The toggle mixes it on or off and does not denoise the speech asset. ABI and band check: `symphony/JARVIS-TEXTURE.md`.
 - **Watermark:** upstream `generate()` applies a Perth watermark. The Nano path should keep a watermark beside the Art. 50 disclosure. Perth's own licence was not read in this session. Do not vendor it yet.
 - **Worker:** the scaffold in `CLONE-WORKER.md` is one out-of-process process, same shape as the warm Piper worker. Piper speaks if the clone worker is absent. No PCM on disk. Generate is not wired. No film audio.
 - **Weights:** gitignored under `weights/clone/`. CloudAgents fetch tag `clone-weights-v1` with `scripts/clone/fetch-clone-weights.sh`. The layout and the admin upload are `CLONE-WEIGHTS.md`. A clean clone does not contain the blobs.
 - **Worker:** the scaffold in `CLONE-WORKER.md` is one out-of-process process, same shape as the warm Piper worker. Piper speaks if the clone worker is absent. No PCM on disk. Generate is not wired. No film audio. The build plan is `CHATTERBOX-WORKER.md`. It leaves `reference_clips` false.
+- **Worker:** `CLONE-WORKER.md` and `CHATTERBOX-WORKER.md`. One out-of-process process, same shape as the warm Piper worker. Piper speaks if the clone worker is absent. No PCM on disk. `generate` runs only when `GALION_CLONE_GENERATE=1`, on CPU. A reference is accepted only by `op: condition` after the consent gate. `reference_clips` stays false until an owner edit.
 
 **CPU and memory (t204u, t205u).** Admin approves full threading, SIMD, and
 maximum memory for Chatterbox Nano/Turbo workers, for every Galion Voice
@@ -707,14 +724,17 @@ backlog. Record only.
 
 **Goal.** High-capability model calls for research, prediction, and
 agent-assist go through **Hermes** (Galion Research / the Hermes access
-layer already typed in `galion-sideband`). Local models stay the voice path.
-Hermes is not on the 80 ms heartbeat. The 3 s retrieval cap stands.
+layer already typed in `galion-sideband`). The live reply may use that
+gateway beside the canned test table. Hermes is not on the 80 ms heartbeat.
+The 3 s retrieval cap stands.
 
 **Owner decision (t198u, 2026-11-03, YES).** Hermes is the approved external
 gateway beside local models. A t197u note that named OpenRouter was replaced
-by this decision before any OpenRouter approval was kept. Do not call Hermes
-from this record. No secrets in the repo. Gateway choice C5 in the sideband
-crate is now this approval; the transport is still a trait, not a client.
+by this decision before any OpenRouter approval was kept. No secrets in the
+repo. The voice reply path calls Hermes off the 80 ms tick: std HTTP to a
+numeric loopback OpenAI chat endpoint (`crates/galion-cascade/src/hermes.rs`,
+`GALION_LLM=hermes`, 3 s cap). The side-band trait in `galion-sideband` is
+unchanged. Do not put a key in the tree.
 
 The hook that offers `Turn`, `Intent`, and `Affect` is
 `galion_openmind::CortexHandoff`. It uses the types already in
@@ -779,3 +799,7 @@ This program does not SSH, and it does not download a model.
 - Ingesting a film clip or shipping a celebrity voice before rights clearance.
 
 — Maciej Grajczyk
+
+---
+
+© G.A.L.I.O.N. — General Autonomous Local Intelligence Open Network. All rights reserved and claims reserved. · CC0 voices: you must tick the consent box agreeing to the CC0 licence before using any CC0 voice; use is at your own responsibility. · No cookies. · De-Googled: no Google services. · All current Galion builds are open source under the Galion perpetual open MIT licence.

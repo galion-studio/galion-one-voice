@@ -53,14 +53,14 @@ watermark before returning samples.
 | Turbo | 350M, English, paralinguistic tags. `tts_turbo.py` asserts the reference is longer than 5 seconds. Encoder window constant on that class is 15× the 16 kHz rate; decoder window is 10× the synthesis rate. | Quality option, same worker shape, not the default. A ~10 s clip fits the owner's target and the >5 s assert. |
 | Original English | 500M, exaggeration and CFG. | Not the CPU primary. |
 | Multilingual V3 | 500M, 23+ languages. T3 can be a Llama backbone (`t3.py` builds `LlamaModel` unless the config says GPT-2). | Out of scope for this English phone path. The `llama` runtime name is forbidden in-tree. |
-| Streaming | Master exposes `generate()`. PR [528](https://github.com/resemble-ai/chatterbox/pull/528) (open as of 2026-06-17) proposes `ChatterboxTurboTTS.stream()` for CPU playback before the utterance finishes. There is no Chatterbox model named Flash in the model zoo. | The owner's "Flash streaming eval" is this CPU time-to-first-audio question. Planned. Not run. |
+| Streaming | Master exposes `generate()`. PR [528](https://github.com/resemble-ai/chatterbox/pull/528) (still open on 2026-11-03) proposes `ChatterboxTurboTTS.stream()`. Master `S3Token2Wav.forward` already accepts `finalize=False`. There is no Chatterbox model named Flash. | The worker streams with that hook, or with `stream()` if the install has it. It does not call `generate()`. The gate is `STREAM-TTFA.md`. A model TTFA number is not recorded here. |
 | Watermark | Perth inside `generate()`. Perth is a separate package (`resemble-perth` on a git pin in `pyproject.toml`). Its licence was not read here. | Nano path should keep a watermark next to the Art. 50 disclosure. Do not vendor Perth in this change. |
 | Dependencies | `pyproject.toml`: torch, torchaudio, transformers, diffusers, safetensors, plus others. Download patterns include `.safetensors` and `.pt`. | PyTorch stays out of process. `.pt` is not a lock weight format. Nothing is downloaded here. |
 
 Output rate in the public ports is described as 24 kHz, which matches the
 Galion clock. That match was not re-measured.
 
-**Worker.** The scaffold is `docs/galion-voice-v2/CLONE-WORKER.md`: one
+**Worker.** The contract is `docs/galion-voice-v2/CLONE-WORKER.md`: one
 long-lived process, the same idea as the warm Piper worker. Text in, PCM
 out of the child. The child writes no file. The Rust compiler turns that
 PCM into a `.gqvoice` packet (`GQVOICE.md`) and the speech stack plays the
@@ -75,6 +75,22 @@ under that. The Python child does not call generate. It accepts a reference only
 the two current wavs after owner t273, and only when the sha256 matches
 (`symphony/CLONE-LANDING.md`). It is CPU-only, one vCPU, and it does not
 denoise. Weights are fetched only with `GALION_CLONE_FETCH=1`.
+out, no file of samples. Nano is the primary and the generate path. Turbo
+stays on the same stdin line and is unwired. If the pinned weights are
+missing, Piper (`en_US-ljspeech-medium`) speaks. Flite remains the
+pack-missing fallback under that. `generate` runs only when
+`GALION_CLONE_LOCAL_REFS=1` and the reference sha256 is allowlisted for
+that persona. Otherwise a clip is still refused. Weights are fetched only
+with `GALION_CLONE_FETCH=1`. `Heartbeat::step` does not call the child.
+**Worker.** `docs/galion-voice-v2/CLONE-WORKER.md` and the runbook
+`docs/galion-voice-v2/CHATTERBOX-WORKER.md`: one long-lived process, the
+same idea as the warm Piper worker. Text in, PCM out, no file of samples.
+Nano is the primary. Turbo is the option on the same stdin line. If the
+pinned weights are missing, Piper (`en_US-ljspeech-medium`) speaks. Flite
+remains the pack-missing fallback under that. `GALION_CLONE_GENERATE=1`
+calls `generate` on CPU in that process. A speak line still refuses a
+clip path. `op: condition` accepts one consented wav. Weights are fetched
+only with `GALION_CLONE_FETCH=1`.
 
 **Personas.**
 
@@ -130,13 +146,14 @@ or ingest a clip. Replaces the external-API swarm, which is dropped.
 | # | Role | Deliverable | Status |
 |---|---|---|---|
 | 1 | Architecture map (T3, VoiceEncoder, S3Gen, vocoder) | `docs/galion-voice-v2/VOICE-CLONING.md` | planned-not-spawned |
-| 2 | Nano 110M CPU worker contract | `docs/galion-voice-v2/CLONE-WORKER.md` | scaffolded, no weights, no generate |
+| 2 | Nano 110M CPU worker contract | `docs/galion-voice-v2/CHATTERBOX-WORKER.md` | out-of-process generate behind `GALION_CLONE_GENERATE=1`; CI does not arm it |
 | 3 | Turbo quality option, same process | `docs/galion-voice-v2/CLONE-WORKER.md` | scaffolded, same stub |
 | 4 | CPU streaming / Flash eval plan (no run) | `docs/galion-voice-v2/FLASH-EVAL.md` | plan + harness stub, no number |
 | 5 | Zero-shot ~10 s conditioning, no fine-tune | `docs/galion-voice-v2/CHATTERBOX-WORKER.md` | plan written; `reference_clips` stays false; seat not spawned |
 | 6 | Jarvis research-target mapping | `docs/galion-voice-v2/VOICE-CLONING.md` | planned-not-spawned |
 | 7 | Samantha tags and emotional register | `docs/galion-voice-v2/VOICE-CLONING.md` | planned-not-spawned |
 | 8 | Rights, consent, licence gate | `docs/galion-voice-v2/RIGHTS-CLEARANCE.md` and `docs/galion-voice-v2/CLIP-INGEST.md` | owner t273 local send recorded; counsel boxes and public demo stay closed; lock key not flipped |
+| 8 | Rights, consent, licence gate | `docs/galion-voice-v2/RIGHTS-CLEARANCE.md`, `CLIP-INGEST.md`, `symphony/CLIP-STORE.md` | t273/t287 PRIVATE CLEARED in `LEDGER.md`; counsel not named; boxes unchecked; `reference_clips` still false pending an owner flip |
 | 9 | Art. 50 watermark note (no Perth vendor) | `docs/galion-voice-v2/VOICE-CLONING.md` | planned-not-spawned |
 | 10 | Piper fallback and warm-worker shape | `docs/galion-voice-v2/CLONE-WORKER.md` | scaffolded; Piper speaks when the clone slot is absent |
 | 11 | TTFA eval plan (no measurement) | `docs/galion-voice-v2/FLASH-EVAL.md` | harness prints `measured: false` until a flagged run |
@@ -161,3 +178,7 @@ Read 2026-11-03. No model download. No API call that spends money.
 - Risk examples, not dependencies: [chatterbox.cpp](https://github.com/gianni-cor/chatterbox.cpp), [community ONNX](https://huggingface.co/onnx-community/chatterbox-ONNX)
 
 — Maciej Grajczyk
+
+---
+
+© G.A.L.I.O.N. — General Autonomous Local Intelligence Open Network. All rights reserved and claims reserved. · CC0 voices: you must tick the consent box agreeing to the CC0 licence before using any CC0 voice; use is at your own responsibility. · No cookies. · De-Googled: no Google services. · All current Galion builds are open source under the Galion perpetual open MIT licence.

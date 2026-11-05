@@ -37,7 +37,7 @@ Last stdout line: `GALION_V1_SCREEN=http://127.0.0.1:7878/` (live) or `GALION_V1
   `en_US-ljspeech-medium` voice into `weights/` (sha256-pinned, not vendored); `--check` verifies them without network.
   - **Fallback only:** `libflite1` (`apt install libflite1`) is used when the A21 pack is missing.
   - **Neither present:** the EN cascade **exits 3** (`SPEECH=ABSENT`) and never passes tones off as the reply. Check C11 reports this.
-  - **Options:** `GALION_SPEECH=auto|a21|flite|off` (default `auto` = A21 first), `GALION_A21_RUNTIME=<piper>`, `GALION_A21_NOISE=natural`, `GALION_FLITE_VOICE=slt|…`.
+  - **Options:** `GALION_SPEECH=auto|clone|a21|flite|off` (default `auto`). Nano is selected only when pinned weights, a tokenizer, and a sha-allowlisted local ref are all present (`GALION_CLONE_LOCAL_REFS=1`, runbook `docs/galion-voice-v2/NANO-BACKEND.md`). Otherwise Piper, then flite. `--headless` does not set that gate, so `:7878` headless stays on Piper. `GALION_A21_RUNTIME=<piper>`, `GALION_A21_NOISE=natural`, `GALION_FLITE_VOICE=slt|…`.
 - Speakers: PulseAudio/PipeWire (`paplay`) or ALSA (`aplay`) for the reply words.
 
 ## 2. What runs behind the one screen
@@ -115,3 +115,7 @@ exposure needs a reverse proxy, which is not built. Release steps: `scripts/depl
 - There is no microphone. Input is a WAV or synthetic audio. Emotion comes from a heuristic proxy. The RTF figure measures the stub path.
 
 — Maciej Grajczyk
+
+---
+
+© G.A.L.I.O.N. — General Autonomous Local Intelligence Open Network. All rights reserved and claims reserved. · CC0 voices: you must tick the consent box agreeing to the CC0 licence before using any CC0 voice; use is at your own responsibility. · No cookies. · De-Googled: no Google services. · All current Galion builds are open source under the Galion perpetual open MIT licence.

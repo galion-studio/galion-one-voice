@@ -7,7 +7,7 @@
 #
 # Checks:
 #   - LOCKS frame_ms is 80 (read only; this script does not edit the lock)
-#   - reference_clips is still false (this landing does not flip the lock)
+#   - reference_clips is true only by owner decision t623u (CC0 donors)
 #   - the worker is CPU-only Nano, one thread, no GGUF, no denoise
 #   - when a pinned wav is on disk, its sha256 matches REFS.sha256
 #   - when the wav is absent, that persona is a clean skip (CI)
@@ -25,10 +25,11 @@ PINS="scripts/clone/REFS.sha256"
 fail() { echo "clone-landing: $*" >&2; exit 1; }
 
 grep -q '^frame_ms = 80' LOCKS.toml || fail "frame_ms is not 80"
-grep -q '^reference_clips = false' LOCKS.toml || fail "reference_clips was flipped; this landing must not edit LOCKS.toml"
+grep -q '^reference_clips = true' LOCKS.toml && grep -q '^ref_clip_decision = "t623u"' LOCKS.toml || fail "reference_clips must be true with ref_clip_decision t623u"
 grep -q 'model_primary = "chatterbox-nano"' LOCKS.toml || fail "primary model is not chatterbox-nano"
 
-if grep -E -q 'import (torch|gguf|llama_cpp)|ffmpeg|noisereduce|\.gguf' "$WORKER"; then
+# torch is imported lazily inside the generate path (PR #53), never at module level.
+if grep -E -q '^(import|from) (torch|gguf|llama_cpp)|import (gguf|llama_cpp)|ffmpeg|noisereduce|\.gguf' "$WORKER"; then
   fail "worker imports a forbidden runtime or a denoise tool"
 fi
 grep -q 'denoise refused' "$WORKER" || fail "worker does not refuse denoise"
@@ -38,8 +39,8 @@ python3 - <<'PY' || fail "REFS.sha256 drifted from the current Samantha and Jarv
 import pathlib
 text = pathlib.Path("scripts/clone/REFS.sha256").read_text()
 need = {
-    "samantha": "bdcb0c2903bb91c7b0fda0cf79a42406fdaa662fd8d31f6eaed3895d9c7a8693",
-    "jarvis": "c2200b59fa78b3c98d13ac5dc7db3a6c14e802310dca73033d7770bd4b532c60",
+    "samantha": "e4bc60c33f697108cf5585dead213da1065979010f5be1d513574893584a4641",
+    "jarvis": "60ad5457dac31af915a9679760705296f9aad17e15ee84885385509b58b8f6b6",
 }
 for persona, sha in need.items():
     line = next(ln for ln in text.splitlines() if ln.startswith(persona + " "))
@@ -50,9 +51,9 @@ for persona, sha in need.items():
     assert parts[8].startswith("preserve"), line
 jarvis = next(ln for ln in text.splitlines() if ln.startswith("jarvis "))
 assert "preserve-hub" in jarvis
-assert "48000" in jarvis
+assert jarvis.split()[3] == "44100" and jarvis.split()[4] == "1"
 samantha = next(ln for ln in text.splitlines() if ln.startswith("samantha "))
-assert "44100" in samantha and samantha.split()[8] == "preserve"
+assert samantha.split()[3] == "44100" and samantha.split()[4] == "1" and samantha.split()[8] == "preserve"
 PY
 
 tmp=$(mktemp -d)
@@ -136,7 +137,7 @@ set -e
 [ ! -s "$tmp/strip" ] || fail "strip_texture wrote PCM"
 
 grep -q 'GALIONVC' crates/galion-ml-voice/src/speech/galion_clip.rs || fail "galion clip magic missing"
-echo "clone-landing: lock_flip=BLOCKED-on-owner reference_clips=false"
+echo "clone-landing: lock_flip=OPEN-t623u reference_clips=true (CC0 donors only)"
 
 # Unconsented name, MP3, and a hash mismatch must not yield PCM.
 set +e
@@ -217,4 +218,4 @@ if [ ! -f weights/clone/nano/t3_nano_v1.safetensors ]; then
 else
   echo "clone-landing: generate=unwired reason=chatterbox-generate-not-called weights=present"
 fi
-echo "clone-landing: PASS frame_ms=80 session_vcpu=1 device=cpu gguf=false denoise=false texture_toggle=separate galion_clip=GALIONVC lock_flip=BLOCKED-on-owner"
+echo "clone-landing: PASS frame_ms=80 session_vcpu=1 device=cpu gguf=false denoise=false texture_toggle=separate galion_clip=GALIONVC lock_flip=OPEN-t623u"

@@ -21,7 +21,12 @@ These files tell a speaking agent who it is. Session mechanics, the bus body, an
 | [JARVIS.md](JARVIS.md) | **Jarvis** | **TEST / INTERNAL.** Iron Man–inspired voice used only to exercise cloning capability. Not a shipping product persona. |
 
 Samantha and Jarvis are defined from publicly known character traits, in prose. This folder does not itself clear rights. Owner t273, written in `LEDGER.md`, clears local reference send for the two current wavs. The paths live in [`voice/`](voice/). The wavs stay gitignored. A public demo in either film voice stays closed (`VOICE-CLONING.md`, `RIGHTS-CLEARANCE.md`).
+Samantha and Jarvis are defined from publicly known character traits, in prose. The owner PRIVATE CLEARED line for a local WAV is in `LEDGER.md` (t273, t287). This folder still does not name counsel, and it does not point at a recording in git. A public demo stays closed. `reference_clips` in `LOCKS.toml` still needs an owner flip. The store is `../symphony/CLIP-STORE.md`.
 
 `SAMANTHA-V2.md` may pin the ids `samantha` and `jarvis` on the process bus while a call is alive. That pin selects a register for a test. It does not turn either id into a product voice. A product session that has not been pinned to a test id speaks as Galion One.
 
 — Maciej Grajczyk
+
+---
+
+© G.A.L.I.O.N. — General Autonomous Local Intelligence Open Network. All rights reserved and claims reserved. · CC0 voices: you must tick the consent box agreeing to the CC0 licence before using any CC0 voice; use is at your own responsibility. · No cookies. · De-Googled: no Google services. · All current Galion builds are open source under the Galion perpetual open MIT licence.

@@ -20,6 +20,12 @@ One-shot: `galion_cascade::phone_turn(&pcm)` / `phone_turn_wav(&bytes)`.
 |---|---|
 | `GALION_ASR` | unset/`stub` (fixtures only; real speech → `AsrUnratified`) · `vosk` (worker; missing model → `AsrUnavailable`) · `off` · `interim` is ignored (treated as stub) |
 | `GALION_LLM` | unset/`canned` (CannedLlm, phone default) · `echo` |
+| `GALION_ASR` | unset/`stub` (fixtures only; real speech → `AsrUnratified`) · `interim` (placeholder) · `off` |
+| `GALION_LLM` | unset/`canned` (CannedLlm, explicit test opt-in) · `echo` · `hermes` (loopback OpenAI chat). Any other value is an error, not a canned fallback. |
+| `GALION_LLM_URL` | `http://127.0.0.1:8642/v1/chat/completions` (default when mode is `hermes`). Numeric loopback `http://` only. No TLS. |
+| `GALION_LLM_MODEL` | model name sent to the gateway. Default `hermes-agent`. Shown on `/v2/say` and `/v2/state` as `llm`. |
+| `GALION_LLM_KEY` | optional bearer token. Not logged. |
+| `GALION_LLM_TIMEOUT_MS` | default `3000`. Timeout or a refused connect speaks `model can't be reached`. No canned fallback. |
 | `GALION_SPEECH` | `auto` (A21 Piper, else flite) · `a21` · `flite` · `off` → `NoSpeech` |
 
 A21 keeps one Piper process for the lane (`--json-input --output_raw`).
@@ -33,3 +39,7 @@ Errors: `PhoneError::{Empty, BadWav, AsrUnratified, AsrUnavailable, NoSpeech, Su
 Smoke: `GALION_ASR=vosk cargo run -p galion-cascade --features cascade --example phone_turn [in.wav [out.wav]]` after `scripts/asr/fetch-vosk.sh`.
 
 Virtual user (offline, `127.0.0.1` only): `scripts/eval/virtual-user.sh`. Report under `galion-gates/results/presence-eval/`. See `docs/eval/PRESENCE-EVAL.md`. `text-inject` is the harness supplying words. It is not recognition. Interim stays `interim-placeholder`.
+
+---
+
+© G.A.L.I.O.N. — General Autonomous Local Intelligence Open Network. All rights reserved and claims reserved. · CC0 voices: you must tick the consent box agreeing to the CC0 licence before using any CC0 voice; use is at your own responsibility. · No cookies. · De-Googled: no Google services. · All current Galion builds are open source under the Galion perpetual open MIT licence.

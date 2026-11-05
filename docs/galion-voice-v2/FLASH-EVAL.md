@@ -6,26 +6,54 @@ Europe/Zagreb. A plan and a harness stub. Not a measurement.
 The spelling is **Galion**. The product is Galion Voice.
 
 There is no Chatterbox model named Flash. Upstream `generate()` returns
-when the utterance is finished. PR 528 (open when `VOICE-CLONING.md` was
-written) proposes `ChatterboxTurboTTS.stream()` so CPU playback can start
-before the utterance ends. The owner's "Flash streaming eval" is that
-question: how long until the first PCM sample, on CPU, with no cloud.
+when the utterance is finished. PR 528 (still open on 2026-11-03) proposes
+`ChatterboxTurboTTS.stream()`. Master does not have that method. The
+worker streams without it. See `STREAM-TTFA.md`. The owner's "Flash
+streaming eval" is still this question: how long until the first PCM
+sample, on CPU, with no cloud.
 
 ## What the clock is
 
 One number, when a run happens:
 
 - start: the worker has accepted one JSON line (`text`, model, persona)
-- stop: the first PCM sample is in the parent's buffer
+- stop: the first PCM sample is in the parent's buffer (the first chunk, not the `galion-clone-utt:` line)
 - machine: this CPU, not a phone, not a VPS, not PSTN
-- label: `engine` from the child (`protocol-stub`, `unwired`, or a future `model`)
+- label: `engine` from the child (`protocol-stub`, `unwired`, `chatterbox-nano`, or a future `model`)
+- label: `engine` from the child (`protocol-stub`, `unwired`, or `model`)
+- `path`: `stream` when chunks were framed, `whole` when they were not
 
-`product_claim` is true only for `engine=model`. This tree never sets that
-engine, because generate is not wired. A protocol-stub clock is a test of
-the pipe. It is not a Flash result. Do not copy a number into `LEDGER.md`
-or a demo until a model run is actually recorded there.
+`product_claim` is true only for real Nano PCM on `path=stream`, or for
+real Piper PCM from `GALION_SPEECH=a21` (`STREAM-TTFA.md`). A
+protocol-stub clock is FAIL. It is not a Flash result. Do not copy a stub
+number into `LEDGER.md`.
+`product_claim` is true only for `engine=model`. The child writes that
+engine only after a real `generate` (`GALION_CLONE_GENERATE=1`). CI does
+not arm the flag and does not download weights, so CI still has no
+`ttfa_ms`. A protocol-stub clock is a test of the pipe. It is not a Flash
+result. Do not copy a number into `LEDGER.md` or a demo until a model run
+is actually recorded there.
 
 The default Flash harness does not require a reference. Consented local wavs are the clone-landing path in `symphony/CLONE-LANDING.md` (owner t273). A protocol-stub clock is still not a Flash result, and a public demo stays closed.
+`product_claim` is true only for `engine=model`. A Nano generate reports
+`chatterbox-nano`, which is not that label, so a clock from it is still
+not a product claim. The default harness does not set
+`GALION_CLONE_LOCAL_REFS` and does not send a reference, so CI stays on
+`measured: false`. A protocol-stub clock is a test of the pipe. Do not
+copy a number into `LEDGER.md` until a model run is actually recorded
+there. `generate()` still returns the whole utterance.
+A reference path is sent only when `symphony/CLIP-STORE.md` opens the
+gate. CI does not set `GALION_CLIP_STORE`, so this harness sends none
+unless that store is present. `reference_clips` in `LOCKS.toml` is still
+false until the owner flips it.
+- label: `engine` from the child (`protocol-stub`, `unwired`, `chatterbox-nano`, `chatterbox-turbo`)
+
+`product_claim` is true only for `engine=model`. A `chatterbox-*` clock is
+a local generate time. It is not a published Flash result until someone
+writes it in `LEDGER.md`. A protocol-stub clock is a test of the pipe.
+
+The JSON line still has no reference field. A local clip is opened only
+under `NANO-BACKEND.md`. Film audio stays on the rights hold.
 
 ## Harness
 
@@ -57,7 +85,14 @@ refuses unless `GALION_CLONE_FETCH=1`.
 ## What a real run would add, later
 
 1. Pinned safetensors on disk, fetched with `GALION_CLONE_FETCH=1` from release `clone-weights-v1` (`CLONE-WEIGHTS.md`).
-2. The child actually calls generate, still out of process, still with no reference clip until rights are cleared.
+2. The child calls generate, still out of process. Nano does that when `GALION_CLONE_LOCAL_REFS=1` and the sha allowlist matches. The default harness still sends no clip.
+3. A product claim wants the stderr engine line `model`. The worker reports `chatterbox-nano` and writes PCM. Protocol-stub PCM stays `product_claim: false`.
+1. Pinned safetensors on disk, fetched with `GALION_CLONE_FETCH=1` from release `clone-weights-v1` (`CLONE-WEIGHTS.md`), plus a flat `GALION_CLONE_CKPT`. `GALION_CLONE_STREAM=1`.
+2. The child streams. It does not call `generate()`. Still out of process. Still no reference clip until the operator allowlist is armed. `LOCKS.toml` stays as it is.
+3. The stderr engine line says `nano` and the path line says `stream`. `ttfa_ms` is the first chunk. `utt_ms` is the closing marker. The live CPU pass today is Piper, `GALION_SPEECH=a21`.
+1. Pinned safetensors on disk, fetched by a human with `GALION_CLONE_FETCH=1`.
+2. The child actually calls generate, still out of process. A reference WAV is the clip-store path in `symphony/CLIP-STORE.md`, not a file in git.
+2. The child calls generate, out of process, on CPU. A reference is sent only as `op: condition`, and only after the clone-time consent gate (`crates/galion-consent`) accepts it.
 3. The stderr engine line says `model`.
 4. Three CPU runs, cold and warm, phrase fixed, written into `LEDGER.md` with the host and the model id.
 5. Still no film audio. Still no celebrity demo.
@@ -79,3 +114,7 @@ call it. The Admin UI check is `ADMIN-UI-CHECK.md`. Maciej Grajczyk
 has to sign that page. This file does not.
 
 — Maciej Grajczyk
+
+---
+
+© G.A.L.I.O.N. — General Autonomous Local Intelligence Open Network. All rights reserved and claims reserved. · CC0 voices: you must tick the consent box agreeing to the CC0 licence before using any CC0 voice; use is at your own responsibility. · No cookies. · De-Googled: no Google services. · All current Galion builds are open source under the Galion perpetual open MIT licence.

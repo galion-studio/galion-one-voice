@@ -13,6 +13,14 @@ fn a21_piper_speaks_deterministic_words_on_cpu() {
         return;
     };
     assert_eq!(st.id(), "present-verified", "{}", st.summary());
+    // lat240 (owner approval t613s2992): galion-piper-rt is the default runtime when
+    // installed (scripts/a21/build-piper-rt.sh); GALION_PIPER_LEGACY=1 keeps the old CLI.
+    let dec = weights::decoder_for("onnx").unwrap();
+    if std::env::var(weights::RUNTIME_ENV).is_err() && weights::piper_rt_runtime().is_some() {
+        let want = if weights::legacy_forced() { "piper 2023.11.14-2" } else { "galion-piper-rt" };
+        assert!(dec.contains(want), "{dec}");
+    }
+    eprintln!("A21 runtime: {dec}");
     // This test is about the A21 slot. Pin it: with clone weights fetched on the
     // host, `auto` would (correctly) pick the Chatterbox clone worker instead.
     // Single test in this binary, so setting the env here does not race.

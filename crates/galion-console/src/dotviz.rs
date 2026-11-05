@@ -25,6 +25,7 @@
 use std::collections::VecDeque;
 
 use galion_emotion::{EmotionFrame, StubExpressor};
+use galion_heartbeat::symphony::DotMark;
 use galion_heartbeat::{FrameOut, FRAME_MS};
 use galion_render::{dot, Emotion, Fanout, RenderSurface, VizFrame};
 
@@ -126,6 +127,20 @@ pub fn viz_from_heartbeat(out: &FrameOut, you_pcm: &[f32], me_pcm: &[f32], me_vo
     // does not change `e`. Off the audio step: this runs after `Heartbeat::step`.
     f.empathy = if snap.sense { empathy_of(snap.affect) } else { 0.0 };
     f
+}
+
+fn apply_sector_dot(viz: &mut VizFrame, mark: DotMark) {
+    match mark {
+        DotMark::Speaking => viz.speak.active = true,
+        DotMark::Listening => {
+            viz.speak.active = false;
+            viz.listen.active = true;
+        }
+        DotMark::Idle => {
+            viz.speak.active = false;
+            viz.listen.active = false;
+        }
+    }
 }
 
 fn empathy_of(reading: Option<AffectReading>) -> f32 {
@@ -235,7 +250,26 @@ impl DotConsole {
     /// Feed one heartbeat frame: builds the `VizFrame`, presents it on every surface,
     /// updates glyph history and stats. `step_us` = measured `Heartbeat::step` time.
     pub fn frame(&mut self, out: &FrameOut, you_pcm: &[f32], me_pcm: &[f32], me_voiced: bool, snap: &LiveSnapshot, step_us: f32) -> &VizFrame {
-        let viz = viz_from_heartbeat(out, you_pcm, me_pcm, me_voiced, snap);
+        self.frame_marked(out, you_pcm, me_pcm, me_voiced, snap, step_us, None)
+    }
+
+    /// Same as [`Self::frame`], then the symphony one-dot mark wins.
+    /// A pause holds the mark the wire already chose. This still runs after
+    /// `Heartbeat::step`, never inside it.
+    pub fn frame_marked(
+        &mut self,
+        out: &FrameOut,
+        you_pcm: &[f32],
+        me_pcm: &[f32],
+        me_voiced: bool,
+        snap: &LiveSnapshot,
+        step_us: f32,
+        mark: Option<DotMark>,
+    ) -> &VizFrame {
+        let mut viz = viz_from_heartbeat(out, you_pcm, me_pcm, me_voiced, snap);
+        if let Some(mark) = mark {
+            apply_sector_dot(&mut viz, mark);
+        }
         self.fanout.present(&viz);
         if self.glyphs.len() == GLYPH_HISTORY {
             self.glyphs.pop_front();
@@ -435,6 +469,13 @@ mod tests {
         assert!(V2_SCREEN_HTML.contains("location.replace"));
         assert!(!V2_SCREEN_HTML.contains("createRadialGradient"), "the second circle page is gone");
         assert!(SCREEN_HTML.contains("data-persona=\"samantha\""));
+        // CC0 licence checkbox (owner t628u): unticked by default, names the licence, links it, posts per session.
+        assert!(SCREEN_HTML.contains("id=\"cc0-accept\""));
+        assert!(!SCREEN_HTML.contains("id=\"cc0-accept\" name=\"cc0\" checked"));
+        assert!(SCREEN_HTML.contains("CC0 1.0 Universal (Public Domain Dedication)"));
+        assert!(SCREEN_HTML.contains("https://creativecommons.org/publicdomain/zero/1.0/"));
+        assert!(SCREEN_HTML.contains("fetch(\"v2/cc0\""));
+        assert!(SCREEN_HTML.contains("data-cc0-accepted=\"false\""));
         assert!(SCREEN_HTML.contains("data-mouth=\"piper\""));
         assert!(SCREEN_HTML.contains("data-film-voice=\"false\""));
         assert!(SCREEN_HTML.contains("data-rights=\"hold\""));
@@ -522,5 +563,15 @@ mod tests {
         snap.sense = false;
         snap.affect = Some(AffectReading { valence: -0.8, arousal: 0.4, confidence: 1.0 });
         assert_eq!(viz_from_heartbeat(&out, &quiet, &quiet, false, &snap).empathy, 0.0, "no sense, no empathy");
+    }
+
+    #[test]
+    fn sectors_match_heartbeat_frame() {
+        assert_eq!(galion_render::dot::FRAME_MS, u64::from(galion_heartbeat::FRAME_MS));
+        assert_eq!(galion_heartbeat::FRAME_MS, 80);
+        assert_eq!(galion_render::v2_persona::HOLD_FRAMES, galion_heartbeat::symphony::PERSONA_HOLD_FRAMES);
+        assert_eq!(galion_render::v2_persona::HOLD_E, galion_heartbeat::symphony::PERSONA_HOLD_E);
+        assert_eq!(galion_render::v2_persona::RELEASE_E, galion_heartbeat::symphony::PERSONA_RELEASE_E);
+        assert_eq!(galion_heartbeat::symphony::BANDS, ["you", "me", "feeling"]);
     }
 }
