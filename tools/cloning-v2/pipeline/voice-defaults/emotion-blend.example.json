@@ -1,0 +1,6 @@
+{
+  "emotion_blend": {
+    "enabled": true
+  },
+  "_note": "Copy to a NEW own-<persona>-v2-blend-<tag>.json only after validation. No deployed configs changed."
+}

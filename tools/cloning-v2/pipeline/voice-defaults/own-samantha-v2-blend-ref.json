@@ -1,0 +1,11 @@
+{
+  "voice": "own-samantha-v2-blend-ref",
+  "persona": "samantha",
+  "dtype": "fp32",
+  "temperature": 0,
+  "seed": 0,
+  "timbre_match": 0.5,
+  "timbre_ref": "$GALION_CLIP_STORE/samantha/reference.wav",
+  "prosody": false,
+  "notes": "emotion-blend candidate (a): conditioning from hap+ang blend windows first; T0 + timbre 0.5"
+}
