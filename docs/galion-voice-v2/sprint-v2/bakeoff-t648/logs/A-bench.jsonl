@@ -1,0 +1,15 @@
+{"label": "A samantha-orig rep1 T4", "rc": 0, "wall_s": 25.216, "cpu_s": 64.853, "maxrss_mb": 1252.7}
+{"label": "A samantha-orig rep2 T4", "rc": 0, "wall_s": 25.078, "cpu_s": 65.635, "maxrss_mb": 1236.7}
+{"label": "A samantha-orig rep3 T4", "rc": 0, "wall_s": 25.258, "cpu_s": 66.249, "maxrss_mb": 1338.6}
+{"label": "A samantha-orig rep4 T4", "rc": 0, "wall_s": 26.113, "cpu_s": 67.857, "maxrss_mb": 1317.5}
+{"label": "A samantha-orig rep5 T4", "rc": 0, "wall_s": 26.856, "cpu_s": 68.998, "maxrss_mb": 1337.5}
+{"label": "A samantha-ALT-src-17.84-29.25 rep1 T4", "rc": 0, "wall_s": 26.126, "cpu_s": 67.031, "maxrss_mb": 1357.1}
+{"label": "A samantha-ALT-src-17.84-29.25 rep2 T4", "rc": 0, "wall_s": 26.365, "cpu_s": 68.278, "maxrss_mb": 1310.3}
+{"label": "A samantha-ALT-src-17.84-29.25 rep3 T4", "rc": 0, "wall_s": 26.517, "cpu_s": 68.676, "maxrss_mb": 1297.4}
+{"label": "A samantha-ALT-src-17.84-29.25 rep4 T4", "rc": 0, "wall_s": 27.705, "cpu_s": 72.066, "maxrss_mb": 1260.1}
+{"label": "A samantha-ALT-src-17.84-29.25 rep5 T4", "rc": 0, "wall_s": 26.312, "cpu_s": 68.376, "maxrss_mb": 1266.6}
+{"label": "A jarvis-orig rep1 T4", "rc": 0, "wall_s": 25.733, "cpu_s": 66.638, "maxrss_mb": 1247.1}
+{"label": "A jarvis-orig rep2 T4", "rc": 0, "wall_s": 26.199, "cpu_s": 67.58, "maxrss_mb": 1255.4}
+{"label": "A jarvis-orig rep3 T4", "rc": 0, "wall_s": 27.982, "cpu_s": 72.632, "maxrss_mb": 1336.8}
+{"label": "A jarvis-orig rep4 T4", "rc": 0, "wall_s": 26.204, "cpu_s": 68.691, "maxrss_mb": 1344.6}
+{"label": "A jarvis-orig rep5 T4", "rc": 0, "wall_s": 28.849, "cpu_s": 77.013, "maxrss_mb": 1255.5}

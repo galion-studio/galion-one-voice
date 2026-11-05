@@ -1,0 +1,33 @@
+== english_18m_2026-10 T2 s1
+INFO: Loading model from config at english_18m_2026-10.yaml...
+INFO: Loading TTSModel weights from hf://kyutai/pocket-tts/languages/english_18m_2026-10/model.safetensors@db04f0e653473e5c7333c69686ac92b7460b0c1d
+INFO: Loading sentencepiece tokenizer from hf://kyutai/pocket-tts-without-voice-cloning/languages/english_18m_2026-10/tokenizer.model@08ffc58775e62aad9409511b9591c9af626270f3
+INFO: Prompting text took 23 ms
+INFO: Average generation step time: 1 ms
+INFO: Generated: 7280 ms of audio in 634 ms so 11.48x faster than real-time
+INFO: Results written in /workspace/swarm/voice-v2-sprint/bakeoff-t648/out/B/rtf-english_18m_2026-10-T2/s1.wav
+INFO: --------------------
+INFO: If you want to try multiple voices and prompts quickly, try the `serve` command.
+INFO: If you like Kyutai projects, comment, like, subscribe at https://x.com/kyutai_labs
+== english_18m_2026-10 T2 s2
+INFO: Loading model from config at english_18m_2026-10.yaml...
+INFO: Loading TTSModel weights from hf://kyutai/pocket-tts/languages/english_18m_2026-10/model.safetensors@db04f0e653473e5c7333c69686ac92b7460b0c1d
+INFO: Loading sentencepiece tokenizer from hf://kyutai/pocket-tts-without-voice-cloning/languages/english_18m_2026-10/tokenizer.model@08ffc58775e62aad9409511b9591c9af626270f3
+INFO: Prompting text took 18 ms
+INFO: Average generation step time: 1 ms
+INFO: Generated: 6480 ms of audio in 415 ms so 15.61x faster than real-time
+INFO: Results written in /workspace/swarm/voice-v2-sprint/bakeoff-t648/out/B/rtf-english_18m_2026-10-T2/s2.wav
+INFO: --------------------
+INFO: If you want to try multiple voices and prompts quickly, try the `serve` command.
+INFO: If you like Kyutai projects, comment, like, subscribe at https://x.com/kyutai_labs
+== english_18m_2026-10 T2 s3
+INFO: Loading model from config at english_18m_2026-10.yaml...
+INFO: Loading TTSModel weights from hf://kyutai/pocket-tts/languages/english_18m_2026-10/model.safetensors@db04f0e653473e5c7333c69686ac92b7460b0c1d
+INFO: Loading sentencepiece tokenizer from hf://kyutai/pocket-tts-without-voice-cloning/languages/english_18m_2026-10/tokenizer.model@08ffc58775e62aad9409511b9591c9af626270f3
+INFO: Prompting text took 32 ms
+INFO: Average generation step time: 1 ms
+INFO: Generated: 8080 ms of audio in 663 ms so 12.19x faster than real-time
+INFO: Results written in /workspace/swarm/voice-v2-sprint/bakeoff-t648/out/B/rtf-english_18m_2026-10-T2/s3.wav
+INFO: --------------------
+INFO: If you want to try multiple voices and prompts quickly, try the `serve` command.
+INFO: If you like Kyutai projects, comment, like, subscribe at https://x.com/kyutai_labs

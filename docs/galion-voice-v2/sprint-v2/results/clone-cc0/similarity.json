@@ -1,0 +1,15 @@
+{
+ "ref_vs_ref": 0.1321,
+ "clone_vs_own_ref": {
+  "samantha": 0.7288,
+  "jarvis": 0.7881
+ },
+ "clone_vs_other_ref": {
+  "samantha~jarvis_ref": 0.1172,
+  "jarvis~samantha_ref": 0.1035
+ },
+ "piper_vs_ref": {
+  "samantha": -0.0259,
+  "jarvis": 0.0306
+ }
+}

@@ -1,0 +1,24 @@
+[2026-11-04 22:00:03.005] [piper] [info] Loaded voice in 0.329277508 second(s)
+[2026-11-04 22:00:03.005] [piper] [info] Initialized piper
+[2026-11-04 22:00:03.426] [piper] [info] Real-time factor: 0.06621724286965232 (infer=0.416679133 sec, audio=6.292607709750567 sec)
+[2026-11-04 22:00:03.426] [piper] [info] Terminated piper
+[2026-11-04 22:00:03.862] [piper] [info] Loaded voice in 0.333549576 second(s)
+[2026-11-04 22:00:03.862] [piper] [info] Initialized piper
+[2026-11-04 22:00:04.218] [piper] [info] Real-time factor: 0.05247285721936677 (infer=0.347248949 sec, audio=6.617687074829932 sec)
+[2026-11-04 22:00:04.218] [piper] [info] Terminated piper
+[2026-11-04 22:00:04.652] [piper] [info] Loaded voice in 0.321983791 second(s)
+[2026-11-04 22:00:04.652] [piper] [info] Initialized piper
+[2026-11-04 22:00:04.857] [piper] [info] Real-time factor: 0.03082228907126627 (infer=0.199320265 sec, audio=6.466757369614513 sec)
+[2026-11-04 22:00:04.857] [piper] [info] Terminated piper
+[2026-11-04 22:00:25.674] [piper] [info] Loaded voice in 0.319904008 second(s)
+[2026-11-04 22:00:25.674] [piper] [info] Initialized piper
+[2026-11-04 22:00:25.895] [piper] [info] Real-time factor: 0.025659899845977486 (infer=0.214197905 sec, audio=8.347573696145124 sec)
+[2026-11-04 22:00:25.895] [piper] [info] Terminated piper
+[2026-11-04 22:00:26.297] [piper] [info] Loaded voice in 0.309105645 second(s)
+[2026-11-04 22:00:26.297] [piper] [info] Initialized piper
+[2026-11-04 22:00:26.560] [piper] [info] Real-time factor: 0.026809691919359113 (infer=0.25710069 sec, audio=9.58984126984127 sec)
+[2026-11-04 22:00:26.560] [piper] [info] Terminated piper
+[2026-11-04 22:00:26.948] [piper] [info] Loaded voice in 0.291861565 second(s)
+[2026-11-04 22:00:26.948] [piper] [info] Initialized piper
+[2026-11-04 22:00:27.178] [piper] [info] Real-time factor: 0.025347735187561594 (infer=0.223952126 sec, audio=8.835192743764173 sec)
+[2026-11-04 22:00:27.179] [piper] [info] Terminated piper

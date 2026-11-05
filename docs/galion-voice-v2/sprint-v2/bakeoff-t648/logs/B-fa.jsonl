@@ -1,0 +1,15 @@
+{"label": "B english alba T1", "sent": "s1.txt", "first_audio_ms": 233.6, "total_s": 3.611, "audio_s": 7.64, "rtf": 0.473}
+{"label": "B english alba T1", "sent": "s2.txt", "first_audio_ms": 212.1, "total_s": 3.158, "audio_s": 6.92, "rtf": 0.456}
+{"label": "B english alba T1", "sent": "s3.txt", "first_audio_ms": 212.5, "total_s": 3.769, "audio_s": 8.36, "rtf": 0.451}
+{"label": "B english alba T2", "sent": "s1.txt", "first_audio_ms": 178.6, "total_s": 1.77, "audio_s": 7.64, "rtf": 0.232}
+{"label": "B english alba T2", "sent": "s2.txt", "first_audio_ms": 173.5, "total_s": 2.273, "audio_s": 6.92, "rtf": 0.328}
+{"label": "B english alba T2", "sent": "s3.txt", "first_audio_ms": 147.1, "total_s": 2.004, "audio_s": 8.36, "rtf": 0.24}
+{"label": "B english alba T4", "sent": "s1.txt", "first_audio_ms": 108.5, "total_s": 1.174, "audio_s": 7.64, "rtf": 0.154}
+{"label": "B english alba T4", "sent": "s2.txt", "first_audio_ms": 111.1, "total_s": 1.165, "audio_s": 6.92, "rtf": 0.168}
+{"label": "B english alba T4", "sent": "s3.txt", "first_audio_ms": 88.9, "total_s": 1.244, "audio_s": 8.36, "rtf": 0.149}
+{"label": "B english_18m_2026-10 alba T1", "sent": "s1.txt", "first_audio_ms": 68.2, "total_s": 0.407, "audio_s": 6.44, "rtf": 0.063}
+{"label": "B english_18m_2026-10 alba T1", "sent": "s2.txt", "first_audio_ms": 48.7, "total_s": 0.509, "audio_s": 6.76, "rtf": 0.075}
+{"label": "B english_18m_2026-10 alba T1", "sent": "s3.txt", "first_audio_ms": 47.1, "total_s": 0.48, "audio_s": 7.8, "rtf": 0.062}
+{"label": "B english_18m_2026-10 alba T4", "sent": "s1.txt", "first_audio_ms": 53.5, "total_s": 0.306, "audio_s": 6.44, "rtf": 0.047}
+{"label": "B english_18m_2026-10 alba T4", "sent": "s2.txt", "first_audio_ms": 31.3, "total_s": 0.263, "audio_s": 6.76, "rtf": 0.039}
+{"label": "B english_18m_2026-10 alba T4", "sent": "s3.txt", "first_audio_ms": 30.3, "total_s": 0.305, "audio_s": 7.8, "rtf": 0.039}

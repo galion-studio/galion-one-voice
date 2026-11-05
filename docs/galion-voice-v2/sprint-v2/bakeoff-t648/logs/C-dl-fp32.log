@@ -1,0 +1,16 @@
+Runtime:
+  available_cores: 8
+  intra_threads:   8
+  parallel_exec:   false
+  ep_requested:    cpu
+  ep_effective:    cpu
+  dtype:           fp32
+
+Model: ResembleAI/chatterbox-turbo-ONNX@main dtype=fp32
+Downloaded assets:
+  tokenizer: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/tokenizer.json
+  conditional_decoder: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/conditional_decoder.onnx
+  speech_encoder: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/speech_encoder.onnx
+  embed_tokens: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/embed_tokens.onnx
+  language_model: /home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/language_model.onnx
+EXIT 0

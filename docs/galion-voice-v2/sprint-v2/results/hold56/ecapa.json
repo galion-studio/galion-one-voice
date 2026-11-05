@@ -1,0 +1,16 @@
+{
+ "L_samantha": {
+  "vs_amy": 0.4762,
+  "vs_alan": 0.0318,
+  "vs_pdx": 0.023,
+  "vs_armstrong": -0.0208,
+  "voiced_s": 1.1
+ },
+ "R_jarvis": {
+  "vs_amy": 0.0842,
+  "vs_alan": 0.5868,
+  "vs_pdx": 0.2738,
+  "vs_armstrong": -0.0356,
+  "voiced_s": 1.0
+ }
+}

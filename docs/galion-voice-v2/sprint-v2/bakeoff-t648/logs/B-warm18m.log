@@ -1,0 +1,10 @@
+INFO: Loading model from config at english_18m_2026-10.yaml...
+INFO: Loading TTSModel weights from hf://kyutai/pocket-tts/languages/english_18m_2026-10/model.safetensors@db04f0e653473e5c7333c69686ac92b7460b0c1d
+INFO: Loading sentencepiece tokenizer from hf://kyutai/pocket-tts-without-voice-cloning/languages/english_18m_2026-10/tokenizer.model@08ffc58775e62aad9409511b9591c9af626270f3
+INFO: Prompting text took 10 ms
+INFO: Average generation step time: 1 ms
+INFO: Generated: 1920 ms of audio in 112 ms so 17.14x faster than real-time
+INFO: Results written in warm18m.wav
+INFO: --------------------
+INFO: If you want to try multiple voices and prompts quickly, try the `serve` command.
+INFO: If you like Kyutai projects, comment, like, subscribe at https://x.com/kyutai_labs
