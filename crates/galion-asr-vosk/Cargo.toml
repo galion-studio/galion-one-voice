@@ -17,3 +17,7 @@ path = "src/main.rs"
 [[bin]]
 name = "galion-asr-protocol-double"
 path = "src/bin/protocol_double.rs"
+
+[dependencies]
+# Std-only core map: the Vosk child is pinned to the ASR placement.
+galion-cores = { path = "../galion-cores" }

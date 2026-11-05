@@ -29,6 +29,8 @@ pub const DEFAULT_URL: &str = "http://127.0.0.1:8642/v1/chat/completions";
 pub const DEFAULT_TIMEOUT_MS: u64 = 3_000;
 
 /// Empathy scripts the model must not speak. Same list the `/v2` floor uses.
+/// This is the one list: `scripts/eval/v2_hard_loop.py` parses it from this
+/// file, and `forbidden_list_is_mirrored_by_the_hard_harness` keeps them in sync.
 pub const FORBIDDEN: &[&str] = &[
     "i hear you",
     "that sounds so hard",
@@ -42,6 +44,8 @@ pub const FORBIDDEN: &[&str] = &[
     "noted, that is hard",
     "i'm sorry for your loss",
     "let's slow down",
+    "i'm sorry",
+    "i am sorry",
 ];
 
 pub fn contains_forbidden(reply: &str) -> bool {
@@ -102,16 +106,43 @@ pub fn parse_loopback_chat_url(url: &str) -> Option<HermesTarget> {
 }
 
 /// Short register prompt. The words stay on the matter. Empathy is prosody, not a script.
+/// No product framing: the persona is a voice on a call, not a support desk.
+/// The ban list in the prompt is [`FORBIDDEN`] itself, so the prompt and the
+/// guard cannot drift.
 pub fn system_prompt(persona: &str) -> &'static str {
+    use std::sync::OnceLock;
+    static SAMANTHA: OnceLock<String> = OnceLock::new();
+    static JARVIS: OnceLock<String> = OnceLock::new();
     if persona == "jarvis" {
-        "You are Jarvis, an internal Galion test voice. Galion is the product. You are not a film voice and you have no clip. \
-Stay on the concrete matter. One or two short spoken sentences, calm and exact. \
-Do not use a canned empathy script. Do not claim you feel their pain. No film quote. English only."
+        JARVIS.get_or_init(|| {
+            prompt_with_bans(
+                "You are Jarvis, a calm and exact voice on a call. You are not a film voice and you have no clip. \
+Say the fact they named back in your own words, then stay on it. One or two short spoken sentences.",
+            )
+        })
     } else {
-        "You are Samantha, an internal Galion test voice. Galion is the product. You are not a film voice and you have no clip. \
-Stay on the concrete matter they named. One or two spoken sentences. \
-Do not use a canned empathy script. Do not claim you feel their pain. No film quote. English only."
+        SAMANTHA.get_or_init(|| {
+            prompt_with_bans(
+                "You are Samantha, a warm voice on a call. You are not a film voice and you have no clip. \
+Say the fact they named back in your own words, then stay on it. One or two short spoken sentences.",
+            )
+        })
     }
+}
+
+fn prompt_with_bans(head: &str) -> String {
+    let mut s = String::from(head);
+    s.push_str(" Do not use a canned empathy script. Never say any of these: ");
+    for (i, p) in FORBIDDEN.iter().enumerate() {
+        if i > 0 {
+            s.push_str(", ");
+        }
+        s.push('"');
+        s.push_str(p);
+        s.push('"');
+    }
+    s.push_str(". Do not claim you feel their pain. No film quote. English only.");
+    s
 }
 
 /// OpenAI-compatible chat client. `Send`. Connects only when [`HermesLlm::complete_as`] runs.
@@ -765,6 +796,48 @@ mod tests {
         });
         let llm = client(addr, 1000);
         assert_eq!(llm.complete("hello"), "Chunked answer.");
+    }
+
+    #[test]
+    fn prompt_has_no_product_framing_and_carries_the_ban_list() {
+        for persona in ["samantha", "jarvis"] {
+            let p = system_prompt(persona);
+            assert!(!p.contains("Galion"), "{p}");
+            assert!(!p.to_ascii_lowercase().contains("product"), "{p}");
+            assert!(p.contains("fact they named"), "{p}");
+            for phrase in FORBIDDEN {
+                assert!(p.contains(phrase), "{phrase} missing from the prompt");
+            }
+        }
+        assert!(system_prompt("jarvis").starts_with("You are Jarvis"));
+        assert!(system_prompt("samantha").starts_with("You are Samantha"));
+    }
+
+    #[test]
+    fn sorry_script_is_refused() {
+        assert!(contains_forbidden("I'm sorry to hear that."));
+        assert!(contains_forbidden("I am sorry about your mother."));
+        assert!(!contains_forbidden("Your mother died this morning."));
+    }
+
+    /// The hard-test harness parses `FORBIDDEN` from this file and keeps a
+    /// mirror for its self-check. Every phrase here must be in that mirror.
+    #[test]
+    fn forbidden_list_is_mirrored_by_the_hard_harness() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../scripts/eval/v2_hard_loop.py");
+        let py = std::fs::read_to_string(&path).expect("hard harness present");
+        let start = py.find("FORBIDDEN_MIRROR = (").expect("mirror tuple");
+        let block = &py[start..];
+        let block = &block[..block.find(')').unwrap()];
+        let mirrored: Vec<&str> = block
+            .lines()
+            .filter_map(|l| {
+                let l = l.trim().trim_end_matches(',');
+                l.strip_prefix('"').and_then(|r| r.strip_suffix('"'))
+            })
+            .collect();
+        assert_eq!(mirrored, FORBIDDEN.to_vec(), "harness mirror drifted from hermes.rs");
     }
 
     #[test]

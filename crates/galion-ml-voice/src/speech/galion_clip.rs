@@ -303,7 +303,7 @@ mod tests {
         assert_eq!(clip.pcm, pcm);
         assert_eq!(
             clip.reference_sha256,
-            "c2200b59fa78b3c98d13ac5dc7db3a6c14e802310dca73033d7770bd4b532c60"
+            "60ad5457dac31af915a9679760705296f9aad17e15ee84885385509b58b8f6b6"
         );
         let layer = clip.texture.unwrap();
         assert_eq!(layer.id, "jarvis-hub");
@@ -328,7 +328,7 @@ mod tests {
         assert_eq!(clip.persona, "samantha");
         assert_eq!(
             clip.reference_sha256,
-            "bdcb0c2903bb91c7b0fda0cf79a42406fdaa662fd8d31f6eaed3895d9c7a8693"
+            "e4bc60c33f697108cf5585dead213da1065979010f5be1d513574893584a4641"
         );
         let mut broken = bytes.clone();
         // Samantha header stripped byte is index 24.
@@ -337,12 +337,12 @@ mod tests {
     }
 
     #[test]
-    fn lock_flip_stays_blocked_until_the_owner_edits_it() {
+    fn lock_flip_is_open_after_owner_t623u() {
         let locks = std::fs::read_to_string(
             std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../LOCKS.toml"),
         )
         .unwrap();
-        assert!(!reference_clips_allowed(&locks));
+        assert!(reference_clips_allowed(&locks), "t623u opened the lock for the CC0 donors");
         assert_eq!(lock_flip_status(false), "BLOCKED-on-owner");
         assert_eq!(lock_flip_status(true), "OPEN");
         let opened = "[formats.exceptions.v2s14_chatterbox]\nreference_clips = true\n";

@@ -745,7 +745,7 @@ mod tests {
     }
 
     fn approve(reg: &Registry, persona: &'static str, sha: &str) -> Approval {
-        let a = Approval { persona, seconds: 9.6, public: false, wav: PathBuf::from("/x/reference.wav"), sha256: sha.into() };
+        let a = Approval { persona, seconds: 9.6, public: false, cc0: false, wav: PathBuf::from("/x/reference.wav"), sha256: sha.into() };
         reg.record(persona, Verdict::Approved(a.clone()));
         a
     }
@@ -785,7 +785,7 @@ mod tests {
         let s = store("gate");
         let key = CondKey::nano("samantha", REF, PINS);
         let reg = Registry::new();
-        let forged = Approval { persona: "samantha", seconds: 9.6, public: false, wav: PathBuf::new(), sha256: REF.into() };
+        let forged = Approval { persona: "samantha", seconds: 9.6, public: false, cc0: false, wav: PathBuf::new(), sha256: REF.into() };
         // Gate never ran: refused, and nothing is created.
         assert!(plan_save(&s.0, &key, &forged, &reg).unwrap_err().contains("has not run"));
         assert!(!cond_dir(&s.0, "samantha").exists());

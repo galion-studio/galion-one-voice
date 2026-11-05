@@ -1,0 +1,14 @@
+# Galion Voice — Perpetual Open MIT License
+[package]
+name = "galion-cores"
+description = "V2 live-call core map: one placement per role (bus, Vosk, LLM, Piper, retrieval), sched_setaffinity for children, the calling thread, and exec'd launchers. Std only."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version = "1.85"
+publish = false
+
+[[bin]]
+name = "galion-pin"
+path = "src/bin/galion-pin.rs"

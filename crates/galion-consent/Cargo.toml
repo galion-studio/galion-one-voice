@@ -15,3 +15,7 @@ publish = false
 [[bin]]
 name = "galion-consent"
 path = "src/bin/galion-consent.rs"
+
+[[bin]]
+name = "galion-ref-recut"
+path = "src/bin/galion-ref-recut.rs"

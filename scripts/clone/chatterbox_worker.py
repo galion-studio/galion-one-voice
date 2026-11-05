@@ -102,22 +102,32 @@ RAM_GB = "0.65-1.15"
 FRAME = 1920
 
 
-def pin_cpu() -> str:
-    """Force the CPU landing. One thread. No GPU. No denoise."""
+SPLIT_PLANS = ("split4", "split3")
+
+
+def pin_cpu() -> tuple:
+    """Force the CPU landing. No GPU. No denoise. One thread under the
+    session plan; under a split plan (the Rust launcher pinned this process
+    with sched_setaffinity) as many threads as asked, never more than the
+    cores in this process's affinity mask."""
     asked = os.environ.get("GALION_CLONE_DEVICE", "cpu").strip().lower()
     if asked not in ("", "cpu"):
         refuse(f"clone landing is CPU-only (device {asked})")
     raw = os.environ.get("GALION_CLONE_THREADS", "").strip()
+    plan = os.environ.get("GALION_CLONE_CPU_PLAN", "session").strip().lower()
+    applied = 1
+    if plan in SPLIT_PLANS and raw.isdigit():
+        applied = max(1, min(int(raw), len(os.sched_getaffinity(0))))
     for key in THREAD_KEYS:
-        os.environ[key] = "1"
+        os.environ[key] = str(applied)
     os.environ["GALION_CLONE_DEVICE"] = "cpu"
     os.environ["CUDA_VISIBLE_DEVICES"] = ""
     os.environ["HIP_VISIBLE_DEVICES"] = ""
     os.environ["GALION_CLONE_DENOISE"] = "0"
     note = ""
-    if raw not in ("", "1"):
-        note = f" asked={raw} applied=1"
-    return note
+    if raw not in ("", str(applied)):
+        note = f" asked={raw} applied={applied}"
+    return note, applied
 
 
 def clone_model() -> str:
@@ -1064,12 +1074,13 @@ def run_stream(pcm_fd: int, allow: dict[str, tuple[str, str]]) -> None:
 
 
 def main() -> None:
-    asked_note = pin_cpu()
+    asked_note, threads = pin_cpu()
     model = clone_model()
     pcm_fd = arm_pcm_channel()
-    sys.stderr.write(f"galion-clone-cpu: threads=1 device=cpu denoise=false{asked_note}\n")
+    sys.stderr.write(f"galion-clone-cpu: threads={threads} device=cpu denoise=false{asked_note}\n")
     sys.stderr.write(
-        "galion-clone-budget: session_vcpu={vcpu} threads=1 burst_max={burst} ram_gb={ram} device=cpu model={model} gguf=false\n".format(
+        "galion-clone-budget: session_vcpu={vcpu} threads={threads} burst_max={burst} ram_gb={ram} device=cpu model={model} gguf=false\n".format(
+            threads=threads,
             vcpu=SESSION_VCPU,
             burst=BURST_VCPU,
             ram=RAM_GB,
