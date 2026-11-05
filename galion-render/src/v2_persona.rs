@@ -141,8 +141,8 @@ pub struct Floor {
     books: Books,
     /// Clone-time verdicts. Written by the clone slot, read here per turn.
     clones: &'static galion_consent::Registry,
-    /// Per-session CC0 licence acceptance. A CC0 voice stays closed
-    /// (`cc0_licence`) until the active session ticked the box.
+    /// CC0 licence registration (clone time). A CC0 voice stays closed
+    /// (`cc0_licence`) until the licence was registered once.
     cc0: &'static galion_consent::Cc0Acceptances,
     /// `GALION_CLIP_STORE` was unset when the floor was built.
     store_unset: bool,
@@ -208,7 +208,7 @@ impl Floor {
         if let Some(g) = fixed {
             return g.clone();
         }
-        gate_from(self.clones.lookup(self.id.as_str()), self.store_unset, self.cc0.active_accepted())
+        gate_from(self.clones.lookup(self.id.as_str()), self.store_unset, self.cc0.licensed())
     }
 
     /// Point content turns at a Hermes client. Unit tests use this so they do
@@ -1367,7 +1367,7 @@ mod tests {
     }
 
     #[test]
-    fn cc0_voice_is_closed_until_the_session_accepts() {
+    fn cc0_voice_is_closed_until_the_licence_is_registered() {
         let reg: &'static galion_consent::Registry = Box::leak(Box::new(galion_consent::Registry::new()));
         let cc0: &'static galion_consent::Cc0Acceptances = Box::leak(Box::new(galion_consent::Cc0Acceptances::new()));
         let f = Floor::new().with_clone_registry(reg).with_cc0_store(cc0);
@@ -1382,10 +1382,9 @@ mod tests {
                 sha256: "0".repeat(64),
             }),
         );
-        cc0.set_active(Some("tok"));
-        assert!(f.state_json().contains("\"clone_block\":\"cc0_licence\""), "unticked = refused");
+        assert!(f.state_json().contains("\"clone_block\":\"cc0_licence\""), "not registered = refused");
         assert!(f.state_json().contains("\"clone_live\":false"));
         cc0.accept("tok");
-        assert!(f.state_json().contains("\"clone_live\":true"), "ticked = allowed");
+        assert!(f.state_json().contains("\"clone_live\":true"), "registered = allowed");
     }
 }

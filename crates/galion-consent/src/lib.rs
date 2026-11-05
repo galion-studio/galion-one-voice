@@ -683,12 +683,15 @@ pub fn consent_is_cc0(fields: &[(String, String)]) -> bool {
     })
 }
 
-/// Per-session CC0 licence acceptance, in memory only. Keys are the sha256
-/// of the session token, so the token itself is never kept; nothing is
-/// written to disk. `active` is the session of the turn in flight.
+/// CC0 licence acceptance, in memory only, registered once at clone /
+/// registration time (owner rule: consent is checked once at clone time, in
+/// Rust, never per synthesis turn). Keys are the sha256 of the session token
+/// that ticked the box, so the token itself is never kept; nothing is
+/// written to disk. Turns do not touch this store; the clone slot and the
+/// persona floor read the cached `licensed` verdict.
 #[derive(Debug, Default)]
 pub struct Cc0Acceptances {
-    inner: Mutex<(Vec<String>, Option<String>)>,
+    inner: Mutex<Vec<String>>,
 }
 
 fn session_key(session: &str) -> Option<String> {
@@ -703,40 +706,34 @@ fn session_key(session: &str) -> Option<String> {
 
 impl Cc0Acceptances {
     pub const fn new() -> Self {
-        Self { inner: Mutex::new((Vec::new(), None)) }
+        Self { inner: Mutex::new(Vec::new()) }
     }
-    /// The user ticked the CC0 checkbox in this session.
+    /// The licence was accepted by this session (registration time).
     pub fn accept(&self, session: &str) -> bool {
         let Some(k) = session_key(session) else { return false };
         let mut g = self.inner.lock().unwrap_or_else(|e| e.into_inner());
-        if !g.0.contains(&k) {
-            g.0.push(k);
+        if !g.contains(&k) {
+            g.push(k);
         }
         true
     }
-    /// The user unticked it.
+    /// The acceptance was withdrawn.
     pub fn revoke(&self, session: &str) {
         let Some(k) = session_key(session) else { return };
         let mut g = self.inner.lock().unwrap_or_else(|e| e.into_inner());
-        g.0.retain(|x| *x != k);
+        g.retain(|x| *x != k);
     }
     pub fn accepted(&self, session: &str) -> bool {
         let Some(k) = session_key(session) else { return false };
-        self.inner.lock().unwrap_or_else(|e| e.into_inner()).0.contains(&k)
+        self.inner.lock().unwrap_or_else(|e| e.into_inner()).contains(&k)
     }
-    /// The web layer calls this with the session of each turn it accepts.
-    pub fn set_active(&self, session: Option<&str>) {
-        let k = session.and_then(session_key);
-        self.inner.lock().unwrap_or_else(|e| e.into_inner()).1 = k;
-    }
-    /// Did the session of the turn in flight accept CC0? False when no
-    /// session is active.
-    pub fn active_accepted(&self) -> bool {
-        let g = self.inner.lock().unwrap_or_else(|e| e.into_inner());
-        g.1.as_ref().is_some_and(|k| g.0.contains(k))
+    /// Clone-time verdict: has the CC0 licence been accepted and registered?
+    /// A CC0 voice can be selected only when this is true.
+    pub fn licensed(&self) -> bool {
+        !self.inner.lock().unwrap_or_else(|e| e.into_inner()).is_empty()
     }
     pub fn clear(&self) {
-        *self.inner.lock().unwrap_or_else(|e| e.into_inner()) = (Vec::new(), None);
+        self.inner.lock().unwrap_or_else(|e| e.into_inner()).clear();
     }
 }
 
@@ -746,8 +743,26 @@ pub fn cc0_acceptances() -> &'static Cc0Acceptances {
     GLOBAL.get_or_init(Cc0Acceptances::new)
 }
 
-/// Use-time gate: a CC0 voice is refused unless the caller accepted CC0.
-/// A non-CC0 approval passes unchanged.
+/// Registration / clone time: record the CC0 acceptance and run the clone
+/// gate once for the CC0 voices (in process, Rust). Nothing CC0-related runs
+/// per turn or per synthesis afterwards.
+pub fn cc0_register(session: &str, env: &Env) -> bool {
+    if !cc0_acceptances().accept(session) {
+        return false;
+    }
+    for voice in ["samantha", "jarvis"] {
+        let _ = clone_gate(voice, env);
+    }
+    true
+}
+
+/// Withdraw a CC0 acceptance; CC0 voices close once none remains.
+pub fn cc0_unregister(session: &str) {
+    cc0_acceptances().revoke(session);
+}
+
+/// Selection / clone-time gate: a CC0 voice is refused unless the CC0
+/// licence was accepted at registration. A non-CC0 approval passes unchanged.
 pub fn cc0_use_gate(approval: &Approval, accepted: bool) -> Result<(), CloneRefused> {
     if approval.cc0 && !accepted {
         return Err(CloneRefused { persona: approval.persona.to_string(), reason: "cc0_licence" });
@@ -897,28 +912,24 @@ mod tests {
     }
 
     #[test]
-    fn cc0_voice_refused_until_the_session_ticks_the_box() {
+    fn cc0_voice_refused_until_the_licence_is_registered() {
         let a = Approval { persona: "samantha", seconds: 9.6, public: false, cc0: true, wav: PathBuf::new(), sha256: String::new() };
         let store = Cc0Acceptances::new();
-        store.set_active(Some("tok-1"));
-        // Unticked: refused.
-        let e = cc0_use_gate(&a, store.active_accepted()).unwrap_err();
+        // Not registered: refused at selection.
+        let e = cc0_use_gate(&a, store.licensed()).unwrap_err();
         assert_eq!(e.reason, "cc0_licence");
         assert!(e.to_string().contains("CC0"));
-        // Ticked in another session: still refused for this one.
-        assert!(store.accept("tok-2"));
-        assert!(cc0_use_gate(&a, store.active_accepted()).is_err());
-        // Ticked in this session: allowed.
+        // Registered once (clone time): allowed, with no per-turn check.
         assert!(store.accept("tok-1"));
-        assert!(cc0_use_gate(&a, store.active_accepted()).is_ok());
-        // Unticked again: refused.
+        assert!(store.accepted("tok-1") && !store.accepted("tok-2"));
+        assert!(cc0_use_gate(&a, store.licensed()).is_ok());
+        // Withdrawn: refused again.
         store.revoke("tok-1");
-        assert!(cc0_use_gate(&a, store.active_accepted()).is_err());
-        // No session: refused. Empty token never accepts.
+        assert!(cc0_use_gate(&a, store.licensed()).is_err());
+        // Empty token never registers.
         assert!(!store.accept("  "));
-        store.set_active(None);
-        assert!(!store.active_accepted());
-        // A non-CC0 voice does not need the box.
+        assert!(!store.licensed());
+        // A non-CC0 voice does not need the licence.
         let signed = Approval { cc0: false, ..a };
         assert!(cc0_use_gate(&signed, false).is_ok());
     }

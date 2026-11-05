@@ -747,14 +747,6 @@ fn cc0_json(accepted: bool) -> String {
     )
 }
 
-/// The turn in flight belongs to this session: the clone slot and the
-/// persona floor read its CC0 acceptance. No session = not accepted.
-fn mark_cc0_session(req: &Request) {
-    let mut s = presented_session(req.header("x-galion-session"), req.header("content-type"), &req.body);
-    galion_consent::cc0_acceptances().set_active(s.as_deref());
-    if let Some(ref mut t) = s { wipe_string(t); }
-}
-
 fn route(req: &mut Request, sh: &Shared) -> (&'static str, &'static str, Vec<u8>) {
     let head = req.method == "HEAD";
     let method = if head { "GET" } else { req.method.as_str() };
@@ -792,8 +784,8 @@ fn route(req: &mut Request, sh: &Shared) -> (&'static str, &'static str, Vec<u8>
             if let Some(ref mut t) = s { wipe_string(t); }
             ("200 OK", "application/json", cc0_json(accepted).into_bytes())
         }
-        // CC0 licence checkbox. In memory, per session; the token is hashed,
-        // never stored. Body: {"accept":true|false} (+ "session" or the header).
+        // CC0 licence registration (clone time). In memory; the token is
+        // hashed, never stored. Body: {"accept":true|false} (+ "session" or the header).
         ("POST", "/v2/cc0") => {
             let mut s = presented_session(req.header("x-galion-session"), req.header("content-type"), &req.body);
             let raw = String::from_utf8_lossy(&req.body).into_owned();
@@ -802,9 +794,10 @@ fn route(req: &mut Request, sh: &Shared) -> (&'static str, &'static str, Vec<u8>
             let Some(mut token) = s.take() else {
                 return ("400 Bad Request", "text/plain", txt("session required for CC0 acceptance"));
             };
-            let store = galion_consent::cc0_acceptances();
-            if accept { store.accept(&token); } else { store.revoke(&token); }
-            let accepted = store.accepted(&token);
+            // Registration time: accept + one clone gate run (Rust, in
+            // process). Turns never re-check CC0.
+            if accept { galion_consent::cc0_register(&token, &galion_consent::Env::process()); } else { galion_consent::cc0_unregister(&token); }
+            let accepted = galion_consent::cc0_acceptances().accepted(&token);
             wipe_string(&mut token);
             ("200 OK", "application/json", cc0_json(accepted).into_bytes())
         }
@@ -812,7 +805,6 @@ fn route(req: &mut Request, sh: &Shared) -> (&'static str, &'static str, Vec<u8>
             if req.body.is_empty() {
                 return ("400 Bad Request", "text/plain", txt("empty body"));
             }
-            mark_cc0_session(req);
             let raw = String::from_utf8_lossy(&req.body);
             let text = crate::v2_persona::json_field_string(&raw, "text").unwrap_or_default();
             let barge = crate::v2_persona::json_field_bool(&raw, "barge");
@@ -851,7 +843,6 @@ fn route(req: &mut Request, sh: &Shared) -> (&'static str, &'static str, Vec<u8>
                 return ("411 Length Required", "text/plain", txt("Content-Length required"));
             }
             if req.body.is_empty() { return ("400 Bad Request", "text/plain", txt("empty body")); }
-            mark_cc0_session(req);
             let fmt = classify_turn(req);
             let n = req.body.len();
             let bytes = std::mem::take(&mut req.body);

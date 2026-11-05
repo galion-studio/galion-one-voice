@@ -1118,8 +1118,8 @@ pub struct CloneTts {
     /// it does not re-run consent or hash the reference again.
     approved: [bool; 2],
     /// Voices whose consent record is CC0 / public domain. Such a voice is
-    /// used only while the active session accepted CC0 (galion-consent
-    /// `cc0_acceptances`); otherwise the turn falls back to Piper.
+    /// selectable only once the CC0 licence was registered (clone time,
+    /// galion-consent `cc0_register`); otherwise Piper speaks.
     cc0: [bool; 2],
     worker: Option<CloneWorker>,
     frames: Arc<CloneFrameDrain>,
@@ -1257,7 +1257,9 @@ impl CloneTts {
     /// Did `persona` pass the consent gate when this slot was built?
     pub fn voice_approved(&self, persona: &str) -> bool {
         let i = usize::from(persona_name(persona) == "jarvis");
-        self.approved[i] && (!self.cc0[i] || galion_consent::cc0_acceptances().active_accepted())
+        // CC0 voices: the licence acceptance is a clone/registration-time
+        // verdict (galion_consent::cc0_register), read here, never re-checked.
+        self.approved[i] && (!self.cc0[i] || galion_consent::cc0_acceptances().licensed())
     }
 
     /// Test hook: mark voices as CC0 (needs the session's CC0 acceptance).
@@ -1310,16 +1312,6 @@ impl TtsEngine for CloneTts {
         let body = body.trim().replace(['\n', '\r'], " ");
         if body.is_empty() {
             return Err(VoiceError::EmptyInput);
-        }
-        // Server-side CC0 gate (owner t628u): a CC0 voice is refused unless
-        // the active session ticked the CC0 licence box.
-        if self.ref_gate {
-            let i = usize::from(self.persona == "jarvis");
-            if self.approved[i] && self.cc0[i] && !galion_consent::cc0_acceptances().active_accepted() {
-                return Err(VoiceError::Backend(
-                    galion_consent::CloneRefused { persona: self.persona.to_string(), reason: "cc0_licence" }.to_string(),
-                ));
-            }
         }
         self.ensure()?;
         let pcm = self.worker.as_mut().unwrap().synthesize(&body)?;

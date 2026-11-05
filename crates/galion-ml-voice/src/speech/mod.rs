@@ -849,8 +849,8 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
     }
 
-    /// Owner t628u 2026-11-04: a CC0 voice is used only after the session
-    /// ticked the CC0 licence box. Unticked = refused (Piper speaks).
+    /// Owner rule: a CC0 voice is selectable only after the CC0 licence was
+    /// registered at clone time. Not registered = refused (Piper speaks).
     #[test]
     fn cc0_clone_voice_needs_the_session_cc0_acceptance() {
         let dir = std::env::temp_dir().join(format!("galion-cc0-turn-{}", std::process::id()));
@@ -865,14 +865,13 @@ mod tests {
             .with_verdicts([true, true])
             .with_cc0([true, false]);
         let store = galion_consent::cc0_acceptances();
-        store.set_active(Some("cc0-test-session"));
-        assert!(!t.ref_ok(), "unticked: CC0 samantha refused");
+        store.clear();
+        assert!(!t.ref_ok(), "not registered: CC0 samantha refused");
         assert!(t.voice_approved("jarvis"), "a non-CC0 voice needs no box");
         store.accept("cc0-test-session");
-        assert!(t.ref_ok(), "ticked: CC0 samantha allowed");
+        assert!(t.ref_ok(), "registered: CC0 samantha allowed");
         store.revoke("cc0-test-session");
-        assert!(!t.ref_ok(), "unticked again: refused");
-        store.set_active(None);
+        assert!(!t.ref_ok(), "withdrawn: refused");
         let _ = std::fs::remove_dir_all(&dir);
     }
 
