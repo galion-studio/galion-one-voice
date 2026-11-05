@@ -141,6 +141,9 @@ pub struct Floor {
     books: Books,
     /// Clone-time verdicts. Written by the clone slot, read here per turn.
     clones: &'static galion_consent::Registry,
+    /// CC0 licence registration (clone time). A CC0 voice stays closed
+    /// (`cc0_licence`) until the licence was registered once.
+    cc0: &'static galion_consent::Cc0Acceptances,
     /// `GALION_CLIP_STORE` was unset when the floor was built.
     store_unset: bool,
     /// Test override for one persona's gate. `None` reads [`Self::clones`].
@@ -177,10 +180,17 @@ impl Floor {
             hermes,
             llm_label,
             clones: galion_consent::global(),
+            cc0: galion_consent::cc0_acceptances(),
             store_unset: std::env::var("GALION_CLIP_STORE").map(|s| s.trim().is_empty()).unwrap_or(true),
             samantha_gate: None,
             jarvis_gate: None,
         }
+    }
+
+    /// Read CC0 acceptance from `cc0` instead of the process store.
+    pub fn with_cc0_store(mut self, cc0: &'static galion_consent::Cc0Acceptances) -> Self {
+        self.cc0 = cc0;
+        self
     }
 
     /// Read clone verdicts from `clones` instead of the process registry.
@@ -198,7 +208,7 @@ impl Floor {
         if let Some(g) = fixed {
             return g.clone();
         }
-        gate_from(self.clones.lookup(self.id.as_str()), self.store_unset)
+        gate_from(self.clones.lookup(self.id.as_str()), self.store_unset, self.cc0.licensed())
     }
 
     /// Point content turns at a Hermes client. Unit tests use this so they do
@@ -670,8 +680,11 @@ fn json_token(s: &str) -> String {
 
 /// `clone_live` follows the clone-time verdict. No verdict yet is closed:
 /// `store` when no clip store is configured, else `pending` (no voice cloned).
-fn gate_from(verdict: Option<galion_consent::Verdict>, store_unset: bool) -> PersonaGate {
+fn gate_from(verdict: Option<galion_consent::Verdict>, store_unset: bool, cc0_accepted: bool) -> PersonaGate {
     match verdict {
+        Some(galion_consent::Verdict::Approved(a)) if galion_consent::cc0_use_gate(&a, cc0_accepted).is_err() => {
+            PersonaGate::closed("cc0_licence")
+        }
         Some(galion_consent::Verdict::Approved(a)) => PersonaGate {
             live: true,
             rights: "cleared",
@@ -1328,6 +1341,7 @@ mod tests {
                 persona: "samantha",
                 seconds: 10.0,
                 public: true,
+                cc0: false,
                 wav: std::path::PathBuf::from("/clips/samantha/reference.wav"),
                 sha256: "0".repeat(64),
             }),
@@ -1350,5 +1364,27 @@ mod tests {
         for banned in [concat!("py", "thon3"), concat!("consent", ".py"), concat!("load", "_gate")] {
             assert!(!body.contains(banned), "{banned} is back in the turn path");
         }
+    }
+
+    #[test]
+    fn cc0_voice_is_closed_until_the_licence_is_registered() {
+        let reg: &'static galion_consent::Registry = Box::leak(Box::new(galion_consent::Registry::new()));
+        let cc0: &'static galion_consent::Cc0Acceptances = Box::leak(Box::new(galion_consent::Cc0Acceptances::new()));
+        let f = Floor::new().with_clone_registry(reg).with_cc0_store(cc0);
+        reg.record(
+            "samantha",
+            galion_consent::Verdict::Approved(galion_consent::Approval {
+                persona: "samantha",
+                seconds: 9.6,
+                public: false,
+                cc0: true,
+                wav: std::path::PathBuf::from("/clips/samantha/reference.wav"),
+                sha256: "0".repeat(64),
+            }),
+        );
+        assert!(f.state_json().contains("\"clone_block\":\"cc0_licence\""), "not registered = refused");
+        assert!(f.state_json().contains("\"clone_live\":false"));
+        cc0.accept("tok");
+        assert!(f.state_json().contains("\"clone_live\":true"), "registered = allowed");
     }
 }
