@@ -1,0 +1,38 @@
+# Galion Voice — Perpetual Open MIT License
+[package]
+name = "galion-v2-live"
+description = "Galion Voice V2 live lane: warm Piper streaming, streaming Vosk sidecar, LLM clause streaming, duplex call, latency + quality gates."
+version = "0.0.1"
+edition = "2021"
+license = "MIT"
+publish = false
+
+# Standalone (not a member of the root workspace; builds into the shared target dir).
+[workspace]
+
+[dependencies]
+serde_json = "1"
+
+[[bin]]
+name = "galion-v2-asr"
+path = "src/bin/asr.rs"
+[[bin]]
+name = "v2-latency"
+path = "src/bin/latency.rs"
+[[bin]]
+name = "v2-call"
+path = "src/bin/call.rs"
+[[bin]]
+name = "v2-acoustic"
+path = "src/bin/acoustic.rs"
+[[bin]]
+name = "v2-pipeline240"
+path = "src/bin/pipeline240.rs"
+[[bin]]
+name = "v2-endpoint-scan"
+path = "src/bin/endpoint_scan.rs"
+
+# Own profile so these bins land in target/pipeline/ and never overwrite the
+# shared target/release/{galion-v2-asr,v2-latency,v2-call} other lanes use.
+[profile.pipeline]
+inherits = "release"

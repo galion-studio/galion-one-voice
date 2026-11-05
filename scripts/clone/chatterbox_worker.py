@@ -102,22 +102,32 @@ RAM_GB = "0.65-1.15"
 FRAME = 1920
 
 
-def pin_cpu() -> str:
-    """Force the CPU landing. One thread. No GPU. No denoise."""
+SPLIT_PLANS = ("split4", "split3")
+
+
+def pin_cpu() -> tuple:
+    """Force the CPU landing. No GPU. No denoise. One thread under the
+    session plan; under a split plan (the Rust launcher pinned this process
+    with sched_setaffinity) as many threads as asked, never more than the
+    cores in this process's affinity mask."""
     asked = os.environ.get("GALION_CLONE_DEVICE", "cpu").strip().lower()
     if asked not in ("", "cpu"):
         refuse(f"clone landing is CPU-only (device {asked})")
     raw = os.environ.get("GALION_CLONE_THREADS", "").strip()
+    plan = os.environ.get("GALION_CLONE_CPU_PLAN", "session").strip().lower()
+    applied = 1
+    if plan in SPLIT_PLANS and raw.isdigit():
+        applied = max(1, min(int(raw), len(os.sched_getaffinity(0))))
     for key in THREAD_KEYS:
-        os.environ[key] = "1"
+        os.environ[key] = str(applied)
     os.environ["GALION_CLONE_DEVICE"] = "cpu"
     os.environ["CUDA_VISIBLE_DEVICES"] = ""
     os.environ["HIP_VISIBLE_DEVICES"] = ""
     os.environ["GALION_CLONE_DENOISE"] = "0"
     note = ""
-    if raw not in ("", "1"):
-        note = f" asked={raw} applied=1"
-    return note
+    if raw not in ("", str(applied)):
+        note = f" asked={raw} applied={applied}"
+    return note, applied
 
 
 def clone_model() -> str:
@@ -479,6 +489,167 @@ def resolve_allowlisted(
     return path
 
 
+# Item 10 (2026-11-04): conditioning cache. The Rust slot names the file
+# (after the galion-consent gate) and checks the sidecar; this side only
+# reads or writes safetensors under $GALION_CLIP_STORE/<persona>/cond/.
+# torch.save / torch.load (pickle) are never used for it.
+COND_FORMAT = "galion-cond-v1"
+COND_T3 = (
+    "speaker_emb",
+    "clap_emb",
+    "cond_prompt_speech_tokens",
+    "cond_prompt_speech_emb",
+    "emotion_adv",
+)
+COND_GEN = ("prompt_token", "prompt_token_len", "prompt_feat", "prompt_feat_len", "embedding")
+COND_META_KEYS = (
+    "format",
+    "persona",
+    "model",
+    "ref_sha256",
+    "pins_sha256",
+    "exaggeration",
+    "norm_loudness",
+)
+
+
+def cond_log(text: str) -> None:
+    sys.stderr.write(f"galion-clone-cond: {text}\n")
+    sys.stderr.flush()
+
+
+def cond_path_ok(path: object, persona: str) -> str | None:
+    """Real path of a cache file inside the persona's cond dir, else None."""
+    store = os.environ.get("GALION_CLIP_STORE", "").strip()
+    if not store or not isinstance(path, str) or not path.strip():
+        return None
+    root = os.path.realpath(os.path.join(store, persona, "cond"))
+    real = os.path.realpath(path)
+    name = os.path.basename(real)
+    if os.path.dirname(real) != root or ".safetensors" not in name or name.endswith(".pt"):
+        return None
+    return real
+
+
+def cond_meta(msg: dict, persona: str, ref_digest: str) -> dict | None:
+    meta = msg.get("cond_meta")
+    if not isinstance(meta, dict):
+        return None
+    out = {}
+    for key in COND_META_KEYS:
+        value = meta.get(key)
+        if not isinstance(value, str):
+            return None
+        out[key] = value
+    if (
+        out["format"] != COND_FORMAT
+        or out["persona"] != persona
+        or out["model"] != "nano"
+        or out["ref_sha256"] != ref_digest
+        or out["exaggeration"] != "0.0"
+        or out["norm_loudness"] != "true"
+    ):
+        return None
+    return out
+
+
+def save_conds(model, path: str, meta: dict) -> bool:
+    try:
+        import torch
+        from safetensors.torch import save_file
+
+        conds = model.conds
+        tensors = {}
+        for prefix, names, source in (
+            ("t3.", COND_T3, lambda k: getattr(conds.t3, k, None)),
+            ("gen.", COND_GEN, lambda k: conds.gen.get(k)),
+        ):
+            for name in names:
+                value = source(name)
+                if not torch.is_tensor(value):
+                    continue
+                value = value.detach().to("cpu").contiguous()
+                if value.is_floating_point():
+                    value = value.to(torch.float32)
+                elif value.dtype not in (torch.int64, torch.int32):
+                    value = value.to(torch.int64)
+                tensors[prefix + name] = value
+        save_file(tensors, path, metadata=meta)
+    except Exception as exc:
+        cond_log(f"save failed ({type(exc).__name__}: {one_line(exc)})")
+        return False
+    cond_log(f"saved {os.path.basename(path)}")
+    return True
+
+
+def load_conds(path: str, meta: dict):
+    """Conditionals from a verified cache file, or None (caller recomputes)."""
+    try:
+        import torch
+        from safetensors import safe_open
+        from chatterbox.tts_turbo import Conditionals
+        from chatterbox.models.t3.modules.cond_enc import T3Cond
+
+        side = sidecar_digest(path)
+        if side is None or side != sha256_file(path):
+            cond_log("load refused (sidecar sha256)")
+            return None
+        t3: dict = {}
+        gen: dict = {}
+        with safe_open(path, framework="pt", device="cpu") as handle:
+            stored = handle.metadata() or {}
+            if any(stored.get(k) != v for k, v in meta.items()):
+                cond_log("load refused (metadata does not match this reference)")
+                return None
+            for name in handle.keys():
+                prefix, _, field = name.partition(".")
+                if prefix == "t3" and field in COND_T3:
+                    t3[field] = handle.get_tensor(name)
+                elif prefix == "gen" and field in COND_GEN:
+                    gen[field] = handle.get_tensor(name)
+                else:
+                    cond_log(f"load refused (unexpected tensor {name})")
+                    return None
+        if "speaker_emb" not in t3 or "prompt_feat" not in gen or "embedding" not in gen:
+            cond_log("load refused (missing tensors)")
+            return None
+        for field in COND_GEN:
+            gen.setdefault(field, None)
+        t3.setdefault("emotion_adv", 0.0 * torch.ones(1, 1, 1))
+        return Conditionals(T3Cond(**t3).to(device="cpu"), gen)
+    except Exception as exc:
+        cond_log(f"load failed ({type(exc).__name__}: {one_line(exc)})")
+        return None
+
+
+def use_cond_cache(model, msg: dict, persona: str, ref_path: str) -> bool:
+    """Set ``model.conds`` for ``ref_path``: cached file if valid, else from
+    the wav (then save if the slot asked). Returns True when conds are set."""
+    load_to = msg.get("cond_load")
+    save_to = msg.get("cond_save")
+    if not load_to and not save_to:
+        return False
+    meta = cond_meta(msg, persona, sha256_file(ref_path))
+    if meta is None:
+        cond_log("skip (cond_meta does not match this reference)")
+        return False
+    if load_to:
+        real = cond_path_ok(load_to, persona)
+        conds = load_conds(real, meta) if real else None
+        if conds is not None:
+            model.conds = conds
+            cond_log(f"loaded {os.path.basename(real)}")
+            return True
+    model.prepare_conditionals(ref_path, exaggeration=0.0, norm_loudness=True)
+    if save_to:
+        real = cond_path_ok(save_to, persona)
+        if real and ".tmp-" in os.path.basename(real):
+            save_conds(model, real, meta)
+        else:
+            cond_log("save refused (path outside the clip store cond dir)")
+    return True
+
+
 def prepare_text(text: str, msg: dict) -> str:
     """Honor an explicit tags flag. A missing flag keeps bracket tags.
 
@@ -824,6 +995,12 @@ def run_nano(pcm_fd: int, allow: dict[str, tuple[str, str]]) -> None:
             if not tokenizer_ready(root):
                 absent("tokenizer files missing or not pinned")
             model = load_nano(build_ckpt(root))
+        if cache.get("path") != path:
+            try:
+                if use_cond_cache(model, msg, persona, path):
+                    cache["path"] = path
+            except Exception as exc:
+                refuse(f"chatterbox nano conditioning failed ({type(exc).__name__}: {one_line(exc)})")
         pcm = render(model, text, path, cache)
         sys.stderr.write("galion-clone-emit: galion-vc\n")
         frame_utterance(pcm_fd, pcm, "chatterbox-nano", persona)
@@ -845,6 +1022,7 @@ def run_stream(pcm_fd: int, allow: dict[str, tuple[str, str]]) -> None:
     pcm = os.fdopen(pcm_fd, "wb", buffering=0)
     model, load_note = nano_stream.try_load()
     local_refs = os.environ.get("GALION_CLONE_LOCAL_REFS") == "1"
+    cond_for = None
     while True:
         msg = read_request()
         if msg is None:
@@ -868,11 +1046,24 @@ def run_stream(pcm_fd: int, allow: dict[str, tuple[str, str]]) -> None:
         if not text:
             nano_stream.write_unwired(sys.stderr, "empty text")
             continue
+        # Item 10: prepare (or load) conditioning once per reference path,
+        # not on every request; iter_pcm then reuses model.conds.
+        stream_ref = ref_path
+        if ref_path and cond_for == ref_path:
+            stream_ref = None
+        elif ref_path:
+            try:
+                if use_cond_cache(model, msg, persona, ref_path):
+                    cond_for = ref_path
+                    stream_ref = None
+            except Exception as exc:
+                nano_stream.write_unwired(sys.stderr, f"conditioning failed ({type(exc).__name__})")
+                continue
         sys.stderr.write("galion-clone-emit: galion-vc\n")
         try:
             nano_stream.write_chunks(
                 pcm,
-                nano_stream.iter_pcm(model, text, ref_path),
+                nano_stream.iter_pcm(model, text, stream_ref),
                 engine="nano",
                 persona=persona,
                 path="stream",
@@ -883,12 +1074,13 @@ def run_stream(pcm_fd: int, allow: dict[str, tuple[str, str]]) -> None:
 
 
 def main() -> None:
-    asked_note = pin_cpu()
+    asked_note, threads = pin_cpu()
     model = clone_model()
     pcm_fd = arm_pcm_channel()
-    sys.stderr.write(f"galion-clone-cpu: threads=1 device=cpu denoise=false{asked_note}\n")
+    sys.stderr.write(f"galion-clone-cpu: threads={threads} device=cpu denoise=false{asked_note}\n")
     sys.stderr.write(
-        "galion-clone-budget: session_vcpu={vcpu} threads=1 burst_max={burst} ram_gb={ram} device=cpu model={model} gguf=false\n".format(
+        "galion-clone-budget: session_vcpu={vcpu} threads={threads} burst_max={burst} ram_gb={ram} device=cpu model={model} gguf=false\n".format(
+            threads=threads,
             vcpu=SESSION_VCPU,
             burst=BURST_VCPU,
             ram=RAM_GB,

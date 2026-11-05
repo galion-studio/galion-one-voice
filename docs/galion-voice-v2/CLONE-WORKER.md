@@ -320,6 +320,41 @@ with real Nano PCM is a TTFA product claim (`FlashReport::from_pcm`).
 - Fixed a pre-existing bug: a Jarvis request that carried a reference produced invalid JSON (the `reference` string was never closed), so the worker answered "bad json".
 - HOLD check: the merged SpeechStack produced real local Nano speech, CPU only, with no stub and no cloud path. The test allowlist of CC0 donors was local only and was not committed. Each output sat closest to its own donor on ECAPA: Samantha 0.476 vs amy, Jarvis 0.587 vs alan.
 
+## Conditioning cache (owner item 10, 2026-11-04)
+
+Chatterbox Nano conditioning (`model.conds`: speaker embedding, prompt speech
+tokens, S3Gen prompt features) used to be recomputed from the reference wav at
+every worker start and kept only in memory. It is now saved once and reused.
+
+- Format: **safetensors** (no pickle; `.pt` stays banned). F32 / I64 / I32
+  tensors only, names `t3.*` / `gen.*` from a fixed list, plus `__metadata__`.
+- Path: `$GALION_CLIP_STORE/<persona>/cond/nano-<key>.safetensors` and a
+  `.sha256` sidecar. `<key>` hashes the format version, persona, model,
+  reference wav sha256, a digest of `scripts/clone/PINS.sha256` +
+  `TOKENIZER.sha256`, and the options (`exaggeration=0.0`,
+  `norm_loudness=true`).
+- Written only after the galion-consent gate: `clone_cache::plan_save` needs
+  the gate's `Approval` for that persona with the same reference sha256, and
+  the same approval in `galion_consent::global()`. The worker writes a temp
+  file the Rust slot named; Rust verifies it (strict header reader, metadata,
+  sizes) and renames it into place with the sidecar.
+- Invalidation: a new reference sha256 or new pins give a new key; on save
+  the old entries are renamed `*.off-<secs>` (never deleted). A file that
+  fails any check on load is renamed aside and the worker recomputes from the
+  wav. The worker also re-checks the sidecar and that the metadata
+  `ref_sha256` equals the digest of the wav it resolved.
+- Request fields: `cond_load` or `cond_save` plus `cond_meta`. Without them
+  the worker behaves as before. `GALION_CLONE_COND_CACHE=0` turns it off.
+- The stream path (`GALION_CLONE_STREAM=1`) now prepares or loads
+  conditioning once per reference path instead of on every request.
+
+Verified: Rust unit tests (`speech::clone_cache`), and a hand-run round trip
+with the real `safetensors.torch.save_file` (torch 2.6.0, safetensors 0.5.3)
+on synthetic tensors shaped like Nano's, read back by the Rust reader
+(`python_written_file_verifies`, `#[ignore]`). **Not verified:** a real
+clone through the gate, because `reference_clips = false` and no consented
+reference exists, so `plan_save` is never reached in a live run.
+
 ---
 
 © G.A.L.I.O.N. — General Autonomous Local Intelligence Open Network. All rights reserved and claims reserved. · CC0 voices: you must tick the consent box agreeing to the CC0 licence before using any CC0 voice; use is at your own responsibility. · No cookies. · De-Googled: no Google services. · All current Galion builds are open source under the Galion perpetual open MIT licence.

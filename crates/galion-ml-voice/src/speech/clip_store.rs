@@ -362,8 +362,9 @@ mod tests {
         assert!(doc.contains("GALION_JARVIS_TEXTURE"));
         assert!(doc.contains("BLOCKED"));
         let locks = std::fs::read_to_string(repo_root().join("LOCKS.toml")).unwrap();
-        assert!(locks.contains("reference_clips = false"));
-        assert!(!locks.contains("reference_clips = true"));
+        // t623u: opened for the CC0 / public-domain donors only.
+        assert!(locks.contains("reference_clips = true"));
+        assert!(locks.contains("ref_clip_decision = \"t623u\""));
     }
 
     #[test]
