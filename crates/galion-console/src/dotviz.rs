@@ -469,19 +469,18 @@ mod tests {
         assert!(V2_SCREEN_HTML.contains("location.replace"));
         assert!(!V2_SCREEN_HTML.contains("createRadialGradient"), "the second circle page is gone");
         assert!(SCREEN_HTML.contains("data-persona=\"samantha\""));
-        // CC0 licence checkbox (owner t628u): unticked by default, names the licence, links it, posts per session.
-        assert!(SCREEN_HTML.contains("id=\"cc0-accept\""));
-        assert!(!SCREEN_HTML.contains("id=\"cc0-accept\" name=\"cc0\" checked"));
-        assert!(SCREEN_HTML.contains("CC0 1.0 Universal (Public Domain Dedication)"));
-        assert!(SCREEN_HTML.contains("https://creativecommons.org/publicdomain/zero/1.0/"));
-        assert!(SCREEN_HTML.contains("fetch(\"v2/cc0\""));
-        assert!(SCREEN_HTML.contains("data-cc0-accepted=\"false\""));
+        // Owner t653u: pure voice-to-voice. One dot + one full-screen object; no
+        // text, labels, buttons, inputs, captions or CC0 UI (CC0 is enforced at clone time).
+        for tag in ["<div", "<form", "<input", "<button", "<label", "<span", "<p>", "<a "] {
+            assert!(!SCREEN_HTML.contains(tag), "{tag} is on the voice screen");
+        }
+        assert!(!SCREEN_HTML.contains("fillText"), "the canvas draws no text");
+        assert!(!SCREEN_HTML.contains("fetch(\"v2/cc0\""));
+        assert!(SCREEN_HTML.contains("document.addEventListener(\"click\",onActivate)"), "a tap anywhere starts the mic");
         assert!(SCREEN_HTML.contains("data-mouth=\"piper\""));
         assert!(SCREEN_HTML.contains("data-film-voice=\"false\""));
         assert!(SCREEN_HTML.contains("data-rights=\"hold\""));
-        assert!(SCREEN_HTML.contains("id=\"say-text\""));
         assert!(SCREEN_HTML.contains("v2/say"));
-        assert!(SCREEN_HTML.contains("not a film clone"));
         assert!(!SCREEN_HTML.contains("I hear you"));
         assert!(SCREEN_HTML.contains("POST /turn"));
         assert!(SCREEN_HTML.contains("function proceedTurn"));
