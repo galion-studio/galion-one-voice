@@ -61,6 +61,7 @@ use std::time::Instant;
 pub mod clause;
 pub mod clip_store;
 pub mod clone_worker;
+pub mod core_map;
 pub mod galion_clip;
 pub mod flite;
 pub mod gqvoice;
@@ -857,8 +858,7 @@ mod tests {
         let script = dir.join("fake-clone.py");
         std::fs::write(&script, FAKE_CLONE).unwrap();
         let worker =
-            clone_worker::CloneWorker::spawn(&script, clone_worker::CloneModel::Nano, "samantha")
-                .unwrap();
+            clone_worker::CloneWorker::spawn_for_test(&script, clone_worker::CloneModel::Nano, "samantha");
         let mut stack =
             SpeechStack::from_clone(clone_worker::CloneTts::for_test(worker, dir.clone()));
         let both = stack.speak("Hello! Go.").unwrap();
@@ -893,8 +893,7 @@ mod tests {
         let jdir = dir.join("jarvis");
         std::fs::create_dir_all(&jdir).unwrap();
         let jworker =
-            clone_worker::CloneWorker::spawn(&script, clone_worker::CloneModel::Turbo, "jarvis")
-                .unwrap();
+            clone_worker::CloneWorker::spawn_for_test(&script, clone_worker::CloneModel::Turbo, "jarvis");
         let mut jarvis =
             SpeechStack::from_clone(clone_worker::CloneTts::for_test(jworker, jdir.clone()));
         let tone = jarvis.speak("Systems ready.").unwrap();

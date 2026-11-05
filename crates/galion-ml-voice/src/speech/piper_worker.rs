@@ -69,6 +69,9 @@ impl PiperWorker {
     /// The first [`synthesize`](Self::synthesize) therefore pays load + inference.
     pub fn spawn(runtime: &Path, model: &Path, config: &Path, prosody: &PiperProsody) -> Result<Self, VoiceError> {
         let mut cmd = Command::new(runtime);
+        // V2 core map: Piper's placement during a live call (no-op when the map is off).
+        // An explicit `GALION_PIPER_CPUS` below is applied after it and wins.
+        super::core_map::apply_affinity(&mut cmd, &super::core_map::placement(super::core_map::CoreRole::Piper).cpus);
         cmd.arg("--model").arg(model)
             .arg("--config").arg(config)
             .arg("--output_raw")
