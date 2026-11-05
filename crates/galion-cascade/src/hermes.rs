@@ -46,10 +46,34 @@ pub const FORBIDDEN: &[&str] = &[
     "let's slow down",
     "i'm sorry",
     "i am sorry",
+    "i'm so sorry",
+    "i am so sorry",
+    "so sorry to hear",
+    "sorry to hear",
+    "sorry for your loss",
+    "my condolences",
+    "my deepest condolences",
+    "you are not alone",
+    "you're not alone",
+    "allow yourself to grieve",
+    "losing a loved one",
+    "i can only imagine",
+    "i can't imagine how",
+    "that must be so hard",
+    "that must be hard",
+    "that must be difficult",
 ];
 
 pub fn contains_forbidden(reply: &str) -> bool {
-    let low = reply.to_ascii_lowercase();
+    // Curly apostrophes and runs of whitespace must not slip a phrase past the list.
+    let low: String = reply
+        .chars()
+        .map(|c| match c {
+            '\u{2018}' | '\u{2019}' | '\u{02BC}' | '`' => '\'',
+            c => c.to_ascii_lowercase(),
+        })
+        .collect();
+    let low = low.split_whitespace().collect::<Vec<_>>().join(" ");
     FORBIDDEN.iter().any(|p| low.contains(p))
 }
 
@@ -818,6 +842,22 @@ mod tests {
         assert!(contains_forbidden("I'm sorry to hear that."));
         assert!(contains_forbidden("I am sorry about your mother."));
         assert!(!contains_forbidden("Your mother died this morning."));
+    }
+
+    /// The live persona-http reply that slipped past the old list.
+    #[test]
+    fn so_sorry_and_condolence_scripts_are_refused() {
+        assert!(contains_forbidden(
+            "I'm so sorry to hear that. Losing a loved one is difficult, but know that you are not alone in your pain."
+        ));
+        assert!(contains_forbidden("I\u{2019}m so sorry."));
+        assert!(contains_forbidden("I am  so sorry."));
+        assert!(contains_forbidden("So sorry to hear about your mother."));
+        assert!(contains_forbidden("My condolences."));
+        assert!(contains_forbidden("Please allow yourself to grieve."));
+        assert!(contains_forbidden("You're not alone."));
+        assert_eq!(guard_model_text("I'm so sorry to hear that."), REFUSED);
+        assert!(!contains_forbidden("Your mother died this morning. Do you want to tell me about her?"));
     }
 
     /// The hard-test harness parses `FORBIDDEN` from this file and keeps a
