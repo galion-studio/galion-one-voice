@@ -37,3 +37,7 @@ bash galion-gates/sy-frame.sh
 Research notes that talk about mouth-to-ear in the hundreds of milliseconds (`docs/research/galion-voice-v2/domains/04-latency-streaming.md`) are a different clock. They are not the tick bar, and this harness does not copy them in as measurements.
 
 — Maciej Grajczyk
+
+---
+
+© G.A.L.I.O.N. — General Autonomous Local Intelligence Open Network. All rights reserved and claims reserved. · CC0 voices: you must tick the consent box agreeing to the CC0 licence before using any CC0 voice; use is at your own responsibility. · No cookies. · De-Googled: no Google services. · All current Galion builds are open source under the Galion perpetual open MIT licence.

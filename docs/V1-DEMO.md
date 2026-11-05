@@ -115,3 +115,7 @@ exposure needs a reverse proxy, which is not built. Release steps: `scripts/depl
 - There is no microphone. Input is a WAV or synthetic audio. Emotion comes from a heuristic proxy. The RTF figure measures the stub path.
 
 — Maciej Grajczyk
+
+---
+
+© G.A.L.I.O.N. — General Autonomous Local Intelligence Open Network. All rights reserved and claims reserved. · CC0 voices: you must tick the consent box agreeing to the CC0 licence before using any CC0 voice; use is at your own responsibility. · No cookies. · De-Googled: no Google services. · All current Galion builds are open source under the Galion perpetual open MIT licence.

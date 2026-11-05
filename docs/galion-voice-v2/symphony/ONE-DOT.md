@@ -56,3 +56,7 @@ bash scripts/run-dot-console-demo.sh --headless
 A green contract test is not a microphone session. Art. 50 disclosure stays on the page. The circle fill stays the locked colour. Empathy moves the wash, not a second face.
 
 — Maciej Grajczyk
+
+---
+
+© G.A.L.I.O.N. — General Autonomous Local Intelligence Open Network. All rights reserved and claims reserved. · CC0 voices: you must tick the consent box agreeing to the CC0 licence before using any CC0 voice; use is at your own responsibility. · No cookies. · De-Googled: no Google services. · All current Galion builds are open source under the Galion perpetual open MIT licence.

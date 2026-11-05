@@ -15,3 +15,7 @@ Backups of the pre-FP-01 files are in `/workspace/fp01-backup/` (box scratch, ou
 | `docs/V1-DEMO.md` row for `V1_SCREEN_HOST`/7870; the "optional web" mention in the galion-console README | These describe removed things. |
 
 **Not touched (by design):** A21 neural TTS slot and flite. FP-03 builds A21 (CPU-only, MIT, e.g. Piper) to replace flite, so the slot is NOT flagged for removal. Heartbeat/Rika core logic is FP-02's. `v1-screen.html` was already one canvas and no text, so it is unchanged.
+
+---
+
+© G.A.L.I.O.N. — General Autonomous Local Intelligence Open Network. All rights reserved and claims reserved. · CC0 voices: you must tick the consent box agreeing to the CC0 licence before using any CC0 voice; use is at your own responsibility. · No cookies. · De-Googled: no Google services. · All current Galion builds are open source under the Galion perpetual open MIT licence.
