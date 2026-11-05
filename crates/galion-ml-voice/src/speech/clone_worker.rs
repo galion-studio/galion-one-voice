@@ -431,7 +431,7 @@ pub enum ClonePlan {
     /// for ASR, Piper and the call loop.
     Split3,
     /// No clone worker: V2 live calls are fully local and every core has a
-    /// role in [`super::core_map`] (LLM 2-5, Piper 6, ...). Spawning refuses
+    /// role in [`super::core_map`] (reasoning 2-5, Piper 6 and 7, ...). Spawning refuses
     /// and the speech stack falls back to Piper.
     Off,
 }

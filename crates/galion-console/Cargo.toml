@@ -43,6 +43,8 @@ galion-render = { path = "../../galion-render", optional = true }
 galion-heartbeat = { path = "../galion-heartbeat", optional = true, default-features = false }
 # Phone lane only (feature `phone-turn`). Not in the default console build.
 galion-cascade = { path = "../galion-cascade", optional = true, default-features = false }
+# Std-only core map: the call loop pins itself to the bus core.
+galion-cores = { path = "../galion-cores" }
 # Pinned to 0.29 (MSRV 1.74) — box toolchain is rustc 1.85. ratatui re-exports crossterm.
 ratatui = { version = "0.29", default-features = false, features = ["crossterm"] }
 

@@ -43,7 +43,10 @@ impl VoskClient {
         }
         let mut cmd = Command::new(&bin);
         cmd.args(&args);
-        apply_cpu_env(&mut cmd);
+        // Core map: the Vosk child runs on the ASR core (v3: core 1). No-op when off.
+        let placed = galion_cores::placement(galion_cores::CoreRole::Asr);
+        galion_cores::apply_affinity(&mut cmd, &placed.cpus);
+        apply_cpu_env(&mut cmd, placed.threads);
         if let Some(dir) = lib.as_ref().and_then(|p| p.parent()) {
             prepend_ld(&mut cmd, dir);
         }
@@ -267,8 +270,11 @@ fn resolve_lib() -> Option<PathBuf> {
     cands.into_iter().find(|p| p.is_file())
 }
 
-fn apply_cpu_env(cmd: &mut Command) {
-    let n = std::env::var("GALION_VOSK_THREADS").unwrap_or_else(|_| "2".into());
+/// `GALION_VOSK_THREADS` wins. Else the core-map thread count when pinned
+/// (`placed` > 0), else 2.
+fn apply_cpu_env(cmd: &mut Command, placed: u32) {
+    let fallback = if placed > 0 { placed.to_string() } else { "2".into() };
+    let n = std::env::var("GALION_VOSK_THREADS").unwrap_or(fallback);
     if std::env::var_os("OMP_NUM_THREADS").is_none() {
         cmd.env("OMP_NUM_THREADS", &n);
     }
