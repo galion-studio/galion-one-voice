@@ -850,6 +850,32 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
     }
 
+    /// Owner rule: a CC0 voice is selectable only after the CC0 licence was
+    /// registered at clone time. Not registered = refused (Piper speaks).
+    #[test]
+    fn cc0_clone_voice_needs_the_session_cc0_acceptance() {
+        let dir = std::env::temp_dir().join(format!("galion-cc0-turn-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let script = dir.join("fake-clone.py");
+        std::fs::write(&script, FAKE_CLONE).unwrap();
+        let worker =
+            clone_worker::CloneWorker::spawn(&script, clone_worker::CloneModel::Nano, "samantha")
+                .unwrap();
+        let t = clone_worker::CloneTts::for_test(worker, dir.clone())
+            .with_verdicts([true, true])
+            .with_cc0([true, false]);
+        let store = galion_consent::cc0_acceptances();
+        store.clear();
+        assert!(!t.ref_ok(), "not registered: CC0 samantha refused");
+        assert!(t.voice_approved("jarvis"), "a non-CC0 voice needs no box");
+        store.accept("cc0-test-session");
+        assert!(t.ref_ok(), "registered: CC0 samantha allowed");
+        store.revoke("cc0-test-session");
+        assert!(!t.ref_ok(), "withdrawn: refused");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
     #[test]
     fn landed_clone_is_compiled_before_the_stack_plays_it() {
         let dir = std::env::temp_dir().join(format!("galion-gqvoice-stack-{}", std::process::id()));

@@ -34,6 +34,7 @@ fn live_turns_with_a_cloned_voice_spawn_no_consent_process() {
             persona: "samantha",
             seconds: 10.0,
             public: false,
+            cc0: false,
             wav: dir.join("store/samantha/reference.wav"),
             sha256: "0".repeat(64),
         }),
