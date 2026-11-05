@@ -1,6 +1,7 @@
 // Galion Voice — Perpetual Open MIT License
 // Copyright (c) 2026 Maciej Grajczyk.
-//! Streaming chat completions via a `curl` child (no TLS stack in tree).
+//! Reply stream. Default: the local canned reply (no network). Opt-in only
+//! (GALION_LLM=openrouter): streaming chat completions via a `curl` child.
 //! The key is read from OPENROUTER_API_KEY and handed to curl on stdin as
 //! a config line, so it never appears in argv, logs, or output.
 use crate::now_ms;
@@ -16,20 +17,22 @@ impl LlmCfg {
     pub fn from_env() -> Self {
         Self {
             url: std::env::var("GALION_LLM_URL").unwrap_or_else(|_| "https://openrouter.ai/api/v1/chat/completions".into()),
-            model: std::env::var("GALION_LLM_MODEL").unwrap_or_else(|_| "meta-llama/llama-3.1-8b-instruct".into()),
+            model: if canned() { "canned".into() } else { std::env::var("GALION_LLM_MODEL").unwrap_or_else(|_| "meta-llama/llama-3.1-8b-instruct".into()) },
             max_tokens: std::env::var("GALION_LLM_MAX_TOKENS").ok().and_then(|v| v.parse().ok()).unwrap_or(60),
             reasoning: None,
-            provider_order: std::env::var("GALION_LLM_PROVIDER").map(|s| s.split(',').map(str::to_string).collect()).unwrap_or_else(|_| vec!["Groq".into()]),
+            provider_order: std::env::var("GALION_LLM_PROVIDER").map(|s| s.split(',').map(str::to_string).collect()).unwrap_or_default(),
         }
     }
 }
 
 
-/// GALION_LLM=canned: no network, no third-party LLM. A local `sh` child
+/// Default reply path (PR #65 fix): canned. No network, no third-party LLM.
+/// The cloud OpenRouter path runs only when GALION_LLM=openrouter is set
+/// explicitly; unset, empty, `canned` or anything else stays canned. A local `sh` child
 /// reads the request body to EOF, waits GALION_CANNED_TTFT_MS (default 0),
 /// then streams a fixed OpenAI-style SSE reply with Llama-style " word"
 /// tokens, so the rest of the loop (clauser, Piper, timing) is unchanged.
-pub fn canned() -> bool { std::env::var("GALION_LLM").map(|v| v == "canned").unwrap_or(false) }
+pub fn canned() -> bool { !matches!(std::env::var("GALION_LLM").as_deref().map(str::trim), Ok("openrouter")) }
 pub const CANNED_REPLY: &str = "That sounds like a lovely idea, and I would be glad to help you plan it out step by step.";
 pub fn canned_cmd() -> Command {
     let ttft: f64 = std::env::var("GALION_CANNED_TTFT_MS").ok().and_then(|v| v.parse().ok()).unwrap_or(0.0);
