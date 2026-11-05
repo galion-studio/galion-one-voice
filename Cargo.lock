@@ -184,6 +184,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "galion-clone-cbx"
+version = "0.0.1"
+dependencies = [
+ "galion-consent",
+]
+
+[[package]]
 name = "galion-consent"
 version = "0.0.1"
 
