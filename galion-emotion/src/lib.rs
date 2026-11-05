@@ -29,6 +29,7 @@ pub mod film;
 pub mod frame;
 pub mod loudness;
 pub mod persona;
+pub mod persona_mood;
 pub mod rika;
 pub mod store;
 
@@ -49,6 +50,11 @@ pub use persona::{Feeling, HubLayer, Manner, VoicePersona, CANNED_EMPATHY, HUB_G
 pub use loudness::{
     parse_reference_track, AffectEstimator, Estimate, EstimatorKind, GatedDetector, LoudnessEstimator, RefEntry, RefLabel,
     ReferenceEstimator, SyntheticEstimator, SyntheticMode,
+};
+pub use persona_mood::{
+    appraise, text_affect, Appraisal, ConditionedDecoder, Mood, MoodDynamics, ObsSource, Persona, PersonaConditioning,
+    PersonaMood, PersonaProfile, PiperProsodyVector, PiperVoiceProfile, UserObservation, CONDITIONING_DIM,
+    CONDITIONING_VERSION, JARVIS, SAMANTHA,
 };
 pub use rika::{Cue, FrameFeatures, OffReason, Rika, RikaConfig, RikaCtx, RikaOutput, RikaReport, RikaState, Trigger};
 pub use store::{AffectBaseline, AffectStore, Consented, Revalidated, Unconsented, WipeHook, WipeReason, WipeReceipt};

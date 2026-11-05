@@ -24,6 +24,7 @@ pub mod artifact;
 /// Jarvis hub texture: a separate on/off layer beside the speech asset.
 /// The toggle ABI and the energy-band gate live in [`jarvis_texture`].
 pub mod jarvis_texture;
+pub mod emotive;
 /// V1-03 real-speech path (feature `speech`): A21 weight slot + interim system TTS.
 #[cfg(feature = "speech")]
 pub mod speech;
