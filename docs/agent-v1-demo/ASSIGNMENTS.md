@@ -12,3 +12,7 @@ Owner ask: version-one demo (local). Brand as **Galion Voice** (never write "FRX
 | V1-02 | Wiring | Drive live + EN cascade + dot behind that screen | V1-02-STATUS.md |
 | V1-03 | Speech | Real-speech path + A21 flag list | V1-03-STATUS.md |
 | V1-04 | Runbook | `scripts/run-v1-demo.sh` + gates | V1-04-STATUS.md |
+
+---
+
+© G.A.L.I.O.N. — General Autonomous Local Intelligence Open Network. All rights reserved and claims reserved. · CC0 voices: you must tick the consent box agreeing to the CC0 licence before using any CC0 voice; use is at your own responsibility. · No cookies. · De-Googled: no Google services. · All current Galion builds are open source under the Galion perpetual open MIT licence.

@@ -749,6 +749,15 @@ fn mic_store_body(cleaned: &str) -> String {
     cleaned.to_string()
 }
 
+/// `/v2/cc0` reply: licence name, link, and this session's acceptance.
+fn cc0_json(accepted: bool) -> String {
+    format!(
+        "{{\"licence\":\"{}\",\"url\":\"{}\",\"accepted\":{accepted}}}",
+        galion_consent::CC0_LICENCE_NAME,
+        galion_consent::CC0_LICENCE_URL
+    )
+}
+
 fn route(req: &mut Request, sh: &Shared) -> (&'static str, &'static str, Vec<u8>) {
     let head = req.method == "HEAD";
     let method = if head { "GET" } else { req.method.as_str() };
@@ -779,6 +788,29 @@ fn route(req: &mut Request, sh: &Shared) -> (&'static str, &'static str, Vec<u8>
             wipe_string(&mut owned);
             zeroise_bytes(&mut req.body);
             ("204 No Content", "text/plain", Vec::new())
+        }
+        ("GET", "/v2/cc0") => {
+            let mut s = presented_session(req.header("x-galion-session"), None, &[]);
+            let accepted = s.as_deref().is_some_and(|t| galion_consent::cc0_acceptances().accepted(t));
+            if let Some(ref mut t) = s { wipe_string(t); }
+            ("200 OK", "application/json", cc0_json(accepted).into_bytes())
+        }
+        // CC0 licence registration (clone time). In memory; the token is
+        // hashed, never stored. Body: {"accept":true|false} (+ "session" or the header).
+        ("POST", "/v2/cc0") => {
+            let mut s = presented_session(req.header("x-galion-session"), req.header("content-type"), &req.body);
+            let raw = String::from_utf8_lossy(&req.body).into_owned();
+            let accept = crate::v2_persona::json_field_bool(&raw, "accept");
+            zeroise_bytes(&mut req.body);
+            let Some(mut token) = s.take() else {
+                return ("400 Bad Request", "text/plain", txt("session required for CC0 acceptance"));
+            };
+            // Registration time: accept + one clone gate run (Rust, in
+            // process). Turns never re-check CC0.
+            if accept { galion_consent::cc0_register(&token, &galion_consent::Env::process()); } else { galion_consent::cc0_unregister(&token); }
+            let accepted = galion_consent::cc0_acceptances().accepted(&token);
+            wipe_string(&mut token);
+            ("200 OK", "application/json", cc0_json(accepted).into_bytes())
         }
         ("POST", "/v2/say") => {
             if req.body.is_empty() {
@@ -1033,6 +1065,35 @@ mod tests {
         assert!(!r.contains("#B695CF"), "empathy hue is not a circle fill");
         assert!(r.trim_end().ends_with('}'));
         assert!(r.contains("\"persona\":\"samantha\""), "{r}");
+        w.close().unwrap();
+    }
+
+    #[test]
+    fn cc0_checkbox_is_per_session_and_in_memory() {
+        let mut w = WebSurface::serve("127.0.0.1:0".parse().unwrap()).with_page("<!doctype html><canvas id=\"s\"></canvas>");
+        w.open().unwrap();
+        let a = w.local_addr().unwrap();
+        let post = |hdr: &str, body: &str| {
+            let mut s = std::net::TcpStream::connect(a).unwrap();
+            s.write_all(format!("POST /v2/cc0 HTTP/1.1\r\nHost: x\r\n{hdr}Content-Type: application/json\r\nContent-Length: {}\r\n\r\n{body}", body.len()).as_bytes()).unwrap();
+            let mut out = String::new();
+            s.read_to_string(&mut out).unwrap();
+            out
+        };
+        let info = get(a, "/v2/cc0");
+        assert!(info.contains("CC0 1.0 Universal") && info.contains("creativecommons.org/publicdomain/zero/1.0"), "{info}");
+        assert!(info.contains("\"accepted\":false"), "{info}");
+        assert!(post("", "{\"accept\":true}").contains("400"), "no session, no acceptance");
+        let tok = "web-cc0-test-token";
+        let off = post(&format!("X-Galion-Session: {tok}\r\n"), "{\"accept\":false}");
+        assert!(off.contains("\"accepted\":false"), "{off}");
+        assert!(!galion_consent::cc0_acceptances().accepted(tok), "unticked = refused");
+        let on = post(&format!("X-Galion-Session: {tok}\r\n"), "{\"accept\":true}");
+        assert!(on.contains("\"accepted\":true") && !on.contains(tok), "{on}");
+        assert!(galion_consent::cc0_acceptances().accepted(tok), "ticked = allowed");
+        assert!(!galion_consent::cc0_acceptances().accepted("another-session"));
+        post(&format!("X-Galion-Session: {tok}\r\n"), "{\"accept\":false}");
+        assert!(!galion_consent::cc0_acceptances().accepted(tok));
         w.close().unwrap();
     }
 

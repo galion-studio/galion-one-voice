@@ -171,6 +171,9 @@ checksum = "d9c4f5dac5e15c24eb999c26181a6ca40b39fe946cbe4c263c7209467bc83af2"
 [[package]]
 name = "galion-asr-vosk"
 version = "0.0.1"
+dependencies = [
+ "galion-cores",
+]
 
 [[package]]
 name = "galion-cascade"
@@ -190,6 +193,7 @@ version = "0.0.1"
 dependencies = [
  "galion-cascade",
  "galion-consent",
+ "galion-cores",
  "galion-emotion",
  "galion-heartbeat",
  "galion-openmind",
@@ -198,6 +202,10 @@ dependencies = [
  "galion-tensor",
  "ratatui",
 ]
+
+[[package]]
+name = "galion-cores"
+version = "0.0.1"
 
 [[package]]
 name = "galion-emotion"
@@ -235,6 +243,7 @@ name = "galion-ml-voice"
 version = "0.0.1"
 dependencies = [
  "galion-consent",
+ "galion-cores",
  "galion-emotion",
  "galion-heartbeat",
  "galion-tensor",

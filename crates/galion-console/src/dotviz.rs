@@ -469,6 +469,13 @@ mod tests {
         assert!(V2_SCREEN_HTML.contains("location.replace"));
         assert!(!V2_SCREEN_HTML.contains("createRadialGradient"), "the second circle page is gone");
         assert!(SCREEN_HTML.contains("data-persona=\"samantha\""));
+        // CC0 licence checkbox (owner t628u): unticked by default, names the licence, links it, posts per session.
+        assert!(SCREEN_HTML.contains("id=\"cc0-accept\""));
+        assert!(!SCREEN_HTML.contains("id=\"cc0-accept\" name=\"cc0\" checked"));
+        assert!(SCREEN_HTML.contains("CC0 1.0 Universal (Public Domain Dedication)"));
+        assert!(SCREEN_HTML.contains("https://creativecommons.org/publicdomain/zero/1.0/"));
+        assert!(SCREEN_HTML.contains("fetch(\"v2/cc0\""));
+        assert!(SCREEN_HTML.contains("data-cc0-accepted=\"false\""));
         assert!(SCREEN_HTML.contains("data-mouth=\"piper\""));
         assert!(SCREEN_HTML.contains("data-film-voice=\"false\""));
         assert!(SCREEN_HTML.contains("data-rights=\"hold\""));

@@ -273,3 +273,7 @@ A section is done when the gates below pass and the run is written in [`SELF-EVA
 Not a failure of D3: the release trap for a forbidden phrase is the reply table. The `debug_assert` in `Floor::finish` is gone in release. The tests still call `contains_forbidden`.
 
 — Maciej Grajczyk
+
+---
+
+© G.A.L.I.O.N. — General Autonomous Local Intelligence Open Network. All rights reserved and claims reserved. · CC0 voices: you must tick the consent box agreeing to the CC0 licence before using any CC0 voice; use is at your own responsibility. · No cookies. · De-Googled: no Google services. · All current Galion builds are open source under the Galion perpetual open MIT licence.

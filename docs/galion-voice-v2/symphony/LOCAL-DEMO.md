@@ -36,3 +36,7 @@ The summary's `lean_in_latency=` on the Rika path is the stub heartbeat's own le
 The student, the codec kernels, and the emotion head on this command are stubs. RTF printed here is not a model number. Do not quote it as EPYC, CX23, or CX43 performance. The tick gate that does measure a step is [LATENCY.md](LATENCY.md), and it labels the result `measured-stub`.
 
 — Maciej Grajczyk
+
+---
+
+© G.A.L.I.O.N. — General Autonomous Local Intelligence Open Network. All rights reserved and claims reserved. · CC0 voices: you must tick the consent box agreeing to the CC0 licence before using any CC0 voice; use is at your own responsibility. · No cookies. · De-Googled: no Google services. · All current Galion builds are open source under the Galion perpetual open MIT licence.

@@ -120,3 +120,7 @@ TTFA grows roughly linearly with words (~8–9 ms per word on the C++ piper at l
 2. The galion-v2-live fixes live outside git. Its owner needs to adopt them.
 3. The first-clause word cap belongs to agent 04.
 4. Machine contention (load 9–21) makes p95 swing 2–5×. The numbers above note the load for each run.
+
+---
+
+© G.A.L.I.O.N. — General Autonomous Local Intelligence Open Network. All rights reserved and claims reserved. · CC0 voices: you must tick the consent box agreeing to the CC0 licence before using any CC0 voice; use is at your own responsibility. · No cookies. · De-Googled: no Google services. · All current Galion builds are open source under the Galion perpetual open MIT licence.

@@ -52,3 +52,7 @@ DOT_DIR=$(GALION_HEADLESS=1 scripts/run-dot-console-demo.sh --seconds 8 | sed -n
 - Branding: dot is #F5F5F7, uniform brightness; amber→violet only in the background; the panel is developer-only.
 
 — Maciej Grajczyk
+
+---
+
+© G.A.L.I.O.N. — General Autonomous Local Intelligence Open Network. All rights reserved and claims reserved. · CC0 voices: you must tick the consent box agreeing to the CC0 licence before using any CC0 voice; use is at your own responsibility. · No cookies. · De-Googled: no Google services. · All current Galion builds are open source under the Galion perpetual open MIT licence.

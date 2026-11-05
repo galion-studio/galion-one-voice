@@ -181,9 +181,10 @@ pub fn bind_decision(
 pub fn route_is_sensitive(method: &str, path: &str) -> bool {
     let method = if method == "HEAD" { "GET" } else { method };
     match (method, path) {
-        ("POST", "/turn" | "/mic" | "/session" | "/v2/say") => true,
+        ("POST", "/turn" | "/mic" | "/session" | "/v2/say" | "/v2/cc0") => true,
+        ("GET", "/v2/cc0") => true,
         ("GET", p) if p.starts_with("/reply/") => true,
-        ("OPTIONS", "/turn" | "/mic" | "/session" | "/v2/say") => true,
+        ("OPTIONS", "/turn" | "/mic" | "/session" | "/v2/say" | "/v2/cc0") => true,
         ("OPTIONS", p) if p.starts_with("/reply/") => true,
         _ => false,
     }

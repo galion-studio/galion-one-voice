@@ -40,3 +40,7 @@ galion-gates/v1-demo.sh             # soft gate V1 (also called by galion-gates/
 `docs/agent-v1-demo/A21-BLOCKERS.md` (V1-03) and `docs/agent-wave20/A21-COUNSEL-MEMO.md`. Open items: counsel sign-off (P-A, and whether flite is OK as an interim voice), A21 TTS weights + sha256, the Galion-native decoder (`DECODER_WIRED=false`), Mimi weights (`IS_STUB`), and ASR weights.
 
 — Maciej Grajczyk
+
+---
+
+© G.A.L.I.O.N. — General Autonomous Local Intelligence Open Network. All rights reserved and claims reserved. · CC0 voices: you must tick the consent box agreeing to the CC0 licence before using any CC0 voice; use is at your own responsibility. · No cookies. · De-Googled: no Google services. · All current Galion builds are open source under the Galion perpetual open MIT licence.

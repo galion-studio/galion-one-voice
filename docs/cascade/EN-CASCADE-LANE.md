@@ -19,3 +19,7 @@ Language: `Lang::En` only; hr/pl/others rejected until model picks + A21 licence
 | LLM | small instruct model via galion-tensor / ONNX | per model |
 | TTS | Piper, SpeechT5, Pocket-TTS-class | MIT/GPL voices vary; MIT; check |
 Runtime: `galion-tensor`; sherpa-onnx reference only (K16).
+
+---
+
+© G.A.L.I.O.N. — General Autonomous Local Intelligence Open Network. All rights reserved and claims reserved. · CC0 voices: you must tick the consent box agreeing to the CC0 licence before using any CC0 voice; use is at your own responsibility. · No cookies. · De-Googled: no Google services. · All current Galion builds are open source under the Galion perpetual open MIT licence.

@@ -41,3 +41,7 @@ See `src/heartbeat.rs`.
 `scripts/run-dot-console-demo.sh` — real 80 ms heartbeat → `DotConsole` (galion-render one-dot: PNG sequence,
 terminal; the web one-dot screen is `scripts/run-v1-screen.sh`) + TIMING / EMOTION / BANDS / RIKA panel. Headless-safe. Embedding guide:
 `docs/agent-wave21/W21-04-ATTACH.md`.
+
+---
+
+© G.A.L.I.O.N. — General Autonomous Local Intelligence Open Network. All rights reserved and claims reserved. · CC0 voices: you must tick the consent box agreeing to the CC0 licence before using any CC0 voice; use is at your own responsibility. · No cookies. · De-Googled: no Google services. · All current Galion builds are open source under the Galion perpetual open MIT licence.

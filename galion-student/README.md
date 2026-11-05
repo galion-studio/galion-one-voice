@@ -20,3 +20,7 @@ The full plan is in `galion-voice-20/B7-student-plan.md`.
 | `configs/data.toml` | Shard manifests and the license allowlist |
 | `configs/eval.toml` | Gates in the style of Full-Duplex-Bench v1/v1.5, plus CPU RTF gates |
 | `configs/openmind-slot.toml` | The Obsidian Open Mind slot contract (`galion.slot.v2`). The voice-side nerve and cortex seam is [`crates/galion-openmind`](../crates/galion-openmind) and [OPENMIND-NERVE-CORTEX.md](../docs/galion-voice-v2/OPENMIND-NERVE-CORTEX.md). |
+
+---
+
+© G.A.L.I.O.N. — General Autonomous Local Intelligence Open Network. All rights reserved and claims reserved. · CC0 voices: you must tick the consent box agreeing to the CC0 licence before using any CC0 voice; use is at your own responsibility. · No cookies. · De-Googled: no Google services. · All current Galion builds are open source under the Galion perpetual open MIT licence.
