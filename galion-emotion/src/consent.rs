@@ -48,6 +48,7 @@ pub enum ConsentState {
     /// Explicit opt-in. `at_ms` = unix ms of consent, `notice_lang` = language
     /// of the Art. 50(3)/GDPR notice shown (e.g. "hr", "en").
     Granted { at_ms: u64, notice_lang: String, purpose: Purpose },
+    /// Explicit refusal, and the state of a new session. Sense is not granted.
     Denied,
     /// Withdrawn after being granted (GDPR Art. 7(3)). Must stop immediately.
     Withdrawn { at_ms: u64 },
@@ -70,6 +71,15 @@ impl ConsentDecision {
     }
 }
 
+/// Caller affect may enter the phone lane only when this is true.
+///
+/// `sense` is the in-band bit. The gate decision must also be [`ConsentDecision::Allow`].
+/// A session that starts denied fails both: the bit is unset and the decision
+/// is [`ConsentDecision::DenyNoConsent`].
+pub fn sense_granted(bits: u8, decision: ConsentDecision) -> bool {
+    bits & crate::band::consent_bits::SENSE != 0 && decision.allowed()
+}
+
 /// Hook point: hosts (Galion OS, Hermes, Galion One) plug their own consent
 /// store / UI here.
 pub trait ConsentGate {
@@ -79,7 +89,7 @@ pub trait ConsentGate {
     fn audit(&self, _purpose: Purpose, _decision: ConsentDecision) {}
 }
 
-/// Reference gate: in-memory state, default deny.
+/// Reference gate: in-memory state. A new session starts [`ConsentState::Denied`].
 #[derive(Debug, Clone)]
 pub struct DefaultConsentGate {
     pub state: ConsentState,
@@ -87,11 +97,16 @@ pub struct DefaultConsentGate {
 
 impl Default for DefaultConsentGate {
     fn default() -> Self {
-        Self { state: ConsentState::Unknown }
+        Self::denied()
     }
 }
 
 impl DefaultConsentGate {
+    /// Session start. LOCKS `[consent]` default is deny, and `sense` is deny.
+    pub fn denied() -> Self {
+        Self { state: ConsentState::Denied }
+    }
+
     pub fn grant(&mut self, at_ms: u64, notice_lang: &str, purpose: Purpose) {
         self.state = ConsentState::Granted { at_ms, notice_lang: notice_lang.to_string(), purpose };
     }
@@ -130,7 +145,49 @@ mod tests {
     #[test]
     fn default_is_deny() {
         let g = DefaultConsentGate::default();
+        assert_eq!(g.state, ConsentState::Denied);
         assert_eq!(g.check(Purpose::PersonalAssistant), ConsentDecision::DenyNoConsent);
+    }
+
+    #[test]
+    fn consent_starts_denied() {
+        let g = DefaultConsentGate::denied();
+        assert_eq!(DefaultConsentGate::default().state, ConsentState::Denied);
+        assert_eq!(g.check(Purpose::PersonalAssistant), ConsentDecision::DenyNoConsent);
+        assert!(!sense_granted(0, g.check(Purpose::PersonalAssistant)));
+        assert!(
+            !sense_granted(crate::band::consent_bits::SENSE, g.check(Purpose::PersonalAssistant)),
+            "a denied gate is not sense, even if the bit was set beside it"
+        );
+    }
+
+    #[test]
+    fn denied_session_does_not_apply_caller_affect() {
+        use crate::express::StubExpressor;
+        use crate::frame::EmotionFrame;
+
+        let g = DefaultConsentGate::default();
+        assert_eq!(g.state, ConsentState::Denied);
+        let caller = EmotionFrame {
+            seq: 4,
+            t_ms: 320,
+            dur_ms: 80,
+            valence: -0.8,
+            arousal: 0.9,
+            dominance: 0.8,
+            confidence: 1.0,
+        };
+        let expressor = StubExpressor;
+        let applied = expressor.voice_color(Some(&caller));
+        let lane = expressor.phone_lane(
+            Some(&caller),
+            crate::band::consent_bits::SENSE | crate::band::consent_bits::ADAPT,
+            Purpose::PersonalAssistant,
+            &g,
+        );
+        assert_ne!(lane, applied, "denied session applied caller affect");
+        assert_eq!(lane, expressor.voice_color(None));
+        assert_eq!(lane.e, 0.0);
     }
 
     #[test]
