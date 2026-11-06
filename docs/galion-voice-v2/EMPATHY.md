@@ -22,6 +22,25 @@ table attached to `e`.
 The 3-bit `Affect` field on `EmotionWire` is full, and `feeling_wire` is
 locked, so empathy is not a new label.
 
+## Situational feeling
+
+Situational feeling is the live weight on the feeling band. That weight is
+`e` above. `Feeling::conduct` writes it once per 80 ms frame from
+`voice_color`. Consent starts denied. `DefaultConsentGate::default` is
+`ConsentState::Unknown`, and `check` returns `DenyNoConsent` until an
+explicit grant for the purpose. The `sense` bit starts off. No caller frame
+means `e` is 0.
+
+## Phone lane
+
+Caller emotion does not steer the phone lane unless `sense` is granted.
+`PhoneLane` passes `Emotion::Neutral` on `reply_text`, `inject_text`, and
+`turn`. Callers may run `ProsodyEmotion` only when `sense` is granted. It
+is unwired on the lane. This page states no accuracy for that heuristic.
+An accuracy, or a claim that a granted `sense` already moved the spoken
+phone reply, stays **BLOCKED**. Reference wavs stay out of git. This page
+does not add one.
+
 ## Prosody at e = 1
 
 Blended from the existing VAD table toward this profile, then clamped.
