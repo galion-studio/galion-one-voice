@@ -16,9 +16,11 @@
 #   V1 V1 demo smoke    : galion-gates/v1-demo.sh (V1-04; scripts/run-v1-demo.sh --headless, SKIP if absent)
 #   OP one-percent      : galion-gates/op-one-percent.sh (V6 engine account; stub vs measured)
 #   SY symphony frame   : galion-gates/sy-frame.sh (80 ms tick + 1% stub-step ceiling; GALION_GATES_NO_SY=1 skips)
+#   RG offline rust     : galion-gates/rg-offline.sh (std-only rustc; no network, weights, or microphone;
+#                         wer/ecapa/mos/latency/ttfa stay BLOCKED; GALION_GATES_NO_RG=1 skips)
 # Usage: galion-gates/run-gates.sh [--strict-cv]
 #   env GALION_VPS_HOST=user@host [GALION_VPS_KEY=path] enables remote gates.
-#   env GALION_GATES_HARD=1 makes soft-gate failures (G4/G6/PS/LK/DG/LV/V1/OP/SY) count toward the exit code.
+#   env GALION_GATES_HARD=1 makes soft-gate failures (G4/G6/PS/LK/DG/LV/V1/OP/SY/RG) count toward the exit code.
 set -uo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$HERE/.." && pwd)"
@@ -117,6 +119,7 @@ soft DG "$ROOT/galion-demo/golden.sh"   # A14 canned demo golden (galion-gates/g
 [ "${GALION_GATES_NO_V1:-0}" = 1 ] && mark V1 SKIP "GALION_GATES_NO_V1=1" || soft V1 "$HERE/v1-demo.sh"   # V1-04 V1 demo smoke (headless)
 [ "${GALION_GATES_NO_OP:-0}" = 1 ] && mark OP SKIP "GALION_GATES_NO_OP=1" || soft OP "$HERE/op-one-percent.sh"   # V6 one-percent engine (symphony)
 [ "${GALION_GATES_NO_SY:-0}" = 1 ] && mark SY SKIP "GALION_GATES_NO_SY=1" || soft SY "$HERE/sy-frame.sh"   # symphony 80 ms / 1% tick
+[ "${GALION_GATES_NO_RG:-0}" = 1 ] && mark RG SKIP "GALION_GATES_NO_RG=1" || soft RG "$HERE/rg-offline.sh"   # offline rust gate; unmeasured metrics stay BLOCKED
 
 # ---------- Remote R0–R3 (VPS) ----------
 if [ -n "${GALION_VPS_HOST:-}" ]; then
@@ -133,9 +136,9 @@ else for g in 0 1 2 3; do mark R$g PENDING "GALION_VPS_HOST not set — VPS not 
 
 # ---------- summary ----------
 FAILS=0; { echo "{\"ts\":\"$TS\",\"root\":\"$ROOT\",\"probe\":$PROBE_JSON,\"gates\":{"
-  first=1; for g in G0 G1 G2 G3 G4 G6 PS LK DG LV V1 OP SY R0 R1 R2 R3; do
+  first=1; for g in G0 G1 G2 G3 G4 G6 PS LK DG LV V1 OP SY RG R0 R1 R2 R3; do
     [ $first = 1 ] || echo ","; first=0
     printf '"%s":{"status":"%s","note":"%s"}' "$g" "${ST[$g]}" "$(echo "${NOTE[$g]}" | sed 's/"/\\"/g')"
     [ "${ST[$g]}" = FAIL ] && FAILS=$((FAILS+1)); done; echo "}}"; } > "$JSON"
-say "== SUMMARY: G0=${ST[G0]} G1=${ST[G1]} G2=${ST[G2]} G3=${ST[G3]} | soft G4=${ST[G4]} G6=${ST[G6]} PS=${ST[PS]} LK=${ST[LK]} DG=${ST[DG]} LV=${ST[LV]} V1=${ST[V1]} OP=${ST[OP]} SY=${ST[SY]} | R0-R3=${ST[R0]}  fails=$FAILS  json=$JSON"
+say "== SUMMARY: G0=${ST[G0]} G1=${ST[G1]} G2=${ST[G2]} G3=${ST[G3]} | soft G4=${ST[G4]} G6=${ST[G6]} PS=${ST[PS]} LK=${ST[LK]} DG=${ST[DG]} LV=${ST[LV]} V1=${ST[V1]} OP=${ST[OP]} SY=${ST[SY]} RG=${ST[RG]} | R0-R3=${ST[R0]}  fails=$FAILS  json=$JSON"
 exit $([ $FAILS = 0 ] && echo 0 || echo 1)
