@@ -16,10 +16,16 @@
 //!          PersonaConditioning  ← one shared, versioned, fixed-size vector
 //!            │                    (persona one-hot + mood VAD + user VAD/conf + e)
 //!            ├─► PiperVoiceProfile::prosody() → PiperProsodyVector
-//!            │     (length_scale, noise_scale, noise_w, sentence silence,
-//!            │      pitch shift st, energy, pre-pause)       — today, Piper
+//!            │     (length_scale, sentence silence, pitch shift st,
+//!            │      energy, pre-pause)                        — feeling, today, Piper
+//!            │     noise_scale and noise_w stay on the body   — timbre, not mood
 //!            └─► ConditionedDecoder::condition()             — later, the in-house
 //!                                                              dual-band model (PR #73)
+//!
+//! Situational mood is read on the feeling band ([`PersonaMood::feeling`]).
+//! [`PersonaMood::timbre`] stays [`crate::persona::Timbre::REFERENCE`].
+//! Empathy `e` is [`empathy_weight`] of a consented reading. Confidence 0
+//! passes no frame, the same as consent deny. Mood valence is not a score.
 //! ```
 //!
 //! V1 building blocks reused, not replaced: [`EmotionFrame`] (VAD + confidence),
@@ -347,7 +353,8 @@ pub struct PiperVoiceProfile {
     pub pitch_per_arousal: f32,
     /// Energy multiplier slope per (arousal − 0.35).
     pub energy_per_arousal: f32,
-    /// noise_scale / noise_w slopes per (arousal − 0.35) (expressiveness).
+    /// Recorded expressiveness slopes. [`PiperVoiceProfile::prosody`] does not
+    /// apply them: situational mood must not change timbre.
     pub noise_per_arousal: f32,
     pub noise_w_per_arousal: f32,
     /// At e = 1 (V1 empathy weight): Δlength_scale, Δpitch st, energy ×, pre-pause ms.
@@ -521,6 +528,33 @@ impl PersonaMood {
         self.observations += 1;
     }
 
+    /// Spectral body. Always the reference match (strength 0).
+    /// [`Self::observe`], [`Self::tick`], and [`Self::conditioning`] do not
+    /// take a timbre and do not write one.
+    pub fn timbre(&self) -> crate::persona::Timbre {
+        crate::persona::Timbre::REFERENCE
+    }
+
+    /// Situational mood on the feeling band at `now` (decays first).
+    ///
+    /// Empathy `e` is [`empathy_weight`] of the last reading when that reading
+    /// has confidence. Confidence 0 passes no frame, the same as consent deny.
+    /// The persona's mood valence is not copied into `e`.
+    /// Timbre is not part of the return and is not updated.
+    pub fn feeling(&mut self, now_ms: u64) -> crate::persona::Feeling {
+        self.tick(now_ms);
+        let voice = match self.persona {
+            Persona::Samantha => crate::persona::VoicePersona::Samantha,
+            Persona::Jarvis => crate::persona::VoicePersona::Jarvis,
+        };
+        let frame = if self.last_user.confidence > 0.0 {
+            Some(self.last_user.as_frame())
+        } else {
+            None
+        };
+        crate::persona::Feeling::situational(voice, frame.as_ref()).0
+    }
+
     /// The shared conditioning vector at `now` (decays first).
     pub fn conditioning(&mut self, now_ms: u64) -> PersonaConditioning {
         self.tick(now_ms);
@@ -617,7 +651,13 @@ impl PiperProsodyVector {
 }
 
 impl PiperVoiceProfile {
+    /// Noise of the persona body. Not a function of mood.
+    pub fn body_noise(&self) -> (f32, f32) {
+        (self.base_noise_scale.clamp(0.2, 0.9), self.base_noise_w.clamp(0.2, 1.0))
+    }
+
     /// Persona-conditioned Piper prosody from mood + user emotion (via `e`).
+    /// `noise_scale` and `noise_w` stay on [`Self::body_noise`].
     pub fn prosody(&self, c: &PersonaConditioning) -> PiperProsodyVector {
         let m = c.mood;
         let da = m.arousal - 0.35;
@@ -628,8 +668,7 @@ impl PiperVoiceProfile {
             .clamp(-self.pitch_bound_st, self.pitch_bound_st);
         let energy = (self.base_energy * (1.0 + self.energy_per_arousal * da) * (1.0 + (self.empathy_energy - 1.0) * e))
             .clamp(self.energy_bounds.0, self.energy_bounds.1);
-        let noise = (self.base_noise_scale + self.noise_per_arousal * da + 0.05 * m.valence).clamp(0.2, 0.9);
-        let noise_w = (self.base_noise_w + self.noise_w_per_arousal * da).clamp(0.2, 1.0);
+        let (noise, noise_w) = self.body_noise();
         let silence = (self.base_sentence_silence_s - 0.25 * da).clamp(0.08, 0.45);
         let pause = (self.base_pre_pause_ms + self.empathy_pause_ms * e).clamp(0.0, 400.0);
         PiperProsodyVector {
@@ -813,6 +852,61 @@ mod tests {
         assert_eq!(a.len(), CONDITIONING_DIM);
         assert_eq!((a[0], a[1]), (0.0, 1.0));
         assert_eq!(CONDITIONING_VERSION, 1);
+    }
+
+    #[test]
+    fn situational_mood_stays_on_the_feeling_band_and_does_not_move_timbre() {
+        use crate::express::empathy_weight;
+        use crate::persona::{Manner, Timbre, VoicePersona};
+
+        let mut s = PersonaMood::new(Persona::Samantha);
+        let mut j = PersonaMood::new(Persona::Jarvis);
+        assert_eq!(s.timbre(), Timbre::REFERENCE);
+        assert_eq!(j.timbre(), Timbre::REFERENCE);
+        assert_eq!(s.feeling(0).e, 0.0);
+        assert_eq!(j.feeling(0).e, empathy_weight(None));
+
+        let joy = obs(0.9, 0.9, 0.5, 0.9);
+        for t in 1..6 {
+            s.observe(&joy, t * 300);
+        }
+        let felt = s.feeling(1_800);
+        assert!(s.mood.valence > SAMANTHA.dynamics.rest.valence);
+        assert_eq!(felt.e, 0.0, "mood valence is not an empathy score");
+        assert_eq!(felt.e, empathy_weight(Some(&s.last_user.as_frame())));
+        assert_eq!(felt.manner, Manner::Shared);
+        assert_eq!(felt.persona, VoicePersona::Samantha);
+        assert_eq!(s.timbre(), Timbre::REFERENCE);
+        let (ns, nw) = SAMANTHA.voice.body_noise();
+        let p = s.conditioning(1_800).piper();
+        assert_eq!(p.noise_scale, ns);
+        assert_eq!(p.noise_w, nw);
+        assert!(SAMANTHA.voice.noise_per_arousal > 0.0);
+        assert!(SAMANTHA.voice.noise_w_per_arousal > 0.0);
+
+        let tired = EmotionFrame { seq: 1, t_ms: 80, dur_ms: 80, valence: -0.6, arousal: 0.2, dominance: 0.4, confidence: 1.0 };
+        j.observe(&UserObservation::from_frame(&tired), 80);
+        let answered = j.feeling(80);
+        assert_eq!(answered.e, empathy_weight(Some(&tired)));
+        assert!((answered.e - 1.0).abs() < 1e-6);
+        assert_eq!(answered.manner, Manner::Answered);
+        assert_eq!(answered.persona, VoicePersona::Jarvis);
+        assert_eq!(j.timbre(), Timbre::REFERENCE);
+        let (jn, jw) = JARVIS.voice.body_noise();
+        let pj = j.conditioning(80).piper();
+        assert_eq!(pj.noise_scale, jn);
+        assert_eq!(pj.noise_w, jw);
+
+        let mut denied = PersonaMood::new(Persona::Jarvis);
+        denied.observe(&obs(-0.9, 0.95, 0.9, 0.0), 80);
+        assert_eq!(denied.feeling(80).e, 0.0);
+        assert_eq!(denied.timbre().match_strength, 0.0);
+
+        let src = include_str!("persona_mood.rs");
+        let code = src.split("#[cfg(test)]").next().unwrap_or(src).to_ascii_lowercase();
+        assert!(!code.contains(".safetensors"));
+        assert!(!code.contains(".gguf"));
+        assert!(!code.contains("cuda"));
     }
 
     #[test]
