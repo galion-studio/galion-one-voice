@@ -5,6 +5,10 @@ Europe/Zagreb. 2026-11-03.
 
 The spelling is **Galion**. The product is Galion Voice.
 
+## Policy
+
+Cloning is Rust-first. This note is the on-demand fetch for the Rust slot. It does not train a voice. Piper training on own-voice clips is forbidden. Reference wavs stay outside git and are read-only. They are not release assets, not pin rows, and not Git LFS objects. The deployed Jarvis voice must not change. Fetch does not run generate. WER, ECAPA, MOS, and timings are not measured here. Those gates stay **BLOCKED**. No audio file is added. `LOCKS.toml` is not edited.
+
 `weights/clone/` holds the Chatterbox safetensors. `weights/.gitignore` is `*`, so a CloudAgent clone has the pins and the fetch script and none of the bytes. Putting the directory in the git tree would copy about 4.58 GiB into every VM. This note is the on-demand fetch. The bytes stay gitignored.
 
 LOCKS.toml is unchanged. `reference_clips` stays false. Samantha and Jarvis reference clips stay on the admin box. They are not release assets, not pin rows, and not Git LFS objects.
@@ -140,6 +144,6 @@ Film audio stays out of Git LFS (`CLIP-INGEST.md`). An LFS pattern on `weights/`
 
 ## What this file does not do
 
-The worker still does not call generate from this note. Piper remains the speaking fallback when the pack is absent. Rights for the two film voices stay closed (`RIGHTS-CLEARANCE.md`).
+The worker still does not call generate from this note. Piper remains the speaking fallback when the pack is absent. Piper training on own-voice clips is forbidden. Reference wavs stay outside git and are read-only. The deployed Jarvis voice must not change. WER, ECAPA, MOS, and timings stay **BLOCKED**. Rights for the two film voices stay on the checklist in `RIGHTS-CLEARANCE.md`.
 
 — Maciej Grajczyk

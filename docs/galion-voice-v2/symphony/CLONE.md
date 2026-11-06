@@ -5,6 +5,10 @@ Europe/Zagreb. 2026-11-03. Symphony section. Index: [README.md](README.md).
 
 The spelling is **Galion**. The product is Galion Voice.
 
+## Policy
+
+Cloning is Rust-first. The request line, the clip compiler, and the cbx slot are Rust. `scripts/clone/chatterbox_worker.py` stays an out-of-process child. Piper training on own-voice clips is forbidden. Reference wavs stay outside git and are read-only. The deployed Jarvis voice must not change. This page does not record WER, ECAPA, MOS, or a timing. Those gates stay **BLOCKED** until a run on this machine writes the measurement beside the command. No audio file is added.
+
 Clone landing uses the current Samantha and Jarvis models. References are the WAV files in [CLIP-STORE.md](CLIP-STORE.md). The child is one long-lived process: a JSON line on stdin, 24 kHz s16le on stdout.
 
 ```text
@@ -33,7 +37,7 @@ Pins: `scripts/clone/PINS.sha256`. Nano is `t3_nano_v1.safetensors` plus shared 
 
 **FAIL** when PCM is silent, the hash mismatches, or the Jarvis take has had the hub texture removed. See [JARVIS-TEXTURE.md](JARVIS-TEXTURE.md).
 
-**BLOCKED** while generate is unwired or the WAV refs are not on the machine. This landing has not logged a smoke speak.
+**BLOCKED** while generate is unwired or the WAV refs are not on the machine. This landing has not logged a smoke speak. WER, ECAPA, MOS, and timings are not measured here. Each of those gates stays **BLOCKED**. An unlogged smoke speak does not become a timing.
 
 Fetch and the flash clock: [TTFA.md](TTFA.md). Record the gate in [SELF-EVAL.md](SELF-EVAL.md).
 
@@ -43,7 +47,10 @@ Turbo ONNX voice-profile conditioning can miss late expressive moments because
 the encoder graph crops LM features to the first 6 s. The opt-in prep in
 [EMOTION-BLEND.md](EMOTION-BLEND.md) (`tools/cloning-v2/`) rotates or montages
 the reference before `voice add`. Default clone landing and Piper stay unchanged.
-Samantha production on 2026-11-05 uses the coherent-rotation candidate; Jarvis does not.
+Samantha production on 2026-11-05 uses the coherent-rotation candidate. Jarvis does not.
+Piper training on own-voice clips is forbidden. The reference wav stays outside git and is read-only.
+The deployed Jarvis voice must not change.
+This section does not copy WER, ECAPA, MOS, or a timing from the blend report. Those gates stay **BLOCKED** here.
 
 — Maciej Grajczyk
 

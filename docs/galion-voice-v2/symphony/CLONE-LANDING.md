@@ -5,6 +5,10 @@ Europe/Zagreb. 2026-11-03. The harness is the spec.
 
 Master slogan: "The seamless connection with the human being, on the voice only."
 
+## Policy
+
+Cloning is Rust-first. This landing's clip emit is Rust (`speech::galion_clip`). The Python child is the protocol stub. Piper training on own-voice clips is forbidden. Reference wavs stay outside git and are read-only. The deployed Jarvis voice must not change. Hub texture stays in the reference file. WER, ECAPA, MOS, and timings are not measured on this page. Those gates stay **BLOCKED**. No audio file is added. `LOCKS.toml` is not edited.
+
 This is the landing for the **current** Samantha and Jarvis references on the
 current Chatterbox Nano worker. It does not swap models. Turbo stays the
 quality option already named on the worker line. It does not fetch weights.
@@ -26,8 +30,8 @@ It does not edit `LOCKS.toml`.
 ## References
 
 Owner t273 clears **local** send of the two current wavs. No counsel name is
-recorded. The wavs are gitignored. MP3 is never a reference. This tree does
-not fetch them and does not commit them.
+recorded. The wavs stay outside git and are read-only. MP3 is never a reference. This tree does
+not fetch them, does not commit them, and does not add an audio file.
 
 | Persona | Repo path (gitignored) | Store path | sha256 | Shape | Texture |
 |---|---|---|---|---|---|
@@ -154,8 +158,8 @@ No reply wav is written.
 Chatterbox generate is not called. The Nano safetensors are not in git and
 are not downloaded by this change. Until both exist, `SpeechStack` does not
 select the clone slot (`weights_ready` is false) and Piper or flite speaks.
-A CPU time-to-first-audio number is not claimed. The 0.65–1.15 GB RAM band
-is the planning figure, not a measurement from this machine.
+A CPU time-to-first-audio number is not claimed. WER, ECAPA, MOS, and timings stay **BLOCKED**. The 0.65–1.15 GB RAM band
+is the planning figure already written above, not a new measurement from this machine. The deployed Jarvis voice must not change.
 
 — Maciej Grajczyk
 
