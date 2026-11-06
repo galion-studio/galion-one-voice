@@ -25,8 +25,8 @@
 //!    `GALION_SPEECH_WEIGHTS` or `<repo>/weights/tts/`) AND a decoder for it exists
 //!    ([`weights::decoder_for`]). Today: Piper VITS `en_US-ljspeech-medium` (MIT),
 //!    decoded on the CPU by one persistent out-of-process Piper worker
-//!    ([`piper_worker`]). With no pack it reports `Absent` and the stack falls
-//!    back to flite.
+//!    ([`piper_worker`]). With no pack it reports `Absent` and the stack selects
+//!    the flite fallback. A clone handoff with that pack absent does the same.
 //! 2. [`flite::FliteTts`] — FALLBACK system TTS (only when the A21 pack/runtime is
 //!    missing): the distro `libflite1`, opened with `dlopen`. Real words, not neural.
 //! 3. none — the caller must fail loudly (FRXDEL Q2: the EN cascade must say
@@ -240,6 +240,23 @@ enum Engine {
     Mock(Box<dyn TtsEngine + Send>),
 }
 
+// Staged by the missing-pack unit test so selection can be proven without
+// libflite and without a voice pack on disk. Unset in every other test.
+#[cfg(test)]
+thread_local! {
+    static TEST_FLITE: std::cell::RefCell<Option<flite::FliteTts>> = const { std::cell::RefCell::new(None) };
+}
+
+/// Existing flite fallback. Tests may stage an in-memory [`flite::FliteTts`];
+/// otherwise this is [`flite::FliteTts::open_default`].
+fn open_flite() -> Result<flite::FliteTts, VoiceError> {
+    #[cfg(test)]
+    if let Some(tts) = TEST_FLITE.with(|slot| slot.borrow().clone()) {
+        return Ok(tts);
+    }
+    flite::FliteTts::open_default()
+}
+
 impl SpeechStack {
     fn bare(
         backend: SpeechBackend,
@@ -261,6 +278,28 @@ impl SpeechStack {
             .unwrap_or_else(|_| "auto".into())
             .to_ascii_lowercase();
         let weights = weights::WeightStatus::discover();
+        let for_a21 = weights.clone();
+        Self::select(
+            &mode,
+            weights,
+            clone_worker::CloneTts::try_new,
+            || weights::A21WeightTts::try_new(&for_a21),
+            open_flite,
+        )
+    }
+
+    /// Choose a backend from an already-known weight status.
+    ///
+    /// A missing Piper voice pack makes [`weights::A21WeightTts::try_new`] fail.
+    /// `auto` and `clone` then open the existing flite fallback. `a21` stays
+    /// silent. Nothing here downloads a pack.
+    fn select(
+        mode: &str,
+        weights: weights::WeightStatus,
+        clone: impl FnOnce() -> Result<clone_worker::CloneTts, String>,
+        a21: impl FnOnce() -> Result<weights::A21WeightTts, String>,
+        flite: impl FnOnce() -> Result<flite::FliteTts, VoiceError>,
+    ) -> Self {
         if mode == "off" {
             return Self::bare(
                 SpeechBackend::None {
@@ -271,7 +310,7 @@ impl SpeechStack {
             );
         }
         if mode == "auto" || mode == "clone" {
-            if let Ok(t) = clone_worker::CloneTts::try_new() {
+            if let Ok(t) = clone() {
                 let model = t.model_name().to_string();
                 let persona = t.persona().to_string();
                 return Self::bare(
@@ -282,7 +321,7 @@ impl SpeechStack {
             }
         }
         if mode == "auto" || mode == "a21" || mode == "clone" {
-            if let Ok(t) = weights::A21WeightTts::try_new(&weights) {
+            if let Ok(t) = a21() {
                 let voice = t.voice().to_string();
                 return Self::bare(
                     SpeechBackend::A21Weights { voice },
@@ -299,7 +338,7 @@ impl SpeechStack {
             }
         }
         if mode == "auto" || mode == "flite" || mode == "clone" {
-            match flite::FliteTts::open_default() {
+            match flite() {
                 Ok(t) => {
                     let voice = t.voice().to_string();
                     Self::bare(
@@ -325,6 +364,23 @@ impl SpeechStack {
                 None,
             )
         }
+    }
+
+    /// Missing Piper pack, clone slot closed. Used by the unit test so a host
+    /// clone install cannot hide the flite choice. Does not read weight files.
+    #[cfg(test)]
+    fn for_absent_piper_pack(mode: &str) -> Self {
+        let weights = weights::WeightStatus::Absent {
+            searched: vec!["unit-test: piper voice pack not on disk".into()],
+        };
+        let for_a21 = weights.clone();
+        Self::select(
+            mode,
+            weights,
+            || Err("clone slot closed in the missing-pack unit test".into()),
+            || weights::A21WeightTts::try_new(&for_a21),
+            open_flite,
+        )
     }
 
     /// A stack that cannot speak. `GALION_SPEECH=off` uses this shape.
@@ -555,13 +611,14 @@ impl SpeechStack {
     }
 
     /// One Piper utterance without retiring the clone child.
+    /// A missing voice pack speaks this utterance with the existing flite fallback.
     fn piper_beside(&mut self, text: &str) -> Result<Audio, VoiceError> {
         self.clear_clone_pending();
         if self.piper_side.is_none() {
-            let piper = weights::A21WeightTts::try_new(&self.weights).map_err(|_| {
-                VoiceError::Backend("clone ref not allowlisted and A21 piper is absent".into())
-            })?;
-            self.piper_side = Some(piper);
+            match weights::A21WeightTts::try_new(&self.weights) {
+                Ok(piper) => self.piper_side = Some(piper),
+                Err(_) => return self.flite_beside(text),
+            }
         }
         let piper = self.piper_side.as_mut().expect("piper side");
         let first = piper.synthesize(text, LanguageId::En);
@@ -581,17 +638,42 @@ impl SpeechStack {
         Ok(audio)
     }
 
-    /// Piper speaks when the clone child cannot. The lane is not restarted.
+    /// Piper speaks when the clone child cannot. A missing Piper voice pack
+    /// selects the existing flite fallback. The lane is not restarted.
     fn fallback_piper(&mut self, text: &str) -> Result<Audio, VoiceError> {
         self.clear_clone_pending();
-        let Ok(piper) = weights::A21WeightTts::try_new(&self.weights) else {
-            return Err(VoiceError::Backend(
-                "clone worker failed and A21 piper is absent".into(),
-            ));
-        };
-        let voice = piper.voice().to_string();
-        self.backend = SpeechBackend::A21Weights { voice };
-        self.engine = Some(Engine::A21(piper));
+        if let Ok(piper) = weights::A21WeightTts::try_new(&self.weights) {
+            let voice = piper.voice().to_string();
+            self.backend = SpeechBackend::A21Weights { voice };
+            self.engine = Some(Engine::A21(piper));
+            return self.synth_one(text);
+        }
+        self.fallback_flite(text, "clone worker failed and the Piper voice pack is absent")
+    }
+
+    /// This utterance uses flite. The clone child stays up.
+    fn flite_beside(&mut self, text: &str) -> Result<Audio, VoiceError> {
+        let mut t = open_flite().map_err(|e| {
+            VoiceError::Backend(format!(
+                "clone ref not allowlisted, Piper voice pack absent; {e}"
+            ))
+        })?;
+        let voice = t.voice().to_string();
+        let mut audio = t.synthesize(text, LanguageId::En)?;
+        apply_frame_prosody(&mut audio.samples, audio.sample_rate, self.frame_prosody);
+        self.spoken_id = Some("system-flite");
+        self.spoken_label = SpeechBackend::SystemFlite { voice }.label();
+        Ok(audio)
+    }
+
+    /// Replace a dead clone slot with the existing flite fallback.
+    fn fallback_flite(&mut self, text: &str, why: &str) -> Result<Audio, VoiceError> {
+        let t = open_flite().map_err(|e| {
+            VoiceError::Backend(format!("{why}; {e}"))
+        })?;
+        let voice = t.voice().to_string();
+        self.backend = SpeechBackend::SystemFlite { voice };
+        self.engine = Some(Engine::Flite(t));
         self.synth_one(text)
     }
 
@@ -763,6 +845,95 @@ mod tests {
         off.prewarm();
         assert_eq!(off.warmth().piper_pid, None);
         assert!(off.clone_frames().is_none());
+    }
+
+    /// Missing Piper pack selects the existing flite fallback.
+    /// The pack status is built in memory. No weight file is read and nothing is fetched.
+    #[test]
+    fn missing_piper_pack_selects_flite_without_downloading() {
+        let pcm = vec![0.25, -0.5, 0.125, 0.0];
+        let _staged = StagedFlite::arm(pcm.clone());
+        let absent = weights::WeightStatus::Absent {
+            searched: vec!["unit-test: piper voice pack not on disk".into()],
+        };
+        let err = match weights::A21WeightTts::try_new(&absent) {
+            Err(e) => e,
+            Ok(_) => panic!("absent piper pack must not open A21"),
+        };
+        assert!(err.contains("ABSENT"), "{err}");
+
+        let mut auto = SpeechStack::for_absent_piper_pack("auto");
+        assert!(matches!(auto.backend, SpeechBackend::SystemFlite { ref voice } if voice == "slt"), "{}", auto.backend.label());
+        assert_eq!(auto.backend.speech_token(), "flite");
+        assert_eq!(auto.backend.id(), "system-flite");
+        assert!(auto.backend.label().contains("NOT A21"));
+        assert!(auto.backend.label().contains("NOT neural"));
+        assert_eq!(auto.weights.id(), "absent");
+        assert!(auto.weights.summary().contains("unit-test: piper voice pack not on disk"));
+        assert!(auto.can_speak());
+        let audio = auto.speak("Hello from the flite fallback.").unwrap();
+        assert_eq!(audio.sample_rate, SPEECH_RATE);
+        assert_eq!(audio.samples, pcm);
+        assert_eq!(auto.reported().0, "system-flite");
+
+        let clone_mode = SpeechStack::for_absent_piper_pack("clone");
+        assert_eq!(clone_mode.backend.speech_token(), "flite");
+        assert!(matches!(clone_mode.backend, SpeechBackend::SystemFlite { ref voice } if voice == "slt"));
+
+        let strict = SpeechStack::for_absent_piper_pack("a21");
+        assert_eq!(strict.backend.speech_token(), "ABSENT");
+        assert!(!strict.can_speak());
+        assert!(strict.backend.label().contains("GALION_SPEECH=a21"), "{}", strict.backend.label());
+
+        let off = SpeechStack::for_absent_piper_pack("off");
+        assert!(!off.can_speak());
+        assert_eq!(off.backend.speech_token(), "ABSENT");
+    }
+
+    /// A refused clone ref keeps the child and speaks with flite when the Piper pack is absent.
+    #[test]
+    fn refused_clone_with_missing_piper_pack_speaks_flite() {
+        let pcm = vec![0.25, -0.5, 0.125, 0.0];
+        let _staged = StagedFlite::arm(pcm.clone());
+        let dir = std::env::temp_dir().join(format!("galion-flite-fallback-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let script = dir.join("fake-clone.py");
+        std::fs::write(&script, "import sys\nsys.exit(0)\n").unwrap();
+        let worker = clone_worker::CloneWorker::spawn_for_test(
+            &script,
+            clone_worker::CloneModel::Nano,
+            "samantha",
+        );
+        let slot = clone_worker::CloneTts::for_test(worker, dir.clone()).with_verdicts([false, false]);
+        let mut stack = SpeechStack::from_clone(slot);
+        assert_eq!(stack.weights.id(), "absent");
+        let audio = stack.speak("Hello.").unwrap();
+        assert_eq!(audio.samples, pcm);
+        assert_eq!(stack.reported().0, "system-flite");
+        assert!(stack.reported().1.contains("NOT A21"));
+        assert!(matches!(stack.backend, SpeechBackend::Clone { .. }), "the clone child stays up");
+        assert!(std::fs::read_dir(&dir).unwrap().all(|e| {
+            let name = e.unwrap().file_name().to_string_lossy().into_owned();
+            !name.ends_with(".onnx") && !name.ends_with(".wav") && !name.ends_with(".onnx.json")
+        }));
+        drop(stack);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    struct StagedFlite;
+    impl StagedFlite {
+        fn arm(samples: Vec<f32>) -> Self {
+            TEST_FLITE.with(|slot| {
+                *slot.borrow_mut() = Some(flite::FliteTts::scripted("slt", samples));
+            });
+            StagedFlite
+        }
+    }
+    impl Drop for StagedFlite {
+        fn drop(&mut self) {
+            TEST_FLITE.with(|slot| *slot.borrow_mut() = None);
+        }
     }
 
     #[test]
