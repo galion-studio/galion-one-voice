@@ -1,0 +1,16 @@
+{
+  "voice": "own-samantha",
+  "persona": "samantha",
+  "dtype": "fp32",
+  "temperature": 0,
+  "seed": 0,
+  "timbre_match": 0.5,
+  "timbre_ref": "$GALION_CLIP_STORE/samantha/reference.wav",
+  "prosody": false,
+  "notes": "Cloning V2 emotion-blend 2026-11-05: coherent-rotation blend-preserve (own-samantha-v2-blendfix-coherent) + timbre 0.5; T0/fp32. MOS tradeoff accepted by Slavik.",
+  "emotion_blend": {
+    "mode": "blend-preserve",
+    "source": "own-samantha-v2-blendfix-coherent",
+    "sha256": "695b72669cd3e67b8cd4a951803582574dec6fc0375cb3de711076c86886bde3"
+  }
+}

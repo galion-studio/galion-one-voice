@@ -1,0 +1,53 @@
+#!/usr/bin/env python3
+"""Shared cloning entry point. Default = byte-identical existing cbx binary and encode path.
+Opt-in expression diversity only; never writes a protected/previously existing voice.
+"""
+import json, os, pathlib, re, shutil, sys
+ROOT=pathlib.Path(__file__).resolve().parents[1]
+args=sys.argv[1:]; enabled=None; work=None; config=None; forwarded=[]
+i=0
+while i<len(args):
+    a=args[i]
+    if a in ('--emotion-blend','--no-emotion-blend'):
+        enabled=a=='--emotion-blend'; i+=1
+    elif a in ('--blend-work-dir','--blend-config'):
+        if i+1==len(args): raise SystemExit(f'{a} requires a value')
+        if a=='--blend-work-dir': work=pathlib.Path(args[i+1]).resolve()
+        else: config=pathlib.Path(args[i+1])
+        i+=2
+    else: forwarded.append(a); i+=1
+
+def value(flag):
+    for i,a in enumerate(forwarded):
+        if a==flag and i+1<len(forwarded): return forwarded[i+1]
+        if a.startswith(flag+'='): return a.split('=',1)[1]
+    return None
+name=value('--name'); reference=value('--voice-wav')
+if not name or not reference:
+    raise SystemExit('Usage: cbx-add-voice [--emotion-blend|--no-emotion-blend] [--blend-work-dir DIR] --name NEW --voice-wav ORIGINAL [--dtype fp32]')
+if not re.fullmatch(r'[A-Za-z0-9_-]+',name): raise SystemExit('Unsafe voice name')
+if name in ('own-samantha','own-jarvis') or '.bak' in name: raise SystemExit('Protected deployed voice; use a new candidate name')
+cache=pathlib.Path(os.environ.get('HF_HOME',pathlib.Path.home()/'.cache/huggingface'))/'cbx/voices'
+if (cache/(name+'.cbxvoice')).exists(): raise SystemExit('Voice already exists; choose a fresh name')
+if config is None: config=ROOT/'voice-defaults'/f'{name}.json'
+settings=json.loads(config.read_text()) if config.exists() else {}
+if enabled is None: enabled=settings.get('emotion_blend',{}).get('enabled',False) is True
+legacy=os.environ.get('CBX',str(ROOT/'cbx-v2-timbre/target/release/cbx'))
+if not enabled:
+    # This branch invokes the unmodified production binary; no scorer/prep/split encode.
+    os.execvp('flock',['flock','/tmp/cbx-render.lock','nice','-n','10',legacy,'--intra-threads','2','--inter-threads','2','voice','add',*forwarded])
+if not re.fullmatch(r'own-.+-v2-blend-.+',name): raise SystemExit('Blend candidates must be named own-<persona>-v2-blend-<tag>')
+if value('--conditioning-wav'): raise SystemExit('Do not combine explicit conditioning with automatic blend selection')
+if work is None: raise SystemExit('--emotion-blend requires --blend-work-dir NEW_DIR for auditable outputs')
+work.mkdir(parents=True,exist_ok=True)
+import subprocess
+if not value('--dtype'): forwarded.extend(['--dtype','fp32'])
+builder=os.environ.get('BLEND_REF',str(ROOT/'emotion-blend-ref/target/release/galion-blend-ref'))
+scorer=os.environ.get('EMOTION_SCORER',str(ROOT.parent/'scorers/emotion/target/release/galion-emotion'))
+blend=os.environ.get('CBX_BLEND',str(ROOT/'cbx-v2-timbre/target/release/cbx-blend'))
+for p in (builder,scorer,blend):
+    if not os.path.isfile(p): raise SystemExit(f'Missing build: {p}')
+reference=str(pathlib.Path(reference).resolve()); montage=work/'conditioning.wav'; meta=work/'conditioning.json'
+subprocess.run(['nice','-n','10',builder,'--input',reference,'--output',str(montage),'--meta',str(meta),'--scorer',scorer],check=True)
+# Both speech-encoder invocations hold the same lock used by all TTS workers.
+os.execvp('flock',['flock','/tmp/cbx-render.lock','nice','-n','10',blend,'--intra-threads','2','--inter-threads','2','voice','add',*forwarded,'--conditioning-wav',str(montage)])

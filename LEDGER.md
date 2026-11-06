@@ -124,6 +124,9 @@
 
 **2026-11-04 20:49 CET · CC0 donors ON again (owner t628u).** Owner: the 16:01 "no CC0" was a wrong click. Revert of 4f28c0c restores `reference_clips = true` for the CC0 LibriVox / Voice Zero donors (Amy Koenig -> samantha, Alan Davis Drake -> jarvis). consent.txt states the true basis (public-domain dedication + CC0 1.0, no signed release, public_demo: no). New: CC0 licence checkbox in the voice page, enforced server-side per session in memory (`galion_consent::Cc0Acceptances`, floor `cc0_licence`, `CloneTts::synthesize`). No celebrity clone stays. Branch `swarm/clone-unblock`. Not deployed.
 
+**2026-11-05 22:54 CET · Cloning V2 emotion blend · Samantha coherent-rotation promoted.** Maciej Grajczyk. Admin Slavik (relayed by owner Mate, t765u) accepted MOS 4.13→~3.88 to restore emotion. Root cause: cbx ONNX LM conditioning sees only the first 6 s / 10 s of reference features; Samantha happy evidence sits ~9.9–12.4 s. Shared tooling lands under `tools/cloning-v2/` (pipeline emotion-blend-ref, cbx-clone-voice `--blend-preserve`, cbx-add-voice `--emotion-blend`, cbx-v2-timbre, galion-voicecheck, voice-defaults) and `docs/galion-voice-v2/symphony/EMOTION-BLEND.md`. Samantha 12-line T0: WER 0.01455, ECAPA 0.7081, emo dist 0.437251, MOS 3.8757 (gate PASS). Jarvis coherent-rotation failed its guard and was not promoted. No voice WAVs or `.cbxvoice` in git. `LOCKS.toml` not edited. Piper remains live call TTS; cbx clone worker voice store switched separately.
+
+
 ---
 
 © G.A.L.I.O.N. — General Autonomous Local Intelligence Open Network. All rights reserved and claims reserved. · CC0 voices: you must tick the consent box agreeing to the CC0 licence before using any CC0 voice; use is at your own responsibility. · No cookies. · De-Googled: no Google services. · All current Galion builds are open source under the Galion perpetual open MIT licence.
