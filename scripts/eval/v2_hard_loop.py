@@ -801,6 +801,7 @@ def report_json(gates: list[Gate], verdict: str, line: str, claim: bool, ttfa_ms
         "overall": verdict,
         "hard_pass": verdict == "HARD-PASS",
         "product_claim": claim,
+        "measured": bool(claim and ttfa_ms is not None),
         "engine": "piper" if claim else None,
         "report_line": line,
         "missing": missing_gates(gates),
@@ -1776,8 +1777,10 @@ def logic_self_check() -> None:
     assert classify_piper_ttfa({"found": True, "pcm_bytes": 4000, "ttfa_ms": 90, "rate": 22050}).status == "met"
     blob = report_json(incomplete, "HARD-FAIL", fail_line, False, None)
     assert "ttfa_ms" not in blob
+    assert blob["measured"] is False
     claimed = report_json(full, "HARD-PASS", hard_line, True, 90)
     assert claimed["product_claim"] is True
+    assert claimed["measured"] is True
     assert claimed["engine"] == "piper"
     assert claimed["ttfa_ms"] == 90
     assert claimed["ttfa_kind"] == "piper-cpu"
