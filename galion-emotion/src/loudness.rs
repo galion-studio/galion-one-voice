@@ -6,7 +6,7 @@
 //!  caller PCM ─► GatedDetector<E>  (gate FIRST, input checks, seq, EMA)  ─► EmotionFrame
 //!                     │
 //!                     └─ E: AffectEstimator   ← swap this, nothing else changes
-//!                          • LoudnessEstimator   heuristic, RMS/ZCR (today's runtime stub; no valence)
+//!                          • LoudnessEstimator   heuristic, RMS/ZCR (runtime stub; no valence)
 //!                          • SyntheticEstimator  deterministic fixture modes (tests / console / Rika)
 //!                          • ReferenceEstimator  replays an OFFLINE label track (e.g. a SenseVoice-Small
 //!                                                dev-oracle run done elsewhere) — reference only
@@ -109,6 +109,34 @@ pub fn rms_zcr(pcm: &[f32]) -> (f32, f32) {
     (rms, zc)
 }
 
+/// Acoustic features this crate already computes for one window.
+/// Recognition reads these. It does not load weights.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct AcousticFeatures {
+    pub rms: f32,
+    pub zcr: f32,
+}
+
+impl AcousticFeatures {
+    pub fn from_pcm(pcm: &[f32]) -> Self {
+        let (rms, zcr) = rms_zcr(pcm);
+        Self { rms, zcr }
+    }
+}
+
+impl LoudnessEstimator {
+    /// Same mapping as [`AffectEstimator::estimate`]. Valence stays `None`.
+    pub fn estimate_features(&self, features: AcousticFeatures) -> Estimate {
+        let arousal = (features.rms / self.full_scale_rms).min(1.0);
+        Estimate {
+            valence: None,
+            arousal,
+            dominance: 0.4 + 0.3 * arousal - 0.2 * features.zcr.min(1.0),
+            confidence: if features.rms < self.silence_rms { 0.0 } else { self.confidence },
+        }
+    }
+}
+
 impl AffectEstimator for LoudnessEstimator {
     fn kind(&self) -> EstimatorKind {
         EstimatorKind::Heuristic
@@ -117,14 +145,7 @@ impl AffectEstimator for LoudnessEstimator {
         "loudness"
     }
     fn estimate(&mut self, pcm: &[f32], _sample_rate: u32, _t_ms: u32) -> Estimate {
-        let (rms, zc) = rms_zcr(pcm);
-        let arousal = (rms / self.full_scale_rms).min(1.0);
-        Estimate {
-            valence: None,
-            arousal,
-            dominance: 0.4 + 0.3 * arousal - 0.2 * zc.min(1.0),
-            confidence: if rms < self.silence_rms { 0.0 } else { self.confidence },
-        }
+        self.estimate_features(AcousticFeatures::from_pcm(pcm))
     }
 }
 
@@ -536,6 +557,28 @@ mod tests {
         assert_eq!(f[4].confidence, 0.0, "unknown label → no confidence");
         assert!(!d.valence_known());
         assert_eq!(d.estimator.kind(), EstimatorKind::OfflineReference);
+    }
+
+    #[test]
+    fn acoustic_features_match_rms_zcr_and_carry_no_valence() {
+        let est = LoudnessEstimator::default();
+        let mut live = est;
+        for amp in [0.0, 0.02, 0.2, 0.9] {
+            let pcm = tone(amp, 1920);
+            let features = AcousticFeatures::from_pcm(&pcm);
+            let (rms, zcr) = rms_zcr(&pcm);
+            assert_eq!(features.rms, rms);
+            assert_eq!(features.zcr, zcr);
+            let from_features = est.estimate_features(features);
+            let from_pcm = live.estimate(&pcm, 24_000, 0);
+            assert_eq!(from_features, from_pcm);
+            assert!(from_features.valence.is_none());
+        }
+        let quiet = est.estimate_features(AcousticFeatures { rms: 0.2, zcr: 0.01 });
+        let harsh = est.estimate_features(AcousticFeatures { rms: 0.2, zcr: 0.9 });
+        assert!(harsh.dominance < quiet.dominance);
+        assert_eq!(harsh.arousal, quiet.arousal);
+        assert_eq!(est.estimate_features(AcousticFeatures { rms: 0.0, zcr: 0.0 }).confidence, 0.0);
     }
 
     #[test]
