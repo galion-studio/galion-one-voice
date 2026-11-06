@@ -16,9 +16,17 @@
 //! links ORT into the voice crates. This crate is its own cargo workspace and is
 //! excluded from the main one (owner approval t613s2992, 2026-11-04, LOCKS
 //! `formats.exceptions.a21_piper`).
+//!
+//! Piper training on own-voice clips is forbidden. This runtime is not the
+//! deployed Jarvis voice. See [`policy`].
 #![allow(unsafe_code)]
 
 mod espeak;
+mod policy;
+
+// Recorded bounds stay in the binary. They are not a runtime branch.
+const _: () = assert!(policy::OWN_VOICE_CLIP_TRAINING_FORBIDDEN);
+const _: () = assert!(!policy::IS_DEPLOYED_JARVIS_VOICE);
 
 use ort::session::{builder::GraphOptimizationLevel, Session};
 use ort::value::Tensor;
@@ -100,6 +108,10 @@ fn parse_args() -> Args {
             "-q" | "--quiet" => a.quiet = true,
             "-h" | "--help" => usage(),
             "--version" => { println!("galion-piper-rt {} (onnxruntime {ORT_VERSION}, piper protocol 2023.11.14-2)", env!("CARGO_PKG_VERSION")); std::process::exit(0) }
+            flag if policy::is_training_flag(flag) => {
+                eprintln!("[galion-piper-rt] refused: {}", policy::RECORD);
+                std::process::exit(2)
+            }
             _ => { eprintln!("unknown argument {k}"); usage() }
         }
     }
