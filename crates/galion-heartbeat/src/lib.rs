@@ -48,6 +48,7 @@ use galion_emotion::{
 #[cfg(feature = "presence")]
 pub mod presence;
 
+pub mod mixer;
 pub mod symphony;
 
 /// The heartbeat period. Locked (LOCKS.toml `[clock] frame_ms = 80`).
@@ -303,16 +304,16 @@ impl<G: ConsentGate> Heartbeat<G> {
         // `caller` is a Copy of that same frame. Assigning it does not allocate.
         let mut caller: Option<EmotionFrame> = None;
         let decided = self.rika.step(ctx, gate, || {
+            // One pass. The stub used to scan the frame again inside detect.
+            let acoustic = galion_emotion::loudness::AcousticFeatures::from_pcm(pcm);
             let affect = match input.affect {
                 Some(a) => Some(a),
-                None if stub => detector.detect(pcm, SAMPLE_RATE, idx.wrapping_mul(FRAME_MS), gate, input.purpose).ok(),
+                None if stub => detector.detect_features(acoustic, pcm.len(), SAMPLE_RATE, idx.wrapping_mul(FRAME_MS), gate, input.purpose).ok(),
                 None => None,
             };
             seen = affect;
             caller = affect;
-            let mut f = FrameFeatures::from_pcm(pcm).with_affect(affect);
-            f.tension = input.tension;
-            f
+            FrameFeatures { rms: acoustic.rms, zcr: acoustic.zcr, affect, tension: input.tension }
         });
         self.last_caller = if decided.off.is_some() { None } else { caller };
         if decided.off.is_some() {

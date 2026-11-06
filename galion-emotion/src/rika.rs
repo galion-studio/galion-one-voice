@@ -204,13 +204,8 @@ pub struct FrameFeatures {
 impl FrameFeatures {
     /// RMS + zero-crossing rate over one frame of mono PCM. No allocation.
     pub fn from_pcm(pcm: &[f32]) -> Self {
-        if pcm.is_empty() {
-            return Self { rms: 0.0, zcr: 0.0, affect: None, tension: None };
-        }
-        let n = pcm.len() as f32;
-        let rms = (pcm.iter().map(|x| x * x).sum::<f32>() / n).sqrt();
-        let zc = pcm.windows(2).filter(|w| (w[0] >= 0.0) != (w[1] >= 0.0)).count() as f32 / n;
-        Self { rms, zcr: zc, affect: None, tension: None }
+        let (rms, zcr) = crate::loudness::rms_zcr(pcm);
+        Self { rms, zcr, affect: None, tension: None }
     }
     pub fn with_affect(mut self, a: Option<EmotionFrame>) -> Self {
         self.affect = a;

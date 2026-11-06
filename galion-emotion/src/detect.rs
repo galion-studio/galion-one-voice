@@ -57,6 +57,20 @@ impl EnergyStubDetector {
         &self.0
     }
 
+    /// Consent-gated loudness frame from features the caller already measured.
+    /// One PCM scan can feed both this and [`crate::rika::FrameFeatures`].
+    pub fn detect_features(
+        &mut self,
+        features: AcousticFeatures,
+        pcm_len: usize,
+        sample_rate: u32,
+        t_ms: u32,
+        gate: &dyn ConsentGate,
+        purpose: Purpose,
+    ) -> Result<EmotionFrame, DetectError> {
+        self.0.detect_acoustic(features, pcm_len, sample_rate, t_ms, gate, purpose)
+    }
+
     /// Consent-gated closed-set recognition.
     ///
     /// The gate runs inside [`AffectDetector::detect`] before PCM is read.
