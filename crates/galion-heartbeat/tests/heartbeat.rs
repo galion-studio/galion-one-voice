@@ -53,9 +53,17 @@ fn last_caller_frame_follows_the_80ms_affect_and_clears_when_off() {
 #[test]
 fn frame_constants_match_locks() {
     assert_eq!(galion_heartbeat::FRAME_MS, 80);
+    assert_eq!(galion_heartbeat::FRAME_HZ_TENTHS, 125);
+    assert_eq!(galion_heartbeat::SAMPLE_RATE, 24_000);
     assert_eq!(FRAME_SAMPLES, 1920);
+    assert_eq!(
+        galion_heartbeat::FRAME_MS * galion_heartbeat::FRAME_HZ_TENTHS,
+        10_000,
+        "80 ms is 12.5 Hz"
+    );
     let locks = include_str!("../../../LOCKS.toml");
     assert!(locks.contains("frame_ms = 80"));
+    assert!(locks.contains("frame_hz = 12.5"));
     assert!(locks.contains("rika_land_max_ms = 160"));
     assert!(locks.contains("rika_yield_max_frames = 1"));
 }
