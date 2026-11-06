@@ -12,6 +12,10 @@ The spelling is **Galion**. The product is Galion Voice.
 
 Master slogan: "The seamless connection with the human being, on the voice only."
 
+## Policy
+
+Cloning is Rust-first. `clone_worker::request_line` and `speech::gqvoice` are the contract the stack runs. The Python child is out of process. Piper training on own-voice clips is forbidden. When the clone slot is absent, Piper speaks the existing pack. It is not trained on a reference wav. Reference wavs stay outside git and are read-only. The child does not rewrite them. The deployed Jarvis voice must not change. This file records no WER, ECAPA, MOS, or timing. Unmeasured gates stay **BLOCKED**. No audio file is added. `LOCKS.toml` is not edited.
+
 ## Shape
 
 One long-lived child, the same idea as the warm Piper worker
@@ -145,8 +149,11 @@ closing line to know that audio has started.
 
 The stub (`GALION_CLONE_STUB_PCM=1`) does not import torch and does not
 call Chatterbox. Its two writes are protocol PCM, not a voice. The first
-write is one sample. The second follows about 50 ms later so a gate can
-see that the first bytes are not the finished utterance.
+write is one sample. The second follows the stub's `time.sleep(0.05)` in
+`scripts/clone/chatterbox_worker.py` so a gate can
+see that the first bytes are not the finished utterance. That sleep is
+the protocol stub. It is not a measured time-to-first-audio. The timing
+gate stays **BLOCKED**.
 
 Without that flag, and without the pinned safetensors on disk, the process
 exits 2 (`galion-clone-absent`). With the files present and
@@ -318,7 +325,7 @@ with real Nano PCM is a TTFA product claim (`FlashReport::from_pcm`).
   - per-utterance `set_persona` and `set_prosody`. The worker logs the prosody numbers as `galion-clone-prosody`.
 - Frame prosody (pause and loudness) is applied to Piper and flite PCM. Clone PCM is not rewritten after the child, because the landed `.gqvoice` must equal the playback buffer.
 - Fixed a pre-existing bug: a Jarvis request that carried a reference produced invalid JSON (the `reference` string was never closed), so the worker answered "bad json".
-- HOLD check: the merged SpeechStack produced real local Nano speech, CPU only, with no stub and no cloud path. The test allowlist of CC0 donors was local only and was not committed. Each output sat closest to its own donor on ECAPA: Samantha 0.476 vs amy, Jarvis 0.587 vs alan.
+- HOLD check: the merged SpeechStack note says it produced local Nano speech, CPU only, with no stub and no cloud path. The test allowlist of CC0 donors was local only and was not committed. This tree does not re-measure speaker similarity. WER, ECAPA, MOS, and timings stay **BLOCKED**.
 
 ## Conditioning cache (owner item 10, 2026-11-04)
 

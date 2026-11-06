@@ -7,6 +7,9 @@
 //! voice service. Piper stays the live TTS.
 //!
 //! * Loopback only: a non-loopback `GALION_CBX_ADDR` exits 2.
+//! * Assets: a missing `cbx` binary, or a missing local fp32 weight snapshot,
+//!   is an error (exit 2 at startup, 503 on `/register` and `/speak`). This
+//!   process never downloads weights.
 //! * Consent-gated at registration: `POST /register?persona=` runs
 //!   `galion_consent::clone_gate` once and builds the cbx voice profile from
 //!   the gated reference. `POST /speak` needs a registered persona and does no
@@ -24,6 +27,19 @@ use std::time::{Duration, Instant};
 
 const DTYPE: &str = "fp32";
 const DEFAULT_REVISION: &str = "d21799bd0354adb85e348b8a0442a8405110a2cf";
+const REPO_FOLDER: &str = "models--ResembleAI--chatterbox-turbo-ONNX";
+/// fp32 files `cbx` loads from the snapshot. Checked locally; never fetched.
+const FP32_WEIGHTS: &[&str] = &[
+    "tokenizer.json",
+    "onnx/conditional_decoder.onnx",
+    "onnx/conditional_decoder.onnx_data",
+    "onnx/speech_encoder.onnx",
+    "onnx/speech_encoder.onnx_data",
+    "onnx/embed_tokens.onnx",
+    "onnx/embed_tokens.onnx_data",
+    "onnx/language_model.onnx",
+    "onnx/language_model.onnx_data",
+];
 const MAX_TEXT: usize = 600;
 const MAX_HEADER: usize = 16 * 1024;
 
@@ -31,6 +47,8 @@ const MAX_HEADER: usize = 16 * 1024;
 struct Config {
     addr: SocketAddr,
     cbx: PathBuf,
+    /// Snapshot directory that already holds [`FP32_WEIGHTS`].
+    weights: PathBuf,
     revision: String,
     threads: usize,
     state: PathBuf,
@@ -49,6 +67,62 @@ fn env_or(key: &str, default: &str) -> String {
     }
 }
 
+fn nonempty_env(key: &str) -> Option<String> {
+    std::env::var(key).ok().map(|v| v.trim().to_string()).filter(|v| !v.is_empty())
+}
+
+/// Hub cache `cbx` uses: `HF_HUB_CACHE`, else `$HF_HOME/hub`, else `~/.cache/huggingface/hub`.
+fn hf_hub_cache() -> PathBuf {
+    if let Some(p) = nonempty_env("HF_HUB_CACHE") {
+        return PathBuf::from(p);
+    }
+    if let Some(p) = nonempty_env("HF_HOME") {
+        return PathBuf::from(p).join("hub");
+    }
+    let home = nonempty_env("HOME").unwrap_or_else(|| ".".into());
+    PathBuf::from(home).join(".cache").join("huggingface").join("hub")
+}
+
+/// Local fp32 snapshot. `GALION_CBX_WEIGHTS` is that directory. Otherwise the
+/// Hugging Face snapshot for `revision`, with `refs/<revision>` resolved to
+/// its commit when the revision is a branch name and the snapshot dir is absent.
+fn weights_snapshot(revision: &str) -> PathBuf {
+    if let Some(p) = nonempty_env("GALION_CBX_WEIGHTS") {
+        return PathBuf::from(p);
+    }
+    let repo = hf_hub_cache().join(REPO_FOLDER);
+    let direct = repo.join("snapshots").join(revision);
+    if direct.is_dir() {
+        return direct;
+    }
+    match std::fs::read_to_string(repo.join("refs").join(revision)) {
+        Ok(hash) => {
+            let hash = hash.trim();
+            if hash.is_empty() { direct } else { repo.join("snapshots").join(hash) }
+        }
+        Err(_) => direct,
+    }
+}
+
+/// `Ok` when `cbx` is a file and every fp32 weight file is already on disk.
+/// A miss is a clear error. This never downloads and never spawns.
+fn asset_error(cbx: &Path, weights: &Path) -> Result<(), String> {
+    match std::fs::metadata(cbx) {
+        Ok(meta) if meta.is_file() => {}
+        Ok(_) => return Err(format!("missing cbx binary: {} is not a file", cbx.display())),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            return Err(format!("missing cbx binary: {}", cbx.display()));
+        }
+        Err(e) => return Err(format!("missing cbx binary: {}: {e}", cbx.display())),
+    }
+    let missing: Vec<&str> = FP32_WEIGHTS.iter().copied().filter(|rel| !weights.join(rel).is_file()).collect();
+    if missing.is_empty() {
+        Ok(())
+    } else {
+        Err(format!("missing weights: {} ({})", weights.display(), missing.join(", ")))
+    }
+}
+
 impl Config {
     fn from_env() -> Result<Self, String> {
         let addr: SocketAddr = env_or("GALION_CBX_ADDR", "127.0.0.1:7880")
@@ -57,10 +131,12 @@ impl Config {
         check_loopback(&addr)?;
         let state = PathBuf::from(env_or("GALION_CBX_STATE", "/opt/galion/voice/cbx/state"));
         let log = env_or("GALION_CBX_LIVE_LOG", "");
+        let revision = env_or("GALION_CBX_REVISION", DEFAULT_REVISION);
         Ok(Self {
             addr,
             cbx: PathBuf::from(env_or("GALION_CBX_BIN", "/opt/galion/voice/cbx/bin/cbx")),
-            revision: env_or("GALION_CBX_REVISION", DEFAULT_REVISION),
+            weights: weights_snapshot(&revision),
+            revision,
             threads: env_or("GALION_CBX_THREADS", "4").parse().unwrap_or(4).clamp(1, 8),
             live_flag: PathBuf::from(env_or("GALION_CBX_LIVE_FLAG", &state.join("live-call").to_string_lossy())),
             state,
@@ -239,7 +315,10 @@ fn json_err(s: &mut TcpStream, status: &str, reason: &str) {
 }
 
 /// Run cbx; kill it when a live call starts or it overruns. `Err(reason)`.
+/// Refuses before spawn when the binary or the local fp32 weights are missing,
+/// so cbx never gets a chance to download them.
 fn run_cbx(cfg: &Config, args: &[String]) -> Result<(), String> {
+    asset_error(&cfg.cbx, &cfg.weights)?;
     let mut child = Command::new(&cfg.cbx)
         .arg("--intra-threads")
         .arg(cfg.threads.to_string())
@@ -386,6 +465,10 @@ fn main() {
             std::process::exit(2);
         }
     };
+    if let Err(e) = asset_error(&cfg.cbx, &cfg.weights) {
+        eprintln!("galion-clone-cbx: {e}");
+        std::process::exit(2);
+    }
     if let Err(e) = std::fs::create_dir_all(&cfg.state) {
         eprintln!("galion-clone-cbx: state dir: {e}");
         std::process::exit(2);
@@ -398,8 +481,8 @@ fn main() {
         }
     };
     eprintln!(
-        "galion-clone-cbx: listening {} · chatterbox-turbo-onnx {DTYPE}@{} · {} threads · live port {}",
-        cfg.addr, &cfg.revision[..cfg.revision.len().min(8)], cfg.threads, cfg.live_port
+        "galion-clone-cbx: listening {} · chatterbox-turbo-onnx {DTYPE}@{} · {} threads · live port {} · weights {}",
+        cfg.addr, &cfg.revision[..cfg.revision.len().min(8)], cfg.threads, cfg.live_port, cfg.weights.display()
     );
     // One job at a time: the clone path is offline work, never concurrent.
     for conn in listener.incoming() {
@@ -412,6 +495,13 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    struct TempTree(std::path::PathBuf);
+    impl Drop for TempTree {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
 
     #[test]
     fn non_loopback_bind_is_refused() {
@@ -435,6 +525,40 @@ mod tests {
         let live = format!("{idle}t=  3.00s f3 dot=listening r=0.3\n");
         assert!(log_tail_busy(&live, 120));
         assert!(!log_tail_busy(&live, 0));
+    }
+
+    #[test]
+    fn missing_cbx_binary_or_weights_is_a_clear_error() {
+        let root = std::env::temp_dir().join(format!(
+            "galion-clone-cbx-assets-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0)
+        ));
+        let _keep = TempTree(root.clone());
+        std::fs::create_dir_all(&root).unwrap();
+        let cbx = root.join("no-such-cbx");
+        let weights = root.join("weights");
+
+        let missing_bin = asset_error(&cbx, &weights).unwrap_err();
+        assert!(missing_bin.contains("missing cbx binary"), "{missing_bin}");
+        assert!(missing_bin.contains(&cbx.display().to_string()), "{missing_bin}");
+        assert!(!missing_bin.contains("missing weights"), "{missing_bin}");
+
+        std::fs::write(&cbx, b"").unwrap();
+        let missing_w = asset_error(&cbx, &weights).unwrap_err();
+        assert!(missing_w.starts_with("missing weights:"), "{missing_w}");
+        assert!(missing_w.contains("tokenizer.json"), "{missing_w}");
+        assert!(missing_w.contains("onnx/language_model.onnx_data"), "{missing_w}");
+        assert!(!missing_w.contains("missing cbx binary"), "{missing_w}");
+
+        for rel in FP32_WEIGHTS {
+            let path = weights.join(rel);
+            if let Some(parent) = path.parent() {
+                std::fs::create_dir_all(parent).unwrap();
+            }
+            std::fs::write(&path, b"").unwrap();
+        }
+        asset_error(&cbx, &weights).expect("empty stand-in files count as present; no audio or download");
     }
 
     #[test]
