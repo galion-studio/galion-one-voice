@@ -1,0 +1,28 @@
+[package]
+name = "galion-score-wrap"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+publish = false
+description = "CPU wrapper that shells out to existing cloning scorers or prints unmeasured"
+
+[[bin]]
+name = "galion-score-wrap"
+path = "src/main.rs"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+serde_json = "1"
+
+[features]
+default = []
+# Optional label only. No wgpu crate: that download is heavy, and this binary
+# does not drive a GPU. Enabling `igpu` still scores on CPU and records
+# igpu as not-wired.
+igpu = []
+
+# No `cuda` feature. CUDA stays on the offline cbx path, not in this tool.
+
+[workspace]
