@@ -1,0 +1,50 @@
+[
+  {
+    "voice": "samantha",
+    "set": "ceiling",
+    "emotion_match": 0.9043674822327858,
+    "gate_0_83": true,
+    "category_blend": 0.8633821174754084,
+    "emb_sim": 1.0
+  },
+  {
+    "voice": "samantha",
+    "set": "merge-v2",
+    "emotion_match": 0.7738271410896993,
+    "gate_0_83": false,
+    "category_blend": 0.7279109709606062,
+    "emb_sim": 0.8809648713909163
+  },
+  {
+    "voice": "samantha",
+    "set": "coherent",
+    "emotion_match": 0.750903466379144,
+    "gate_0_83": false,
+    "category_blend": 0.716687174659952,
+    "emb_sim": 0.8307414803905919
+  },
+  {
+    "voice": "jarvis",
+    "set": "ceiling",
+    "emotion_match": 0.9475098448700927,
+    "gate_0_83": true,
+    "category_blend": 0.9250140641001326,
+    "emb_sim": 1.0
+  },
+  {
+    "voice": "jarvis",
+    "set": "merge-v2",
+    "emotion_match": 0.880208326849959,
+    "gate_0_83": true,
+    "category_blend": 0.892812455907453,
+    "emb_sim": 0.8507986923824734
+  },
+  {
+    "voice": "jarvis",
+    "set": "coherent",
+    "emotion_match": 0.8900818729989053,
+    "gate_0_83": true,
+    "category_blend": 0.8807917200834441,
+    "emb_sim": 0.9117588964683153
+  }
+]

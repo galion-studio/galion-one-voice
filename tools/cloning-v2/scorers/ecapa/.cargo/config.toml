@@ -1,0 +1,6 @@
+[env]
+ORT_LIB_LOCATION = "/home/box/.cache/ort.pyke.io/dfbin/x86_64-unknown-linux-gnu/ED1716DE95974BF47AB0223CA33734A0B5A5D09A181225D0E8ED62D070AEA893/onnxruntime/lib"
+[build]
+jobs = 2
+target-dir = "target"
+rustflags = ["-L", "/workspace/swarm/voice-v2-sprint/cloning-v2/scorers/ecapa/linkshim", "-C", "target-cpu=native"]

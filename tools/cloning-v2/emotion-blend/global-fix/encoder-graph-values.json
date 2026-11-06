@@ -1,0 +1,40 @@
+{
+  "model": "/home/box/.cache/huggingface/hub/models--ResembleAI--chatterbox-turbo-ONNX/snapshots/d21799bd0354adb85e348b8a0442a8405110a2cf/onnx/speech_encoder.onnx",
+  "graph_sha256": "4d66128037517dd51d370edc9b89ce36d42c75dcbd96e7216c7fb45dfae36045",
+  "initializers": {
+    "/Constant_4_output_0_subg_174_sub_graph2_subg_209_sub_graph4": [
+      0
+    ],
+    "/Constant_5_output_0": [
+      240000
+    ],
+    "/Constant_3_output_0": [
+      1
+    ],
+    "/Constant_91_output_0": [
+      96000
+    ]
+  },
+  "ancestry": {
+    "audio_features": {
+      "first6s_slice_ancestry": true,
+      "first10s_slice_ancestry": false,
+      "speaker_reduce_mean_ancestry": false
+    },
+    "audio_tokens": {
+      "first6s_slice_ancestry": false,
+      "first10s_slice_ancestry": true,
+      "speaker_reduce_mean_ancestry": false
+    },
+    "speaker_embeddings": {
+      "first6s_slice_ancestry": false,
+      "first10s_slice_ancestry": false,
+      "speaker_reduce_mean_ancestry": true
+    },
+    "speaker_features": {
+      "first6s_slice_ancestry": false,
+      "first10s_slice_ancestry": true,
+      "speaker_reduce_mean_ancestry": false
+    }
+  }
+}

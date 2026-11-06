@@ -1,0 +1,30 @@
+{
+  "schema": "galion-voicecheck-profile/1",
+  "persona": "samantha",
+  "base_recording": "/workspace/swarm/voice-v2-sprint/clip-store-own/samantha/original.wav",
+  "reference_wav": "/workspace/swarm/voice-v2-sprint/clip-store-own/samantha/reference.wav",
+  "baselines": {
+    "wer_max": 0.018,
+    "ecapa_min": 0.7057
+  },
+  "base": {
+    "f0_mean_hz": 190.0778656005859,
+    "f0_sd_st": 2.9559502601623535,
+    "f0_range_st": 9.112062454223633,
+    "energy_sd_db": 9.319502830505373,
+    "rms_dbfs": -20.955623626708984,
+    "pace_syl_s": 2.8789658546447754,
+    "ser": {
+      "neu": 0.3498891592025757,
+      "hap": 0.2133377343416214,
+      "ang": 0.11915408074855804,
+      "sad": 0.3176189959049225
+    },
+    "avd": {
+      "arousal": 0.4990397095680237,
+      "valence": 0.5527817606925964,
+      "dominance": 0.5685235857963562
+    }
+  },
+  "source": "galion-voicecheck-profile/1"
+}

@@ -1,0 +1,26 @@
+{
+  "generated": "2026-11-05 22:30 CET (Europe/Zagreb)",
+  "rows": 71,
+  "missing_metrics": [],
+  "tests": "4/4 unit tests pass",
+  "top5": {
+    "samantha": [
+      "own-samantha (v2 merged)",
+      "Samantha emo-r2 @T0",
+      "Samantha emo-r2 @T0.8",
+      "similarity/wav/sam-multi_rp1.2",
+      "timbre-match 0.5"
+    ],
+    "jarvis": [
+      "Jarvis emo-m9/w8 @12-line",
+      "own-jarvis (v2 merged)",
+      "timbre-match 0.5",
+      "ecapa_jar_hygiene_only",
+      "timbre-match 1.0"
+    ]
+  },
+  "cpu_only": true,
+  "no_render": true,
+  "no_voice_writes": true,
+  "no_commits_pushes_deletes": true
+}

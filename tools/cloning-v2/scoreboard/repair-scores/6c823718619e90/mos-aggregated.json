@@ -1,0 +1,49 @@
+{
+  "files": [
+    {
+      "duration_s": 4.64,
+      "mos": 4.1885,
+      "ms": 1054.1,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-fix/runs/jd_r10_up/t01.wav",
+      "pesq": 3.8928,
+      "si_sdr": 20.1244,
+      "stoi": 0.9914,
+      "file": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-fix/runs/jd_r10_up/t01.wav"
+    },
+    {
+      "duration_s": 2.64,
+      "mos": 3.7911,
+      "ms": 399.8,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-fix/runs/jd_r10_up/t04.wav",
+      "pesq": 3.434,
+      "si_sdr": 21.8888,
+      "stoi": 0.9867,
+      "file": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-fix/runs/jd_r10_up/t04.wav"
+    },
+    {
+      "duration_s": 4.16,
+      "mos": 4.3007,
+      "ms": 693.3,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-fix/runs/jd_r10_up/t06.wav",
+      "pesq": 4.1388,
+      "si_sdr": 29.1259,
+      "stoi": 0.9986,
+      "file": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-fix/runs/jd_r10_up/t06.wav"
+    },
+    {
+      "duration_s": 7.6,
+      "mos": 4.3875,
+      "ms": 1702.5,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-fix/runs/jd_r10_up/t08.wav",
+      "pesq": 3.9008,
+      "si_sdr": 26.4054,
+      "stoi": 0.997,
+      "file": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-fix/runs/jd_r10_up/t08.wav"
+    }
+  ],
+  "provenance": [
+    "/workspace/swarm/voice-v2-sprint/cloning-v2/scoreboard/repair-scores/6c823718619e90-6c8237/mos.json"
+  ],
+  "aggregation": "select original Rust per-file scores by identical WAV path; no Python metric computation",
+  "nmr": "/workspace/swarm/voice-v2-sprint/clip-store-own/samantha/reference.wav"
+}

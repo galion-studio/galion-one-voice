@@ -1,0 +1,14 @@
+Runtime:
+  available_cores: 8
+  intra_threads:   2
+  parallel_exec:   false
+  ep_requested:    cpu
+  ep_effective:    cpu
+  dtype:           fp32
+
+model_load_ms=4117
+t01 c0 seed=0 ms=9230 tok=124 dur=5.08s f0=132.9 rate=3.54 erange=22.9 tilt=-7.5 dist=7.81
+t04 c0 seed=1000003 ms=5904 tok=72 dur=3.00s f0=126.8 rate=3.33 erange=21.1 tilt=-6.7 dist=6.93
+t06 c0 seed=2000006 ms=7043 tok=98 dur=4.04s f0=134.2 rate=3.71 erange=29.6 tilt=-4.0 dist=6.76
+t08 c0 seed=3000009 ms=15282 tok=206 dur=8.36s f0=132.7 rate=2.99 erange=28.5 tilt=-6.7 dist=4.68
+done jd_m11_simc_w10

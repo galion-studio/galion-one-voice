@@ -1,0 +1,14 @@
+Runtime:
+  available_cores: 8
+  intra_threads:   2
+  parallel_exec:   false
+  ep_requested:    cpu
+  ep_effective:    cpu
+  dtype:           fp32
+
+model_load_ms=6779
+t01: exists, skipping (resume)
+t04: exists, skipping (resume)
+t06: exists, skipping (resume)
+t08 c0 seed=3000009 ms=12868 tok=182 dur=7.40s f0=134.1 rate=3.38 erange=32.2 tilt=-4.9 dist=5.38
+done jd_ln_up

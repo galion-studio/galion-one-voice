@@ -1,0 +1,74 @@
+[
+  {
+    "id": "t01",
+    "category": "neutral",
+    "text": "The morning light came slowly over the hills, and the whole valley seemed to wake up at once.",
+    "n_words": 18
+  },
+  {
+    "id": "t02",
+    "category": "neutral",
+    "text": "If you need anything at all tonight, just tell me, and I will take care of it.",
+    "n_words": 17
+  },
+  {
+    "id": "t03",
+    "category": "neutral",
+    "text": "We checked the numbers twice this afternoon, and the results are clear.",
+    "n_words": 12
+  },
+  {
+    "id": "t04",
+    "category": "question",
+    "text": "Could you open the living room window before dinner starts?",
+    "n_words": 10
+  },
+  {
+    "id": "t05",
+    "category": "question",
+    "text": "Are you sure the meeting is still at three thirty on Thursday?",
+    "n_words": 12
+  },
+  {
+    "id": "t06",
+    "category": "emotional",
+    "text": "I am so glad you made it home safely. I was worried the whole time.",
+    "n_words": 15
+  },
+  {
+    "id": "t07",
+    "category": "emotional",
+    "text": "That was an incredible performance. You should be really proud of yourself.",
+    "n_words": 12
+  },
+  {
+    "id": "t08",
+    "category": "long",
+    "text": "Please remember to bring your passport, the confirmation email, and the hotel booking number when you leave for the airport tomorrow morning at six fifteen.",
+    "n_words": 25
+  },
+  {
+    "id": "t09",
+    "category": "long",
+    "text": "After reviewing the quarterly report, the board decided to approve the budget increase for research and development, contingent on a detailed timeline being delivered by next Friday.",
+    "n_words": 27
+  },
+  {
+    "id": "t10",
+    "category": "numbers",
+    "text": "Call me back at five five five, zero one two three, extension four seven.",
+    "n_words": 14
+  },
+  {
+    "id": "t11",
+    "category": "numbers",
+    "text": "The package has tracking number one two three four five six seven eight nine, and it should arrive between the twelfth and the fourteenth of November.",
+    "n_words": 26
+  },
+  {
+    "id": "t12",
+    "category": "hesitation",
+    "text": "Hmm, let me think about that for a second. Yes, I believe we can move the appointment to half past two.",
+    "n_words": 21
+  }
+]

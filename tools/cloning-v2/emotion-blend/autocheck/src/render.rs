@@ -1,5 +1,3 @@
-// Galion Voice — Perpetual Open MIT License
-// (c) 2026 Maciej Grajczyk / G.A.L.I.O.N.
 //! Serialised TTS via flock on emotion-blend/render.lock + cbx-speak-voice.
 
 use anyhow::{bail, Context, Result};

@@ -1,0 +1,70 @@
+{
+  "base": "/workspace/swarm/voice-v2-sprint/clip-store-own/jarvis/reference.wav",
+  "meta": {
+    "base_speech_s": 13.270000000000001,
+    "max_seg_s": 6.0,
+    "method": "builtin expressive-moments: phrases split on >=0.2 s pauses (floor p95-35 dB), long phrases split <= max_seg_s; score = z(F0 sd st)+z(F0 p5-p95 range st)+z(energy sd dB)+0.5*z(level); top phrases until target_s, original order, 15 ms fades, 120 ms gaps",
+    "n_chosen": 4,
+    "n_phrases": 6,
+    "out_s": 9.98,
+    "phrases": [
+      {
+        "chosen": false,
+        "end_s": 3.34,
+        "energy_sd_db": 7.516243405565637,
+        "f0_range_st": 6.944442122993685,
+        "f0_sd_st": 2.2622862951893343,
+        "score": -1.3651935595442457,
+        "start_s": 0.2
+      },
+      {
+        "chosen": true,
+        "end_s": 7.0,
+        "energy_sd_db": 7.252498273120417,
+        "f0_range_st": 11.375439026764857,
+        "f0_sd_st": 3.8118860277089626,
+        "score": 2.5573418526012586,
+        "start_s": 3.34
+      },
+      {
+        "chosen": true,
+        "end_s": 8.38,
+        "energy_sd_db": 6.823899182616293,
+        "f0_range_st": 7.657865278640996,
+        "f0_sd_st": 2.725048279883343,
+        "score": -1.0352128573304706,
+        "start_s": 7.22
+      },
+      {
+        "chosen": false,
+        "end_s": 9.69,
+        "energy_sd_db": 7.2913652304857415,
+        "f0_range_st": 5.026677897293406,
+        "f0_sd_st": 1.5993525398890924,
+        "score": -3.6311867646365332,
+        "start_s": 8.66
+      },
+      {
+        "chosen": true,
+        "end_s": 12.68,
+        "energy_sd_db": 7.769383395781383,
+        "f0_range_st": 9.284689730115888,
+        "f0_sd_st": 2.660170073452533,
+        "score": 0.6663250654578794,
+        "start_s": 10.37
+      },
+      {
+        "chosen": true,
+        "end_s": 15.47,
+        "energy_sd_db": 7.970714875215144,
+        "f0_range_st": 9.883439717044661,
+        "f0_sd_st": 3.4996067534808484,
+        "score": 2.8079262634520963,
+        "start_s": 13.5
+      }
+    ],
+    "target_s": 7.962000000000001
+  },
+  "provider": "builtin",
+  "stage": "reference"
+}

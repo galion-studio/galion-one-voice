@@ -1,0 +1,24 @@
+{
+ "ref": "/workspace/swarm/voice-v2-sprint/clip-store-own/jarvis/reference.wav",
+ "half_vs_half_ceiling": 0.7251,
+ "scores": {
+  "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/jarvis/t01.wav": 0.7927,
+  "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/jarvis/t02.wav": 0.7706,
+  "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/jarvis/t03.wav": 0.7146,
+  "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/jarvis/t04.wav": 0.7291,
+  "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/jarvis/t05.wav": 0.7995,
+  "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/jarvis/t06.wav": 0.7115,
+  "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/jarvis/t07.wav": 0.7163,
+  "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/jarvis/t08.wav": 0.7497,
+  "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/jarvis/t09.wav": 0.784,
+  "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/jarvis/t10.wav": 0.61,
+  "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/jarvis/t11.wav": 0.6616,
+  "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/jarvis/t12.wav": 0.7531
+ },
+ "mean": 0.7327,
+ "timing": {
+  "wall_s_total": 180.658,
+  "wall_s_scoring": 178.302,
+  "cpu_s_total": 38.674
+ }
+}

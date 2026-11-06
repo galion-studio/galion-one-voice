@@ -1,0 +1,56 @@
+{
+  "duration_s": 17.40718820861678,
+  "missing": [
+    "joyful",
+    "disgust",
+    "fear",
+    "sad",
+    "surprise",
+    "seductive",
+    "crying"
+  ],
+  "n_windows": 7,
+  "original": "/workspace/swarm/voice-v2-sprint/clip-store-own/samantha/original.wav",
+  "original_sha256": "bdcb0c2903bb91c7b0fda0cf79a42406fdaa662fd8d31f6eaed3895d9c7a8693",
+  "presence_floor": 0.2,
+  "present": [
+    {
+      "category": "aggressive",
+      "source": "trained class (emotion2vec+)",
+      "span": "7.500-10.000",
+      "strength": 0.9990363121032716
+    },
+    {
+      "category": "neutral",
+      "source": "trained class (emotion2vec+)",
+      "span": "0.000-2.500",
+      "strength": 1.0
+    },
+    {
+      "category": "love",
+      "source": "zero-shot text prompt (CLAP)",
+      "span": "7.500-10.000",
+      "strength": 0.8109382317899566
+    },
+    {
+      "category": "yelling",
+      "source": "efficientat",
+      "span": "15.000-17.407",
+      "strength": 0.6644409894943237
+    },
+    {
+      "category": "laughter",
+      "source": "efficientat",
+      "span": "0.000-2.500",
+      "strength": 0.2743651270866394
+    },
+    {
+      "category": "logic",
+      "source": "zero-shot text prompt (CLAP)",
+      "span": "15.000-17.407",
+      "strength": 0.4992222803994493
+    }
+  ],
+  "targets": "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/missing-emotion-targets/runs/own-samantha/TARGETS.json",
+  "voice": "own-samantha"
+}

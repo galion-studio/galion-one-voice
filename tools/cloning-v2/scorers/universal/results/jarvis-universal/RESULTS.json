@@ -1,0 +1,175 @@
+{
+  "persona": "jarvis",
+  "formula": "emotion_match = 0.70*category_blend + 0.30*emb_sim; category_blend = strength-weighted mean of per-emotion scores; score_C = 0.55*max_i match_i + 0.45*mean_i match_i; trained match = max(0,1-RMS9(e2v)); efficientat match = max(0,1-|\u0394eat_C|) for yelling/crying/laughter; zeroshot match = max(0,1-|\u0394clap_C|) for love/seductive/logic; emb_sim = mean_i max_j mean_centred_cosine(emb_i, emb_window_j) (EmoCtrlTTS-Eval/Emo-DPO); no pitch/energy proxies in gate",
+  "presence": 0.2,
+  "backends": {
+    "emotion2vec+": "trained class",
+    "efficientat": {
+      "role": "PRIMARY for yelling/crying/laughter",
+      "model": "Chris-Kode/efficientat-mn10-as-onnx",
+      "url": "https://huggingface.co/Chris-Kode/efficientat-mn10-as-onnx",
+      "licence": "MIT",
+      "sha256": "bec20620ab8be5e41297b45845f6fb116fbe42cd4da339ad7d44f27630b7a504",
+      "attribution": "EfficientAT mn10_as \u00a9 2022 Florian Schmid; ONNX export Chris-Kode"
+    },
+    "clap": "zero-shot for love/seductive/logic/reason"
+  },
+  "moments": [
+    {
+      "category": "neutral",
+      "source": "trained class (emotion2vec+)",
+      "strength": 1.0,
+      "span": "0.000-2.500",
+      "e2v_top": "neutral",
+      "clap_top": "logic",
+      "efficientat": {
+        "yelling": 0.1505,
+        "crying": 0.0855,
+        "laughter": 0.078
+      }
+    },
+    {
+      "category": "yelling",
+      "source": "efficientat",
+      "strength": 0.8088,
+      "span": "2.500-5.000",
+      "e2v_top": "neutral",
+      "clap_top": "logic",
+      "efficientat": {
+        "yelling": 0.8088,
+        "crying": 0.0722,
+        "laughter": 0.1236
+      }
+    },
+    {
+      "category": "logic",
+      "source": "zero-shot text prompt (CLAP)",
+      "strength": 0.8277,
+      "span": "7.500-10.000",
+      "e2v_top": "neutral",
+      "clap_top": "logic",
+      "efficientat": {
+        "yelling": 0.4846,
+        "crying": 0.0317,
+        "laughter": 0.0385
+      }
+    }
+  ],
+  "BASE-self-ceiling": {
+    "emotion_match": 0.9475098448700927,
+    "category_blend": 0.9250140641001326,
+    "emb_sim": 1.0,
+    "leaderboard": [
+      {
+        "category": "neutral",
+        "source": "trained class (emotion2vec+)",
+        "strength": 1.0,
+        "moment": "0.000-2.500",
+        "score": 1.0,
+        "best_line": "w00",
+        "best_match": 1.0,
+        "mean_match": 1.0
+      },
+      {
+        "category": "logic",
+        "source": "zero-shot text prompt (CLAP)",
+        "strength": 0.8277,
+        "moment": "7.500-10.000",
+        "score": 0.9214,
+        "best_line": "w03",
+        "best_match": 1.0,
+        "mean_match": 0.8254
+      },
+      {
+        "category": "yelling",
+        "source": "efficientat",
+        "strength": 0.8088,
+        "moment": "2.500-5.000",
+        "score": 0.836,
+        "best_line": "w01",
+        "best_match": 1.0,
+        "mean_match": 0.6357
+      }
+    ]
+  },
+  "sets": {
+    "merge-v2": {
+      "n": 12,
+      "emotion_match": 0.880208326849959,
+      "category_blend": 0.892812455907453,
+      "emb_sim": 0.8507986923824734,
+      "leaderboard": [
+        {
+          "category": "neutral",
+          "source": "trained class (emotion2vec+)",
+          "strength": 1.0,
+          "moment": "0.000-2.500",
+          "score": 0.965,
+          "best_line": "t09",
+          "best_match": 1.0,
+          "mean_match": 0.9222
+        },
+        {
+          "category": "yelling",
+          "source": "efficientat",
+          "strength": 0.8088,
+          "moment": "2.500-5.000",
+          "score": 0.9055,
+          "best_line": "t10",
+          "best_match": 0.9924,
+          "mean_match": 0.7993
+        },
+        {
+          "category": "logic",
+          "source": "zero-shot text prompt (CLAP)",
+          "strength": 0.8277,
+          "moment": "7.500-10.000",
+          "score": 0.7932,
+          "best_line": "t03",
+          "best_match": 0.9262,
+          "mean_match": 0.6306
+        }
+      ],
+      "renders": "/workspace/swarm/voice-v2-sprint/cloning-v2/merge-v2/wav/jarvis"
+    },
+    "global-fix-coherent": {
+      "n": 12,
+      "emotion_match": 0.8900818729989053,
+      "category_blend": 0.8807917200834441,
+      "emb_sim": 0.9117588964683153,
+      "leaderboard": [
+        {
+          "category": "neutral",
+          "source": "trained class (emotion2vec+)",
+          "strength": 1.0,
+          "moment": "0.000-2.500",
+          "score": 0.9823,
+          "best_line": "t02",
+          "best_match": 1.0,
+          "mean_match": 0.9607
+        },
+        {
+          "category": "yelling",
+          "source": "efficientat",
+          "strength": 0.8088,
+          "moment": "2.500-5.000",
+          "score": 0.9095,
+          "best_line": "t06",
+          "best_match": 0.9826,
+          "mean_match": 0.8202
+        },
+        {
+          "category": "logic",
+          "source": "zero-shot text prompt (CLAP)",
+          "strength": 0.8277,
+          "moment": "7.500-10.000",
+          "score": 0.7301,
+          "best_line": "t11",
+          "best_match": 0.8131,
+          "mean_match": 0.6287
+        }
+      ],
+      "renders": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-blend/global-fix/wav/jarvis"
+    }
+  }
+}

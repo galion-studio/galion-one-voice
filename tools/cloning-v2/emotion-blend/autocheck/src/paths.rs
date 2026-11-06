@@ -1,5 +1,3 @@
-// Galion Voice — Perpetual Open MIT License
-// (c) 2026 Maciej Grajczyk / G.A.L.I.O.N.
 //! Resolved tool + data paths for the Cloning V2 tree.
 
 use anyhow::{bail, Context, Result};

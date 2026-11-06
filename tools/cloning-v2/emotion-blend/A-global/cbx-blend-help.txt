@@ -1,0 +1,50 @@
+Create/update a named voice profile from a reference WAV
+
+Usage: cbx-blend voice add [OPTIONS] --name <NAME> --voice-wav <VOICE_WAV>
+
+Options:
+      --intra-threads <INTRA_THREADS>
+          Threads used to parallelize execution *within* operators (intra-op).
+          
+          Defaults to all available cores.
+
+      --name <NAME>
+          Name for this voice profile (used by `--voice`)
+
+      --inter-threads <INTER_THREADS>
+          Threads used to parallelize execution *across* operators (inter-op).
+          
+          Only used when `--parallel-execution` is enabled.
+
+      --voice-wav <VOICE_WAV>
+          Reference voice WAV (mono or stereo). Will be converted to 24kHz mono f32
+
+      --conditioning-wav <CONDITIONING_WAV>
+          Optional expression-diverse reference for token/audio conditioning only. Speaker embeddings/features always remain from --voice-wav
+
+      --parallel-execution
+          Enable ORT parallel execution mode (inter-op parallelism)
+
+      --ep <EP>
+          Execution provider (backend).
+          
+          CPU is the default and fastest for this model. CoreML/DirectML are available but slower due to graph partitioning overhead. See README for benchmark details.
+          
+          [default: cpu]
+          [possible values: auto, cpu, coreml, directml, cuda]
+
+      --repo-id <REPO_ID>
+          [default: ResembleAI/chatterbox-turbo-ONNX]
+
+      --coreml-cache-dir <COREML_CACHE_DIR>
+          Optional cache directory for compiled CoreML models (when `--ep coreml`)
+
+      --revision <REVISION>
+          [default: main]
+
+      --dtype <DTYPE>
+          [default: fp16]
+          [possible values: fp32, fp16, quantized, q4, q4f16, q8, q8f16]
+
+  -h, --help
+          Print help (see a summary with '-h')

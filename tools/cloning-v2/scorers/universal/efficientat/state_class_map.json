@@ -1,0 +1,53 @@
+{
+  "model": "Chris-Kode/efficientat-mn10-as-onnx",
+  "sha256_expected": "bec20620ab8be5e41297b45845f6fb116fbe42cd4da339ad7d44f27630b7a504",
+  "n_classes": 527,
+  "sample_rate": 32000,
+  "states": {
+    "yelling": {
+      "source": "efficientat",
+      "indices": {
+        "Shout": 8,
+        "Yell": 11,
+        "Screaming": 14,
+        "Children shouting": 13
+      },
+      "aggregate": "max",
+      "notes": "AudioSet shout/yell/scream family; Battle cry (12) excluded (combat-specific)."
+    },
+    "crying": {
+      "source": "efficientat",
+      "indices": {
+        "Crying, sobbing": 22
+      },
+      "aggregate": "max",
+      "notes": "Adult/general sobbing only. Baby cry, infant cry (23) excluded for adult clone eval \u2014 infant-specific and would confound Samantha/Jarvis scores."
+    },
+    "laughter": {
+      "source": "efficientat",
+      "indices": {
+        "Laughter": 16,
+        "Baby laughter": 17,
+        "Giggle": 18,
+        "Belly laugh": 20,
+        "Chuckle, chortle": 21
+      },
+      "aggregate": "max",
+      "notes": "Laughter + AudioSet subtypes from class map."
+    }
+  },
+  "all_related_audioset": {
+    "8": "Shout",
+    "11": "Yell",
+    "12": "Battle cry",
+    "13": "Children shouting",
+    "14": "Screaming",
+    "16": "Laughter",
+    "17": "Baby laughter",
+    "18": "Giggle",
+    "20": "Belly laugh",
+    "21": "Chuckle, chortle",
+    "22": "Crying, sobbing",
+    "23": "Baby cry, infant cry"
+  }
+}

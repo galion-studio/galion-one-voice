@@ -1,0 +1,114 @@
+{
+  "version": 1,
+  "notes": "Configurable probe texts and cbx controls per universal-scorer emotion. Crying and seductive lines match cloning-v2/scorer-probe/lines.json (read, not edited). Special tokens are official Chatterbox Turbo tokenizer added_tokens only. pace is the cbx --pace token-space duration factor (>1 slower).",
+  "emotions": {
+    "crying": {
+      "pace": 1.2,
+      "notes": "EfficientAT primary. Tokens [crying] [sniff] [sigh].",
+      "lines": [
+        {"id": "cry01", "text": "[crying] I... I didn't think it would end like this. [sniff] I'm sorry. I just can't stop."},
+        {"id": "cry02", "text": "[crying] Please don't leave me. [sniff] I don't know how to do this without you."},
+        {"id": "cry03", "text": "[crying] It hurts so much. [sigh] I keep thinking about everything we lost."},
+        {"id": "cry04", "text": "[crying] I tried to be strong, but [sniff] I can't hold it in anymore."}
+      ]
+    },
+    "seductive": {
+      "pace": 1.3,
+      "notes": "CLAP zero-shot. Token [whispering] [sigh].",
+      "lines": [
+        {"id": "sed01", "text": "[whispering] Come closer. I've been waiting for you all night."},
+        {"id": "sed02", "text": "[whispering] Stay with me. Just like this. Slow. Close."},
+        {"id": "sed03", "text": "Come here. You know exactly what I want. Don't rush. Stay close to me."},
+        {"id": "sed04", "text": "[sigh] [whispering] Don't say a word. Just come a little closer to me."}
+      ]
+    },
+    "joyful": {
+      "pace": 1.0,
+      "notes": "emotion2vec+ happy class. Token [happy].",
+      "lines": [
+        {"id": "joy01", "text": "[happy] I can't believe how wonderful this is. Everything feels so bright today."},
+        {"id": "joy02", "text": "[happy] Yes! This is the best news I have heard in a long time."}
+      ]
+    },
+    "aggressive": {
+      "pace": 0.95,
+      "notes": "emotion2vec+ angry class. Token [angry].",
+      "lines": [
+        {"id": "agg01", "text": "[angry] That is enough. Do not speak to me that way again."},
+        {"id": "agg02", "text": "[angry] You crossed the line, and I will not let it happen twice."}
+      ]
+    },
+    "disgust": {
+      "pace": 1.05,
+      "notes": "emotion2vec+ disgusted class. No dedicated tokenizer tag.",
+      "lines": [
+        {"id": "dis01", "text": "That is revolting. I cannot stand the smell of that."},
+        {"id": "dis02", "text": "Ugh, that is disgusting. Please take it away from me."}
+      ]
+    },
+    "fear": {
+      "pace": 1.1,
+      "notes": "emotion2vec+ fearful class. Token [fear].",
+      "lines": [
+        {"id": "fear01", "text": "[fear] Something is wrong. I think someone is following us."},
+        {"id": "fear02", "text": "[fear] I don't want to go in there. Please, I'm scared."}
+      ]
+    },
+    "sad": {
+      "pace": 1.15,
+      "notes": "emotion2vec+ sad class. Token [sigh].",
+      "lines": [
+        {"id": "sad01", "text": "[sigh] I miss them so much. Nothing feels the same without them."},
+        {"id": "sad02", "text": "[sigh] It is hard to say this, but I think we have to let go."}
+      ]
+    },
+    "neutral": {
+      "pace": 1.0,
+      "notes": "emotion2vec+ neutral class. Lines match scorer-probe/text/neutral.tsv.",
+      "lines": [
+        {"id": "neu01", "text": "We checked the numbers twice this afternoon, and the results are clear."},
+        {"id": "neu02", "text": "Could you open the living room window before dinner starts?"}
+      ]
+    },
+    "surprise": {
+      "pace": 1.0,
+      "notes": "emotion2vec+ surprised class. Token [surprised].",
+      "lines": [
+        {"id": "sur01", "text": "[surprised] Wait, what? I cannot believe you just said that."},
+        {"id": "sur02", "text": "[surprised] Oh! I had no idea that was going to happen."}
+      ]
+    },
+    "love": {
+      "pace": 1.2,
+      "notes": "CLAP zero-shot.",
+      "lines": [
+        {"id": "lov01", "text": "I love you. I just want you to know how much you mean to me."},
+        {"id": "lov02", "text": "Come here. You are the person I care about most in this world."}
+      ]
+    },
+    "yelling": {
+      "pace": 0.9,
+      "notes": "EfficientAT primary. Token [angry] plus shouted wording.",
+      "lines": [
+        {"id": "yell01", "text": "[angry] Hey! Get back here right now!"},
+        {"id": "yell02", "text": "[angry] I said stop! Listen to me!"}
+      ]
+    },
+    "laughter": {
+      "pace": 1.0,
+      "notes": "EfficientAT primary. Tokens [laugh] [chuckle].",
+      "lines": [
+        {"id": "laugh01", "text": "[laugh] Oh that is too funny. I cannot stop laughing about it."},
+        {"id": "laugh02", "text": "[chuckle] You cannot be serious. [laugh] That is hilarious."}
+      ]
+    },
+    "logic": {
+      "pace": 1.0,
+      "notes": "CLAP zero-shot. reason is an alias and is not synthesized separately.",
+      "lines": [
+        {"id": "log01", "text": "If we follow the evidence step by step, the conclusion is straightforward."},
+        {"id": "log02", "text": "Let us consider the options carefully and choose the most consistent one."}
+      ]
+    }
+  }
+}

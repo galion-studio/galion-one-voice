@@ -1,0 +1,166 @@
+{
+ "summary": {
+  "n": 26,
+  "mean_ratio": 1.017,
+  "mean_abs_err_pct": 9.7,
+  "corr_text_vs_detected": 0.979
+ },
+ "rows": [
+  {
+   "wav": "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/samantha/t01.wav",
+   "text_syl": 23,
+   "detected": 20,
+   "ratio": 0.87
+  },
+  {
+   "wav": "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/samantha/t02.wav",
+   "text_syl": 20,
+   "detected": 18,
+   "ratio": 0.9
+  },
+  {
+   "wav": "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/samantha/t03.wav",
+   "text_syl": 17,
+   "detected": 14,
+   "ratio": 0.824
+  },
+  {
+   "wav": "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/samantha/t04.wav",
+   "text_syl": 15,
+   "detected": 15,
+   "ratio": 1.0
+  },
+  {
+   "wav": "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/samantha/t05.wav",
+   "text_syl": 16,
+   "detected": 14,
+   "ratio": 0.875
+  },
+  {
+   "wav": "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/samantha/t06.wav",
+   "text_syl": 19,
+   "detected": 15,
+   "ratio": 0.789
+  },
+  {
+   "wav": "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/samantha/t07.wav",
+   "text_syl": 19,
+   "detected": 20,
+   "ratio": 1.053
+  },
+  {
+   "wav": "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/samantha/t08.wav",
+   "text_syl": 40,
+   "detected": 41,
+   "ratio": 1.025
+  },
+  {
+   "wav": "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/samantha/t09.wav",
+   "text_syl": 49,
+   "detected": 47,
+   "ratio": 0.959
+  },
+  {
+   "wav": "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/samantha/t10.wav",
+   "text_syl": 19,
+   "detected": 20,
+   "ratio": 1.053
+  },
+  {
+   "wav": "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/samantha/t11.wav",
+   "text_syl": 36,
+   "detected": 34,
+   "ratio": 0.944
+  },
+  {
+   "wav": "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/samantha/t12.wav",
+   "text_syl": 26,
+   "detected": 24,
+   "ratio": 0.923
+  },
+  {
+   "wav": "/workspace/swarm/voice-v2-sprint/clip-store-own/samantha/original.wav",
+   "text_syl": 77,
+   "detected": 70,
+   "ratio": 0.909
+  },
+  {
+   "wav": "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/jarvis/t01.wav",
+   "text_syl": 23,
+   "detected": 26,
+   "ratio": 1.13
+  },
+  {
+   "wav": "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/jarvis/t02.wav",
+   "text_syl": 20,
+   "detected": 21,
+   "ratio": 1.05
+  },
+  {
+   "wav": "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/jarvis/t03.wav",
+   "text_syl": 17,
+   "detected": 21,
+   "ratio": 1.235
+  },
+  {
+   "wav": "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/jarvis/t04.wav",
+   "text_syl": 15,
+   "detected": 16,
+   "ratio": 1.067
+  },
+  {
+   "wav": "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/jarvis/t05.wav",
+   "text_syl": 16,
+   "detected": 20,
+   "ratio": 1.25
+  },
+  {
+   "wav": "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/jarvis/t06.wav",
+   "text_syl": 19,
+   "detected": 23,
+   "ratio": 1.211
+  },
+  {
+   "wav": "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/jarvis/t07.wav",
+   "text_syl": 19,
+   "detected": 19,
+   "ratio": 1.0
+  },
+  {
+   "wav": "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/jarvis/t08.wav",
+   "text_syl": 40,
+   "detected": 46,
+   "ratio": 1.15
+  },
+  {
+   "wav": "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/jarvis/t09.wav",
+   "text_syl": 49,
+   "detected": 58,
+   "ratio": 1.184
+  },
+  {
+   "wav": "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/jarvis/t10.wav",
+   "text_syl": 19,
+   "detected": 20,
+   "ratio": 1.053
+  },
+  {
+   "wav": "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/jarvis/t11.wav",
+   "text_syl": 36,
+   "detected": 35,
+   "ratio": 0.972
+  },
+  {
+   "wav": "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/jarvis/t12.wav",
+   "text_syl": 26,
+   "detected": 26,
+   "ratio": 1.0
+  },
+  {
+   "wav": "/workspace/swarm/voice-v2-sprint/clip-store-own/jarvis/original.wav",
+   "text_syl": 68,
+   "detected": 69,
+   "ratio": 1.015
+  }
+ ]
+}

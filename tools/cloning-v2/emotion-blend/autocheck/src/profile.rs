@@ -1,5 +1,3 @@
-// Galion Voice — Perpetual Open MIT License
-// (c) 2026 Maciej Grajczyk / G.A.L.I.O.N.
 //! Load base-recording profiles. Accepts voicecheck schema or worker-A blend schema.
 
 use anyhow::{bail, Context, Result};

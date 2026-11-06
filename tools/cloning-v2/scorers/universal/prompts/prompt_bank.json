@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "notes": "Zero-shot CLAP text prompts for categories without trained SER classes. Multiple paraphrases per label; scores are max (or mean) similarity then softmax across labels.",
+  "labels": {
+    "love": ["a tender loving voice", "a warm affectionate speaking voice", "someone speaking with love and care"],
+    "seductive": ["a seductive flirtatious voice", "a soft sensual speaking voice", "someone speaking in a seductive tone"],
+    "yelling": ["a person yelling and shouting", "an angry person shouting loudly", "someone raising their voice yelling"],
+    "logic": ["a calm logical reasoning voice", "a person explaining something calmly and rationally", "a measured analytical speaking voice"],
+    "reason": ["a calm logical reasoning voice", "a thoughtful rational explanation", "a composed reasonable speaking voice"],
+    "aggressive": ["an aggressive hostile voice", "an angry confrontational speaking voice", "someone speaking aggressively"],
+    "joyful": ["a happy joyful cheerful voice", "someone speaking happily with joy", "a bright upbeat speaking voice"],
+    "fear": ["a fearful scared anxious voice", "someone speaking in fear", "a frightened trembling voice"],
+    "surprise": ["a surprised astonished voice", "someone speaking with surprise", "a startled surprised speaking voice"],
+    "disgust": ["a disgusted revolted voice", "someone speaking with disgust", "a contemptuous disgusted tone"]
+  }
+}

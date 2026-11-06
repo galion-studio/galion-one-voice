@@ -1,0 +1,55 @@
+{
+  "schema": "galion-voicecheck-report/1",
+  "generated_at": "2026-11-05T22:41:02+0100",
+  "timezone": "Europe/Zagreb (UTC+1)",
+  "voice": "own-jarvis",
+  "persona": "jarvis",
+  "dry_run": true,
+  "profile_source": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-blend/analysis/profile-jarvis.json",
+  "baselines": {
+    "ecapa_min": 0.7331,
+    "wer_max": 0.019
+  },
+  "base_recording": "/workspace/swarm/voice-v2-sprint/clip-store-own/jarvis/original.wav",
+  "attempts": [
+    {
+      "label": "baseline",
+      "voice": "own-jarvis",
+      "gate": {
+        "keep": false,
+        "wer_ok": true,
+        "ecapa_ok": false,
+        "wer_mean": 0.019,
+        "ecapa_mean": 0.7331,
+        "wer_max": 0.019,
+        "ecapa_min": 0.7331,
+        "reason": "REJECT: ECAPA 0.7331 <= 0.7331 (WER 0.0190 ok vs 0.0190)"
+      },
+      "wer_mean": 0.019,
+      "ecapa_mean": 0.7331,
+      "emotion_distance": 0.5020260661840439,
+      "label_counts": {
+        "neu": 12
+      },
+      "n_lines": 12,
+      "mean_delta_f0_hz": 9.421440124511719,
+      "mean_delta_pace": 0.54556671778361,
+      "mean_ser": {
+        "ang": 0.13338724865267673,
+        "hap": 0.09755547794823845,
+        "neu": 0.7675336301326752,
+        "sad": 0.0015236280478347908
+      },
+      "fix": null,
+      "renders_dir": "/workspace/swarm/voice-v2-sprint/cloning-v2/merge-v2/wav/jarvis"
+    }
+  ],
+  "kept": null,
+  "notes": [
+    "profile loaded from /workspace/swarm/voice-v2-sprint/cloning-v2/emotion-blend/analysis/profile-jarvis.json (galion-voicecheck-profile/1)",
+    "reused merge-v2 score JSON for baseline ( --reuse-scores )",
+    "fix a_ref_expressive skipped: dry-run: would extract high-energy 8s window from base and cbx voice add (no TTS, no voice write)",
+    "fix b_prosody_light skipped: dry-run: would copy voice profile + write prosody sidecar (pace=1.03, pitch=+0.4st)",
+    "fix c_combined skipped: dry-run: would run fix-a then fix-b into combined check voice"
+  ]
+}

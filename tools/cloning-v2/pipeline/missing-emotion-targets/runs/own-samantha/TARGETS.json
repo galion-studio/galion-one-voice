@@ -1,0 +1,893 @@
+{
+  "backends": {
+    "clap": "zero-shot for love/seductive/logic/reason",
+    "efficientat": "PRIMARY for yelling/crying/laughter",
+    "emotion2vec+": "trained class for joyful/aggressive/disgust/fear/sad/neutral/surprise"
+  },
+  "emotions": {
+    "aggressive": {
+      "detected": true,
+      "moment": {
+        "clap_probs": {
+          "aggressive": 0.010617293028595744,
+          "disgust": 0.015300409014995594,
+          "fear": 0.0034166614153399917,
+          "joyful": 0.10130141222241971,
+          "logic": 0.014502208466433268,
+          "love": 0.8109382317899566,
+          "reason": 0.002771461758556213,
+          "seductive": 0.009208299601890398,
+          "surprise": 0.03002601347666151,
+          "yelling": 0.0019180092251510517
+        },
+        "clap_top": "love",
+        "e2v_probs": {
+          "angry": 0.9990363121032716,
+          "disgusted": 0.00043972977437078953,
+          "fearful": 0.0000742570700822398,
+          "happy": 0.00001696411709417589,
+          "neutral": 2.4821665647323243e-6,
+          "other": 0.000013867827874491924,
+          "sad": 0.0003758981474675238,
+          "surprised": 9.97668962554599e-7,
+          "unknown": 0.00003952215774916112
+        },
+        "e2v_top": "angry",
+        "efficientat_max": {
+          "crying": 0.027236223220825195,
+          "laughter": 0.05388101935386658,
+          "yelling": 0.3115094304084778
+        },
+        "end_s": 10.0,
+        "id": "w03",
+        "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/missing-emotion-targets/runs/own-samantha/windows/w03_7.500_10.000.wav",
+        "start_s": 7.5
+      },
+      "moment_wav": "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/missing-emotion-targets/runs/own-samantha/windows/w03_7.500_10.000.wav",
+      "origin": "original-present",
+      "probe_score": null,
+      "probe_scores": null,
+      "source": "trained class (emotion2vec+)",
+      "strength": 0.9990363121032716,
+      "target": 0.9990363121032716,
+      "window_id": "w03",
+      "window_span": "7.500-10.000"
+    },
+    "crying": {
+      "best_probe": {
+        "id": "cry01",
+        "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/missing-emotion-targets/runs/own-samantha/wav/crying/cry01.wav",
+        "strength": 0.1916964054107666
+      },
+      "detected": false,
+      "moment": {
+        "clap_probs": {
+          "aggressive": 0.06943698919575035,
+          "disgust": 0.059153882424888914,
+          "fear": 0.06989656662306207,
+          "joyful": 0.038254089811526046,
+          "logic": 0.2544795154635871,
+          "love": 0.08328086367615678,
+          "reason": 0.14789884018048352,
+          "seductive": 0.15948267790064574,
+          "surprise": 0.09337443034268346,
+          "yelling": 0.02474214438121604
+        },
+        "clap_top": "logic",
+        "e2v_probs": {
+          "angry": 1.5163780231475243e-9,
+          "disgusted": 1.1804952571026206e-8,
+          "fearful": 2.159801049117505e-8,
+          "happy": 1.749901201719695e-8,
+          "neutral": 1.2109969702578385e-6,
+          "other": 7.451371075717361e-9,
+          "sad": 0.9999988079071044,
+          "surprised": 3.1550168033689374e-10,
+          "unknown": 9.087688823683493e-9
+        },
+        "e2v_top": "sad",
+        "efficientat_max": {
+          "crying": 0.1916964054107666,
+          "laughter": 0.4674400687217712,
+          "yelling": 0.9764747023582458
+        },
+        "end_s": 7.56,
+        "id": "cry01",
+        "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/missing-emotion-targets/runs/own-samantha/wav/crying/cry01.wav",
+        "start_s": 0.0
+      },
+      "moment_wav": "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/missing-emotion-targets/runs/own-samantha/wav/crying/cry01.wav",
+      "origin": "synthesized",
+      "original_max_below_presence": 0.16115853190422058,
+      "probe_score": 0.1916964054107666,
+      "probe_scores": [
+        {
+          "id": "cry01",
+          "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/missing-emotion-targets/runs/own-samantha/wav/crying/cry01.wav",
+          "strength": 0.1916964054107666
+        },
+        {
+          "id": "cry02",
+          "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/missing-emotion-targets/runs/own-samantha/wav/crying/cry02.wav",
+          "strength": 0.11858475208282472
+        },
+        {
+          "id": "cry04",
+          "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/missing-emotion-targets/runs/own-samantha/wav/crying/cry04.wav",
+          "strength": 0.11139628291130066
+        },
+        {
+          "id": "cry03",
+          "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/missing-emotion-targets/runs/own-samantha/wav/crying/cry03.wav",
+          "strength": 0.04767462611198425
+        }
+      ],
+      "source": "efficientat",
+      "strength": 0.16115853190422058,
+      "target": 0.1916964054107666,
+      "window_id": null,
+      "window_span": null
+    },
+    "disgust": {
+      "best_probe": {
+        "id": "dis02",
+        "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/missing-emotion-targets/runs/own-samantha/wav/disgust/dis02.wav",
+        "strength": 0.9999996423721312
+      },
+      "detected": true,
+      "moment": {
+        "clap_probs": {
+          "aggressive": 0.06292011242346378,
+          "disgust": 0.0068387243017738126,
+          "fear": 0.03765438764857468,
+          "joyful": 0.08907482314425022,
+          "logic": 0.3886199923033564,
+          "love": 0.03891252127247805,
+          "reason": 0.14795432096088282,
+          "seductive": 0.12322487076273908,
+          "surprise": 0.04438779584656842,
+          "yelling": 0.06041245133591284
+        },
+        "clap_top": "logic",
+        "e2v_probs": {
+          "angry": 2.156242473461134e-8,
+          "disgusted": 0.9999996423721312,
+          "fearful": 2.426103762331877e-9,
+          "happy": 1.0552835050248175e-8,
+          "neutral": 8.358081338144531e-9,
+          "other": 1.1376478425972893e-8,
+          "sad": 9.485029650591061e-9,
+          "surprised": 3.3335109606014157e-7,
+          "unknown": 3.4999149411962804e-11
+        },
+        "e2v_top": "disgusted",
+        "efficientat_max": {
+          "crying": 0.0785776674747467,
+          "laughter": 0.16345402598381042,
+          "yelling": 0.8994325399398804
+        },
+        "end_s": 3.76,
+        "id": "dis02",
+        "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/missing-emotion-targets/runs/own-samantha/wav/disgust/dis02.wav",
+        "start_s": 0.0
+      },
+      "moment_wav": "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/missing-emotion-targets/runs/own-samantha/wav/disgust/dis02.wav",
+      "origin": "synthesized",
+      "original_max_below_presence": 0.006356066092848778,
+      "probe_score": 0.9999996423721312,
+      "probe_scores": [
+        {
+          "id": "dis02",
+          "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/missing-emotion-targets/runs/own-samantha/wav/disgust/dis02.wav",
+          "strength": 0.9999996423721312
+        },
+        {
+          "id": "dis01",
+          "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/missing-emotion-targets/runs/own-samantha/wav/disgust/dis01.wav",
+          "strength": 2.8470087727328064e-6
+        }
+      ],
+      "source": "trained class (emotion2vec+)",
+      "strength": 0.006356066092848778,
+      "target": 0.9999996423721312,
+      "window_id": null,
+      "window_span": null
+    },
+    "fear": {
+      "best_probe": {
+        "id": "fear02",
+        "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/missing-emotion-targets/runs/own-samantha/wav/fear/fear02.wav",
+        "strength": 0.00021766251302324235
+      },
+      "detected": false,
+      "moment": {
+        "clap_probs": {
+          "aggressive": 0.03885564144369203,
+          "disgust": 0.01280796500670432,
+          "fear": 0.029962634776893555,
+          "joyful": 0.09638603056220778,
+          "logic": 0.2107145043927518,
+          "love": 0.0675991143253547,
+          "reason": 0.3178770139898554,
+          "seductive": 0.16088575136235075,
+          "surprise": 0.02967384265931653,
+          "yelling": 0.03523750148087309
+        },
+        "clap_top": "reason",
+        "e2v_probs": {
+          "angry": 0.00027412138297222555,
+          "disgusted": 4.424830422067316e-6,
+          "fearful": 0.00021766251302324235,
+          "happy": 4.5477167986973654e-6,
+          "neutral": 0.99946790933609,
+          "other": 2.469622586431797e-7,
+          "sad": 0.00002686198422452435,
+          "surprised": 4.1369030441273935e-6,
+          "unknown": 1.3737943049818568e-7
+        },
+        "e2v_top": "neutral",
+        "efficientat_max": {
+          "crying": 0.16562139987945557,
+          "laughter": 0.11366590857505798,
+          "yelling": 0.5423024296760559
+        },
+        "end_s": 3.36,
+        "id": "fear02",
+        "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/missing-emotion-targets/runs/own-samantha/wav/fear/fear02.wav",
+        "start_s": 0.0
+      },
+      "moment_wav": "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/missing-emotion-targets/runs/own-samantha/wav/fear/fear02.wav",
+      "origin": "synthesized",
+      "original_max_below_presence": 0.013201448135077952,
+      "probe_score": 0.00021766251302324235,
+      "probe_scores": [
+        {
+          "id": "fear02",
+          "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/missing-emotion-targets/runs/own-samantha/wav/fear/fear02.wav",
+          "strength": 0.00021766251302324235
+        },
+        {
+          "id": "fear01",
+          "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/missing-emotion-targets/runs/own-samantha/wav/fear/fear01.wav",
+          "strength": 1.5122255390184053e-14
+        }
+      ],
+      "source": "trained class (emotion2vec+)",
+      "strength": 0.013201448135077952,
+      "target": 0.00021766251302324235,
+      "window_id": null,
+      "window_span": null
+    },
+    "happy": {
+      "alias_of": "joyful",
+      "best_probe": {
+        "id": "joy02",
+        "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/missing-emotion-targets/runs/own-samantha/wav/joyful/joy02.wav",
+        "strength": 1.0
+      },
+      "detected": true,
+      "moment": {
+        "clap_probs": {
+          "aggressive": 0.2024329845926039,
+          "disgust": 0.021841555131441145,
+          "fear": 0.03338012650905567,
+          "joyful": 0.26718196371035474,
+          "logic": 0.08808949033621885,
+          "love": 0.0417298711448016,
+          "reason": 0.044434096937528415,
+          "seductive": 0.07520851305724345,
+          "surprise": 0.0899362368398105,
+          "yelling": 0.13576516174094172
+        },
+        "clap_top": "joyful",
+        "e2v_probs": {
+          "angry": 1.2281252403933962e-10,
+          "disgusted": 3.0945931928094694e-10,
+          "fearful": 5.595233165678336e-10,
+          "happy": 1.0,
+          "neutral": 9.364962139102315e-10,
+          "other": 2.7563598625768293e-10,
+          "sad": 3.151095162579054e-9,
+          "surprised": 6.082401249329904e-10,
+          "unknown": 2.8848634592293365e-10
+        },
+        "e2v_top": "happy",
+        "efficientat_max": {
+          "crying": 0.04400154948234558,
+          "laughter": 0.06676068902015686,
+          "yelling": 0.42838215827941895
+        },
+        "end_s": 3.56,
+        "id": "joy02",
+        "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/missing-emotion-targets/runs/own-samantha/wav/joyful/joy02.wav",
+        "start_s": 0.0
+      },
+      "moment_wav": "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/missing-emotion-targets/runs/own-samantha/wav/joyful/joy02.wav",
+      "origin": "synthesized",
+      "original_max_below_presence": 0.1264711767435074,
+      "probe_score": 1.0,
+      "probe_scores": [
+        {
+          "id": "joy02",
+          "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/missing-emotion-targets/runs/own-samantha/wav/joyful/joy02.wav",
+          "strength": 1.0
+        },
+        {
+          "id": "joy01",
+          "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/missing-emotion-targets/runs/own-samantha/wav/joyful/joy01.wav",
+          "strength": 0.8013359308242798
+        }
+      ],
+      "source": "trained class (emotion2vec+)",
+      "strength": 0.1264711767435074,
+      "target": 1.0,
+      "window_id": null,
+      "window_span": null
+    },
+    "joyful": {
+      "best_probe": {
+        "id": "joy02",
+        "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/missing-emotion-targets/runs/own-samantha/wav/joyful/joy02.wav",
+        "strength": 1.0
+      },
+      "detected": true,
+      "moment": {
+        "clap_probs": {
+          "aggressive": 0.2024329845926039,
+          "disgust": 0.021841555131441145,
+          "fear": 0.03338012650905567,
+          "joyful": 0.26718196371035474,
+          "logic": 0.08808949033621885,
+          "love": 0.0417298711448016,
+          "reason": 0.044434096937528415,
+          "seductive": 0.07520851305724345,
+          "surprise": 0.0899362368398105,
+          "yelling": 0.13576516174094172
+        },
+        "clap_top": "joyful",
+        "e2v_probs": {
+          "angry": 1.2281252403933962e-10,
+          "disgusted": 3.0945931928094694e-10,
+          "fearful": 5.595233165678336e-10,
+          "happy": 1.0,
+          "neutral": 9.364962139102315e-10,
+          "other": 2.7563598625768293e-10,
+          "sad": 3.151095162579054e-9,
+          "surprised": 6.082401249329904e-10,
+          "unknown": 2.8848634592293365e-10
+        },
+        "e2v_top": "happy",
+        "efficientat_max": {
+          "crying": 0.04400154948234558,
+          "laughter": 0.06676068902015686,
+          "yelling": 0.42838215827941895
+        },
+        "end_s": 3.56,
+        "id": "joy02",
+        "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/missing-emotion-targets/runs/own-samantha/wav/joyful/joy02.wav",
+        "start_s": 0.0
+      },
+      "moment_wav": "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/missing-emotion-targets/runs/own-samantha/wav/joyful/joy02.wav",
+      "origin": "synthesized",
+      "original_max_below_presence": 0.1264711767435074,
+      "probe_score": 1.0,
+      "probe_scores": [
+        {
+          "id": "joy02",
+          "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/missing-emotion-targets/runs/own-samantha/wav/joyful/joy02.wav",
+          "strength": 1.0
+        },
+        {
+          "id": "joy01",
+          "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/missing-emotion-targets/runs/own-samantha/wav/joyful/joy01.wav",
+          "strength": 0.8013359308242798
+        }
+      ],
+      "source": "trained class (emotion2vec+)",
+      "strength": 0.1264711767435074,
+      "target": 1.0,
+      "window_id": null,
+      "window_span": null
+    },
+    "laughter": {
+      "detected": true,
+      "moment": {
+        "clap_probs": {
+          "aggressive": 0.032520544330829786,
+          "disgust": 0.002872912085823489,
+          "fear": 0.00455709700685057,
+          "joyful": 0.8054080274219197,
+          "logic": 0.012385372815560168,
+          "love": 0.07693856890835132,
+          "reason": 0.0058830936920846195,
+          "seductive": 0.026193468035764153,
+          "surprise": 0.02552720556309871,
+          "yelling": 0.007713710139717366
+        },
+        "clap_top": "joyful",
+        "e2v_probs": {
+          "angry": 2.341507654435304e-9,
+          "disgusted": 7.693716219669965e-10,
+          "fearful": 1.029340085390018e-10,
+          "happy": 3.930167746801771e-9,
+          "neutral": 1.0,
+          "other": 2.2861749993108302e-10,
+          "sad": 5.26918553234168e-9,
+          "surprised": 2.2563491353100318e-10,
+          "unknown": 1.1124626775327327e-9
+        },
+        "e2v_top": "neutral",
+        "efficientat_max": {
+          "crying": 0.16115853190422058,
+          "laughter": 0.2743651270866394,
+          "yelling": 0.44253021478652954
+        },
+        "end_s": 2.5,
+        "id": "w00",
+        "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/missing-emotion-targets/runs/own-samantha/windows/w00_0.000_2.500.wav",
+        "start_s": 0.0
+      },
+      "moment_wav": "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/missing-emotion-targets/runs/own-samantha/windows/w00_0.000_2.500.wav",
+      "origin": "original-present",
+      "probe_score": null,
+      "probe_scores": null,
+      "source": "efficientat",
+      "strength": 0.2743651270866394,
+      "target": 0.2743651270866394,
+      "window_id": "w00",
+      "window_span": "0.000-2.500"
+    },
+    "logic": {
+      "detected": true,
+      "moment": {
+        "clap_probs": {
+          "aggressive": 0.0978159723196419,
+          "disgust": 0.016772820790713072,
+          "fear": 0.026762995586413357,
+          "joyful": 0.015499836996480727,
+          "logic": 0.4992222803994493,
+          "love": 0.18148430441745303,
+          "reason": 0.05942674257228488,
+          "seductive": 0.06949635539950044,
+          "surprise": 0.021615350980910792,
+          "yelling": 0.0119033405371525
+        },
+        "clap_top": "logic",
+        "e2v_probs": {
+          "angry": 0.0011876726057380438,
+          "disgusted": 0.006356066092848778,
+          "fearful": 0.013201448135077952,
+          "happy": 0.09944252669811247,
+          "neutral": 0.7659593224525452,
+          "other": 0.0004786259378306568,
+          "sad": 0.008780359290540218,
+          "surprised": 0.00008692368282936513,
+          "unknown": 0.10450702905654909
+        },
+        "e2v_top": "neutral",
+        "efficientat_max": {
+          "crying": 0.09706032276153564,
+          "laughter": 0.08636268973350525,
+          "yelling": 0.6644409894943237
+        },
+        "end_s": 17.40718820861678,
+        "id": "w06",
+        "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/missing-emotion-targets/runs/own-samantha/windows/w06_15.000_17.407.wav",
+        "start_s": 15.0
+      },
+      "moment_wav": "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/missing-emotion-targets/runs/own-samantha/windows/w06_15.000_17.407.wav",
+      "origin": "original-present",
+      "probe_score": null,
+      "probe_scores": null,
+      "source": "zero-shot text prompt (CLAP)",
+      "strength": 0.4992222803994493,
+      "target": 0.4992222803994493,
+      "window_id": "w06",
+      "window_span": "15.000-17.407"
+    },
+    "love": {
+      "detected": true,
+      "moment": {
+        "clap_probs": {
+          "aggressive": 0.010617293028595744,
+          "disgust": 0.015300409014995594,
+          "fear": 0.0034166614153399917,
+          "joyful": 0.10130141222241971,
+          "logic": 0.014502208466433268,
+          "love": 0.8109382317899566,
+          "reason": 0.002771461758556213,
+          "seductive": 0.009208299601890398,
+          "surprise": 0.03002601347666151,
+          "yelling": 0.0019180092251510517
+        },
+        "clap_top": "love",
+        "e2v_probs": {
+          "angry": 0.9990363121032716,
+          "disgusted": 0.00043972977437078953,
+          "fearful": 0.0000742570700822398,
+          "happy": 0.00001696411709417589,
+          "neutral": 2.4821665647323243e-6,
+          "other": 0.000013867827874491924,
+          "sad": 0.0003758981474675238,
+          "surprised": 9.97668962554599e-7,
+          "unknown": 0.00003952215774916112
+        },
+        "e2v_top": "angry",
+        "efficientat_max": {
+          "crying": 0.027236223220825195,
+          "laughter": 0.05388101935386658,
+          "yelling": 0.3115094304084778
+        },
+        "end_s": 10.0,
+        "id": "w03",
+        "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/missing-emotion-targets/runs/own-samantha/windows/w03_7.500_10.000.wav",
+        "start_s": 7.5
+      },
+      "moment_wav": "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/missing-emotion-targets/runs/own-samantha/windows/w03_7.500_10.000.wav",
+      "origin": "original-present",
+      "probe_score": null,
+      "probe_scores": null,
+      "source": "zero-shot text prompt (CLAP)",
+      "strength": 0.8109382317899566,
+      "target": 0.8109382317899566,
+      "window_id": "w03",
+      "window_span": "7.500-10.000"
+    },
+    "neutral": {
+      "detected": true,
+      "moment": {
+        "clap_probs": {
+          "aggressive": 0.032520544330829786,
+          "disgust": 0.002872912085823489,
+          "fear": 0.00455709700685057,
+          "joyful": 0.8054080274219197,
+          "logic": 0.012385372815560168,
+          "love": 0.07693856890835132,
+          "reason": 0.0058830936920846195,
+          "seductive": 0.026193468035764153,
+          "surprise": 0.02552720556309871,
+          "yelling": 0.007713710139717366
+        },
+        "clap_top": "joyful",
+        "e2v_probs": {
+          "angry": 2.341507654435304e-9,
+          "disgusted": 7.693716219669965e-10,
+          "fearful": 1.029340085390018e-10,
+          "happy": 3.930167746801771e-9,
+          "neutral": 1.0,
+          "other": 2.2861749993108302e-10,
+          "sad": 5.26918553234168e-9,
+          "surprised": 2.2563491353100318e-10,
+          "unknown": 1.1124626775327327e-9
+        },
+        "e2v_top": "neutral",
+        "efficientat_max": {
+          "crying": 0.16115853190422058,
+          "laughter": 0.2743651270866394,
+          "yelling": 0.44253021478652954
+        },
+        "end_s": 2.5,
+        "id": "w00",
+        "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/missing-emotion-targets/runs/own-samantha/windows/w00_0.000_2.500.wav",
+        "start_s": 0.0
+      },
+      "moment_wav": "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/missing-emotion-targets/runs/own-samantha/windows/w00_0.000_2.500.wav",
+      "origin": "original-present",
+      "probe_score": null,
+      "probe_scores": null,
+      "source": "trained class (emotion2vec+)",
+      "strength": 1.0,
+      "target": 1.0,
+      "window_id": "w00",
+      "window_span": "0.000-2.500"
+    },
+    "reason": {
+      "alias_of": "logic",
+      "detected": true,
+      "moment": {
+        "clap_probs": {
+          "aggressive": 0.0978159723196419,
+          "disgust": 0.016772820790713072,
+          "fear": 0.026762995586413357,
+          "joyful": 0.015499836996480727,
+          "logic": 0.4992222803994493,
+          "love": 0.18148430441745303,
+          "reason": 0.05942674257228488,
+          "seductive": 0.06949635539950044,
+          "surprise": 0.021615350980910792,
+          "yelling": 0.0119033405371525
+        },
+        "clap_top": "logic",
+        "e2v_probs": {
+          "angry": 0.0011876726057380438,
+          "disgusted": 0.006356066092848778,
+          "fearful": 0.013201448135077952,
+          "happy": 0.09944252669811247,
+          "neutral": 0.7659593224525452,
+          "other": 0.0004786259378306568,
+          "sad": 0.008780359290540218,
+          "surprised": 0.00008692368282936513,
+          "unknown": 0.10450702905654909
+        },
+        "e2v_top": "neutral",
+        "efficientat_max": {
+          "crying": 0.09706032276153564,
+          "laughter": 0.08636268973350525,
+          "yelling": 0.6644409894943237
+        },
+        "end_s": 17.40718820861678,
+        "id": "w06",
+        "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/missing-emotion-targets/runs/own-samantha/windows/w06_15.000_17.407.wav",
+        "start_s": 15.0
+      },
+      "moment_wav": "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/missing-emotion-targets/runs/own-samantha/windows/w06_15.000_17.407.wav",
+      "origin": "original-present",
+      "probe_score": null,
+      "probe_scores": null,
+      "source": "zero-shot text prompt (CLAP)",
+      "strength": 0.4992222803994493,
+      "target": 0.4992222803994493,
+      "window_id": "w06",
+      "window_span": "15.000-17.407"
+    },
+    "sad": {
+      "best_probe": {
+        "id": "sad01",
+        "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/missing-emotion-targets/runs/own-samantha/wav/sad/sad01.wav",
+        "strength": 0.00021238584304228425
+      },
+      "detected": false,
+      "moment": {
+        "clap_probs": {
+          "aggressive": 0.11882772886867762,
+          "disgust": 0.07297641756755753,
+          "fear": 0.0820545298156024,
+          "joyful": 0.029088324464814946,
+          "logic": 0.2373389889795455,
+          "love": 0.06424323513121924,
+          "reason": 0.10473467187542514,
+          "seductive": 0.11853499195909,
+          "surprise": 0.16086429134641078,
+          "yelling": 0.01133681999165679
+        },
+        "clap_top": "logic",
+        "e2v_probs": {
+          "angry": 0.0000496136890433263,
+          "disgusted": 0.00030438945395871997,
+          "fearful": 8.51479489938356e-6,
+          "happy": 0.00006692219903925434,
+          "neutral": 0.997298777103424,
+          "other": 0.0004976653726771474,
+          "sad": 0.00021238584304228425,
+          "surprised": 1.9426758512963718e-7,
+          "unknown": 0.0015616287710145116
+        },
+        "e2v_top": "neutral",
+        "efficientat_max": {
+          "crying": 0.30156397819519043,
+          "laughter": 0.5231677889823914,
+          "yelling": 0.8254324793815613
+        },
+        "end_s": 4.44,
+        "id": "sad01",
+        "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/missing-emotion-targets/runs/own-samantha/wav/sad/sad01.wav",
+        "start_s": 0.0
+      },
+      "moment_wav": "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/missing-emotion-targets/runs/own-samantha/wav/sad/sad01.wav",
+      "origin": "synthesized",
+      "original_max_below_presence": 0.0124720623716712,
+      "probe_score": 0.00021238584304228425,
+      "probe_scores": [
+        {
+          "id": "sad01",
+          "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/missing-emotion-targets/runs/own-samantha/wav/sad/sad01.wav",
+          "strength": 0.00021238584304228425
+        },
+        {
+          "id": "sad02",
+          "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/missing-emotion-targets/runs/own-samantha/wav/sad/sad02.wav",
+          "strength": 4.0045636251484495e-10
+        }
+      ],
+      "source": "trained class (emotion2vec+)",
+      "strength": 0.0124720623716712,
+      "target": 0.00021238584304228425,
+      "window_id": null,
+      "window_span": null
+    },
+    "seductive": {
+      "best_probe": {
+        "id": "sed04",
+        "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/missing-emotion-targets/runs/own-samantha/wav/seductive/sed04.wav",
+        "strength": 0.3402995553566158
+      },
+      "detected": true,
+      "moment": {
+        "clap_probs": {
+          "aggressive": 0.02735159603002777,
+          "disgust": 0.06307153166330899,
+          "fear": 0.036112313188175045,
+          "joyful": 0.01552575078916685,
+          "logic": 0.28276816076798544,
+          "love": 0.09804536733947268,
+          "reason": 0.12124731967724944,
+          "seductive": 0.3402995553566158,
+          "surprise": 0.01286103034530816,
+          "yelling": 0.002717374842689654
+        },
+        "clap_top": "seductive",
+        "e2v_probs": {
+          "angry": 4.3292185836207864e-8,
+          "disgusted": 3.5837402379002015e-8,
+          "fearful": 1.1652978137988157e-8,
+          "happy": 5.72999070413971e-8,
+          "neutral": 0.9999980926513672,
+          "other": 1.2093098078480581e-8,
+          "sad": 1.8183711745223263e-6,
+          "surprised": 4.906112849312194e-9,
+          "unknown": 2.7294877469330462e-8
+        },
+        "e2v_top": "neutral",
+        "efficientat_max": {
+          "crying": 0.1528627872467041,
+          "laughter": 0.2998538613319397,
+          "yelling": 0.8824998140335083
+        },
+        "end_s": 4.56,
+        "id": "sed04",
+        "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/missing-emotion-targets/runs/own-samantha/wav/seductive/sed04.wav",
+        "start_s": 0.0
+      },
+      "moment_wav": "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/missing-emotion-targets/runs/own-samantha/wav/seductive/sed04.wav",
+      "origin": "synthesized",
+      "original_max_below_presence": 0.10222795871230352,
+      "probe_score": 0.3402995553566158,
+      "probe_scores": [
+        {
+          "id": "sed04",
+          "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/missing-emotion-targets/runs/own-samantha/wav/seductive/sed04.wav",
+          "strength": 0.3402995553566158
+        },
+        {
+          "id": "sed01",
+          "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/missing-emotion-targets/runs/own-samantha/wav/seductive/sed01.wav",
+          "strength": 0.24728260750828057
+        },
+        {
+          "id": "sed03",
+          "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/missing-emotion-targets/runs/own-samantha/wav/seductive/sed03.wav",
+          "strength": 0.11461722890735156
+        },
+        {
+          "id": "sed02",
+          "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/missing-emotion-targets/runs/own-samantha/wav/seductive/sed02.wav",
+          "strength": 0.10671363809038573
+        }
+      ],
+      "source": "zero-shot text prompt (CLAP)",
+      "strength": 0.10222795871230352,
+      "target": 0.3402995553566158,
+      "window_id": null,
+      "window_span": null
+    },
+    "surprise": {
+      "best_probe": {
+        "id": "sur01",
+        "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/missing-emotion-targets/runs/own-samantha/wav/surprise/sur01.wav",
+        "strength": 0.7338723540306091
+      },
+      "detected": true,
+      "moment": {
+        "clap_probs": {
+          "aggressive": 0.08496507778330573,
+          "disgust": 0.005986503941355805,
+          "fear": 0.007133248251011631,
+          "joyful": 0.4912799193759584,
+          "logic": 0.09854150392491264,
+          "love": 0.1367394329714163,
+          "reason": 0.06382030624086533,
+          "seductive": 0.07533248945894697,
+          "surprise": 0.02112919529313728,
+          "yelling": 0.01507232275908984
+        },
+        "clap_top": "joyful",
+        "e2v_probs": {
+          "angry": 0.00036900045233778656,
+          "disgusted": 0.008893034420907497,
+          "fearful": 0.00011595727846724913,
+          "happy": 0.0008031830075196922,
+          "neutral": 0.02192135713994503,
+          "other": 0.14524203538894653,
+          "sad": 0.0074719712138175964,
+          "surprised": 0.7338723540306091,
+          "unknown": 0.08131115883588791
+        },
+        "e2v_top": "surprised",
+        "efficientat_max": {
+          "crying": 0.1589047908782959,
+          "laughter": 0.1408730447292328,
+          "yelling": 0.4033617079257965
+        },
+        "end_s": 3.08,
+        "id": "sur01",
+        "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/missing-emotion-targets/runs/own-samantha/wav/surprise/sur01.wav",
+        "start_s": 0.0
+      },
+      "moment_wav": "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/missing-emotion-targets/runs/own-samantha/wav/surprise/sur01.wav",
+      "origin": "synthesized",
+      "original_max_below_presence": 0.00008692368282936513,
+      "probe_score": 0.7338723540306091,
+      "probe_scores": [
+        {
+          "id": "sur01",
+          "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/missing-emotion-targets/runs/own-samantha/wav/surprise/sur01.wav",
+          "strength": 0.7338723540306091
+        },
+        {
+          "id": "sur02",
+          "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/missing-emotion-targets/runs/own-samantha/wav/surprise/sur02.wav",
+          "strength": 0.00033910066122189164
+        }
+      ],
+      "source": "trained class (emotion2vec+)",
+      "strength": 0.00008692368282936513,
+      "target": 0.7338723540306091,
+      "window_id": null,
+      "window_span": null
+    },
+    "yelling": {
+      "detected": true,
+      "moment": {
+        "clap_probs": {
+          "aggressive": 0.0978159723196419,
+          "disgust": 0.016772820790713072,
+          "fear": 0.026762995586413357,
+          "joyful": 0.015499836996480727,
+          "logic": 0.4992222803994493,
+          "love": 0.18148430441745303,
+          "reason": 0.05942674257228488,
+          "seductive": 0.06949635539950044,
+          "surprise": 0.021615350980910792,
+          "yelling": 0.0119033405371525
+        },
+        "clap_top": "logic",
+        "e2v_probs": {
+          "angry": 0.0011876726057380438,
+          "disgusted": 0.006356066092848778,
+          "fearful": 0.013201448135077952,
+          "happy": 0.09944252669811247,
+          "neutral": 0.7659593224525452,
+          "other": 0.0004786259378306568,
+          "sad": 0.008780359290540218,
+          "surprised": 0.00008692368282936513,
+          "unknown": 0.10450702905654909
+        },
+        "e2v_top": "neutral",
+        "efficientat_max": {
+          "crying": 0.09706032276153564,
+          "laughter": 0.08636268973350525,
+          "yelling": 0.6644409894943237
+        },
+        "end_s": 17.40718820861678,
+        "id": "w06",
+        "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/missing-emotion-targets/runs/own-samantha/windows/w06_15.000_17.407.wav",
+        "start_s": 15.0
+      },
+      "moment_wav": "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/missing-emotion-targets/runs/own-samantha/windows/w06_15.000_17.407.wav",
+      "origin": "original-present",
+      "probe_score": null,
+      "probe_scores": null,
+      "source": "efficientat",
+      "strength": 0.6644409894943237,
+      "target": 0.6644409894943237,
+      "window_id": "w06",
+      "window_span": "15.000-17.407"
+    }
+  },
+  "formula": "For original-present emotions, target = detector strength on the best original window (same strength() as universal_match.py). For missing emotions (strength < presence), target = detector strength on the best synthesized probe line. origin marks synthesized vs original-present. The gate should compare clone category scores against these targets instead of skipping the category.",
+  "original": "/workspace/swarm/voice-v2-sprint/clip-store-own/samantha/original.wav",
+  "original_sha256": "bdcb0c2903bb91c7b0fda0cf79a42406fdaa662fd8d31f6eaed3895d9c7a8693",
+  "presence_floor": 0.2,
+  "schema": "galion-emotion-targets/1",
+  "voice": "own-samantha"
+}

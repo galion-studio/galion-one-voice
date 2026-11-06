@@ -1,0 +1,12 @@
+{
+  "voice": "own-samantha-v2-blend-montage",
+  "persona": "samantha",
+  "dtype": "fp32",
+  "temperature": 0,
+  "seed": 0,
+  "timbre_match": 0.5,
+  "timbre_ref": "/workspace/swarm/voice-v2-sprint/clip-store-own/samantha/reference.wav",
+  "prosody": false,
+  "emotion_blend": {"enabled": true},
+  "notes": "Worker C extra candidate: cbx-add-voice --emotion-blend diverse <=6s montage; T0 + timbre 0.5"
+}

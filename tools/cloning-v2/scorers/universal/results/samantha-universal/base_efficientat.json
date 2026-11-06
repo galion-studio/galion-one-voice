@@ -1,0 +1,274 @@
+{
+  "class_map": {
+    "model": "Chris-Kode/efficientat-mn10-as-onnx",
+    "n_classes": 527,
+    "sample_rate": 32000,
+    "sha256": "bec20620ab8be5e41297b45845f6fb116fbe42cd4da339ad7d44f27630b7a504",
+    "states": {
+      "crying": {
+        "aggregate": "max",
+        "indices": {
+          "Crying, sobbing": 22
+        },
+        "notes": "Baby cry, infant cry (23) excluded for adult Samantha/Jarvis clone eval",
+        "source": "efficientat"
+      },
+      "laughter": {
+        "aggregate": "max over subtypes",
+        "indices": {
+          "Baby laughter": 17,
+          "Belly laugh": 20,
+          "Chuckle, chortle": 21,
+          "Giggle": 18,
+          "Laughter": 16
+        },
+        "source": "efficientat"
+      },
+      "yelling": {
+        "aggregate": "max over family, then max/mean over windows",
+        "indices": {
+          "Children shouting": 13,
+          "Screaming": 14,
+          "Shout": 8,
+          "Yell": 11
+        },
+        "source": "efficientat"
+      }
+    }
+  },
+  "files": [
+    {
+      "duration_s": 2.5,
+      "file": "/workspace/swarm/voice-v2-sprint/cloning-v2/scorers/universal/results/samantha-universal/windows/w00_0.000_2.500.wav",
+      "hop_s": 1.25,
+      "model": "Chris-Kode/efficientat-mn10-as-onnx",
+      "n_windows": 1,
+      "per_class_max": {},
+      "sample_rate": 32000,
+      "source": "efficientat",
+      "states": {
+        "crying": {
+          "max": 0.16115853190422058,
+          "mean": 0.16115853190422058,
+          "source": "efficientat"
+        },
+        "laughter": {
+          "max": 0.2743651270866394,
+          "mean": 0.2743651270866394,
+          "source": "efficientat"
+        },
+        "yelling": {
+          "max": 0.44253021478652954,
+          "mean": 0.44253021478652954,
+          "source": "efficientat"
+        }
+      },
+      "window_s": 2.5
+    },
+    {
+      "duration_s": 2.5,
+      "file": "/workspace/swarm/voice-v2-sprint/cloning-v2/scorers/universal/results/samantha-universal/windows/w01_2.500_5.000.wav",
+      "hop_s": 1.25,
+      "model": "Chris-Kode/efficientat-mn10-as-onnx",
+      "n_windows": 1,
+      "per_class_max": {},
+      "sample_rate": 32000,
+      "source": "efficientat",
+      "states": {
+        "crying": {
+          "max": 0.05510377883911133,
+          "mean": 0.05510377883911133,
+          "source": "efficientat"
+        },
+        "laughter": {
+          "max": 0.08316746354103088,
+          "mean": 0.08316746354103088,
+          "source": "efficientat"
+        },
+        "yelling": {
+          "max": 0.622445285320282,
+          "mean": 0.622445285320282,
+          "source": "efficientat"
+        }
+      },
+      "window_s": 2.5
+    },
+    {
+      "duration_s": 2.5,
+      "file": "/workspace/swarm/voice-v2-sprint/cloning-v2/scorers/universal/results/samantha-universal/windows/w02_5.000_7.500.wav",
+      "hop_s": 1.25,
+      "model": "Chris-Kode/efficientat-mn10-as-onnx",
+      "n_windows": 1,
+      "per_class_max": {},
+      "sample_rate": 32000,
+      "source": "efficientat",
+      "states": {
+        "crying": {
+          "max": 0.06456518173217773,
+          "mean": 0.06456518173217773,
+          "source": "efficientat"
+        },
+        "laughter": {
+          "max": 0.07198423147201538,
+          "mean": 0.07198423147201538,
+          "source": "efficientat"
+        },
+        "yelling": {
+          "max": 0.31871435046195984,
+          "mean": 0.31871435046195984,
+          "source": "efficientat"
+        }
+      },
+      "window_s": 2.5
+    },
+    {
+      "duration_s": 2.5,
+      "file": "/workspace/swarm/voice-v2-sprint/cloning-v2/scorers/universal/results/samantha-universal/windows/w03_7.500_10.000.wav",
+      "hop_s": 1.25,
+      "model": "Chris-Kode/efficientat-mn10-as-onnx",
+      "n_windows": 1,
+      "per_class_max": {},
+      "sample_rate": 32000,
+      "source": "efficientat",
+      "states": {
+        "crying": {
+          "max": 0.027236223220825195,
+          "mean": 0.027236223220825195,
+          "source": "efficientat"
+        },
+        "laughter": {
+          "max": 0.05388101935386658,
+          "mean": 0.05388101935386658,
+          "source": "efficientat"
+        },
+        "yelling": {
+          "max": 0.3115094304084778,
+          "mean": 0.3115094304084778,
+          "source": "efficientat"
+        }
+      },
+      "window_s": 2.5
+    },
+    {
+      "duration_s": 2.5,
+      "file": "/workspace/swarm/voice-v2-sprint/cloning-v2/scorers/universal/results/samantha-universal/windows/w04_10.000_12.500.wav",
+      "hop_s": 1.25,
+      "model": "Chris-Kode/efficientat-mn10-as-onnx",
+      "n_windows": 1,
+      "per_class_max": {},
+      "sample_rate": 32000,
+      "source": "efficientat",
+      "states": {
+        "crying": {
+          "max": 0.031191617250442505,
+          "mean": 0.031191617250442505,
+          "source": "efficientat"
+        },
+        "laughter": {
+          "max": 0.027370363473892212,
+          "mean": 0.027370363473892212,
+          "source": "efficientat"
+        },
+        "yelling": {
+          "max": 0.054163068532943726,
+          "mean": 0.054163068532943726,
+          "source": "efficientat"
+        }
+      },
+      "window_s": 2.5
+    },
+    {
+      "duration_s": 2.5,
+      "file": "/workspace/swarm/voice-v2-sprint/cloning-v2/scorers/universal/results/samantha-universal/windows/w05_12.500_15.000.wav",
+      "hop_s": 1.25,
+      "model": "Chris-Kode/efficientat-mn10-as-onnx",
+      "n_windows": 1,
+      "per_class_max": {},
+      "sample_rate": 32000,
+      "source": "efficientat",
+      "states": {
+        "crying": {
+          "max": 0.020213603973388672,
+          "mean": 0.020213603973388672,
+          "source": "efficientat"
+        },
+        "laughter": {
+          "max": 0.06679797172546387,
+          "mean": 0.06679797172546387,
+          "source": "efficientat"
+        },
+        "yelling": {
+          "max": 0.3517768383026123,
+          "mean": 0.3517768383026123,
+          "source": "efficientat"
+        }
+      },
+      "window_s": 2.5
+    },
+    {
+      "duration_s": 2.4071875,
+      "file": "/workspace/swarm/voice-v2-sprint/cloning-v2/scorers/universal/results/samantha-universal/windows/w06_15.000_17.407.wav",
+      "hop_s": 1.25,
+      "model": "Chris-Kode/efficientat-mn10-as-onnx",
+      "n_windows": 1,
+      "per_class_max": {},
+      "sample_rate": 32000,
+      "source": "efficientat",
+      "states": {
+        "crying": {
+          "max": 0.09773129224777222,
+          "mean": 0.09773129224777222,
+          "source": "efficientat"
+        },
+        "laughter": {
+          "max": 0.08700191974639893,
+          "mean": 0.08700191974639893,
+          "source": "efficientat"
+        },
+        "yelling": {
+          "max": 0.6654093861579895,
+          "mean": 0.6654093861579895,
+          "source": "efficientat"
+        }
+      },
+      "window_s": 2.5
+    },
+    {
+      "duration_s": 2.48696875,
+      "file": "/workspace/swarm/voice-v2-sprint/cloning-v2/scorers/universal/results/samantha-universal/windows/w07_9.947_12.434.wav",
+      "hop_s": 1.25,
+      "model": "Chris-Kode/efficientat-mn10-as-onnx",
+      "n_windows": 1,
+      "per_class_max": {},
+      "sample_rate": 32000,
+      "source": "efficientat",
+      "states": {
+        "crying": {
+          "max": 0.07436773180961609,
+          "mean": 0.07436773180961609,
+          "source": "efficientat"
+        },
+        "laughter": {
+          "max": 0.04565015435218811,
+          "mean": 0.04565015435218811,
+          "source": "efficientat"
+        },
+        "yelling": {
+          "max": 0.09325447678565979,
+          "mean": 0.09325447678565979,
+          "source": "efficientat"
+        }
+      },
+      "window_s": 2.5
+    }
+  ],
+  "model": {
+    "attribution": "EfficientAT mn10_as © 2022 Florian Schmid; ONNX export Chris-Kode",
+    "id": "Chris-Kode/efficientat-mn10-as-onnx",
+    "licence": "MIT",
+    "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/scorers/universal/efficientat/efficientat-mn10-as.onnx",
+    "sha256": "bec20620ab8be5e41297b45845f6fb116fbe42cd4da339ad7d44f27630b7a504",
+    "url": "https://huggingface.co/Chris-Kode/efficientat-mn10-as-onnx"
+  },
+  "schema": "galion-efficientat/1"
+}

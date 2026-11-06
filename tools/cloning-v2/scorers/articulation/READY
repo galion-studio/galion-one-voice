@@ -1,0 +1,8 @@
+READY galion-artic 0.1.0  2026-11-05 20:40 CET
+binary: /workspace/swarm/voice-v2-sprint/cloning-v2/scorers/articulation/bin/galion-artic
+usage:
+  /workspace/swarm/voice-v2-sprint/cloning-v2/scorers/articulation/bin/galion-artic profile [-j 2] [--frames] [--out out.json] FILE.wav...
+  /workspace/swarm/voice-v2-sprint/cloning-v2/scorers/articulation/bin/galion-artic compare [-j 2] --ref REF.wav --clone CLONE.wav [--clone C2.wav ...] [--out out.json]
+key JSON paths: comparisons[].mcd.mcd_dtw_db, comparisons[].vowels_aligned.{f1,f2,f3}.mean_abs_pct, comparisons[].score.articulation_score_0_100,
+  files[].rate.articulation_rate_syl_s, files[].vowel_space.hull_area_trimmed_bark2, files[].consonants.fricative.centroid_hz.median, files[].pauses
+docs: /workspace/swarm/voice-v2-sprint/cloning-v2/scorers/articulation/README.md   baselines: /workspace/swarm/voice-v2-sprint/cloning-v2/scorers/articulation/results/   reproduce: /workspace/swarm/voice-v2-sprint/cloning-v2/scorers/articulation/run_baseline.sh

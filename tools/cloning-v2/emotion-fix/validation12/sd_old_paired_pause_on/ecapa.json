@@ -1,0 +1,26 @@
+{
+  "max": 0.7611,
+  "mean": 0.7072,
+  "min": 0.6626,
+  "n": 12,
+  "ref": "/workspace/swarm/voice-v2-sprint/clip-store-own/samantha/reference.wav",
+  "scores": {
+    "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-fix/validation12/sd_old_paired_pause_on/t01.wav": 0.7611,
+    "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-fix/validation12/sd_old_paired_pause_on/t02.wav": 0.6854,
+    "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-fix/validation12/sd_old_paired_pause_on/t03.wav": 0.7344,
+    "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-fix/validation12/sd_old_paired_pause_on/t04.wav": 0.6773,
+    "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-fix/validation12/sd_old_paired_pause_on/t05.wav": 0.743,
+    "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-fix/validation12/sd_old_paired_pause_on/t06.wav": 0.6772,
+    "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-fix/validation12/sd_old_paired_pause_on/t07.wav": 0.6626,
+    "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-fix/validation12/sd_old_paired_pause_on/t08.wav": 0.728,
+    "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-fix/validation12/sd_old_paired_pause_on/t09.wav": 0.7172,
+    "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-fix/validation12/sd_old_paired_pause_on/t10.wav": 0.6633,
+    "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-fix/validation12/sd_old_paired_pause_on/t11.wav": 0.7197,
+    "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-fix/validation12/sd_old_paired_pause_on/t12.wav": 0.717
+  },
+  "sd": 0.0329,
+  "timing": {
+    "model_load_s": 0.2323,
+    "wall_s_total": 8.679
+  }
+}

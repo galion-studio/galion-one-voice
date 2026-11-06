@@ -1,5 +1,3 @@
-// Galion Voice — Perpetual Open MIT License
-// (c) 2026 Maciej Grajczyk / G.A.L.I.O.N.
 //! galion-voicecheck — automatic per-voice emotion/prosody check for Cloning V2.
 //!
 //! Usage:

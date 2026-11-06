@@ -1,0 +1,14 @@
+Runtime:
+  available_cores: 8
+  intra_threads:   2
+  parallel_exec:   false
+  ep_requested:    cpu
+  ep_effective:    cpu
+  dtype:           fp32
+
+model_load_ms=14230
+t01 c0 seed=0 ms=25909 tok=128 dur=5.24s f0=140.8 rate=3.44 erange=25.0 tilt=-6.9 dist=7.80
+t04 c0 seed=1000003 ms=11573 tok=75 dur=3.12s f0=136.3 rate=3.21 erange=25.0 tilt=-6.3 dist=6.07
+t06 c0 seed=2000006 ms=15048 tok=106 dur=4.36s f0=139.4 rate=3.44 erange=28.1 tilt=-4.3 dist=7.05
+t08 c0 seed=3000009 ms=53741 tok=292 dur=11.80s f0=143.9 rate=2.12 erange=30.1 tilt=-5.5 dist=6.57
+done jd_m5_mup

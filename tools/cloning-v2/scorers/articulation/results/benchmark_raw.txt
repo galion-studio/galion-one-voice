@@ -1,0 +1,23 @@
+rust profile 26 files -j1 run 1
+ real	0m3.103s user	0m0.941s sys	0m0.049s 
+rust profile 26 files -j1 run 2
+ real	0m2.543s user	0m0.935s sys	0m0.042s 
+rust profile 26 files -j1 run 3
+ real	0m2.587s user	0m0.916s sys	0m0.020s 
+python profile 26 files run 1
+ real	0m12.173s user	0m8.726s sys	0m0.157s 
+python profile 26 files run 2
+ real	0m9.060s user	0m9.508s sys	0m0.205s 
+rust compare run 1
+ real	0m0.524s user	0m0.213s sys	0m0.013s 
+rust compare run 2
+ real	0m0.471s user	0m0.215s sys	0m0.004s 
+rust compare run 3
+ real	0m0.395s user	0m0.214s sys	0m0.008s 
+python compare run 1
+ real	0m3.276s user	0m2.324s sys	0m0.535s 
+python compare run 2
+ real	0m2.980s user	0m2.230s sys	0m0.298s 
+rust profile -j2
+ real	0m0.722s user	0m0.932s sys	0m0.008s 
+ 20:36:32 up 4 days, 22:07,  0 users,  load average: 19.26, 30.49, 30.40

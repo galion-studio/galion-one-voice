@@ -1,0 +1,16 @@
+[package]
+name = "galion-persona"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Persona emotion target files and persona-aware gate (opt-in; does not replace the universal scorer)"
+
+[lib]
+name = "galion_persona"
+path = "src/lib.rs"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+toml = "0.8"
+
+[workspace]

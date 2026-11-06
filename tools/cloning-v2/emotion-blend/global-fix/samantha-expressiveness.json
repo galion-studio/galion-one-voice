@@ -1,0 +1,44 @@
+{
+  "f0_mean_hz": {
+    "mean": 193.05544662475586,
+    "population_sd": 6.71011604036133
+  },
+  "f0_range_st_p5_p95": {
+    "mean": 9.307537396748861,
+    "population_sd": 1.2696368813415821
+  },
+  "energy_dr_db": {
+    "mean": 28.067396958669026,
+    "population_sd": 1.0548109575254425
+  },
+  "pause_ratio": {
+    "mean": 0.06782051765670379,
+    "population_sd": 0.05427477163110296
+  },
+  "speech_rate_syl_s": {
+    "mean": 3.3527782758076987,
+    "population_sd": 0.5692972637943327
+  },
+  "spectral_tilt_db_oct": {
+    "mean": -6.347728371620178,
+    "population_sd": 0.21643080119056798
+  },
+  "arousal": {
+    "mean": 0.49536412209272385,
+    "population_sd": 0.059854448383254516
+  },
+  "valence": {
+    "mean": 0.5300327216585478,
+    "population_sd": 0.09479821805393969
+  },
+  "dominance": {
+    "mean": 0.5857194388906161,
+    "population_sd": 0.054134442919612946
+  },
+  "hard_label_mix_entropy_bits": 1.0408520829727552,
+  "label_counts": {
+    "ang": 9,
+    "hap": 1,
+    "neu": 2
+  }
+}

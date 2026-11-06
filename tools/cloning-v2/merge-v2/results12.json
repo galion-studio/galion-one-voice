@@ -1,0 +1,183 @@
+{
+  "generated_at": "2026-11-05T22:22:00+01:00",
+  "timezone": "Europe/Zagreb (UTC+1)",
+  "approval": "Owner Mate explicit approve 2026-11-05 22:17 CET (t753u / pt753u)",
+  "scope": "box-local voice merge only; no git; no VPS deploy",
+  "method": {
+    "samantha_conditioning": "copied own-samantha-v2-emo-r2.cbxvoice over own-samantha.cbxvoice",
+    "samantha_render_default": "temperature 0, fp32",
+    "jarvis_conditioning": "UNCHANGED",
+    "timbre": "shared cbx-v2-timbre --timbre-match 0.5 --timbre-ref <voice reference.wav>; default only for own-samantha and own-jarvis via pipeline/voice-defaults/",
+    "prosody": "OFF (cbx-v2-prosody not enabled)",
+    "excluded": [
+      "jarvis hf-e-mild",
+      "jarvis emo-m*/r6/r10/ln warmth",
+      "samantha hf-e-mild",
+      "natural pauses"
+    ],
+    "test_wavs": {
+      "samantha": "emotion-fix/runs/sd_r2_t012 (r2@T0) then timbre apply 0.5 \u2192 merge-v2/wav/samantha/",
+      "jarvis": "own-clone-analysis/wav/jarvis (baseline T0) then timbre apply 0.5 \u2192 merge-v2/wav/jarvis/",
+      "note": "timbre apply uses same Rust stage as speak --timbre-match (post-decoder); avoids re-TTS OOM"
+    },
+    "scorers": {
+      "ecapa": "scorers/ecapa/target/release/galion-ecapa",
+      "emotion": "scorers/emotion/target/release/galion-emotion fp32",
+      "articulation": "scorers/articulation/bin/galion-artic",
+      "wer": "scorers/quality/bin/galion-wer",
+      "mos": "scorers/quality/bin/galion-mos",
+      "hygiene": "scorers/quality/bin/galion-hygiene",
+      "prosody": "emotion-fix/cbx-emo analyze (F0 median, rate_wps)"
+    }
+  },
+  "backups": {
+    "voices_dir": "/home/box/.cache/huggingface/cbx/voices",
+    "files": [
+      "/home/box/.cache/huggingface/cbx/voices/own-samantha.cbxvoice.bak-pre-v2-20261105",
+      "/home/box/.cache/huggingface/cbx/voices/own-jarvis.cbxvoice.bak-pre-v2-20261105"
+    ],
+    "clip_store_metadata": [
+      "/workspace/swarm/voice-v2-sprint/clip-store-own/samantha/consent.txt.bak-pre-v2-20261105",
+      "/workspace/swarm/voice-v2-sprint/clip-store-own/samantha/reference.wav.sha256.bak-pre-v2-20261105",
+      "/workspace/swarm/voice-v2-sprint/clip-store-own/jarvis/consent.txt.bak-pre-v2-20261105",
+      "/workspace/swarm/voice-v2-sprint/clip-store-own/jarvis/reference.wav.sha256.bak-pre-v2-20261105"
+    ],
+    "sha256": {
+      "own-samantha.cbxvoice.bak-pre-v2-20261105": "7b2ead400cbc517ca15e4bbd2540fa5a28c1e66cc2b33a5bb481f2cf05e8cf20",
+      "own-jarvis.cbxvoice.bak-pre-v2-20261105": "73fc04d8e8aafb20a3294b38e39746408dbd1b74f804f9089eff147a9d94155d",
+      "live_own-samantha.cbxvoice": "c06681cf37758c3b4fb4328e087b83c14c51c45c01041f5eeeddfa81dd3ebc97",
+      "live_own-jarvis.cbxvoice": "73fc04d8e8aafb20a3294b38e39746408dbd1b74f804f9089eff147a9d94155d",
+      "source_own-samantha-v2-emo-r2.cbxvoice": "c06681cf37758c3b4fb4328e087b83c14c51c45c01041f5eeeddfa81dd3ebc97"
+    },
+    "read_only_untouched": [
+      "/workspace/swarm/voice-v2-sprint/clip-store-own/samantha/original.wav",
+      "/workspace/swarm/voice-v2-sprint/clip-store-own/samantha/reference.wav",
+      "/workspace/swarm/voice-v2-sprint/clip-store-own/jarvis/original.wav",
+      "/workspace/swarm/voice-v2-sprint/clip-store-own/jarvis/reference.wav"
+    ],
+    "nothing_deleted": true
+  },
+  "targets": {
+    "samantha_f0_hz": 178,
+    "jarvis_f0_hz": [
+      129,
+      132
+    ]
+  },
+  "samantha": {
+    "baseline": {
+      "n": 12,
+      "ecapa_mean": 0.7072,
+      "ecapa_sd": 0.0315,
+      "wer_mean": 0.05,
+      "mos_mean": 3.7285,
+      "emotion_distance": 0.5062,
+      "avd_distance": 0.0969,
+      "emotion_label_counts": {
+        "ang": 7,
+        "hap": 2,
+        "neu": 3
+      },
+      "f0_mean_hz": 202.97,
+      "pace_wps": 3.49,
+      "hf_f99_hz": 2813.5,
+      "clicks_total": 32,
+      "clips_with_clicks": 5,
+      "clipped_samples_total": 9
+    },
+    "merged": {
+      "n": 12,
+      "ecapa_mean": 0.7057,
+      "ecapa_sd": 0.0348,
+      "wer_mean": 0.018,
+      "mos_mean": 4.1323,
+      "emotion_distance": 0.4651,
+      "avd_distance": 0.1008,
+      "emotion_label_counts": {
+        "ang": 7,
+        "hap": 1,
+        "neu": 4
+      },
+      "f0_mean_hz": 181.09,
+      "pace_wps": 3.556,
+      "hf_f99_hz": 2686.5,
+      "clicks_total": 4,
+      "clips_with_clicks": 3,
+      "clipped_samples_total": 0
+    },
+    "delta": {
+      "ecapa_mean": -0.0015,
+      "wer_mean": -0.032,
+      "mos_mean": 0.4038,
+      "emotion_distance": -0.0411,
+      "f0_mean_hz": -21.88,
+      "pace_wps": 0.066,
+      "hf_f99_hz": -127.0,
+      "clicks_total": -28
+    },
+    "verdict": {
+      "pass": true,
+      "ecapa_drop": 0.0015,
+      "fail_if_ecapa_drop_gt": 0.01
+    }
+  },
+  "jarvis": {
+    "baseline": {
+      "n": 12,
+      "ecapa_mean": 0.7327,
+      "ecapa_sd": 0.0556,
+      "wer_mean": 0.019,
+      "mos_mean": 4.3044,
+      "emotion_distance": 0.5114,
+      "avd_distance": 0.2305,
+      "emotion_label_counts": {
+        "neu": 12
+      },
+      "f0_mean_hz": 142.36,
+      "pace_wps": 3.311,
+      "hf_f99_hz": 6023.4,
+      "clicks_total": 39,
+      "clips_with_clicks": 8,
+      "clipped_samples_total": 4
+    },
+    "merged": {
+      "n": 12,
+      "ecapa_mean": 0.7331,
+      "ecapa_sd": 0.0571,
+      "wer_mean": 0.019,
+      "mos_mean": 4.3141,
+      "emotion_distance": 0.502,
+      "avd_distance": 0.2266,
+      "emotion_label_counts": {
+        "neu": 12
+      },
+      "f0_mean_hz": 142.36,
+      "pace_wps": 3.311,
+      "hf_f99_hz": 6376.9,
+      "clicks_total": 4,
+      "clips_with_clicks": 4,
+      "clipped_samples_total": 0
+    },
+    "delta": {
+      "ecapa_mean": 0.0004,
+      "wer_mean": 0.0,
+      "mos_mean": 0.0097,
+      "emotion_distance": -0.0094,
+      "f0_mean_hz": 0.0,
+      "pace_wps": 0.0,
+      "hf_f99_hz": 353.5,
+      "clicks_total": -35
+    },
+    "verdict": {
+      "pass": true,
+      "ecapa_drop": -0.0004,
+      "fail_if_ecapa_drop_gt": 0.01
+    }
+  },
+  "configs_created": [
+    "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/voice-defaults/own-samantha.json",
+    "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/voice-defaults/own-jarvis.json",
+    "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/bin/cbx-speak-voice",
+    "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/bin/cbx-batch-voice"
+  ]
+}

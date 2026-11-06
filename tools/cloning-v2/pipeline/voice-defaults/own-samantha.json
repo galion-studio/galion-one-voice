@@ -5,7 +5,7 @@
   "temperature": 0,
   "seed": 0,
   "timbre_match": 0.5,
-  "timbre_ref": "$GALION_CLIP_STORE/samantha/reference.wav",
+  "timbre_ref": "/workspace/swarm/voice-v2-sprint/clip-store-own/samantha/reference.wav",
   "prosody": false,
   "notes": "Cloning V2 emotion-blend 2026-11-05: coherent-rotation blend-preserve (own-samantha-v2-blendfix-coherent) + timbre 0.5; T0/fp32. MOS tradeoff accepted by Slavik.",
   "emotion_blend": {

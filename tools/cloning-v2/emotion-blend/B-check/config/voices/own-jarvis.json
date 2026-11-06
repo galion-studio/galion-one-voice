@@ -1,0 +1,12 @@
+{
+  "base": "/workspace/swarm/voice-v2-sprint/clip-store-own/jarvis/reference.wav",
+  "persona": "jarvis",
+  "ecapa_threshold": 0.7327,
+  "wer_max": 0.018,
+  "require_beat_prefix": false,
+  "notes": "Per-voice gate example: Jarvis ECAPA bar = his own pre-merge baseline 0.7327 (merge-v2/REPORT.md) instead of the default 0.7057. The checker never writes own-jarvis.cbxvoice. Emotion gate OFF unless emotion_enabled/emotion_window configured; profile/leaderboard still computable with --emo-min or emotion_enabled true. Do not change Jarvis production voice.",
+  "emotion_enabled": false,
+  "emotion_backend": "universal",
+  "emotion_window_s": 2.5,
+  "emotion_presence": 0.28
+}

@@ -1,0 +1,1 @@
+reference=PauseStats { median_seconds: 0.48, pause_ratio: 0.2659818, n: 9 }; inserted=2; input_samples=137280; output_samples=144864

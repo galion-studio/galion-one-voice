@@ -1,0 +1,23 @@
+{
+  "half_vs_half_ceiling": 0.8283,
+  "max": 0.7636,
+  "mean": 0.6383,
+  "min": 0.5681,
+  "n": 8,
+  "ref": "/workspace/swarm/voice-v2-sprint/clip-store-own/samantha/reference.wav",
+  "scores": {
+    "wav/own-samantha-v2-hf-d-orig44/t01.wav": 0.7636,
+    "wav/own-samantha-v2-hf-d-orig44/t02.wav": 0.5681,
+    "wav/own-samantha-v2-hf-d-orig44/t03.wav": 0.5785,
+    "wav/own-samantha-v2-hf-d-orig44/t04.wav": 0.6136,
+    "wav/own-samantha-v2-hf-d-orig44/t05.wav": 0.6359,
+    "wav/own-samantha-v2-hf-d-orig44/t06.wav": 0.681,
+    "wav/own-samantha-v2-hf-d-orig44/t07.wav": 0.6509,
+    "wav/own-samantha-v2-hf-d-orig44/t08.wav": 0.6144
+  },
+  "sd": 0.0625,
+  "timing": {
+    "model_load_s": 0.135,
+    "wall_s_total": 2.0796
+  }
+}

@@ -1,0 +1,143 @@
+{
+  "files": [
+    {
+      "duration_s": 4.257,
+      "mos": 3.7337,
+      "ms": 700.1,
+      "path": "/workspace/samples/v2/pipeline/samantha/t01-postonly.wav",
+      "pesq": 3.653,
+      "si_sdr": 26.7395,
+      "stoi": 0.9846
+    },
+    {
+      "duration_s": 3.24,
+      "mos": 4.5084,
+      "ms": 519.8,
+      "path": "/workspace/samples/v2/pipeline/samantha/t02-postonly.wav",
+      "pesq": 3.0031,
+      "si_sdr": 17.3159,
+      "stoi": 0.9552
+    },
+    {
+      "duration_s": 2.759,
+      "mos": 4.5108,
+      "ms": 433.0,
+      "path": "/workspace/samples/v2/pipeline/samantha/t03-postonly.wav",
+      "pesq": 2.6342,
+      "si_sdr": 9.2487,
+      "stoi": 0.9465
+    },
+    {
+      "duration_s": 2.286,
+      "mos": 4.2032,
+      "ms": 373.0,
+      "path": "/workspace/samples/v2/pipeline/samantha/t04-postonly.wav",
+      "pesq": 2.6962,
+      "si_sdr": 14.5751,
+      "stoi": 0.9519
+    },
+    {
+      "duration_s": 2.622,
+      "mos": 4.3211,
+      "ms": 414.3,
+      "path": "/workspace/samples/v2/pipeline/samantha/t05-postonly.wav",
+      "pesq": 2.9438,
+      "si_sdr": 14.9309,
+      "stoi": 0.9418
+    },
+    {
+      "duration_s": 3.204,
+      "mos": 3.9173,
+      "ms": 534.9,
+      "path": "/workspace/samples/v2/pipeline/samantha/t06-postonly.wav",
+      "pesq": 2.4817,
+      "si_sdr": 15.5996,
+      "stoi": 0.9217
+    },
+    {
+      "duration_s": 3.276,
+      "mos": 4.3701,
+      "ms": 533.6,
+      "path": "/workspace/samples/v2/pipeline/samantha/t07-postonly.wav",
+      "pesq": 3.3873,
+      "si_sdr": 21.8714,
+      "stoi": 0.9683
+    },
+    {
+      "duration_s": 6.846,
+      "mos": 4.0633,
+      "ms": 1738.9,
+      "path": "/workspace/samples/v2/pipeline/samantha/t08-postonly.wav",
+      "pesq": 3.0213,
+      "si_sdr": 19.057,
+      "stoi": 0.9613
+    },
+    {
+      "duration_s": 7.464,
+      "mos": 4.5876,
+      "ms": 2076.8,
+      "path": "/workspace/samples/v2/pipeline/samantha/t09-postonly.wav",
+      "pesq": 2.9595,
+      "si_sdr": 19.9417,
+      "stoi": 0.9618
+    },
+    {
+      "duration_s": 4.875,
+      "mos": 4.4773,
+      "ms": 1063.6,
+      "path": "/workspace/samples/v2/pipeline/samantha/t10-postonly.wav",
+      "pesq": 3.7471,
+      "si_sdr": 25.0488,
+      "stoi": 0.9824
+    },
+    {
+      "duration_s": 6.882,
+      "mos": 4.4498,
+      "ms": 1677.2,
+      "path": "/workspace/samples/v2/pipeline/samantha/t11-postonly.wav",
+      "pesq": 3.3381,
+      "si_sdr": 18.616,
+      "stoi": 0.964
+    },
+    {
+      "duration_s": 5.111,
+      "mos": 4.4546,
+      "ms": 852.0,
+      "path": "/workspace/samples/v2/pipeline/samantha/t12-postonly.wav",
+      "pesq": 2.1951,
+      "si_sdr": 11.1719,
+      "stoi": 0.9365
+    }
+  ],
+  "metric": "torchaudio SQUIM_SUBJECTIVE (NORESQA-MOS) + SQUIM_OBJECTIVE, ONNX fp32",
+  "nmr": "/workspace/swarm/voice-v2-sprint/clip-store-own/jarvis/reference.wav",
+  "summary": {
+    "mos": {
+      "mean": 4.2998,
+      "n": 12,
+      "sd": 0.256
+    },
+    "pesq": {
+      "mean": 3.005,
+      "n": 12,
+      "sd": 0.4469
+    },
+    "si_sdr": {
+      "mean": 17.8431,
+      "n": 12,
+      "sd": 4.9717
+    },
+    "stoi": {
+      "mean": 0.9563,
+      "n": 12,
+      "sd": 0.0175
+    }
+  },
+  "threads": 2,
+  "timing": {
+    "load_s": 1.323,
+    "peak_rss_mb": 884.1,
+    "score_s": 10.917
+  },
+  "tool": "galion-mos"
+}
