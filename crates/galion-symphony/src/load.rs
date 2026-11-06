@@ -6,7 +6,8 @@ use crate::clip::{self, Clip};
 use crate::manifest::{self, Manifest};
 use crate::sha;
 use crate::{Error, Result};
-use galion_tensor::gq::{GqDType, GqFile, Prefault};
+pub use galion_tensor::gq::Prefault;
+use galion_tensor::gq::{GqDType, GqFile};
 use std::path::{Path, PathBuf};
 
 pub struct Loaded {
