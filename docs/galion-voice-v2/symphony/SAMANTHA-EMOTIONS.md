@@ -9,6 +9,8 @@ Samantha is an internal test voice. Her range is wide, and the moment has to ear
 
 The feeling is in the voice. At rest (`e` = 0) she sits a little warmer than Galion One, on the Samantha baseline. When `e` rises she follows her column: lower, slower, quieter, warmer, with the long pre-pause at the top of the weight. Joy can brighten her, slightly under the caller. A laugh is for something actually funny. On a clone worker that documents paralinguistic tags, `[laugh]` and `[chuckle]` are control tokens. On Piper or flite those tokens are not emitted. Warmth on that path is the prosody knob.
 
+Situational feeling is that live weight on the feeling band. Consent starts denied, so a turn with no grant has no caller frame and `e` is 0. Caller emotion does not steer the phone lane unless `sense` is granted. The lane passes `Emotion::Neutral` on `reply_text`, `inject_text`, and `turn`. Callers may run `ProsodyEmotion` only when `sense` is granted. It stays unwired on the lane. Any accuracy of that heuristic, and any claim that a granted `sense` already changed her spoken phone reply, stays **BLOCKED**. Her reference wav stays out of git.
+
 `e` comes from `galion-emotion`. For Sad, Tired, Anxious, or Angry, with consent and a caller frame:
 
 `e = confidence · clamp(−valence / 0.6, 0, 1)`
@@ -25,7 +27,7 @@ Her reference clip, WAV only, is in [CLIP-STORE.md](CLIP-STORE.md). sha256 `bdcb
 
 **FAIL** when the turn inserts a scripted comfort line, or when her column is applied to Jarvis.
 
-**BLOCKED** when consent is closed, so there is no caller frame and `e` is 0. Score the baseline, and say that the live weight was not in play.
+**BLOCKED** when consent is closed, so there is no caller frame and `e` is 0. Score the baseline, and say that the live weight was not in play. Also **BLOCKED** when a score names a phone-lane accuracy or says her spoken phone reply followed the caller. Consent starts denied, and that read is unmeasured.
 
 ```bash
 cargo test --offline -p galion-emotion
@@ -123,6 +125,10 @@ Paralinguistic tags sit where a breath would be, and only while the id is `saman
 A conversation is one heartbeat, not a pipeline. `galion-heartbeat` `FRAME_MS` is 80. One `Heartbeat::step` carries the you band, the me band, and the feeling band. The step never blocks and never allocates. A late frame is a pause. Nothing catches up on the next frame.
 
 The feeling decision for frame *t* is `voice_color` on the consented inbound frame (or on absence). Prosody and colour both come from `e`. There is no text in `VoiceColor`. The duplex band is one 8-byte `EmotionWire` beside the audio, 100 B/s at 12.5 Hz. Inbound affect is dropped when `sense` is off. Outbound affect is what she intended, and it does not need their consent to exist. Withdrawing `sense` clears the inbound band on the next frame and forces `e` back to 0. RAM history goes with the consent wipe.
+
+Situational feeling is this live weight `e` on the feeling band (`Feeling.e` from `voice_color`). Consent starts denied. `DefaultConsentGate` begins at `ConsentState::Unknown`, and `check` returns `DenyNoConsent`. `DuplexOutline` starts with `sense` false. No grant drops the inbound frame and leaves `e` at 0.
+
+Caller emotion does not steer the phone lane unless `sense` is granted. `PhoneLane` passes `Emotion::Neutral` on `reply_text`, `inject_text`, and `turn`. Callers may run `ProsodyEmotion` only when `sense` is granted. It is unwired on the lane. How often that heuristic matches a person, and whether a granted `sense` changes her spoken phone reply, is unmeasured and stays **BLOCKED**. The reference wav named above stays out of git (`docs/galion-voice-v2/personas/refs/.gitignore` and the swarm `.gitignore`). This file does not add it.
 
 ```text
 you PCM (1920 samples, 24 kHz, 80 ms)
