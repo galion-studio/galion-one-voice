@@ -1,0 +1,17 @@
+{
+  "python_refs": {
+    "own-samantha-v2-sim-cleaned": "refs/samantha-cleaned-ln.wav",
+    "own-samantha-v2-sim-multi": "refs/samantha-multiclip-long-ln.wav",
+    "own-jarvis-v2-sim-cleaned": "refs/jarvis-cleaned-ln.wav",
+    "own-jarvis-v2-sim-multi": "refs/jarvis-multiclip-long-ln.wav"
+  },
+  "rust_refs": {
+    "own-samantha-v2-sim-rs-cleaned": "refs/samantha-rs-cleaned-ln.wav",
+    "own-samantha-v2-sim-rs-multi": "refs/samantha-rs-multiclip-long-ln.wav",
+    "own-jarvis-v2-sim-rs-cleaned": "refs/jarvis-rs-cleaned-ln.wav",
+    "own-jarvis-v2-sim-rs-multi": "refs/jarvis-rs-multiclip-long-ln.wav"
+  },
+  "untouched": ["own-samantha", "own-jarvis", "*.bak"],
+  "simsel_bin": "simsel-rs/target/release/simsel",
+  "best_of_n": {"w_emotion": 0.65, "w_ecapa": 0.35, "n_default": 3}
+}

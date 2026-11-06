@@ -1,0 +1,25 @@
+[package]
+name = "refprep"
+version = "0.1.0"
+edition = "2021"
+description = "Cloning V2 shared reference-preparation stage (one code path, one default config, every voice)"
+license = "MIT"
+publish = false
+
+[[bin]]
+name = "refprep"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1.0"
+clap = { version = "4.5", features = ["derive"] }
+hound = "3.5"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+toml = "0.8"
+rustfft = "6"
+
+[workspace]
+
+[profile.release]
+opt-level = 3

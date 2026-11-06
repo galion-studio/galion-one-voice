@@ -1,0 +1,98 @@
+{
+ "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/samantha/t01.wav": {
+  "wer": 0.056,
+  "hyp": "the morning light came slowly over the hills and the whole valley seem to wake up at once"
+ },
+ "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/samantha/t02.wav": {
+  "wer": 0.0,
+  "hyp": "if you need anything at all tonight just tell me and i will take care of it"
+ },
+ "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/samantha/t03.wav": {
+  "wer": 0.0,
+  "hyp": "we checked the numbers twice this afternoon and the results are clear"
+ },
+ "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/samantha/t04.wav": {
+  "wer": 0.2,
+  "hyp": "could you up in the living room window before dinner starts"
+ },
+ "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/samantha/t05.wav": {
+  "wer": 0.0,
+  "hyp": "are you sure the meeting is still at three thirty on thursday"
+ },
+ "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/samantha/t06.wav": {
+  "wer": 0.133,
+  "hyp": "i'm so glad you made it home safely i was worried the whole time"
+ },
+ "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/samantha/t07.wav": {
+  "wer": 0.0,
+  "hyp": "that was an incredible performance you should be really proud of yourself"
+ },
+ "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/samantha/t08.wav": {
+  "wer": 0.0,
+  "hyp": "please remember to bring your passport the confirmation email and the hotel booking number when you leave for the airport tomorrow morning at six fifteen"
+ },
+ "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/samantha/t09.wav": {
+  "wer": 0.0,
+  "hyp": "after reviewing the quarterly report the board decided to approve the budget increase for research and development contingent on a detailed timeline being delivered by next friday"
+ },
+ "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/samantha/t10.wav": {
+  "wer": 0.071,
+  "hyp": "call me back at five five five zero one two three extension for seven"
+ },
+ "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/samantha/t11.wav": {
+  "wer": 0.0,
+  "hyp": "the package has tracking number one two three four five six seven eight nine and it should arrive between the twelfth and the fourteenth of november"
+ },
+ "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/samantha/t12.wav": {
+  "wer": 0.143,
+  "hyp": "he let me think about that for a second yes i believe we can move the appointment to have passed two"
+ },
+ "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/jarvis/t01.wav": {
+  "wer": 0.056,
+  "hyp": "the morning light came slowly over the hills and the whole valley seem to wake up at once"
+ },
+ "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/jarvis/t02.wav": {
+  "wer": 0.0,
+  "hyp": "if you need anything at all tonight just tell me and i will take care of it"
+ },
+ "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/jarvis/t03.wav": {
+  "wer": 0.0,
+  "hyp": "we checked the numbers twice this afternoon and the results are clear"
+ },
+ "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/jarvis/t04.wav": {
+  "wer": 0.0,
+  "hyp": "could you open the living room window before dinner starts"
+ },
+ "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/jarvis/t05.wav": {
+  "wer": 0.0,
+  "hyp": "are you sure the meeting is still at three thirty on thursday"
+ },
+ "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/jarvis/t06.wav": {
+  "wer": 0.0,
+  "hyp": "i am so glad you made it home safely i was worried the whole time"
+ },
+ "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/jarvis/t07.wav": {
+  "wer": 0.0,
+  "hyp": "that was an incredible performance you should be really proud of yourself"
+ },
+ "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/jarvis/t08.wav": {
+  "wer": 0.0,
+  "hyp": "please remember to bring your passport the confirmation email and the hotel booking number when you leave for the airport tomorrow morning at six fifteen"
+ },
+ "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/jarvis/t09.wav": {
+  "wer": 0.0,
+  "hyp": "after reviewing the quarterly report the board decided to approve the budget increase for research and development contingent on a detailed timeline being delivered by next friday"
+ },
+ "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/jarvis/t10.wav": {
+  "wer": 0.071,
+  "hyp": "call me back at five five five zero one two three extension for seven"
+ },
+ "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/jarvis/t11.wav": {
+  "wer": 0.0,
+  "hyp": "the package has tracking number one two three four five six seven eight nine and it should arrive between the twelfth and the fourteenth of november"
+ },
+ "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/jarvis/t12.wav": {
+  "wer": 0.095,
+  "hyp": "let me think about that for a second yes i believe we can move the appointment a half past two"
+ }
+}

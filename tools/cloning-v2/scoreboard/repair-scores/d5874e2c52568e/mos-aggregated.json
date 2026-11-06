@@ -1,0 +1,129 @@
+{
+  "files": [
+    {
+      "duration_s": 4.058,
+      "mos": 3.0185,
+      "ms": 674.3,
+      "path": "/workspace/samples/v2/pipeline/jarvis/t01-postonly.wav",
+      "pesq": 1.8328,
+      "si_sdr": 6.8093,
+      "stoi": 0.9217,
+      "file": "/workspace/samples/v2/pipeline/jarvis/t01-postonly.wav"
+    },
+    {
+      "duration_s": 3.323,
+      "mos": 3.119,
+      "ms": 532.1,
+      "path": "/workspace/samples/v2/pipeline/jarvis/t02-postonly.wav",
+      "pesq": 3.7877,
+      "si_sdr": 20.5455,
+      "stoi": 0.9772,
+      "file": "/workspace/samples/v2/pipeline/jarvis/t02-postonly.wav"
+    },
+    {
+      "duration_s": 3.026,
+      "mos": 3.4063,
+      "ms": 598.8,
+      "path": "/workspace/samples/v2/pipeline/jarvis/t03-postonly.wav",
+      "pesq": 2.4753,
+      "si_sdr": 15.0265,
+      "stoi": 0.9471,
+      "file": "/workspace/samples/v2/pipeline/jarvis/t03-postonly.wav"
+    },
+    {
+      "duration_s": 2.239,
+      "mos": 4.5727,
+      "ms": 435.3,
+      "path": "/workspace/samples/v2/pipeline/jarvis/t04-postonly.wav",
+      "pesq": 2.7217,
+      "si_sdr": 17.1607,
+      "stoi": 0.9301,
+      "file": "/workspace/samples/v2/pipeline/jarvis/t04-postonly.wav"
+    },
+    {
+      "duration_s": 2.841,
+      "mos": 3.2423,
+      "ms": 488.2,
+      "path": "/workspace/samples/v2/pipeline/jarvis/t05-postonly.wav",
+      "pesq": 3.4977,
+      "si_sdr": 23.2248,
+      "stoi": 0.9768,
+      "file": "/workspace/samples/v2/pipeline/jarvis/t05-postonly.wav"
+    },
+    {
+      "duration_s": 3.235,
+      "mos": 3.4739,
+      "ms": 582.1,
+      "path": "/workspace/samples/v2/pipeline/jarvis/t06-postonly.wav",
+      "pesq": 3.4073,
+      "si_sdr": 17.5933,
+      "stoi": 0.9566,
+      "file": "/workspace/samples/v2/pipeline/jarvis/t06-postonly.wav"
+    },
+    {
+      "duration_s": 3.123,
+      "mos": 3.0637,
+      "ms": 500.9,
+      "path": "/workspace/samples/v2/pipeline/jarvis/t07-postonly.wav",
+      "pesq": 1.5422,
+      "si_sdr": 4.0657,
+      "stoi": 0.8835,
+      "file": "/workspace/samples/v2/pipeline/jarvis/t07-postonly.wav"
+    },
+    {
+      "duration_s": 6.715,
+      "mos": 3.5064,
+      "ms": 1649.8,
+      "path": "/workspace/samples/v2/pipeline/jarvis/t08-postonly.wav",
+      "pesq": 2.2339,
+      "si_sdr": 11.8037,
+      "stoi": 0.9372,
+      "file": "/workspace/samples/v2/pipeline/jarvis/t08-postonly.wav"
+    },
+    {
+      "duration_s": 8.274,
+      "mos": 3.7396,
+      "ms": 2130.2,
+      "path": "/workspace/samples/v2/pipeline/jarvis/t09-postonly.wav",
+      "pesq": 2.7626,
+      "si_sdr": 14.6093,
+      "stoi": 0.9707,
+      "file": "/workspace/samples/v2/pipeline/jarvis/t09-postonly.wav"
+    },
+    {
+      "duration_s": 4.733,
+      "mos": 3.0837,
+      "ms": 822.9,
+      "path": "/workspace/samples/v2/pipeline/jarvis/t10-postonly.wav",
+      "pesq": 2.9891,
+      "si_sdr": 11.5281,
+      "stoi": 0.9594,
+      "file": "/workspace/samples/v2/pipeline/jarvis/t10-postonly.wav"
+    },
+    {
+      "duration_s": 6.441,
+      "mos": 3.2715,
+      "ms": 1432.5,
+      "path": "/workspace/samples/v2/pipeline/jarvis/t11-postonly.wav",
+      "pesq": 2.6807,
+      "si_sdr": 14.4174,
+      "stoi": 0.9524,
+      "file": "/workspace/samples/v2/pipeline/jarvis/t11-postonly.wav"
+    },
+    {
+      "duration_s": 4.96,
+      "mos": 3.4189,
+      "ms": 1113.1,
+      "path": "/workspace/samples/v2/pipeline/jarvis/t12-postonly.wav",
+      "pesq": 2.7303,
+      "si_sdr": 13.9117,
+      "stoi": 0.9481,
+      "file": "/workspace/samples/v2/pipeline/jarvis/t12-postonly.wav"
+    }
+  ],
+  "provenance": [
+    "/workspace/swarm/voice-v2-sprint/cloning-v2/scoreboard/repair-scores/d5874e2c52568e-d5874e/mos.json"
+  ],
+  "aggregation": "select original Rust per-file scores by identical WAV path; no Python metric computation",
+  "nmr": "/workspace/swarm/voice-v2-sprint/clip-store-own/samantha/reference.wav"
+}

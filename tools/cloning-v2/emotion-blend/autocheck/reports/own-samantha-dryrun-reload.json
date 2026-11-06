@@ -1,0 +1,56 @@
+{
+  "schema": "galion-voicecheck-report/1",
+  "generated_at": "2026-11-05T22:43:49+0100",
+  "timezone": "Europe/Zagreb (UTC+1)",
+  "voice": "own-samantha",
+  "persona": "samantha",
+  "dry_run": true,
+  "profile_source": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-blend/analysis/profile-samantha.json",
+  "baselines": {
+    "ecapa_min": 0.7057,
+    "wer_max": 0.018
+  },
+  "base_recording": "/workspace/swarm/voice-v2-sprint/clip-store-own/samantha/original.wav",
+  "attempts": [
+    {
+      "label": "baseline",
+      "voice": "own-samantha",
+      "gate": {
+        "keep": false,
+        "wer_ok": true,
+        "ecapa_ok": false,
+        "wer_mean": 0.018,
+        "ecapa_mean": 0.7057,
+        "wer_max": 0.018,
+        "ecapa_min": 0.7057,
+        "reason": "REJECT: ECAPA 0.7057 <= 0.7057 (WER 0.0180 ok vs 0.0180)"
+      },
+      "wer_mean": 0.018,
+      "ecapa_mean": 0.7057,
+      "emotion_distance": 0.46513793617486954,
+      "label_counts": {
+        "ang": 7,
+        "hap": 1,
+        "neu": 4
+      },
+      "n_lines": 12,
+      "mean_delta_f0_hz": -4.346886952718076,
+      "mean_delta_pace": 0.5902156432469686,
+      "mean_ser": {
+        "ang": 0.40905657441665727,
+        "hap": 0.1427755729140093,
+        "neu": 0.43781140943368274,
+        "sad": 0.010356434156032417
+      },
+      "fix": null,
+      "renders_dir": "/workspace/swarm/voice-v2-sprint/cloning-v2/merge-v2/wav/samantha"
+    }
+  ],
+  "kept": null,
+  "notes": [
+    "profile loaded from /workspace/swarm/voice-v2-sprint/cloning-v2/emotion-blend/analysis/profile-samantha.json (galion-voicecheck-profile/1)",
+    "dry-run using existing renders at /workspace/swarm/voice-v2-sprint/cloning-v2/merge-v2/wav/samantha",
+    "reused merge-v2 score JSON for baseline ( --reuse-scores )",
+    "fixes skipped (--skip-fixes)"
+  ]
+}

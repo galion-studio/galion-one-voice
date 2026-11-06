@@ -1,7 +1,5 @@
-// Galion Voice — Perpetual Open MIT License
-// (c) 2026 Maciej Grajczyk / G.A.L.I.O.N.
 //! Opt-in coherent, distribution-preserving prefix selection. No synthesis code.
-mod audio;
+#[path="../../../../scorers/emotion/src/audio.rs"] mod audio;
 use anyhow::{bail,Context,Result};
 use serde_json::{json,Value};
 use std::{path::{Path,PathBuf},process::Command,fs};

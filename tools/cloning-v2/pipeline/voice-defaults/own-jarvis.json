@@ -5,7 +5,7 @@
   "temperature": 0,
   "seed": 0,
   "timbre_match": 0.5,
-  "timbre_ref": "$GALION_CLIP_STORE/jarvis/reference.wav",
+  "timbre_ref": "/workspace/swarm/voice-v2-sprint/clip-store-own/jarvis/reference.wav",
   "prosody": false,
   "notes": "Cloning V2 merge 2026-11-05: conditioning UNCHANGED; shared timbre 0.5 only. No hf-e-mild, no warmth variants. cbx-v2-prosody OFF."
 }

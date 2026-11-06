@@ -1,0 +1,143 @@
+{
+  "files": [
+    {
+      "duration_s": 5.04,
+      "mos": 3.8491,
+      "ms": 2956.7,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-fix/validation12/jd_old_paired_pause_on/t01.wav",
+      "pesq": 3.7845,
+      "si_sdr": 24.0069,
+      "stoi": 0.9948
+    },
+    {
+      "duration_s": 4.166,
+      "mos": 4.1278,
+      "ms": 1413.6,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-fix/validation12/jd_old_paired_pause_on/t02.wav",
+      "pesq": 3.6582,
+      "si_sdr": 28.2119,
+      "stoi": 0.9985
+    },
+    {
+      "duration_s": 3.68,
+      "mos": 4.0112,
+      "ms": 1775.2,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-fix/validation12/jd_old_paired_pause_on/t03.wav",
+      "pesq": 3.3384,
+      "si_sdr": 16.2931,
+      "stoi": 0.9851
+    },
+    {
+      "duration_s": 2.72,
+      "mos": 4.2634,
+      "ms": 1706.9,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-fix/validation12/jd_old_paired_pause_on/t04.wav",
+      "pesq": 3.9989,
+      "si_sdr": 28.931,
+      "stoi": 0.9956
+    },
+    {
+      "duration_s": 3.56,
+      "mos": 4.1694,
+      "ms": 1840.6,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-fix/validation12/jd_old_paired_pause_on/t05.wav",
+      "pesq": 3.9018,
+      "si_sdr": 28.4078,
+      "stoi": 0.9971
+    },
+    {
+      "duration_s": 4.13,
+      "mos": 4.315,
+      "ms": 2852.4,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-fix/validation12/jd_old_paired_pause_on/t06.wav",
+      "pesq": 4.1436,
+      "si_sdr": 26.7544,
+      "stoi": 0.9951
+    },
+    {
+      "duration_s": 3.9,
+      "mos": 4.0154,
+      "ms": 2545.3,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-fix/validation12/jd_old_paired_pause_on/t07.wav",
+      "pesq": 3.2632,
+      "si_sdr": 21.4683,
+      "stoi": 0.9941
+    },
+    {
+      "duration_s": 8.468,
+      "mos": 4.2906,
+      "ms": 4969.1,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-fix/validation12/jd_old_paired_pause_on/t08.wav",
+      "pesq": 3.6582,
+      "si_sdr": 24.754,
+      "stoi": 0.9957
+    },
+    {
+      "duration_s": 10.378,
+      "mos": 4.2644,
+      "ms": 5066.6,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-fix/validation12/jd_old_paired_pause_on/t09.wav",
+      "pesq": 3.9423,
+      "si_sdr": 26.5301,
+      "stoi": 0.997
+    },
+    {
+      "duration_s": 5.948,
+      "mos": 4.0101,
+      "ms": 1995.4,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-fix/validation12/jd_old_paired_pause_on/t10.wav",
+      "pesq": 3.4768,
+      "si_sdr": 21.2123,
+      "stoi": 0.9938
+    },
+    {
+      "duration_s": 7.92,
+      "mos": 4.1596,
+      "ms": 4745.9,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-fix/validation12/jd_old_paired_pause_on/t11.wav",
+      "pesq": 3.533,
+      "si_sdr": 22.3604,
+      "stoi": 0.9959
+    },
+    {
+      "duration_s": 6.04,
+      "mos": 4.0592,
+      "ms": 3007.6,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-fix/validation12/jd_old_paired_pause_on/t12.wav",
+      "pesq": 3.8824,
+      "si_sdr": 22.8378,
+      "stoi": 0.9975
+    }
+  ],
+  "metric": "torchaudio SQUIM_SUBJECTIVE (NORESQA-MOS) + SQUIM_OBJECTIVE, ONNX fp32",
+  "nmr": "/workspace/swarm/voice-v2-sprint/clip-store-own/samantha/reference.wav",
+  "summary": {
+    "mos": {
+      "mean": 4.1279,
+      "n": 12,
+      "sd": 0.1366
+    },
+    "pesq": {
+      "mean": 3.7151,
+      "n": 12,
+      "sd": 0.2623
+    },
+    "si_sdr": {
+      "mean": 24.314,
+      "n": 12,
+      "sd": 3.5646
+    },
+    "stoi": {
+      "mean": 0.995,
+      "n": 12,
+      "sd": 0.0033
+    }
+  },
+  "threads": 2,
+  "timing": {
+    "load_s": 2.253,
+    "peak_rss_mb": 987.0,
+    "score_s": 34.875
+  },
+  "tool": "galion-mos"
+}

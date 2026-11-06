@@ -1,0 +1,44 @@
+{
+  "files": [
+    {
+      "duration_s": 15.952,
+      "mos": 4.5481,
+      "ms": 7306.7,
+      "path": "/workspace/swarm/voice-v2-sprint/clip-store-own/jarvis/reference.wav",
+      "pesq": 3.1299,
+      "si_sdr": 15.8847,
+      "stoi": 0.9682
+    }
+  ],
+  "metric": "torchaudio SQUIM_SUBJECTIVE (NORESQA-MOS) + SQUIM_OBJECTIVE, ONNX fp32",
+  "nmr": "/workspace/swarm/voice-v2-sprint/clip-store-own/samantha/reference.wav",
+  "summary": {
+    "mos": {
+      "mean": 4.5481,
+      "n": 1,
+      "sd": 0.0
+    },
+    "pesq": {
+      "mean": 3.1299,
+      "n": 1,
+      "sd": 0.0
+    },
+    "si_sdr": {
+      "mean": 15.8847,
+      "n": 1,
+      "sd": 0.0
+    },
+    "stoi": {
+      "mean": 0.9682,
+      "n": 1,
+      "sd": 0.0
+    }
+  },
+  "threads": 2,
+  "timing": {
+    "load_s": 1.193,
+    "peak_rss_mb": 1332.8,
+    "score_s": 7.307
+  },
+  "tool": "galion-mos"
+}

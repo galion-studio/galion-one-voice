@@ -1,0 +1,23 @@
+Runtime:
+  available_cores: 8
+  intra_threads:   8
+  parallel_exec:   false
+  ep_requested:    cpu
+  ep_effective:    cpu
+
+t01 c0 dist=10.35 emo=Some((0.45520973205566406, 0.5325673222541809)) f0=136.5 rate=3.44
+t01 c1 dist=9.94 emo=Some((0.43941769003868103, 0.5145576000213623)) f0=133.3 rate=3.49
+t01 c2 dist=11.06 emo=Some((0.47279882431030273, 0.5463268160820007)) f0=145.9 rate=3.28
+t01 -> runs/jd_m12_bon/cands/t01_c1.wav (dist 9.94)
+t04 c0 dist=8.23 emo=Some((0.5053713321685791, 0.48841720819473267)) f0=128.9 rate=3.21
+t04 c1 dist=9.95 emo=Some((0.4908318519592285, 0.5130213499069214)) f0=130.9 rate=3.62
+t04 c2 dist=9.31 emo=Some((0.5221914052963257, 0.4828537106513977)) f0=126.1 rate=3.42
+t04 -> runs/jd_m12_bon/cands/t04_c0.wav (dist 8.23)
+t06 c0 dist=12.04 emo=Some((0.4793219566345215, 0.3689568638801574)) f0=119.1 rate=3.44
+t06 c1 dist=9.64 emo=Some((0.5035825967788696, 0.3813185691833496)) f0=135.9 rate=3.38
+t06 c2 dist=11.77 emo=Some((0.5040063858032227, 0.3920035064220429)) f0=150.3 rate=3.41
+t06 -> runs/jd_m12_bon/cands/t06_c1.wav (dist 9.64)
+t08 c0 dist=8.47 emo=Some((0.5794399976730347, 0.5728299021720886)) f0=144.2 rate=2.12
+t08 c1 dist=8.02 emo=Some((0.559522271156311, 0.5286851525306702)) f0=150.0 rate=2.29
+t08 c2 dist=6.55 emo=Some((0.5158833265304565, 0.546475887298584)) f0=140.0 rate=2.73
+t08 -> runs/jd_m12_bon/cands/t08_c2.wav (dist 6.55)

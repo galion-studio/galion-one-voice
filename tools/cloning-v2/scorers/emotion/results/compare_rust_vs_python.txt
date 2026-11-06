@@ -1,0 +1,41 @@
+files: 26
+SER top-label agreement Rust vs Python(this run): 26/26; max|dprob| mean 0.0153 max 0.0389
+SER top-label agreement Rust vs original REPORT labels: 25/26; Python(this run) vs original: 25/26
+AVD |darousal| mean 0.0018 max 0.0035
+AVD |dvalence| mean 0.0008 max 0.0021
+AVD |ddominance| mean 0.0016 max 0.0030
+proxy (Rust vs Praat/numpy): mean Rust, mean Py, mean |diff|, Pearson r
+  f0_mean_hz              173.997  181.262    8.621  r=0.934
+  f0_median_hz            167.896  167.645    2.297  r=0.993
+  f0_sd_st                  3.472    5.117    1.657  r=0.546
+  f0_range_st_p5_p95       11.130   16.490    5.381  r=0.208
+  jitter_local_pct          1.345    2.426    1.080  r=-0.080
+  shimmer_local_pct         8.471   10.054    1.587  r=0.681
+  energy_dr_db             26.242   26.210    0.161  r=0.995
+per-file: file | rust | py | orig | max|dprob| | dAVD
+  clip-store-own/jarvis/reference.wav neu neu neu 0.0134 {'arousal': 0.0023, 'valence': 0.0021, 'dominance': 0.002}
+  clip-store-own/samantha/reference.wav neu neu neu 0.0164 {'arousal': 0.0019, 'valence': -0.0005, 'dominance': 0.0015}
+  own-clone-analysis/wav/jarvis/t01.wav neu neu neu 0.0125 {'arousal': 0.0014, 'valence': -0.0003, 'dominance': 0.0012}
+  own-clone-analysis/wav/jarvis/t02.wav neu neu neu 0.0059 {'arousal': 0.0022, 'valence': 0.0013, 'dominance': 0.0017}
+  own-clone-analysis/wav/jarvis/t03.wav neu neu neu 0.019 {'arousal': 0.0024, 'valence': 0.0008, 'dominance': 0.0024}
+  own-clone-analysis/wav/jarvis/t04.wav neu neu neu 0.0029 {'arousal': 0.0013, 'valence': 0.0009, 'dominance': 0.0008}
+  own-clone-analysis/wav/jarvis/t05.wav neu neu neu 0.0053 {'arousal': 0.0018, 'valence': -0.0008, 'dominance': 0.0012}
+  own-clone-analysis/wav/jarvis/t06.wav neu neu neu 0.0104 {'arousal': 0.0009, 'valence': 0.0002, 'dominance': 0.0006}
+  own-clone-analysis/wav/jarvis/t07.wav neu neu neu 0.0066 {'arousal': 0.0008, 'valence': -0.0002, 'dominance': 0.0012}
+  own-clone-analysis/wav/jarvis/t08.wav neu neu neu 0.0086 {'arousal': 0.002, 'valence': 0.0009, 'dominance': 0.0015}
+  own-clone-analysis/wav/jarvis/t09.wav neu neu neu 0.0106 {'arousal': 0.0015, 'valence': 0.0008, 'dominance': 0.0012}
+  own-clone-analysis/wav/jarvis/t10.wav neu neu neu 0.0123 {'arousal': 0.0017, 'valence': 0.0015, 'dominance': 0.0012}
+  own-clone-analysis/wav/jarvis/t11.wav neu neu neu 0.0092 {'arousal': 0.0013, 'valence': 0.0003, 'dominance': 0.0008}
+  own-clone-analysis/wav/jarvis/t12.wav neu neu neu 0.0156 {'arousal': 0.0011, 'valence': 0.0008, 'dominance': 0.001}
+  own-clone-analysis/wav/samantha/t01.wav hap hap ang 0.0204 {'arousal': 0.0012, 'valence': -0.0004, 'dominance': 0.0014}
+  own-clone-analysis/wav/samantha/t02.wav ang ang ang 0.0275 {'arousal': 0.0028, 'valence': 0.0015, 'dominance': 0.0027}
+  own-clone-analysis/wav/samantha/t03.wav hap hap hap 0.0212 {'arousal': 0.0011, 'valence': -0.0007, 'dominance': 0.0014}
+  own-clone-analysis/wav/samantha/t04.wav neu neu neu 0.0206 {'arousal': 0.0035, 'valence': 0.0016, 'dominance': 0.003}
+  own-clone-analysis/wav/samantha/t05.wav neu neu neu 0.0389 {'arousal': 0.002, 'valence': -0.0001, 'dominance': 0.002}
+  own-clone-analysis/wav/samantha/t06.wav ang ang ang 0.0212 {'arousal': 0.0011, 'valence': 0.0009, 'dominance': 0.0009}
+  own-clone-analysis/wav/samantha/t07.wav neu neu neu 0.028 {'arousal': 0.0009, 'valence': 0.0002, 'dominance': 0.0008}
+  own-clone-analysis/wav/samantha/t08.wav ang ang ang 0.0233 {'arousal': 0.0025, 'valence': 0.0014, 'dominance': 0.0025}
+  own-clone-analysis/wav/samantha/t09.wav ang ang ang 0.0049 {'arousal': 0.0019, 'valence': 0.0011, 'dominance': 0.0018}
+  own-clone-analysis/wav/samantha/t10.wav ang ang ang 0.018 {'arousal': 0.0027, 'valence': 0.002, 'dominance': 0.0025}
+  own-clone-analysis/wav/samantha/t11.wav ang ang ang 0.0082 {'arousal': 0.0016, 'valence': 0.0002, 'dominance': 0.0016}
+  own-clone-analysis/wav/samantha/t12.wav ang ang ang 0.0166 {'arousal': 0.002, 'valence': 0.0005, 'dominance': 0.002}

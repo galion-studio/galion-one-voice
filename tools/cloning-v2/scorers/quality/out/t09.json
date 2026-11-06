@@ -1,0 +1,43 @@
+{
+  "files": [
+    {
+      "duration_s": 10.2,
+      "ms": 3919.8,
+      "path": "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/jarvis/t09.wav",
+      "pesq": 3.9151,
+      "si_sdr": 25.98,
+      "stoi": 0.9967
+    }
+  ],
+  "metric": "torchaudio SQUIM_SUBJECTIVE (NORESQA-MOS) + SQUIM_OBJECTIVE, ONNX fp32",
+  "nmr": null,
+  "summary": {
+    "mos": {
+      "mean": null,
+      "n": 0,
+      "sd": null
+    },
+    "pesq": {
+      "mean": 3.9151,
+      "n": 1,
+      "sd": 0.0
+    },
+    "si_sdr": {
+      "mean": 25.98,
+      "n": 1,
+      "sd": 0.0
+    },
+    "stoi": {
+      "mean": 0.9967,
+      "n": 1,
+      "sd": 0.0
+    }
+  },
+  "threads": 2,
+  "timing": {
+    "load_s": 0.325,
+    "peak_rss_mb": 375.3,
+    "score_s": 3.92
+  },
+  "tool": "galion-mos"
+}

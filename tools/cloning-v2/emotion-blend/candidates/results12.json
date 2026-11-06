@@ -1,0 +1,229 @@
+{
+  "generated_at": "2026-11-05T23:29:01+01:00",
+  "timezone": "Europe/Zagreb (UTC+1)",
+  "worker": "C (emotion-blend/candidates)",
+  "base": "production own-samantha merged v2 (emo-r2 + T0 + timbre 0.5)",
+  "keep_rule": "WER <= 0.018 AND ECAPA > 0.7057",
+  "scorers": {
+    "ecapa": "scorers/ecapa/target/release/galion-ecapa vs clip-store-own/samantha/reference.wav",
+    "emotion_orig": "galion-emotion fp32 vs reference.wav",
+    "emotion_calm": "galion-emotion fp32 vs candidates/prep/samantha-calm-target.wav (original 0\u20137.5s neu windows)",
+    "wer": "galion-wer text12",
+    "mos": "galion-mos NMR=jarvis/reference.wav",
+    "hygiene": "galion-hygiene",
+    "prosody": "cbx-emo analyze F0 median / rate_wps"
+  },
+  "constraints_honored": [
+    "never overwrite own-samantha/own-jarvis/.bak",
+    "originals read-only",
+    "flock emotion-blend/render.lock",
+    "nice -n 10, 2 threads, CPU",
+    "no git/deploys/deletes/laptop/Piper"
+  ],
+  "candidates": [
+    {
+      "candidate": "own-samantha (merged v2 baseline)",
+      "ECAPA": 0.7057,
+      "WER": 0.018,
+      "MOS": 4.13,
+      "emotion_distance_orig": 0.4651,
+      "emotion_distance_calm": null,
+      "SER_labels": {
+        "ang": 7,
+        "neu": 4,
+        "hap": 1
+      },
+      "F0_median_Hz": 181.1,
+      "pace_wps": 3.556,
+      "HF_f99_Hz": 2686,
+      "clicks": 4,
+      "clipped_runs": 0,
+      "keep": null,
+      "note": "production merged baseline; keep gate ECAPA>0.7057 WER<=0.018"
+    },
+    {
+      "candidate": "own-samantha-v2-blend-ref",
+      "description": "(a) cbx-blend: speaker=original.wav; conditioning=assembled hap-first windows (10-12.5,12.5-15,5-7.5,\u2026) dropping low-ECAPA 7.5-10; T0+timbre0.5",
+      "n": 12,
+      "temperature": 0,
+      "timbre_match": 0.5,
+      "ECAPA": 0.3441,
+      "ECAPA_sd": 0.093,
+      "WER": 0.962,
+      "MOS": 3.3258,
+      "emotion_distance_orig": 0.5623,
+      "emotion_distance_calm": 0.5675,
+      "SER_labels": {
+        "ang": 1,
+        "hap": 2,
+        "neu": 4,
+        "sad": 5
+      },
+      "F0_median_Hz": 183.6,
+      "pace_wps": 3.432,
+      "HF_f99_Hz": 2589.8,
+      "clicks": 1,
+      "clipped_runs": 0,
+      "keep": false,
+      "keep_rule": "WER<=0.018 AND ECAPA>0.7057"
+    },
+    {
+      "candidate": "own-samantha-v2-blend-pros",
+      "description": "(b) merged merge-v2 wavs + energy envelope expand 1.03 (no F0 shift). F0-contour expand archived ECAPA 0.6808",
+      "n": 12,
+      "temperature": 0,
+      "timbre_match": 0.5,
+      "ECAPA": 0.7051,
+      "ECAPA_sd": 0.0337,
+      "WER": 0.018,
+      "MOS": 4.1175,
+      "emotion_distance_orig": 0.46,
+      "emotion_distance_calm": 0.4464,
+      "SER_labels": {
+        "ang": 7,
+        "hap": 1,
+        "neu": 4
+      },
+      "F0_median_Hz": 181.07,
+      "pace_wps": 3.556,
+      "HF_f99_Hz": 2652.3,
+      "clicks": 4,
+      "clipped_runs": 0,
+      "keep": false,
+      "keep_rule": "WER<=0.018 AND ECAPA>0.7057"
+    },
+    {
+      "candidate": "own-samantha-v2-blend-both",
+      "description": "(c) blend-ref renders + energy envelope expand 1.03",
+      "n": 12,
+      "temperature": 0,
+      "timbre_match": 0.5,
+      "ECAPA": 0.3455,
+      "ECAPA_sd": 0.092,
+      "WER": 0.958,
+      "MOS": 3.3314,
+      "emotion_distance_orig": 0.5589,
+      "emotion_distance_calm": 0.5695,
+      "SER_labels": {
+        "ang": 1,
+        "hap": 2,
+        "neu": 4,
+        "sad": 5
+      },
+      "F0_median_Hz": 183.8,
+      "pace_wps": 3.432,
+      "HF_f99_Hz": 2569.3,
+      "clicks": 1,
+      "clipped_runs": 0,
+      "keep": false,
+      "keep_rule": "WER<=0.018 AND ECAPA>0.7057"
+    },
+    {
+      "candidate": "own-samantha-v2-blend-global",
+      "description": "(d) A's own-samantha-v2-blendfix-coherent (coherent prefix rotation start=4.36s) + timbre 0.5 from global-fix/wav/samantha",
+      "n": 12,
+      "temperature": 0,
+      "timbre_match": 0.5,
+      "ECAPA": 0.7081,
+      "ECAPA_sd": 0.033,
+      "WER": 0.015,
+      "MOS": 3.8757,
+      "emotion_distance_orig": 0.4373,
+      "emotion_distance_calm": 0.4376,
+      "SER_labels": {
+        "ang": 9,
+        "hap": 1,
+        "neu": 2
+      },
+      "F0_median_Hz": 186.18,
+      "pace_wps": 3.317,
+      "HF_f99_Hz": 2704.1,
+      "clicks": 4,
+      "clipped_runs": 0,
+      "keep": true,
+      "keep_rule": "WER<=0.018 AND ECAPA>0.7057"
+    },
+    {
+      "candidate": "own-samantha-v2-blend-pros-f0energy-fail",
+      "description": "archived: energy 1.12 + F0 contour expand 1.08 (max \u00b10.35 st); mean F0 shift ~0.01 st but ECAPA collapsed",
+      "ECAPA": 0.6808,
+      "WER": null,
+      "MOS": null,
+      "keep": false,
+      "note": "scores partial under scores/own-samantha-v2-blend-pros-f0energy-fail/"
+    },
+    {
+      "candidate": "own-samantha-v2-blend-montage",
+      "description": "(e) OFFICIAL cbx-add-voice --emotion-blend: galion-blend-ref windows [1,4,6] (happy ~9.95\u201311.95s) + cbx-blend --conditioning-wav tensor split. Speak fails: conditional_decoder Invalid input shape {0}. Profile 780680B vs healthy ~781480. Recreated as montageb: same fail. No 12-line numbers.",
+      "n": 0,
+      "ECAPA": null,
+      "WER": null,
+      "MOS": null,
+      "emotion_distance_orig": null,
+      "emotion_distance_calm": null,
+      "keep": false,
+      "speak_error": "conditional_decoder Invalid input shape {0} (/f0_predictor/condnet/condnet.0/Conv)",
+      "keep_rule": "WER<=0.018 AND ECAPA>0.7057"
+    },
+    {
+      "candidate": "own-samantha-v2-blend-montagectl",
+      "description": "(e-ctl) CONTROL: same builder conditioning.wav (6s, windows 1/4/6) encoded with normal cbx voice add (no tensor split). Not the official path; scores for diagnostic comparison only.",
+      "n": 12,
+      "temperature": 0,
+      "timbre_match": 0.5,
+      "ECAPA": 0.627,
+      "ECAPA_sd": 0.044,
+      "WER": 0.041,
+      "MOS": 4.0102,
+      "emotion_distance_orig": 0.5214,
+      "emotion_distance_calm": 0.4974,
+      "SER_labels": {
+        "ang": 8,
+        "neu": 4
+      },
+      "F0_median_Hz": 190.38,
+      "pace_wps": 3.553,
+      "HF_f99_Hz": 2710.9,
+      "clicks": 7,
+      "clipped_runs": 0,
+      "keep": false,
+      "keep_rule": "WER<=0.018 AND ECAPA>0.7057"
+    }
+  ],
+  "passing": [
+    "own-samantha-v2-blend-global"
+  ],
+  "failing": [
+    "own-samantha-v2-blend-ref",
+    "own-samantha-v2-blend-pros",
+    "own-samantha-v2-blend-both",
+    "own-samantha-v2-blend-pros-f0energy-fail",
+    "own-samantha-v2-blend-montage",
+    "own-samantha-v2-blend-montagectl"
+  ],
+  "incident_own_samantha_overwrite": {
+    "detected_at": "2026-11-05T22:58:00+01:00",
+    "found_sha256": "695b72669cd3e67b8cd4a951803582574dec6fc0375cb3de711076c86886bde3",
+    "matched": "own-samantha-v2-blendfix-coherent.cbxvoice",
+    "restored_from": "own-samantha-v2-emo-r2.cbxvoice",
+    "restored_sha256": "c06681cf37758c3b4fb4328e087b83c14c51c45c01041f5eeeddfa81dd3ebc97",
+    "worker_C_voice_add_verified_unchanged_at": "2026-11-05T22:45:52+01:00",
+    "correction": "Admin Slavik approved blendfix as live own-samantha (695b7266\u2026). Prior restores by Worker C were incorrect; stopped after steering 23:09 CET."
+  },
+  "notes_montage": {
+    "official_path": "pipeline/bin/cbx-add-voice --emotion-blend \u2192 unspeakable profile",
+    "selected_windows": [
+      1,
+      4,
+      6
+    ],
+    "happy_segment_s": [
+      9.946961451247166,
+      11.946961451247166
+    ],
+    "locks": "renders hold emotion-blend/render.lock AND /tmp/cbx-render.lock",
+    "own_samantha_live_sha256": "695b72669cd3e67b8cd4a951803582574dec6fc0375cb3de711076c86886bde3",
+    "own_samantha_note": "Admin Slavik approved blendfix; Worker C does not restore",
+    "waiter_fix": "pgrep-based nblend wait self-matched; render12 now uses blocking dual flock only"
+  }
+}

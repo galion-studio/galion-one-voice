@@ -1,0 +1,4 @@
+own-samantha-v2-blend-montage created via cbx-add-voice --emotion-blend (galion-blend-ref windows [1,4,6] incl. happy ~9.95–11.95s + cbx-blend --conditioning-wav).
+Speak fails on stock cbx and cbx-blend: conditional_decoder Invalid input shape {0} on /f0_predictor/condnet/condnet.0/Conv.
+Profile size 780680 vs healthy ~781480. Recreated as montageb: same failure.
+No 12-line scores possible. Control own-samantha-v2-blend-montagectl (normal encode of same conditioning.wav) speaks and is scored separately.

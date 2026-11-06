@@ -1,0 +1,60 @@
+{
+  "schema": "galion-blendfix-validation/1",
+  "voices": [
+    {
+      "persona": "samantha",
+      "voice": "own-samantha-v2-blendfix-coherent",
+      "n": 12,
+      "temperature": 0,
+      "dtype": "fp32",
+      "timbre_match": 0.5,
+      "wer": 0.01455,
+      "ecapa": 0.7081,
+      "mos": 3.8757,
+      "emotion_distance": 0.43725114564100903,
+      "labels": {
+        "ang": 9,
+        "hap": 1,
+        "neu": 2
+      },
+      "selected_start_s": 4.36,
+      "baseline": {
+        "wer": 0.018,
+        "ecapa": 0.7057,
+        "mos": 4.1323,
+        "emotion_distance": 0.4651
+      },
+      "gate_pass": true,
+      "source_dir": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-blend/global-fix/scores/samantha",
+      "quality_warning": "MOS is a prediction, not listening; Jarvis baseline NMR differs from candidate, so MOS cross-job comparison is not controlled"
+    },
+    {
+      "persona": "jarvis",
+      "voice": "own-jarvis-v2-blendfix-coherent",
+      "n": 12,
+      "temperature": 0,
+      "dtype": "fp32",
+      "timbre_match": 0.5,
+      "wer": 0.02963,
+      "ecapa": 0.7303,
+      "mos": 4.1622,
+      "emotion_distance": 0.5381030390659968,
+      "labels": {
+        "hap": 1,
+        "neu": 11
+      },
+      "selected_start_s": 13.76,
+      "baseline": {
+        "wer": 0.019,
+        "ecapa": 0.7331,
+        "mos": 4.3141,
+        "emotion_distance": 0.502
+      },
+      "gate_pass": false,
+      "source_dir": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-blend/global-fix/scores/jarvis",
+      "quality_warning": "MOS is a prediction, not listening; Jarvis baseline NMR differs from candidate, so MOS cross-job comparison is not controlled"
+    }
+  ],
+  "global_guard_pass": false,
+  "promotion_performed": false
+}

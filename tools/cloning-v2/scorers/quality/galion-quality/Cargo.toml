@@ -1,0 +1,24 @@
+[package]
+name = "galion-quality"
+description = "Clone-quality scorers in Rust: SQUIM MOS (ONNX/ort), vosk WER, signal hygiene (true peak, clipping, clicks, bandwidth, EBU R128)."
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+publish = false
+
+[dependencies]
+ort = { version = "=2.0.0-rc.15", default-features = false, features = ["load-dynamic", "std"] }
+serde_json = "1"
+libloading = "0.8"
+rustfft = "6"
+hound = "3.5"
+
+[lib]
+path = "src/lib.rs"
+
+[workspace]
+
+[profile.release]
+opt-level = 3
+codegen-units = 4
+lto = "thin"

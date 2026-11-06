@@ -1,0 +1,14 @@
+Runtime:
+  available_cores: 8
+  intra_threads:   2
+  parallel_exec:   false
+  ep_requested:    cpu
+  ep_effective:    cpu
+  dtype:           fp32
+
+model_load_ms=4473
+t01 c0 seed=0 ms=9732 tok=122 dur=5.00s f0=192.0 rate=3.60 erange=49.2 tilt=-10.4 dist=6.03
+t04 c0 seed=1000003 ms=5583 tok=64 dur=2.68s f0=231.2 rate=3.73 erange=41.9 tilt=-14.4 dist=8.86
+t06 c0 seed=2000006 ms=7137 tok=91 dur=3.76s f0=221.7 rate=3.99 erange=42.6 tilt=-8.5 dist=8.66
+t08 c0 seed=3000009 ms=16347 tok=198 dur=8.04s f0=191.2 rate=3.11 erange=41.7 tilt=-9.5 dist=3.30
+done sd_base_leg

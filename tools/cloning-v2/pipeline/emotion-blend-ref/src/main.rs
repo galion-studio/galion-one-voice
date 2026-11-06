@@ -1,5 +1,3 @@
-// Galion Voice — Perpetual Open MIT License
-// (c) 2026 Maciej Grajczyk / G.A.L.I.O.N.
 //! Global expressive reference selection. No voice names, labels, or target emotions are hardcoded.
 use anyhow::{bail, Context, Result};
 use clap::Parser;

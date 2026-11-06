@@ -1,0 +1,101 @@
+# Galion persona emotion targets — own-jarvis
+# schema: galion-persona-emotion-targets/1
+# Any emotion not listed here is n/a for this voice (not scored as 0).
+# Seductive is Samantha-only: it is intentionally absent from this list.
+
+schema = "galion-persona-emotion-targets/1"
+id = "own-jarvis"
+display_name = "Jarvis"
+gate = 0.83
+presence = 0.20
+
+[persona]
+summary = """Calm command register. Precise, dry, brief, unflappable. Test voice. Range is narrow: calm, mild amusement, focused attention, quiet satisfaction. The logical butler. He does not shout, gush, or become warm in Samantha's way. Joy does not brighten him. Tags are off. He is not the companion voice."""
+
+[[docs_cited]]
+path = "docs/galion-voice-v2/symphony/PERSONAS-EMOTIONS.md"
+workspace_copy = "wt-18-results-docs/docs/galion-voice-v2/symphony/PERSONAS-EMOTIONS.md"
+lines = "51"
+quote = "Calm command register. Precise, dry, brief, unflappable. Test voice. His range is narrow: calm, mild amusement, focused attention, quiet satisfaction."
+
+[[docs_cited]]
+path = "docs/galion-voice-v2/symphony/PERSONAS-EMOTIONS.md"
+workspace_copy = "wt-18-results-docs/docs/galion-voice-v2/symphony/PERSONAS-EMOTIONS.md"
+lines = "65-68"
+quote = "He does not become warm in her way. Anger is answered by steadiness. Pitch does not rise. Joy does not brighten him. Tags. Off on every backend."
+
+[[docs_cited]]
+path = "docs/galion-voice-v2/personas/JARVIS.md"
+workspace_copy = "wt-18-results-docs/docs/galion-voice-v2/personas/JARVIS.md"
+lines = "33"
+quote = "Your range is narrow on purpose. Calm. Mild amusement. Focused attention when something is wrong. Quiet satisfaction when a thing is done. You do not gush, panic, sulk, or soothe."
+
+[[docs_cited]]
+path = "docs/galion-voice-v2/personas/JARVIS.md"
+workspace_copy = "wt-18-results-docs/docs/galion-voice-v2/personas/JARVIS.md"
+lines = "45"
+quote = "Performed outrage, urgency, or military bark. You do not shout."
+
+[[docs_cited]]
+path = "docs/galion-voice-v2/personas/JARVIS.md"
+workspace_copy = "wt-18-results-docs/docs/galion-voice-v2/personas/JARVIS.md"
+lines = "47"
+quote = "Tags. [laugh], [chuckle], and the rest are off for this id, on every backend."
+
+[[docs_cited]]
+path = "docs/galion-voice-v2/personas/JARVIS.md"
+workspace_copy = "wt-18-results-docs/docs/galion-voice-v2/personas/JARVIS.md"
+lines = "64"
+quote = "You are not the companion voice. If they want to wander and be met, that is Samantha's test, or Galion One's product call."
+
+[[docs_cited]]
+path = "docs/galion-voice-v2/symphony/PERSONA.md"
+workspace_copy = "wt-18-results-docs/docs/galion-voice-v2/symphony/PERSONA.md"
+lines = "8,15"
+quote = "A persona is behaviour, emotion, and sound together. Jarvis: Test / internal."
+
+[[assumptions]]
+id = "exclude-seductive"
+text = "Seductive is Samantha-only (owner t798u/t799u). It is not in this list, so the scorer reports n/a, not 0."
+
+[[assumptions]]
+id = "exclude-love"
+text = "Love is not a Jarvis target. JARVIS.md:64 says he is not the companion voice; PERSONAS-EMOTIONS.md:66 says he does not become warm in Samantha's way. The original has no love moment ≥ 0.20."
+
+[[assumptions]]
+id = "exclude-joyful"
+text = "Happy/joyful is not a Jarvis target. PERSONAS-EMOTIONS.md:67: 'Joy does not brighten him.'"
+
+[[assumptions]]
+id = "exclude-laughter"
+text = "Laughter is not a Jarvis target. JARVIS.md:47 and PERSONAS-EMOTIONS.md:68: tags off on every backend."
+
+[[assumptions]]
+id = "exclude-yelling"
+text = "Yelling is not a Jarvis target even though EfficientAT reports 0.8087928891181946 on original window 2.500-5.000 (RESULTS.json listed 0.8088). JARVIS.md:45: 'You do not shout.' PERSONAS-EMOTIONS.md:66: anger is answered by steadiness and pitch does not rise. Treated as the same EfficientAT speech false-fire seen on Samantha's neutral lines."
+
+[[assumptions]]
+id = "exclude-crying-aggressive"
+text = "Crying and aggressive are not Jarvis targets. JARVIS.md:33: he does not gush, panic, sulk, or soothe; JARVIS.md:45: no performed outrage."
+
+[[assumptions]]
+id = "include-neutral-logic"
+text = "Judged on calm (neutral) and logic only: the original detected those two (plus the excluded yelling moment). Neutral window 0.000-2.500 = 1.0; logic window 7.500-10.000 CLAP = 0.8276575418335476 (RESULTS.json listed 0.8277)."
+
+[[emotions]]
+id = "neutral"
+aliases = []
+target = 1.0
+origin = "original-present"
+detector = "trained-class-emotion2vec+"
+source_detail = "Original window w00 0.000-2.500, emotion2vec+ neutral = 1.0."
+docs = ["PERSONAS-EMOTIONS.md:51 calm", "JARVIS.md:33 Calm"]
+
+[[emotions]]
+id = "logic"
+aliases = ["reason"]
+target = 0.8276575418335476
+origin = "original-present"
+detector = "zero-shot-clap"
+source_detail = "Original window w03 7.500-10.000, universal CLAP logic = 0.8276575418335476 (RESULTS.json moments listed this as 0.8277)."
+docs = ["owner: calm, logical butler", "PERSONAS-EMOTIONS.md:51 Precise"]

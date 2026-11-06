@@ -1,0 +1,122 @@
+{
+  "categories": [
+    {
+      "best_window_id": null,
+      "best_window_path": null,
+      "best_window_span": null,
+      "category": "joyful",
+      "present": false,
+      "source": "trained class (emotion2vec+)",
+      "strength": 0.1264711767435074
+    },
+    {
+      "best_window_id": "w03",
+      "best_window_path": "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/missing-emotion-targets/runs/own-samantha/windows/w03_7.500_10.000.wav",
+      "best_window_span": "7.500-10.000",
+      "category": "aggressive",
+      "present": true,
+      "source": "trained class (emotion2vec+)",
+      "strength": 0.9990363121032716
+    },
+    {
+      "best_window_id": null,
+      "best_window_path": null,
+      "best_window_span": null,
+      "category": "disgust",
+      "present": false,
+      "source": "trained class (emotion2vec+)",
+      "strength": 0.006356066092848778
+    },
+    {
+      "best_window_id": null,
+      "best_window_path": null,
+      "best_window_span": null,
+      "category": "fear",
+      "present": false,
+      "source": "trained class (emotion2vec+)",
+      "strength": 0.013201448135077952
+    },
+    {
+      "best_window_id": null,
+      "best_window_path": null,
+      "best_window_span": null,
+      "category": "sad",
+      "present": false,
+      "source": "trained class (emotion2vec+)",
+      "strength": 0.0124720623716712
+    },
+    {
+      "best_window_id": "w00",
+      "best_window_path": "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/missing-emotion-targets/runs/own-samantha/windows/w00_0.000_2.500.wav",
+      "best_window_span": "0.000-2.500",
+      "category": "neutral",
+      "present": true,
+      "source": "trained class (emotion2vec+)",
+      "strength": 1.0
+    },
+    {
+      "best_window_id": null,
+      "best_window_path": null,
+      "best_window_span": null,
+      "category": "surprise",
+      "present": false,
+      "source": "trained class (emotion2vec+)",
+      "strength": 0.00008692368282936513
+    },
+    {
+      "best_window_id": "w03",
+      "best_window_path": "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/missing-emotion-targets/runs/own-samantha/windows/w03_7.500_10.000.wav",
+      "best_window_span": "7.500-10.000",
+      "category": "love",
+      "present": true,
+      "source": "zero-shot text prompt (CLAP)",
+      "strength": 0.8109382317899566
+    },
+    {
+      "best_window_id": null,
+      "best_window_path": null,
+      "best_window_span": null,
+      "category": "seductive",
+      "present": false,
+      "source": "zero-shot text prompt (CLAP)",
+      "strength": 0.10222795871230352
+    },
+    {
+      "best_window_id": "w06",
+      "best_window_path": "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/missing-emotion-targets/runs/own-samantha/windows/w06_15.000_17.407.wav",
+      "best_window_span": "15.000-17.407",
+      "category": "yelling",
+      "present": true,
+      "source": "efficientat",
+      "strength": 0.6644409894943237
+    },
+    {
+      "best_window_id": null,
+      "best_window_path": null,
+      "best_window_span": null,
+      "category": "crying",
+      "present": false,
+      "source": "efficientat",
+      "strength": 0.16115853190422058
+    },
+    {
+      "best_window_id": "w00",
+      "best_window_path": "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/missing-emotion-targets/runs/own-samantha/windows/w00_0.000_2.500.wav",
+      "best_window_span": "0.000-2.500",
+      "category": "laughter",
+      "present": true,
+      "source": "efficientat",
+      "strength": 0.2743651270866394
+    },
+    {
+      "best_window_id": "w06",
+      "best_window_path": "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/missing-emotion-targets/runs/own-samantha/windows/w06_15.000_17.407.wav",
+      "best_window_span": "15.000-17.407",
+      "category": "logic",
+      "present": true,
+      "source": "zero-shot text prompt (CLAP)",
+      "strength": 0.4992222803994493
+    }
+  ],
+  "presence_floor": 0.2
+}

@@ -1,0 +1,61 @@
+{
+  "base": "/workspace/swarm/voice-v2-sprint/clip-store-own/samantha/reference.wav",
+  "meta": {
+    "base_speech_s": 15.599999999999998,
+    "max_seg_s": 6.0,
+    "method": "builtin expressive-moments: phrases split on >=0.2 s pauses (floor p95-35 dB), long phrases split <= max_seg_s; score = z(F0 sd st)+z(F0 p5-p95 range st)+z(energy sd dB)+0.5*z(level); top phrases until target_s, original order, 15 ms fades, 120 ms gaps",
+    "n_chosen": 4,
+    "n_phrases": 5,
+    "out_s": 11.62,
+    "phrases": [
+      {
+        "chosen": true,
+        "end_s": 2.8,
+        "energy_sd_db": 10.30436046180815,
+        "f0_range_st": 22.579653644119283,
+        "f0_sd_st": 5.027850007114875,
+        "score": 1.7153602923483557,
+        "start_s": 0.0
+      },
+      {
+        "chosen": false,
+        "end_s": 7.83,
+        "energy_sd_db": 9.723379101232728,
+        "f0_range_st": 6.191050275498057,
+        "f0_sd_st": 2.607269611141222,
+        "score": -3.3962535593937457,
+        "start_s": 3.02
+      },
+      {
+        "chosen": true,
+        "end_s": 9.75,
+        "energy_sd_db": 10.495881890040572,
+        "f0_range_st": 19.340752923407305,
+        "f0_sd_st": 5.402546530398965,
+        "score": 1.3478227420411713,
+        "start_s": 7.83
+      },
+      {
+        "chosen": true,
+        "end_s": 13.02,
+        "energy_sd_db": 12.095414645394976,
+        "f0_range_st": 18.719501935095142,
+        "f0_sd_st": 3.8348709949058097,
+        "score": 0.5822024944721621,
+        "start_s": 9.75
+      },
+      {
+        "chosen": true,
+        "end_s": 15.82,
+        "energy_sd_db": 11.896496396263226,
+        "f0_range_st": 9.877466854991045,
+        "f0_sd_st": 3.5071656155052016,
+        "score": -0.2491319694679417,
+        "start_s": 13.02
+      }
+    ],
+    "target_s": 10.0
+  },
+  "provider": "builtin",
+  "stage": "reference"
+}

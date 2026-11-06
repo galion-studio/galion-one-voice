@@ -1,0 +1,8 @@
+READY 2026-11-05 Europe/Zagreb (CET)
+binary: /workspace/swarm/voice-v2-sprint/cloning-v2/scorers/ecapa/target/release/galion-ecapa
+model:  /workspace/swarm/voice-v2-sprint/cloning-v2/scorers/ecapa/models/ecapa.onnx (default; override --model or $GALION_ECAPA_MODEL)
+usage:  galion-ecapa --ref REF.wav f1.wav f2.wav ... [--out out.json] [--no-ceiling] [--raw] [--threads 2]
+output: JSON {ref, half_vs_half_ceiling, scores{path:cos}, n, mean, sd, min, max, timing}; cos rounded 4 dp (as score_t648.py) unless --raw
+deps:   ONNX Runtime statically linked; only needs libstdc++/libc. Any WAV (int 8/16/24/32, float32, any SR, any channels).
+accuracy: max |cos_rust - cos_python| = 5e-5 on 24 clone lines + 2 ceilings + 3 format tests (tolerance 0.005).
+rebuild: cd this dir && nice -n 10 cargo build --release --offline   (.cargo/config.toml: jobs=2, ORT_LIB_LOCATION, libstdc++ link shim)

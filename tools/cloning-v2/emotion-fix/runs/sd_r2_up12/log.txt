@@ -1,0 +1,21 @@
+Runtime:
+  available_cores: 8
+  intra_threads:   2
+  parallel_exec:   false
+  ep_requested:    cpu
+  ep_effective:    cpu
+  dtype:           fp32
+
+model_load_ms=9724
+t01 c0 seed=0 ms=22155 tok=119 dur=4.88s f0=175.2 rate=3.69 erange=30.3 tilt=-11.0 dist=4.46
+t02 c0 seed=1000003 ms=20607 tok=95 dur=3.92s f0=209.4 rate=4.34 erange=50.6 tilt=-10.4 dist=9.47
+t03 c0 seed=2000006 ms=7399 tok=77 dur=3.20s f0=173.2 rate=3.75 erange=37.7 tilt=-10.6 dist=3.48
+t04 c0 seed=3000009 ms=5633 tok=66 dur=2.76s f0=177.3 rate=3.62 erange=45.6 tilt=-14.1 dist=4.40
+t05 c0 seed=4000012 ms=6325 tok=70 dur=2.92s f0=174.2 rate=4.11 erange=41.4 tilt=-11.4 dist=4.73
+t06 c0 seed=5000015 ms=12313 tok=90 dur=3.72s f0=167.5 rate=4.03 erange=47.9 tilt=-9.1 dist=7.06
+t07 c0 seed=6000018 ms=10819 tok=91 dur=3.76s f0=218.4 rate=3.19 erange=41.1 tilt=-10.0 dist=5.77
+t08 c0 seed=7000021 ms=12990 tok=172 dur=7.00s f0=169.1 rate=3.57 erange=36.6 tilt=-8.8 dist=4.04
+t09 c0 seed=8000024 ms=20127 tok=230 dur=9.32s f0=180.1 rate=2.90 erange=36.0 tilt=-9.8 dist=1.24
+t10 c0 seed=9000027 ms=10767 tok=126 dur=5.16s f0=183.1 rate=2.71 erange=45.3 tilt=-7.3 dist=2.83
+t11 c0 seed=10000030 ms=23372 tok=194 dur=7.88s f0=169.9 rate=3.30 erange=40.9 tilt=-7.7 dist=3.58
+t12 c0 seed=11000033 ms=16320 tok=146 dur=5.96s f0=201.0 rate=3.52 erange=45.2 tilt=-10.4 dist=6.05

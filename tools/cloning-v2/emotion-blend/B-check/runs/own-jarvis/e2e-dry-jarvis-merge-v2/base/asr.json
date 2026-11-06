@@ -1,0 +1,36 @@
+{
+  "asr": "/workspace/swarm/voice-v2-sprint/repo/weights/asr/vosk-model-small-en-us-0.15",
+  "files": [
+    {
+      "del": 0,
+      "duration_s": 15.952,
+      "errors": 42,
+      "hyp": "i am jarvis a virtual artificial intelligence and i'm here to assist you with a variety of tasks as best i can twenty four hours a day seven days a week importing all preferences from home interface systems are now fully operational",
+      "ins": 41,
+      "ms": 1543.5,
+      "n_ref_words": 1,
+      "path": "/workspace/swarm/voice-v2-sprint/clip-store-own/jarvis/reference.wav",
+      "sub": 1,
+      "wer": 42.0,
+      "wer_raw": 42.0
+    }
+  ],
+  "normalisation": "wer_t648.py: lower, [^a-z' ]->space, split",
+  "summary": {
+    "frac_le_10pct": 0.0,
+    "max": 42.0,
+    "mean": 42.0,
+    "mean_raw": 42.0,
+    "min": 42.0,
+    "n": 1,
+    "sd": 0.0
+  },
+  "timing": {
+    "audio_s": 15.952,
+    "jobs": 1,
+    "load_s": 0.297,
+    "rtf": 0.0968,
+    "score_s": 1.543
+  },
+  "tool": "galion-wer"
+}

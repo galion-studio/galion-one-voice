@@ -1,0 +1,10 @@
+{
+  "voice": "own-samantha-v2-blend-montageb",
+  "persona": "samantha",
+  "dtype": "fp32",
+  "temperature": 0,
+  "seed": 0,
+  "timbre_match": 0.5,
+  "timbre_ref": "/workspace/swarm/voice-v2-sprint/clip-store-own/samantha/reference.wav",
+  "emotion_blend": {"enabled": true}
+}

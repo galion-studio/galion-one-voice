@@ -1,0 +1,82 @@
+{
+  "candidate": "own-samantha-v2-blend-pros",
+  "params": {
+    "energy_expand": 1.03,
+    "f0_applied": false
+  },
+  "note": "Prior F0+energy ECAPA 0.6808; energy 1.10 ECAPA 0.7024; trying 1.03. Keep gate ECAPA>0.7057 is strict vs merge baseline.",
+  "files": [
+    {
+      "src": "/workspace/swarm/voice-v2-sprint/cloning-v2/merge-v2/wav/samantha/t01.wav",
+      "dst": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-blend/candidates/own-samantha-v2-blend-pros/wav/t01.wav",
+      "energy_expand": 1.03,
+      "f0_applied": false
+    },
+    {
+      "src": "/workspace/swarm/voice-v2-sprint/cloning-v2/merge-v2/wav/samantha/t02.wav",
+      "dst": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-blend/candidates/own-samantha-v2-blend-pros/wav/t02.wav",
+      "energy_expand": 1.03,
+      "f0_applied": false
+    },
+    {
+      "src": "/workspace/swarm/voice-v2-sprint/cloning-v2/merge-v2/wav/samantha/t03.wav",
+      "dst": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-blend/candidates/own-samantha-v2-blend-pros/wav/t03.wav",
+      "energy_expand": 1.03,
+      "f0_applied": false
+    },
+    {
+      "src": "/workspace/swarm/voice-v2-sprint/cloning-v2/merge-v2/wav/samantha/t04.wav",
+      "dst": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-blend/candidates/own-samantha-v2-blend-pros/wav/t04.wav",
+      "energy_expand": 1.03,
+      "f0_applied": false
+    },
+    {
+      "src": "/workspace/swarm/voice-v2-sprint/cloning-v2/merge-v2/wav/samantha/t05.wav",
+      "dst": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-blend/candidates/own-samantha-v2-blend-pros/wav/t05.wav",
+      "energy_expand": 1.03,
+      "f0_applied": false
+    },
+    {
+      "src": "/workspace/swarm/voice-v2-sprint/cloning-v2/merge-v2/wav/samantha/t06.wav",
+      "dst": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-blend/candidates/own-samantha-v2-blend-pros/wav/t06.wav",
+      "energy_expand": 1.03,
+      "f0_applied": false
+    },
+    {
+      "src": "/workspace/swarm/voice-v2-sprint/cloning-v2/merge-v2/wav/samantha/t07.wav",
+      "dst": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-blend/candidates/own-samantha-v2-blend-pros/wav/t07.wav",
+      "energy_expand": 1.03,
+      "f0_applied": false
+    },
+    {
+      "src": "/workspace/swarm/voice-v2-sprint/cloning-v2/merge-v2/wav/samantha/t08.wav",
+      "dst": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-blend/candidates/own-samantha-v2-blend-pros/wav/t08.wav",
+      "energy_expand": 1.03,
+      "f0_applied": false
+    },
+    {
+      "src": "/workspace/swarm/voice-v2-sprint/cloning-v2/merge-v2/wav/samantha/t09.wav",
+      "dst": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-blend/candidates/own-samantha-v2-blend-pros/wav/t09.wav",
+      "energy_expand": 1.03,
+      "f0_applied": false
+    },
+    {
+      "src": "/workspace/swarm/voice-v2-sprint/cloning-v2/merge-v2/wav/samantha/t10.wav",
+      "dst": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-blend/candidates/own-samantha-v2-blend-pros/wav/t10.wav",
+      "energy_expand": 1.03,
+      "f0_applied": false
+    },
+    {
+      "src": "/workspace/swarm/voice-v2-sprint/cloning-v2/merge-v2/wav/samantha/t11.wav",
+      "dst": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-blend/candidates/own-samantha-v2-blend-pros/wav/t11.wav",
+      "energy_expand": 1.03,
+      "f0_applied": false
+    },
+    {
+      "src": "/workspace/swarm/voice-v2-sprint/cloning-v2/merge-v2/wav/samantha/t12.wav",
+      "dst": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-blend/candidates/own-samantha-v2-blend-pros/wav/t12.wav",
+      "energy_expand": 1.03,
+      "f0_applied": false
+    }
+  ]
+}

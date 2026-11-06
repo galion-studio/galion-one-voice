@@ -1,0 +1,107 @@
+{
+  "files": [
+    {
+      "duration_s": 5.2,
+      "mos": 3.7146,
+      "ms": 1205.9,
+      "path": "wav/own-samantha-v2-hf-d-orig44/t01.wav",
+      "pesq": 4.1946,
+      "si_sdr": 31.0642,
+      "stoi": 0.9985
+    },
+    {
+      "duration_s": 3.84,
+      "mos": 4.0912,
+      "ms": 697.4,
+      "path": "wav/own-samantha-v2-hf-d-orig44/t02.wav",
+      "pesq": 3.5248,
+      "si_sdr": 25.2971,
+      "stoi": 0.9948
+    },
+    {
+      "duration_s": 3.2,
+      "mos": 3.6893,
+      "ms": 541.7,
+      "path": "wav/own-samantha-v2-hf-d-orig44/t03.wav",
+      "pesq": 4.0763,
+      "si_sdr": 31.7336,
+      "stoi": 0.998
+    },
+    {
+      "duration_s": 2.72,
+      "mos": 3.4289,
+      "ms": 433.4,
+      "path": "wav/own-samantha-v2-hf-d-orig44/t04.wav",
+      "pesq": 3.9342,
+      "si_sdr": 28.1075,
+      "stoi": 0.9945
+    },
+    {
+      "duration_s": 3.28,
+      "mos": 4.3913,
+      "ms": 611.9,
+      "path": "wav/own-samantha-v2-hf-d-orig44/t05.wav",
+      "pesq": 4.0255,
+      "si_sdr": 26.2285,
+      "stoi": 0.9843
+    },
+    {
+      "duration_s": 3.8,
+      "mos": 3.6719,
+      "ms": 702.0,
+      "path": "wav/own-samantha-v2-hf-d-orig44/t06.wav",
+      "pesq": 4.1591,
+      "si_sdr": 24.3441,
+      "stoi": 0.9975
+    },
+    {
+      "duration_s": 3.72,
+      "mos": 4.2734,
+      "ms": 642.4,
+      "path": "wav/own-samantha-v2-hf-d-orig44/t07.wav",
+      "pesq": 3.9415,
+      "si_sdr": 30.9349,
+      "stoi": 0.9967
+    },
+    {
+      "duration_s": 7.76,
+      "mos": 3.7634,
+      "ms": 1975.2,
+      "path": "wav/own-samantha-v2-hf-d-orig44/t08.wav",
+      "pesq": 3.9257,
+      "si_sdr": 27.0053,
+      "stoi": 0.9973
+    }
+  ],
+  "metric": "torchaudio SQUIM_SUBJECTIVE (NORESQA-MOS) + SQUIM_OBJECTIVE, ONNX fp32",
+  "nmr": "/workspace/swarm/voice-v2-sprint/clip-store-own/jarvis/reference.wav",
+  "summary": {
+    "mos": {
+      "mean": 3.878,
+      "n": 8,
+      "sd": 0.3132
+    },
+    "pesq": {
+      "mean": 3.9727,
+      "n": 8,
+      "sd": 0.1945
+    },
+    "si_sdr": {
+      "mean": 28.0894,
+      "n": 8,
+      "sd": 2.662
+    },
+    "stoi": {
+      "mean": 0.9952,
+      "n": 8,
+      "sd": 0.0043
+    }
+  },
+  "threads": 2,
+  "timing": {
+    "load_s": 1.215,
+    "peak_rss_mb": 917.0,
+    "score_s": 6.81
+  },
+  "tool": "galion-mos"
+}

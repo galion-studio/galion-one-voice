@@ -1,0 +1,4427 @@
+{
+  "presence_threshold": 0.2,
+  "original_moments_present_ge_0.2": {
+    "samantha": [
+      "aggressive",
+      "neutral",
+      "love",
+      "yelling",
+      "laughter",
+      "logic"
+    ],
+    "jarvis": [
+      "neutral",
+      "yelling",
+      "logic"
+    ]
+  },
+  "original_moments_missing_or_below_0.2": {
+    "samantha": [
+      "joyful",
+      "disgust",
+      "fear",
+      "sad",
+      "surprise",
+      "seductive",
+      "crying"
+    ],
+    "jarvis": [
+      "joyful",
+      "aggressive",
+      "disgust",
+      "fear",
+      "sad",
+      "surprise",
+      "love",
+      "seductive",
+      "crying",
+      "laughter"
+    ]
+  },
+  "lines": [
+    {
+      "persona": "samantha",
+      "id": "cry01",
+      "group": "crying",
+      "text": "[crying] I... I didn't think it would end like this. [sniff] I'm sorry. I just can't stop.",
+      "pace": 1.2,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/scorer-probe/wav/samantha/cry01.wav",
+      "duration_s": 7.56,
+      "e2v_top": "sad",
+      "e2v_top_conf": 0.9999972581863403,
+      "e2v": {
+        "angry": 2.103332397140889e-09,
+        "disgusted": 1.7814842934171793e-08,
+        "fearful": 3.8756905240688866e-08,
+        "happy": 2.602745041713206e-08,
+        "neutral": 2.59321382145572e-06,
+        "other": 5.171200356812733e-09,
+        "sad": 0.9999972581863403,
+        "surprised": 5.728428842388666e-10,
+        "unknown": 1.6399255287069536e-08
+      },
+      "clap_top": "logic",
+      "clap_probs": {
+        "love": 0.08505601893120195,
+        "seductive": 0.1689362621999837,
+        "yelling": 0.02352504763171321,
+        "logic": 0.2043504392387153,
+        "reason": 0.18848708420089455,
+        "aggressive": 0.0803483739324656,
+        "joyful": 0.037958142164345315,
+        "fear": 0.06853987750869127,
+        "surprise": 0.08020618472311428,
+        "disgust": 0.06259256946887504
+      },
+      "clap_cosine": {
+        "love": -0.03333006799221039,
+        "seductive": 0.0009805025765672326,
+        "yelling": -0.09759228676557541,
+        "logic": 0.010496245697140694,
+        "reason": 0.006455902010202408,
+        "aggressive": -0.036176979541778564,
+        "joyful": -0.0736713707447052,
+        "fear": -0.044124785810709,
+        "surprise": -0.0362655408680439,
+        "disgust": -0.048663243651390076
+      },
+      "efficientat_max": {
+        "yelling": 0.9171158671379089,
+        "crying": 0.12454459071159363,
+        "laughter": 0.345497727394104
+      },
+      "efficientat_mean": {
+        "yelling": 0.47218742966651917,
+        "crying": 0.05919932574033737,
+        "laughter": 0.12731842696666718
+      },
+      "detected_0.2": {
+        "crying": false,
+        "seductive": false,
+        "yelling": true,
+        "laughter": true,
+        "sad_e2v": true
+      },
+      "listen_proxy": {
+        "energy_rms_mean": 0.05780453675266965,
+        "energy_rms_std": 0.07087434665725051,
+        "energy_rms_cv": 1.2261035316397937,
+        "f0_hz_mean": 227.6859604881283,
+        "f0_hz_std": 55.20828628966625,
+        "f0_n_voiced_frames": 126,
+        "cbx_f0": null,
+        "cbx_rate": null,
+        "cbx_erange": null,
+        "cbx_tilt": null,
+        "cbx_dur": null,
+        "cbx_tok": null
+      }
+    },
+    {
+      "persona": "samantha",
+      "id": "cry02",
+      "group": "crying",
+      "text": "[crying] Please don't leave me. [sniff] I don't know how to do this without you.",
+      "pace": 1.2,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/scorer-probe/wav/samantha/cry02.wav",
+      "duration_s": 5.04,
+      "e2v_top": "sad",
+      "e2v_top_conf": 0.9999998807907104,
+      "e2v": {
+        "angry": 2.9216495889272664e-09,
+        "disgusted": 3.7093812466082454e-08,
+        "fearful": 2.8812419117230093e-08,
+        "happy": 3.438535012278976e-09,
+        "neutral": 1.82137185333886e-08,
+        "other": 7.632564802406705e-09,
+        "sad": 0.9999998807907104,
+        "surprised": 1.685951239727146e-10,
+        "unknown": 3.8127108581420543e-08
+      },
+      "clap_top": "aggressive",
+      "clap_probs": {
+        "love": 0.08718317182992032,
+        "seductive": 0.08736060550527146,
+        "yelling": 0.018884922346988985,
+        "logic": 0.0698707879668931,
+        "reason": 0.08455353614410463,
+        "aggressive": 0.2743687727521009,
+        "joyful": 0.11205648343692876,
+        "fear": 0.04354132224336012,
+        "surprise": 0.03718434187266175,
+        "disgust": 0.18499605590176982
+      },
+      "clap_cosine": {
+        "love": -0.05217873677611351,
+        "seductive": -0.05207708105444908,
+        "yelling": -0.1286611109972,
+        "logic": -0.06324692070484161,
+        "reason": -0.05371005833148956,
+        "aggressive": 0.005144351162016392,
+        "joyful": -0.03962915018200874,
+        "fear": -0.08689378201961517,
+        "surprise": -0.09478491544723511,
+        "disgust": -0.014562577940523624
+      },
+      "efficientat_max": {
+        "yelling": 0.8520121574401855,
+        "crying": 0.0726918876171112,
+        "laughter": 0.22446513175964355
+      },
+      "efficientat_mean": {
+        "yelling": 0.5461714863777161,
+        "crying": 0.05706022307276726,
+        "laughter": 0.14816048741340637
+      },
+      "detected_0.2": {
+        "crying": false,
+        "seductive": false,
+        "yelling": true,
+        "laughter": true,
+        "sad_e2v": true
+      },
+      "listen_proxy": {
+        "energy_rms_mean": 0.07212249497173939,
+        "energy_rms_std": 0.07340479053256076,
+        "energy_rms_cv": 1.017779412114401,
+        "f0_hz_mean": 215.16169005345932,
+        "f0_hz_std": 46.98195669125772,
+        "f0_n_voiced_frames": 110,
+        "cbx_f0": null,
+        "cbx_rate": null,
+        "cbx_erange": null,
+        "cbx_tilt": null,
+        "cbx_dur": null,
+        "cbx_tok": null
+      }
+    },
+    {
+      "persona": "samantha",
+      "id": "cry03",
+      "group": "crying",
+      "text": "[crying] It hurts so much. [sigh] I keep thinking about everything we lost.",
+      "pace": 1.2,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/scorer-probe/wav/samantha/cry03.wav",
+      "duration_s": 5.72,
+      "e2v_top": "sad",
+      "e2v_top_conf": 1.0,
+      "e2v": {
+        "angry": 5.532894697957147e-10,
+        "disgusted": 3.8488474629616576e-09,
+        "fearful": 9.068427786473876e-09,
+        "happy": 3.11698689081652e-09,
+        "neutral": 5.584938733704803e-08,
+        "other": 1.8471797424979286e-09,
+        "sad": 1.0,
+        "surprised": 2.5755833577001397e-10,
+        "unknown": 1.5889523030665487e-09
+      },
+      "clap_top": "reason",
+      "clap_probs": {
+        "love": 0.07015242357627752,
+        "seductive": 0.2615347406946245,
+        "yelling": 0.030714480800879306,
+        "logic": 0.09800141250490488,
+        "reason": 0.26918378284869804,
+        "aggressive": 0.03695845462422183,
+        "joyful": 0.08364349198905519,
+        "fear": 0.05510700458365279,
+        "surprise": 0.034417354306146744,
+        "disgust": 0.06028685407153929
+      },
+      "clap_cosine": {
+        "love": -0.03546452894806862,
+        "seductive": 0.03033030964434147,
+        "yelling": -0.07676133513450623,
+        "logic": -0.018748952075839043,
+        "reason": 0.031771671026945114,
+        "aggressive": -0.06750832498073578,
+        "joyful": -0.02666986547410488,
+        "fear": -0.04753420501947403,
+        "surprise": -0.07107000052928925,
+        "disgust": -0.043042343109846115
+      },
+      "efficientat_max": {
+        "yelling": 0.713221549987793,
+        "crying": 0.11070552468299866,
+        "laughter": 0.14421305060386658
+      },
+      "efficientat_mean": {
+        "yelling": 0.5872271656990051,
+        "crying": 0.06868180632591248,
+        "laughter": 0.08323687314987183
+      },
+      "detected_0.2": {
+        "crying": false,
+        "seductive": true,
+        "yelling": true,
+        "laughter": false,
+        "sad_e2v": true
+      },
+      "listen_proxy": {
+        "energy_rms_mean": 0.0658443842910391,
+        "energy_rms_std": 0.0684709094191824,
+        "energy_rms_cv": 1.0398898882026715,
+        "f0_hz_mean": 231.1692140715728,
+        "f0_hz_std": 40.915128346759886,
+        "f0_n_voiced_frames": 105,
+        "cbx_f0": null,
+        "cbx_rate": null,
+        "cbx_erange": null,
+        "cbx_tilt": null,
+        "cbx_dur": null,
+        "cbx_tok": null
+      }
+    },
+    {
+      "persona": "samantha",
+      "id": "cry04",
+      "group": "crying",
+      "text": "[crying] I tried to be strong, but [sniff] I can't hold it in anymore.",
+      "pace": 1.2,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/scorer-probe/wav/samantha/cry04.wav",
+      "duration_s": 5.2,
+      "e2v_top": "neutral",
+      "e2v_top_conf": 1.0,
+      "e2v": {
+        "angry": 1.8940452233950217e-13,
+        "disgusted": 6.277065557603028e-15,
+        "fearful": 1.2340488653601314e-15,
+        "happy": 2.2417563140010588e-13,
+        "neutral": 1.0,
+        "other": 8.494857958508712e-16,
+        "sad": 6.036923890472001e-13,
+        "surprised": 7.337643134156663e-14,
+        "unknown": 3.90949073244759e-15
+      },
+      "clap_top": "joyful",
+      "clap_probs": {
+        "love": 0.056062915174183985,
+        "seductive": 0.04120263716556451,
+        "yelling": 0.14053353499044643,
+        "logic": 0.14131488707432313,
+        "reason": 0.051217522886149926,
+        "aggressive": 0.17626922702604253,
+        "joyful": 0.220802617608001,
+        "fear": 0.06209132959328684,
+        "surprise": 0.05355411643105528,
+        "disgust": 0.05695121205094628
+      },
+      "clap_cosine": {
+        "love": -0.07949589192867279,
+        "seductive": -0.09489450603723526,
+        "yelling": -0.03354731202125549,
+        "logic": -0.03327008709311485,
+        "reason": -0.08401553332805634,
+        "aggressive": -0.022218992933630943,
+        "joyful": -0.010956160724163055,
+        "fear": -0.07438930124044418,
+        "surprise": -0.08178498595952988,
+        "disgust": -0.07870987057685852
+      },
+      "efficientat_max": {
+        "yelling": 0.8557149767875671,
+        "crying": 0.0740409791469574,
+        "laughter": 0.24383139610290527
+      },
+      "efficientat_mean": {
+        "yelling": 0.5779305696487427,
+        "crying": 0.0608668215572834,
+        "laughter": 0.15758876502513885
+      },
+      "detected_0.2": {
+        "crying": false,
+        "seductive": false,
+        "yelling": true,
+        "laughter": true,
+        "sad_e2v": false
+      },
+      "listen_proxy": {
+        "energy_rms_mean": 0.06545541435336522,
+        "energy_rms_std": 0.06833147566366084,
+        "energy_rms_cv": 1.0439392422874145,
+        "f0_hz_mean": 202.3663710754419,
+        "f0_hz_std": 31.727739659869982,
+        "f0_n_voiced_frames": 105,
+        "cbx_f0": null,
+        "cbx_rate": null,
+        "cbx_erange": null,
+        "cbx_tilt": null,
+        "cbx_dur": null,
+        "cbx_tok": null
+      }
+    },
+    {
+      "persona": "samantha",
+      "id": "sed01",
+      "group": "seductive",
+      "text": "[whispering] Come closer. I've been waiting for you all night.",
+      "pace": 1.3,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/scorer-probe/wav/samantha/sed01.wav",
+      "duration_s": 3.88,
+      "e2v_top": "neutral",
+      "e2v_top_conf": 0.7328807711601257,
+      "e2v": {
+        "angry": 7.514770550187677e-05,
+        "disgusted": 0.002233282895758748,
+        "fearful": 0.003911551553755999,
+        "happy": 0.002670751651749015,
+        "neutral": 0.7328807711601257,
+        "other": 0.009922567754983902,
+        "sad": 0.0005951042403467,
+        "surprised": 1.7374112530887942e-06,
+        "unknown": 0.24770916998386383
+      },
+      "clap_top": "logic",
+      "clap_probs": {
+        "love": 0.09868103059404991,
+        "seductive": 0.21242489922715546,
+        "yelling": 0.0031889649400791246,
+        "logic": 0.3517435789930365,
+        "reason": 0.17381503943546392,
+        "aggressive": 0.02813805444722314,
+        "joyful": 0.05932300107359935,
+        "fear": 0.017859329519852005,
+        "surprise": 0.004796922188846564,
+        "disgust": 0.050029179580693965
+      },
+      "clap_cosine": {
+        "love": -0.01612258143723011,
+        "seductive": 0.022212207317352295,
+        "yelling": -0.18773239850997925,
+        "logic": 0.04742790386080742,
+        "reason": 0.012182368896901608,
+        "aggressive": -0.07886107265949249,
+        "joyful": -0.041567362844944,
+        "fear": -0.10159091651439667,
+        "surprise": -0.16731849312782288,
+        "disgust": -0.05008689686655998
+      },
+      "efficientat_max": {
+        "yelling": 0.7330939173698425,
+        "crying": 0.04368653893470764,
+        "laughter": 0.11595228314399719
+      },
+      "efficientat_mean": {
+        "yelling": 0.3887198865413666,
+        "crying": 0.03400765359401703,
+        "laughter": 0.07700693607330322
+      },
+      "detected_0.2": {
+        "crying": false,
+        "seductive": true,
+        "yelling": true,
+        "laughter": false,
+        "sad_e2v": false
+      },
+      "listen_proxy": {
+        "energy_rms_mean": 0.027556851391619487,
+        "energy_rms_std": 0.022641129750520555,
+        "energy_rms_cv": 0.8216152647035035,
+        "f0_hz_mean": 161.37732250682546,
+        "f0_hz_std": 18.8345895980528,
+        "f0_n_voiced_frames": 74,
+        "cbx_f0": null,
+        "cbx_rate": null,
+        "cbx_erange": null,
+        "cbx_tilt": null,
+        "cbx_dur": null,
+        "cbx_tok": null
+      }
+    },
+    {
+      "persona": "samantha",
+      "id": "sed02",
+      "group": "seductive",
+      "text": "[whispering] Stay with me. Just like this. Slow. Close.",
+      "pace": 1.3,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/scorer-probe/wav/samantha/sed02.wav",
+      "duration_s": 4.4,
+      "e2v_top": "neutral",
+      "e2v_top_conf": 0.972634494304657,
+      "e2v": {
+        "angry": 0.0004071709408890456,
+        "disgusted": 0.0005266063380986452,
+        "fearful": 3.1528612453257665e-05,
+        "happy": 0.01851961947977543,
+        "neutral": 0.972634494304657,
+        "other": 0.0003128708922304213,
+        "sad": 0.0014229664811864495,
+        "surprised": 8.446662604910671e-07,
+        "unknown": 0.006143894977867603
+      },
+      "clap_top": "logic",
+      "clap_probs": {
+        "love": 0.05498201206424869,
+        "seductive": 0.09575001362314822,
+        "yelling": 0.014576913030157053,
+        "logic": 0.40672324695030154,
+        "reason": 0.07966314207466468,
+        "aggressive": 0.1753321912715938,
+        "joyful": 0.006050531937402368,
+        "fear": 0.026645872422862264,
+        "surprise": 0.05006506062102868,
+        "disgust": 0.09021101600459257
+      },
+      "clap_cosine": {
+        "love": -0.07355093955993652,
+        "seductive": -0.04581420496106148,
+        "yelling": -0.13992929458618164,
+        "logic": 0.026505405083298683,
+        "reason": -0.05501089245080948,
+        "aggressive": -0.015567122958600521,
+        "joyful": -0.18389393389225006,
+        "fear": -0.10976953059434891,
+        "surprise": -0.07823507487773895,
+        "disgust": -0.04879366606473923
+      },
+      "efficientat_max": {
+        "yelling": 0.3757062554359436,
+        "crying": 0.042325735092163086,
+        "laughter": 0.07206520438194275
+      },
+      "efficientat_mean": {
+        "yelling": 0.3545765280723572,
+        "crying": 0.03728175163269043,
+        "laughter": 0.06838405132293701
+      },
+      "detected_0.2": {
+        "crying": false,
+        "seductive": false,
+        "yelling": true,
+        "laughter": false,
+        "sad_e2v": false
+      },
+      "listen_proxy": {
+        "energy_rms_mean": 0.02886801516930945,
+        "energy_rms_std": 0.03615552943321183,
+        "energy_rms_cv": 1.2524425119344536,
+        "f0_hz_mean": 164.23552367320758,
+        "f0_hz_std": 40.85270468629547,
+        "f0_n_voiced_frames": 56,
+        "cbx_f0": null,
+        "cbx_rate": null,
+        "cbx_erange": null,
+        "cbx_tilt": null,
+        "cbx_dur": null,
+        "cbx_tok": null
+      }
+    },
+    {
+      "persona": "samantha",
+      "id": "sed03",
+      "group": "seductive",
+      "text": "Come here. You know exactly what I want. Don't rush. Stay close to me.",
+      "pace": 1.3,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/scorer-probe/wav/samantha/sed03.wav",
+      "duration_s": 5.2,
+      "e2v_top": "neutral",
+      "e2v_top_conf": 1.0,
+      "e2v": {
+        "angry": 2.472660097507795e-11,
+        "disgusted": 3.40024644725212e-12,
+        "fearful": 6.723765424640482e-13,
+        "happy": 7.142444274910176e-11,
+        "neutral": 1.0,
+        "other": 7.667950475964691e-13,
+        "sad": 1.2931666848459145e-10,
+        "surprised": 8.688351253727244e-12,
+        "unknown": 2.293895108584909e-12
+      },
+      "clap_top": "reason",
+      "clap_probs": {
+        "love": 0.04944583784349491,
+        "seductive": 0.15666967712967103,
+        "yelling": 0.06976217464839962,
+        "logic": 0.16444403430880222,
+        "reason": 0.1862035289746421,
+        "aggressive": 0.17730901597512377,
+        "joyful": 0.0819920713223465,
+        "fear": 0.04250166206462914,
+        "surprise": 0.042440602855610486,
+        "disgust": 0.0292313948772802
+      },
+      "clap_cosine": {
+        "love": -0.07491575181484222,
+        "seductive": -0.017252665013074875,
+        "yelling": -0.057705048471689224,
+        "logic": -0.01483113132417202,
+        "reason": -0.00861763022840023,
+        "aggressive": -0.011064942926168442,
+        "joyful": -0.049628518521785736,
+        "fear": -0.0824824869632721,
+        "surprise": -0.08255437016487122,
+        "disgust": -0.10119748115539551
+      },
+      "efficientat_max": {
+        "yelling": 0.43645837903022766,
+        "crying": 0.04278057813644409,
+        "laughter": 0.18364369869232178
+      },
+      "efficientat_mean": {
+        "yelling": 0.30158233642578125,
+        "crying": 0.03365810588002205,
+        "laughter": 0.12037410587072372
+      },
+      "detected_0.2": {
+        "crying": false,
+        "seductive": false,
+        "yelling": true,
+        "laughter": false,
+        "sad_e2v": false
+      },
+      "listen_proxy": {
+        "energy_rms_mean": 0.06219126165261826,
+        "energy_rms_std": 0.0608954601556997,
+        "energy_rms_cv": 0.9791642513355571,
+        "f0_hz_mean": 200.66503301706052,
+        "f0_hz_std": 50.90935870931244,
+        "f0_n_voiced_frames": 104,
+        "cbx_f0": null,
+        "cbx_rate": null,
+        "cbx_erange": null,
+        "cbx_tilt": null,
+        "cbx_dur": null,
+        "cbx_tok": null
+      }
+    },
+    {
+      "persona": "samantha",
+      "id": "sed04",
+      "group": "seductive",
+      "text": "[sigh] [whispering] Don't say a word. Just come a little closer to me.",
+      "pace": 1.3,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/scorer-probe/wav/samantha/sed04.wav",
+      "duration_s": 4.56,
+      "e2v_top": "neutral",
+      "e2v_top_conf": 0.9996235370635986,
+      "e2v": {
+        "angry": 1.1164411262143403e-05,
+        "disgusted": 1.3888982721255161e-05,
+        "fearful": 1.2573469803101034e-06,
+        "happy": 6.699378445773618e-06,
+        "neutral": 0.9996235370635986,
+        "other": 4.5695916924159974e-05,
+        "sad": 0.00024513035896234214,
+        "surprised": 6.78949220400682e-07,
+        "unknown": 5.197266727918759e-05
+      },
+      "clap_top": "seductive",
+      "clap_probs": {
+        "love": 0.08765046164954701,
+        "seductive": 0.33438899274060635,
+        "yelling": 0.004004254075994105,
+        "logic": 0.2542118574257406,
+        "reason": 0.0905289283877202,
+        "aggressive": 0.04480141031314714,
+        "joyful": 0.02909517683812483,
+        "fear": 0.03973556945876672,
+        "surprise": 0.02241662514321013,
+        "disgust": 0.09316672396714273
+      },
+      "clap_cosine": {
+        "love": 0.02750428393483162,
+        "seductive": 0.09445168823003769,
+        "yelling": -0.126795694231987,
+        "logic": 0.08074484020471573,
+        "reason": 0.029119912534952164,
+        "aggressive": -0.006051579024642706,
+        "joyful": -0.027634939178824425,
+        "fear": -0.01205122284591198,
+        "surprise": -0.04067341610789299,
+        "disgust": 0.03055597096681595
+      },
+      "efficientat_max": {
+        "yelling": 0.7600821256637573,
+        "crying": 0.10360974073410034,
+        "laughter": 0.19402262568473816
+      },
+      "efficientat_mean": {
+        "yelling": 0.6920382976531982,
+        "crying": 0.08028124272823334,
+        "laughter": 0.18767498433589935
+      },
+      "detected_0.2": {
+        "crying": false,
+        "seductive": true,
+        "yelling": true,
+        "laughter": false,
+        "sad_e2v": false
+      },
+      "listen_proxy": {
+        "energy_rms_mean": 0.026711277220558452,
+        "energy_rms_std": 0.024834588171115016,
+        "energy_rms_cv": 0.929741695466399,
+        "f0_hz_mean": 155.36471125133045,
+        "f0_hz_std": 29.6695503206991,
+        "f0_n_voiced_frames": 80,
+        "cbx_f0": null,
+        "cbx_rate": null,
+        "cbx_erange": null,
+        "cbx_tilt": null,
+        "cbx_dur": null,
+        "cbx_tok": null
+      }
+    },
+    {
+      "persona": "samantha",
+      "id": "neu01",
+      "group": "neutral",
+      "text": "We checked the numbers twice this afternoon, and the results are clear.",
+      "pace": 1.0,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/scorer-probe/wav/samantha/neu01.wav",
+      "duration_s": 3.2,
+      "e2v_top": "neutral",
+      "e2v_top_conf": 1.0,
+      "e2v": {
+        "angry": 2.6543461872918783e-11,
+        "disgusted": 2.5478475666057543e-12,
+        "fearful": 1.1120028509115087e-12,
+        "happy": 2.696491918641186e-10,
+        "neutral": 1.0,
+        "other": 3.265178112697026e-13,
+        "sad": 7.254993827920941e-10,
+        "surprised": 8.671480200561632e-12,
+        "unknown": 1.3421988130299378e-12
+      },
+      "clap_top": "logic",
+      "clap_probs": {
+        "love": 0.07894103600064686,
+        "seductive": 0.09117801014913104,
+        "yelling": 0.0055868988085652094,
+        "logic": 0.5178707127184747,
+        "reason": 0.10447066140924073,
+        "aggressive": 0.068896526259912,
+        "joyful": 0.10149039130594723,
+        "fear": 0.009605911564461314,
+        "surprise": 0.018657914566572828,
+        "disgust": 0.0033019372170479716
+      },
+      "clap_cosine": {
+        "love": -0.06767495721578598,
+        "seductive": -0.06046932935714722,
+        "yelling": -0.20008879899978638,
+        "logic": 0.026376264169812202,
+        "reason": -0.05366470292210579,
+        "aggressive": -0.07447972893714905,
+        "joyful": -0.05511181056499481,
+        "fear": -0.172991082072258,
+        "surprise": -0.13979649543762207,
+        "disgust": -0.22638455033302307
+      },
+      "efficientat_max": {
+        "yelling": 0.7883808612823486,
+        "crying": 0.15375348925590515,
+        "laughter": 0.23788070678710938
+      },
+      "efficientat_mean": {
+        "yelling": 0.7883808612823486,
+        "crying": 0.15375348925590515,
+        "laughter": 0.23788070678710938
+      },
+      "detected_0.2": {
+        "crying": false,
+        "seductive": false,
+        "yelling": true,
+        "laughter": true,
+        "sad_e2v": false
+      },
+      "listen_proxy": {
+        "energy_rms_mean": 0.0676903448930885,
+        "energy_rms_std": 0.05427599113898566,
+        "energy_rms_cv": 0.801827664266008,
+        "f0_hz_mean": 193.48488623792244,
+        "f0_hz_std": 42.80588381379404,
+        "f0_n_voiced_frames": 75,
+        "cbx_f0": null,
+        "cbx_rate": null,
+        "cbx_erange": null,
+        "cbx_tilt": null,
+        "cbx_dur": null,
+        "cbx_tok": null
+      }
+    },
+    {
+      "persona": "samantha",
+      "id": "neu02",
+      "group": "neutral",
+      "text": "Could you open the living room window before dinner starts?",
+      "pace": 1.0,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/scorer-probe/wav/samantha/neu02.wav",
+      "duration_s": 2.68,
+      "e2v_top": "neutral",
+      "e2v_top_conf": 0.9989407658576965,
+      "e2v": {
+        "angry": 1.9062052842855337e-06,
+        "disgusted": 6.730655286446563e-07,
+        "fearful": 4.952205046038216e-08,
+        "happy": 0.0007444886141456664,
+        "neutral": 0.9989407658576965,
+        "other": 9.139410508396395e-07,
+        "sad": 2.216684151790105e-06,
+        "surprised": 0.0003088101511821151,
+        "unknown": 1.0779930192938991e-07
+      },
+      "clap_top": "logic",
+      "clap_probs": {
+        "love": 0.08498943465471151,
+        "seductive": 0.12049726236349802,
+        "yelling": 0.013422632702225,
+        "logic": 0.25031421925088304,
+        "reason": 0.16296282393789144,
+        "aggressive": 0.08648871217021763,
+        "joyful": 0.2029258557066057,
+        "fear": 0.03028818145733195,
+        "surprise": 0.03095003419603646,
+        "disgust": 0.01716084356059923
+      },
+      "clap_cosine": {
+        "love": -0.0822196826338768,
+        "seductive": -0.06476467847824097,
+        "yelling": -0.17449891567230225,
+        "logic": -0.02821017988026142,
+        "reason": -0.04966992512345314,
+        "aggressive": -0.081345334649086,
+        "joyful": -0.03870399668812752,
+        "fear": -0.13380815088748932,
+        "surprise": -0.13272732496261597,
+        "disgust": -0.1622145175933838
+      },
+      "efficientat_max": {
+        "yelling": 0.8003960251808167,
+        "crying": 0.0854959785938263,
+        "laughter": 0.053740739822387695
+      },
+      "efficientat_mean": {
+        "yelling": 0.8003960251808167,
+        "crying": 0.0854959785938263,
+        "laughter": 0.053740739822387695
+      },
+      "detected_0.2": {
+        "crying": false,
+        "seductive": false,
+        "yelling": true,
+        "laughter": false,
+        "sad_e2v": false
+      },
+      "listen_proxy": {
+        "energy_rms_mean": 0.09770913316980405,
+        "energy_rms_std": 0.07886966561665558,
+        "energy_rms_cv": 0.8071882643722951,
+        "f0_hz_mean": 231.5386403712037,
+        "f0_hz_std": 63.371376786069774,
+        "f0_n_voiced_frames": 74,
+        "cbx_f0": null,
+        "cbx_rate": null,
+        "cbx_erange": null,
+        "cbx_tilt": null,
+        "cbx_dur": null,
+        "cbx_tok": null
+      }
+    },
+    {
+      "persona": "jarvis",
+      "id": "cry01",
+      "group": "crying",
+      "text": "[crying] I... I didn't think it would end like this. [sniff] I'm sorry. I just can't stop.",
+      "pace": 1.2,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/scorer-probe/wav/jarvis/cry01.wav",
+      "duration_s": 8.32,
+      "e2v_top": "sad",
+      "e2v_top_conf": 0.999992847442627,
+      "e2v": {
+        "angry": 1.2902983570484139e-08,
+        "disgusted": 1.426431168738418e-07,
+        "fearful": 2.563429291058128e-07,
+        "happy": 5.701343397390701e-08,
+        "neutral": 6.675234544673003e-06,
+        "other": 1.7019694098507898e-08,
+        "sad": 0.999992847442627,
+        "surprised": 1.4818589910703395e-08,
+        "unknown": 1.9576066989657193e-08
+      },
+      "clap_top": "logic",
+      "clap_probs": {
+        "love": 0.037869543201831786,
+        "seductive": 0.05307548680297654,
+        "yelling": 0.15317155887802,
+        "logic": 0.4298401749989347,
+        "reason": 0.039368830148853375,
+        "aggressive": 0.182294115854803,
+        "joyful": 0.020319281389451695,
+        "fear": 0.03574759392243545,
+        "surprise": 0.016464163781772487,
+        "disgust": 0.03184925102092094
+      },
+      "clap_cosine": {
+        "love": -0.05023660510778427,
+        "seductive": -0.03335820510983467,
+        "yelling": 0.01963396556675434,
+        "logic": 0.07122670859098434,
+        "reason": -0.048295244574546814,
+        "aggressive": 0.028337106108665466,
+        "joyful": -0.08136545121669769,
+        "fear": -0.05311981588602066,
+        "surprise": -0.09188465774059296,
+        "disgust": -0.058893270790576935
+      },
+      "efficientat_max": {
+        "yelling": 0.8991987705230713,
+        "crying": 0.17580771446228027,
+        "laughter": 0.2363310158252716
+      },
+      "efficientat_mean": {
+        "yelling": 0.400831401348114,
+        "crying": 0.062364667654037476,
+        "laughter": 0.08413401991128922
+      },
+      "detected_0.2": {
+        "crying": false,
+        "seductive": false,
+        "yelling": true,
+        "laughter": true,
+        "sad_e2v": true
+      },
+      "listen_proxy": {
+        "energy_rms_mean": 0.05616849775484692,
+        "energy_rms_std": 0.05811734996398535,
+        "energy_rms_cv": 1.0346965343037016,
+        "f0_hz_mean": 200.36359476619407,
+        "f0_hz_std": 89.60500640840712,
+        "f0_n_voiced_frames": 115,
+        "cbx_f0": null,
+        "cbx_rate": null,
+        "cbx_erange": null,
+        "cbx_tilt": null,
+        "cbx_dur": null,
+        "cbx_tok": null
+      }
+    },
+    {
+      "persona": "jarvis",
+      "id": "cry02",
+      "group": "crying",
+      "text": "[crying] Please don't leave me. [sniff] I don't know how to do this without you.",
+      "pace": 1.2,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/scorer-probe/wav/jarvis/cry02.wav",
+      "duration_s": 5.08,
+      "e2v_top": "neutral",
+      "e2v_top_conf": 0.4696376621723175,
+      "e2v": {
+        "angry": 0.004477349575608969,
+        "disgusted": 0.02252596616744995,
+        "fearful": 0.0014443924883380532,
+        "happy": 0.0011611981317400932,
+        "neutral": 0.4696376621723175,
+        "other": 0.018258053809404373,
+        "sad": 0.3633507192134857,
+        "surprised": 4.360246020951308e-05,
+        "unknown": 0.11910102516412735
+      },
+      "clap_top": "logic",
+      "clap_probs": {
+        "love": 0.014452321773041855,
+        "seductive": 0.03502706833498467,
+        "yelling": 0.06134607342889076,
+        "logic": 0.5143010218870414,
+        "reason": 0.059662874143553146,
+        "aggressive": 0.2524735176907635,
+        "joyful": 0.01680885388960342,
+        "fear": 0.01756380148864776,
+        "surprise": 0.009393296971004404,
+        "disgust": 0.01897117039246918
+      },
+      "clap_cosine": {
+        "love": -0.15497836470603943,
+        "seductive": -0.11071506142616272,
+        "yelling": -0.08269456028938293,
+        "logic": 0.02361931838095188,
+        "reason": -0.0840856209397316,
+        "aggressive": -0.011955800466239452,
+        "joyful": -0.1474258303642273,
+        "fear": -0.14522911608219147,
+        "surprise": -0.17652130126953125,
+        "disgust": -0.1413750946521759
+      },
+      "efficientat_max": {
+        "yelling": 0.42134130001068115,
+        "crying": 0.06953170895576477,
+        "laughter": 0.11695778369903564
+      },
+      "efficientat_mean": {
+        "yelling": 0.38467755913734436,
+        "crying": 0.052354007959365845,
+        "laughter": 0.08293372392654419
+      },
+      "detected_0.2": {
+        "crying": false,
+        "seductive": false,
+        "yelling": true,
+        "laughter": false,
+        "sad_e2v": true
+      },
+      "listen_proxy": {
+        "energy_rms_mean": 0.06423426213973388,
+        "energy_rms_std": 0.05224053987780869,
+        "energy_rms_cv": 0.8132815437992532,
+        "f0_hz_mean": 180.88931072466184,
+        "f0_hz_std": 77.10920979419474,
+        "f0_n_voiced_frames": 98,
+        "cbx_f0": null,
+        "cbx_rate": null,
+        "cbx_erange": null,
+        "cbx_tilt": null,
+        "cbx_dur": null,
+        "cbx_tok": null
+      }
+    },
+    {
+      "persona": "jarvis",
+      "id": "cry03",
+      "group": "crying",
+      "text": "[crying] It hurts so much. [sigh] I keep thinking about everything we lost.",
+      "pace": 1.2,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/scorer-probe/wav/jarvis/cry03.wav",
+      "duration_s": 6.16,
+      "e2v_top": "neutral",
+      "e2v_top_conf": 0.9968641400337219,
+      "e2v": {
+        "angry": 2.687658525246661e-05,
+        "disgusted": 3.1017119908938184e-05,
+        "fearful": 1.726840309856925e-05,
+        "happy": 5.9037687606178224e-05,
+        "neutral": 0.9968641400337219,
+        "other": 1.5232686564559117e-05,
+        "sad": 0.0028845658525824547,
+        "surprised": 6.296160677266016e-07,
+        "unknown": 0.00010129796282853931
+      },
+      "clap_top": "aggressive",
+      "clap_probs": {
+        "love": 0.019945690006401354,
+        "seductive": 0.03761686058826634,
+        "yelling": 0.055094067952367654,
+        "logic": 0.3575438708066205,
+        "reason": 0.05716880625000875,
+        "aggressive": 0.3642240043391542,
+        "joyful": 0.007205702772185393,
+        "fear": 0.030876184601676637,
+        "surprise": 0.01751405022904047,
+        "disgust": 0.0528107624542787
+      },
+      "clap_cosine": {
+        "love": -0.11659985780715942,
+        "seductive": -0.08487789332866669,
+        "yelling": -0.06579840928316116,
+        "logic": 0.027712391689419746,
+        "reason": -0.06395009160041809,
+        "aggressive": 0.028637941926717758,
+        "joyful": -0.1675068736076355,
+        "fear": -0.0947512537240982,
+        "surprise": -0.12310034036636353,
+        "disgust": -0.06791476160287857
+      },
+      "efficientat_max": {
+        "yelling": 0.6624224781990051,
+        "crying": 0.1651308536529541,
+        "laughter": 0.15572643280029297
+      },
+      "efficientat_mean": {
+        "yelling": 0.40937137603759766,
+        "crying": 0.09060069173574448,
+        "laughter": 0.10609664767980576
+      },
+      "detected_0.2": {
+        "crying": false,
+        "seductive": false,
+        "yelling": true,
+        "laughter": false,
+        "sad_e2v": false
+      },
+      "listen_proxy": {
+        "energy_rms_mean": 0.05012421554312045,
+        "energy_rms_std": 0.04819051303972222,
+        "energy_rms_cv": 0.9614217901976996,
+        "f0_hz_mean": 170.02910711331683,
+        "f0_hz_std": 79.76474533823841,
+        "f0_n_voiced_frames": 79,
+        "cbx_f0": null,
+        "cbx_rate": null,
+        "cbx_erange": null,
+        "cbx_tilt": null,
+        "cbx_dur": null,
+        "cbx_tok": null
+      }
+    },
+    {
+      "persona": "jarvis",
+      "id": "cry04",
+      "group": "crying",
+      "text": "[crying] I tried to be strong, but [sniff] I can't hold it in anymore.",
+      "pace": 1.2,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/scorer-probe/wav/jarvis/cry04.wav",
+      "duration_s": 5.16,
+      "e2v_top": "neutral",
+      "e2v_top_conf": 1.0,
+      "e2v": {
+        "angry": 3.935305858959737e-09,
+        "disgusted": 3.6941040504334666e-11,
+        "fearful": 7.021655392541737e-12,
+        "happy": 2.37287439697198e-10,
+        "neutral": 1.0,
+        "other": 1.0108652196555434e-12,
+        "sad": 6.440859512402142e-10,
+        "surprised": 8.637545539924574e-11,
+        "unknown": 1.7579888282950873e-12
+      },
+      "clap_top": "logic",
+      "clap_probs": {
+        "love": 0.010712608908606414,
+        "seductive": 0.020514599724561208,
+        "yelling": 0.17609588849682503,
+        "logic": 0.42203549952307884,
+        "reason": 0.0551065167149228,
+        "aggressive": 0.233783885195355,
+        "joyful": 0.028887002429919168,
+        "fear": 0.018497634988262335,
+        "surprise": 0.007261954175017411,
+        "disgust": 0.02710440984345156
+      },
+      "clap_cosine": {
+        "love": -0.20761731266975403,
+        "seductive": -0.17513154447078705,
+        "yelling": -0.06763695180416107,
+        "logic": -0.023933913558721542,
+        "reason": -0.12572498619556427,
+        "aggressive": -0.053468529134988785,
+        "joyful": -0.1580187976360321,
+        "fear": -0.18030624091625214,
+        "surprise": -0.22705593705177307,
+        "disgust": -0.1612035632133484
+      },
+      "efficientat_max": {
+        "yelling": 0.2095649242401123,
+        "crying": 0.07920458912849426,
+        "laughter": 0.054265618324279785
+      },
+      "efficientat_mean": {
+        "yelling": 0.17084109783172607,
+        "crying": 0.040698569267988205,
+        "laughter": 0.047300517559051514
+      },
+      "detected_0.2": {
+        "crying": false,
+        "seductive": false,
+        "yelling": true,
+        "laughter": false,
+        "sad_e2v": false
+      },
+      "listen_proxy": {
+        "energy_rms_mean": 0.0746819730757812,
+        "energy_rms_std": 0.06503441412161423,
+        "energy_rms_cv": 0.8708181029928412,
+        "f0_hz_mean": 156.31017812166033,
+        "f0_hz_std": 58.72869535165054,
+        "f0_n_voiced_frames": 95,
+        "cbx_f0": null,
+        "cbx_rate": null,
+        "cbx_erange": null,
+        "cbx_tilt": null,
+        "cbx_dur": null,
+        "cbx_tok": null
+      }
+    },
+    {
+      "persona": "jarvis",
+      "id": "sed01",
+      "group": "seductive",
+      "text": "[whispering] Come closer. I've been waiting for you all night.",
+      "pace": 1.3,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/scorer-probe/wav/jarvis/sed01.wav",
+      "duration_s": 4.24,
+      "e2v_top": "angry",
+      "e2v_top_conf": 0.752303421497345,
+      "e2v": {
+        "angry": 0.752303421497345,
+        "disgusted": 0.0010085708927363157,
+        "fearful": 0.00010033929720520973,
+        "happy": 0.0008853080216795206,
+        "neutral": 0.22935135662555695,
+        "other": 0.0034287171438336372,
+        "sad": 0.0048419940285384655,
+        "surprised": 0.00672435387969017,
+        "unknown": 0.0013558994978666306
+      },
+      "clap_top": "aggressive",
+      "clap_probs": {
+        "love": 0.02614565636689572,
+        "seductive": 0.020788459704512822,
+        "yelling": 0.1299244846389001,
+        "logic": 0.19932770090084057,
+        "reason": 0.03372522809270088,
+        "aggressive": 0.5010186644397999,
+        "joyful": 0.025346855584056215,
+        "fear": 0.00930475596902278,
+        "surprise": 0.007792942645231226,
+        "disgust": 0.04662525165804003
+      },
+      "clap_cosine": {
+        "love": -0.16725191473960876,
+        "seductive": -0.17871616780757904,
+        "yelling": -0.08708839863538742,
+        "logic": -0.06568855792284012,
+        "reason": -0.15452376008033752,
+        "aggressive": -0.019603900611400604,
+        "joyful": -0.16880333423614502,
+        "fear": -0.21890978515148163,
+        "surprise": -0.22777514159679413,
+        "disgust": -0.13832895457744598
+      },
+      "efficientat_max": {
+        "yelling": 0.570030927658081,
+        "crying": 0.1227908730506897,
+        "laughter": 0.08866885304450989
+      },
+      "efficientat_mean": {
+        "yelling": 0.39935028553009033,
+        "crying": 0.07708564400672913,
+        "laughter": 0.0818481296300888
+      },
+      "detected_0.2": {
+        "crying": false,
+        "seductive": false,
+        "yelling": true,
+        "laughter": false,
+        "sad_e2v": false
+      },
+      "listen_proxy": {
+        "energy_rms_mean": 0.07513714139023431,
+        "energy_rms_std": 0.06887536052233621,
+        "energy_rms_cv": 0.9166619763270373,
+        "f0_hz_mean": 156.12983879881105,
+        "f0_hz_std": 106.0441897596592,
+        "f0_n_voiced_frames": 57,
+        "cbx_f0": null,
+        "cbx_rate": null,
+        "cbx_erange": null,
+        "cbx_tilt": null,
+        "cbx_dur": null,
+        "cbx_tok": null
+      }
+    },
+    {
+      "persona": "jarvis",
+      "id": "sed02",
+      "group": "seductive",
+      "text": "[whispering] Stay with me. Just like this. Slow. Close.",
+      "pace": 1.3,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/scorer-probe/wav/jarvis/sed02.wav",
+      "duration_s": 4.0,
+      "e2v_top": "neutral",
+      "e2v_top_conf": 1.0,
+      "e2v": {
+        "angry": 2.6163363142650553e-11,
+        "disgusted": 1.2421861499481435e-12,
+        "fearful": 3.691184456613289e-13,
+        "happy": 2.3811792815298105e-11,
+        "neutral": 1.0,
+        "other": 6.212405264695298e-14,
+        "sad": 5.994201662806731e-11,
+        "surprised": 4.835297093275237e-12,
+        "unknown": 2.37388478015535e-13
+      },
+      "clap_top": "logic",
+      "clap_probs": {
+        "love": 0.016726799178791208,
+        "seductive": 0.020337040605279598,
+        "yelling": 0.05273213407889652,
+        "logic": 0.5390594384859085,
+        "reason": 0.0209217288440755,
+        "aggressive": 0.27780499729038016,
+        "joyful": 0.005081690955296836,
+        "fear": 0.015189779815912834,
+        "surprise": 0.010419007555724932,
+        "disgust": 0.04172738318973384
+      },
+      "clap_cosine": {
+        "love": -0.14388209581375122,
+        "seductive": -0.13411051034927368,
+        "yelling": -0.08647145330905914,
+        "logic": 0.02975858747959137,
+        "reason": -0.13269329071044922,
+        "aggressive": -0.0033867335878312588,
+        "joyful": -0.2034505009651184,
+        "fear": -0.14870156347751617,
+        "surprise": -0.16755111515522003,
+        "disgust": -0.09817482531070709
+      },
+      "efficientat_max": {
+        "yelling": 0.8030365705490112,
+        "crying": 0.1041506826877594,
+        "laughter": 0.12066483497619629
+      },
+      "efficientat_mean": {
+        "yelling": 0.7382832765579224,
+        "crying": 0.06270240247249603,
+        "laughter": 0.08090706169605255
+      },
+      "detected_0.2": {
+        "crying": false,
+        "seductive": false,
+        "yelling": true,
+        "laughter": false,
+        "sad_e2v": false
+      },
+      "listen_proxy": {
+        "energy_rms_mean": 0.04388386555452246,
+        "energy_rms_std": 0.04135548656944978,
+        "energy_rms_cv": 0.9423847705045183,
+        "f0_hz_mean": 171.05691958476766,
+        "f0_hz_std": 89.8128400315886,
+        "f0_n_voiced_frames": 34,
+        "cbx_f0": null,
+        "cbx_rate": null,
+        "cbx_erange": null,
+        "cbx_tilt": null,
+        "cbx_dur": null,
+        "cbx_tok": null
+      }
+    },
+    {
+      "persona": "jarvis",
+      "id": "sed03",
+      "group": "seductive",
+      "text": "Come here. You know exactly what I want. Don't rush. Stay close to me.",
+      "pace": 1.3,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/scorer-probe/wav/jarvis/sed03.wav",
+      "duration_s": 5.6,
+      "e2v_top": "neutral",
+      "e2v_top_conf": 1.0,
+      "e2v": {
+        "angry": 3.105450467090487e-13,
+        "disgusted": 9.732647427243037e-15,
+        "fearful": 2.1045598718464264e-15,
+        "happy": 3.365056443129649e-13,
+        "neutral": 1.0,
+        "other": 1.21584390386215e-15,
+        "sad": 1.071329873772453e-12,
+        "surprised": 1.0122809437473207e-13,
+        "unknown": 6.172256241808623e-15
+      },
+      "clap_top": "aggressive",
+      "clap_probs": {
+        "love": 0.0087391853772499,
+        "seductive": 0.03655004821177384,
+        "yelling": 0.2665176496930714,
+        "logic": 0.1456233643204986,
+        "reason": 0.06583020962855032,
+        "aggressive": 0.32886850062267736,
+        "joyful": 0.017171793734164057,
+        "fear": 0.03661830055626844,
+        "surprise": 0.020713534583715786,
+        "disgust": 0.07336741327203028
+      },
+      "clap_cosine": {
+        "love": -0.18852531909942627,
+        "seductive": -0.11698204278945923,
+        "yelling": -0.017644144594669342,
+        "logic": -0.04786498844623566,
+        "reason": -0.08756222575902939,
+        "aggressive": -0.007133269216865301,
+        "joyful": -0.15475276112556458,
+        "fear": -0.11688876152038574,
+        "surprise": -0.1453768014907837,
+        "disgust": -0.082142174243927
+      },
+      "efficientat_max": {
+        "yelling": 0.9471548795700073,
+        "crying": 0.23735004663467407,
+        "laughter": 0.3220030665397644
+      },
+      "efficientat_mean": {
+        "yelling": 0.6868376731872559,
+        "crying": 0.12508022785186768,
+        "laughter": 0.1988539695739746
+      },
+      "detected_0.2": {
+        "crying": true,
+        "seductive": false,
+        "yelling": true,
+        "laughter": true,
+        "sad_e2v": false
+      },
+      "listen_proxy": {
+        "energy_rms_mean": 0.06984320231134268,
+        "energy_rms_std": 0.05232967314213505,
+        "energy_rms_cv": 0.7492450433309613,
+        "f0_hz_mean": 155.6975807429244,
+        "f0_hz_std": 54.495596492519766,
+        "f0_n_voiced_frames": 82,
+        "cbx_f0": null,
+        "cbx_rate": null,
+        "cbx_erange": null,
+        "cbx_tilt": null,
+        "cbx_dur": null,
+        "cbx_tok": null
+      }
+    },
+    {
+      "persona": "jarvis",
+      "id": "sed04",
+      "group": "seductive",
+      "text": "[sigh] [whispering] Don't say a word. Just come a little closer to me.",
+      "pace": 1.3,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/scorer-probe/wav/jarvis/sed04.wav",
+      "duration_s": 4.52,
+      "e2v_top": "neutral",
+      "e2v_top_conf": 0.9845090508460999,
+      "e2v": {
+        "angry": 0.00015907626948319376,
+        "disgusted": 0.0003950983809772879,
+        "fearful": 4.118464858038351e-05,
+        "happy": 8.098906255327165e-05,
+        "neutral": 0.9845090508460999,
+        "other": 0.0003037271089851856,
+        "sad": 0.013340670615434647,
+        "surprised": 1.5975691667335923e-06,
+        "unknown": 0.0011686288053169847
+      },
+      "clap_top": "logic",
+      "clap_probs": {
+        "love": 0.017340694196368512,
+        "seductive": 0.007503466957353025,
+        "yelling": 0.021939357264477193,
+        "logic": 0.815092399727036,
+        "reason": 0.014271817682689331,
+        "aggressive": 0.10049108907479513,
+        "joyful": 0.00334217049973604,
+        "fear": 0.005060682007541281,
+        "surprise": 0.0038324009474482662,
+        "disgust": 0.011125921642555547
+      },
+      "clap_cosine": {
+        "love": -0.1282278150320053,
+        "seductive": -0.17011235654354095,
+        "yelling": -0.11646650731563568,
+        "logic": 0.06428445875644684,
+        "reason": -0.13796627521514893,
+        "aggressive": -0.040377162396907806,
+        "joyful": -0.21054959297180176,
+        "fear": -0.1898055523633957,
+        "surprise": -0.2037060409784317,
+        "disgust": -0.15041673183441162
+      },
+      "efficientat_max": {
+        "yelling": 0.5859289765357971,
+        "crying": 0.1133788526058197,
+        "laughter": 0.14540699124336243
+      },
+      "efficientat_mean": {
+        "yelling": 0.5514052510261536,
+        "crying": 0.06799246370792389,
+        "laughter": 0.09984040260314941
+      },
+      "detected_0.2": {
+        "crying": false,
+        "seductive": false,
+        "yelling": true,
+        "laughter": false,
+        "sad_e2v": false
+      },
+      "listen_proxy": {
+        "energy_rms_mean": 0.05203416270174049,
+        "energy_rms_std": 0.04023169721495789,
+        "energy_rms_cv": 0.7731785259150943,
+        "f0_hz_mean": 123.2101532211901,
+        "f0_hz_std": 66.38549049421735,
+        "f0_n_voiced_frames": 71,
+        "cbx_f0": null,
+        "cbx_rate": null,
+        "cbx_erange": null,
+        "cbx_tilt": null,
+        "cbx_dur": null,
+        "cbx_tok": null
+      }
+    },
+    {
+      "persona": "jarvis",
+      "id": "neu01",
+      "group": "neutral",
+      "text": "We checked the numbers twice this afternoon, and the results are clear.",
+      "pace": 1.0,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/scorer-probe/wav/jarvis/neu01.wav",
+      "duration_s": 3.68,
+      "e2v_top": "neutral",
+      "e2v_top_conf": 1.0,
+      "e2v": {
+        "angry": 9.306410503340246e-11,
+        "disgusted": 5.412178084168717e-12,
+        "fearful": 1.3087083500229468e-12,
+        "happy": 6.339790498133269e-11,
+        "neutral": 1.0,
+        "other": 3.184756332350741e-13,
+        "sad": 4.560428701338992e-10,
+        "surprised": 1.7896122084248844e-11,
+        "unknown": 1.1657755923794033e-12
+      },
+      "clap_top": "logic",
+      "clap_probs": {
+        "love": 0.010308911502726876,
+        "seductive": 0.029218809756874332,
+        "yelling": 0.02065090130107995,
+        "logic": 0.6838906903660151,
+        "reason": 0.0545313220338008,
+        "aggressive": 0.1631955459501099,
+        "joyful": 0.003795336987949748,
+        "fear": 0.01353289367738777,
+        "surprise": 0.0078072903068935814,
+        "disgust": 0.013068298117161902
+      },
+      "clap_cosine": {
+        "love": -0.17919644713401794,
+        "seductive": -0.12710624933242798,
+        "yelling": -0.14445893466472626,
+        "logic": 0.030543021857738495,
+        "reason": -0.09590812027454376,
+        "aggressive": -0.0410994254052639,
+        "joyful": -0.2291582226753235,
+        "fear": -0.16559071838855743,
+        "surprise": -0.19309398531913757,
+        "disgust": -0.16733741760253906
+      },
+      "efficientat_max": {
+        "yelling": 0.7906242609024048,
+        "crying": 0.2096705436706543,
+        "laughter": 0.1188930869102478
+      },
+      "efficientat_mean": {
+        "yelling": 0.7906242609024048,
+        "crying": 0.2096705436706543,
+        "laughter": 0.1188930869102478
+      },
+      "detected_0.2": {
+        "crying": true,
+        "seductive": false,
+        "yelling": true,
+        "laughter": false,
+        "sad_e2v": false
+      },
+      "listen_proxy": {
+        "energy_rms_mean": 0.06592240621737143,
+        "energy_rms_std": 0.04928319727262408,
+        "energy_rms_cv": 0.747594029109291,
+        "f0_hz_mean": 152.80940724832163,
+        "f0_hz_std": 76.1036285242228,
+        "f0_n_voiced_frames": 52,
+        "cbx_f0": null,
+        "cbx_rate": null,
+        "cbx_erange": null,
+        "cbx_tilt": null,
+        "cbx_dur": null,
+        "cbx_tok": null
+      }
+    },
+    {
+      "persona": "jarvis",
+      "id": "neu02",
+      "group": "neutral",
+      "text": "Could you open the living room window before dinner starts?",
+      "pace": 1.0,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/scorer-probe/wav/jarvis/neu02.wav",
+      "duration_s": 2.72,
+      "e2v_top": "neutral",
+      "e2v_top_conf": 1.0,
+      "e2v": {
+        "angry": 6.215256174307848e-12,
+        "disgusted": 1.6741564189647062e-13,
+        "fearful": 6.009921699840978e-14,
+        "happy": 7.587529562980144e-12,
+        "neutral": 1.0,
+        "other": 1.3059094041876444e-14,
+        "sad": 1.5658566457354972e-11,
+        "surprised": 1.889038404867538e-12,
+        "unknown": 5.879420350097045e-14
+      },
+      "clap_top": "logic",
+      "clap_probs": {
+        "love": 0.015935718687990586,
+        "seductive": 0.02849043063559944,
+        "yelling": 0.11711763315644082,
+        "logic": 0.35892684762986193,
+        "reason": 0.040825664077616314,
+        "aggressive": 0.3156892783684176,
+        "joyful": 0.07285512259383467,
+        "fear": 0.014074418929373387,
+        "surprise": 0.012193409193396114,
+        "disgust": 0.023891476727469045
+      },
+      "clap_cosine": {
+        "love": -0.20800703763961792,
+        "seductive": -0.1789567768573761,
+        "yelling": -0.10827624797821045,
+        "logic": -0.052279260009527206,
+        "reason": -0.16096964478492737,
+        "aggressive": -0.05869726836681366,
+        "joyful": -0.1320115476846695,
+        "fear": -0.21421724557876587,
+        "surprise": -0.22139041125774384,
+        "disgust": -0.18775910139083862
+      },
+      "efficientat_max": {
+        "yelling": 0.37657779455184937,
+        "crying": 0.02994900941848755,
+        "laughter": 0.05157855153083801
+      },
+      "efficientat_mean": {
+        "yelling": 0.37657779455184937,
+        "crying": 0.02994900941848755,
+        "laughter": 0.05157855153083801
+      },
+      "detected_0.2": {
+        "crying": false,
+        "seductive": false,
+        "yelling": true,
+        "laughter": false,
+        "sad_e2v": false
+      },
+      "listen_proxy": {
+        "energy_rms_mean": 0.08347414747856596,
+        "energy_rms_std": 0.04667564605576634,
+        "energy_rms_cv": 0.5591628961260305,
+        "f0_hz_mean": 168.8388871157867,
+        "f0_hz_std": 78.59513448396486,
+        "f0_n_voiced_frames": 65,
+        "cbx_f0": null,
+        "cbx_rate": null,
+        "cbx_erange": null,
+        "cbx_tilt": null,
+        "cbx_dur": null,
+        "cbx_tok": null
+      }
+    },
+    {
+      "persona": "samantha",
+      "id": "joy01",
+      "group": "joyful",
+      "text": "[happy] I am so glad you made it. This is the best news I have heard all week.",
+      "pace": 1.0,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/scorer-probe/wav/samantha/joy01.wav",
+      "duration_s": 4.04,
+      "e2v_top": "happy",
+      "e2v_top_conf": 0.9999996423721313,
+      "e2v": {
+        "angry": 5.488644205797755e-09,
+        "disgusted": 1.0715396348004447e-09,
+        "fearful": 3.423745909003628e-08,
+        "happy": 0.9999996423721313,
+        "neutral": 6.528204199440779e-09,
+        "other": 3.1183623150354833e-07,
+        "sad": 1.9940804563134407e-08,
+        "surprised": 5.932466962121907e-09,
+        "unknown": 2.965276024724517e-09
+      },
+      "clap_top": "joyful",
+      "clap_probs": {
+        "love": 0.03101494622228783,
+        "seductive": 0.10006494304009927,
+        "yelling": 0.03803878100793085,
+        "logic": 0.11709600708225462,
+        "reason": 0.09036201015835575,
+        "aggressive": 0.024828345077469408,
+        "joyful": 0.5783155885001662,
+        "fear": 0.008283905679440597,
+        "surprise": 0.008984521256939885,
+        "disgust": 0.003010951975055827
+      },
+      "clap_cosine": {
+        "love": -0.1471451222896576,
+        "seductive": -0.08857761323451996,
+        "yelling": -0.13693827390670776,
+        "logic": -0.08071887493133545,
+        "reason": -0.09367738664150238,
+        "aggressive": -0.15826928615570068,
+        "joyful": -0.0008625974878668785,
+        "fear": -0.21315285563468933,
+        "surprise": -0.20909342169761658,
+        "disgust": -0.26375576853752136
+      },
+      "efficientat_max": {
+        "yelling": 0.7356127500534058,
+        "crying": 0.10764151811599731,
+        "laughter": 0.21753591299057007
+      },
+      "efficientat_mean": {
+        "yelling": 0.6695543527603149,
+        "crying": 0.10653926432132721,
+        "laughter": 0.13366347551345825
+      },
+      "primary": {
+        "source": "e2v",
+        "key": "happy",
+        "value": 0.9999996423721313,
+        "detected_0.2": true
+      },
+      "detected_0.2": {
+        "crying": false,
+        "seductive": false,
+        "yelling": true,
+        "laughter": true,
+        "sad_e2v": false,
+        "happy_e2v": true,
+        "fearful_e2v": false,
+        "surprised_e2v": false,
+        "disgusted_e2v": false,
+        "angry_e2v": false,
+        "love_clap": false,
+        "primary": true
+      },
+      "listen_proxy": {
+        "energy_rms_mean": 0.09587071850888491,
+        "energy_rms_std": 0.0761925498287432,
+        "energy_rms_cv": 0.7947426598422956,
+        "f0_hz_mean": 207.53112940624507,
+        "f0_hz_std": 29.24529355110793,
+        "f0_n_voiced_frames": 105
+      }
+    },
+    {
+      "persona": "samantha",
+      "id": "joy02",
+      "group": "joyful",
+      "text": "[happy] That was wonderful. I cannot stop smiling. You did it!",
+      "pace": 1.0,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/scorer-probe/wav/samantha/joy02.wav",
+      "duration_s": 3.28,
+      "e2v_top": "happy",
+      "e2v_top_conf": 0.9999339580535889,
+      "e2v": {
+        "angry": 2.5980136797443265e-07,
+        "disgusted": 5.937075115980406e-07,
+        "fearful": 9.41911508789417e-08,
+        "happy": 0.9999339580535889,
+        "neutral": 5.3612617193721235e-05,
+        "other": 3.9773439652890374e-07,
+        "sad": 1.25162534914125e-06,
+        "surprised": 7.549105340842743e-09,
+        "unknown": 9.80007644102443e-06
+      },
+      "clap_top": "joyful",
+      "clap_probs": {
+        "love": 0.052335774803522285,
+        "seductive": 0.05796513933951897,
+        "yelling": 0.03824720472107358,
+        "logic": 0.10258412724901683,
+        "reason": 0.045081387911271815,
+        "aggressive": 0.14453640911691343,
+        "joyful": 0.520623073629702,
+        "fear": 0.010687780180481474,
+        "surprise": 0.023749998193515903,
+        "disgust": 0.004189104854983736
+      },
+      "clap_cosine": {
+        "love": -0.0764939934015274,
+        "seductive": -0.07138591259717941,
+        "yelling": -0.0921744778752327,
+        "logic": -0.04284384101629257,
+        "reason": -0.08395452797412872,
+        "aggressive": -0.025701429694890976,
+        "joyful": 0.03837331384420395,
+        "fear": -0.15592294931411743,
+        "surprise": -0.11599887907505035,
+        "disgust": -0.20275364816188812
+      },
+      "efficientat_max": {
+        "yelling": 0.7851959466934204,
+        "crying": 0.2898308336734772,
+        "laughter": 0.15463697910308838
+      },
+      "efficientat_mean": {
+        "yelling": 0.7851959466934204,
+        "crying": 0.2898308336734772,
+        "laughter": 0.15463697910308838
+      },
+      "primary": {
+        "source": "e2v",
+        "key": "happy",
+        "value": 0.9999339580535889,
+        "detected_0.2": true
+      },
+      "detected_0.2": {
+        "crying": true,
+        "seductive": false,
+        "yelling": true,
+        "laughter": false,
+        "sad_e2v": false,
+        "happy_e2v": true,
+        "fearful_e2v": false,
+        "surprised_e2v": false,
+        "disgusted_e2v": false,
+        "angry_e2v": false,
+        "love_clap": false,
+        "primary": true
+      },
+      "listen_proxy": {
+        "energy_rms_mean": 0.09667584771023856,
+        "energy_rms_std": 0.08188969244749959,
+        "energy_rms_cv": 0.8470542993627868,
+        "f0_hz_mean": 226.52914861098367,
+        "f0_hz_std": 50.135561368512164,
+        "f0_n_voiced_frames": 83
+      }
+    },
+    {
+      "persona": "samantha",
+      "id": "fea01",
+      "group": "fear",
+      "text": "[fear] Something is wrong. I think someone is following us. We have to get out of here.",
+      "pace": 1.0,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/scorer-probe/wav/samantha/fea01.wav",
+      "duration_s": 4.36,
+      "e2v_top": "neutral",
+      "e2v_top_conf": 1.0,
+      "e2v": {
+        "angry": 1.2048817347488916e-13,
+        "disgusted": 4.084985371206841e-15,
+        "fearful": 7.054879713561536e-16,
+        "happy": 1.5709795389475673e-13,
+        "neutral": 1.0,
+        "other": 5.965421701638318e-16,
+        "sad": 3.3364500398591623e-13,
+        "surprised": 5.487816350977469e-14,
+        "unknown": 2.5060717000533307e-15
+      },
+      "clap_top": "logic",
+      "clap_probs": {
+        "love": 0.08892778800793917,
+        "seductive": 0.12945642818002434,
+        "yelling": 0.007362272859505079,
+        "logic": 0.44060392003923393,
+        "reason": 0.17288583834235663,
+        "aggressive": 0.07447901380260814,
+        "joyful": 0.0452808822520606,
+        "fear": 0.01191558929311982,
+        "surprise": 0.021243394507425118,
+        "disgust": 0.007844872715727107
+      },
+      "clap_cosine": {
+        "love": -0.0918295830488205,
+        "seductive": -0.07305359840393066,
+        "yelling": -0.21640238165855408,
+        "logic": -0.011813499964773655,
+        "reason": -0.05858924239873886,
+        "aggressive": -0.10069494694471359,
+        "joyful": -0.12557657063007355,
+        "fear": -0.19232843816280365,
+        "surprise": -0.16341851651668549,
+        "disgust": -0.21322780847549438
+      },
+      "efficientat_max": {
+        "yelling": 0.2571890354156494,
+        "crying": 0.0507487952709198,
+        "laughter": 0.04344654083251953
+      },
+      "efficientat_mean": {
+        "yelling": 0.2282545268535614,
+        "crying": 0.040060386061668396,
+        "laughter": 0.0414271205663681
+      },
+      "primary": {
+        "source": "e2v",
+        "key": "fearful",
+        "value": 7.054879713561536e-16,
+        "detected_0.2": false
+      },
+      "detected_0.2": {
+        "crying": false,
+        "seductive": false,
+        "yelling": true,
+        "laughter": false,
+        "sad_e2v": false,
+        "happy_e2v": false,
+        "fearful_e2v": false,
+        "surprised_e2v": false,
+        "disgusted_e2v": false,
+        "angry_e2v": false,
+        "love_clap": false,
+        "primary": false
+      },
+      "listen_proxy": {
+        "energy_rms_mean": 0.07499684170375388,
+        "energy_rms_std": 0.06821523562242647,
+        "energy_rms_cv": 0.9095747777204334,
+        "f0_hz_mean": 197.54793929098878,
+        "f0_hz_std": 42.47444209409669,
+        "f0_n_voiced_frames": 101
+      }
+    },
+    {
+      "persona": "samantha",
+      "id": "fea02",
+      "group": "fear",
+      "text": "[fear] Do not turn around. I heard a noise downstairs. I am really scared.",
+      "pace": 1.0,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/scorer-probe/wav/samantha/fea02.wav",
+      "duration_s": 4.28,
+      "e2v_top": "fearful",
+      "e2v_top_conf": 0.992368757724762,
+      "e2v": {
+        "angry": 0.0002712391142267734,
+        "disgusted": 0.0001318107097176835,
+        "fearful": 0.992368757724762,
+        "happy": 9.786954615265131e-05,
+        "neutral": 0.0036345769185572863,
+        "other": 3.7784066080348566e-05,
+        "sad": 0.003353842068463564,
+        "surprised": 1.3481759197020438e-05,
+        "unknown": 9.078235598281026e-05
+      },
+      "clap_top": "logic",
+      "clap_probs": {
+        "love": 0.05332899782201532,
+        "seductive": 0.14083905938815103,
+        "yelling": 0.033447708801055374,
+        "logic": 0.24572978878628382,
+        "reason": 0.1755600682909897,
+        "aggressive": 0.07206664204774405,
+        "joyful": 0.22851391381352498,
+        "fear": 0.011254395581003253,
+        "surprise": 0.031983597075929626,
+        "disgust": 0.007275828393302731
+      },
+      "clap_cosine": {
+        "love": -0.14601100981235504,
+        "seductive": -0.09745413064956665,
+        "yelling": -0.16933585703372955,
+        "logic": -0.06962339580059052,
+        "reason": -0.0864359587430954,
+        "aggressive": -0.13095545768737793,
+        "joyful": -0.07325516641139984,
+        "fear": -0.22379708290100098,
+        "surprise": -0.17157386243343353,
+        "disgust": -0.2456071376800537
+      },
+      "efficientat_max": {
+        "yelling": 0.3823417127132416,
+        "crying": 0.10633441805839539,
+        "laughter": 0.11142760515213013
+      },
+      "efficientat_mean": {
+        "yelling": 0.29904741048812866,
+        "crying": 0.09021198749542236,
+        "laughter": 0.0857064425945282
+      },
+      "primary": {
+        "source": "e2v",
+        "key": "fearful",
+        "value": 0.992368757724762,
+        "detected_0.2": true
+      },
+      "detected_0.2": {
+        "crying": false,
+        "seductive": false,
+        "yelling": true,
+        "laughter": false,
+        "sad_e2v": false,
+        "happy_e2v": false,
+        "fearful_e2v": true,
+        "surprised_e2v": false,
+        "disgusted_e2v": false,
+        "angry_e2v": false,
+        "love_clap": false,
+        "primary": true
+      },
+      "listen_proxy": {
+        "energy_rms_mean": 0.08797192114576544,
+        "energy_rms_std": 0.07535495959036048,
+        "energy_rms_cv": 0.8565796746157308,
+        "f0_hz_mean": 199.40702460094695,
+        "f0_hz_std": 29.41664824134393,
+        "f0_n_voiced_frames": 108
+      }
+    },
+    {
+      "persona": "samantha",
+      "id": "sad01",
+      "group": "sad",
+      "text": "[sigh] I miss them every day. It has not been the same since they left.",
+      "pace": 1.15,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/scorer-probe/wav/samantha/sad01.wav",
+      "duration_s": 4.88,
+      "e2v_top": "sad",
+      "e2v_top_conf": 0.9999569654464722,
+      "e2v": {
+        "angry": 1.3338301130261243e-07,
+        "disgusted": 1.6432995835202746e-05,
+        "fearful": 1.5803570931893773e-06,
+        "happy": 1.4567987136615557e-06,
+        "neutral": 2.193174441345036e-05,
+        "other": 1.032309000947862e-06,
+        "sad": 0.9999569654464722,
+        "surprised": 1.2788976277988695e-07,
+        "unknown": 3.492048108455492e-07
+      },
+      "clap_top": "aggressive",
+      "clap_probs": {
+        "love": 0.07706778122293985,
+        "seductive": 0.07621909591532536,
+        "yelling": 0.015374691805532954,
+        "logic": 0.18421201924233166,
+        "reason": 0.054053558926359116,
+        "aggressive": 0.24684513452235385,
+        "joyful": 0.060805736181484604,
+        "fear": 0.05334848216517284,
+        "surprise": 0.1695539247111315,
+        "disgust": 0.06251957530736849
+      },
+      "clap_cosine": {
+        "love": -0.03263941779732704,
+        "seductive": -0.03319308161735535,
+        "yelling": -0.11323754489421844,
+        "logic": 0.010930685326457024,
+        "reason": -0.05037491396069527,
+        "aggressive": 0.025564374402165413,
+        "joyful": -0.04448947682976723,
+        "fear": -0.051031406968832016,
+        "surprise": 0.006784867495298386,
+        "disgust": -0.043099697679281235
+      },
+      "efficientat_max": {
+        "yelling": 0.9100676774978638,
+        "crying": 0.33986419439315796,
+        "laughter": 0.6516111493110657
+      },
+      "efficientat_mean": {
+        "yelling": 0.5893833637237549,
+        "crying": 0.19232049584388733,
+        "laughter": 0.34759724140167236
+      },
+      "primary": {
+        "source": "e2v",
+        "key": "sad",
+        "value": 0.9999569654464722,
+        "detected_0.2": true
+      },
+      "detected_0.2": {
+        "crying": true,
+        "seductive": false,
+        "yelling": true,
+        "laughter": true,
+        "sad_e2v": true,
+        "happy_e2v": false,
+        "fearful_e2v": false,
+        "surprised_e2v": false,
+        "disgusted_e2v": false,
+        "angry_e2v": false,
+        "love_clap": false,
+        "primary": true
+      },
+      "listen_proxy": {
+        "energy_rms_mean": 0.06955750466285933,
+        "energy_rms_std": 0.06713128188590242,
+        "energy_rms_cv": 0.9651191803283248,
+        "f0_hz_mean": 198.85560452619646,
+        "f0_hz_std": 38.654686289648296,
+        "f0_n_voiced_frames": 103
+      }
+    },
+    {
+      "persona": "samantha",
+      "id": "sad02",
+      "group": "sad",
+      "text": "[sigh] I keep thinking about what I should have said, and now it is too late.",
+      "pace": 1.15,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/scorer-probe/wav/samantha/sad02.wav",
+      "duration_s": 4.96,
+      "e2v_top": "neutral",
+      "e2v_top_conf": 0.6065101027488708,
+      "e2v": {
+        "angry": 7.095886189745215e-07,
+        "disgusted": 1.0693131116568111e-05,
+        "fearful": 6.090835427130514e-07,
+        "happy": 4.306975370127475e-06,
+        "neutral": 0.6065101027488708,
+        "other": 1.7867108908831142e-05,
+        "sad": 0.39345070719718933,
+        "surprised": 4.482626536628231e-06,
+        "unknown": 4.855070301346132e-07
+      },
+      "clap_top": "logic",
+      "clap_probs": {
+        "love": 0.1317390673791966,
+        "seductive": 0.1677993820566372,
+        "yelling": 0.0054268713663491045,
+        "logic": 0.18017445633449533,
+        "reason": 0.06248694471212398,
+        "aggressive": 0.17006107814493623,
+        "joyful": 0.02990102051473577,
+        "fear": 0.05564438463991247,
+        "surprise": 0.13967723923871284,
+        "disgust": 0.05708955561290058
+      },
+      "clap_cosine": {
+        "love": 0.060358744114637375,
+        "seductive": 0.07245603948831558,
+        "yelling": -0.09911427646875381,
+        "logic": 0.07601386308670044,
+        "reason": 0.023065466433763504,
+        "aggressive": 0.07312546670436859,
+        "joyful": -0.013787785544991493,
+        "fear": 0.017266642302274704,
+        "surprise": 0.06328430026769638,
+        "disgust": 0.018548643216490746
+      },
+      "efficientat_max": {
+        "yelling": 0.7356270551681519,
+        "crying": 0.11209931969642639,
+        "laughter": 0.10177388787269592
+      },
+      "efficientat_mean": {
+        "yelling": 0.6578881144523621,
+        "crying": 0.08394661545753479,
+        "laughter": 0.07586783170700073
+      },
+      "primary": {
+        "source": "e2v",
+        "key": "sad",
+        "value": 0.39345070719718933,
+        "detected_0.2": true
+      },
+      "detected_0.2": {
+        "crying": false,
+        "seductive": false,
+        "yelling": true,
+        "laughter": false,
+        "sad_e2v": true,
+        "happy_e2v": false,
+        "fearful_e2v": false,
+        "surprised_e2v": false,
+        "disgusted_e2v": false,
+        "angry_e2v": false,
+        "love_clap": false,
+        "primary": true
+      },
+      "listen_proxy": {
+        "energy_rms_mean": 0.07354894730079492,
+        "energy_rms_std": 0.06554599952177896,
+        "energy_rms_cv": 0.8911888195178904,
+        "f0_hz_mean": 194.73952738295517,
+        "f0_hz_std": 43.92594025402506,
+        "f0_n_voiced_frames": 107
+      }
+    },
+    {
+      "persona": "samantha",
+      "id": "sur01",
+      "group": "surprise",
+      "text": "[surprised] What? You are here? I had no idea you were coming tonight!",
+      "pace": 1.0,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/scorer-probe/wav/samantha/sur01.wav",
+      "duration_s": 3.96,
+      "e2v_top": "sad",
+      "e2v_top_conf": 0.7830357551574707,
+      "e2v": {
+        "angry": 3.0319355573737994e-05,
+        "disgusted": 3.446577466093004e-05,
+        "fearful": 0.0006046683411113918,
+        "happy": 0.004566624760627747,
+        "neutral": 0.00047439333866350353,
+        "other": 0.004273494705557823,
+        "sad": 0.7830357551574707,
+        "surprised": 0.2066083550453186,
+        "unknown": 0.00037189136492088437
+      },
+      "clap_top": "joyful",
+      "clap_probs": {
+        "love": 0.10200942085050224,
+        "seductive": 0.13787032941606275,
+        "yelling": 0.04208254748820618,
+        "logic": 0.09664515876654195,
+        "reason": 0.1037491240129615,
+        "aggressive": 0.06752027188145344,
+        "joyful": 0.3629369423625541,
+        "fear": 0.028296673502129655,
+        "surprise": 0.04062241008782686,
+        "disgust": 0.01826712163176124
+      },
+      "clap_cosine": {
+        "love": -0.027097374200820923,
+        "seductive": -0.012034952640533447,
+        "yelling": -0.0713689774274826,
+        "logic": -0.029798327013850212,
+        "reason": -0.02625184692442417,
+        "aggressive": -0.047729238867759705,
+        "joyful": 0.03636082261800766,
+        "fear": -0.0912134200334549,
+        "surprise": -0.0731346383690834,
+        "disgust": -0.1130954921245575
+      },
+      "efficientat_max": {
+        "yelling": 0.3665350675582886,
+        "crying": 0.040816694498062134,
+        "laughter": 0.03988403081893921
+      },
+      "efficientat_mean": {
+        "yelling": 0.2698597311973572,
+        "crying": 0.03358915448188782,
+        "laughter": 0.03697177767753601
+      },
+      "primary": {
+        "source": "e2v",
+        "key": "surprised",
+        "value": 0.2066083550453186,
+        "detected_0.2": true
+      },
+      "detected_0.2": {
+        "crying": false,
+        "seductive": false,
+        "yelling": true,
+        "laughter": false,
+        "sad_e2v": true,
+        "happy_e2v": false,
+        "fearful_e2v": false,
+        "surprised_e2v": true,
+        "disgusted_e2v": false,
+        "angry_e2v": false,
+        "love_clap": false,
+        "primary": true
+      },
+      "listen_proxy": {
+        "energy_rms_mean": 0.08891847826777045,
+        "energy_rms_std": 0.07705105101070774,
+        "energy_rms_cv": 0.8665358709657067,
+        "f0_hz_mean": 258.42185945514194,
+        "f0_hz_std": 66.87741189702132,
+        "f0_n_voiced_frames": 95
+      }
+    },
+    {
+      "persona": "samantha",
+      "id": "sur02",
+      "group": "surprise",
+      "text": "[surprised] Wait. Did you just say we won? I cannot believe it!",
+      "pace": 1.0,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/scorer-probe/wav/samantha/sur02.wav",
+      "duration_s": 3.16,
+      "e2v_top": "unknown",
+      "e2v_top_conf": 0.9975031018257141,
+      "e2v": {
+        "angry": 1.5076854651852045e-05,
+        "disgusted": 0.00010278016998199746,
+        "fearful": 0.00010683565051294863,
+        "happy": 0.0013668978353962302,
+        "neutral": 0.000245307688601315,
+        "other": 0.0006491760723292828,
+        "sad": 1.0839667993423063e-05,
+        "surprised": 3.2058167676041194e-08,
+        "unknown": 0.9975031018257141
+      },
+      "clap_top": "joyful",
+      "clap_probs": {
+        "love": 0.10718040516328255,
+        "seductive": 0.1829767252558761,
+        "yelling": 0.034685033114417264,
+        "logic": 0.13877427107137724,
+        "reason": 0.07951397009619098,
+        "aggressive": 0.17124498172378835,
+        "joyful": 0.19911660399672537,
+        "fear": 0.02079406302000124,
+        "surprise": 0.052508361355979624,
+        "disgust": 0.013205585202360967
+      },
+      "clap_cosine": {
+        "love": -0.019496599212288857,
+        "seductive": 0.007245676591992378,
+        "yelling": -0.07590685784816742,
+        "logic": -0.00657983822748065,
+        "reason": -0.034425634890794754,
+        "aggressive": 0.003932487219572067,
+        "joyful": 0.01147225871682167,
+        "fear": -0.10148889571428299,
+        "surprise": -0.05517365038394928,
+        "disgust": -0.12419027835130692
+      },
+      "efficientat_max": {
+        "yelling": 0.8844342231750488,
+        "crying": 0.10113400220870972,
+        "laughter": 0.07332712411880493
+      },
+      "efficientat_mean": {
+        "yelling": 0.8844342231750488,
+        "crying": 0.10113400220870972,
+        "laughter": 0.07332712411880493
+      },
+      "primary": {
+        "source": "e2v",
+        "key": "surprised",
+        "value": 3.2058167676041194e-08,
+        "detected_0.2": false
+      },
+      "detected_0.2": {
+        "crying": false,
+        "seductive": false,
+        "yelling": true,
+        "laughter": false,
+        "sad_e2v": false,
+        "happy_e2v": false,
+        "fearful_e2v": false,
+        "surprised_e2v": false,
+        "disgusted_e2v": false,
+        "angry_e2v": false,
+        "love_clap": false,
+        "primary": false
+      },
+      "listen_proxy": {
+        "energy_rms_mean": 0.08603239238771695,
+        "energy_rms_std": 0.07696728376100391,
+        "energy_rms_cv": 0.8946314478172376,
+        "f0_hz_mean": 256.5665376814833,
+        "f0_hz_std": 51.67592484012071,
+        "f0_n_voiced_frames": 80
+      }
+    },
+    {
+      "persona": "samantha",
+      "id": "dis01",
+      "group": "disgust",
+      "text": "That is disgusting. I cannot believe anyone would do something so vile.",
+      "pace": 1.0,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/scorer-probe/wav/samantha/dis01.wav",
+      "duration_s": 3.72,
+      "e2v_top": "surprised",
+      "e2v_top_conf": 0.9994990825653076,
+      "e2v": {
+        "angry": 4.454679583432153e-06,
+        "disgusted": 7.289381755981594e-05,
+        "fearful": 2.1036744612956682e-07,
+        "happy": 7.955760565891978e-07,
+        "neutral": 3.8751477404730394e-05,
+        "other": 0.00038253318052738905,
+        "sad": 5.115853127790615e-07,
+        "surprised": 0.9994990825653076,
+        "unknown": 7.424358159369149e-07
+      },
+      "clap_top": "logic",
+      "clap_probs": {
+        "love": 0.04688587044481625,
+        "seductive": 0.13735473960742223,
+        "yelling": 0.022174093890164365,
+        "logic": 0.2446797795432087,
+        "reason": 0.19579042591831552,
+        "aggressive": 0.18067139591849224,
+        "joyful": 0.11709491799421617,
+        "fear": 0.02332587551887285,
+        "surprise": 0.021475110633695543,
+        "disgust": 0.010547790530796238
+      },
+      "clap_cosine": {
+        "love": -0.13804571330547333,
+        "seductive": -0.08430318534374237,
+        "yelling": -0.175485298037529,
+        "logic": -0.05543401464819908,
+        "reason": -0.06657928973436356,
+        "aggressive": -0.07059753686189651,
+        "joyful": -0.09228228777647018,
+        "fear": -0.17295336723327637,
+        "surprise": -0.17708680033683777,
+        "disgust": -0.21263571083545685
+      },
+      "efficientat_max": {
+        "yelling": 0.5637737512588501,
+        "crying": 0.11469000577926636,
+        "laughter": 0.10681319236755371
+      },
+      "efficientat_mean": {
+        "yelling": 0.5637737512588501,
+        "crying": 0.11469000577926636,
+        "laughter": 0.10681319236755371
+      },
+      "primary": {
+        "source": "e2v",
+        "key": "disgusted",
+        "value": 7.289381755981594e-05,
+        "detected_0.2": false
+      },
+      "detected_0.2": {
+        "crying": false,
+        "seductive": false,
+        "yelling": true,
+        "laughter": false,
+        "sad_e2v": false,
+        "happy_e2v": false,
+        "fearful_e2v": false,
+        "surprised_e2v": true,
+        "disgusted_e2v": false,
+        "angry_e2v": false,
+        "love_clap": false,
+        "primary": false
+      },
+      "listen_proxy": {
+        "energy_rms_mean": 0.07316913591625307,
+        "energy_rms_std": 0.05671547670073402,
+        "energy_rms_cv": 0.7751284197977771,
+        "f0_hz_mean": 214.2752171393528,
+        "f0_hz_std": 57.3347680017627,
+        "f0_n_voiced_frames": 89
+      }
+    },
+    {
+      "persona": "samantha",
+      "id": "dis02",
+      "group": "disgust",
+      "text": "Ugh, that smell is revolting. Get it away from me right now.",
+      "pace": 1.0,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/scorer-probe/wav/samantha/dis02.wav",
+      "duration_s": 3.76,
+      "e2v_top": "neutral",
+      "e2v_top_conf": 0.8634333610534668,
+      "e2v": {
+        "angry": 0.0019888579845428467,
+        "disgusted": 0.0062418486922979355,
+        "fearful": 0.0031189590226858854,
+        "happy": 0.0008281602058559656,
+        "neutral": 0.8634333610534668,
+        "other": 0.0012730991002172232,
+        "sad": 0.10290361940860748,
+        "surprised": 1.801530015654862e-05,
+        "unknown": 0.020194020122289658
+      },
+      "clap_top": "joyful",
+      "clap_probs": {
+        "love": 0.0751781229483095,
+        "seductive": 0.07790481451173341,
+        "yelling": 0.03955432562208396,
+        "logic": 0.25431007032641856,
+        "reason": 0.10972225319618778,
+        "aggressive": 0.09593641102325694,
+        "joyful": 0.30334680805063513,
+        "fear": 0.012109442552952487,
+        "surprise": 0.021244103584612737,
+        "disgust": 0.010693648183809428
+      },
+      "clap_cosine": {
+        "love": -0.14386646449565887,
+        "seductive": -0.14208509027957916,
+        "yelling": -0.1759757250547409,
+        "logic": -0.0829317644238472,
+        "reason": -0.12496186792850494,
+        "aggressive": -0.13167519867420197,
+        "joyful": -0.07411564141511917,
+        "fear": -0.2351602017879486,
+        "surprise": -0.20705550909042358,
+        "disgust": -0.24137698113918304
+      },
+      "efficientat_max": {
+        "yelling": 0.24155110120773315,
+        "crying": 0.060306012630462646,
+        "laughter": 0.06740859150886536
+      },
+      "efficientat_mean": {
+        "yelling": 0.1800636649131775,
+        "crying": 0.04370690882205963,
+        "laughter": 0.06115184724330902
+      },
+      "primary": {
+        "source": "e2v",
+        "key": "disgusted",
+        "value": 0.0062418486922979355,
+        "detected_0.2": false
+      },
+      "detected_0.2": {
+        "crying": false,
+        "seductive": false,
+        "yelling": true,
+        "laughter": false,
+        "sad_e2v": false,
+        "happy_e2v": false,
+        "fearful_e2v": false,
+        "surprised_e2v": false,
+        "disgusted_e2v": false,
+        "angry_e2v": false,
+        "love_clap": false,
+        "primary": false
+      },
+      "listen_proxy": {
+        "energy_rms_mean": 0.07926397165554831,
+        "energy_rms_std": 0.07541343565565159,
+        "energy_rms_cv": 0.9514213592951194,
+        "f0_hz_mean": 187.5749472987622,
+        "f0_hz_std": 38.705938687565066,
+        "f0_n_voiced_frames": 92
+      }
+    },
+    {
+      "persona": "jarvis",
+      "id": "joy01",
+      "group": "joyful",
+      "text": "[happy] I am so glad you made it. This is the best news I have heard all week.",
+      "pace": 1.0,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/scorer-probe/wav/jarvis/joy01.wav",
+      "duration_s": 4.88,
+      "e2v_top": "happy",
+      "e2v_top_conf": 0.9999877214431763,
+      "e2v": {
+        "angry": 1.938026485959199e-07,
+        "disgusted": 3.581475027658598e-08,
+        "fearful": 1.065197125171835e-06,
+        "happy": 0.9999877214431763,
+        "neutral": 4.0454929717270716e-07,
+        "other": 9.787097042135429e-06,
+        "sad": 3.15885273494132e-07,
+        "surprised": 6.5550423755667e-08,
+        "unknown": 3.281562328538712e-07
+      },
+      "clap_top": "logic",
+      "clap_probs": {
+        "love": 0.016515657393267665,
+        "seductive": 0.020177695034630436,
+        "yelling": 0.07778406925008197,
+        "logic": 0.4423006238180058,
+        "reason": 0.021010178748876028,
+        "aggressive": 0.38609419585811383,
+        "joyful": 0.01266292433606377,
+        "fear": 0.008039747729693026,
+        "surprise": 0.0049094114700763405,
+        "disgust": 0.010505496361191283
+      },
+      "clap_cosine": {
+        "love": -0.14416970312595367,
+        "seductive": -0.1341562569141388,
+        "yelling": -0.06668831408023834,
+        "logic": 0.020214343443512917,
+        "reason": -0.1321347951889038,
+        "aggressive": 0.013418922200798988,
+        "joyful": -0.15745122730731964,
+        "fear": -0.18016526103019714,
+        "surprise": -0.2048274427652359,
+        "disgust": -0.1667902171611786
+      },
+      "efficientat_max": {
+        "yelling": 0.3330812454223633,
+        "crying": 0.04928934574127197,
+        "laughter": 0.1098175048828125
+      },
+      "efficientat_mean": {
+        "yelling": 0.29438912868499756,
+        "crying": 0.04272131621837616,
+        "laughter": 0.09627190232276917
+      },
+      "primary": {
+        "source": "e2v",
+        "key": "happy",
+        "value": 0.9999877214431763,
+        "detected_0.2": true
+      },
+      "detected_0.2": {
+        "crying": false,
+        "seductive": false,
+        "yelling": true,
+        "laughter": false,
+        "sad_e2v": false,
+        "happy_e2v": true,
+        "fearful_e2v": false,
+        "surprised_e2v": false,
+        "disgusted_e2v": false,
+        "angry_e2v": false,
+        "love_clap": false,
+        "primary": true
+      },
+      "listen_proxy": {
+        "energy_rms_mean": 0.07439846385851137,
+        "energy_rms_std": 0.05483773156970115,
+        "energy_rms_cv": 0.7370815031072389,
+        "f0_hz_mean": 171.99624736249277,
+        "f0_hz_std": 79.49377798468475,
+        "f0_n_voiced_frames": 91
+      }
+    },
+    {
+      "persona": "jarvis",
+      "id": "joy02",
+      "group": "joyful",
+      "text": "[happy] That was wonderful. I cannot stop smiling. You did it!",
+      "pace": 1.0,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/scorer-probe/wav/jarvis/joy02.wav",
+      "duration_s": 3.4,
+      "e2v_top": "happy",
+      "e2v_top_conf": 0.9999895095825195,
+      "e2v": {
+        "angry": 7.506739052587363e-08,
+        "disgusted": 1.2849763209032972e-07,
+        "fearful": 7.321944650584555e-08,
+        "happy": 0.9999895095825195,
+        "neutral": 6.302708243310917e-06,
+        "other": 1.0464901833984186e-07,
+        "sad": 1.1301070799163426e-06,
+        "surprised": 5.360341504001553e-09,
+        "unknown": 2.6395023269287776e-06
+      },
+      "clap_top": "aggressive",
+      "clap_probs": {
+        "love": 0.009798322972770782,
+        "seductive": 0.031035508013008792,
+        "yelling": 0.11017769616578645,
+        "logic": 0.18849069160213913,
+        "reason": 0.035021637366036945,
+        "aggressive": 0.5202623518943122,
+        "joyful": 0.02991700747301299,
+        "fear": 0.024083544546565288,
+        "surprise": 0.018537105291590597,
+        "disgust": 0.032676134674776626
+      },
+      "clap_cosine": {
+        "love": -0.16797323524951935,
+        "seductive": -0.11032719910144806,
+        "yelling": -0.04697907343506813,
+        "logic": -0.020131366327404976,
+        "reason": -0.10428549349308014,
+        "aggressive": 0.03063286282122135,
+        "joyful": -0.11216244101524353,
+        "fear": -0.12300735712051392,
+        "surprise": -0.1360950767993927,
+        "disgust": -0.10775154829025269
+      },
+      "efficientat_max": {
+        "yelling": 0.7483399510383606,
+        "crying": 0.16107025742530823,
+        "laughter": 0.13663944602012634
+      },
+      "efficientat_mean": {
+        "yelling": 0.7483399510383606,
+        "crying": 0.16107025742530823,
+        "laughter": 0.13663944602012634
+      },
+      "primary": {
+        "source": "e2v",
+        "key": "happy",
+        "value": 0.9999895095825195,
+        "detected_0.2": true
+      },
+      "detected_0.2": {
+        "crying": false,
+        "seductive": false,
+        "yelling": true,
+        "laughter": false,
+        "sad_e2v": false,
+        "happy_e2v": true,
+        "fearful_e2v": false,
+        "surprised_e2v": false,
+        "disgusted_e2v": false,
+        "angry_e2v": false,
+        "love_clap": false,
+        "primary": true
+      },
+      "listen_proxy": {
+        "energy_rms_mean": 0.06663320549487811,
+        "energy_rms_std": 0.05782059125192983,
+        "energy_rms_cv": 0.8677444049479852,
+        "f0_hz_mean": 213.18602248425273,
+        "f0_hz_std": 87.0203240792416,
+        "f0_n_voiced_frames": 47
+      }
+    },
+    {
+      "persona": "jarvis",
+      "id": "fea01",
+      "group": "fear",
+      "text": "[fear] Something is wrong. I think someone is following us. We have to get out of here.",
+      "pace": 1.0,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/scorer-probe/wav/jarvis/fea01.wav",
+      "duration_s": 4.0,
+      "e2v_top": "neutral",
+      "e2v_top_conf": 1.0,
+      "e2v": {
+        "angry": 1.4360773903376867e-08,
+        "disgusted": 1.810094851784072e-09,
+        "fearful": 1.7556526232809233e-09,
+        "happy": 3.0421016816717383e-08,
+        "neutral": 1.0,
+        "other": 3.2992095722050863e-09,
+        "sad": 5.504522349042418e-08,
+        "surprised": 5.543109304895211e-10,
+        "unknown": 1.6067543739950452e-08
+      },
+      "clap_top": "logic",
+      "clap_probs": {
+        "love": 0.012247835476684418,
+        "seductive": 0.013948899273555864,
+        "yelling": 0.04652681436351417,
+        "logic": 0.5126827829218554,
+        "reason": 0.025403110639603134,
+        "aggressive": 0.35243655170199806,
+        "joyful": 0.005529444540334562,
+        "fear": 0.009027195033597567,
+        "surprise": 0.007935346162622982,
+        "disgust": 0.014262019886233804
+      },
+      "clap_cosine": {
+        "love": -0.16761788725852966,
+        "seductive": -0.16111531853675842,
+        "yelling": -0.10088390856981277,
+        "logic": 0.01909751631319523,
+        "reason": -0.1311417669057846,
+        "aggressive": 0.00035818200558423996,
+        "joyful": -0.2073809802532196,
+        "fear": -0.18287326395511627,
+        "surprise": -0.18931899964809418,
+        "disgust": -0.1600053459405899
+      },
+      "efficientat_max": {
+        "yelling": 0.36098146438598633,
+        "crying": 0.0841870903968811,
+        "laughter": 0.10654106736183167
+      },
+      "efficientat_mean": {
+        "yelling": 0.33414527773857117,
+        "crying": 0.05234098434448242,
+        "laughter": 0.0952068567276001
+      },
+      "primary": {
+        "source": "e2v",
+        "key": "fearful",
+        "value": 1.7556526232809233e-09,
+        "detected_0.2": false
+      },
+      "detected_0.2": {
+        "crying": false,
+        "seductive": false,
+        "yelling": true,
+        "laughter": false,
+        "sad_e2v": false,
+        "happy_e2v": false,
+        "fearful_e2v": false,
+        "surprised_e2v": false,
+        "disgusted_e2v": false,
+        "angry_e2v": false,
+        "love_clap": false,
+        "primary": false
+      },
+      "listen_proxy": {
+        "energy_rms_mean": 0.07720956942808077,
+        "energy_rms_std": 0.05826635753324463,
+        "energy_rms_cv": 0.754652020013123,
+        "f0_hz_mean": 131.89428879024055,
+        "f0_hz_std": 21.789251686289838,
+        "f0_n_voiced_frames": 71
+      }
+    },
+    {
+      "persona": "jarvis",
+      "id": "fea02",
+      "group": "fear",
+      "text": "[fear] Do not turn around. I heard a noise downstairs. I am really scared.",
+      "pace": 1.0,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/scorer-probe/wav/jarvis/fea02.wav",
+      "duration_s": 4.48,
+      "e2v_top": "neutral",
+      "e2v_top_conf": 0.9977672100067139,
+      "e2v": {
+        "angry": 0.0008312120917253196,
+        "disgusted": 0.00019809538207482547,
+        "fearful": 8.090943447314203e-05,
+        "happy": 5.452784535009414e-05,
+        "neutral": 0.9977672100067139,
+        "other": 0.00023412545851897448,
+        "sad": 5.3702442528447136e-05,
+        "surprised": 2.510925241949735e-06,
+        "unknown": 0.0007778202998451889
+      },
+      "clap_top": "logic",
+      "clap_probs": {
+        "love": 0.02113285343960656,
+        "seductive": 0.02087241469852219,
+        "yelling": 0.17150779610269432,
+        "logic": 0.40350591817547937,
+        "reason": 0.02573054651436223,
+        "aggressive": 0.30170207628969314,
+        "joyful": 0.011887037721033201,
+        "fear": 0.012888801896593777,
+        "surprise": 0.008906113447292512,
+        "disgust": 0.02186644171472255
+      },
+      "clap_cosine": {
+        "love": -0.15047834813594818,
+        "seductive": -0.151098370552063,
+        "yelling": -0.04578835517168045,
+        "logic": -0.0030102336313575506,
+        "reason": -0.14063584804534912,
+        "aggressive": -0.017547789961099625,
+        "joyful": -0.17924736440181732,
+        "fear": -0.17520184814929962,
+        "surprise": -0.19368289411067963,
+        "disgust": -0.14877213537693024
+      },
+      "efficientat_max": {
+        "yelling": 0.6130157709121704,
+        "crying": 0.06323742866516113,
+        "laughter": 0.10073620080947876
+      },
+      "efficientat_mean": {
+        "yelling": 0.3757632076740265,
+        "crying": 0.058899372816085815,
+        "laughter": 0.07709304988384247
+      },
+      "primary": {
+        "source": "e2v",
+        "key": "fearful",
+        "value": 8.090943447314203e-05,
+        "detected_0.2": false
+      },
+      "detected_0.2": {
+        "crying": false,
+        "seductive": false,
+        "yelling": true,
+        "laughter": false,
+        "sad_e2v": false,
+        "happy_e2v": false,
+        "fearful_e2v": false,
+        "surprised_e2v": false,
+        "disgusted_e2v": false,
+        "angry_e2v": false,
+        "love_clap": false,
+        "primary": false
+      },
+      "listen_proxy": {
+        "energy_rms_mean": 0.08100951411238148,
+        "energy_rms_std": 0.05663920111587417,
+        "energy_rms_cv": 0.6991672735785172,
+        "f0_hz_mean": 151.64473504122088,
+        "f0_hz_std": 36.12441526520627,
+        "f0_n_voiced_frames": 79
+      }
+    },
+    {
+      "persona": "jarvis",
+      "id": "sad01",
+      "group": "sad",
+      "text": "[sigh] I miss them every day. It has not been the same since they left.",
+      "pace": 1.15,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/scorer-probe/wav/jarvis/sad01.wav",
+      "duration_s": 4.84,
+      "e2v_top": "neutral",
+      "e2v_top_conf": 0.9997590184211731,
+      "e2v": {
+        "angry": 1.1781155990320258e-05,
+        "disgusted": 1.654818515817169e-05,
+        "fearful": 2.1999783257342642e-06,
+        "happy": 6.409861725842347e-06,
+        "neutral": 0.9997590184211731,
+        "other": 7.072466360114049e-06,
+        "sad": 0.00016027683159336448,
+        "surprised": 2.3110531799375167e-07,
+        "unknown": 3.651806036941707e-05
+      },
+      "clap_top": "logic",
+      "clap_probs": {
+        "love": 0.016341897688224485,
+        "seductive": 0.019384441665688094,
+        "yelling": 0.044191793569533025,
+        "logic": 0.5109386075741851,
+        "reason": 0.020880380359634847,
+        "aggressive": 0.34964452245756944,
+        "joyful": 0.007447945780317181,
+        "fear": 0.010990966851463209,
+        "surprise": 0.006856762046617792,
+        "disgust": 0.013322682006766897
+      },
+      "clap_cosine": {
+        "love": -0.1156223863363266,
+        "seductive": -0.1070854589343071,
+        "yelling": -0.06588204205036163,
+        "logic": 0.056503474712371826,
+        "reason": -0.10336849838495255,
+        "aggressive": 0.037536852061748505,
+        "joyful": -0.1549120843410492,
+        "fear": -0.13545531034469604,
+        "surprise": -0.1590472310781479,
+        "disgust": -0.1258355975151062
+      },
+      "efficientat_max": {
+        "yelling": 0.9180895090103149,
+        "crying": 0.4669448733329773,
+        "laughter": 0.5104617476463318
+      },
+      "efficientat_mean": {
+        "yelling": 0.6291131973266602,
+        "crying": 0.252363920211792,
+        "laughter": 0.29534658789634705
+      },
+      "primary": {
+        "source": "e2v",
+        "key": "sad",
+        "value": 0.00016027683159336448,
+        "detected_0.2": false
+      },
+      "detected_0.2": {
+        "crying": true,
+        "seductive": false,
+        "yelling": true,
+        "laughter": true,
+        "sad_e2v": false,
+        "happy_e2v": false,
+        "fearful_e2v": false,
+        "surprised_e2v": false,
+        "disgusted_e2v": false,
+        "angry_e2v": false,
+        "love_clap": false,
+        "primary": false
+      },
+      "listen_proxy": {
+        "energy_rms_mean": 0.05773780823672411,
+        "energy_rms_std": 0.051602060094737695,
+        "energy_rms_cv": 0.8937308441492975,
+        "f0_hz_mean": 162.27310605232003,
+        "f0_hz_std": 74.76231835575433,
+        "f0_n_voiced_frames": 69
+      }
+    },
+    {
+      "persona": "jarvis",
+      "id": "sad02",
+      "group": "sad",
+      "text": "[sigh] I keep thinking about what I should have said, and now it is too late.",
+      "pace": 1.15,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/scorer-probe/wav/jarvis/sad02.wav",
+      "duration_s": 5.04,
+      "e2v_top": "neutral",
+      "e2v_top_conf": 1.0,
+      "e2v": {
+        "angry": 4.901045715099972e-12,
+        "disgusted": 3.5489918837929013e-13,
+        "fearful": 9.382501286320233e-14,
+        "happy": 6.115350413560261e-12,
+        "neutral": 1.0,
+        "other": 3.349538935061222e-14,
+        "sad": 1.7635040996943907e-11,
+        "surprised": 2.0341866212303383e-12,
+        "unknown": 2.338753106109759e-13
+      },
+      "clap_top": "logic",
+      "clap_probs": {
+        "love": 0.014126634900174418,
+        "seductive": 0.019367276529690843,
+        "yelling": 0.036790563402887264,
+        "logic": 0.6196522472889381,
+        "reason": 0.05267093986618483,
+        "aggressive": 0.19996726208640267,
+        "joyful": 0.011618698070862401,
+        "fear": 0.01973591160497087,
+        "surprise": 0.0049966143868785074,
+        "disgust": 0.021073851863010157
+      },
+      "clap_cosine": {
+        "love": -0.1664060354232788,
+        "seductive": -0.1506298929452896,
+        "yelling": -0.11854706704616547,
+        "logic": 0.022648785263299942,
+        "reason": -0.10060594230890274,
+        "aggressive": -0.03390145301818848,
+        "joyful": -0.17617835104465485,
+        "fear": -0.14968714118003845,
+        "surprise": -0.21837110817432404,
+        "disgust": -0.14640748500823975
+      },
+      "efficientat_max": {
+        "yelling": 0.7582448124885559,
+        "crying": 0.1707635521888733,
+        "laughter": 0.11974692344665527
+      },
+      "efficientat_mean": {
+        "yelling": 0.5675157904624939,
+        "crying": 0.08499399572610855,
+        "laughter": 0.08951916545629501
+      },
+      "primary": {
+        "source": "e2v",
+        "key": "sad",
+        "value": 1.7635040996943907e-11,
+        "detected_0.2": false
+      },
+      "detected_0.2": {
+        "crying": false,
+        "seductive": false,
+        "yelling": true,
+        "laughter": false,
+        "sad_e2v": false,
+        "happy_e2v": false,
+        "fearful_e2v": false,
+        "surprised_e2v": false,
+        "disgusted_e2v": false,
+        "angry_e2v": false,
+        "love_clap": false,
+        "primary": false
+      },
+      "listen_proxy": {
+        "energy_rms_mean": 0.06343526783776227,
+        "energy_rms_std": 0.056153444953889645,
+        "energy_rms_cv": 0.8852086050539565,
+        "f0_hz_mean": 169.38223610737424,
+        "f0_hz_std": 72.99654582115575,
+        "f0_n_voiced_frames": 69
+      }
+    },
+    {
+      "persona": "jarvis",
+      "id": "sur01",
+      "group": "surprise",
+      "text": "[surprised] What? You are here? I had no idea you were coming tonight!",
+      "pace": 1.0,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/scorer-probe/wav/jarvis/sur01.wav",
+      "duration_s": 3.76,
+      "e2v_top": "happy",
+      "e2v_top_conf": 0.9997288584709167,
+      "e2v": {
+        "angry": 4.1072431145039445e-07,
+        "disgusted": 2.344839913348551e-06,
+        "fearful": 1.3502818774213665e-06,
+        "happy": 0.9997288584709167,
+        "neutral": 8.937050006352365e-05,
+        "other": 2.2870959583087824e-05,
+        "sad": 4.702127625932917e-06,
+        "surprised": 8.618861357945207e-08,
+        "unknown": 0.00015007320325821638
+      },
+      "clap_top": "aggressive",
+      "clap_probs": {
+        "love": 0.02471778637426376,
+        "seductive": 0.027331097442823436,
+        "yelling": 0.23799515656665568,
+        "logic": 0.15480414732814363,
+        "reason": 0.023201743302771256,
+        "aggressive": 0.26672170645816223,
+        "joyful": 0.19146761158173098,
+        "fear": 0.016086322761730863,
+        "surprise": 0.019668122355359433,
+        "disgust": 0.03800630582835874
+      },
+      "clap_cosine": {
+        "love": -0.1342354565858841,
+        "seductive": -0.12921035289764404,
+        "yelling": -0.02099909447133541,
+        "logic": -0.04250357300043106,
+        "reason": -0.13740023970603943,
+        "aggressive": -0.015301319770514965,
+        "joyful": -0.03187567740678787,
+        "fear": -0.15571314096450806,
+        "surprise": -0.14566165208816528,
+        "disgust": -0.11272400617599487
+      },
+      "efficientat_max": {
+        "yelling": 0.8744086027145386,
+        "crying": 0.10276457667350769,
+        "laughter": 0.2446557879447937
+      },
+      "efficientat_mean": {
+        "yelling": 0.4877677261829376,
+        "crying": 0.0840030312538147,
+        "laughter": 0.15754148364067078
+      },
+      "primary": {
+        "source": "e2v",
+        "key": "surprised",
+        "value": 8.618861357945207e-08,
+        "detected_0.2": false
+      },
+      "detected_0.2": {
+        "crying": false,
+        "seductive": false,
+        "yelling": true,
+        "laughter": true,
+        "sad_e2v": false,
+        "happy_e2v": true,
+        "fearful_e2v": false,
+        "surprised_e2v": false,
+        "disgusted_e2v": false,
+        "angry_e2v": false,
+        "love_clap": false,
+        "primary": false
+      },
+      "listen_proxy": {
+        "energy_rms_mean": 0.07137410030610608,
+        "energy_rms_std": 0.06085180185922009,
+        "energy_rms_cv": 0.8525753963726558,
+        "f0_hz_mean": 176.73302991428884,
+        "f0_hz_std": 65.37462420955976,
+        "f0_n_voiced_frames": 63
+      }
+    },
+    {
+      "persona": "jarvis",
+      "id": "sur02",
+      "group": "surprise",
+      "text": "[surprised] Wait. Did you just say we won? I cannot believe it!",
+      "pace": 1.0,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/scorer-probe/wav/jarvis/sur02.wav",
+      "duration_s": 3.36,
+      "e2v_top": "sad",
+      "e2v_top_conf": 0.9988592863082886,
+      "e2v": {
+        "angry": 5.296567451296141e-06,
+        "disgusted": 8.313398211612366e-06,
+        "fearful": 0.00010006249067373574,
+        "happy": 8.184702164726332e-05,
+        "neutral": 4.0230977901956066e-05,
+        "other": 0.00011168910714332014,
+        "sad": 0.9988592863082886,
+        "surprised": 7.398666213020988e-08,
+        "unknown": 0.0007931254804134369
+      },
+      "clap_top": "aggressive",
+      "clap_probs": {
+        "love": 0.01212274457046161,
+        "seductive": 0.03135838049655728,
+        "yelling": 0.22334094787046282,
+        "logic": 0.17801805139575053,
+        "reason": 0.02671453876587956,
+        "aggressive": 0.3873264880623448,
+        "joyful": 0.05724584701945878,
+        "fear": 0.032133124651548,
+        "surprise": 0.015577491694473866,
+        "disgust": 0.03616238547306273
+      },
+      "clap_cosine": {
+        "love": -0.16571931540966034,
+        "seductive": -0.1181994080543518,
+        "yelling": -0.020038509741425514,
+        "logic": -0.03137923777103424,
+        "reason": -0.12621308863162994,
+        "aggressive": 0.007489913143217564,
+        "joyful": -0.08810573071241379,
+        "fear": -0.11697911471128464,
+        "surprise": -0.15318213403224945,
+        "disgust": -0.11107251048088074
+      },
+      "efficientat_max": {
+        "yelling": 0.6739206910133362,
+        "crying": 0.06386080384254456,
+        "laughter": 0.06469383835792542
+      },
+      "efficientat_mean": {
+        "yelling": 0.6739206910133362,
+        "crying": 0.06386080384254456,
+        "laughter": 0.06469383835792542
+      },
+      "primary": {
+        "source": "e2v",
+        "key": "surprised",
+        "value": 7.398666213020988e-08,
+        "detected_0.2": false
+      },
+      "detected_0.2": {
+        "crying": false,
+        "seductive": false,
+        "yelling": true,
+        "laughter": false,
+        "sad_e2v": true,
+        "happy_e2v": false,
+        "fearful_e2v": false,
+        "surprised_e2v": false,
+        "disgusted_e2v": false,
+        "angry_e2v": false,
+        "love_clap": false,
+        "primary": false
+      },
+      "listen_proxy": {
+        "energy_rms_mean": 0.06536295959086835,
+        "energy_rms_std": 0.052797941446455596,
+        "energy_rms_cv": 0.8077654649810536,
+        "f0_hz_mean": 200.2600184641796,
+        "f0_hz_std": 77.39840402074792,
+        "f0_n_voiced_frames": 64
+      }
+    },
+    {
+      "persona": "jarvis",
+      "id": "dis01",
+      "group": "disgust",
+      "text": "That is disgusting. I cannot believe anyone would do something so vile.",
+      "pace": 1.0,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/scorer-probe/wav/jarvis/dis01.wav",
+      "duration_s": 3.8,
+      "e2v_top": "neutral",
+      "e2v_top_conf": 0.9960927367210388,
+      "e2v": {
+        "angry": 8.194337715394795e-05,
+        "disgusted": 0.0005635222769342363,
+        "fearful": 0.00015368750609923154,
+        "happy": 4.6294433559523895e-05,
+        "neutral": 0.9960927367210388,
+        "other": 0.0019976054318249226,
+        "sad": 0.00013856031000614166,
+        "surprised": 5.93821496295277e-05,
+        "unknown": 0.0008662736508995295
+      },
+      "clap_top": "logic",
+      "clap_probs": {
+        "love": 0.009443390211958837,
+        "seductive": 0.029388988563774057,
+        "yelling": 0.04701751242800683,
+        "logic": 0.49347579276240594,
+        "reason": 0.046410147384867484,
+        "aggressive": 0.3197643528167107,
+        "joyful": 0.024558110067765433,
+        "fear": 0.012110544548428429,
+        "surprise": 0.008882011596021654,
+        "disgust": 0.008949149620060597
+      },
+      "clap_cosine": {
+        "love": -0.168416827917099,
+        "seductive": -0.11165157705545425,
+        "yelling": -0.0881565734744072,
+        "logic": 0.029391109943389893,
+        "reason": -0.08880667388439178,
+        "aggressive": 0.0076966360211372375,
+        "joyful": -0.12063047289848328,
+        "fear": -0.1559787541627884,
+        "surprise": -0.1714811772108078,
+        "disgust": -0.17110465466976166
+      },
+      "efficientat_max": {
+        "yelling": 0.4916874170303345,
+        "crying": 0.1644204556941986,
+        "laughter": 0.15394318103790283
+      },
+      "efficientat_mean": {
+        "yelling": 0.4636988639831543,
+        "crying": 0.12849567830562592,
+        "laughter": 0.13295745849609375
+      },
+      "primary": {
+        "source": "e2v",
+        "key": "disgusted",
+        "value": 0.0005635222769342363,
+        "detected_0.2": false
+      },
+      "detected_0.2": {
+        "crying": false,
+        "seductive": false,
+        "yelling": true,
+        "laughter": false,
+        "sad_e2v": false,
+        "happy_e2v": false,
+        "fearful_e2v": false,
+        "surprised_e2v": false,
+        "disgusted_e2v": false,
+        "angry_e2v": false,
+        "love_clap": false,
+        "primary": false
+      },
+      "listen_proxy": {
+        "energy_rms_mean": 0.07269805221109368,
+        "energy_rms_std": 0.047985312759349856,
+        "energy_rms_cv": 0.6600632520389222,
+        "f0_hz_mean": 174.78521888332153,
+        "f0_hz_std": 80.39072567926166,
+        "f0_n_voiced_frames": 62
+      }
+    },
+    {
+      "persona": "jarvis",
+      "id": "dis02",
+      "group": "disgust",
+      "text": "Ugh, that smell is revolting. Get it away from me right now.",
+      "pace": 1.0,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/scorer-probe/wav/jarvis/dis02.wav",
+      "duration_s": 3.8,
+      "e2v_top": "neutral",
+      "e2v_top_conf": 0.9981858134269714,
+      "e2v": {
+        "angry": 0.0007790900417603552,
+        "disgusted": 0.00014172555529512465,
+        "fearful": 8.17814998299582e-06,
+        "happy": 5.3919098718324676e-05,
+        "neutral": 0.9981858134269714,
+        "other": 0.00019764999160543084,
+        "sad": 0.00031515059527009726,
+        "surprised": 2.082898026856128e-05,
+        "unknown": 0.0002975601819343865
+      },
+      "clap_top": "aggressive",
+      "clap_probs": {
+        "love": 0.009208661067898145,
+        "seductive": 0.016966686621646836,
+        "yelling": 0.0920492809553757,
+        "logic": 0.313151907174641,
+        "reason": 0.026563657091114717,
+        "aggressive": 0.4748979473159595,
+        "joyful": 0.018079586928220735,
+        "fear": 0.011662756788172642,
+        "surprise": 0.008120585073617485,
+        "disgust": 0.02929893098335352
+      },
+      "clap_cosine": {
+        "love": -0.18666702508926392,
+        "seductive": -0.15611165761947632,
+        "yelling": -0.07155804336071014,
+        "logic": -0.010339828208088875,
+        "reason": -0.133697047829628,
+        "aggressive": 0.010480748489499092,
+        "joyful": -0.15293507277965546,
+        "fear": -0.17485421895980835,
+        "surprise": -0.1929541379213333,
+        "disgust": -0.12879669666290283
+      },
+      "efficientat_max": {
+        "yelling": 0.22834166884422302,
+        "crying": 0.0608903169631958,
+        "laughter": 0.14496439695358276
+      },
+      "efficientat_mean": {
+        "yelling": 0.18369033932685852,
+        "crying": 0.040537938475608826,
+        "laughter": 0.09992606937885284
+      },
+      "primary": {
+        "source": "e2v",
+        "key": "disgusted",
+        "value": 0.00014172555529512465,
+        "detected_0.2": false
+      },
+      "detected_0.2": {
+        "crying": false,
+        "seductive": false,
+        "yelling": true,
+        "laughter": false,
+        "sad_e2v": false,
+        "happy_e2v": false,
+        "fearful_e2v": false,
+        "surprised_e2v": false,
+        "disgusted_e2v": false,
+        "angry_e2v": false,
+        "love_clap": false,
+        "primary": false
+      },
+      "listen_proxy": {
+        "energy_rms_mean": 0.07275371328666144,
+        "energy_rms_std": 0.0535552822633715,
+        "energy_rms_cv": 0.7361175099387023,
+        "f0_hz_mean": 168.72595225839595,
+        "f0_hz_std": 81.38195362910814,
+        "f0_n_voiced_frames": 66
+      }
+    },
+    {
+      "persona": "jarvis",
+      "id": "agg01",
+      "group": "aggressive",
+      "text": "[angry] Do not lie to me. I know exactly what you did, and I will not let it go.",
+      "pace": 1.0,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/scorer-probe/wav/jarvis/agg01.wav",
+      "duration_s": 4.48,
+      "e2v_top": "angry",
+      "e2v_top_conf": 0.9983598589897156,
+      "e2v": {
+        "angry": 0.9983598589897156,
+        "disgusted": 8.304092261823826e-06,
+        "fearful": 1.482694869991974e-06,
+        "happy": 7.1889917307998985e-06,
+        "neutral": 0.0016104812966659665,
+        "other": 1.7641625618125545e-06,
+        "sad": 8.566074939153623e-06,
+        "surprised": 1.264829506908427e-06,
+        "unknown": 1.1035258467018139e-06
+      },
+      "clap_top": "logic",
+      "clap_probs": {
+        "love": 0.02198288188272659,
+        "seductive": 0.02518839018760179,
+        "yelling": 0.17726363466105055,
+        "logic": 0.3311312355024711,
+        "reason": 0.028386755501284906,
+        "aggressive": 0.21029923749246426,
+        "joyful": 0.16556224985140228,
+        "fear": 0.012166016469395817,
+        "surprise": 0.009195982110939853,
+        "disgust": 0.018823616340662774
+      },
+      "clap_cosine": {
+        "love": -0.1625247746706009,
+        "seductive": -0.1557188183069229,
+        "yelling": -0.05815607309341431,
+        "logic": -0.02691223844885826,
+        "reason": -0.14974184334278107,
+        "aggressive": -0.0496114045381546,
+        "joyful": -0.06157061457633972,
+        "fear": -0.19210565090179443,
+        "surprise": -0.20609964430332184,
+        "disgust": -0.17028236389160156
+      },
+      "efficientat_max": {
+        "yelling": 0.8736387491226196,
+        "crying": 0.1964516043663025,
+        "laughter": 0.18864259123802185
+      },
+      "efficientat_mean": {
+        "yelling": 0.7773478627204895,
+        "crying": 0.12611816823482513,
+        "laughter": 0.13097451627254486
+      },
+      "primary": {
+        "source": "e2v",
+        "key": "angry",
+        "value": 0.9983598589897156,
+        "detected_0.2": true
+      },
+      "detected_0.2": {
+        "crying": false,
+        "seductive": false,
+        "yelling": true,
+        "laughter": false,
+        "sad_e2v": false,
+        "happy_e2v": false,
+        "fearful_e2v": false,
+        "surprised_e2v": false,
+        "disgusted_e2v": false,
+        "angry_e2v": true,
+        "love_clap": false,
+        "primary": true
+      },
+      "listen_proxy": {
+        "energy_rms_mean": 0.08635712923459078,
+        "energy_rms_std": 0.0651631490850831,
+        "energy_rms_cv": 0.7545775277923629,
+        "f0_hz_mean": 181.62408971272043,
+        "f0_hz_std": 81.5377889704415,
+        "f0_n_voiced_frames": 97
+      }
+    },
+    {
+      "persona": "jarvis",
+      "id": "agg02",
+      "group": "aggressive",
+      "text": "[angry] Back off. You have no right to speak to me that way.",
+      "pace": 1.0,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/scorer-probe/wav/jarvis/agg02.wav",
+      "duration_s": 3.2,
+      "e2v_top": "angry",
+      "e2v_top_conf": 0.8552329540252686,
+      "e2v": {
+        "angry": 0.8552329540252686,
+        "disgusted": 0.012669868767261505,
+        "fearful": 0.0006584880175068974,
+        "happy": 0.002616502344608307,
+        "neutral": 0.03134017065167427,
+        "other": 0.008550587110221386,
+        "sad": 0.00043643731623888016,
+        "surprised": 3.999482942163013e-05,
+        "unknown": 0.08845500648021698
+      },
+      "clap_top": "aggressive",
+      "clap_probs": {
+        "love": 0.02404538397756002,
+        "seductive": 0.027779599408791357,
+        "yelling": 0.15221548532687618,
+        "logic": 0.29034906058639953,
+        "reason": 0.02276121280949137,
+        "aggressive": 0.41076914060017394,
+        "joyful": 0.019206493674818217,
+        "fear": 0.013764207767429957,
+        "surprise": 0.010275505479437052,
+        "disgust": 0.02883391036902225
+      },
+      "clap_cosine": {
+        "love": -0.14878401160240173,
+        "seductive": -0.14156606793403625,
+        "yelling": -0.05651630461215973,
+        "logic": -0.024226970970630646,
+        "reason": -0.1515282690525055,
+        "aggressive": -0.006879596039652824,
+        "joyful": -0.16001874208450317,
+        "fear": -0.17667758464813232,
+        "surprise": -0.19129301607608795,
+        "disgust": -0.13970355689525604
+      },
+      "efficientat_max": {
+        "yelling": 0.47321295738220215,
+        "crying": 0.07251507043838501,
+        "laughter": 0.13104891777038574
+      },
+      "efficientat_mean": {
+        "yelling": 0.47321295738220215,
+        "crying": 0.07251507043838501,
+        "laughter": 0.13104891777038574
+      },
+      "primary": {
+        "source": "e2v",
+        "key": "angry",
+        "value": 0.8552329540252686,
+        "detected_0.2": true
+      },
+      "detected_0.2": {
+        "crying": false,
+        "seductive": false,
+        "yelling": true,
+        "laughter": false,
+        "sad_e2v": false,
+        "happy_e2v": false,
+        "fearful_e2v": false,
+        "surprised_e2v": false,
+        "disgusted_e2v": false,
+        "angry_e2v": true,
+        "love_clap": false,
+        "primary": true
+      },
+      "listen_proxy": {
+        "energy_rms_mean": 0.06798529538166682,
+        "energy_rms_std": 0.052307348787230076,
+        "energy_rms_cv": 0.769392094181229,
+        "f0_hz_mean": 175.5744279160319,
+        "f0_hz_std": 66.40501579062486,
+        "f0_n_voiced_frames": 52
+      }
+    },
+    {
+      "persona": "jarvis",
+      "id": "lov01",
+      "group": "love",
+      "text": "I love you so much. You mean everything to me, and I am so grateful you are here.",
+      "pace": 1.15,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/scorer-probe/wav/jarvis/lov01.wav",
+      "duration_s": 5.56,
+      "e2v_top": "happy",
+      "e2v_top_conf": 0.9999991655349731,
+      "e2v": {
+        "angry": 1.0533002026136273e-08,
+        "disgusted": 3.2754073231444636e-08,
+        "fearful": 3.2336791022657962e-09,
+        "happy": 0.9999991655349731,
+        "neutral": 6.267856065278465e-07,
+        "other": 2.8864599599387475e-08,
+        "sad": 7.627470921534041e-08,
+        "surprised": 1.3206248317132463e-09,
+        "unknown": 8.499990400423485e-08
+      },
+      "clap_top": "logic",
+      "clap_probs": {
+        "love": 0.013194709546592643,
+        "seductive": 0.02746725349956203,
+        "yelling": 0.20296110539422293,
+        "logic": 0.39296138886493315,
+        "reason": 0.05202136022323337,
+        "aggressive": 0.21878792409851208,
+        "joyful": 0.03079631987084772,
+        "fear": 0.024285561907555746,
+        "surprise": 0.010152763730643673,
+        "disgust": 0.027371612863896614
+      },
+      "clap_cosine": {
+        "love": -0.18010099232196808,
+        "seductive": -0.1434420645236969,
+        "yelling": -0.04344107210636139,
+        "logic": -0.010406222194433212,
+        "reason": -0.11150906980037689,
+        "aggressive": -0.039686646312475204,
+        "joyful": -0.13772203028202057,
+        "fear": -0.14959768950939178,
+        "surprise": -0.19320449233055115,
+        "disgust": -0.1436164677143097
+      },
+      "efficientat_max": {
+        "yelling": 0.514836847782135,
+        "crying": 0.08397427201271057,
+        "laughter": 0.12299105525016785
+      },
+      "efficientat_mean": {
+        "yelling": 0.3128890097141266,
+        "crying": 0.04356391355395317,
+        "laughter": 0.07210256904363632
+      },
+      "primary": {
+        "source": "clap_probs",
+        "key": "love",
+        "value": 0.013194709546592643,
+        "detected_0.2": false
+      },
+      "detected_0.2": {
+        "crying": false,
+        "seductive": false,
+        "yelling": true,
+        "laughter": false,
+        "sad_e2v": false,
+        "happy_e2v": true,
+        "fearful_e2v": false,
+        "surprised_e2v": false,
+        "disgusted_e2v": false,
+        "angry_e2v": false,
+        "love_clap": false,
+        "primary": false
+      },
+      "listen_proxy": {
+        "energy_rms_mean": 0.08789133844996905,
+        "energy_rms_std": 0.057834783585193526,
+        "energy_rms_cv": 0.6580259739486752,
+        "f0_hz_mean": 171.38163179371338,
+        "f0_hz_std": 56.00639103668905,
+        "f0_n_voiced_frames": 121
+      }
+    },
+    {
+      "persona": "jarvis",
+      "id": "lov02",
+      "group": "love",
+      "text": "Come here, my love. I have been thinking about you all day.",
+      "pace": 1.15,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/scorer-probe/wav/jarvis/lov02.wav",
+      "duration_s": 3.88,
+      "e2v_top": "neutral",
+      "e2v_top_conf": 1.0,
+      "e2v": {
+        "angry": 1.177532071849896e-09,
+        "disgusted": 1.2399550830544115e-10,
+        "fearful": 6.9059024991602325e-12,
+        "happy": 1.1429572843724145e-08,
+        "neutral": 1.0,
+        "other": 7.631215104275668e-12,
+        "sad": 1.0289636920290945e-09,
+        "surprised": 1.3182119285026772e-10,
+        "unknown": 1.1480660172535906e-11
+      },
+      "clap_top": "aggressive",
+      "clap_probs": {
+        "love": 0.019290552229826268,
+        "seductive": 0.027459254108802865,
+        "yelling": 0.0935686175822623,
+        "logic": 0.30580163204721944,
+        "reason": 0.04465800734694529,
+        "aggressive": 0.4110178989494882,
+        "joyful": 0.029745142708037128,
+        "fear": 0.021046009155124754,
+        "surprise": 0.012695218400303096,
+        "disgust": 0.0347176674719908
+      },
+      "clap_cosine": {
+        "love": -0.10546824336051941,
+        "seductive": -0.0878138542175293,
+        "yelling": -0.026514263823628426,
+        "logic": 0.03269781544804573,
+        "reason": -0.06349733471870422,
+        "aggressive": 0.047482822090387344,
+        "joyful": -0.08381572365760803,
+        "fear": -0.1011134684085846,
+        "surprise": -0.12638774514198303,
+        "disgust": -0.07608658075332642
+      },
+      "efficientat_max": {
+        "yelling": 0.20606034994125366,
+        "crying": 0.06705445051193237,
+        "laughter": 0.06737443804740906
+      },
+      "efficientat_mean": {
+        "yelling": 0.15407174825668335,
+        "crying": 0.055193498730659485,
+        "laughter": 0.05618239939212799
+      },
+      "primary": {
+        "source": "clap_probs",
+        "key": "love",
+        "value": 0.019290552229826268,
+        "detected_0.2": false
+      },
+      "detected_0.2": {
+        "crying": false,
+        "seductive": false,
+        "yelling": true,
+        "laughter": false,
+        "sad_e2v": false,
+        "happy_e2v": false,
+        "fearful_e2v": false,
+        "surprised_e2v": false,
+        "disgusted_e2v": false,
+        "angry_e2v": false,
+        "love_clap": false,
+        "primary": false
+      },
+      "listen_proxy": {
+        "energy_rms_mean": 0.07598872453813194,
+        "energy_rms_std": 0.05348872099356446,
+        "energy_rms_cv": 0.7039033924924384,
+        "f0_hz_mean": 183.8780250073781,
+        "f0_hz_std": 82.78660433001262,
+        "f0_n_voiced_frames": 75
+      }
+    },
+    {
+      "persona": "jarvis",
+      "id": "lau01",
+      "group": "laughter",
+      "text": "[laugh] Oh that is too funny. I cannot believe you actually said that.",
+      "pace": 1.0,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/scorer-probe/wav/jarvis/lau01.wav",
+      "duration_s": 4.32,
+      "e2v_top": "neutral",
+      "e2v_top_conf": 0.9961258769035339,
+      "e2v": {
+        "angry": 5.192384560359642e-05,
+        "disgusted": 6.37504635960795e-05,
+        "fearful": 1.4556451787939295e-05,
+        "happy": 0.003009878797456622,
+        "neutral": 0.9961258769035339,
+        "other": 0.0002461441035848111,
+        "sad": 5.2795527153648436e-05,
+        "surprised": 5.061004412709735e-05,
+        "unknown": 0.0003843603772111237
+      },
+      "clap_top": "logic",
+      "clap_probs": {
+        "love": 0.023059908700813425,
+        "seductive": 0.018307042235944225,
+        "yelling": 0.055790935242591766,
+        "logic": 0.6352476324836479,
+        "reason": 0.021006295618949667,
+        "aggressive": 0.17338264783993715,
+        "joyful": 0.0401175149136353,
+        "fear": 0.014335474343393292,
+        "surprise": 0.0073502448790902656,
+        "disgust": 0.01140230374199709
+      },
+      "clap_cosine": {
+        "love": -0.10234960913658142,
+        "seductive": -0.11389009654521942,
+        "yelling": -0.05817381665110588,
+        "logic": 0.06344635784626007,
+        "reason": -0.1070132777094841,
+        "aggressive": -0.0014793374575674534,
+        "joyful": -0.07466373592615128,
+        "fear": -0.1261175274848938,
+        "surprise": -0.15951770544052124,
+        "disgust": -0.13756361603736877
+      },
+      "efficientat_max": {
+        "yelling": 0.916619062423706,
+        "crying": 0.2699253559112549,
+        "laughter": 0.3794521689414978
+      },
+      "efficientat_mean": {
+        "yelling": 0.6485856175422668,
+        "crying": 0.1633443981409073,
+        "laughter": 0.2714006006717682
+      },
+      "primary": {
+        "source": "efficientat_max",
+        "key": "laughter",
+        "value": 0.3794521689414978,
+        "detected_0.2": true
+      },
+      "detected_0.2": {
+        "crying": true,
+        "seductive": false,
+        "yelling": true,
+        "laughter": true,
+        "sad_e2v": false,
+        "happy_e2v": false,
+        "fearful_e2v": false,
+        "surprised_e2v": false,
+        "disgusted_e2v": false,
+        "angry_e2v": false,
+        "love_clap": false,
+        "primary": true
+      },
+      "listen_proxy": {
+        "energy_rms_mean": 0.06642640086985527,
+        "energy_rms_std": 0.0556906598877867,
+        "energy_rms_cv": 0.8383814139937767,
+        "f0_hz_mean": 180.0787566772723,
+        "f0_hz_std": 66.69699700424013,
+        "f0_n_voiced_frames": 66
+      }
+    },
+    {
+      "persona": "jarvis",
+      "id": "lau02",
+      "group": "laughter",
+      "text": "[chuckle] Ha, you got me. That was a good one. I needed that.",
+      "pace": 1.0,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/scorer-probe/wav/jarvis/lau02.wav",
+      "duration_s": 4.24,
+      "e2v_top": "neutral",
+      "e2v_top_conf": 0.5063904523849487,
+      "e2v": {
+        "angry": 0.010851694270968437,
+        "disgusted": 0.010347764007747173,
+        "fearful": 0.00042644666973501444,
+        "happy": 0.43279173970222473,
+        "neutral": 0.5063904523849487,
+        "other": 0.008172466419637203,
+        "sad": 0.00043963559437543154,
+        "surprised": 0.0004280226130504161,
+        "unknown": 0.030151773244142532
+      },
+      "clap_top": "aggressive",
+      "clap_probs": {
+        "love": 0.022694248249419485,
+        "seductive": 0.016157385554823527,
+        "yelling": 0.1368061343180375,
+        "logic": 0.22935163753462504,
+        "reason": 0.01877943907305265,
+        "aggressive": 0.43605727434756275,
+        "joyful": 0.07628823918840177,
+        "fear": 0.01163471050696373,
+        "surprise": 0.0106163490843362,
+        "disgust": 0.041614582142777516
+      },
+      "clap_cosine": {
+        "love": -0.11398404836654663,
+        "seductive": -0.130970761179924,
+        "yelling": -0.024161381646990776,
+        "logic": 0.0016731941141188145,
+        "reason": -0.12345149368047714,
+        "aggressive": 0.033799055963754654,
+        "joyful": -0.05336368456482887,
+        "fear": -0.1473899781703949,
+        "surprise": -0.15196986496448517,
+        "disgust": -0.08366709202528
+      },
+      "efficientat_max": {
+        "yelling": 0.8719978332519531,
+        "crying": 0.17914345860481262,
+        "laughter": 0.24334925413131714
+      },
+      "efficientat_mean": {
+        "yelling": 0.7600375413894653,
+        "crying": 0.13357821106910706,
+        "laughter": 0.1842169314622879
+      },
+      "primary": {
+        "source": "efficientat_max",
+        "key": "laughter",
+        "value": 0.24334925413131714,
+        "detected_0.2": true
+      },
+      "detected_0.2": {
+        "crying": false,
+        "seductive": false,
+        "yelling": true,
+        "laughter": true,
+        "sad_e2v": false,
+        "happy_e2v": true,
+        "fearful_e2v": false,
+        "surprised_e2v": false,
+        "disgusted_e2v": false,
+        "angry_e2v": false,
+        "love_clap": false,
+        "primary": true
+      },
+      "listen_proxy": {
+        "energy_rms_mean": 0.06326240220488225,
+        "energy_rms_std": 0.06219997006054157,
+        "energy_rms_cv": 0.9832059468608247,
+        "f0_hz_mean": 192.0450854672701,
+        "f0_hz_std": 85.37374294058972,
+        "f0_n_voiced_frames": 57
+      }
+    }
+  ],
+  "means": {
+    "samantha": {
+      "crying": {
+        "n": 4,
+        "e2v": {
+          "angry": 1.3946152150965524e-09,
+          "disgusted": 1.4689377285070366e-08,
+          "fearful": 1.9159438344610425e-08,
+          "happy": 8.145799123964739e-09,
+          "neutral": 0.25000066681923183,
+          "other": 3.6627364378007906e-09,
+          "sad": 0.7499992847444136,
+          "surprised": 2.497674301032342e-10,
+          "unknown": 1.402883002026184e-08
+        },
+        "clap_probs": {
+          "love": 0.07461363237789594,
+          "seductive": 0.13975856139136106,
+          "yelling": 0.05341449644250698,
+          "logic": 0.1283843816962091,
+          "reason": 0.14836048151996178,
+          "aggressive": 0.1419862070837077,
+          "joyful": 0.11361518379958256,
+          "fear": 0.05731988348224775,
+          "surprise": 0.05134049933324451,
+          "disgust": 0.0912066728732826
+        },
+        "efficientat_max": {
+          "yelling": 0.8345161378383636,
+          "crying": 0.09549574553966522,
+          "laughter": 0.23950182646512985
+        },
+        "primary_detect_rate_0.2": 0.0
+      },
+      "disgust": {
+        "n": 2,
+        "e2v": {
+          "angry": 0.0009966563320631394,
+          "disgusted": 0.0031573712549288757,
+          "fearful": 0.0015595846950660075,
+          "happy": 0.0004144778909562774,
+          "neutral": 0.43173605626543576,
+          "other": 0.0008278161403723061,
+          "sad": 0.05145206549696013,
+          "surprised": 0.4997585489327321,
+          "unknown": 0.010097381279052797
+        },
+        "clap_probs": {
+          "love": 0.061031996696562875,
+          "seductive": 0.10762977705957782,
+          "yelling": 0.030864209756124163,
+          "logic": 0.24949492493481362,
+          "reason": 0.15275633955725165,
+          "aggressive": 0.1383039034708746,
+          "joyful": 0.21022086302242565,
+          "fear": 0.01771765903591267,
+          "surprise": 0.02135960710915414,
+          "disgust": 0.010620719357302834
+        },
+        "efficientat_max": {
+          "yelling": 0.4026624262332916,
+          "crying": 0.0874980092048645,
+          "laughter": 0.08711089193820953
+        },
+        "primary_detect_rate_0.2": 0.0
+      },
+      "fear": {
+        "n": 2,
+        "e2v": {
+          "angry": 0.00013561955717363076,
+          "disgusted": 6.590535486088423e-05,
+          "fearful": 0.4961843788623813,
+          "happy": 4.893477315487463e-05,
+          "neutral": 0.5018172884592786,
+          "other": 1.8892033040472554e-05,
+          "sad": 0.0016769210343986045,
+          "surprised": 6.7408796259493005e-06,
+          "unknown": 4.539117799265816e-05
+        },
+        "clap_probs": {
+          "love": 0.07112839291497725,
+          "seductive": 0.13514774378408767,
+          "yelling": 0.020404990830280228,
+          "logic": 0.34316685441275885,
+          "reason": 0.17422295331667315,
+          "aggressive": 0.07327282792517609,
+          "joyful": 0.1368973980327928,
+          "fear": 0.011584992437061537,
+          "surprise": 0.02661349579167737,
+          "disgust": 0.007560350554514919
+        },
+        "efficientat_max": {
+          "yelling": 0.3197653740644455,
+          "crying": 0.07854160666465759,
+          "laughter": 0.07743707299232483
+        },
+        "primary_detect_rate_0.2": 0.5
+      },
+      "joyful": {
+        "n": 2,
+        "e2v": {
+          "angry": 1.326450060901152e-07,
+          "disgusted": 2.973895256164205e-07,
+          "fearful": 6.421430498448899e-08,
+          "happy": 0.9999668002128601,
+          "neutral": 2.6809572698960338e-05,
+          "other": 3.5478531401622604e-07,
+          "sad": 6.357830768521922e-07,
+          "surprised": 6.740786151482325e-09,
+          "unknown": 4.901520858524577e-06
+        },
+        "clap_probs": {
+          "love": 0.04167536051290506,
+          "seductive": 0.07901504118980912,
+          "yelling": 0.03814299286450222,
+          "logic": 0.10984006716563573,
+          "reason": 0.06772169903481379,
+          "aggressive": 0.08468237709719142,
+          "joyful": 0.5494693310649341,
+          "fear": 0.009485842929961037,
+          "surprise": 0.016367259725227894,
+          "disgust": 0.0036000284150197815
+        },
+        "efficientat_max": {
+          "yelling": 0.7604043483734131,
+          "crying": 0.19873617589473724,
+          "laughter": 0.18608644604682922
+        },
+        "primary_detect_rate_0.2": 1.0
+      },
+      "neutral": {
+        "n": 2,
+        "e2v": {
+          "angry": 9.531159138737033e-07,
+          "disgusted": 3.3653403824611145e-07,
+          "fearful": 2.4761581231616536e-08,
+          "happy": 0.0003722444418974291,
+          "neutral": 0.9994703829288483,
+          "other": 4.569706886787254e-07,
+          "sad": 1.1087048255864485e-06,
+          "surprised": 0.00015440507992679764,
+          "unknown": 5.390032206410147e-08
+        },
+        "clap_probs": {
+          "love": 0.08196523532767919,
+          "seductive": 0.10583763625631454,
+          "yelling": 0.009504765755395106,
+          "logic": 0.3840924659846789,
+          "reason": 0.1337167426735661,
+          "aggressive": 0.07769261921506482,
+          "joyful": 0.15220812350627647,
+          "fear": 0.019947046510896634,
+          "surprise": 0.024803974381304644,
+          "disgust": 0.0102313903888236
+        },
+        "efficientat_max": {
+          "yelling": 0.7943884432315826,
+          "crying": 0.11962473392486572,
+          "laughter": 0.14581072330474854
+        },
+        "primary_detect_rate_0.2": 0.0
+      },
+      "sad": {
+        "n": 2,
+        "e2v": {
+          "angry": 4.21485815138567e-07,
+          "disgusted": 1.3563063475885428e-05,
+          "fearful": 1.0947203179512144e-06,
+          "happy": 2.8818870418945153e-06,
+          "neutral": 0.30326601724664215,
+          "other": 9.449708954889502e-06,
+          "sad": 0.6967038363218307,
+          "surprised": 2.305258149704059e-06,
+          "unknown": 4.173559204900812e-07
+        },
+        "clap_probs": {
+          "love": 0.10440342430106822,
+          "seductive": 0.12200923898598127,
+          "yelling": 0.01040078158594103,
+          "logic": 0.1821932377884135,
+          "reason": 0.058270251819241545,
+          "aggressive": 0.20845310633364506,
+          "joyful": 0.045353378348110186,
+          "fear": 0.054496433402542656,
+          "surprise": 0.15461558197492217,
+          "disgust": 0.05980456546013453
+        },
+        "efficientat_max": {
+          "yelling": 0.8228473663330078,
+          "crying": 0.22598175704479218,
+          "laughter": 0.3766925185918808
+        },
+        "primary_detect_rate_0.2": 1.0
+      },
+      "seductive": {
+        "n": 4,
+        "e2v": {
+          "angry": 0.0001233707705949167,
+          "disgusted": 0.0006934445549947237,
+          "fearful": 0.0009860843784654856,
+          "happy": 0.005299267645348665,
+          "neutral": 0.9262847006320953,
+          "other": 0.0025702836412263195,
+          "sad": 0.00056580030245304,
+          "surprised": 8.152588555829492e-07,
+          "unknown": 0.06347625940782613
+        },
+        "clap_probs": {
+          "love": 0.07268983553783513,
+          "seductive": 0.19980839568014527,
+          "yelling": 0.022883076673657476,
+          "logic": 0.2942806794194702,
+          "reason": 0.13255265971812272,
+          "aggressive": 0.10639516800177197,
+          "joyful": 0.04411519529286826,
+          "fear": 0.031685608366527535,
+          "surprise": 0.029929802702173967,
+          "disgust": 0.06565957860742737
+        },
+        "efficientat_max": {
+          "yelling": 0.5763351693749428,
+          "crying": 0.05810064822435379,
+          "laughter": 0.14142095297574997
+        },
+        "primary_detect_rate_0.2": 0.0
+      },
+      "surprise": {
+        "n": 2,
+        "e2v": {
+          "angry": 2.269810511279502e-05,
+          "disgusted": 6.862297232146375e-05,
+          "fearful": 0.0003557519958121702,
+          "happy": 0.0029667612980119884,
+          "neutral": 0.0003598505136324093,
+          "other": 0.002461335388943553,
+          "sad": 0.39152329741273206,
+          "surprised": 0.10330419355174314,
+          "unknown": 0.4989374965953175
+        },
+        "clap_probs": {
+          "love": 0.10459491300689239,
+          "seductive": 0.16042352733596943,
+          "yelling": 0.03838379030131173,
+          "logic": 0.1177097149189596,
+          "reason": 0.09163154705457624,
+          "aggressive": 0.1193826268026209,
+          "joyful": 0.28102677317963976,
+          "fear": 0.024545368261065445,
+          "surprise": 0.046565385721903246,
+          "disgust": 0.015736353417061102
+        },
+        "efficientat_max": {
+          "yelling": 0.6254846453666687,
+          "crying": 0.07097534835338593,
+          "laughter": 0.05660557746887207
+        },
+        "primary_detect_rate_0.2": 0.5
+      }
+    },
+    "jarvis": {
+      "aggressive": {
+        "n": 2,
+        "e2v": {
+          "angry": 0.9267964065074921,
+          "disgusted": 0.0063390864297616645,
+          "fearful": 0.0003299853561884447,
+          "happy": 0.0013118456681695534,
+          "neutral": 0.01647532597417012,
+          "other": 0.004276175636391599,
+          "sad": 0.0002225016955890169,
+          "surprised": 2.0629829464269278e-05,
+          "unknown": 0.04422805500303184
+        },
+        "clap_probs": {
+          "love": 0.023014132930143302,
+          "seductive": 0.026483994798196575,
+          "yelling": 0.16473955999396336,
+          "logic": 0.3107401480444353,
+          "reason": 0.025573984155388137,
+          "aggressive": 0.31053418904631913,
+          "joyful": 0.09238437176311025,
+          "fear": 0.012965112118412888,
+          "surprise": 0.009735743795188451,
+          "disgust": 0.023828763354842512
+        },
+        "efficientat_max": {
+          "yelling": 0.6734258532524109,
+          "crying": 0.13448333740234375,
+          "laughter": 0.1598457545042038
+        },
+        "primary_detect_rate_0.2": 1.0
+      },
+      "crying": {
+        "n": 4,
+        "e2v": {
+          "angry": 0.0011260607497877162,
+          "disgusted": 0.005639281491854201,
+          "fearful": 0.0003654793103468459,
+          "happy": 0.00030507326751692126,
+          "neutral": 0.616627119360146,
+          "other": 0.004568325879168474,
+          "sad": 0.34155703328819526,
+          "surprised": 1.1061745310651447e-05,
+          "unknown": 0.029800585676195215
+        },
+        "clap_probs": {
+          "love": 0.020745040972470354,
+          "seductive": 0.03655850386269719,
+          "yelling": 0.11142689718902586,
+          "logic": 0.43093014180391886,
+          "reason": 0.05282675681433452,
+          "aggressive": 0.2581938807700189,
+          "joyful": 0.01830521012028992,
+          "fear": 0.025671303750255545,
+          "surprise": 0.012658366289208692,
+          "disgust": 0.0326838984277801
+        },
+        "efficientat_max": {
+          "yelling": 0.5481318682432175,
+          "crying": 0.12241871654987335,
+          "laughter": 0.14082021266222
+        },
+        "primary_detect_rate_0.2": 0.0
+      },
+      "disgust": {
+        "n": 2,
+        "e2v": {
+          "angry": 0.0004305167094571516,
+          "disgusted": 0.00035262391611468047,
+          "fearful": 8.093282804111368e-05,
+          "happy": 5.0106766138924286e-05,
+          "neutral": 0.9971392750740051,
+          "other": 0.0010976277117151767,
+          "sad": 0.00022685545263811946,
+          "surprised": 4.010556494904449e-05,
+          "unknown": 0.000581916916416958
+        },
+        "clap_probs": {
+          "love": 0.00932602563992849,
+          "seductive": 0.023177837592710446,
+          "yelling": 0.06953339669169127,
+          "logic": 0.4033138499685235,
+          "reason": 0.0364869022379911,
+          "aggressive": 0.3973311500663351,
+          "joyful": 0.021318848497993086,
+          "fear": 0.011886650668300535,
+          "surprise": 0.008501298334819569,
+          "disgust": 0.019124040301707057
+        },
+        "efficientat_max": {
+          "yelling": 0.36001454293727875,
+          "crying": 0.1126553863286972,
+          "laughter": 0.1494537889957428
+        },
+        "primary_detect_rate_0.2": 0.0
+      },
+      "fear": {
+        "n": 2,
+        "e2v": {
+          "angry": 0.0004156132262496115,
+          "disgusted": 9.904859608483862e-05,
+          "fearful": 4.0455595062882654e-05,
+          "happy": 2.727913318345543e-05,
+          "neutral": 0.9988836050033569,
+          "other": 0.00011706437886427334,
+          "sad": 2.687874387596878e-05,
+          "surprised": 1.2557397764401124e-06,
+          "unknown": 0.0003889181836944644
+        },
+        "clap_probs": {
+          "love": 0.01669034445814549,
+          "seductive": 0.017410656986039028,
+          "yelling": 0.10901730523310424,
+          "logic": 0.45809435054866743,
+          "reason": 0.025566828576982684,
+          "aggressive": 0.3270693139958456,
+          "joyful": 0.008708241130683882,
+          "fear": 0.010957998465095672,
+          "surprise": 0.008420729804957748,
+          "disgust": 0.018064230800478177
+        },
+        "efficientat_max": {
+          "yelling": 0.48699861764907837,
+          "crying": 0.07371225953102112,
+          "laughter": 0.10363863408565521
+        },
+        "primary_detect_rate_0.2": 0.0
+      },
+      "joyful": {
+        "n": 2,
+        "e2v": {
+          "angry": 1.3443501956089676e-07,
+          "disgusted": 8.215619118345785e-08,
+          "fearful": 5.692082858388403e-07,
+          "happy": 0.9999886155128479,
+          "neutral": 3.353628770241812e-06,
+          "other": 4.945873030237635e-06,
+          "sad": 7.229961767052373e-07,
+          "surprised": 3.5455382629834276e-08,
+          "unknown": 1.4838292798913244e-06
+        },
+        "clap_probs": {
+          "love": 0.013156990183019223,
+          "seductive": 0.025606601523819612,
+          "yelling": 0.0939808827079342,
+          "logic": 0.31539565771007244,
+          "reason": 0.028015908057456487,
+          "aggressive": 0.453178273876213,
+          "joyful": 0.02128996590453838,
+          "fear": 0.016061646138129156,
+          "surprise": 0.01172325838083347,
+          "disgust": 0.021590815517983954
+        },
+        "efficientat_max": {
+          "yelling": 0.5407105982303619,
+          "crying": 0.1051798015832901,
+          "laughter": 0.12322847545146942
+        },
+        "primary_detect_rate_0.2": 1.0
+      },
+      "laughter": {
+        "n": 2,
+        "e2v": {
+          "angry": 0.005451809058286017,
+          "disgusted": 0.005205757235671626,
+          "fearful": 0.00022050156076147687,
+          "happy": 0.21790080924984068,
+          "neutral": 0.7512581646442413,
+          "other": 0.004209305261611007,
+          "sad": 0.00024621556076454,
+          "surprised": 0.00023931632858875673,
+          "unknown": 0.015268066810676828
+        },
+        "clap_probs": {
+          "love": 0.022877078475116455,
+          "seductive": 0.017232213895383874,
+          "yelling": 0.09629853478031464,
+          "logic": 0.4322996350091365,
+          "reason": 0.01989286734600116,
+          "aggressive": 0.30471996109374994,
+          "joyful": 0.05820287705101854,
+          "fear": 0.01298509242517851,
+          "surprise": 0.008983296981713233,
+          "disgust": 0.026508442942387304
+        },
+        "efficientat_max": {
+          "yelling": 0.8943084478378296,
+          "crying": 0.22453440725803375,
+          "laughter": 0.31140071153640747
+        },
+        "primary_detect_rate_0.2": 1.0
+      },
+      "love": {
+        "n": 2,
+        "e2v": {
+          "angry": 5.855267048993085e-09,
+          "disgusted": 1.643903436987504e-08,
+          "fearful": 1.6202925023824782e-09,
+          "happy": 0.499999588482273,
+          "neutral": 0.5000003133928033,
+          "other": 1.4436115407245875e-08,
+          "sad": 3.865183645368475e-08,
+          "surprised": 7.26223012281757e-10,
+          "unknown": 4.250569233220369e-08
+        },
+        "clap_probs": {
+          "love": 0.016242630888209455,
+          "seductive": 0.02746325380418245,
+          "yelling": 0.1482648614882426,
+          "logic": 0.3493815104560763,
+          "reason": 0.048339683785089335,
+          "aggressive": 0.31490291152400013,
+          "joyful": 0.030270731289442424,
+          "fear": 0.02266578553134025,
+          "surprise": 0.011423991065473385,
+          "disgust": 0.031044640167943706
+        },
+        "efficientat_max": {
+          "yelling": 0.36044859886169434,
+          "crying": 0.07551436126232147,
+          "laughter": 0.09518274664878845
+        },
+        "primary_detect_rate_0.2": 0.0
+      },
+      "neutral": {
+        "n": 2,
+        "e2v": {
+          "angry": 4.963968060385515e-11,
+          "disgusted": 2.789796863032594e-12,
+          "fearful": 6.844037835106783e-13,
+          "happy": 3.5492717272156415e-11,
+          "neutral": 1.0,
+          "other": 1.6576736363847528e-13,
+          "sad": 2.358507182956271e-10,
+          "surprised": 9.892580244558191e-12,
+          "unknown": 6.122848979401869e-13
+        },
+        "clap_probs": {
+          "love": 0.01312231509535873,
+          "seductive": 0.028854620196236885,
+          "yelling": 0.06888426722876038,
+          "logic": 0.5214087689979385,
+          "reason": 0.04767849305570856,
+          "aggressive": 0.23944241215926376,
+          "joyful": 0.03832522979089221,
+          "fear": 0.013803656303380579,
+          "surprise": 0.010000349750144848,
+          "disgust": 0.018479887422315475
+        },
+        "efficientat_max": {
+          "yelling": 0.5836010277271271,
+          "crying": 0.11980977654457092,
+          "laughter": 0.08523581922054291
+        },
+        "primary_detect_rate_0.2": 0.0
+      },
+      "sad": {
+        "n": 2,
+        "e2v": {
+          "angry": 5.8905804456829865e-06,
+          "disgusted": 8.27409275653544e-06,
+          "fearful": 1.0999892097796385e-06,
+          "happy": 3.2049339205963805e-06,
+          "neutral": 0.9998795092105865,
+          "other": 3.5362331968047193e-06,
+          "sad": 8.013842461420274e-05,
+          "surprised": 1.1555367609018645e-07,
+          "unknown": 1.825903030164619e-05
+        },
+        "clap_probs": {
+          "love": 0.015234266294199453,
+          "seductive": 0.01937585909768947,
+          "yelling": 0.040491178486210144,
+          "logic": 0.5652954274315616,
+          "reason": 0.036775660112909836,
+          "aggressive": 0.27480589227198604,
+          "joyful": 0.009533321925589791,
+          "fear": 0.015363439228217039,
+          "surprise": 0.00592668821674815,
+          "disgust": 0.017198266934888528
+        },
+        "efficientat_max": {
+          "yelling": 0.8381671607494354,
+          "crying": 0.3188542127609253,
+          "laughter": 0.31510433554649353
+        },
+        "primary_detect_rate_0.2": 0.0
+      },
+      "seductive": {
+        "n": 4,
+        "e2v": {
+          "angry": 0.18811562444832552,
+          "disgusted": 0.0003509173187413806,
+          "fearful": 3.5380986539204065e-05,
+          "happy": 0.00024157427709527269,
+          "neutral": 0.8034651018679142,
+          "other": 0.0009331110632205407,
+          "sad": 0.004545666176246615,
+          "surprised": 0.0016814878634483573,
+          "unknown": 0.000631132075856794
+        },
+        "clap_probs": {
+          "love": 0.017238083779826333,
+          "seductive": 0.021294753869729822,
+          "yelling": 0.1177784064188363,
+          "logic": 0.42477572585857093,
+          "reason": 0.03368724606200401,
+          "aggressive": 0.3020458128569131,
+          "joyful": 0.012735627693313286,
+          "fear": 0.016543379587186335,
+          "surprise": 0.010689471433030052,
+          "disgust": 0.04321149244058992
+        },
+        "efficientat_max": {
+          "yelling": 0.7265378385782242,
+          "crying": 0.14441761374473572,
+          "laughter": 0.16918593645095825
+        },
+        "primary_detect_rate_0.2": 0.0
+      },
+      "surprise": {
+        "n": 2,
+        "e2v": {
+          "angry": 2.853645881373268e-06,
+          "disgusted": 5.3291190624804585e-06,
+          "fearful": 5.070638627557855e-05,
+          "happy": 0.499905352746282,
+          "neutral": 6.480073898273986e-05,
+          "other": 6.728003336320398e-05,
+          "sad": 0.49943199421795725,
+          "surprised": 8.008763785483097e-08,
+          "unknown": 0.00047159934183582664
+        },
+        "clap_probs": {
+          "love": 0.018420265472362685,
+          "seductive": 0.029344738969690358,
+          "yelling": 0.23066805221855924,
+          "logic": 0.1664110993619471,
+          "reason": 0.024958141034325407,
+          "aggressive": 0.3270240972602535,
+          "joyful": 0.12435672930059488,
+          "fear": 0.024109723706639434,
+          "surprise": 0.01762280702491665,
+          "disgust": 0.03708434565071074
+        },
+        "efficientat_max": {
+          "yelling": 0.7741646468639374,
+          "crying": 0.08331269025802612,
+          "laughter": 0.15467481315135956
+        },
+        "primary_detect_rate_0.2": 0.0
+      }
+    }
+  }
+}

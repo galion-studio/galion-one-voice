@@ -1,0 +1,41 @@
+{
+  "baseline": false,
+  "board_wall_s": 0.01,
+  "builtin_rust": {
+    "error": "no wav outputs found"
+  },
+  "generation": {
+    "cpu_s": null,
+    "note": "no timing.json emitted by generator",
+    "rtf": null
+  },
+  "metrics": {
+    "articulation": {
+      "error": "no wavs"
+    },
+    "similarity": {
+      "error": "no wavs"
+    }
+  },
+  "persona": {
+    "emotion": "pending",
+    "hf": "n/a (not Jarvis's limit)",
+    "mouth": {
+      "error": "no wavs"
+    },
+    "pace": {
+      "clone_wps": null,
+      "dist_wps": null,
+      "target_wps": 2.63
+    },
+    "pitch": {
+      "clone_hz": null,
+      "dist_hz": null,
+      "target_hz": 129.0
+    }
+  },
+  "reference": "/workspace/swarm/voice-v2-sprint/cloning-v2/similarity/inputs/jarvis-reference.wav",
+  "speaker": "jarvis",
+  "voice": "own-jarvis-v2-refprep",
+  "wav_dir": null
+}

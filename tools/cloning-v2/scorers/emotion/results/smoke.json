@@ -1,0 +1,286 @@
+{
+  "files": [
+    {
+      "avd": {
+        "arousal": 0.39759525656700134,
+        "dominance": 0.4871329665184021,
+        "valence": 0.519544780254364
+      },
+      "duration_s": 5.0,
+      "file": "../../../own-clone-analysis/wav/samantha/t01.wav",
+      "proxies": {
+        "alpha_ratio_db": -10.652402877807617,
+        "articulation_rate_syl_s": 3.649634838104248,
+        "energy_dr_db": 25.957805633544922,
+        "energy_sd_db": 8.49655532836914,
+        "f0_mean_hz": 194.4184112548828,
+        "f0_median_hz": 187.22569274902344,
+        "f0_range_st_minmax": 11.135320663452148,
+        "f0_range_st_p5_p95": 8.190779685974121,
+        "f0_sd_st": 2.416452646255493,
+        "glottal_cycles": 555,
+        "hammarberg_db": 16.93341064453125,
+        "jitter_local_pct": 2.6179916858673096,
+        "pause_count": 1,
+        "pause_count_ge300ms": 1,
+        "pause_max_ms": 450.0,
+        "pause_mean_ms": 450.0,
+        "pause_ratio": 0.09868420660495758,
+        "pause_total_s": 0.44999998807907104,
+        "rms_dbfs": -19.727760314941406,
+        "shimmer_local_db": 0.825035035610199,
+        "shimmer_local_pct": 8.076578140258789,
+        "spectral_tilt_db_oct": -5.798041820526123,
+        "speech_rate_syl_s": 3.28947377204895,
+        "speech_span_s": 4.559999942779541,
+        "syllables": 15,
+        "voiced_frac": 0.6513158082962036
+      },
+      "sample_rate": 24000,
+      "ser": {
+        "probs": {
+          "ang": 0.3231160640716553,
+          "hap": 0.3961472511291504,
+          "neu": 0.231511652469635,
+          "sad": 0.04922504350543022
+        },
+        "top": "hap",
+        "top_conf": 0.3961472511291504
+      },
+      "timing_ms": {
+        "dim": 2621.245298,
+        "load_resample": 23.69801,
+        "proxies": 92.167174,
+        "ser": 1728.5204880000001
+      },
+      "vs_ref": {
+        "avd_delta": {
+          "arousal": -0.10135430097579956,
+          "dominance": -0.08133703470230103,
+          "valence": -0.03309798240661621
+        },
+        "avd_dist": 0.13410399854183197,
+        "distance_terms": {
+          "avd": 0.8940266370773315,
+          "energy_dr": 0.6212075352668762,
+          "f0_median": 0.5274872779846191,
+          "f0_sd": 0.5395047664642334,
+          "rate": 0.0679870992898941,
+          "ser_js": 0.5722103118896484,
+          "tilt": 0.10818926244974136
+        },
+        "emotion_distance": 0.47580185532569885,
+        "emotion_similarity": 0.5241981744766235,
+        "label_match": false,
+        "proxy_delta": {
+          "alpha_ratio_db": 0.2921428680419922,
+          "articulation_rate_ratio": 1.015194296836853,
+          "energy_dr_db": -3.727245330810547,
+          "f0_median_st": 1.0549745559692383,
+          "f0_range_st_p5_p95": -0.9212865829467773,
+          "f0_sd_st": -0.5395047664642334,
+          "hammarberg_db": 0.8432445526123047,
+          "jitter_local_pct": -0.38706040382385254,
+          "pause_ratio": -0.10049323737621307,
+          "shimmer_local_pct": 0.1932220458984375,
+          "spectral_tilt_db_oct": 0.3245677947998047,
+          "speech_rate_ratio": 1.1425886154174805
+        },
+        "ser_js_div": 0.1430525779724121
+      }
+    },
+    {
+      "avd": {
+        "arousal": 0.5271252393722534,
+        "dominance": 0.6070365309715271,
+        "valence": 0.45379018783569336
+      },
+      "duration_s": 3.799999952316284,
+      "file": "../../../own-clone-analysis/wav/samantha/t02.wav",
+      "proxies": {
+        "alpha_ratio_db": -9.658217430114746,
+        "articulation_rate_syl_s": 4.0625,
+        "energy_dr_db": 29.488739013671875,
+        "energy_sd_db": 10.075532913208008,
+        "f0_mean_hz": 213.9584503173828,
+        "f0_median_hz": 212.25611877441406,
+        "f0_range_st_minmax": 12.714619636535645,
+        "f0_range_st_p5_p95": 11.295658111572266,
+        "f0_sd_st": 3.4662702083587646,
+        "glottal_cycles": 395,
+        "hammarberg_db": 21.113609313964844,
+        "jitter_local_pct": 2.945171356201172,
+        "pause_count": 1,
+        "pause_count_ge300ms": 1,
+        "pause_max_ms": 350.0,
+        "pause_mean_ms": 350.0,
+        "pause_ratio": 0.09859155118465424,
+        "pause_total_s": 0.3499999940395355,
+        "rms_dbfs": -18.52350616455078,
+        "shimmer_local_db": 0.8202437162399292,
+        "shimmer_local_pct": 7.9760661125183105,
+        "spectral_tilt_db_oct": -5.59035062789917,
+        "speech_rate_syl_s": 3.6619718074798584,
+        "speech_span_s": 3.549999952316284,
+        "syllables": 13,
+        "voiced_frac": 0.5718309879302979
+      },
+      "sample_rate": 24000,
+      "ser": {
+        "probs": {
+          "ang": 0.6116347312927246,
+          "hap": 0.020059596747159958,
+          "neu": 0.3662176728248596,
+          "sad": 0.0020880892407149076
+        },
+        "top": "ang",
+        "top_conf": 0.6116347312927246
+      },
+      "timing_ms": {
+        "dim": 886.119623,
+        "load_resample": 21.472041,
+        "proxies": 63.512876999999996,
+        "ser": 1025.441462
+      },
+      "vs_ref": {
+        "avd_delta": {
+          "arousal": 0.028175681829452515,
+          "dominance": 0.038566529750823975,
+          "valence": -0.09885257482528687
+        },
+        "avd_dist": 0.1097865104675293,
+        "distance_terms": {
+          "avd": 0.7319100499153137,
+          "energy_dr": 0.032718658447265625,
+          "f0_median": 1.0,
+          "f0_sd": 0.5103127956390381,
+          "rate": 0.5511613488197327,
+          "ser_js": 1.0,
+          "tilt": 0.17741966247558594
+        },
+        "emotion_distance": 0.571931779384613,
+        "emotion_similarity": 0.42806822061538696,
+        "label_match": false,
+        "proxy_delta": {
+          "alpha_ratio_db": 1.2863283157348633,
+          "articulation_rate_ratio": 1.1300382614135742,
+          "energy_dr_db": -0.19631195068359375,
+          "f0_median_st": 3.2273073196411133,
+          "f0_range_st_p5_p95": 2.183591842651367,
+          "f0_sd_st": 0.5103127956390381,
+          "hammarberg_db": 5.023443222045898,
+          "jitter_local_pct": -0.059880733489990234,
+          "pause_ratio": -0.10058589279651642,
+          "shimmer_local_pct": 0.09271001815795898,
+          "spectral_tilt_db_oct": 0.5322589874267578,
+          "speech_rate_ratio": 1.2719746828079224
+        },
+        "ser_js_div": 0.3493829071521759
+      }
+    }
+  ],
+  "models": {
+    "dim": "/workspace/swarm/voice-v2-sprint/cloning-v2/scorers/emotion/models/msp_dim.onnx",
+    "ser": "/workspace/swarm/voice-v2-sprint/cloning-v2/scorers/emotion/models/superb_er.onnx",
+    "ser_labels": [
+      "neu",
+      "hap",
+      "ang",
+      "sad"
+    ],
+    "threads": 2
+  },
+  "reference": {
+    "avd": {
+      "arousal": 0.4989495575428009,
+      "dominance": 0.5684700012207031,
+      "valence": 0.5526427626609802
+    },
+    "duration_s": 17.407207489013672,
+    "file": "../../../clip-store-own/samantha/reference.wav",
+    "proxies": {
+      "alpha_ratio_db": -10.94454574584961,
+      "articulation_rate_syl_s": 3.595010995864868,
+      "energy_dr_db": 29.68505096435547,
+      "energy_sd_db": 9.860148429870605,
+      "f0_mean_hz": 190.0778350830078,
+      "f0_median_hz": 176.15725708007812,
+      "f0_range_st_minmax": 21.657739639282227,
+      "f0_range_st_p5_p95": 9.112066268920898,
+      "f0_sd_st": 2.9559574127197266,
+      "glottal_cycles": 1797,
+      "hammarberg_db": 16.090166091918945,
+      "jitter_local_pct": 3.005052089691162,
+      "pause_count": 10,
+      "pause_count_ge300ms": 6,
+      "pause_max_ms": 650.0,
+      "pause_mean_ms": 339.0,
+      "pause_ratio": 0.19917744398117065,
+      "pause_total_s": 3.390000104904175,
+      "rms_dbfs": -20.95583152770996,
+      "shimmer_local_db": 0.8765745162963867,
+      "shimmer_local_pct": 7.883356094360352,
+      "spectral_tilt_db_oct": -6.122609615325928,
+      "speech_rate_syl_s": 2.8789658546447754,
+      "speech_span_s": 17.020000457763672,
+      "syllables": 49,
+      "voiced_frac": 0.5816686153411865
+    },
+    "sample_rate": 24000,
+    "ser": {
+      "probs": {
+        "ang": 0.11922252923250198,
+        "hap": 0.2136276662349701,
+        "neu": 0.34940651059150696,
+        "sad": 0.3177432715892792
+      },
+      "top": "neu",
+      "top_conf": 0.34940651059150696
+    },
+    "timing_ms": {
+      "dim": 6950.484215,
+      "load_resample": 52.55065,
+      "proxies": 151.61233700000003,
+      "ser": 3649.3257369999997
+    }
+  },
+  "schema": "galion-emotion/1",
+  "summary": {
+    "label_counts": {
+      "ang": 1,
+      "hap": 1
+    },
+    "label_match_rate": 0.0,
+    "mean_avd": {
+      "arousal": 0.4623602479696274,
+      "dominance": 0.5470847487449646,
+      "valence": 0.4866674840450287
+    },
+    "mean_avd_delta": {
+      "arousal": -0.03658930957317352,
+      "dominance": -0.021385252475738525,
+      "valence": -0.06597527861595154
+    },
+    "mean_avd_dist": 0.12194525450468063,
+    "mean_emotion_distance": 0.523866817355156,
+    "mean_emotion_similarity": 0.47613319754600525,
+    "mean_proxy_delta": {
+      "articulation_rate_ratio": 1.0726162791252136,
+      "energy_dr_db": -1.9617786407470703,
+      "f0_median_st": 2.141140937805176,
+      "f0_sd_st": -0.014595985412597656,
+      "jitter_local_pct": -0.2234705686569214,
+      "pause_ratio": -0.10053956508636475,
+      "shimmer_local_pct": 0.14296603202819824,
+      "spectral_tilt_db_oct": 0.42841339111328125
+    },
+    "mean_ser_js_div": 0.246217742562294,
+    "n_files": 2,
+    "ref_label": "neu"
+  },
+  "timing": {
+    "cpu_s": 13.17,
+    "model_load_ms": 5305.127616,
+    "wall_s": 22.588850103
+  }
+}

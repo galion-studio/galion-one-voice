@@ -1,5 +1,3 @@
-// Galion Voice — Perpetual Open MIT License
-// (c) 2026 Maciej Grajczyk / G.A.L.I.O.N.
 //! Pluggable fix steps. External commands override the bundled simple versions.
 //!
 //! Env contract for a plugin:

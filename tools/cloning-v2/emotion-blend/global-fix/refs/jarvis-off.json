@@ -1,0 +1,6 @@
+{
+  "enabled": false,
+  "input": "../clip-store-own/jarvis/original.wav",
+  "mode": "byte-copy",
+  "output": "emotion-blend/global-fix/refs/jarvis-off.wav"
+}

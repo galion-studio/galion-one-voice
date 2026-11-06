@@ -1,0 +1,27 @@
+{
+  "half_vs_half_ceiling": 0.8283,
+  "max": 0.747,
+  "mean": 0.6874,
+  "min": 0.6414,
+  "n": 12,
+  "ref": "/workspace/swarm/voice-v2-sprint/clip-store-own/samantha/reference.wav",
+  "scores": {
+    "/workspace/swarm/voice-v2-sprint/cloning-v2/hf-samantha/wav/own-samantha-v2-hf-e-mild/t01.wav": 0.7296,
+    "/workspace/swarm/voice-v2-sprint/cloning-v2/hf-samantha/wav/own-samantha-v2-hf-e-mild/t02.wav": 0.6613,
+    "/workspace/swarm/voice-v2-sprint/cloning-v2/hf-samantha/wav/own-samantha-v2-hf-e-mild/t03.wav": 0.7173,
+    "/workspace/swarm/voice-v2-sprint/cloning-v2/hf-samantha/wav/own-samantha-v2-hf-e-mild/t04.wav": 0.747,
+    "/workspace/swarm/voice-v2-sprint/cloning-v2/hf-samantha/wav/own-samantha-v2-hf-e-mild/t05.wav": 0.6817,
+    "/workspace/swarm/voice-v2-sprint/cloning-v2/hf-samantha/wav/own-samantha-v2-hf-e-mild/t06.wav": 0.7276,
+    "/workspace/swarm/voice-v2-sprint/cloning-v2/hf-samantha/wav/own-samantha-v2-hf-e-mild/t07.wav": 0.663,
+    "/workspace/swarm/voice-v2-sprint/cloning-v2/hf-samantha/wav/own-samantha-v2-hf-e-mild/t08.wav": 0.675,
+    "/workspace/swarm/voice-v2-sprint/cloning-v2/hf-samantha/wav/own-samantha-v2-hf-e-mild/t09.wav": 0.6745,
+    "/workspace/swarm/voice-v2-sprint/cloning-v2/hf-samantha/wav/own-samantha-v2-hf-e-mild/t10.wav": 0.6644,
+    "/workspace/swarm/voice-v2-sprint/cloning-v2/hf-samantha/wav/own-samantha-v2-hf-e-mild/t11.wav": 0.666,
+    "/workspace/swarm/voice-v2-sprint/cloning-v2/hf-samantha/wav/own-samantha-v2-hf-e-mild/t12.wav": 0.6414
+  },
+  "sd": 0.0338,
+  "timing": {
+    "model_load_s": 0.1451,
+    "wall_s_total": 2.676
+  }
+}

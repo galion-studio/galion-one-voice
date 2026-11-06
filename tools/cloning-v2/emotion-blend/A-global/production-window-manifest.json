@@ -1,0 +1,866 @@
+[
+  {
+    "persona": "samantha",
+    "cohort": "merged",
+    "line": "t01",
+    "start_s": 0.0,
+    "end_s": 2.36,
+    "source": "merge-v2/wav/samantha/t01.wav",
+    "path": "emotion-blend/A-global/windows/samantha_merged_t01_00.wav"
+  },
+  {
+    "persona": "samantha",
+    "cohort": "merged",
+    "line": "t01",
+    "start_s": 2.36,
+    "end_s": 4.72,
+    "source": "merge-v2/wav/samantha/t01.wav",
+    "path": "emotion-blend/A-global/windows/samantha_merged_t01_01.wav"
+  },
+  {
+    "persona": "samantha",
+    "cohort": "merged",
+    "line": "t02",
+    "start_s": 0.0,
+    "end_s": 3.6,
+    "source": "merge-v2/wav/samantha/t02.wav",
+    "path": "emotion-blend/A-global/windows/samantha_merged_t02_00.wav"
+  },
+  {
+    "persona": "samantha",
+    "cohort": "merged",
+    "line": "t03",
+    "start_s": 0.0,
+    "end_s": 3.2,
+    "source": "merge-v2/wav/samantha/t03.wav",
+    "path": "emotion-blend/A-global/windows/samantha_merged_t03_00.wav"
+  },
+  {
+    "persona": "samantha",
+    "cohort": "merged",
+    "line": "t04",
+    "start_s": 0.0,
+    "end_s": 2.52,
+    "source": "merge-v2/wav/samantha/t04.wav",
+    "path": "emotion-blend/A-global/windows/samantha_merged_t04_00.wav"
+  },
+  {
+    "persona": "samantha",
+    "cohort": "merged",
+    "line": "t05",
+    "start_s": 0.0,
+    "end_s": 3.08,
+    "source": "merge-v2/wav/samantha/t05.wav",
+    "path": "emotion-blend/A-global/windows/samantha_merged_t05_00.wav"
+  },
+  {
+    "persona": "samantha",
+    "cohort": "merged",
+    "line": "t06",
+    "start_s": 0.0,
+    "end_s": 2.08,
+    "source": "merge-v2/wav/samantha/t06.wav",
+    "path": "emotion-blend/A-global/windows/samantha_merged_t06_00.wav"
+  },
+  {
+    "persona": "samantha",
+    "cohort": "merged",
+    "line": "t06",
+    "start_s": 2.08,
+    "end_s": 4.16,
+    "source": "merge-v2/wav/samantha/t06.wav",
+    "path": "emotion-blend/A-global/windows/samantha_merged_t06_01.wav"
+  },
+  {
+    "persona": "samantha",
+    "cohort": "merged",
+    "line": "t07",
+    "start_s": 0.0,
+    "end_s": 3.44,
+    "source": "merge-v2/wav/samantha/t07.wav",
+    "path": "emotion-blend/A-global/windows/samantha_merged_t07_00.wav"
+  },
+  {
+    "persona": "samantha",
+    "cohort": "merged",
+    "line": "t08",
+    "start_s": 0.0,
+    "end_s": 2.493333333333333,
+    "source": "merge-v2/wav/samantha/t08.wav",
+    "path": "emotion-blend/A-global/windows/samantha_merged_t08_00.wav"
+  },
+  {
+    "persona": "samantha",
+    "cohort": "merged",
+    "line": "t08",
+    "start_s": 2.493333333333333,
+    "end_s": 4.986666666666666,
+    "source": "merge-v2/wav/samantha/t08.wav",
+    "path": "emotion-blend/A-global/windows/samantha_merged_t08_01.wav"
+  },
+  {
+    "persona": "samantha",
+    "cohort": "merged",
+    "line": "t08",
+    "start_s": 4.986666666666666,
+    "end_s": 7.48,
+    "source": "merge-v2/wav/samantha/t08.wav",
+    "path": "emotion-blend/A-global/windows/samantha_merged_t08_02.wav"
+  },
+  {
+    "persona": "samantha",
+    "cohort": "merged",
+    "line": "t09",
+    "start_s": 0.0,
+    "end_s": 2.84,
+    "source": "merge-v2/wav/samantha/t09.wav",
+    "path": "emotion-blend/A-global/windows/samantha_merged_t09_00.wav"
+  },
+  {
+    "persona": "samantha",
+    "cohort": "merged",
+    "line": "t09",
+    "start_s": 2.84,
+    "end_s": 5.68,
+    "source": "merge-v2/wav/samantha/t09.wav",
+    "path": "emotion-blend/A-global/windows/samantha_merged_t09_01.wav"
+  },
+  {
+    "persona": "samantha",
+    "cohort": "merged",
+    "line": "t09",
+    "start_s": 5.68,
+    "end_s": 8.52,
+    "source": "merge-v2/wav/samantha/t09.wav",
+    "path": "emotion-blend/A-global/windows/samantha_merged_t09_02.wav"
+  },
+  {
+    "persona": "samantha",
+    "cohort": "merged",
+    "line": "t10",
+    "start_s": 0.0,
+    "end_s": 2.86,
+    "source": "merge-v2/wav/samantha/t10.wav",
+    "path": "emotion-blend/A-global/windows/samantha_merged_t10_00.wav"
+  },
+  {
+    "persona": "samantha",
+    "cohort": "merged",
+    "line": "t10",
+    "start_s": 2.86,
+    "end_s": 5.72,
+    "source": "merge-v2/wav/samantha/t10.wav",
+    "path": "emotion-blend/A-global/windows/samantha_merged_t10_01.wav"
+  },
+  {
+    "persona": "samantha",
+    "cohort": "merged",
+    "line": "t11",
+    "start_s": 0.0,
+    "end_s": 2.64,
+    "source": "merge-v2/wav/samantha/t11.wav",
+    "path": "emotion-blend/A-global/windows/samantha_merged_t11_00.wav"
+  },
+  {
+    "persona": "samantha",
+    "cohort": "merged",
+    "line": "t11",
+    "start_s": 2.64,
+    "end_s": 5.28,
+    "source": "merge-v2/wav/samantha/t11.wav",
+    "path": "emotion-blend/A-global/windows/samantha_merged_t11_01.wav"
+  },
+  {
+    "persona": "samantha",
+    "cohort": "merged",
+    "line": "t11",
+    "start_s": 5.28,
+    "end_s": 7.92,
+    "source": "merge-v2/wav/samantha/t11.wav",
+    "path": "emotion-blend/A-global/windows/samantha_merged_t11_02.wav"
+  },
+  {
+    "persona": "samantha",
+    "cohort": "merged",
+    "line": "t12",
+    "start_s": 0.0,
+    "end_s": 2.2,
+    "source": "merge-v2/wav/samantha/t12.wav",
+    "path": "emotion-blend/A-global/windows/samantha_merged_t12_00.wav"
+  },
+  {
+    "persona": "samantha",
+    "cohort": "merged",
+    "line": "t12",
+    "start_s": 2.2,
+    "end_s": 4.4,
+    "source": "merge-v2/wav/samantha/t12.wav",
+    "path": "emotion-blend/A-global/windows/samantha_merged_t12_01.wav"
+  },
+  {
+    "persona": "samantha",
+    "cohort": "merged",
+    "line": "t12",
+    "start_s": 4.4,
+    "end_s": 6.6,
+    "source": "merge-v2/wav/samantha/t12.wav",
+    "path": "emotion-blend/A-global/windows/samantha_merged_t12_02.wav"
+  },
+  {
+    "persona": "samantha",
+    "cohort": "pre_timbre",
+    "line": "t01",
+    "start_s": 0.0,
+    "end_s": 2.36,
+    "source": "emotion-fix/runs/sd_r2_t012/t01.wav",
+    "path": "emotion-blend/A-global/windows/samantha_pre_timbre_t01_00.wav"
+  },
+  {
+    "persona": "samantha",
+    "cohort": "pre_timbre",
+    "line": "t01",
+    "start_s": 2.36,
+    "end_s": 4.72,
+    "source": "emotion-fix/runs/sd_r2_t012/t01.wav",
+    "path": "emotion-blend/A-global/windows/samantha_pre_timbre_t01_01.wav"
+  },
+  {
+    "persona": "samantha",
+    "cohort": "pre_timbre",
+    "line": "t02",
+    "start_s": 0.0,
+    "end_s": 3.6,
+    "source": "emotion-fix/runs/sd_r2_t012/t02.wav",
+    "path": "emotion-blend/A-global/windows/samantha_pre_timbre_t02_00.wav"
+  },
+  {
+    "persona": "samantha",
+    "cohort": "pre_timbre",
+    "line": "t03",
+    "start_s": 0.0,
+    "end_s": 3.2,
+    "source": "emotion-fix/runs/sd_r2_t012/t03.wav",
+    "path": "emotion-blend/A-global/windows/samantha_pre_timbre_t03_00.wav"
+  },
+  {
+    "persona": "samantha",
+    "cohort": "pre_timbre",
+    "line": "t04",
+    "start_s": 0.0,
+    "end_s": 2.52,
+    "source": "emotion-fix/runs/sd_r2_t012/t04.wav",
+    "path": "emotion-blend/A-global/windows/samantha_pre_timbre_t04_00.wav"
+  },
+  {
+    "persona": "samantha",
+    "cohort": "pre_timbre",
+    "line": "t05",
+    "start_s": 0.0,
+    "end_s": 3.08,
+    "source": "emotion-fix/runs/sd_r2_t012/t05.wav",
+    "path": "emotion-blend/A-global/windows/samantha_pre_timbre_t05_00.wav"
+  },
+  {
+    "persona": "samantha",
+    "cohort": "pre_timbre",
+    "line": "t06",
+    "start_s": 0.0,
+    "end_s": 2.08,
+    "source": "emotion-fix/runs/sd_r2_t012/t06.wav",
+    "path": "emotion-blend/A-global/windows/samantha_pre_timbre_t06_00.wav"
+  },
+  {
+    "persona": "samantha",
+    "cohort": "pre_timbre",
+    "line": "t06",
+    "start_s": 2.08,
+    "end_s": 4.16,
+    "source": "emotion-fix/runs/sd_r2_t012/t06.wav",
+    "path": "emotion-blend/A-global/windows/samantha_pre_timbre_t06_01.wav"
+  },
+  {
+    "persona": "samantha",
+    "cohort": "pre_timbre",
+    "line": "t07",
+    "start_s": 0.0,
+    "end_s": 3.44,
+    "source": "emotion-fix/runs/sd_r2_t012/t07.wav",
+    "path": "emotion-blend/A-global/windows/samantha_pre_timbre_t07_00.wav"
+  },
+  {
+    "persona": "samantha",
+    "cohort": "pre_timbre",
+    "line": "t08",
+    "start_s": 0.0,
+    "end_s": 2.493333333333333,
+    "source": "emotion-fix/runs/sd_r2_t012/t08.wav",
+    "path": "emotion-blend/A-global/windows/samantha_pre_timbre_t08_00.wav"
+  },
+  {
+    "persona": "samantha",
+    "cohort": "pre_timbre",
+    "line": "t08",
+    "start_s": 2.493333333333333,
+    "end_s": 4.986666666666666,
+    "source": "emotion-fix/runs/sd_r2_t012/t08.wav",
+    "path": "emotion-blend/A-global/windows/samantha_pre_timbre_t08_01.wav"
+  },
+  {
+    "persona": "samantha",
+    "cohort": "pre_timbre",
+    "line": "t08",
+    "start_s": 4.986666666666666,
+    "end_s": 7.48,
+    "source": "emotion-fix/runs/sd_r2_t012/t08.wav",
+    "path": "emotion-blend/A-global/windows/samantha_pre_timbre_t08_02.wav"
+  },
+  {
+    "persona": "samantha",
+    "cohort": "pre_timbre",
+    "line": "t09",
+    "start_s": 0.0,
+    "end_s": 2.84,
+    "source": "emotion-fix/runs/sd_r2_t012/t09.wav",
+    "path": "emotion-blend/A-global/windows/samantha_pre_timbre_t09_00.wav"
+  },
+  {
+    "persona": "samantha",
+    "cohort": "pre_timbre",
+    "line": "t09",
+    "start_s": 2.84,
+    "end_s": 5.68,
+    "source": "emotion-fix/runs/sd_r2_t012/t09.wav",
+    "path": "emotion-blend/A-global/windows/samantha_pre_timbre_t09_01.wav"
+  },
+  {
+    "persona": "samantha",
+    "cohort": "pre_timbre",
+    "line": "t09",
+    "start_s": 5.68,
+    "end_s": 8.52,
+    "source": "emotion-fix/runs/sd_r2_t012/t09.wav",
+    "path": "emotion-blend/A-global/windows/samantha_pre_timbre_t09_02.wav"
+  },
+  {
+    "persona": "samantha",
+    "cohort": "pre_timbre",
+    "line": "t10",
+    "start_s": 0.0,
+    "end_s": 2.86,
+    "source": "emotion-fix/runs/sd_r2_t012/t10.wav",
+    "path": "emotion-blend/A-global/windows/samantha_pre_timbre_t10_00.wav"
+  },
+  {
+    "persona": "samantha",
+    "cohort": "pre_timbre",
+    "line": "t10",
+    "start_s": 2.86,
+    "end_s": 5.72,
+    "source": "emotion-fix/runs/sd_r2_t012/t10.wav",
+    "path": "emotion-blend/A-global/windows/samantha_pre_timbre_t10_01.wav"
+  },
+  {
+    "persona": "samantha",
+    "cohort": "pre_timbre",
+    "line": "t11",
+    "start_s": 0.0,
+    "end_s": 2.64,
+    "source": "emotion-fix/runs/sd_r2_t012/t11.wav",
+    "path": "emotion-blend/A-global/windows/samantha_pre_timbre_t11_00.wav"
+  },
+  {
+    "persona": "samantha",
+    "cohort": "pre_timbre",
+    "line": "t11",
+    "start_s": 2.64,
+    "end_s": 5.28,
+    "source": "emotion-fix/runs/sd_r2_t012/t11.wav",
+    "path": "emotion-blend/A-global/windows/samantha_pre_timbre_t11_01.wav"
+  },
+  {
+    "persona": "samantha",
+    "cohort": "pre_timbre",
+    "line": "t11",
+    "start_s": 5.28,
+    "end_s": 7.92,
+    "source": "emotion-fix/runs/sd_r2_t012/t11.wav",
+    "path": "emotion-blend/A-global/windows/samantha_pre_timbre_t11_02.wav"
+  },
+  {
+    "persona": "samantha",
+    "cohort": "pre_timbre",
+    "line": "t12",
+    "start_s": 0.0,
+    "end_s": 2.2,
+    "source": "emotion-fix/runs/sd_r2_t012/t12.wav",
+    "path": "emotion-blend/A-global/windows/samantha_pre_timbre_t12_00.wav"
+  },
+  {
+    "persona": "samantha",
+    "cohort": "pre_timbre",
+    "line": "t12",
+    "start_s": 2.2,
+    "end_s": 4.4,
+    "source": "emotion-fix/runs/sd_r2_t012/t12.wav",
+    "path": "emotion-blend/A-global/windows/samantha_pre_timbre_t12_01.wav"
+  },
+  {
+    "persona": "samantha",
+    "cohort": "pre_timbre",
+    "line": "t12",
+    "start_s": 4.4,
+    "end_s": 6.6,
+    "source": "emotion-fix/runs/sd_r2_t012/t12.wav",
+    "path": "emotion-blend/A-global/windows/samantha_pre_timbre_t12_02.wav"
+  },
+  {
+    "persona": "jarvis",
+    "cohort": "merged",
+    "line": "t01",
+    "start_s": 0.0,
+    "end_s": 2.52,
+    "source": "merge-v2/wav/jarvis/t01.wav",
+    "path": "emotion-blend/A-global/windows/jarvis_merged_t01_00.wav"
+  },
+  {
+    "persona": "jarvis",
+    "cohort": "merged",
+    "line": "t01",
+    "start_s": 2.52,
+    "end_s": 5.04,
+    "source": "merge-v2/wav/jarvis/t01.wav",
+    "path": "emotion-blend/A-global/windows/jarvis_merged_t01_01.wav"
+  },
+  {
+    "persona": "jarvis",
+    "cohort": "merged",
+    "line": "t02",
+    "start_s": 0.0,
+    "end_s": 2.06,
+    "source": "merge-v2/wav/jarvis/t02.wav",
+    "path": "emotion-blend/A-global/windows/jarvis_merged_t02_00.wav"
+  },
+  {
+    "persona": "jarvis",
+    "cohort": "merged",
+    "line": "t02",
+    "start_s": 2.06,
+    "end_s": 4.12,
+    "source": "merge-v2/wav/jarvis/t02.wav",
+    "path": "emotion-blend/A-global/windows/jarvis_merged_t02_01.wav"
+  },
+  {
+    "persona": "jarvis",
+    "cohort": "merged",
+    "line": "t03",
+    "start_s": 0.0,
+    "end_s": 3.68,
+    "source": "merge-v2/wav/jarvis/t03.wav",
+    "path": "emotion-blend/A-global/windows/jarvis_merged_t03_00.wav"
+  },
+  {
+    "persona": "jarvis",
+    "cohort": "merged",
+    "line": "t04",
+    "start_s": 0.0,
+    "end_s": 2.72,
+    "source": "merge-v2/wav/jarvis/t04.wav",
+    "path": "emotion-blend/A-global/windows/jarvis_merged_t04_00.wav"
+  },
+  {
+    "persona": "jarvis",
+    "cohort": "merged",
+    "line": "t05",
+    "start_s": 0.0,
+    "end_s": 3.56,
+    "source": "merge-v2/wav/jarvis/t05.wav",
+    "path": "emotion-blend/A-global/windows/jarvis_merged_t05_00.wav"
+  },
+  {
+    "persona": "jarvis",
+    "cohort": "merged",
+    "line": "t06",
+    "start_s": 0.0,
+    "end_s": 2.02,
+    "source": "merge-v2/wav/jarvis/t06.wav",
+    "path": "emotion-blend/A-global/windows/jarvis_merged_t06_00.wav"
+  },
+  {
+    "persona": "jarvis",
+    "cohort": "merged",
+    "line": "t06",
+    "start_s": 2.02,
+    "end_s": 4.04,
+    "source": "merge-v2/wav/jarvis/t06.wav",
+    "path": "emotion-blend/A-global/windows/jarvis_merged_t06_01.wav"
+  },
+  {
+    "persona": "jarvis",
+    "cohort": "merged",
+    "line": "t07",
+    "start_s": 0.0,
+    "end_s": 1.9,
+    "source": "merge-v2/wav/jarvis/t07.wav",
+    "path": "emotion-blend/A-global/windows/jarvis_merged_t07_00.wav"
+  },
+  {
+    "persona": "jarvis",
+    "cohort": "merged",
+    "line": "t07",
+    "start_s": 1.9,
+    "end_s": 3.8,
+    "source": "merge-v2/wav/jarvis/t07.wav",
+    "path": "emotion-blend/A-global/windows/jarvis_merged_t07_01.wav"
+  },
+  {
+    "persona": "jarvis",
+    "cohort": "merged",
+    "line": "t08",
+    "start_s": 0.0,
+    "end_s": 2.76,
+    "source": "merge-v2/wav/jarvis/t08.wav",
+    "path": "emotion-blend/A-global/windows/jarvis_merged_t08_00.wav"
+  },
+  {
+    "persona": "jarvis",
+    "cohort": "merged",
+    "line": "t08",
+    "start_s": 2.76,
+    "end_s": 5.52,
+    "source": "merge-v2/wav/jarvis/t08.wav",
+    "path": "emotion-blend/A-global/windows/jarvis_merged_t08_01.wav"
+  },
+  {
+    "persona": "jarvis",
+    "cohort": "merged",
+    "line": "t08",
+    "start_s": 5.52,
+    "end_s": 8.28,
+    "source": "merge-v2/wav/jarvis/t08.wav",
+    "path": "emotion-blend/A-global/windows/jarvis_merged_t08_02.wav"
+  },
+  {
+    "persona": "jarvis",
+    "cohort": "merged",
+    "line": "t09",
+    "start_s": 0.0,
+    "end_s": 2.55,
+    "source": "merge-v2/wav/jarvis/t09.wav",
+    "path": "emotion-blend/A-global/windows/jarvis_merged_t09_00.wav"
+  },
+  {
+    "persona": "jarvis",
+    "cohort": "merged",
+    "line": "t09",
+    "start_s": 2.55,
+    "end_s": 5.1,
+    "source": "merge-v2/wav/jarvis/t09.wav",
+    "path": "emotion-blend/A-global/windows/jarvis_merged_t09_01.wav"
+  },
+  {
+    "persona": "jarvis",
+    "cohort": "merged",
+    "line": "t09",
+    "start_s": 5.1,
+    "end_s": 7.65,
+    "source": "merge-v2/wav/jarvis/t09.wav",
+    "path": "emotion-blend/A-global/windows/jarvis_merged_t09_02.wav"
+  },
+  {
+    "persona": "jarvis",
+    "cohort": "merged",
+    "line": "t09",
+    "start_s": 7.65,
+    "end_s": 10.2,
+    "source": "merge-v2/wav/jarvis/t09.wav",
+    "path": "emotion-blend/A-global/windows/jarvis_merged_t09_03.wav"
+  },
+  {
+    "persona": "jarvis",
+    "cohort": "merged",
+    "line": "t10",
+    "start_s": 0.0,
+    "end_s": 2.88,
+    "source": "merge-v2/wav/jarvis/t10.wav",
+    "path": "emotion-blend/A-global/windows/jarvis_merged_t10_00.wav"
+  },
+  {
+    "persona": "jarvis",
+    "cohort": "merged",
+    "line": "t10",
+    "start_s": 2.88,
+    "end_s": 5.76,
+    "source": "merge-v2/wav/jarvis/t10.wav",
+    "path": "emotion-blend/A-global/windows/jarvis_merged_t10_01.wav"
+  },
+  {
+    "persona": "jarvis",
+    "cohort": "merged",
+    "line": "t11",
+    "start_s": 0.0,
+    "end_s": 2.64,
+    "source": "merge-v2/wav/jarvis/t11.wav",
+    "path": "emotion-blend/A-global/windows/jarvis_merged_t11_00.wav"
+  },
+  {
+    "persona": "jarvis",
+    "cohort": "merged",
+    "line": "t11",
+    "start_s": 2.64,
+    "end_s": 5.28,
+    "source": "merge-v2/wav/jarvis/t11.wav",
+    "path": "emotion-blend/A-global/windows/jarvis_merged_t11_01.wav"
+  },
+  {
+    "persona": "jarvis",
+    "cohort": "merged",
+    "line": "t11",
+    "start_s": 5.28,
+    "end_s": 7.92,
+    "source": "merge-v2/wav/jarvis/t11.wav",
+    "path": "emotion-blend/A-global/windows/jarvis_merged_t11_02.wav"
+  },
+  {
+    "persona": "jarvis",
+    "cohort": "merged",
+    "line": "t12",
+    "start_s": 0.0,
+    "end_s": 3.02,
+    "source": "merge-v2/wav/jarvis/t12.wav",
+    "path": "emotion-blend/A-global/windows/jarvis_merged_t12_00.wav"
+  },
+  {
+    "persona": "jarvis",
+    "cohort": "merged",
+    "line": "t12",
+    "start_s": 3.02,
+    "end_s": 6.04,
+    "source": "merge-v2/wav/jarvis/t12.wav",
+    "path": "emotion-blend/A-global/windows/jarvis_merged_t12_01.wav"
+  },
+  {
+    "persona": "jarvis",
+    "cohort": "pre_timbre",
+    "line": "t01",
+    "start_s": 0.0,
+    "end_s": 2.52,
+    "source": "../own-clone-analysis/wav/jarvis/t01.wav",
+    "path": "emotion-blend/A-global/windows/jarvis_pre_timbre_t01_00.wav"
+  },
+  {
+    "persona": "jarvis",
+    "cohort": "pre_timbre",
+    "line": "t01",
+    "start_s": 2.52,
+    "end_s": 5.04,
+    "source": "../own-clone-analysis/wav/jarvis/t01.wav",
+    "path": "emotion-blend/A-global/windows/jarvis_pre_timbre_t01_01.wav"
+  },
+  {
+    "persona": "jarvis",
+    "cohort": "pre_timbre",
+    "line": "t02",
+    "start_s": 0.0,
+    "end_s": 2.06,
+    "source": "../own-clone-analysis/wav/jarvis/t02.wav",
+    "path": "emotion-blend/A-global/windows/jarvis_pre_timbre_t02_00.wav"
+  },
+  {
+    "persona": "jarvis",
+    "cohort": "pre_timbre",
+    "line": "t02",
+    "start_s": 2.06,
+    "end_s": 4.12,
+    "source": "../own-clone-analysis/wav/jarvis/t02.wav",
+    "path": "emotion-blend/A-global/windows/jarvis_pre_timbre_t02_01.wav"
+  },
+  {
+    "persona": "jarvis",
+    "cohort": "pre_timbre",
+    "line": "t03",
+    "start_s": 0.0,
+    "end_s": 3.68,
+    "source": "../own-clone-analysis/wav/jarvis/t03.wav",
+    "path": "emotion-blend/A-global/windows/jarvis_pre_timbre_t03_00.wav"
+  },
+  {
+    "persona": "jarvis",
+    "cohort": "pre_timbre",
+    "line": "t04",
+    "start_s": 0.0,
+    "end_s": 2.72,
+    "source": "../own-clone-analysis/wav/jarvis/t04.wav",
+    "path": "emotion-blend/A-global/windows/jarvis_pre_timbre_t04_00.wav"
+  },
+  {
+    "persona": "jarvis",
+    "cohort": "pre_timbre",
+    "line": "t05",
+    "start_s": 0.0,
+    "end_s": 3.56,
+    "source": "../own-clone-analysis/wav/jarvis/t05.wav",
+    "path": "emotion-blend/A-global/windows/jarvis_pre_timbre_t05_00.wav"
+  },
+  {
+    "persona": "jarvis",
+    "cohort": "pre_timbre",
+    "line": "t06",
+    "start_s": 0.0,
+    "end_s": 2.02,
+    "source": "../own-clone-analysis/wav/jarvis/t06.wav",
+    "path": "emotion-blend/A-global/windows/jarvis_pre_timbre_t06_00.wav"
+  },
+  {
+    "persona": "jarvis",
+    "cohort": "pre_timbre",
+    "line": "t06",
+    "start_s": 2.02,
+    "end_s": 4.04,
+    "source": "../own-clone-analysis/wav/jarvis/t06.wav",
+    "path": "emotion-blend/A-global/windows/jarvis_pre_timbre_t06_01.wav"
+  },
+  {
+    "persona": "jarvis",
+    "cohort": "pre_timbre",
+    "line": "t07",
+    "start_s": 0.0,
+    "end_s": 1.9,
+    "source": "../own-clone-analysis/wav/jarvis/t07.wav",
+    "path": "emotion-blend/A-global/windows/jarvis_pre_timbre_t07_00.wav"
+  },
+  {
+    "persona": "jarvis",
+    "cohort": "pre_timbre",
+    "line": "t07",
+    "start_s": 1.9,
+    "end_s": 3.8,
+    "source": "../own-clone-analysis/wav/jarvis/t07.wav",
+    "path": "emotion-blend/A-global/windows/jarvis_pre_timbre_t07_01.wav"
+  },
+  {
+    "persona": "jarvis",
+    "cohort": "pre_timbre",
+    "line": "t08",
+    "start_s": 0.0,
+    "end_s": 2.76,
+    "source": "../own-clone-analysis/wav/jarvis/t08.wav",
+    "path": "emotion-blend/A-global/windows/jarvis_pre_timbre_t08_00.wav"
+  },
+  {
+    "persona": "jarvis",
+    "cohort": "pre_timbre",
+    "line": "t08",
+    "start_s": 2.76,
+    "end_s": 5.52,
+    "source": "../own-clone-analysis/wav/jarvis/t08.wav",
+    "path": "emotion-blend/A-global/windows/jarvis_pre_timbre_t08_01.wav"
+  },
+  {
+    "persona": "jarvis",
+    "cohort": "pre_timbre",
+    "line": "t08",
+    "start_s": 5.52,
+    "end_s": 8.28,
+    "source": "../own-clone-analysis/wav/jarvis/t08.wav",
+    "path": "emotion-blend/A-global/windows/jarvis_pre_timbre_t08_02.wav"
+  },
+  {
+    "persona": "jarvis",
+    "cohort": "pre_timbre",
+    "line": "t09",
+    "start_s": 0.0,
+    "end_s": 2.55,
+    "source": "../own-clone-analysis/wav/jarvis/t09.wav",
+    "path": "emotion-blend/A-global/windows/jarvis_pre_timbre_t09_00.wav"
+  },
+  {
+    "persona": "jarvis",
+    "cohort": "pre_timbre",
+    "line": "t09",
+    "start_s": 2.55,
+    "end_s": 5.1,
+    "source": "../own-clone-analysis/wav/jarvis/t09.wav",
+    "path": "emotion-blend/A-global/windows/jarvis_pre_timbre_t09_01.wav"
+  },
+  {
+    "persona": "jarvis",
+    "cohort": "pre_timbre",
+    "line": "t09",
+    "start_s": 5.1,
+    "end_s": 7.65,
+    "source": "../own-clone-analysis/wav/jarvis/t09.wav",
+    "path": "emotion-blend/A-global/windows/jarvis_pre_timbre_t09_02.wav"
+  },
+  {
+    "persona": "jarvis",
+    "cohort": "pre_timbre",
+    "line": "t09",
+    "start_s": 7.65,
+    "end_s": 10.2,
+    "source": "../own-clone-analysis/wav/jarvis/t09.wav",
+    "path": "emotion-blend/A-global/windows/jarvis_pre_timbre_t09_03.wav"
+  },
+  {
+    "persona": "jarvis",
+    "cohort": "pre_timbre",
+    "line": "t10",
+    "start_s": 0.0,
+    "end_s": 2.88,
+    "source": "../own-clone-analysis/wav/jarvis/t10.wav",
+    "path": "emotion-blend/A-global/windows/jarvis_pre_timbre_t10_00.wav"
+  },
+  {
+    "persona": "jarvis",
+    "cohort": "pre_timbre",
+    "line": "t10",
+    "start_s": 2.88,
+    "end_s": 5.76,
+    "source": "../own-clone-analysis/wav/jarvis/t10.wav",
+    "path": "emotion-blend/A-global/windows/jarvis_pre_timbre_t10_01.wav"
+  },
+  {
+    "persona": "jarvis",
+    "cohort": "pre_timbre",
+    "line": "t11",
+    "start_s": 0.0,
+    "end_s": 2.64,
+    "source": "../own-clone-analysis/wav/jarvis/t11.wav",
+    "path": "emotion-blend/A-global/windows/jarvis_pre_timbre_t11_00.wav"
+  },
+  {
+    "persona": "jarvis",
+    "cohort": "pre_timbre",
+    "line": "t11",
+    "start_s": 2.64,
+    "end_s": 5.28,
+    "source": "../own-clone-analysis/wav/jarvis/t11.wav",
+    "path": "emotion-blend/A-global/windows/jarvis_pre_timbre_t11_01.wav"
+  },
+  {
+    "persona": "jarvis",
+    "cohort": "pre_timbre",
+    "line": "t11",
+    "start_s": 5.28,
+    "end_s": 7.92,
+    "source": "../own-clone-analysis/wav/jarvis/t11.wav",
+    "path": "emotion-blend/A-global/windows/jarvis_pre_timbre_t11_02.wav"
+  },
+  {
+    "persona": "jarvis",
+    "cohort": "pre_timbre",
+    "line": "t12",
+    "start_s": 0.0,
+    "end_s": 3.02,
+    "source": "../own-clone-analysis/wav/jarvis/t12.wav",
+    "path": "emotion-blend/A-global/windows/jarvis_pre_timbre_t12_00.wav"
+  },
+  {
+    "persona": "jarvis",
+    "cohort": "pre_timbre",
+    "line": "t12",
+    "start_s": 3.02,
+    "end_s": 6.04,
+    "source": "../own-clone-analysis/wav/jarvis/t12.wav",
+    "path": "emotion-blend/A-global/windows/jarvis_pre_timbre_t12_01.wav"
+  }
+]

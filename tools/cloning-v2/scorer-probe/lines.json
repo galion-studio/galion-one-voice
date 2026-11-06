@@ -1,0 +1,278 @@
+{
+  "purpose": "Probe whether the unmodified universal scorer detects crying (EfficientAT) and seductive (CLAP) when those emotions are synthesized from ceiling originals.",
+  "ceiling_originals": {
+    "samantha": {
+      "path": "/workspace/swarm/voice-v2-sprint/clip-store-own/samantha/original.wav",
+      "reason": "Universal ceiling windows w00-w07 match this file: last window w06_15.000_17.407 and duration 17.407188s at 44100 Hz stereo. Identical sha256 to cloning-v2/hf-samantha/inputs/original.wav and similarity/inputs/samantha-original.wav.",
+      "duration_s": 17.40718820861678,
+      "sr": 44100,
+      "channels": 2
+    },
+    "jarvis": {
+      "path": "/workspace/swarm/voice-v2-sprint/clip-store-own/jarvis/original.wav",
+      "reason": "Universal ceiling windows w00-w05 match this file: duration 15.9520625s at 48000 Hz stereo (last 0.952s shorter than the 1.2s window floor, so no w06). Identical sha256 to cloning-v2/hf-jarvis/inputs/original.wav and similarity/inputs/jarvis-original.wav.",
+      "duration_s": 15.9520625,
+      "sr": 48000,
+      "channels": 2
+    }
+  },
+  "voice_profiles": {
+    "samantha": {
+      "name": "probe-orig-samantha",
+      "out_file": "/workspace/swarm/voice-v2-sprint/cloning-v2/scorer-probe/voices/probe-orig-samantha.cbxvoice"
+    },
+    "jarvis": {
+      "name": "probe-orig-jarvis",
+      "out_file": "/workspace/swarm/voice-v2-sprint/cloning-v2/scorer-probe/voices/probe-orig-jarvis.cbxvoice"
+    }
+  },
+  "tts": {
+    "binary": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-fix/cbx-emo/target/release/cbx",
+    "note": "Chatterbox Turbo ONNX has no exaggeration/CFG/emotion input (graph scan). Emotion via official tokenizer special tokens plus text and --pace. Defaults otherwise unchanged: dtype fp32, temperature 0, seed 0, repetition_penalty 1.2, ep cpu, intra-threads 2.",
+    "special_tokens_used": [
+      "[crying]",
+      "[sniff]",
+      "[sigh]",
+      "[whispering]"
+    ],
+    "unsupported_requested_tags": [
+      "[sob]",
+      "[cry]",
+      "not in tokenizer added_tokens"
+    ],
+    "groups": {
+      "crying": {
+        "pace": 1.2,
+        "lines": [
+          {
+            "id": "cry01",
+            "text": "[crying] I... I didn't think it would end like this. [sniff] I'm sorry. I just can't stop."
+          },
+          {
+            "id": "cry02",
+            "text": "[crying] Please don't leave me. [sniff] I don't know how to do this without you."
+          },
+          {
+            "id": "cry03",
+            "text": "[crying] It hurts so much. [sigh] I keep thinking about everything we lost."
+          },
+          {
+            "id": "cry04",
+            "text": "[crying] I tried to be strong, but [sniff] I can't hold it in anymore."
+          }
+        ]
+      },
+      "seductive": {
+        "pace": 1.3,
+        "lines": [
+          {
+            "id": "sed01",
+            "text": "[whispering] Come closer. I've been waiting for you all night."
+          },
+          {
+            "id": "sed02",
+            "text": "[whispering] Stay with me. Just like this. Slow. Close."
+          },
+          {
+            "id": "sed03",
+            "text": "Come here. You know exactly what I want. Don't rush. Stay close to me."
+          },
+          {
+            "id": "sed04",
+            "text": "[sigh] [whispering] Don't say a word. Just come a little closer to me."
+          }
+        ]
+      },
+      "neutral": {
+        "pace": 1.0,
+        "lines": [
+          {
+            "id": "neu01",
+            "text": "We checked the numbers twice this afternoon, and the results are clear."
+          },
+          {
+            "id": "neu02",
+            "text": "Could you open the living room window before dinner starts?"
+          }
+        ]
+      },
+      "joyful": {
+        "pace": 1.0,
+        "lines": [
+          {
+            "id": "joy01",
+            "text": "[happy] I am so glad you made it. This is the best news I have heard all week."
+          },
+          {
+            "id": "joy02",
+            "text": "[happy] That was wonderful. I cannot stop smiling. You did it!"
+          }
+        ],
+        "voices": [
+          "samantha",
+          "jarvis"
+        ]
+      },
+      "fear": {
+        "pace": 1.0,
+        "lines": [
+          {
+            "id": "fea01",
+            "text": "[fear] Something is wrong. I think someone is following us. We have to get out of here."
+          },
+          {
+            "id": "fea02",
+            "text": "[fear] Do not turn around. I heard a noise downstairs. I am really scared."
+          }
+        ],
+        "voices": [
+          "samantha",
+          "jarvis"
+        ]
+      },
+      "sad": {
+        "pace": 1.15,
+        "lines": [
+          {
+            "id": "sad01",
+            "text": "[sigh] I miss them every day. It has not been the same since they left."
+          },
+          {
+            "id": "sad02",
+            "text": "[sigh] I keep thinking about what I should have said, and now it is too late."
+          }
+        ],
+        "voices": [
+          "samantha",
+          "jarvis"
+        ],
+        "note": "No [crying] token \u2014 distinguishes sad speech from the crying probe"
+      },
+      "surprise": {
+        "pace": 1.0,
+        "lines": [
+          {
+            "id": "sur01",
+            "text": "[surprised] What? You are here? I had no idea you were coming tonight!"
+          },
+          {
+            "id": "sur02",
+            "text": "[surprised] Wait. Did you just say we won? I cannot believe it!"
+          }
+        ],
+        "voices": [
+          "samantha",
+          "jarvis"
+        ]
+      },
+      "disgust": {
+        "pace": 1.0,
+        "lines": [
+          {
+            "id": "dis01",
+            "text": "That is disgusting. I cannot believe anyone would do something so vile."
+          },
+          {
+            "id": "dis02",
+            "text": "Ugh, that smell is revolting. Get it away from me right now."
+          }
+        ],
+        "voices": [
+          "samantha",
+          "jarvis"
+        ],
+        "note": "No official tokenizer token for disgust"
+      },
+      "aggressive": {
+        "pace": 1.0,
+        "lines": [
+          {
+            "id": "agg01",
+            "text": "[angry] Do not lie to me. I know exactly what you did, and I will not let it go."
+          },
+          {
+            "id": "agg02",
+            "text": "[angry] Back off. You have no right to speak to me that way."
+          }
+        ],
+        "voices": [
+          "jarvis"
+        ],
+        "why": "present on Samantha original (strength 0.999), missing on Jarvis"
+      },
+      "love": {
+        "pace": 1.15,
+        "lines": [
+          {
+            "id": "lov01",
+            "text": "I love you so much. You mean everything to me, and I am so grateful you are here."
+          },
+          {
+            "id": "lov02",
+            "text": "Come here, my love. I have been thinking about you all day."
+          }
+        ],
+        "voices": [
+          "jarvis"
+        ],
+        "why": "present on Samantha original (strength 0.8109), missing on Jarvis"
+      },
+      "laughter": {
+        "pace": 1.0,
+        "lines": [
+          {
+            "id": "lau01",
+            "text": "[laugh] Oh that is too funny. I cannot believe you actually said that."
+          },
+          {
+            "id": "lau02",
+            "text": "[chuckle] Ha, you got me. That was a good one. I needed that."
+          }
+        ],
+        "voices": [
+          "jarvis"
+        ],
+        "why": "present on Samantha original (strength 0.2744), missing on Jarvis"
+      }
+    }
+  },
+  "original_moments_present_ge_0.2": {
+    "samantha": [
+      "aggressive",
+      "neutral",
+      "love",
+      "yelling",
+      "laughter",
+      "logic"
+    ],
+    "jarvis": [
+      "neutral",
+      "yelling",
+      "logic"
+    ]
+  },
+  "original_moments_missing_or_below_0.2": {
+    "samantha": [
+      "joyful",
+      "disgust",
+      "fear",
+      "sad",
+      "surprise",
+      "seductive",
+      "crying"
+    ],
+    "jarvis": [
+      "joyful",
+      "aggressive",
+      "disgust",
+      "fear",
+      "sad",
+      "surprise",
+      "love",
+      "seductive",
+      "crying",
+      "laughter"
+    ]
+  },
+  "note_whisper": "whisper is not a universal-scorer category (no detector). [whispering] was already used as a TTS control on seductive lines. No separate whisper probe."
+}

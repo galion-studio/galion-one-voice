@@ -1,0 +1,888 @@
+{
+  "files": [
+    {
+      "analysis": {
+        "f0_range_hz": [
+          65.0,
+          600.0
+        ],
+        "formant_ceiling_hz": 5500.0,
+        "hop_s": 0.01,
+        "min_pause_s": 0.3,
+        "silence_threshold_db": -36.361
+      },
+      "consonants": {
+        "fricative": {
+          "centroid_hz": {
+            "max": 8109.599,
+            "mean": 5682.309,
+            "median": 6018.591,
+            "min": 3132.546,
+            "n": 8,
+            "p10": 3136.182,
+            "p90": 7748.646,
+            "sd": 2051.167
+          },
+          "frac_of_speech": 0.025,
+          "kurtosis": {
+            "max": 49.026,
+            "mean": 7.429,
+            "median": 0.764,
+            "min": -0.414,
+            "n": 8,
+            "p10": -0.326,
+            "p90": 18.505,
+            "sd": 16.932
+          },
+          "n_frames": 8,
+          "sd_hz": {
+            "max": 1847.825,
+            "mean": 1458.199,
+            "median": 1553.648,
+            "min": 493.956,
+            "n": 8,
+            "p10": 1132.252,
+            "p90": 1761.399,
+            "sd": 418.23
+          },
+          "sibilant_centroid_hz": 7497.111,
+          "sibilant_frames": 5,
+          "skewness": {
+            "max": 3.013,
+            "mean": 0.834,
+            "median": 0.677,
+            "min": -0.215,
+            "n": 8,
+            "p10": -0.18,
+            "p90": 2.014,
+            "sd": 1.111
+          }
+        },
+        "hf_tilt_4k_db": -34.196,
+        "plosive": {
+          "burst_centroid_hz": {
+            "max": 4087.135,
+            "mean": 2542.134,
+            "median": 2596.562,
+            "min": 851.275,
+            "n": 6,
+            "p10": 1418.708,
+            "p90": 3611.133,
+            "sd": 1093.306
+          },
+          "burst_rel_db": {
+            "max": -5.68,
+            "mean": -11.441,
+            "median": -10.629,
+            "min": -19.86,
+            "n": 6,
+            "p10": -17.373,
+            "p90": -6.319,
+            "sd": 5.372
+          },
+          "long_lag_frac": 1.0,
+          "n_bursts": 6,
+          "per_s": 1.519,
+          "vot_ms": {
+            "max": 72.5,
+            "mean": 50.0,
+            "median": 46.25,
+            "min": 35.0,
+            "n": 4,
+            "p10": 35.75,
+            "p90": 67.25,
+            "sd": 17.44
+          }
+        }
+      },
+      "duration_s": 5.2,
+      "f0": {
+        "pyin": {
+          "mean_hz": 209.671,
+          "median_hz": 210.723,
+          "p5_hz": 161.623,
+          "p95_hz": 270.481,
+          "range_p5_p95_st": 8.915,
+          "sd_st": 2.696,
+          "voiced_frac_of_speech": 0.761
+        },
+        "yin": {
+          "median_hz": 210.395,
+          "voiced_frac_of_speech": 0.764
+        }
+      },
+      "file": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-fix/runs/sd_r9_up/t01.wav",
+      "formants_voiced_frames": {
+        "f1": {
+          "max": 984.977,
+          "mean": 458.132,
+          "median": 439.833,
+          "min": 127.227,
+          "n": 245,
+          "p10": 307.491,
+          "p90": 604.445,
+          "sd": 145.41
+        },
+        "f2": {
+          "max": 2877.398,
+          "mean": 1489.121,
+          "median": 1386.486,
+          "min": 318.151,
+          "n": 245,
+          "p10": 717.164,
+          "p90": 2356.74,
+          "sd": 576.514
+        },
+        "f3": {
+          "max": 3581.849,
+          "mean": 2774.862,
+          "median": 2810.838,
+          "min": 1844.655,
+          "n": 245,
+          "p10": 2338.343,
+          "p90": 3150.502,
+          "sd": 332.288
+        },
+        "n": 245
+      },
+      "intensity": {
+        "dynamic_range_p5_p95_db": 20.326
+      },
+      "pauses": {
+        "dur": {
+          "max": 0.66,
+          "mean": 0.66,
+          "median": 0.66,
+          "min": 0.66,
+          "n": 1,
+          "p10": 0.66,
+          "p90": 0.66,
+          "sd": null
+        },
+        "durations_s": [
+          0.66
+        ],
+        "mean_run_syl": 11.0,
+        "n": 1,
+        "pause_ratio": 0.143,
+        "per_min": 13.015,
+        "total_s": 0.66
+      },
+      "rate": {
+        "articulation_rate_syl_s": 5.57,
+        "mean_syllable_dur_s": 0.18,
+        "n_syllables": 22,
+        "phonation_time_s": 3.95,
+        "speech_rate_syl_s": 4.772,
+        "speech_span_s": 4.61
+      },
+      "sample_rate": 24000,
+      "vowel_space": {
+        "dispersion_bark": 1.904,
+        "f1_range_p5_p95_hz": 387.947,
+        "f2_range_p5_p95_hz": 1489.14,
+        "hull_area_bark2": 19.263,
+        "hull_area_hz2": 529037.518,
+        "hull_area_trimmed_bark2": 6.922,
+        "hull_area_trimmed_hz2": 192715.548,
+        "n_vowels": 22
+      },
+      "vowels": {
+        "f1": {
+          "max": 775.033,
+          "mean": 494.71,
+          "median": 482.375,
+          "min": 338.319,
+          "n": 22,
+          "p10": 369.449,
+          "p90": 682.369,
+          "sd": 117.631
+        },
+        "f2": {
+          "max": 2552.72,
+          "mean": 1572.88,
+          "median": 1481.654,
+          "min": 690.981,
+          "n": 22,
+          "p10": 1175.888,
+          "p90": 2111.519,
+          "sd": 471.84
+        },
+        "f3": {
+          "max": 3170.82,
+          "mean": 2706.623,
+          "median": 2769.093,
+          "min": 2016.817,
+          "n": 22,
+          "p10": 2373.83,
+          "p90": 3137.446,
+          "sd": 308.558
+        },
+        "n": 22
+      },
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-fix/runs/sd_r9_up/t01.wav"
+    },
+    {
+      "analysis": {
+        "f0_range_hz": [
+          65.0,
+          600.0
+        ],
+        "formant_ceiling_hz": 5500.0,
+        "hop_s": 0.01,
+        "min_pause_s": 0.3,
+        "silence_threshold_db": -34.976
+      },
+      "consonants": {
+        "fricative": {
+          "centroid_hz": {
+            "max": 6351.244,
+            "mean": 5210.51,
+            "median": 5626.575,
+            "min": 3529.727,
+            "n": 10,
+            "p10": 3764.61,
+            "p90": 6325.565,
+            "sd": 1095.242
+          },
+          "frac_of_speech": 0.051,
+          "kurtosis": {
+            "max": 10.082,
+            "mean": 4.992,
+            "median": 4.186,
+            "min": 0.398,
+            "n": 10,
+            "p10": 2.481,
+            "p90": 9.037,
+            "sd": 3.127
+          },
+          "n_frames": 10,
+          "sd_hz": {
+            "max": 1566.115,
+            "mean": 1165.544,
+            "median": 1175.005,
+            "min": 877.707,
+            "n": 10,
+            "p10": 884.633,
+            "p90": 1359.684,
+            "sd": 217.089
+          },
+          "sibilant_centroid_hz": 5872.597,
+          "sibilant_frames": 8,
+          "skewness": {
+            "max": 1.709,
+            "mean": 0.958,
+            "median": 1.069,
+            "min": -0.33,
+            "n": 10,
+            "p10": 0.102,
+            "p90": 1.567,
+            "sd": 0.664
+          }
+        },
+        "hf_tilt_4k_db": -37.494,
+        "plosive": {
+          "burst_centroid_hz": {
+            "max": 7631.212,
+            "mean": 4331.504,
+            "median": 3913.132,
+            "min": 2646.884,
+            "n": 5,
+            "p10": 2710.693,
+            "p90": 6442.683,
+            "sd": 2020.817
+          },
+          "burst_rel_db": {
+            "max": -0.473,
+            "mean": -10.977,
+            "median": -13.231,
+            "min": -21.636,
+            "n": 5,
+            "p10": -19.357,
+            "p90": -1.726,
+            "sd": 8.774
+          },
+          "long_lag_frac": 0.75,
+          "n_bursts": 5,
+          "per_s": 2.252,
+          "vot_ms": {
+            "max": 40.0,
+            "mean": 28.75,
+            "median": 26.25,
+            "min": 22.5,
+            "n": 4,
+            "p10": 23.25,
+            "p90": 36.25,
+            "sd": 7.773
+          }
+        }
+      },
+      "duration_s": 2.8,
+      "f0": {
+        "pyin": {
+          "mean_hz": 235.137,
+          "median_hz": 226.983,
+          "p5_hz": 180.275,
+          "p95_hz": 332.153,
+          "range_p5_p95_st": 10.579,
+          "sd_st": 3.303,
+          "voiced_frac_of_speech": 0.893
+        },
+        "yin": {
+          "median_hz": 228.14,
+          "voiced_frac_of_speech": 0.847
+        }
+      },
+      "file": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-fix/runs/sd_r9_up/t04.wav",
+      "formants_voiced_frames": {
+        "f1": {
+          "max": 2734.75,
+          "mean": 453.841,
+          "median": 401.363,
+          "min": 220.207,
+          "n": 175,
+          "p10": 293.631,
+          "p90": 526.728,
+          "sd": 309.072
+        },
+        "f2": {
+          "max": 3429.469,
+          "mean": 1724.576,
+          "median": 1677.143,
+          "min": 486.299,
+          "n": 175,
+          "p10": 1080.656,
+          "p90": 2411.921,
+          "sd": 546.451
+        },
+        "f3": {
+          "max": 4163.09,
+          "mean": 2609.881,
+          "median": 2683.113,
+          "min": 1791.043,
+          "n": 175,
+          "p10": 1962.273,
+          "p90": 3071.7,
+          "sd": 446.029
+        },
+        "n": 175
+      },
+      "intensity": {
+        "dynamic_range_p5_p95_db": 18.167
+      },
+      "pauses": {
+        "dur": {
+          "n": 0
+        },
+        "durations_s": [],
+        "mean_run_syl": 15.0,
+        "n": 0,
+        "pause_ratio": -0.0,
+        "per_min": 0.0,
+        "total_s": -0.0
+      },
+      "rate": {
+        "articulation_rate_syl_s": 6.757,
+        "mean_syllable_dur_s": 0.148,
+        "n_syllables": 15,
+        "phonation_time_s": 2.22,
+        "speech_rate_syl_s": 6.757,
+        "speech_span_s": 2.22
+      },
+      "sample_rate": 24000,
+      "vowel_space": {
+        "dispersion_bark": 2.145,
+        "f1_range_p5_p95_hz": 590.705,
+        "f2_range_p5_p95_hz": 1421.441,
+        "hull_area_bark2": 24.023,
+        "hull_area_hz2": 907203.512,
+        "hull_area_trimmed_bark2": 7.982,
+        "hull_area_trimmed_hz2": 233479.768,
+        "n_vowels": 15
+      },
+      "vowels": {
+        "f1": {
+          "max": 1464.431,
+          "mean": 502.069,
+          "median": 431.016,
+          "min": 313.641,
+          "n": 15,
+          "p10": 329.539,
+          "p90": 602.08,
+          "sd": 280.23
+        },
+        "f2": {
+          "max": 2724.25,
+          "mean": 1835.821,
+          "median": 1739.083,
+          "min": 1105.91,
+          "n": 15,
+          "p10": 1233.836,
+          "p90": 2464.663,
+          "sd": 534.688
+        },
+        "f3": {
+          "max": 4080.596,
+          "mean": 2682.571,
+          "median": 2793.909,
+          "min": 1752.26,
+          "n": 15,
+          "p10": 1971.24,
+          "p90": 3034.621,
+          "sd": 556.662
+        },
+        "n": 15
+      },
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-fix/runs/sd_r9_up/t04.wav"
+    },
+    {
+      "analysis": {
+        "f0_range_hz": [
+          65.0,
+          600.0
+        ],
+        "formant_ceiling_hz": 5500.0,
+        "hop_s": 0.01,
+        "min_pause_s": 0.3,
+        "silence_threshold_db": -36.155
+      },
+      "consonants": {
+        "fricative": {
+          "centroid_hz": {
+            "max": 8585.541,
+            "mean": 6248.453,
+            "median": 7157.427,
+            "min": 2814.072,
+            "n": 5,
+            "p10": 3606.632,
+            "p90": 8307.226,
+            "sd": 2392.081
+          },
+          "frac_of_speech": 0.018,
+          "kurtosis": {
+            "max": 3.081,
+            "mean": 0.847,
+            "median": 0.487,
+            "min": -0.478,
+            "n": 5,
+            "p10": -0.274,
+            "p90": 2.293,
+            "sd": 1.379
+          },
+          "n_frames": 5,
+          "sd_hz": {
+            "max": 2055.369,
+            "mean": 1664.266,
+            "median": 1621.46,
+            "min": 1334.03,
+            "n": 5,
+            "p10": 1359.879,
+            "p90": 1997.949,
+            "sd": 314.516
+          },
+          "sibilant_centroid_hz": 7523.589,
+          "sibilant_frames": 4,
+          "skewness": {
+            "max": 0.571,
+            "mean": -0.11,
+            "median": -0.074,
+            "min": -1.005,
+            "n": 5,
+            "p10": -0.765,
+            "p90": 0.487,
+            "sd": 0.628
+          }
+        },
+        "hf_tilt_4k_db": -31.984,
+        "plosive": {
+          "burst_centroid_hz": {
+            "max": 3740.199,
+            "mean": 2463.951,
+            "median": 2272.659,
+            "min": 1570.287,
+            "n": 4,
+            "p10": 1631.458,
+            "p90": 3449.477,
+            "sd": 999.595
+          },
+          "burst_rel_db": {
+            "max": -12.741,
+            "mean": -18.478,
+            "median": -14.747,
+            "min": -31.676,
+            "n": 4,
+            "p10": -26.926,
+            "p90": -13.014,
+            "sd": 8.895
+          },
+          "long_lag_frac": 0.75,
+          "n_bursts": 4,
+          "per_s": 1.278,
+          "vot_ms": {
+            "max": 85.0,
+            "mean": 64.167,
+            "median": 77.5,
+            "min": 30.0,
+            "n": 3,
+            "p10": 39.5,
+            "p90": 83.5,
+            "sd": 29.826
+          }
+        }
+      },
+      "duration_s": 3.96,
+      "f0": {
+        "pyin": {
+          "mean_hz": 219.746,
+          "median_hz": 195.565,
+          "p5_hz": 166.548,
+          "p95_hz": 337.27,
+          "range_p5_p95_st": 12.216,
+          "sd_st": 3.793,
+          "voiced_frac_of_speech": 0.751
+        },
+        "yin": {
+          "median_hz": 196.372,
+          "voiced_frac_of_speech": 0.715
+        }
+      },
+      "file": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-fix/runs/sd_r9_up/t06.wav",
+      "formants_voiced_frames": {
+        "f1": {
+          "max": 1522.583,
+          "mean": 481.501,
+          "median": 440.285,
+          "min": 178.145,
+          "n": 208,
+          "p10": 302.856,
+          "p90": 728.631,
+          "sd": 198.619
+        },
+        "f2": {
+          "max": 2834.962,
+          "mean": 1662.725,
+          "median": 1691.77,
+          "min": 499.837,
+          "n": 208,
+          "p10": 868.33,
+          "p90": 2353.531,
+          "sd": 544.653
+        },
+        "f3": {
+          "max": 3941.261,
+          "mean": 2697.592,
+          "median": 2673.128,
+          "min": 1734.023,
+          "n": 208,
+          "p10": 2201.022,
+          "p90": 3127.479,
+          "sd": 389.799
+        },
+        "n": 208
+      },
+      "intensity": {
+        "dynamic_range_p5_p95_db": 21.032
+      },
+      "pauses": {
+        "dur": {
+          "max": 0.54,
+          "mean": 0.54,
+          "median": 0.54,
+          "min": 0.54,
+          "n": 1,
+          "p10": 0.54,
+          "p90": 0.54,
+          "sd": null
+        },
+        "durations_s": [
+          0.54
+        ],
+        "mean_run_syl": 11.0,
+        "n": 1,
+        "pause_ratio": 0.147,
+        "per_min": 16.349,
+        "total_s": 0.54
+      },
+      "rate": {
+        "articulation_rate_syl_s": 7.029,
+        "mean_syllable_dur_s": 0.142,
+        "n_syllables": 22,
+        "phonation_time_s": 3.13,
+        "speech_rate_syl_s": 5.995,
+        "speech_span_s": 3.67
+      },
+      "sample_rate": 24000,
+      "vowel_space": {
+        "dispersion_bark": 2.001,
+        "f1_range_p5_p95_hz": 476.464,
+        "f2_range_p5_p95_hz": 1490.217,
+        "hull_area_bark2": 25.336,
+        "hull_area_hz2": 655193.376,
+        "hull_area_trimmed_bark2": 8.785,
+        "hull_area_trimmed_hz2": 223384.693,
+        "n_vowels": 22
+      },
+      "vowels": {
+        "f1": {
+          "max": 866.333,
+          "mean": 465.369,
+          "median": 470.613,
+          "min": 256.118,
+          "n": 22,
+          "p10": 256.232,
+          "p90": 662.474,
+          "sd": 154.349
+        },
+        "f2": {
+          "max": 2441.723,
+          "mean": 1556.566,
+          "median": 1528.203,
+          "min": 704.225,
+          "n": 22,
+          "p10": 1035.843,
+          "p90": 2100.844,
+          "sd": 442.424
+        },
+        "f3": {
+          "max": 3066.502,
+          "mean": 2585.847,
+          "median": 2582.229,
+          "min": 1994.591,
+          "n": 22,
+          "p10": 2268.961,
+          "p90": 2829.458,
+          "sd": 240.34
+        },
+        "n": 22
+      },
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-fix/runs/sd_r9_up/t06.wav"
+    },
+    {
+      "analysis": {
+        "f0_range_hz": [
+          65.0,
+          600.0
+        ],
+        "formant_ceiling_hz": 5500.0,
+        "hop_s": 0.01,
+        "min_pause_s": 0.3,
+        "silence_threshold_db": -36.755
+      },
+      "consonants": {
+        "fricative": {
+          "centroid_hz": {
+            "max": 5569.687,
+            "mean": 4178.73,
+            "median": 4074.465,
+            "min": 3102.257,
+            "n": 21,
+            "p10": 3434.292,
+            "p90": 5136.666,
+            "sd": 677.079
+          },
+          "frac_of_speech": 0.04,
+          "kurtosis": {
+            "max": 29.146,
+            "mean": 7.544,
+            "median": 6.413,
+            "min": -0.152,
+            "n": 21,
+            "p10": 2.087,
+            "p90": 15.331,
+            "sd": 6.831
+          },
+          "n_frames": 21,
+          "sd_hz": {
+            "max": 2156.91,
+            "mean": 1096.479,
+            "median": 994.633,
+            "min": 659.658,
+            "n": 21,
+            "p10": 757.87,
+            "p90": 1413.691,
+            "sd": 363.448
+          },
+          "sibilant_centroid_hz": 4431.529,
+          "sibilant_frames": 11,
+          "skewness": {
+            "max": 2.908,
+            "mean": 1.419,
+            "median": 1.588,
+            "min": -0.305,
+            "n": 21,
+            "p10": 0.169,
+            "p90": 2.484,
+            "sd": 0.973
+          }
+        },
+        "hf_tilt_4k_db": -37.27,
+        "plosive": {
+          "burst_centroid_hz": {
+            "max": 4491.484,
+            "mean": 2120.968,
+            "median": 1861.426,
+            "min": 635.241,
+            "n": 18,
+            "p10": 690.832,
+            "p90": 3904.584,
+            "sd": 1133.105
+          },
+          "burst_rel_db": {
+            "max": -8.173,
+            "mean": -15.962,
+            "median": -14.962,
+            "min": -29.704,
+            "n": 18,
+            "p10": -23.108,
+            "p90": -9.616,
+            "sd": 5.761
+          },
+          "long_lag_frac": 0.818,
+          "n_bursts": 18,
+          "per_s": 2.769,
+          "vot_ms": {
+            "max": 110.0,
+            "mean": 49.773,
+            "median": 50.0,
+            "min": 10.0,
+            "n": 11,
+            "p10": 15.0,
+            "p90": 75.0,
+            "sd": 28.449
+          }
+        }
+      },
+      "duration_s": 7.6,
+      "f0": {
+        "pyin": {
+          "mean_hz": 203.794,
+          "median_hz": 176.216,
+          "p5_hz": 150.446,
+          "p95_hz": 332.159,
+          "range_p5_p95_st": 13.711,
+          "sd_st": 4.307,
+          "voiced_frac_of_speech": 0.673
+        },
+        "yin": {
+          "median_hz": 173.552,
+          "voiced_frac_of_speech": 0.669
+        }
+      },
+      "file": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-fix/runs/sd_r9_up/t08.wav",
+      "formants_voiced_frames": {
+        "f1": {
+          "max": 2354.34,
+          "mean": 481.911,
+          "median": 416.488,
+          "min": 104.163,
+          "n": 354,
+          "p10": 326.497,
+          "p90": 709.812,
+          "sd": 243.313
+        },
+        "f2": {
+          "max": 3341.673,
+          "mean": 1636.531,
+          "median": 1568.928,
+          "min": 397.866,
+          "n": 354,
+          "p10": 975.802,
+          "p90": 2479.701,
+          "sd": 567.319
+        },
+        "f3": {
+          "max": 3789.16,
+          "mean": 2544.487,
+          "median": 2619.279,
+          "min": 1614.144,
+          "n": 354,
+          "p10": 1898.557,
+          "p90": 3049.269,
+          "sd": 450.038
+        },
+        "n": 354
+      },
+      "intensity": {
+        "dynamic_range_p5_p95_db": 21.135
+      },
+      "pauses": {
+        "dur": {
+          "max": 0.45,
+          "mean": 0.42,
+          "median": 0.42,
+          "min": 0.39,
+          "n": 2,
+          "p10": 0.396,
+          "p90": 0.444,
+          "sd": 0.042
+        },
+        "durations_s": [
+          0.45,
+          0.39
+        ],
+        "mean_run_syl": 13.0,
+        "n": 2,
+        "pause_ratio": 0.114,
+        "per_min": 16.349,
+        "total_s": 0.84
+      },
+      "rate": {
+        "articulation_rate_syl_s": 6.0,
+        "mean_syllable_dur_s": 0.167,
+        "n_syllables": 39,
+        "phonation_time_s": 6.5,
+        "speech_rate_syl_s": 5.313,
+        "speech_span_s": 7.34
+      },
+      "sample_rate": 24000,
+      "vowel_space": {
+        "dispersion_bark": 1.967,
+        "f1_range_p5_p95_hz": 437.944,
+        "f2_range_p5_p95_hz": 1632.034,
+        "hull_area_bark2": 24.872,
+        "hull_area_hz2": 798463.845,
+        "hull_area_trimmed_bark2": 15.818,
+        "hull_area_trimmed_hz2": 464129.641,
+        "n_vowels": 39
+      },
+      "vowels": {
+        "f1": {
+          "max": 959.298,
+          "mean": 461.267,
+          "median": 438.8,
+          "min": 257.629,
+          "n": 39,
+          "p10": 339.996,
+          "p90": 556.124,
+          "sd": 134.809
+        },
+        "f2": {
+          "max": 2885.077,
+          "mean": 1771.031,
+          "median": 1805.15,
+          "min": 876.324,
+          "n": 39,
+          "p10": 1026.217,
+          "p90": 2448.326,
+          "sd": 518.113
+        },
+        "f3": {
+          "max": 3441.371,
+          "mean": 2484.508,
+          "median": 2691.242,
+          "min": 1684.369,
+          "n": 39,
+          "p10": 1805.995,
+          "p90": 2922.308,
+          "sd": 460.107
+        },
+        "n": 39
+      },
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-fix/runs/sd_r9_up/t08.wav"
+    }
+  ],
+  "provenance": [
+    "/workspace/swarm/voice-v2-sprint/cloning-v2/scoreboard/repair-scores/aaf881bd093b4d-aaf881/artic.json"
+  ],
+  "aggregation": "select original Rust per-file scores by identical WAV path; no Python metric computation"
+}

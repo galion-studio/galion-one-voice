@@ -1,0 +1,71 @@
+{
+  "files": [
+    {
+      "duration_s": 8.72,
+      "mos": 3.8176,
+      "ms": 2326.6,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/hf-samantha/wav/own-samantha-v2-hf-e-mild/t09.wav",
+      "pesq": 4.0681,
+      "si_sdr": 25.9796,
+      "stoi": 0.9978
+    },
+    {
+      "duration_s": 5.6,
+      "mos": 4.3109,
+      "ms": 966.6,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/hf-samantha/wav/own-samantha-v2-hf-e-mild/t10.wav",
+      "pesq": 3.8217,
+      "si_sdr": 24.0838,
+      "stoi": 0.9949
+    },
+    {
+      "duration_s": 8.36,
+      "mos": 3.8946,
+      "ms": 2116.2,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/hf-samantha/wav/own-samantha-v2-hf-e-mild/t11.wav",
+      "pesq": 4.1864,
+      "si_sdr": 28.7302,
+      "stoi": 0.9982
+    },
+    {
+      "duration_s": 5.72,
+      "mos": 4.1396,
+      "ms": 1092.1,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/hf-samantha/wav/own-samantha-v2-hf-e-mild/t12.wav",
+      "pesq": 3.9988,
+      "si_sdr": 29.3832,
+      "stoi": 0.9987
+    }
+  ],
+  "metric": "torchaudio SQUIM_SUBJECTIVE (NORESQA-MOS) + SQUIM_OBJECTIVE, ONNX fp32",
+  "nmr": "/workspace/swarm/voice-v2-sprint/clip-store-own/jarvis/reference.wav",
+  "summary": {
+    "mos": {
+      "mean": 4.0407,
+      "n": 4,
+      "sd": 0.1962
+    },
+    "pesq": {
+      "mean": 4.0188,
+      "n": 4,
+      "sd": 0.132
+    },
+    "si_sdr": {
+      "mean": 27.0442,
+      "n": 4,
+      "sd": 2.1337
+    },
+    "stoi": {
+      "mean": 0.9974,
+      "n": 4,
+      "sd": 0.0015
+    }
+  },
+  "threads": 2,
+  "timing": {
+    "load_s": 1.164,
+    "peak_rss_mb": 934.9,
+    "score_s": 6.502
+  },
+  "tool": "galion-mos"
+}

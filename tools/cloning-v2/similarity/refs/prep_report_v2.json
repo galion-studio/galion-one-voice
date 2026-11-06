@@ -1,0 +1,156 @@
+{
+  "samantha": {
+    "cleaned_ln": {
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/similarity/refs/samantha-cleaned-ln.wav",
+      "sr": 24000,
+      "duration_s": 17.02,
+      "peak_dbfs": -1.11,
+      "rms_dbfs": -19.92,
+      "true_peak_dbtp_est": -1.0,
+      "clicks": 5,
+      "channels": 1,
+      "lufs": -19.77
+    },
+    "multiclip_long_ln": {
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/similarity/refs/samantha-multiclip-long-ln.wav",
+      "sr": 24000,
+      "duration_s": 28.023,
+      "peak_dbfs": -1.11,
+      "rms_dbfs": -19.69,
+      "true_peak_dbtp_est": -1.0,
+      "clicks": 5,
+      "channels": 1,
+      "lufs": -19.66,
+      "segments": [
+        {
+          "start": 0.0,
+          "end": 9.361,
+          "dur": 9.361
+        },
+        {
+          "start": 3.404,
+          "end": 12.765,
+          "dur": 9.361
+        },
+        {
+          "start": 7.659,
+          "end": 17.02,
+          "dur": 9.361
+        }
+      ]
+    },
+    "multiclip_phrases_ln": {
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/similarity/refs/samantha-multiclip-phrases-ln.wav",
+      "sr": 24000,
+      "duration_s": 28.023,
+      "peak_dbfs": -1.11,
+      "rms_dbfs": -19.69,
+      "true_peak_dbtp_est": -1.0,
+      "clicks": 5,
+      "channels": 1,
+      "lufs": -19.66,
+      "segments": [
+        {
+          "start": 0.0,
+          "end": 9.361,
+          "dur": 9.361
+        },
+        {
+          "start": 3.404,
+          "end": 12.765,
+          "dur": 9.361
+        },
+        {
+          "start": 7.659,
+          "end": 17.02,
+          "dur": 9.361
+        }
+      ]
+    }
+  },
+  "jarvis": {
+    "cleaned_ln": {
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/similarity/refs/jarvis-cleaned-ln.wav",
+      "sr": 24000,
+      "duration_s": 15.44,
+      "peak_dbfs": -1.01,
+      "rms_dbfs": -23.61,
+      "true_peak_dbtp_est": -1.0,
+      "clicks": 0,
+      "channels": 1,
+      "lufs": -23.18
+    },
+    "multiclip_long_ln": {
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/similarity/refs/jarvis-multiclip-long-ln.wav",
+      "sr": 24000,
+      "duration_s": 25.416,
+      "peak_dbfs": -1.01,
+      "rms_dbfs": -22.79,
+      "true_peak_dbtp_est": -1.0,
+      "clicks": 4,
+      "channels": 1,
+      "lufs": -22.43,
+      "segments": [
+        {
+          "start": 0.0,
+          "end": 8.492,
+          "dur": 8.492
+        },
+        {
+          "start": 3.088,
+          "end": 11.58,
+          "dur": 8.492
+        },
+        {
+          "start": 6.948,
+          "end": 15.44,
+          "dur": 8.492
+        }
+      ]
+    },
+    "multiclip_phrases_ln": {
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/similarity/refs/jarvis-multiclip-phrases-ln.wav",
+      "sr": 24000,
+      "duration_s": 22.91,
+      "peak_dbfs": -1.01,
+      "rms_dbfs": -23.31,
+      "true_peak_dbtp_est": -1.0,
+      "clicks": 0,
+      "channels": 1,
+      "lufs": -23.09,
+      "segments": [
+        {
+          "start": 1.16,
+          "end": 2.95,
+          "dur": 1.79
+        },
+        {
+          "start": 3.2,
+          "end": 5.26,
+          "dur": 2.06
+        },
+        {
+          "start": 7.03,
+          "end": 8.26,
+          "dur": 1.23
+        },
+        {
+          "start": 10.84,
+          "end": 12.15,
+          "dur": 1.31
+        },
+        {
+          "start": 13.57,
+          "end": 14.8,
+          "dur": 1.23
+        },
+        {
+          "start": 0.0,
+          "end": 15.44,
+          "dur": 15.44,
+          "note": "full_append"
+        }
+      ]
+    }
+  }
+}

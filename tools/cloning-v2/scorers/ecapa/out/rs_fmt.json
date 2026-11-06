@@ -1,0 +1,17 @@
+{
+  "max": 0.7610067222460675,
+  "mean": 0.7609305517753691,
+  "min": 0.7608346976274402,
+  "n": 3,
+  "ref": "/workspace/swarm/voice-v2-sprint/clip-store-own/samantha/reference.wav",
+  "scores": {
+    "out/fmt_22050_24.wav": 0.7608346976274402,
+    "out/fmt_44100_16.wav": 0.7609502354525994,
+    "out/fmt_48000_32.wav": 0.7610067222460675
+  },
+  "sd": 0.00008768524799218543,
+  "timing": {
+    "model_load_s": 0.3728,
+    "wall_s_total": 3.1277
+  }
+}

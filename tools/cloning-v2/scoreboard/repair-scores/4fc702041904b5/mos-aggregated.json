@@ -1,0 +1,130 @@
+{
+  "files": [
+    {
+      "duration_s": 4.8,
+      "mos": 4.3677,
+      "ms": 1025.6,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/hf-samantha/wav/own-samantha-v2-hf-c-bwe/t01.wav",
+      "pesq": 3.8236,
+      "si_sdr": 30.1944,
+      "stoi": 0.9965,
+      "file": "/workspace/swarm/voice-v2-sprint/cloning-v2/hf-samantha/wav/own-samantha-v2-hf-c-bwe/t01.wav"
+    },
+    {
+      "duration_s": 3.84,
+      "mos": 4.4263,
+      "ms": 619.4,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/hf-samantha/wav/own-samantha-v2-hf-c-bwe/t02.wav",
+      "pesq": 3.8615,
+      "si_sdr": 25.2398,
+      "stoi": 0.9959,
+      "file": "/workspace/swarm/voice-v2-sprint/cloning-v2/hf-samantha/wav/own-samantha-v2-hf-c-bwe/t02.wav"
+    },
+    {
+      "duration_s": 3.16,
+      "mos": 4.2529,
+      "ms": 514.0,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/hf-samantha/wav/own-samantha-v2-hf-c-bwe/t03.wav",
+      "pesq": 3.9406,
+      "si_sdr": 30.2548,
+      "stoi": 0.9972,
+      "file": "/workspace/swarm/voice-v2-sprint/cloning-v2/hf-samantha/wav/own-samantha-v2-hf-c-bwe/t03.wav"
+    },
+    {
+      "duration_s": 2.68,
+      "mos": 4.2125,
+      "ms": 410.7,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/hf-samantha/wav/own-samantha-v2-hf-c-bwe/t04.wav",
+      "pesq": 3.4907,
+      "si_sdr": 24.2183,
+      "stoi": 0.9872,
+      "file": "/workspace/swarm/voice-v2-sprint/cloning-v2/hf-samantha/wav/own-samantha-v2-hf-c-bwe/t04.wav"
+    },
+    {
+      "duration_s": 3.16,
+      "mos": 4.419,
+      "ms": 471.0,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/hf-samantha/wav/own-samantha-v2-hf-c-bwe/t05.wav",
+      "pesq": 3.8399,
+      "si_sdr": 24.4042,
+      "stoi": 0.9928,
+      "file": "/workspace/swarm/voice-v2-sprint/cloning-v2/hf-samantha/wav/own-samantha-v2-hf-c-bwe/t05.wav"
+    },
+    {
+      "duration_s": 3.84,
+      "mos": 4.1627,
+      "ms": 625.1,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/hf-samantha/wav/own-samantha-v2-hf-c-bwe/t06.wav",
+      "pesq": 4.1932,
+      "si_sdr": 27.2523,
+      "stoi": 0.9964,
+      "file": "/workspace/swarm/voice-v2-sprint/cloning-v2/hf-samantha/wav/own-samantha-v2-hf-c-bwe/t06.wav"
+    },
+    {
+      "duration_s": 3.92,
+      "mos": 4.3031,
+      "ms": 929.3,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/hf-samantha/wav/own-samantha-v2-hf-c-bwe/t07.wav",
+      "pesq": 3.8529,
+      "si_sdr": 27.9932,
+      "stoi": 0.9971,
+      "file": "/workspace/swarm/voice-v2-sprint/cloning-v2/hf-samantha/wav/own-samantha-v2-hf-c-bwe/t07.wav"
+    },
+    {
+      "duration_s": 7.88,
+      "mos": 4.0906,
+      "ms": 2014.6,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/hf-samantha/wav/own-samantha-v2-hf-c-bwe/t08.wav",
+      "pesq": 4.0047,
+      "si_sdr": 30.2323,
+      "stoi": 0.9981,
+      "file": "/workspace/swarm/voice-v2-sprint/cloning-v2/hf-samantha/wav/own-samantha-v2-hf-c-bwe/t08.wav"
+    },
+    {
+      "duration_s": 8.8,
+      "mos": 4.2411,
+      "ms": 2406.5,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/hf-samantha/wav/own-samantha-v2-hf-c-bwe/t09.wav",
+      "pesq": 4.1355,
+      "si_sdr": 30.8838,
+      "stoi": 0.9984,
+      "file": "/workspace/swarm/voice-v2-sprint/cloning-v2/hf-samantha/wav/own-samantha-v2-hf-c-bwe/t09.wav"
+    },
+    {
+      "duration_s": 5.64,
+      "mos": 4.386,
+      "ms": 1161.6,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/hf-samantha/wav/own-samantha-v2-hf-c-bwe/t10.wav",
+      "pesq": 3.8875,
+      "si_sdr": 27.8768,
+      "stoi": 0.9957,
+      "file": "/workspace/swarm/voice-v2-sprint/cloning-v2/hf-samantha/wav/own-samantha-v2-hf-c-bwe/t10.wav"
+    },
+    {
+      "duration_s": 8.08,
+      "mos": 3.8411,
+      "ms": 2053.1,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/hf-samantha/wav/own-samantha-v2-hf-c-bwe/t11.wav",
+      "pesq": 4.0021,
+      "si_sdr": 28.7246,
+      "stoi": 0.9978,
+      "file": "/workspace/swarm/voice-v2-sprint/cloning-v2/hf-samantha/wav/own-samantha-v2-hf-c-bwe/t11.wav"
+    },
+    {
+      "duration_s": 6.48,
+      "mos": 4.2611,
+      "ms": 1488.8,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/hf-samantha/wav/own-samantha-v2-hf-c-bwe/t12.wav",
+      "pesq": 3.4673,
+      "si_sdr": 23.4266,
+      "stoi": 0.9974,
+      "file": "/workspace/swarm/voice-v2-sprint/cloning-v2/hf-samantha/wav/own-samantha-v2-hf-c-bwe/t12.wav"
+    }
+  ],
+  "provenance": [
+    "/workspace/swarm/voice-v2-sprint/cloning-v2/hf-samantha/scores8/c-bwe/mos.json",
+    "/workspace/swarm/voice-v2-sprint/cloning-v2/scoreboard/repair-scores/4fc702041904b5-688c02/mos.json"
+  ],
+  "aggregation": "select original Rust per-file scores by identical WAV path; no Python metric computation",
+  "nmr": "/workspace/swarm/voice-v2-sprint/clip-store-own/jarvis/reference.wav"
+}
