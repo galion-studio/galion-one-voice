@@ -6,7 +6,7 @@
 //! pipeline"). This crate owns the frame-loop API; [`Rika`] runs inside it on
 //! the feeling band (D20, Q-RIKA.Q6: inside `step()`, no separate process).
 //!
-//! Hot-path contract (LOCKS `[frame] frame_ms = 80`):
+//! Hot-path contract (LOCKS `[clock] frame_ms = 80`, `frame_hz = 12.5`):
 //! * [`Heartbeat::step`] **never blocks**: no locks, no channels, no sleeps, no
 //!   clock reads, no file or network I/O.
 //! * [`Heartbeat::step`] **never allocates**: all state is fixed-size and lives
@@ -50,12 +50,19 @@ pub mod presence;
 
 pub mod symphony;
 
-/// The heartbeat period. Locked (LOCKS.toml `[frame] frame_ms = 80`).
+/// The heartbeat period. Locked (LOCKS.toml `[clock] frame_ms = 80`).
 pub const FRAME_MS: u32 = 80;
 /// Audio sample rate of the you/me bands (Mimi 24 kHz).
 pub const SAMPLE_RATE: u32 = 24_000;
 /// Samples in one 80 ms frame at 24 kHz.
 pub const FRAME_SAMPLES: usize = (SAMPLE_RATE as usize * FRAME_MS as usize) / 1000;
+/// Locked cadence in tenths of a hertz. 125 means 12.5 Hz (LOCKS.toml `[clock] frame_hz`).
+pub const FRAME_HZ_TENTHS: u32 = 125;
+
+const _: () = assert!(FRAME_MS == 80);
+const _: () = assert!(SAMPLE_RATE == 24_000);
+const _: () = assert!(FRAME_SAMPLES == 1_920);
+const _: () = assert!(FRAME_MS * FRAME_HZ_TENTHS == 10_000);
 
 /// Heartbeat configuration. `Default` = Rika OFF (Q-RIKA.Q14: off until ≥ 5 must specs).
 #[derive(Debug, Clone)]

@@ -3,14 +3,15 @@
 //! Read clone safetensors (interchange only) and write a symphony pack.
 
 use crate::clip::{self, WrapOpts};
-use crate::gq_write::{self, GqPart};
+use crate::gq_write::{self, GqPart, MemTensor};
 use crate::manifest::{ClipRec, FileRec, Manifest, TensorRec, FILE_NAME};
 use crate::persona::{self, galion_name, ModelId, PersonaId};
 use crate::pins::{self, pin_for};
 use crate::safetensors::{self, refused_extension};
 use crate::sha;
 use crate::{Error, Result};
-use std::collections::BTreeSet;
+use galion_tensor::gq::GqDType;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
 pub struct TranslateOpts {
@@ -26,6 +27,189 @@ pub struct TranslateOpts {
 }
 
 const AUDIO_EXT: &[&str] = &["wav", "mp3", "flac", "mp4", "mkv", "mov"];
+
+/// Dtype of a tensor the caller already holds in memory.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PackDType {
+    F32,
+    BF16,
+}
+
+/// One tensor. `source` is the interchange name recorded in the manifest.
+/// `file` is the relative `.gq` path inside the pack.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BufferTensor {
+    pub name: String,
+    pub source: String,
+    pub dtype: PackDType,
+    pub shape: Vec<u64>,
+    pub bytes: Vec<u8>,
+    pub file: String,
+}
+
+/// Inputs for [`pack_buffers`]. Bytes only: no wav path and no weight file.
+#[derive(Debug, Clone)]
+pub struct BufferPack {
+    pub output: PathBuf,
+    pub persona: PersonaId,
+    pub model: ModelId,
+    pub host: crate::host_cpu::HostId,
+    pub wav: Option<Vec<u8>>,
+    pub tensors: Vec<BufferTensor>,
+    pub force: bool,
+}
+
+/// Write a symphony pack from caller-owned buffers.
+///
+/// This does not open a wav, a safetensors file, or a published pin.
+/// It is the synthetic fixture path. It is not a substitute for [`translate`]
+/// on the pinned interchange.
+pub fn pack_buffers(opts: &BufferPack) -> Result<Manifest> {
+    if opts.output.join(FILE_NAME).is_file() && !opts.force {
+        return Err(Error::Refused(format!(
+            "{} already holds a pack (pass --force)",
+            opts.output.display()
+        )));
+    }
+    if opts.tensors.is_empty() {
+        return Err(Error::Bad("pack has no tensors".into()));
+    }
+    let mut seen = BTreeSet::new();
+    let mut groups: BTreeMap<&str, Vec<&BufferTensor>> = BTreeMap::new();
+    for t in &opts.tensors {
+        if !gq_rel_ok(&t.file) {
+            return Err(Error::Refused(format!("{} is not a pack .gq path", t.file)));
+        }
+        if t.source.is_empty() || t.source == t.name || !t.name.starts_with("sym.") {
+            return Err(Error::Bad(format!(
+                "tensor {} must stay in sym. and keep its interchange name",
+                t.name
+            )));
+        }
+        if !seen.insert(t.name.as_str()) {
+            return Err(Error::Bad(format!("duplicate tensor {}", t.name)));
+        }
+        groups.entry(t.file.as_str()).or_default().push(t);
+    }
+    std::fs::create_dir_all(&opts.output)
+        .map_err(|e| Error::io(&opts.output.display().to_string(), e))?;
+    let mut file_recs = Vec::new();
+    let mut tensor_recs = Vec::new();
+    for (rel, mut group) in groups {
+        group.sort_by(|a, b| a.name.cmp(&b.name));
+        let mem: Vec<MemTensor> = group
+            .iter()
+            .map(|t| MemTensor {
+                name: t.name.clone(),
+                dtype: match t.dtype {
+                    PackDType::F32 => GqDType::F32,
+                    PackDType::BF16 => GqDType::BF16,
+                },
+                dims: t.shape.clone(),
+                bytes: t.bytes.clone(),
+            })
+            .collect();
+        let gq_path = opts.output.join(rel);
+        gq_write::write_gq_mem(&gq_path, &mem)?;
+        let digest = sha::hex(
+            &sha::hash_file(&gq_path).map_err(|e| Error::io(&gq_path.display().to_string(), e))?,
+        );
+        file_recs.push(FileRec {
+            rel: rel.to_string(),
+            sha256: digest,
+            tensors: mem.len() as u32,
+        });
+        for t in group {
+            tensor_recs.push(TensorRec {
+                name: t.name.clone(),
+                file: t.file.clone(),
+                dtype: match t.dtype {
+                    PackDType::F32 => "F32".into(),
+                    PackDType::BF16 => "BF16".into(),
+                },
+                shape: t.shape.clone(),
+                source: t.source.clone(),
+            });
+        }
+    }
+    tensor_recs.sort_by(|a, b| a.name.cmp(&b.name));
+    let clip = match &opts.wav {
+        None => None,
+        Some(wav) => {
+            let out = opts.output.join("clip.gclip");
+            let header = clip::wrap_bytes(clip::WrapBytes {
+                persona: opts.persona,
+                wav,
+                out: &out,
+                check_pin: false,
+            })?;
+            let file_sha = sha::hex(
+                &sha::hash_file(&out).map_err(|e| Error::io(&out.display().to_string(), e))?,
+            );
+            Some(ClipRec {
+                rel: "clip.gclip".into(),
+                file_sha256: file_sha,
+                payload_sha256: sha::hex(&header.payload_sha256),
+                sample_rate: header.sample_rate,
+                channels: header.channels,
+                bits: header.bits,
+                duration_ms: header.duration_ms,
+                texture: header.texture,
+            })
+        }
+    };
+    let manifest = Manifest {
+        persona: opts.persona,
+        model: opts.model,
+        host: opts.host.spec(),
+        budget: crate::host_cpu::voice_budget(),
+        texture: opts.persona.texture(),
+        prosody: opts.persona.prosody(),
+        emotions: opts
+            .persona
+            .emotions()
+            .iter()
+            .map(|s| (*s).to_string())
+            .collect(),
+        tags: opts
+            .persona
+            .tags()
+            .iter()
+            .map(|s| (*s).to_string())
+            .collect(),
+        tags_enabled: opts.persona.tags_enabled(),
+        files: file_recs,
+        tensors: tensor_recs,
+        clip,
+    };
+    manifest.write(&opts.output)?;
+    write_sums(&opts.output)?;
+    Ok(manifest)
+}
+
+fn gq_rel_ok(rel: &str) -> bool {
+    if rel.is_empty() || rel.contains('\\') || rel.contains('\0') {
+        return false;
+    }
+    let path = Path::new(rel);
+    if path.is_absolute() {
+        return false;
+    }
+    let mut last_is_gq = false;
+    for c in path.components() {
+        match c {
+            std::path::Component::Normal(s) => {
+                let s = s.to_string_lossy();
+                if s.starts_with('.') {
+                    return false;
+                }
+                last_is_gq = s.ends_with(".gq");
+            }
+            _ => return false,
+        }
+    }
+    last_is_gq
+}
 
 pub fn translate(opts: &TranslateOpts) -> Result<Manifest> {
     if opts.output.starts_with(&opts.input) {

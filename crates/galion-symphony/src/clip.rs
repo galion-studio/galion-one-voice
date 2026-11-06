@@ -81,6 +81,14 @@ pub struct WrapOpts<'a> {
     pub check_pin: bool,
 }
 
+pub struct WrapBytes<'a> {
+    pub persona: PersonaId,
+    pub wav: &'a [u8],
+    pub out: &'a Path,
+    /// When set, the WAV sha256 and PCM shape must match the published reference.
+    pub check_pin: bool,
+}
+
 pub fn wrap(opts: WrapOpts<'_>) -> Result<ClipHeader> {
     let meta =
         std::fs::metadata(opts.wav).map_err(|e| Error::io(&opts.wav.display().to_string(), e))?;
@@ -93,13 +101,29 @@ pub fn wrap(opts: WrapOpts<'_>) -> Result<ClipHeader> {
     }
     let bytes =
         std::fs::read(opts.wav).map_err(|e| Error::io(&opts.wav.display().to_string(), e))?;
-    let digest = sha::sha256(&bytes);
+    wrap_bytes(WrapBytes {
+        persona: opts.persona,
+        wav: &bytes,
+        out: opts.out,
+        check_pin: opts.check_pin,
+    })
+}
+
+/// Wrap WAV bytes the caller already holds. This does not open a wav path.
+pub fn wrap_bytes(opts: WrapBytes<'_>) -> Result<ClipHeader> {
+    let len = opts.wav.len() as u64;
+    if len == 0 || len > MAX_WAV {
+        return Err(Error::Refused(format!(
+            "clip payload is {len} bytes; clip payload must be 1..={MAX_WAV}"
+        )));
+    }
+    let digest = sha::sha256(opts.wav);
     if opts.check_pin {
         let expect = opts.persona.ref_expect();
-        check_published(&expect, &digest, &bytes)?;
+        check_published(&expect, &digest, opts.wav)?;
     }
-    let header = header_for(opts.persona, &bytes, digest)?;
-    write_file(opts.out, &header, &bytes)?;
+    let header = header_for(opts.persona, opts.wav, digest)?;
+    write_file(opts.out, &header, opts.wav)?;
     Ok(header)
 }
 
@@ -271,19 +295,27 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("galion-clip-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
-        let wav = dir.join("jarvis.wav");
         let samples = [20_000i16, 0, 0, -3];
         let bed = b"clicks,alarms,ambience";
-        wav::write_pcm16(&wav, 48_000, 2, &samples, &[(*b"hub ", bed.as_slice())]).unwrap();
-        let raw = std::fs::read(&wav).unwrap();
+        let raw = wav::encode_pcm16(48_000, 2, &samples, &[(*b"hub ", bed.as_slice())]).unwrap();
         let out = dir.join("clip.gclip");
-        wrap(WrapOpts {
+        wrap_bytes(WrapBytes {
             persona: PersonaId::Jarvis,
-            wav: &wav,
+            wav: &raw,
             out: &out,
             check_pin: false,
         })
         .unwrap();
+        let pinned = wrap_bytes(WrapBytes {
+            persona: PersonaId::Jarvis,
+            wav: &raw,
+            out: &out,
+            check_pin: true,
+        });
+        assert!(
+            pinned.is_err(),
+            "a synthetic buffer is not the published clip"
+        );
         let clip = open(&out).unwrap();
         assert_eq!(clip.payload(), raw.as_slice());
         assert_eq!(clip.header.channels, 2);
