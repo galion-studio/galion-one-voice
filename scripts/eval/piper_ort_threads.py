@@ -9,7 +9,6 @@
 # Piper links) - the version is printed in every row.
 import argparse, json, os, re, subprocess, time
 from pathlib import Path
-import numpy as np, onnxruntime as ort
 
 REPO = Path("/workspace/swarm/voice-v2-sprint/repo")
 TEXTS = {"1w": "Yes.", "3w": "Oh, I see.", "4w": "I hear you, Mate.", "8w": "That sounds hard, tell me what happened next."}
@@ -20,7 +19,19 @@ def ids_for(model, text):
     m = re.search(rb"phoneme id\(s\): ([0-9, ]+)", p.stderr)
     return [int(x) for x in m.group(1).decode().split(",") if x.strip()]
 
-def pct(v, q): return float(np.percentile(v, q))
+def absent(reason):
+    print(json.dumps({
+        "engine": "piper",
+        "measured": False,
+        "product_claim": False,
+        "reason": reason,
+    }, separators=(",", ":")))
+    raise SystemExit(2)
+
+
+def pct(v, q):
+    import numpy as np
+    return float(np.percentile(v, q))
 
 def main():
     ap = argparse.ArgumentParser()
@@ -31,6 +42,15 @@ def main():
     ap.add_argument("--reps", type=int, default=10)
     ap.add_argument("--piper-opts", action="store_true", help="mimic Piper 2023.11.14 session opts: no cpu mem arena, no mem pattern")
     a = ap.parse_args()
+    model = Path(a.model)
+    runtime = REPO / "weights/runtime/piper/piper"
+    if not model.is_file() or not runtime.is_file():
+        absent("Piper runtime or voice pack is not on this machine; no TTFA number")
+    try:
+        import numpy as np
+        import onnxruntime as ort
+    except ModuleNotFoundError as exc:
+        absent(f"onnx runtime import failed ({exc}); no TTFA number")
     if a.cpus:
         s = set()
         for part in a.cpus.split(","):
