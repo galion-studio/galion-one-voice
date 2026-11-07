@@ -110,6 +110,14 @@ The operator copies `summary.md` and the twelve JSON files out as a build artifa
 
 Suggested cadence is once a night on one GPU runner. The pull-request job stays the CPU stub. A red nightly does not deploy and does not merge.
 
+## Nebula live feed
+
+`docs/emotion-v2/NEBULA-LIVE-FEED.md` is the frame schema for `apps/nebula-voice-v2`. The pull-request job runs its unit tests in the same CPU step's environment. Those tests use numeric posteriors. They do not synthesize audio, and they do not download weights.
+
+```bash
+python -m unittest discover -s tools/emotion-v2/nebula/tests -v
+```
+
 ## Out of scope
 
 This cut does not render speech, tune a checkpoint, touch Galion OS, edit `SOUL.md`, `config.yaml`, or `LOCKS.toml`, or change a deployed voice.
