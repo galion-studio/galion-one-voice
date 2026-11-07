@@ -503,29 +503,33 @@ A live frame is not a gate result. 0.83 is not consulted to accept or reject a h
 
 ## Fixed element-to-emotion table (Nebula)
 
-This table is hard-coded. The same rows are the colour key for the visualiser at `apps/nebula-voice-v2`, for the live emotion frames, and for the training labels. The emotion id is the key. All three consumers use this table. They do not each invent a line.
+This table supersedes the earlier rows in this plan (Neutral on H-alpha 656.3, Tender on H-gamma 434.0, Excited on [O III] 500.7, Amused on [O II] 372.7, Surprised on Ne I 640.2, Fearful rendered as hot blue, Sad on Ar I 696.5, Disappointed on [S II] 673.1, Disgusted on N II 399.5, Seductive on [O I] 630.0). The source is [`COLOR-EMOTION-ELEMENT-TABLE-20261107.md`](COLOR-EMOTION-ELEMENT-TABLE-20261107.md), section 2. Wavelengths below are that note’s rounded nominal visible air-line values.
 
-The gas line is a label on the emotion. It does not change acoustic output. Pitch, energy, tilt, the persona blend, and the 0.83 gate are untouched by the element, the wavelength, and the colour.
+The table is hard-coded. The emotion id is the key. The visualiser at `apps/nebula-voice-v2`, the live emotion frames, and the training labels share these rows. They do not each invent a line.
 
-Ne I (Surprised) and Ar I (Sad) are lab lines that are weak in real nebulae. They stay in the table by admin choice.
+The gas line is a label on the emotion. It does not change acoustic output. Pitch, energy, tilt, the persona blend, and the 0.83 gate are untouched by the element, the wavelength, and the colour. Display hex values in the research note are gamut-clipped spectral swatches. They are not a claim that the loudspeaker emits that spectrum.
 
-| Emotion | Gas line | Wavelength (nm) | Colours |
-|---|---|---:|---|
-| Neutral | H-alpha | 656.3 | red |
-| Calm | H-beta | 486.1 | blue-green |
-| Tender | H-gamma | 434.0 | violet |
-| Happy | He I | 587.6 | yellow |
-| Excited | [O III] | 500.7 | teal-green |
-| Amused | [O II] | 372.7 | violet (near-UV) |
-| Surprised | Ne I | 640.2 | orange-red |
-| Fearful | He II | 468.6 | hot blue |
-| Sad | Ar I | 696.5 | deep red |
-| Disappointed | [S II] | 673.1 | red-orange |
-| Angry | [S III] | 631.2 | deep red |
-| Disgusted | N II | 399.5 | violet-blue |
-| Seductive (Samantha only) | [O I] | 630.0 | red-orange |
+No single emission line is white, grey, black, pink, or brown. Those displays need a mixture, desaturation, or low intensity. The carrier rows exist so every emotion still has a distinct real line. A carrier is not evidence that the line’s hue is the emotion’s colour. Ne I 594.5 and Ne I 585.2 are laboratory lines, not prominent ionised-nebula lines. They stay as labelled fallbacks. Several emotions share an element. All thirteen wavelengths are distinct. The semantic assignment is a human design.
 
-Seductive remains Samantha-only. Jarvis and Galion One do not take that row. The twelve shared emotions are the twelve rows above it.
+| Emotion | Gas line | Wavelength nm | Colors (name + computed spectral hex) | Cultural association + evidence strength |
+|---|---|---:|---|---|
+| Neutral | H I H-delta — carrier only | 410.2 | Violet `#7000FF`; semantic target neutral grey/white, requiring achromatic continuum/desaturation | **No demonstrated dominant hue; weak.** Neutral is not one of the specific emotion labels established by the cited 2020 headline findings. Grey/white is a design convention, not a measured universal neutral code. This carrier is explicitly arbitrary. |
+| Calm | H I H-beta | 486.1 | Cyan/blue-green `#00C0FF`; use low motion and modest saturation | **Blue/blue-green; moderate.** Cross-national calming/peaceful blue/green patterns in Madden et al.; not a unique calm-only hue. Ou’s tense–relaxed differences caution against a universal formula. |
+| Tender | He I | 667.8 | Red `#FF0000`; pink requires added broadband white and reduced saturation | **Pink/soft warm tones; weak-to-moderate, indirect.** Multinational pink–love/pleasure supports an affectionate design proxy, not tenderness equivalence. Older English-language work also linked tenderness to blue; no basis for universal violet–tenderness. |
+| Happy | He I | 587.6 | Yellow/amber spectral region; clipped sRGB appears orange-amber `#FF8700` | **Yellow; strong but not universal.** Direct yellow–joy association in Jonauskaite 2020; Egypt is a reported exception. This familiar nebular “helium yellow” line is an amber compromise, not pure display yellow. |
+| Excited | Ne I — laboratory-line fallback | 594.5 | Orange `#FF6300` | **Warm saturated orange/red/yellow family; moderate, indirect.** Warm/activity/arousal evidence supports the family, not a unique excitement hue. Selected orange separates excitement from red anger. Ne I is not the normal nebular [Ne III] emission: flag as laboratory-inspired. |
+| Amused | Ne I — laboratory-line fallback | 585.2 | Yellow-orange/amber `#FF9500` | **Orange; moderate-to-strong for the measured association.** Orange–amusement is explicitly a prominent multinational pairing in Jonauskaite 2020; do not call it unsupported. Generalisation to every culture and differentiation from joy remain weaker. This line is a slightly yellower orange compromise. |
+| Surprised | [O III] | 495.9 | Green-cyan `#00FFCB` | **No established dominant cross-cultural hue; weak.** Cyan is an explicit design choice, not a research finding. A short onset/expansion cue can indicate surprise without pretending a unique hue exists. |
+| Fearful | He II — dimmed carrier | 468.6 | Blue `#0017FF`; semantic target near-black, achieved by low intensity | **Black/dark; strong.** Direct multinational fear–black evidence in Jonauskaite and Hupka. Blue itself is not the established fear colour; the carrier supplies faint structure only. |
+| Sad | H I H-gamma — dimmed/desaturated carrier | 434.0 | Violet-blue `#6700FF`; semantic target dark grey/black | **Black/grey; strong. Blue secondary and culturally contingent.** Jonauskaite’s prominent global sadness links are black and grey, not a universal blue-only rule. White in China and purple in Greece are explicit alternatives. |
+| Disappointed | [Cl III] — desaturated carrier | 551.7 | Green `#00FF00`; semantic target grey, requiring desaturation/continuum | **Grey; moderate-to-strong for the measured association.** Direct grey–disappointment multinational evidence in Jonauskaite 2020. Less independent replication than anger/joy; green is not an asserted disappointment association. Carrier chosen for a distinct line ID only. |
+| Angry | [S III] | 631.2 | Red `#FF0000` | **Red (also black); strong.** Convergent multinational Jonauskaite/Hupka evidence. 631.2 nm is red, not deeper red than the 671–673 nm sulfur lines. |
+| Disgusted | [Cl III] | 553.8 | Yellow-green `#39FF00` | **Green-yellow/brown family; moderate locally, weak as a universal unique hue.** English-language evidence supports green-yellow; Jonauskaite 2019 finds brown–disgust particularly in Germany but almost absent in China. Neither “green universally means disgust” nor envy→disgust substitution is justified. Yellow-green chosen because brown is not a spectral colour. |
+| Seductive (Samantha only) | H I H-alpha | 656.3 | Red `#FF0000`; distinguish from anger with softness/slow motion, not fake wavelength separation | **Red/pink as love/passion proxy; weak for “seductive” specifically.** Red–love is strong cross-culturally, but love is not seduction; attraction experiments have mixed/failed replications. This is an adult-character design convention, not a scientifically fixed seductive colour. |
+
+Seductive remains Samantha-only. Jarvis and Galion One do not take that row.
+
+Carriers, from the research note: Neutral (grey/white by desaturation), Tender (soft pink by adding white), Fearful (near-black by low intensity), Sad (dark grey/black), and Disappointed (grey by desaturation). Their line colours are not the semantic target. Happy’s computed swatch is orange-amber `#FF8700`, not pure display yellow. Angry at 631.2 nm and Seductive at 656.3 nm both clip to `#FF0000`. Distinct line ids do not guarantee distinct display colours. The shader separates them. The audio path does not.
 
 ## Ranked next steps
 
