@@ -75,6 +75,12 @@ pub const REQUIRED: [&str; 15] = [
 ];
 
 pub const SCOPE: &str = "local-zero-shot-conditioning";
+/// Owner-widened scope (t662s3211, 2026-11-05 10:32 CET): fine-tune a Piper
+/// voice for the Samantha / Jarvis CC0 donors only. Recorded in a separate
+/// addendum next to `consent.txt`; the original consent record is never edited.
+pub const SCOPE_PIPER_TRAINING: &str = "piper-voice-training";
+/// Filename of the addendum beside `consent.txt`.
+pub const PIPER_TRAINING_ADDENDUM: &str = "consent-addendum-piper-training.txt";
 pub const DURATION_MIN: f64 = 8.0;
 pub const DURATION_MAX: f64 = 12.0;
 pub const DURATION_TOLERANCE: f64 = 0.25;
@@ -766,6 +772,49 @@ pub fn cc0_unregister(session: &str) {
 pub fn cc0_use_gate(approval: &Approval, accepted: bool) -> Result<(), CloneRefused> {
     if approval.cc0 && !accepted {
         return Err(CloneRefused { persona: approval.persona.to_string(), reason: "cc0_licence" });
+    }
+    Ok(())
+}
+
+/// Whether Piper fine-tuning is allowed for this persona under the owner
+/// addendum (t662s3211). Checks the existing consent gate (without Nano
+/// weights), then the addendum file: persona match, scope
+/// [`SCOPE_PIPER_TRAINING`], and the decision card. Only `samantha` and
+/// `jarvis` can pass. Never creates or edits consent text.
+pub fn piper_training_allowed(persona: &str, env: &Env) -> Result<(), CloneRefused> {
+    if blocked(persona) {
+        return Err(CloneRefused { persona: persona.trim().to_lowercase(), reason: "celebrity" });
+    }
+    let Some(name) = persona_of(persona) else {
+        return Err(CloneRefused { persona: persona.trim().to_lowercase(), reason: "persona" });
+    };
+    let gate = evaluate(name, env, false);
+    if !gate.ok {
+        return Err(CloneRefused { persona: name.to_string(), reason: gate.reason });
+    }
+    if !gate.cc0 {
+        return Err(CloneRefused { persona: name.to_string(), reason: "not_cc0" });
+    }
+    let Some(store) = env.store.as_ref() else {
+        return Err(CloneRefused { persona: name.to_string(), reason: "store" });
+    };
+    let path = store.join(name).join(PIPER_TRAINING_ADDENDUM);
+    let Ok(text) = std::fs::read_to_string(&path) else {
+        return Err(CloneRefused { persona: name.to_string(), reason: "addendum" });
+    };
+    let fields = parse_consent(&text);
+    if field(&fields, "persona").trim().to_lowercase() != name {
+        return Err(CloneRefused { persona: name.to_string(), reason: "addendum" });
+    }
+    if field(&fields, "scope") != SCOPE_PIPER_TRAINING {
+        return Err(CloneRefused { persona: name.to_string(), reason: "addendum" });
+    }
+    let decision = field(&fields, "decision").trim().to_lowercase();
+    if decision != "t662s3211" {
+        return Err(CloneRefused { persona: name.to_string(), reason: "addendum" });
+    }
+    if ["persona", "performer"].iter().any(|k| blocked(field(&fields, k))) {
+        return Err(CloneRefused { persona: name.to_string(), reason: "celebrity" });
     }
     Ok(())
 }

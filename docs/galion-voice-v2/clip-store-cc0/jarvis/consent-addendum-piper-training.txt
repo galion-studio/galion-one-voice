@@ -1,0 +1,17 @@
+# Galion Voice V2 — consent addendum: Piper voice training for this persona only.
+# Does not replace or edit consent.txt. That file's scope remains local-zero-shot-conditioning.
+# Owner (Mate Grajczyk, relaying for admin Slavik) answered YES at 2026-11-05 10:32 CET
+# to: "Go ahead with training Piper voices for Samantha and Jarvis from the CC0 donors?"
+# Approval card: t662s3211. Widens consent for this persona only; covers nothing else.
+date: 2026-11-05 10:32 CET (Europe/Zagreb)
+persona: jarvis
+performer: Alan Davis Drake (same donor as consent.txt)
+scope: piper-voice-training
+scope_note: Fine-tune a Piper ONNX voice for the jarvis live slot only, from speech synthesised by the local Chatterbox Turbo (cbx) worker conditioned on this persona's reference.wav. No other persona. No celebrity voice. No film audio. No cloud training without a further yes.
+decision: t662s3211
+approved_by: Mate Grajczyk (owner), relaying for Slavik (admin)
+approved_at: 2026-11-05 10:32 CET
+instrument: same public-domain / CC0 dedication as consent.txt; this addendum only records the owner-approved training use
+grantee: Galion Voice training run on the Galion box; resulting ONNX may be deployed to the Galion voice VPS for live Piper TTS
+withdrawal: Owner or performer request: rename this file to consent-addendum-piper-training.txt.off; the gate then refuses fine-tuning for jarvis
+counsel: Not consulted; basis is the existing public-domain/CC0 dedication plus the owner YES on t662s3211

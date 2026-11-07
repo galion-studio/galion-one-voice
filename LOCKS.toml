@@ -157,6 +157,26 @@ decision = "t230u"
 owner = "Maciej Grajczyk"
 notes = "Sunset is 90 days from 2026-11-03. Foreign runtime stays out of process. No film audio. No celebrity clone. Do not widen this pin to ASR or an in-tree runtime."
 
+# Owner YES t662s3211 (2026-11-05 10:32 CET, Mate Grajczyk relaying for Slavik):
+# Piper fine-tune for the two CC0 donor personas only. Gated on
+# consent-addendum-piper-training.txt next to each consent.txt. Does not edit
+# the original consent records. Training is offline Python on the Galion box;
+# the VPS ships only the resulting ONNX + JSON. No other personas. No celebrity.
+# No paid cloud without a further yes.
+[formats.exceptions.v2s14_piper_cc0_finetune]
+lane = "V2 Piper fine-tune from CC0 donors only"
+personas = ["samantha", "jarvis"]
+donors = "Amy Koenig (samantha), Alan Davis Drake (jarvis)"
+scope = "piper-voice-training"
+addendum = "consent-addendum-piper-training.txt"
+decision = "t662s3211"
+approved_at = "2026-11-05 10:32 CET"
+owner = "Maciej Grajczyk"
+base_checkpoint = "en_US-ljspeech-medium (or lessac-medium)"
+shipped = "ONNX + JSON only; no Python on the VPS"
+fallback = "formats.exceptions.a21_piper"
+notes = "Narrow widen of the CC0 donor pin for Piper training. Celebrity lock unchanged."
+
 # ---------------------------------------------------------------- UI
 [ui]
 rule = "one-dot"                  # the interface is one dot; nothing else on screen
