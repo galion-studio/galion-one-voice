@@ -1,0 +1,87 @@
+# Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+# Machine spec for Emotion V2 controlled-reference capture.
+# Human procedure: CAPTURE-PROTOCOL.md. refcheck reads this file.
+# The numbers here are the gate. Do not put audio next to this file.
+
+standard = "galion-voice-v2-432"
+persona = "samantha"
+consent = "owner-own-recordings-only"
+reference_hz = 432.0
+
+[format]
+sample_rate_hz = 48000
+bit_depth = 24
+channels = 1
+sample_format = "pcm_integer"
+
+[loudness]
+# Mono ITU-R BS.1770-4. One channel, gain 1. Not a stereo sum.
+target_lufs = -20.0
+tolerance_lu = 2.0
+block_ms = 400
+hop_ms = 100
+absolute_gate_lufs = -70.0
+relative_gate_lu = 10.0
+
+[true_peak]
+max_dbtp = -1.0
+oversample = 4
+
+[noise_floor]
+max_dbfs = -60.0
+window_ms = 400
+hop_ms = 100
+
+[clipping]
+max_clipped_samples = 0
+
+[dc_offset]
+max_dbfs = -50.0
+
+[duration]
+min_s = 3.0
+max_s = 12.0
+
+[calibration]
+tone_hz = 432.0
+tolerance_hz = 2.0
+min_s = 2.0
+max_s = 8.0
+min_passing = 1
+
+[reverb]
+# Schroeder T20 on the tail after the sustain. Upper bound only.
+max_rt60_s = 0.40
+fit_start_db = -5.0
+fit_end_db = -20.0
+frame_ms = 10
+hop_ms = 5
+
+[spectral]
+# Power spectral density, dB per octave, on bands centered at reference_hz * 2^k.
+tilt_db_per_octave = -6.0
+tolerance_db = 2.0
+octave_min = -2
+octave_max = 4
+fft_size = 8192
+active_down_db = 20.0
+
+[takes]
+per_emotion = 5
+min_per_emotion = 3
+
+[emotions]
+names = [
+  "Neutral",
+  "Calm",
+  "Happy",
+  "Amused",
+  "Excited",
+  "Tender",
+  "Sad",
+  "Disappointed",
+  "Angry",
+  "Fearful",
+  "Surprised",
+  "Disgusted",
+]
