@@ -22,7 +22,10 @@ tendencies.
 Display targets are hand-chosen semantic swatches. Spectral hex values are
 the CIE 1931 gamut-clipped swatches already computed in the design document
 (CVRL 1 nm colour-matching functions, D65 linear sRGB matrix, negative
-channels clamped, peak channel scaled to 1, sRGB transfer). This repository
+channels clamped, peak channel scaled to 1, sRGB transfer). An independent check with the same CVRL 1 nm table reproduced the stored
+spectral hex for the demo wavelengths (410.2 `#7000FF`, 486.1 `#00C0FF`,
+541.2 `#00FF00`, 575.5 `#FFD300`, 587.6 `#FF8700`, 594.5 `#FF6300`, 656.3
+`#FF0000`). This repository
 does not invent a second set of spectral hex values. CIEDE2000 between the
 13 display targets has a minimum of about 12.7 (Amused `#FF9C64` versus
 Excited `#FF6300`). No display target was moved.

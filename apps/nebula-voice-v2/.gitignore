@@ -1,4 +1,5 @@
 /target
 /dist
+/web/pkg
 **/*.png
 /nebula-frames
