@@ -484,7 +484,7 @@ The budget is the one already locked. This plan adds no new millisecond figure.
 
 A wall-clock time for a twelve-way posterior on one 80 ms frame is **unknown**. emotion2vec+ in the persona scorer is an utterance ONNX session on `CPUExecutionProvider`. Nothing in the repo shows that session finishing inside 60 ms. Until that is measured on the laptop, the twelve-way head stays off the heartbeat. The frame that ships is the last smoothed outbound cloud, or an explicit absence when there has been no estimate yet. Absence is the wire’s existing `present = 0`. It is not a Neutral weight of 1 invented to keep the visualiser busy. The audio heartbeat is not blocked on the head.
 
-The visualiser reads the side stream. It does not sit inside `frame_budget_p95_ms`. A slow draw drops a line. It does not delay `affect_to_voice`.
+The visualiser reads the side stream. It does not sit inside `frame_budget_p95_ms`. A slow draw drops a line. It does not delay `affect_to_voice`. Colour for a particle comes from the fixed element table below. That colour is a label. It is not an audio control.
 
 ### How the live cloud relates to the offline score and the gate
 
@@ -500,6 +500,32 @@ The live distribution is the cloud the voice was asked to inhabit, frame by fram
 The same twelve names, the same Samantha-only seductive rule, and the same VAD axes are the coordinates of both. After a call, the utterance line and the rendered wav can be scored offline against each other and against the controlled reference: what was conditioned, what the audio did, what the reference holds. That comparison uses the rescore in the previous section. It does not run inside the 60 ms budget, and its distance does not become a live pass/fail.
 
 A live frame is not a gate result. 0.83 is not consulted to accept or reject a heartbeat. The gate is not lowered because the visualiser needs a number. Warmth is not removed from the live weights because love is the weak offline row.
+
+## Fixed element-to-emotion table (Nebula)
+
+This table is hard-coded. The same rows are the colour key for the visualiser at `apps/nebula-voice-v2`, for the live emotion frames, and for the training labels. The emotion id is the key. All three consumers use this table. They do not each invent a line.
+
+The gas line is a label on the emotion. It does not change acoustic output. Pitch, energy, tilt, the persona blend, and the 0.83 gate are untouched by the element, the wavelength, and the colour.
+
+Ne I (Surprised) and Ar I (Sad) are lab lines that are weak in real nebulae. They stay in the table by admin choice.
+
+| Emotion | Gas line | Wavelength (nm) | Colours |
+|---|---|---:|---|
+| Neutral | H-alpha | 656.3 | red |
+| Calm | H-beta | 486.1 | blue-green |
+| Tender | H-gamma | 434.0 | violet |
+| Happy | He I | 587.6 | yellow |
+| Excited | [O III] | 500.7 | teal-green |
+| Amused | [O II] | 372.7 | violet (near-UV) |
+| Surprised | Ne I | 640.2 | orange-red |
+| Fearful | He II | 468.6 | hot blue |
+| Sad | Ar I | 696.5 | deep red |
+| Disappointed | [S II] | 673.1 | red-orange |
+| Angry | [S III] | 631.2 | deep red |
+| Disgusted | N II | 399.5 | violet-blue |
+| Seductive (Samantha only) | [O I] | 630.0 | red-orange |
+
+Seductive remains Samantha-only. Jarvis and Galion One do not take that row. The twelve shared emotions are the twelve rows above it.
 
 ## Ranked next steps
 
