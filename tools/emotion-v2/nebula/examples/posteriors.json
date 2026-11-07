@@ -1,0 +1,77 @@
+{
+  "schema": "galion-nebula-replay/1",
+  "voice_id": "samantha",
+  "tau_ms": 240,
+  "posteriors": [
+    {
+      "t_ms": 0,
+      "kind": "frame",
+      "weights": {
+        "neutral": 1.0,
+        "calm": 0.0,
+        "happy": 0.0,
+        "amused": 0.0,
+        "excited": 0.0,
+        "tender": 0.0,
+        "sad": 0.0,
+        "disappointed": 0.0,
+        "angry": 0.0,
+        "fearful": 0.0,
+        "surprised": 0.0,
+        "disgusted": 0.0,
+        "seductive": 0.0
+      },
+      "valence": 0.0,
+      "arousal": 0.0,
+      "dominance": 0.0,
+      "energy": 0.2
+    },
+    {
+      "t_ms": 80,
+      "kind": "frame",
+      "weights": {
+        "neutral": 0.0,
+        "calm": 0.0,
+        "happy": 1.0,
+        "amused": 0.0,
+        "excited": 0.0,
+        "tender": 0.0,
+        "sad": 0.0,
+        "disappointed": 0.0,
+        "angry": 0.0,
+        "fearful": 0.0,
+        "surprised": 0.0,
+        "disgusted": 0.0,
+        "seductive": 0.0
+      },
+      "valence": 0.8,
+      "arousal": 0.4,
+      "dominance": 0.2,
+      "energy": 0.7
+    },
+    {
+      "t_ms": 1000,
+      "kind": "utterance",
+      "labels": [
+        "neutral",
+        "calm",
+        "happy",
+        "amused",
+        "excited",
+        "tender",
+        "sad",
+        "disappointed",
+        "angry",
+        "fearful",
+        "surprised",
+        "disgusted",
+        "seductive"
+      ],
+      "posterior": [0.0, 0.0, 0.5, 0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+      "valence": 0.7,
+      "arousal": 0.3,
+      "dominance": 0.1,
+      "energy": 0.55
+    }
+  ]
+}
