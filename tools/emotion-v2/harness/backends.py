@@ -37,6 +37,20 @@ class Analysis:
     labels: tuple[str, ...]
     posterior: tuple[float, ...]
     embedding: tuple[float, ...]
+    # Element ids are labels. They are not features of the acoustic posterior.
+    elements: tuple[str, ...] = ()
+
+    def distribution(self) -> list[dict[str, object]]:
+        """Emotion weights with the fixed element id. Acoustics are unchanged."""
+        from harness.line_table import element_ids_for
+
+        elements = self.elements or element_ids_for(self.labels)
+        if len(elements) != len(self.labels):
+            elements = element_ids_for(self.labels)
+        return [
+            {"emotion": label, "weight": float(weight), "element": element}
+            for label, weight, element in zip(self.labels, self.posterior, elements, strict=True)
+        ]
 
 
 class EmotionBackend(Protocol):
@@ -100,10 +114,13 @@ class StubBackend:
         # Powers, not log-powers: a pure tone is nearly one-hot after L2,
         # so embedding cosine separates emotions the posterior also separates.
         embedding = l2_normalize(powers)
+        from harness.line_table import element_ids_for
+
         return Analysis(
             labels=EMOTIONS,
             posterior=tuple(posterior),
             embedding=tuple(embedding),
+            elements=element_ids_for(EMOTIONS),
         )
 
 
@@ -203,7 +220,15 @@ class SuperbBackend:
             raise BackendUnavailable("superb model did not return hidden states; refusing to guess an embedding")
         hidden = hidden_states[-1][0].detach().float().cpu()
         embedding = l2_normalize(hidden.mean(dim=0).tolist())
-        return Analysis(labels=labels, posterior=tuple(softmax(logits)), embedding=tuple(embedding))
+        from harness.line_table import element_ids_for
+
+        posterior = tuple(softmax(logits))
+        return Analysis(
+            labels=labels,
+            posterior=posterior,
+            embedding=tuple(embedding),
+            elements=element_ids_for(labels),
+        )
 
     def _load(self) -> tuple[object, object, tuple[str, ...]]:
         if self._model is not None and self._extractor is not None and self._labels is not None:

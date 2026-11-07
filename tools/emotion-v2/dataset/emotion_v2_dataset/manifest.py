@@ -48,6 +48,8 @@ class ManifestRow:
     noise_licence: str
     telephony_hz: int | None = None
     duration_s: float = 0.0
+    # Label only. Audio synthesis does not read this field.
+    element: str = ""
 
     def as_dict(self) -> dict[str, Any]:
         row: dict[str, Any] = {
@@ -77,8 +79,27 @@ class ManifestRow:
             "noise_source": self.noise_source,
             "noise_licence": self.noise_licence,
             "telephony_hz": self.telephony_hz,
+            "element": self.element or _element_label(self.emotion),
         }
         return row
+
+
+def _element_label(emotion: str) -> str:
+    """Fixed element id for a dataset emotion. Empty when the name is unknown."""
+    import importlib.util
+
+    from emotion_v2_dataset.paths import find_repo_root
+
+    root = find_repo_root()
+    if root is None:
+        return ""
+    path = root / "emotion-v2" / "elements.py"
+    spec = importlib.util.spec_from_file_location("galion_emotion_elements", path)
+    if spec is None or spec.loader is None:
+        return ""
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.element_id(emotion)
 
 
 def write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:

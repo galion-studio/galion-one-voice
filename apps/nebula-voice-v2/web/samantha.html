@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <title>Samantha</title>
+  <link rel="stylesheet" href="nebula.css">
+</head>
+<body data-voice="samantha">
+  <canvas id="nebula"></canvas>
+  <div id="safe"></div>
+  <div id="overlay" hidden>
+    <div id="labels"></div>
+    <canvas id="strip"></canvas>
+  </div>
+  <script type="module">
+    import init, * as mod from "./pkg/nebula_voice_v2.js";
+    import { start } from "./boot.js";
+    await init();
+    start(mod);
+  </script>
+</body>
+</html>

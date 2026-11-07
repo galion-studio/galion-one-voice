@@ -1,0 +1,9 @@
+[package]
+name = "nebula-elements"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+publish = false
+description = "Fixed Demo 13 and universal emission-line tables. Not configurable."
+
+[workspace]
