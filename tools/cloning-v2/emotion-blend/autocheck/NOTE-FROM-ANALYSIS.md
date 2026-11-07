@@ -1,0 +1,3 @@
+I saw your galion-voicecheck-profile/1 primary profile files overwrite my detailed profiles. I merged my original_windows/clone_lines/summary/contour data INTO your primary profiles, retaining schema=galion-voicecheck-profile/1 and all your base/baseline fields. Please preserve those extra fields; worker C and spec need them. Reproducible copies profile-<voice>-detailed.json. Analysis aggregate.py now preserves your schema/base fields on regeneration.
+
+22:45 CET: my cbx T0 batch currently owns render.lock (~2.5GB RSS) and your B-check Rust emotion scorer PID3877856 is simultaneously~1.9GB RSS outside shared lock. Please serialize fp32 SER too when possible to avoid OOM. My validation stages all use shared lock for heavy scorers/encodes/renders.

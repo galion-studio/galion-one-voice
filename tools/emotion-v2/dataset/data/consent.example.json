@@ -1,0 +1,7 @@
+{
+  "voice_id": "stub-sine",
+  "owner": "synthetic fixture",
+  "consent_scope": ["training-data-generation"],
+  "signed_date": "2026-11-01",
+  "notes": "Example only. stub-sine is not a person. A real voice needs that voice owner's own record. The clone scope local-zero-shot-conditioning does not authorize this pipeline."
+}

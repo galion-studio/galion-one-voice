@@ -1,0 +1,1 @@
+READY: detailed original/merged per-line + same-window profiles and FINDINGS.md. Primary profiles retain worker B voicecheck schema, base and baseline fields and add original_windows,clone_lines,clone_windows, summaries and Rust contour supplement. Copies profile-*-detailed.json. No deployment/promotion.

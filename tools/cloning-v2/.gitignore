@@ -1,0 +1,9 @@
+**/target/
+**/*.wav
+**/*.cbxvoice
+**/__pycache__/
+**/logs/
+**/scores/
+**/wav/
+**/raw/
+**/work/

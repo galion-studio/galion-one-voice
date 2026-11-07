@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# Render a TSV (id<TAB>text) one line at a time with cbx-speak-voice (memory-safe).
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+SPEAK="$ROOT/bin/cbx-speak-voice"
+voice=""; manifest=""; outdir=""; 
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --voice) voice="$2"; shift 2;;
+    --manifest) manifest="$2"; shift 2;;
+    --out-dir) outdir="$2"; shift 2;;
+    *) echo "unknown $1"; exit 2;;
+  esac
+done
+[[ -n "$voice" && -n "$manifest" && -n "$outdir" ]] || { echo "need --voice --manifest --out-dir"; exit 2; }
+mkdir -p "$outdir"
+while IFS=$'\t' read -r id text; do
+  [[ -z "${id:-}" || "$id" =~ ^# ]] && continue
+  out="$outdir/${id}.wav"
+  if [[ -f "$out" ]]; then echo "SKIP $id"; continue; fi
+  # wait for memory / no other cbx speak
+  while true; do
+    avail=$(awk '/MemAvailable/{print int($2/1024)}' /proc/meminfo)
+    ncbx=$(pgrep -c -f '/release/cbx .* (speak|batch)' 2>/dev/null || true)
+    if [[ ${avail:-0} -ge 3800 && ${ncbx:-0} -eq 0 ]]; then break; fi
+    echo "WAIT $id avail=${avail}MB ncbx=${ncbx:-0}"
+    sleep 15
+  done
+  echo "RENDER $id"
+  "$SPEAK" --voice "$voice" --text "$text" --out-wav "$out" --seed 0
+done < "$manifest"
+echo DONE

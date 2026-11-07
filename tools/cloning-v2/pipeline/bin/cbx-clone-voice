@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# Shared Cloning V2 reference prep. No synthesis or production-default changes.
+# --blend-preserve is experimental and OFF unless explicitly requested.
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+CBX="${CBX_CLONE_BINARY:-$ROOT/pipeline/cbx-v2-timbre/target/release/cbx}"
+BUILDER="${CBX_BLEND_REF_BINARY:-$ROOT/emotion-blend/global-fix/refbuilder/target/debug/galion-blend-ref}"
+name= input= work=; blend=()
+while (($#)); do
+ case "$1" in
+  --name) name="$2"; shift 2;;
+  --voice-wav) input="$2"; shift 2;;
+  --work-dir) work="$2"; shift 2;;
+  --blend-preserve) blend=(--blend-preserve); shift;;
+  -h|--help) echo 'cbx-clone-voice --name NEW --voice-wav REF --work-dir NEW-DIR [--blend-preserve]'; exit 0;;
+  *) echo "Unknown argument: $1" >&2; exit 2;;
+ esac
+done
+[[ -n "$name" && -n "$input" && -n "$work" ]] || { echo 'name, voice-wav and work-dir required' >&2; exit 2; }
+[[ "$name" =~ ^[A-Za-z0-9][A-Za-z0-9_-]*$ && "$name" != own-samantha && "$name" != own-jarvis ]] || { echo 'unsafe/protected voice name' >&2; exit 2; }
+cache="${HF_HOME:-$HOME/.cache/huggingface}/cbx/voices"
+exec 9>"$ROOT/emotion-blend/render.lock"
+flock 9
+exec 8>/tmp/cbx-render.lock
+flock 8
+[[ ! -e "$cache/$name.cbxvoice" ]] || { echo 'refusing existing voice' >&2; exit 2; }
+mkdir "$work" # explicit fresh audit directory; no cleanup/delete
+nice -n 10 "$BUILDER" --input "$input" --output "$work/reference.wav" --meta "$work/reference.json" "${blend[@]}" --emotion-scorer "$ROOT/scorers/emotion/target/release/galion-emotion"
+nice -n 10 "$CBX" --intra-threads 2 --ep cpu voice add --dtype fp32 --name "$name" --voice-wav "$work/reference.wav"
