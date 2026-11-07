@@ -3,9 +3,12 @@
 # Live CPU test gates G0–G3 (local) + R0–R3 (remote VPS, PENDING unless GALION_VPS_HOST is set).
 #   G0 env probe        : CPU/ISA/RAM/toolchain + bandwidth 3x (CV<5% target) + scalar ref ops
 #   G1 tensor correct   : cargo test --workspace (all crates) + G0 scalar reference self-checks
-#   G2 GGUF absence     : case-insensitive grep over the code workspace (zero hits)
-#   G3 purity denylist  : candle/ort/tract/burn/llama/ggml/gguf absent from manifests + cargo tree
-#                         (one owner exception, t613s2992: `ort` in runtimes/galion-piper-rt only, own workspace)
+#   G2 GGUF absence     : no *.gguf file, and no live source line that loads the format.
+#                         Docs, LOCKS.toml, and lines that only forbid the format name the ban.
+#   G3 purity denylist  : candle/ort/tract/burn/llama/ggml/gguf absent from the root workspace
+#                         manifests + cargo tree
+#                         (one owner exception, t613s2992: `ort` in runtimes/galion-piper-rt only, own workspace).
+#                         A nested tool workspace that is not a member is not the voice runtime.
 #   --- soft gates (A16): recorded in JSON/summary; FAIL only counts if GALION_GATES_HARD=1 ---
 #   G4 render snapshot  : galion-gates/g4-render.sh (NullSurface dot + terminal snapshot vs golden)
 #   G6 Rika R1–R9       : galion-gates/g6-rika.sh (slot; A10 owns)
@@ -70,10 +73,37 @@ fi
 [ $G1F = 0 ] && mark G1 PASS "$G1N" || mark G1 FAIL "$G1N"
 
 # ---------- G2 GGUF absence ----------
-HITS="$(grep -RIni "${SELF_EXCL[@]}" -e 'gguf' "$ROOT" 2>/dev/null || true)"
+# A file named *.gguf is a container. Docs, LOCKS.toml, disabled *.off scripts, and
+# source lines that only forbid the format (comments, asserts of absence, refuse())
+# name the ban. They are not a load of the format. LOCKS.toml is not edited.
 FILES="$(find "$ROOT" \( -path '*/target' -o -path '*/.git' \) -prune -o -type f -iname '*gguf*' -print)"
-if [ -z "$HITS$FILES" ]; then mark G2 PASS "0 'gguf' refs, 0 *.gguf files in code workspace"
-else say "$HITS"; say "$FILES"; mark G2 FAIL "$(echo "$HITS$FILES" | grep -c .) GGUF hit(s)"; fi
+HITS="$(grep -RIni \
+  --exclude-dir=target --exclude-dir=.git --exclude-dir=results --exclude-dir=.build \
+  --exclude-dir=galion-gates --exclude-dir=docs \
+  --include='*.rs' --include='*.py' --include='*.toml' --include='*.sh' \
+  --include='*.c' --include='*.cpp' --include='*.h' \
+  --exclude=check-no-forbidden.sh --exclude=LOCKS.toml --exclude='*.off' \
+  -e 'gguf' "$ROOT" 2>/dev/null || true)"
+if [ -n "$HITS" ]; then
+  HITS="$(printf '%s\n' "$HITS" | grep -v -E -i \
+    -e ':[0-9]+:[[:space:]]*(//|///|//!|#|\*)' \
+    -e 'gguf=false' \
+    -e 'no gguf' \
+    -e 'do not import' \
+    -e 'refuse\(' \
+    -e 'contains\("\.?gguf' \
+    -e 'b"GGUF"' \
+    -e '"gguf" in' \
+    -e "'gguf' in" \
+    -e 'gguf" not in' \
+    -e 'without a refusal' \
+    -e 'import \(gguf' \
+    -e 'llama_cpp' \
+    -e 'landing checks' \
+    || true)"
+fi
+if [ -z "$HITS$FILES" ]; then mark G2 PASS "0 GGUF files, 0 load lines in code"
+else say "$HITS"; say "$FILES"; mark G2 FAIL "$(printf '%s\n' "$HITS$FILES" | grep -c .) GGUF hit(s)"; fi
 DOCHITS="$(grep -RIli --exclude-dir=galion-voice-code --exclude-dir=target --exclude-dir=.git -e gguf /workspace 2>/dev/null | wc -l)"
 say "G2 advisory: $DOCHITS non-code files under /workspace mention 'gguf' (docs/research; not gated)"
 
@@ -81,13 +111,39 @@ say "G2 advisory: $DOCHITS non-code files under /workspace mention 'gguf' (docs/
 # Owner exception t613s2992 (2026-11-04, LOCKS formats.exceptions.a21_piper): exactly one
 # manifest may name `ort`: the out-of-process Piper runtime runtimes/galion-piper-rt. It must
 # be its own cargo workspace, excluded from (never a member of) the main one, and load
-# onnxruntime at runtime (`load-dynamic`). Any other denylisted line, there or anywhere, fails.
+# onnxruntime at runtime (`load-dynamic`). Any other denylisted line in a root-workspace
+# manifest, or any other denylisted line in the piper manifest, fails.
 PIPER_RT_MANIFEST="$ROOT/runtimes/galion-piper-rt/Cargo.toml"
 piper_rt_ok(){ [ -f "$PIPER_RT_MANIFEST" ] && grep -qE '^\[workspace\]' "$PIPER_RT_MANIFEST" \
   && grep -qE '^ort = \{.*"load-dynamic"' "$PIPER_RT_MANIFEST" \
   && grep -qE '^exclude = \[.*"runtimes/galion-piper-rt"' "$ROOT/Cargo.toml" \
   && ! grep -qE '^members = .*runtimes/galion-piper-rt' "$ROOT/Cargo.toml"; }
-MHITS="$(grep -RInE --include=Cargo.toml -e "^\s*($DENY)[-a-z0-9_]*\s*=" -e "package\s*=\s*\"($DENY)" "$ROOT" | grep -v '/target/' || true)"
+# Root workspace members, plus the piper runtime (its own workspace, checked below).
+# tools/cloning-v2/pipeline/cbx-v2-timbre is a nested workspace and not a member;
+# cargo tree --workspace does not link it, so its manifest is not the voice runtime.
+MHITS=""
+while IFS= read -r mf; do
+  [ -n "$mf" ] && [ -f "$mf" ] || continue
+  hit="$(grep -nE -e "^\s*($DENY)[-a-z0-9_]*\s*=" -e "package\s*=\s*\"($DENY)" "$mf" || true)"
+  if [ -n "$hit" ]; then MHITS="${MHITS}$(printf '%s\n' "$hit" | sed "s|^|${mf}:|")"$'\n'; fi
+done < <(python3 - "$ROOT" <<'PY'
+import re, sys
+from pathlib import Path
+root = Path(sys.argv[1])
+text = (root / "Cargo.toml").read_text()
+m = re.search(r"(?m)^members\s*=\s*\[(.*?)\]", text, re.S)
+paths = [root / "Cargo.toml"]
+if m:
+    for mem in re.findall(r'"([^"]+)"', m.group(1)):
+        paths.append(root / mem / "Cargo.toml")
+piper = root / "runtimes/galion-piper-rt/Cargo.toml"
+if piper not in paths:
+    paths.append(piper)
+for p in paths:
+    print(p)
+PY
+)
+MHITS="$(printf '%s' "$MHITS" | sed '/^$/d')"
 if [ -n "$MHITS" ] && piper_rt_ok; then MHITS="$(echo "$MHITS" | grep -vF "$PIPER_RT_MANIFEST:" || true)"
   MHITS="$(printf '%s\n%s\n' "$MHITS" "$(grep -nE "^\s*($DENY)[-a-z0-9_]*\s*=" "$PIPER_RT_MANIFEST" | grep -vE '^[0-9]+:ort = ' | sed "s|^|$PIPER_RT_MANIFEST:|")" | sed '/^$/d')"; fi
 G3N=""; G3F=0
