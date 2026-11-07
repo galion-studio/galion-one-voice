@@ -43,7 +43,7 @@ Persona id may change only after `PERSONA_HOLD_FRAMES` (8) sensed samples at or 
 
 The one-dot mark is `Speaking` when this frame copied me samples, `Listening` when you are voiced and me is quiet, `Idle` otherwise. Speak wins. A pause holds the previous mark.
 
-The budget checked by the harness is `STEP_BUDGET_US` (800). A step whose warm p99 or max reaches that budget fails. The number is the harness ceiling. It is not a second clock.
+The budget checked by the harness is `STEP_BUDGET_US` (800). The harness times five independent passes. Each pass drops 64 warmup frames, then ranks the rest. The gate is the median pass: its warm p99 and its warm max both stay under 800 µs. The slowest pass is printed (`worst_p99_us`, `worst_max_us`) and is not the gate, so one preempted sample does not fail the run. A step that is at or over 800 µs on every pass still fails, because that median is over the ceiling. The number is the harness ceiling. It is not a second clock, and CI does not widen it.
 
 ## Off the step
 

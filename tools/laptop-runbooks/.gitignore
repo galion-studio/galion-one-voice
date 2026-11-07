@@ -1,0 +1,8 @@
+out/
+worktrees/
+*.wav
+*.wave
+*.flac
+*.mp3
+*.ogg
+*.WAV

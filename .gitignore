@@ -39,3 +39,12 @@ tools/emotion-v2/**/*.wave
 tools/emotion-v2/**/*.flac
 tools/emotion-v2/**/*.mp3
 tools/emotion-v2/**/*.ogg
+
+# Laptop runbooks write JSON and audio only under the cache outside this repo.
+# Anything dropped beside the scripts stays untracked.
+tools/laptop-runbooks/out/
+tools/laptop-runbooks/**/*.wav
+tools/laptop-runbooks/**/*.wave
+tools/laptop-runbooks/**/*.flac
+tools/laptop-runbooks/**/*.mp3
+tools/laptop-runbooks/**/*.ogg

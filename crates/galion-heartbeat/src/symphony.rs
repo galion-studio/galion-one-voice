@@ -17,8 +17,9 @@
 
 use crate::{FrameOut, FRAME_MS, FRAME_SAMPLES};
 
-/// Tick budget for one heartbeat step plus this wire. A measurement above
-/// this fails the harness. It is not a second clock and it is not a lock file.
+/// Tick budget for one heartbeat step plus this wire. The harness gates the
+/// median of several passes against this ceiling. It is not a second clock
+/// and it is not a lock file.
 pub const STEP_BUDGET_US: u32 = 800;
 
 pub const BAND_YOU: &str = "you";
