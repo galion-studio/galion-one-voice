@@ -1,3 +1,7 @@
+Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+
+Companion to SAMANTHA-EMOTION-GAP-PLAN.md. The text below is the universal emotion–gas research of 7 November 2026, copied unchanged. The plan hard-codes the Demo 13 rows v2 table and links the 62-row universal vocabulary in this file.
+
 # Universal emotion–gas design vocabulary and Demo 13 rows v2
 
 7 November 2026 (Europe/Zagreb). Research proposal only. No source-code edits, voice generation, merge or deployment.
