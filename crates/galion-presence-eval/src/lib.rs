@@ -13,13 +13,18 @@
 //! - T2: one loopback capture. TTFA is filled only when a reply WAV comes back.
 //!   PSTN is `not_run`.
 //!
+//! [`run_headless`] is the in-process T0 check: no socket, no `PhoneLane`, no
+//! speech weights. TTFA and barge-in stay unmeasured. Interim stays a placeholder.
+//!
 //! Run: `scripts/eval/virtual-user.sh`. Doc: `docs/eval/PRESENCE-EVAL.md`.
 
 use std::fs;
 use std::path::{Path, PathBuf};
 
 use galion_cascade::phone::wav_to_pcm16k;
-use galion_cascade::{AsrMode, AsrSource, CannedLlm, Emotion, LlmMode, PhoneConfig, PhoneLane};
+use galion_cascade::{
+    AsrMode, AsrSource, CannedLlm, Emotion, LlmMode, PhoneConfig, PhoneLane, PhoneTurnAsr,
+};
 use galion_presence::json::Value;
 
 mod barge;
@@ -693,6 +698,213 @@ fn case_value(c: &Case) -> Result<Value, String> {
     ])
 }
 
+/// In-process T0 check. No socket, no `PhoneLane`, no speech weights.
+///
+/// Task facts come from the canned table. A synthetic tone is labelled
+/// `interim-placeholder` and is not recognition. A stub fixture is an exact
+/// codec decode and is still not called recognition. TTFA is null. Barge-in
+/// is `not_run`. Neither number is filled in from the presence mock.
+pub fn run_headless(args: RunArgs<'_>) -> Result<RunSummary, String> {
+    if let Some(parent) = args.report.parent() {
+        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    fs::create_dir_all(args.wav_dir).map_err(|e| e.to_string())?;
+
+    let mut cases = headless_facts();
+    cases.push(headless_interim());
+    cases.push(headless_stub());
+    cases.push(t0_denylist());
+    if cases.iter().any(|c| c.wav.is_some() || c.ttfa_ms.is_some()) {
+        return Err("headless run must not record a wav or a ttfa".into());
+    }
+
+    let failed = cases.iter().filter(|c| c.status != "pass").count();
+    let any_claim = cases.iter().any(|c| c.claims_recognition);
+    let verdict = if failed == 0 && !any_claim {
+        "green"
+    } else {
+        "red"
+    };
+    let case_values = cases
+        .iter()
+        .map(case_value)
+        .collect::<Result<Vec<_>, _>>()?;
+    let tiers = tier_counts(&cases)?;
+    let report = score::obj(vec![
+        ("schema", Value::Str(SCHEMA.into())),
+        ("program", Value::Str("Galion Voice".into())),
+        ("owner", Value::Str("Maciej Grajczyk".into())),
+        ("commit", Value::Str(args.commit.into())),
+        ("scope", Value::Str("headless".into())),
+        ("transport", Value::Str("headless".into())),
+        ("bind", Value::Str("none".into())),
+        ("phone", Value::Bool(false)),
+        ("network", Value::Bool(false)),
+        ("weights", Value::Bool(false)),
+        ("pstn", Value::Str("not_run".into())),
+        ("t1", Value::Str("not_run".into())),
+        ("t2", Value::Str("not_run".into())),
+        ("asr_mode", Value::Str("interim".into())),
+        ("llm", Value::Str("canned".into())),
+        ("reply_model", Value::Str("canned-llm".into())),
+        ("speech_backend", Value::Str("none".into())),
+        ("speech_label", Value::Str("headless; weights not loaded".into())),
+        ("endpointing", Value::Str("scripted-inject".into())),
+        ("vad", Value::Str("not-on-this-path".into())),
+        ("audio_captured", Value::Bool(false)),
+        ("ttfa_ms", Value::Null),
+        ("ttfa_status", Value::Str("unmeasured".into())),
+        ("ttfa_kind", Value::Str(TTFA_KIND.into())),
+        ("ttfa_note", Value::Str(TTFA_NOTE.into())),
+        ("supersede", Value::Null),
+        ("barge_in_cancel", Value::Str("not_run".into())),
+        ("barge_in_stop_ms", Value::Null),
+        ("barge_in_kind", Value::Str("not_run".into())),
+        ("claims_recognition", Value::Bool(any_claim)),
+        ("tiers", tiers),
+        ("cases", Value::Arr(case_values)),
+        ("verdict", Value::Str(verdict.into())),
+    ])?;
+    score::walk_keys(&report)?;
+    let body = report.to_json();
+    fs::write(args.report, format!("{body}\n")).map_err(|e| e.to_string())?;
+
+    Ok(RunSummary {
+        verdict,
+        cases: cases.len(),
+        failed,
+        ttfa_status: "unmeasured".into(),
+        ttfa_ms: None,
+        audio_captured: false,
+        barge_in_cancel: "not_run".into(),
+        report: args.report.to_path_buf(),
+    })
+}
+
+fn headless_facts() -> Vec<Case> {
+    let llm = CannedLlm::new();
+    TASK_FACTS
+        .iter()
+        .map(|(text, expect)| {
+            let id = format!("T0-fact-{}", slug(text));
+            let body = llm.body(text, Emotion::Neutral);
+            let asr = AsrSource::TextInject;
+            let fact_ok = body == *expect;
+            let ok = fact_ok && !asr.is_recognised() && !claims_recognition(asr);
+            Case {
+                id,
+                tier: "T0",
+                inject: "text",
+                input: (*text).into(),
+                transcript: (*text).into(),
+                reply: (*body).into(),
+                expected_reply: (*expect).into(),
+                task_fact: if fact_ok { "pass" } else { "fail" },
+                asr: asr.id().into(),
+                claims_recognition: claims_recognition(asr),
+                fixture_decoded: false,
+                wav: None,
+                wav_peak: None,
+                ttfa_ms: None,
+                status: if ok { "pass" } else { "fail" },
+                note: "text inject; not recognition".into(),
+            }
+        })
+        .collect()
+}
+
+fn headless_interim() -> Case {
+    let expect = fact("hello");
+    let id = "T0-interim-label".to_string();
+    let wav = voice_wav(0.5);
+    match wav_to_pcm16k(&wav).and_then(|pcm| PhoneTurnAsr::new(AsrMode::Interim).transcribe(&pcm)) {
+        Ok((transcript, asr)) => {
+            let reply = CannedLlm::new()
+                .body(&transcript, Emotion::Neutral)
+                .to_string();
+            let fact_ok = reply == expect;
+            let ok = transcript == "hello"
+                && fact_ok
+                && asr == AsrSource::InterimPlaceholder
+                && !asr.is_recognised()
+                && !claims_recognition(asr)
+                && asr.id() == "interim-placeholder";
+            Case {
+                id,
+                tier: "T0",
+                inject: "wav",
+                input: "synthetic-voice-0.5s".into(),
+                transcript,
+                reply,
+                expected_reply: expect.into(),
+                task_fact: if fact_ok { "pass" } else { "fail" },
+                asr: asr.id().into(),
+                claims_recognition: claims_recognition(asr),
+                fixture_decoded: false,
+                wav: None,
+                wav_peak: None,
+                ttfa_ms: None,
+                status: if ok { "pass" } else { "fail" },
+                note: "duration placeholder; the words were not heard".into(),
+            }
+        }
+        Err(e) => blank_fail(
+            id,
+            "T0",
+            "wav",
+            "synthetic-voice-0.5s",
+            expect,
+            e.to_string(),
+        ),
+    }
+}
+
+fn headless_stub() -> Case {
+    let expect = fact("how are you");
+    let id = "T0-stub-fixture".to_string();
+    let wav = fixture_wav("how are you");
+    match wav_to_pcm16k(&wav).and_then(|pcm| PhoneTurnAsr::new(AsrMode::Interim).transcribe(&pcm))
+    {
+        Ok((transcript, asr)) => {
+            let reply = CannedLlm::new()
+                .body(&transcript, Emotion::Neutral)
+                .to_string();
+            let fact_ok = reply == expect;
+            let ok = transcript == "how are you"
+                && fact_ok
+                && asr == AsrSource::StubFixture
+                && asr.is_recognised()
+                && !claims_recognition(asr);
+            Case {
+                id,
+                tier: "T0",
+                inject: "wav",
+                input: "fixture:how are you".into(),
+                transcript,
+                reply,
+                expected_reply: expect.into(),
+                task_fact: if fact_ok { "pass" } else { "fail" },
+                asr: asr.id().into(),
+                claims_recognition: claims_recognition(asr),
+                fixture_decoded: true,
+                wav: None,
+                wav_peak: None,
+                ttfa_ms: None,
+                status: if ok { "pass" } else { "fail" },
+                note: "stub fixture decoded; the report does not call that recognition".into(),
+            }
+        }
+        Err(e) => blank_fail(
+            id,
+            "T0",
+            "wav",
+            "fixture:how are you",
+            expect,
+            e.to_string(),
+        ),
+    }
+}
+
 fn tier_counts(cases: &[Case]) -> Result<Value, String> {
     let mut fields = Vec::new();
     for tier in ["T0", "T1", "T2"] {
@@ -790,6 +1002,121 @@ mod tests {
             assert_eq!(summary.ttfa_status, "unmeasured");
             assert_eq!(summary.ttfa_ms, None);
         }
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn headless_eval_scores_labels_without_inventing_presence() {
+        let dir = std::env::temp_dir().join(format!(
+            "galion-presence-eval-headless-{}",
+            std::process::id()
+        ));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let report = dir.join("report.json");
+        let wav_dir = dir.join("wav");
+        let summary = run_headless(RunArgs {
+            report: &report,
+            wav_dir: &wav_dir,
+            commit: "test",
+        })
+        .unwrap();
+        assert_eq!(summary.verdict, "green", "{summary:?}");
+        assert_eq!(summary.failed, 0);
+        assert_eq!(summary.cases, TASK_FACTS.len() + 3);
+        assert_eq!(summary.ttfa_status, "unmeasured");
+        assert_eq!(summary.ttfa_ms, None);
+        assert!(!summary.audio_captured);
+        assert_eq!(summary.barge_in_cancel, "not_run");
+        let wavs = fs::read_dir(&wav_dir).unwrap().count();
+        assert_eq!(wavs, 0, "headless must not write a reply wav");
+        let text = fs::read_to_string(&report).unwrap();
+        let value = json::parse(&text).unwrap();
+        assert_eq!(value.get("schema").and_then(|v| v.as_str()), Some(SCHEMA));
+        assert_eq!(
+            value.get("scope").and_then(|v| v.as_str()),
+            Some("headless")
+        );
+        assert_eq!(
+            value.get("transport").and_then(|v| v.as_str()),
+            Some("headless")
+        );
+        assert_eq!(value.get("bind").and_then(|v| v.as_str()), Some("none"));
+        assert_eq!(value.get("phone"), Some(&Value::Bool(false)));
+        assert_eq!(value.get("network"), Some(&Value::Bool(false)));
+        assert_eq!(value.get("weights"), Some(&Value::Bool(false)));
+        assert_eq!(value.get("pstn").and_then(|v| v.as_str()), Some("not_run"));
+        assert_eq!(value.get("t1").and_then(|v| v.as_str()), Some("not_run"));
+        assert_eq!(value.get("t2").and_then(|v| v.as_str()), Some("not_run"));
+        assert_eq!(
+            value.get("speech_backend").and_then(|v| v.as_str()),
+            Some("none")
+        );
+        assert_eq!(value.get("audio_captured"), Some(&Value::Bool(false)));
+        assert_eq!(value.get("ttfa_ms"), Some(&Value::Null));
+        assert_eq!(
+            value.get("ttfa_status").and_then(|v| v.as_str()),
+            Some("unmeasured")
+        );
+        assert_eq!(value.get("supersede"), Some(&Value::Null));
+        assert_eq!(
+            value.get("barge_in_cancel").and_then(|v| v.as_str()),
+            Some("not_run")
+        );
+        assert_eq!(value.get("barge_in_stop_ms"), Some(&Value::Null));
+        assert_eq!(
+            value.get("barge_in_kind").and_then(|v| v.as_str()),
+            Some("not_run")
+        );
+        assert_eq!(value.get("claims_recognition"), Some(&Value::Bool(false)));
+        assert_eq!(value.get("verdict").and_then(|v| v.as_str()), Some("green"));
+        for absent in ["onset_p50_ms", "onset_p95_ms", "barge_in_ms", "attunement"] {
+            assert!(value.get(absent).is_none(), "{absent} must not be invented");
+        }
+        score::walk_keys(&value).unwrap();
+        let cases = value.get("cases").and_then(|v| v.as_arr()).unwrap();
+        assert_eq!(cases.len(), TASK_FACTS.len() + 3);
+        for case in cases {
+            assert_eq!(case.get("claims_recognition"), Some(&Value::Bool(false)));
+            assert_eq!(case.get("status").and_then(|v| v.as_str()), Some("pass"));
+            assert_eq!(case.get("ttfa_ms"), Some(&Value::Null));
+            assert_eq!(case.get("wav"), Some(&Value::Null));
+            assert_eq!(case.get("tier").and_then(|v| v.as_str()), Some("T0"));
+        }
+        let interim = cases
+            .iter()
+            .find(|c| c.get("id").and_then(|v| v.as_str()) == Some("T0-interim-label"))
+            .unwrap();
+        assert_eq!(
+            interim.get("asr").and_then(|v| v.as_str()),
+            Some("interim-placeholder")
+        );
+        assert_eq!(interim.get("fixture_decoded"), Some(&Value::Bool(false)));
+        assert_eq!(
+            interim.get("transcript").and_then(|v| v.as_str()),
+            Some("hello")
+        );
+        let note = interim.get("note").and_then(|v| v.as_str()).unwrap();
+        assert!(note.contains("not heard"), "{note}");
+        let stub = cases
+            .iter()
+            .find(|c| c.get("id").and_then(|v| v.as_str()) == Some("T0-stub-fixture"))
+            .unwrap();
+        assert_eq!(
+            stub.get("asr").and_then(|v| v.as_str()),
+            Some("stub-fixture")
+        );
+        assert_eq!(stub.get("fixture_decoded"), Some(&Value::Bool(true)));
+        assert_eq!(stub.get("claims_recognition"), Some(&Value::Bool(false)));
+        let t0 = value.get("tiers").and_then(|v| v.get("T0")).unwrap();
+        assert_eq!(t0.get("fail").and_then(|v| v.as_f64()), Some(0.0));
+        assert_eq!(
+            t0.get("pass").and_then(|v| v.as_f64()),
+            Some((TASK_FACTS.len() + 3) as f64)
+        );
+        let t1 = value.get("tiers").and_then(|v| v.get("T1")).unwrap();
+        assert_eq!(t1.get("pass").and_then(|v| v.as_f64()), Some(0.0));
+        assert_eq!(t1.get("fail").and_then(|v| v.as_f64()), Some(0.0));
         let _ = fs::remove_dir_all(&dir);
     }
 }

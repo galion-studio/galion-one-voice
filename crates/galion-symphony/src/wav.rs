@@ -117,18 +117,15 @@ fn data_chunk(b: &[u8]) -> Result<&[u8]> {
     Err(Error::Bad("wav: no data chunk".into()))
 }
 
-pub fn write_pcm16(
-    path: &std::path::Path,
+/// PCM bytes in memory. Callers that already hold samples do not need a wav path.
+pub fn encode_pcm16(
     rate: u32,
     channels: u16,
     samples: &[i16],
     extra: &[([u8; 4], &[u8])],
-) -> Result<()> {
+) -> Result<Vec<u8>> {
     if channels == 0 || samples.len() % channels as usize != 0 {
         return Err(Error::Bad("wav: sample count".into()));
-    }
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent).map_err(|e| Error::io(&parent.display().to_string(), e))?;
     }
     let data_bytes = samples.len() * 2;
     let mut extra_bytes = 0usize;
@@ -165,5 +162,38 @@ pub fn write_pcm16(
             out.push(0);
         }
     }
+    Ok(out)
+}
+
+pub fn write_pcm16(
+    path: &std::path::Path,
+    rate: u32,
+    channels: u16,
+    samples: &[i16],
+    extra: &[([u8; 4], &[u8])],
+) -> Result<()> {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| Error::io(&parent.display().to_string(), e))?;
+    }
+    let out = encode_pcm16(rate, channels, samples, extra)?;
     std::fs::write(path, out).map_err(|e| Error::io(&path.display().to_string(), e))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn encode_pcm16_stays_in_a_buffer() {
+        let samples = [20_000i16, 1, 0, -4];
+        let bed = b"clicks,alarms,ambience";
+        let bytes = encode_pcm16(48_000, 2, &samples, &[(*b"hub ", bed.as_slice())]).unwrap();
+        assert_eq!(&bytes[..4], b"RIFF");
+        let facts = facts(&bytes).unwrap();
+        assert_eq!(facts.sample_rate, 48_000);
+        assert_eq!(facts.channels, 2);
+        assert_eq!(facts.bits, 16);
+        assert_eq!(interleaved_i16(&bytes).unwrap(), samples);
+        assert!(bytes.windows(bed.len()).any(|w| w == bed));
+    }
 }

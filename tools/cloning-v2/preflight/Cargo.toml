@@ -1,0 +1,13 @@
+[package]
+name = "galion-cloning-preflight"
+version = "0.1.0"
+edition = "2021"
+description = "Rust-first Cloning V2 preflight: refuse Piper training and require cbx plus fp32 weights"
+license = "MIT"
+publish = false
+
+[[bin]]
+name = "galion-cloning-preflight"
+path = "src/main.rs"
+
+[workspace]

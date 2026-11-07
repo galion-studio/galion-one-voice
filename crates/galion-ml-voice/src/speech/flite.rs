@@ -89,14 +89,31 @@ fn with_lib<R>(voice: &str, f: impl FnOnce(&Lib) -> R) -> Result<R, String> {
 }
 
 /// Interim English TTS on the system libflite.
-pub struct FliteTts { voice: String }
+#[cfg_attr(test, derive(Clone))]
+pub struct FliteTts {
+    voice: String,
+    /// In-memory PCM for the missing-pack unit test. Production builds have
+    /// no such field; [`Self::open`] still dlopens libflite.
+    #[cfg(test)]
+    scripted: Option<Vec<f32>>,
+}
 
 impl FliteTts {
     /// Open `voice` (one of [`VOICES`]).
     pub fn open(voice: &str) -> Result<Self, VoiceError> {
         if !VOICES.contains(&voice) { return Err(VoiceError::Backend(format!("unknown flite voice {voice}"))); }
         with_lib(voice, |_| ()).map_err(|e| VoiceError::Backend(format!("libflite unavailable ({e}); install the distro package libflite1")))?;
-        Ok(Self { voice: voice.to_string() })
+        Ok(Self {
+            voice: voice.to_string(),
+            #[cfg(test)]
+            scripted: None,
+        })
+    }
+    /// Same voice id as [`Self::open`], with PCM already in memory.
+    /// Does not dlopen and does not read a Piper pack.
+    #[cfg(test)]
+    pub(crate) fn scripted(voice: &str, samples: Vec<f32>) -> Self {
+        Self { voice: voice.to_string(), scripted: Some(samples) }
     }
     /// Open `GALION_FLITE_VOICE` or `slt`.
     pub fn open_default() -> Result<Self, VoiceError> {
@@ -112,6 +129,10 @@ impl TtsEngine for FliteTts {
         let (_, body) = split_lang_token(text);
         let body = body.trim();
         if body.is_empty() { return Err(VoiceError::EmptyInput); }
+        #[cfg(test)]
+        if let Some(samples) = &self.scripted {
+            return Ok(Audio { sample_rate: SPEECH_RATE, samples: samples.clone() });
+        }
         let c = CString::new(body.replace('\0', " ")).unwrap();
         let (rate, pcm) = with_lib(&self.voice, |l| {
             // SAFETY: voice pointer from register_*; wave freed below; access serialized by mutex.

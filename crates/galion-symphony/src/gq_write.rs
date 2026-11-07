@@ -30,7 +30,65 @@ pub fn dtype_of(st: crate::safetensors::StDtype) -> GqDType {
     }
 }
 
+/// Tensor payload already in memory. The pack test uses this. It is not a weight file.
+#[derive(Debug, Clone)]
+pub struct MemTensor {
+    pub name: String,
+    pub dtype: GqDType,
+    pub dims: Vec<u64>,
+    pub bytes: Vec<u8>,
+}
+
+enum Src<'a> {
+    File { path: &'a Path, off: u64 },
+    Mem(&'a [u8]),
+}
+
+struct Piece<'a> {
+    name: &'a str,
+    dtype: GqDType,
+    dims: &'a [u64],
+    sha256: &'a [u8; 32],
+    len: u64,
+    src: Src<'a>,
+}
+
 pub fn write_gq(path: &Path, parts: &[GqPart]) -> Result<()> {
+    let pieces: Vec<Piece<'_>> = parts
+        .iter()
+        .map(|p| Piece {
+            name: &p.name,
+            dtype: p.dtype,
+            dims: &p.dims,
+            sha256: &p.sha256,
+            len: p.len,
+            src: Src::File {
+                path: &p.src,
+                off: p.src_off,
+            },
+        })
+        .collect();
+    write_pieces(path, &pieces)
+}
+
+pub fn write_gq_mem(path: &Path, parts: &[MemTensor]) -> Result<()> {
+    let hashes: Vec<[u8; 32]> = parts.iter().map(|p| crate::sha::sha256(&p.bytes)).collect();
+    let pieces: Vec<Piece<'_>> = parts
+        .iter()
+        .zip(hashes.iter())
+        .map(|(p, hash)| Piece {
+            name: &p.name,
+            dtype: p.dtype,
+            dims: &p.dims,
+            sha256: hash,
+            len: p.bytes.len() as u64,
+            src: Src::Mem(&p.bytes),
+        })
+        .collect();
+    write_pieces(path, &pieces)
+}
+
+fn write_pieces(path: &Path, parts: &[Piece<'_>]) -> Result<()> {
     if parts.is_empty() {
         return Err(Error::Bad(format!("{}: empty .gq", path.display())));
     }
@@ -52,11 +110,11 @@ pub fn write_gq(path: &Path, parts: &[GqPart]) -> Result<()> {
         if p.name.len() > MAX_NAME_LEN || p.dims.len() > MAX_RANK {
             return Err(Error::Bad(format!("tensor {} exceeds .gq limits", p.name)));
         }
-        if !seen.insert(p.name.clone()) {
+        if !seen.insert(p.name) {
             return Err(Error::Bad(format!("duplicate tensor {}", p.name)));
         }
         let es = match p.dtype {
-            GqDType::F32 => 4,
+            GqDType::F32 => 4u64,
             GqDType::BF16 => 2,
             GqDType::I8 => {
                 return Err(Error::Refused(format!(
@@ -91,13 +149,13 @@ pub fn write_gq(path: &Path, parts: &[GqPart]) -> Result<()> {
         table.push(p.dtype as u8);
         table.push(p.dims.len() as u8);
         table.extend_from_slice(&0u16.to_le_bytes());
-        for d in &p.dims {
+        for d in p.dims {
             table.extend_from_slice(&d.to_le_bytes());
         }
         table.extend_from_slice(&0f32.to_le_bytes());
         table.extend_from_slice(&off.to_le_bytes());
         table.extend_from_slice(&p.len.to_le_bytes());
-        table.extend_from_slice(&p.sha256);
+        table.extend_from_slice(p.sha256);
     }
     let table_len = table.len() as u64;
     let table_end = HEADER_LEN as u64 + table_len;
@@ -127,7 +185,18 @@ pub fn write_gq(path: &Path, parts: &[GqPart]) -> Result<()> {
         if *off > data_cursor {
             write_zeros(&mut out, (*off - data_cursor) as usize)?;
         }
-        copy_range(&p.src, p.src_off, p.len, &mut out)?;
+        match p.src {
+            Src::File {
+                path: src,
+                off: src_off,
+            } => copy_range(src, src_off, p.len, &mut out)?,
+            Src::Mem(bytes) => {
+                if bytes.len() as u64 != p.len {
+                    return Err(Error::Bad(format!("{}: memory length", p.name)));
+                }
+                out.write_all(bytes).map_err(|e| Error::Io(e.to_string()))?;
+            }
+        }
         data_cursor = off + p.len;
     }
     out.sync_all()
@@ -169,4 +238,81 @@ fn copy_range(src: &Path, off: u64, len: u64, out: &mut File) -> Result<()> {
         left -= n as u64;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use galion_tensor::gq::{GqDType, GqFile, Prefault};
+
+    #[test]
+    fn mem_bytes_roundtrip_without_a_weight_file() {
+        let dir = std::env::temp_dir().join(format!("galion-gq-mem-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let bytes: Vec<u8> = [0.5f32, -1.0]
+            .into_iter()
+            .flat_map(|v| v.to_le_bytes())
+            .collect();
+        let path = dir.join("voice_encoder.gq");
+        write_gq_mem(
+            &path,
+            &[MemTensor {
+                name: "sym.voice_encoder.encoder_weight".into(),
+                dtype: GqDType::F32,
+                dims: vec![2],
+                bytes: bytes.clone(),
+            }],
+        )
+        .unwrap();
+        let gq = GqFile::open(&path, Prefault::None).unwrap();
+        gq.verify_all().unwrap();
+        assert_eq!(
+            gq.raw("sym.voice_encoder.encoder_weight").unwrap(),
+            bytes.as_slice()
+        );
+        assert_eq!(
+            gq.f32_view("sym.voice_encoder.encoder_weight")
+                .unwrap()
+                .unwrap(),
+            &[0.5f32, -1.0]
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn file_range_roundtrip_matches_the_buffer() {
+        let dir = std::env::temp_dir().join(format!("galion-gq-file-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let bytes: Vec<u8> = [0.25f32, 2.0]
+            .into_iter()
+            .flat_map(|v| v.to_le_bytes())
+            .collect();
+        let src = dir.join("span.bin");
+        let mut padded = vec![0xABu8; 8];
+        padded.extend_from_slice(&bytes);
+        std::fs::write(&src, &padded).unwrap();
+        let path = dir.join("voice_encoder.gq");
+        write_gq(
+            &path,
+            &[GqPart {
+                name: "sym.voice_encoder.encoder_weight".into(),
+                dtype: GqDType::F32,
+                dims: vec![2],
+                src,
+                src_off: 8,
+                len: bytes.len() as u64,
+                sha256: crate::sha::sha256(&bytes),
+            }],
+        )
+        .unwrap();
+        let gq = GqFile::open(&path, Prefault::None).unwrap();
+        gq.verify_all().unwrap();
+        assert_eq!(
+            gq.raw("sym.voice_encoder.encoder_weight").unwrap(),
+            bytes.as_slice()
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 }

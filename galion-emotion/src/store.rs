@@ -407,9 +407,14 @@ pub mod spoken {
         Unclear,
     }
 
+    /// Keyword match. No heap: the utterance is not copied to a lowercase `String`.
+    /// Keywords are already lowercase; only the caller's token is case-folded.
     pub fn classify(utterance: &str) -> Heard {
-        let u = utterance.to_lowercase();
-        let has = |ws: &[&str]| ws.iter().any(|w| u.split(|c: char| !c.is_alphanumeric()).any(|t| t == *w));
+        let has = |ws: &[&str]| {
+            utterance.split(|c: char| !c.is_alphanumeric()).any(|token| {
+                !token.is_empty() && ws.iter().any(|word| token_eq_lower(token, word))
+            })
+        };
         if has(&["stop", "withdraw", "prestani", "povuci", "povlačim", "zaustavi"]) {
             Heard::Withdraw
         } else if has(&["no", "ne", "nemoj", "nope"]) {
@@ -419,6 +424,17 @@ pub mod spoken {
         } else {
             Heard::Unclear
         }
+    }
+
+    fn token_eq_lower(token: &str, word: &str) -> bool {
+        let mut folded = token.chars().flat_map(char::to_lowercase);
+        for expected in word.chars() {
+            match folded.next() {
+                Some(got) if got == expected => {}
+                _ => return false,
+            }
+        }
+        folded.next().is_none()
     }
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]

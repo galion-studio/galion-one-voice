@@ -10,6 +10,7 @@
 # A protocol-stub clock, including a 15 ms first-PCM figure, is FAIL.
 # product_claim stays false for that clock. The live pass is
 # scripts/eval/piper-stream-ttfa.sh when the A21 pack is on disk.
+# No pack and no model engine: one JSON line, measured false, gate BLOCKED.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 
@@ -47,6 +48,5 @@ if [ -x weights/runtime/piper/piper ] && [ -f weights/tts/en_US-ljspeech-medium.
   exit 0
 fi
 
-echo "FAIL"
-echo '{"engine":null,"gate":"FAIL","hard_pass":false,"measured":false,"model_measured":false,"note":"Piper pack absent. Protocol-stub clocks stay FAIL. product_claim is false.","piper_measured":false,"product_claim":false,"stub":false}'
+echo '{"engine":null,"gate":"BLOCKED","hard_pass":false,"measured":false,"model_measured":false,"note":"Piper pack absent. No model engine ran. product_claim is false.","piper_measured":false,"product_claim":false,"stub":false}'
 exit 2

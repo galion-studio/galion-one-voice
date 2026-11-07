@@ -5,7 +5,11 @@ Europe/Zagreb. 2026-11-03. Symphony section. Index: [README.md](README.md).
 
 The spelling is **Galion**. The product is Galion Voice.
 
-Two reference clips. WAV only. One per test persona. They condition the clone. They are not in git.
+## Policy
+
+Reference wavs stay outside git and are read-only. This tree does not add a wav, an mp3, or any other audio file. A worker opens a store file to read it. It does not rewrite, trim, denoise, or replace the bytes. A stage copy, when an owner path exists, writes a new file outside the work tree and leaves the source bytes alone. Piper training on own-voice clips is forbidden. Cloning is Rust-first: the store is a path the Rust gate checks. It is not a Piper training corpus. The deployed Jarvis voice must not change, and the Jarvis hub texture stays in the file. A hash, a duration, or a rate that this checkout did not compute is unmeasured. Unmeasured gates stay **BLOCKED**. Pins already printed below are owner-published records. They are not a new measurement from this tree.
+
+Two reference clips. WAV only. One per test persona. They condition the clone. They are not in git. They are read-only.
 
 | Id | In-repo path (gitignored) | Outside the repo |
 |---|---|---|
@@ -38,7 +42,7 @@ sha256sum /workspace/galion-clip-store/samantha/reference.wav \
 
 **FAIL** when a hash mismatches, when an mp3 is used as the ref, or when a WAV is committed.
 
-**BLOCKED** when the files are absent on this machine. The placeholders are the slots. Absence is not a hash.
+**BLOCKED** when the files are absent on this machine. The placeholders are the slots. Absence is not a hash. WER, ECAPA, MOS, and timings are not measured from these files on this page. Those gates stay **BLOCKED**.
 Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
 Europe/Zagreb. From the repository root.
 
@@ -215,6 +219,7 @@ error, because the WAV is not part of the clone.
 | Jarvis texture is its own toggle and does not rewrite the WAV | PASS, covered by the worker test (`hub` default, `off` leaves the bytes). |
 | `LOCKS.toml` `reference_clips` flipped to true | BLOCKED. The value is still false. This change does not edit the lock. The owner flips it in a later commit. |
 | Repeat the Nano smoke from `personas/refs/*.wav` here | BLOCKED. Those WAVs are not in this checkout. Clone weights are not in git. t287 reports a local smoke already generated Nano clones from those files. This tree does not re-measure that run and does not invent a duration or a sha256. |
+| WER, ECAPA, MOS, timings | BLOCKED. Not measured in this tree. |
 | Public demo | Not opened. |
 | `generate()` inside this process | Not wired. The stub still does not import torch. |
 

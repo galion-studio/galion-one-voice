@@ -18,13 +18,17 @@ The index of those instruction files is [personas/README.md](../personas/README.
 
 Empathy is the live OKLCH weight `e` and the prosody knobs in [EMPATHY.md](../EMPATHY.md). The words stay on the matter. The feeling is in the pace, the pitch, the loudness, and the wash behind the circle. `galion-emotion` recomputes that weight from the caller frame. A high `e` quiets the voice. It does not insert a comfort script.
 
+Situational feeling is the live weight on the feeling band. That weight is `e`, recomputed inside `Heartbeat::step` from `galion-emotion` (`empathy_weight` on `Feeling.e` and `StubExpressor::voice_color`). Consent starts denied. `DefaultConsentGate` begins at `ConsentState::Unknown`, and `check` returns `DenyNoConsent`. The `sense` bit starts off, so the first frame has no caller and `e` is 0.
+
+Caller emotion does not steer the phone lane unless `sense` is granted. `PhoneLane` passes `Emotion::Neutral` on `reply_text`, `inject_text`, and `turn`. Callers may run `ProsodyEmotion` only when `sense` is granted. That heuristic is unwired on the phone lane. An accuracy for the read, or a claim that a granted `sense` already changed the spoken phone reply, is unmeasured and stays **BLOCKED**. Reference wavs stay out of git. This file does not add one.
+
 ## Gate
 
 **PASS** when each persona file exists, the emotion column for that id is the one the feeling band applies, and a spoken turn carries prosody and wash with the words left on the matter.
 
 **FAIL** when a test voice is presented as the product, or when a reply uses a stock comfort line in place of the weight.
 
-**BLOCKED** when the feeling band has no caller frame (consent denied, so `e` is 0) and the row is being scored as if a live emotion were present.
+**BLOCKED** when the feeling band has no caller frame (consent starts denied, so `e` is 0) and the row is being scored as if a live situational feeling were present. Also **BLOCKED** when the score names a phone-lane accuracy or says the lane followed the caller. That read is unmeasured.
 
 How the screen selects a persona: [ONE-DOT.md](ONE-DOT.md). Record the gate in [SELF-EVAL.md](SELF-EVAL.md).
 
