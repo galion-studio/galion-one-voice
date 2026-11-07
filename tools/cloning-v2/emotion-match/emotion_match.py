@@ -8,8 +8,8 @@
 # open SpeechBrain encoder. Both are means over the clips. The weights above are
 # applied in emotion_match(); this process does not invent a constant.
 #
-# Weights: speechbrain/emotion-recognition-wav2vec2-IEMOCAP (Apache-2.0).
-# Cached outside the git checkout. CPU only.
+# Weights: superb/wav2vec2-base-superb-er (Apache-2.0), already in the local
+# Hugging Face cache. CPU only. The cache is outside this git checkout.
 
 import os
 import sys
@@ -33,7 +33,9 @@ def _reexec():
 _reexec()
 
 import json  # noqa: E402
+import wave  # noqa: E402
 
+import numpy as np  # noqa: E402
 import torch  # noqa: E402
 import torchaudio  # noqa: E402
 
@@ -95,10 +97,22 @@ def parse(argv):
 
 
 def load16(path):
-    wav, sr = torchaudio.load(path)
-    if wav.shape[0] > 1:
-        wav = wav.mean(dim=0, keepdim=True)
-    wav = wav.squeeze(0)
+    with wave.open(path) as handle:
+        sr = handle.getframerate()
+        channels = handle.getnchannels()
+        width = handle.getsampwidth()
+        raw = handle.readframes(handle.getnframes())
+    if width == 2:
+        samples = np.frombuffer(raw, dtype="<i2").astype(np.float32) / 32768.0
+    elif width == 4:
+        samples = np.frombuffer(raw, dtype="<i4").astype(np.float32) / 2147483648.0
+    elif width == 1:
+        samples = (np.frombuffer(raw, dtype=np.uint8).astype(np.float32) - 128.0) / 128.0
+    else:
+        raise SystemExit(f"{path}: unsupported sample width {width}")
+    if channels > 1:
+        samples = samples.reshape(-1, channels).mean(axis=1)
+    wav = torch.from_numpy(np.ascontiguousarray(samples))
     if sr != 16000:
         wav = torchaudio.functional.resample(wav, sr, 16000)
     return wav.contiguous()
@@ -119,6 +133,13 @@ def as_unit(emb):
     return e / e.norm().clamp_min(1e-12)
 
 
+DEFAULT_MODEL = (
+    "/home/galion/workspace/galion/cache/hf/hub/"
+    "models--superb--wav2vec2-base-superb-er/snapshots/"
+    "441a7599c3b22107314dcbd9166621c5c83f2cc5"
+)
+
+
 def load_classifier(threads):
     torch.set_num_threads(threads)
     try:
@@ -126,29 +147,31 @@ def load_classifier(threads):
     except RuntimeError:
         pass
     os.environ.setdefault("CUDA_VISIBLE_DEVICES", "")
-    savedir = os.environ.get(
-        "GALION_EMOTION_MODEL",
-        "/home/galion/workspace/galion/cache/hf/speechbrain/emotion-recognition-wav2vec2-IEMOCAP",
-    )
-    os.makedirs(savedir, exist_ok=True)
-    from speechbrain.inference.interfaces import foreign_class
+    snap = os.environ.get("GALION_EMOTION_MODEL", DEFAULT_MODEL)
+    if not os.path.isdir(snap):
+        raise SystemExit(f"emotion model snapshot missing: {snap}")
+    from transformers import Wav2Vec2FeatureExtractor, Wav2Vec2ForSequenceClassification
 
-    return foreign_class(
-        source="speechbrain/emotion-recognition-wav2vec2-IEMOCAP",
-        pymodule_file="custom_interface.py",
-        classname="CustomEncoderWav2vec2Classifier",
-        savedir=savedir,
-        run_opts={"device": "cpu"},
-    )
+    extractor = Wav2Vec2FeatureExtractor.from_pretrained(snap, local_files_only=True)
+    model = Wav2Vec2ForSequenceClassification.from_pretrained(snap, local_files_only=True)
+    model.eval()
+    captured = {}
+
+    def _hook(_module, inputs, _output):
+        captured["emb"] = inputs[0].detach()
+
+    model.classifier.register_forward_hook(_hook)
+    return extractor, model, captured
 
 
-def embed_and_prob(clf, wav):
-    batch = wav.unsqueeze(0)
-    if not hasattr(clf, "encode_batch"):
-        raise SystemExit("emotion model has no encode_batch")
-    emb = clf.encode_batch(batch)
-    out_prob, _score, _index, _text = clf.classify_batch(batch)
-    return as_prob(out_prob), as_unit(emb)
+def embed_and_prob(bundle, wav):
+    extractor, model, captured = bundle
+    features = extractor(wav.numpy(), sampling_rate=16000, return_tensors="pt")
+    with torch.no_grad():
+        logits = model(**features).logits
+    if "emb" not in captured:
+        raise SystemExit("emotion classifier did not expose an embedding")
+    return as_prob(logits), as_unit(captured["emb"])
 
 
 def intersection(p, q):
@@ -193,7 +216,7 @@ def main():
     body = {
         "tool": "emotion_match",
         "formula": FORMULA,
-        "model": "speechbrain/emotion-recognition-wav2vec2-IEMOCAP",
+        "model": "superb/wav2vec2-base-superb-er",
         "licence": "Apache-2.0",
         "device": "cpu",
         "threads": threads,
