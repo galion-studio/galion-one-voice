@@ -1,0 +1,8 @@
+{
+  "voice_id": "stub-sine",
+  "kind": "synthetic",
+  "pitch_standard_hz": 432,
+  "pitch_centre_hz": 216.0,
+  "references": {},
+  "notes": "Synthetic sine and noise fixture. Not a person. No reference audio."
+}

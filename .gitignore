@@ -80,3 +80,20 @@ venv/
 __pycache__/
 node_modules/
 target/
+
+# Emotion V2 capture audio stays outside git. Originals are the owner's own
+# recordings: read-only, sha256-manifested, never committed. The spec and the
+# checker are tracked. No voice clips, weights, or secrets.
+docs/emotion-v2/**/*.wav
+docs/emotion-v2/**/*.wave
+docs/emotion-v2/**/*.mp3
+docs/emotion-v2/**/*.flac
+tools/emotion-v2/**/*.wav
+tools/emotion-v2/**/*.wave
+tools/emotion-v2/**/*.mp3
+tools/emotion-v2/**/*.flac
+# Emotion V2 training data. Audio, manifests, and run output stay local.
+datasets/emotion-v2/
+
+# Never commit rendered clips from the dataset tool, even outside that root.
+tools/emotion-v2/**/*.ogg
