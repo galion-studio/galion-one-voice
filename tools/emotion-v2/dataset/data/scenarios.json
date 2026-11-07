@@ -1,0 +1,50 @@
+{
+  "Neutral": [
+    {"id": "neutral-01", "text": "The notebook is on the table.", "intensity": 0.35},
+    {"id": "neutral-02", "text": "I will send the summary after lunch.", "intensity": 0.45}
+  ],
+  "Calm": [
+    {"id": "calm-01", "text": "We can take this one step at a time.", "intensity": 0.40},
+    {"id": "calm-02", "text": "There is enough time to finish it.", "intensity": 0.55}
+  ],
+  "Happy": [
+    {"id": "happy-01", "text": "That turned out better than I hoped.", "intensity": 0.70},
+    {"id": "happy-02", "text": "I am glad you are here today.", "intensity": 0.85}
+  ],
+  "Amused": [
+    {"id": "amused-01", "text": "Well, that was an unexpected plot twist.", "intensity": 0.60},
+    {"id": "amused-02", "text": "I did not see that coming at all.", "intensity": 0.75}
+  ],
+  "Excited": [
+    {"id": "excited-01", "text": "We leave at dawn and I cannot wait.", "intensity": 0.80},
+    {"id": "excited-02", "text": "The results just came in and they are good.", "intensity": 0.90}
+  ],
+  "Tender": [
+    {"id": "tender-01", "text": "I kept the light on for you.", "intensity": 0.45},
+    {"id": "tender-02", "text": "You do not have to explain it all.", "intensity": 0.65}
+  ],
+  "Sad": [
+    {"id": "sad-01", "text": "I miss the way the evenings used to be.", "intensity": 0.55},
+    {"id": "sad-02", "text": "The chair by the window is empty.", "intensity": 0.70}
+  ],
+  "Disappointed": [
+    {"id": "disappointed-01", "text": "I expected the train to be on time.", "intensity": 0.50},
+    {"id": "disappointed-02", "text": "This is not the outcome I prepared for.", "intensity": 0.75}
+  ],
+  "Angry": [
+    {"id": "angry-01", "text": "That deadline was agreed and then ignored.", "intensity": 0.65},
+    {"id": "angry-02", "text": "Please stop moving the goal after we start.", "intensity": 0.85}
+  ],
+  "Fearful": [
+    {"id": "fearful-01", "text": "I heard a sound in the hall and I froze.", "intensity": 0.60},
+    {"id": "fearful-02", "text": "Something about this route does not feel safe.", "intensity": 0.80}
+  ],
+  "Surprised": [
+    {"id": "surprised-01", "text": "You finished it already?", "intensity": 0.70},
+    {"id": "surprised-02", "text": "I did not expect the door to open.", "intensity": 0.85}
+  ],
+  "Disgusted": [
+    {"id": "disgusted-01", "text": "The bin has been sitting there all week.", "intensity": 0.55},
+    {"id": "disgusted-02", "text": "That smell does not belong in the kitchen.", "intensity": 0.80}
+  ]
+}

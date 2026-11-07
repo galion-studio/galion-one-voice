@@ -41,3 +41,8 @@ tools/emotion-v2/**/*.wav
 tools/emotion-v2/**/*.wave
 tools/emotion-v2/**/*.mp3
 tools/emotion-v2/**/*.flac
+# Emotion V2 training data. Audio, manifests, and run output stay local.
+datasets/emotion-v2/
+
+# Never commit rendered clips from the dataset tool, even outside that root.
+tools/emotion-v2/**/*.ogg

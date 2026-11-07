@@ -1,0 +1,43 @@
+# Galion Voice — Perpetual Open MIT License
+# Copyright (c) 2026 Maciej Grajczyk.
+#
+# Emotion V2 thresholds for Samantha (Galion Voice V2, 432 Hz tuning standard).
+# The emotion target is the categorical-recogniser posterior compared with
+# that emotion's own reference. WER and ECAPA are the existing merge-v2 guards.
+
+schema = "galion-emotion-v2-thresholds/1"
+persona = "samantha"
+tuning_hz = 432
+
+[guards]
+# Inclusive upper bound. A fix is kept only when WER is at or below this.
+wer_max = 0.018
+# Strict lower bound. ECAPA must be greater than the Samantha merge-v2 baseline.
+ecapa_min = 0.7057
+
+[emotion]
+# Shared target. Every emotion below uses this number unless a row overrides it.
+target = 0.83
+
+[emotion.targets]
+neutral = 0.83
+calm = 0.83
+happy = 0.83
+amused = 0.83
+excited = 0.83
+tender = 0.83
+sad = 0.83
+disappointed = 0.83
+angry = 0.83
+fearful = 0.83
+surprised = 0.83
+disgusted = 0.83
+
+[embedding]
+# Cosine similarity of embeddings to that emotion's reference is always
+# reported. Set `min` to adopt it as a gate. This cut does not.
+
+[backend]
+# Used when a local weight directory is present. CPU CI forces the stub.
+id = "superb/wav2vec2-base-superb-er"
+stub = "stub"
