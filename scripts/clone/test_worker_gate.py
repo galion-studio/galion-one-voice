@@ -62,10 +62,11 @@ def run_worker(payload: dict, env: dict[str, str]) -> subprocess.CompletedProces
 class AllowlistTests(unittest.TestCase):
     def test_documented_prefixes_are_the_file(self) -> None:
         allow = MOD.load_allowlist(str(HERE / "REFS.sha256"))
-        # REFS.sha256 now carries main's full t273 pin rows; the allowlist
-        # reads the full digest as the prefix with an empty suffix.
-        self.assertTrue(allow["samantha"][0].startswith("e4bc60c3"))
-        self.assertTrue((allow["samantha"][0] + allow["samantha"][1]).endswith("84a4641"))
+        # The allowlist reads the active REFS row's full digest as the prefix
+        # with an empty suffix. samantha-exp's active row is the proposed
+        # Amy Koenig 17.84-29.25 s cut. The previous CC0 row stays commented.
+        self.assertTrue(allow["samantha"][0].startswith("16364282"))
+        self.assertTrue((allow["samantha"][0] + allow["samantha"][1]).endswith("921005"))
         self.assertTrue(allow["jarvis"][0].startswith("60ad5457"))
         self.assertTrue((allow["jarvis"][0] + allow["jarvis"][1]).endswith("58b8f6b6"))
         self.assertEqual(set(allow), {"samantha", "jarvis"})

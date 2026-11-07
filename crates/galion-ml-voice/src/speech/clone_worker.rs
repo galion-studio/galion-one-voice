@@ -2492,7 +2492,7 @@ mod tests {
         let refs = include_str!("../../../../scripts/clone/REFS.sha256");
         let rows: Vec<&str> = refs.lines().filter(|l| !l.trim_start().starts_with('#') && !l.trim().is_empty()).collect();
         assert_eq!(rows.len(), 2, "{refs}");
-        assert!(rows.iter().any(|r| r.starts_with("samantha e4bc60c3") && r.split_whitespace().nth(1).unwrap().ends_with("84a4641")));
+        assert!(rows.iter().any(|r| r.starts_with("samantha 16364282") && r.split_whitespace().nth(1).unwrap().ends_with("921005")));
         assert!(rows.iter().any(|r| r.starts_with("jarvis 60ad5457") && r.split_whitespace().nth(1).unwrap().ends_with("58b8f6b6")));
         let tok = include_str!("../../../../scripts/clone/TOKENIZER.sha256");
         assert!(tok.contains("tokenizer/vocab.json"));
