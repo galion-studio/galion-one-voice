@@ -12,7 +12,7 @@ publish = false
 [features]
 # V1-03: real-speech path (A21 weight slot + interim system TTS via runtime dlopen of
 # libflite). Off by default: the default build stays no-I/O, no FFI.
-speech = ["dep:galion-heartbeat", "dep:galion-consent"]
+speech = ["dep:galion-heartbeat", "dep:galion-consent", "dep:galion-cores"]
 
 [[example]]
 name = "piper_warmth"
@@ -37,6 +37,10 @@ galion-tensor = { path = "../galion-tensor", default-features = false }
 galion-heartbeat = { path = "../galion-heartbeat", optional = true, default-features = false }
 # Std-only, zero deps. The consent gate runs here, when a voice is cloned.
 galion-consent = { path = "../galion-consent", optional = true }
+# Std-only core map (v3): shared with the Vosk launcher, the call loop and galion-pin.
+galion-cores = { path = "../galion-cores", optional = true }
+# Persona-mood conditioning (zero-dependency crate) for the Piper path.
+galion-emotion = { path = "../../galion-emotion" }
 
 [dev-dependencies]
 galion-emotion = { path = "../../galion-emotion" }
@@ -45,3 +49,7 @@ galion-heartbeat = { path = "../galion-heartbeat", default-features = false }
 [[bin]]
 name = "galion-voice-compile"
 path = "src/bin/galion-voice-compile.rs"
+
+[[example]]
+name = "emotion_sweep"
+required-features = ["speech"]

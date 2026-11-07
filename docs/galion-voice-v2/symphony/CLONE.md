@@ -37,4 +37,16 @@ Pins: `scripts/clone/PINS.sha256`. Nano is `t3_nano_v1.safetensors` plus shared 
 
 Fetch and the flash clock: [TTFA.md](TTFA.md). Record the gate in [SELF-EVAL.md](SELF-EVAL.md).
 
+## Emotion blend (opt-in)
+
+Turbo ONNX voice-profile conditioning can miss late expressive moments because
+the encoder graph crops LM features to the first 6 s. The opt-in prep in
+[EMOTION-BLEND.md](EMOTION-BLEND.md) (`tools/cloning-v2/`) rotates or montages
+the reference before `voice add`. Default clone landing and Piper stay unchanged.
+Samantha production on 2026-11-05 uses the coherent-rotation candidate; Jarvis does not.
+
 — Maciej Grajczyk
+
+---
+
+© G.A.L.I.O.N. — General Autonomous Local Intelligence Open Network. All rights reserved and claims reserved. · CC0 voices: you must tick the consent box agreeing to the CC0 licence before using any CC0 voice; use is at your own responsibility. · No cookies. · De-Googled: no Google services. · All current Galion builds are open source under the Galion perpetual open MIT licence.

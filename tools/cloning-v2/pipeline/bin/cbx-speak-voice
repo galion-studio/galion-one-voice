@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# Speak via cbx-v2-timbre, injecting per-voice defaults from voice-defaults/<voice>.json
+# when --voice names a known production voice. Timbre stays off for all other voices.
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+CBX="${CBX:-$ROOT/cbx-v2-timbre/target/release/cbx}"
+DEFAULTS_DIR="$ROOT/voice-defaults"
+
+voice=""
+args=("$@")
+for ((i=0; i<${#args[@]}; i++)); do
+  if [[ "${args[$i]}" == "--voice" && $((i+1)) -lt ${#args[@]} ]]; then
+    voice="${args[$((i+1))]}"
+  elif [[ "${args[$i]}" == --voice=* ]]; then
+    voice="${args[$i]#--voice=}"
+  fi
+done
+
+extra=()
+cfg="$DEFAULTS_DIR/${voice}.json"
+if [[ -n "$voice" && -f "$cfg" ]]; then
+  # Only inject flags the caller did not already pass
+  has() { local f="$1"; local a; for a in "${args[@]}"; do [[ "$a" == "$f" || "$a" == "$f"=* ]] && return 0; done; return 1; }
+  tm=$(python3 -c "import json;print(json.load(open('$cfg')).get('timbre_match',0))")
+  tr=$(python3 -c "import json;print(json.load(open('$cfg')).get('timbre_ref',''))")
+  dt=$(python3 -c "import json;print(json.load(open('$cfg')).get('dtype','fp32'))")
+  tp=$(python3 -c "import json;print(json.load(open('$cfg')).get('temperature',0))")
+  if ! has --timbre-match && [[ "$tm" != "0" && -n "$tm" ]]; then
+    extra+=(--timbre-match "$tm")
+    if ! has --timbre-ref && [[ -n "$tr" ]]; then extra+=(--timbre-ref "$tr"); fi
+  fi
+  if ! has --dtype; then extra+=(--dtype "$dt"); fi
+  if ! has --temperature; then extra+=(--temperature "$tp"); fi
+fi
+
+exec nice -n 10 "$CBX" --intra-threads "${CBX_INTRA_THREADS:-2}" speak "${extra[@]}" "${args[@]}"

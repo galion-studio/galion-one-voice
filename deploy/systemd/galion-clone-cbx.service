@@ -1,0 +1,39 @@
+# Galion Voice — separate cloning worker (Chatterbox Turbo ONNX fp32 via cbx).
+# Loopback only, consent-gated at registration, off while a live call is active.
+# Piper stays the live TTS in galion-one-voice.service; this unit never serves calls.
+[Unit]
+Description=Galion clone worker (Chatterbox Turbo ONNX fp32, loopback, consent-gated)
+After=network.target galion-one-voice.service
+
+[Service]
+Type=simple
+ExecStart=/opt/galion/voice/cbx/galion-clone-cbx
+WorkingDirectory=/opt/galion/voice/cbx
+Environment=HOME=/opt/galion/voice/cbx/home
+Environment=GALION_CBX_ADDR=127.0.0.1:7880
+Environment=GALION_CBX_BIN=/opt/galion/voice/cbx/bin/cbx
+Environment=GALION_CBX_STATE=/opt/galion/voice/cbx/state
+Environment=GALION_CBX_THREADS=4
+Environment=GALION_CBX_LIVE_PORT=7878
+Environment=GALION_CBX_LIVE_LOG=/opt/galion/voice/logs/galion-one-voice.log
+Environment=GALION_REPO=/opt/galion/voice/galion-one-voice
+Environment=GALION_CLIP_STORE=/opt/galion/voice/clip-store-cc0
+# CC0 donors (owner t623u decision, t661u enable).
+Environment=GALION_CBX_ACCEPT_CC0=1
+# Low priority so the live service always wins the CPU.
+Nice=19
+CPUWeight=10
+IOSchedulingClass=idle
+MemoryMax=6G
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/opt/galion/voice/cbx
+IPAddressDeny=any
+IPAddressAllow=localhost
+
+[Install]
+WantedBy=multi-user.target

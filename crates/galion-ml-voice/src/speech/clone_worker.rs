@@ -17,7 +17,12 @@
 //! safetensors are on disk. Nothing here downloads them.
 //!
 //! The child is CPU-only Chatterbox Nano (Turbo remains the quality option,
-//! not a swap), pinned to one thread: the ~1 vCPU voice-session budget.
+//! not a swap). Its CPU placement is a [`ClonePlan`]: `session` is one thread
+//! (the ~1 vCPU multi-tenant voice-session budget); on a dedicated host with
+//! 8+ usable cores the two personas get disjoint cores and matching thread
+//! pools (`split4`: Samantha 0-3, Jarvis 4-7, 4 threads each; `split3`:
+//! 0-2 / 3-5, 3 threads, 6-7 left to ASR, Piper and the loop). The pin is a
+//! `sched_setaffinity` in the child before exec, not a taskset wrapper.
 //! No GPU. No GGUF. PyTorch stays in that process and is not linked here.
 //!
 //! A reference is attached only for the owner-cleared Samantha and Jarvis
@@ -47,6 +52,9 @@
 //! generate. The host calls it beside `Heartbeat::step`, not inside it.
 #![allow(unsafe_code)]
 
+pub use super::core_map::{apply_affinity, parse_cpu_list, usable_cpus};
+use super::core_map::format_cpu_list;
+use super::clone_cache::{self, CondCtx, CondPlan, SaveTicket};
 use super::{sha256, FrameProsody};
 use crate::{Audio, LanguageId, TtsEngine, VoiceError};
 use std::cell::UnsafeCell;
@@ -154,8 +162,9 @@ impl Default for CloneFrameDrain {
 const PINS_TEXT: &str = include_str!("../../../../scripts/clone/PINS.sha256");
 const REFS_TEXT: &str = include_str!("../../../../scripts/clone/REFS.sha256");
 
-/// This child asks for one hardware thread. That is the voice-session
-/// budget (~1 vCPU). The cascade burst of ~4 is not this process.
+/// Plan `session`: this child asks for one hardware thread. That is the
+/// voice-session budget (~1 vCPU). The cascade burst of ~4 is not this
+/// process. Dedicated hosts use a split [`ClonePlan`] instead.
 pub const CLONE_SESSION_VCPU: u32 = 1;
 pub const CLONE_BURST_VCPU: u32 = 4;
 
@@ -407,10 +416,174 @@ fn resolve_reference(persona: &str) -> Result<Option<ResolvedRef>, VoiceError> {
     resolve_reference_at(persona, store.as_deref(), &repo_root())
 }
 
-fn apply_cpu_budget(cmd: &mut Command) {
-    for key in CPU_THREAD_KEYS {
-        cmd.env(key, CLONE_SESSION_VCPU.to_string());
+/// How the clone children share the host CPUs (latency-240, agent 02).
+///
+/// Measured on the 8-core live box (latency-240/02-core-pinning.md): two
+/// unpinned Nano workers at 8 threads each oversubscribe 16 threads on 8
+/// cores and live RTF drifts to ~2x; disjoint cores with matching pools keep
+/// each voice near its solo RTF.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ClonePlan {
+    /// One thread, no pin: the ~1 vCPU voice-session budget (multi-tenant).
+    Session,
+    /// Samantha cores 0-3, Jarvis cores 4-7, 4 threads each.
+    Split4,
+    /// Samantha cores 0-2, Jarvis cores 3-5, 3 threads each; 6-7 reserved
+    /// for ASR, Piper and the call loop.
+    Split3,
+    /// No clone worker: V2 live calls are fully local and every core has a
+    /// role in [`super::core_map`] (reasoning 2-5, Piper 6 and 7, ...). Spawning refuses
+    /// and the speech stack falls back to Piper.
+    Off,
+}
+
+/// Plan `auto` picks on a dedicated host with at least [`DEDICATED_MIN_CPUS`]
+/// usable cores. Chosen from the measured matrix in 02-core-pinning.md.
+pub const DEDICATED_PLAN: ClonePlan = ClonePlan::Split4;
+/// Plan `auto` picks when `GALION_LLM_LOCAL` is set (V2 fully local, the
+/// owner ruling: no clone workers during a live call).
+pub const LOCAL_LLM_PLAN: ClonePlan = ClonePlan::Off;
+/// The dedicated plans index cores 0-7.
+pub const DEDICATED_MIN_CPUS: usize = 8;
+
+impl ClonePlan {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            ClonePlan::Session => "session",
+            ClonePlan::Split4 => "split4",
+            ClonePlan::Split3 => "split3",
+            ClonePlan::Off => "off",
+        }
     }
+
+    /// `session`, `split4`, `split3`, `off`; `auto` (or empty) resolves by
+    /// core count (local LLM hosts: see [`ClonePlan::auto`]).
+    pub fn parse(s: &str, usable_cpus: usize) -> Option<Self> {
+        Self::parse_with(s, usable_cpus, false)
+    }
+
+    /// `auto` with the local-LLM flag: [`LOCAL_LLM_PLAN`] on a dedicated host
+    /// that also runs the LLM, [`DEDICATED_PLAN`] when the LLM is remote.
+    pub fn parse_with(s: &str, usable_cpus: usize, local_llm: bool) -> Option<Self> {
+        match s.trim().to_ascii_lowercase().as_str() {
+            "off" | "live" => Some(ClonePlan::Off),
+            "" | "auto" if local_llm && usable_cpus >= DEDICATED_MIN_CPUS => Some(LOCAL_LLM_PLAN),
+            "session" | "1" => Some(ClonePlan::Session),
+            "split4" | "4+4" => Some(ClonePlan::Split4),
+            "split3" | "3+3" => Some(ClonePlan::Split3),
+            "" | "auto" => Some(if usable_cpus >= DEDICATED_MIN_CPUS {
+                DEDICATED_PLAN
+            } else {
+                ClonePlan::Session
+            }),
+            _ => None,
+        }
+    }
+
+    /// Cores this plan leaves for ASR, Piper and the loop.
+    pub fn reserved_cpus(self) -> Vec<usize> {
+        match self {
+            ClonePlan::Split3 => vec![6, 7],
+            _ => Vec::new(),
+        }
+    }
+}
+
+/// Where one clone child runs and how many threads its pools get.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ClonePlacement {
+    pub plan: ClonePlan,
+    /// Empty means not pinned (inherit the parent's mask).
+    pub cpus: Vec<usize>,
+    pub threads: u32,
+}
+
+impl ClonePlacement {
+    /// The plan's default cores for `persona` (only Samantha and Jarvis exist).
+    pub fn for_persona(plan: ClonePlan, persona: &str, usable_cpus: usize) -> Self {
+        let jarvis = persona_name(persona) == "jarvis";
+        let (cpus, threads) = match plan {
+            ClonePlan::Session => (Vec::new(), CLONE_SESSION_VCPU),
+            ClonePlan::Split4 => (
+                if jarvis {
+                    (4..8).collect()
+                } else {
+                    (0..4).collect()
+                },
+                4,
+            ),
+            ClonePlan::Split3 => (
+                if jarvis {
+                    (3..6).collect()
+                } else {
+                    (0..3).collect()
+                },
+                3,
+            ),
+            ClonePlan::Off => (Vec::new(), 0),
+        };
+        if matches!(plan, ClonePlan::Split4 | ClonePlan::Split3) && usable_cpus < DEDICATED_MIN_CPUS {
+            // A split plan on a small host would pin onto cores that are not there.
+            return Self::for_persona(ClonePlan::Session, persona, usable_cpus);
+        }
+        Self {
+            plan,
+            cpus,
+            threads,
+        }
+    }
+
+    /// `GALION_CLONE_CPU_PLAN` (default auto), then per-persona overrides
+    /// `GALION_CLONE_CPUS_<PERSONA>` (`0-3`, `0,2,4`, or `none`) and
+    /// `GALION_CLONE_THREADS`. A pinned child never gets more threads than
+    /// cores: oversubscription is what this plan exists to stop.
+    pub fn from_env(persona: &str) -> Self {
+        let n = usable_cpus();
+        let get = |k: &str| std::env::var(k).ok();
+        let local_llm = super::core_map::local_llm_env();
+        let plan_env = get("GALION_CLONE_CPU_PLAN");
+        let plan = ClonePlan::parse_with(plan_env.as_deref().unwrap_or(""), n, local_llm)
+            .unwrap_or(ClonePlan::Session);
+        let mut p = Self::for_persona(plan, persona, n);
+        if matches!(p.plan, ClonePlan::Session | ClonePlan::Off) {
+            return p;
+        }
+        let key = format!(
+            "GALION_CLONE_CPUS_{}",
+            persona_name(persona).to_ascii_uppercase()
+        );
+        if let Some(v) = get(&key) {
+            if v.trim().eq_ignore_ascii_case("none") {
+                p.cpus.clear();
+            } else if let Some(c) = parse_cpu_list(&v).filter(|c| c.iter().all(|&i| i < n)) {
+                p.threads = p.threads.min(c.len() as u32).max(1);
+                p.cpus = c;
+            }
+        }
+        if let Some(t) = get("GALION_CLONE_THREADS").and_then(|t| t.trim().parse::<u32>().ok()) {
+            let cap = if p.cpus.is_empty() {
+                n as u32
+            } else {
+                p.cpus.len() as u32
+            };
+            p.threads = t.clamp(1, cap.max(1));
+        }
+        p
+    }
+
+    /// taskset-style list, e.g. `0-3`; empty when not pinned.
+    pub fn cpu_list(&self) -> String {
+        format_cpu_list(&self.cpus)
+    }
+}
+
+fn apply_cpu_budget(cmd: &mut Command, placement: &ClonePlacement) {
+    for key in CPU_THREAD_KEYS {
+        cmd.env(key, placement.threads.to_string());
+    }
+    cmd.env("GALION_CLONE_CPU_PLAN", placement.plan.as_str());
+    cmd.env("GALION_CLONE_CPUS", placement.cpu_list());
+    apply_affinity(cmd, &placement.cpus);
     cmd.env("GALION_CLONE_DEVICE", "cpu");
     cmd.env("CUDA_VISIBLE_DEVICES", "");
     cmd.env("HIP_VISIBLE_DEVICES", "");
@@ -606,11 +779,47 @@ pub struct CloneWorker {
     persona: &'static str,
     prosody: FrameProsody,
     engine: String,
+    /// Item 10: on-disk conditioning cache. `None` = recompute from the wav.
+    cond: Option<CondCtx>,
+    cond_ticket: Option<SaveTicket>,
+    cond_note: String,
 }
 
 impl CloneWorker {
+    /// Spawn with [`ClonePlacement::from_env`] (plan `auto` by default).
     pub fn spawn(script: &Path, model: CloneModel, persona: &str) -> Result<Self, VoiceError> {
         Self::spawn_env(script, model, persona, &[])
+    }
+
+    /// Test spawn that follows the host env, except that plan `off` (which
+    /// must refuse) falls back to `session` so protocol tests still run.
+    #[cfg(test)]
+    pub(crate) fn spawn_for_test(script: &Path, model: CloneModel, persona: &str) -> Self {
+        let p = ClonePlacement::from_env(persona);
+        if p.plan == ClonePlan::Off {
+            let err = Self::spawn(script, model, persona).err().expect("plan off refuses");
+            assert!(err.to_string().contains("no clone workers during a live call"), "{err}");
+            let session = ClonePlacement::for_persona(ClonePlan::Session, persona, 1);
+            return Self::spawn_placed(script, model, persona, &session).unwrap();
+        }
+        Self::spawn(script, model, persona).unwrap()
+    }
+
+    /// Spawn with an explicit CPU placement (no extra env, private frame drain).
+    pub fn spawn_placed(
+        script: &Path,
+        model: CloneModel,
+        persona: &str,
+        placement: &ClonePlacement,
+    ) -> Result<Self, VoiceError> {
+        Self::spawn_env_ring_placed(
+            script,
+            model,
+            persona,
+            &[],
+            Arc::new(CloneFrameDrain::new()),
+            placement,
+        )
     }
 
     /// Same child, PCM also published into a shared [`CloneFrameDrain`].
@@ -634,6 +843,7 @@ impl CloneWorker {
         Self::spawn_env_ring(script, model, persona, extra, Arc::new(CloneFrameDrain::new()))
     }
 
+    /// Placement from [`ClonePlacement::from_env`].
     pub fn spawn_env_ring(
         script: &Path,
         model: CloneModel,
@@ -641,7 +851,24 @@ impl CloneWorker {
         extra: &[(&str, &str)],
         frames: Arc<CloneFrameDrain>,
     ) -> Result<Self, VoiceError> {
+        let placement = ClonePlacement::from_env(persona);
+        Self::spawn_env_ring_placed(script, model, persona, extra, frames, &placement)
+    }
+
+    pub fn spawn_env_ring_placed(
+        script: &Path,
+        model: CloneModel,
+        persona: &str,
+        extra: &[(&str, &str)],
+        frames: Arc<CloneFrameDrain>,
+        placement: &ClonePlacement,
+    ) -> Result<Self, VoiceError> {
         let persona = persona_name(persona);
+        if placement.plan == ClonePlan::Off {
+            return Err(VoiceError::Backend(
+                "clone plan off: no clone workers during a live call (core map v2); Piper speaks".into(),
+            ));
+        }
         let mut cmd = Command::new("python3");
         cmd.arg(script)
             .env("GALION_CLONE_MODEL", model.as_str())
@@ -652,7 +879,7 @@ impl CloneWorker {
         for (key, value) in extra {
             cmd.env(key, value);
         }
-        apply_cpu_budget(&mut cmd);
+        apply_cpu_budget(&mut cmd, placement);
         cmd.env("HF_HUB_OFFLINE", "1")
             .env("TRANSFORMERS_OFFLINE", "1")
             .env("HF_HUB_DISABLE_TELEMETRY", "1");
@@ -700,7 +927,45 @@ impl CloneWorker {
             persona,
             prosody: FrameProsody::identity(),
             engine: String::new(),
+            cond: None,
+            cond_ticket: None,
+            cond_note: String::new(),
         })
+    }
+
+    /// Item 10: reuse saved conditioning from `$GALION_CLIP_STORE/<persona>/cond/`.
+    pub fn set_cond_cache(&mut self, ctx: Option<CondCtx>) {
+        self.cond = ctx;
+    }
+
+    /// Last cache action (`load …`, `saved …`, `skip …`), for logs and tests.
+    pub fn cond_note(&self) -> &str {
+        &self.cond_note
+    }
+
+    fn cond_plan(&mut self, reference: Option<&ResolvedRef>) -> Option<CondPlan> {
+        let (ctx, reference) = (self.cond.as_ref()?, reference?);
+        let plan = ctx.plan(self.model.as_str(), self.persona, &reference.sha256, galion_consent::global());
+        self.cond_note = match &plan {
+            CondPlan::Load { path, .. } => format!("load {}", path.display()),
+            CondPlan::Save(t) => format!("save {}", t.tmp.display()),
+            CondPlan::Skip(why) => format!("skip {why}"),
+        };
+        Some(plan)
+    }
+
+    fn cond_after(&mut self, mark: usize) {
+        let Some(ticket) = self.cond_ticket.take() else { return };
+        let log = self.err_log.get(mark..).unwrap_or("");
+        if clone_cache::saved_in(log, &ticket) {
+            self.cond_note = match clone_cache::commit(&ticket) {
+                Ok(p) => format!("saved {}", p.display()),
+                Err(why) => format!("skip commit refused: {why}"),
+            };
+        } else if ticket.tmp.exists() {
+            let _ = clone_cache::quarantine(&ticket.tmp);
+            self.cond_note = "skip worker did not confirm the save".into();
+        }
     }
 
     pub fn pid(&self) -> u32 {
@@ -887,7 +1152,8 @@ impl CloneWorker {
     pub fn synthesize(&mut self, text: &str) -> Result<Vec<i16>, VoiceError> {
         let t0 = Instant::now();
         let resolved = resolve_reference(self.persona)?;
-        let line = with_prosody(
+        let plan = self.cond_plan(resolved.as_ref());
+        let mut line = with_prosody(
             request_line(
                 text,
                 self.model,
@@ -897,6 +1163,12 @@ impl CloneWorker {
             ),
             self.prosody,
         );
+        if let Some(plan) = plan {
+            line = with_fields(line, &clone_cache::request_fields(&plan));
+            if let CondPlan::Save(t) = plan {
+                self.cond_ticket = Some(t);
+            }
+        }
         {
             let stdin = self
                 .stdin
@@ -915,7 +1187,10 @@ impl CloneWorker {
         self.utt_ms = None;
         self.path.clear();
         self.engine.clear();
-        let pcm = self.read_utterance(t0, Duration::from_secs(60))?;
+        let mark = self.err_log.len();
+        let pcm = self.read_utterance(t0, Duration::from_secs(60));
+        self.cond_after(mark);
+        let pcm = pcm?;
         self.utt_ms = Some(elapsed_ms(t0));
         let ms = elapsed_ms(t0);
         self.calls += 1;
@@ -1118,9 +1393,11 @@ pub struct CloneTts {
     /// it does not re-run consent or hash the reference again.
     approved: [bool; 2],
     /// Voices whose consent record is CC0 / public domain. Such a voice is
-    /// used only while the active session accepted CC0 (galion-consent
-    /// `cc0_acceptances`); otherwise the turn falls back to Piper.
+    /// selectable only once the CC0 licence was registered (clone time,
+    /// galion-consent `cc0_register`); otherwise Piper speaks.
     cc0: [bool; 2],
+    /// The gate's approvals, kept so the conditioning cache may write.
+    approvals: Vec<galion_consent::Approval>,
     worker: Option<CloneWorker>,
     frames: Arc<CloneFrameDrain>,
     spawns: u32,
@@ -1155,12 +1432,14 @@ impl CloneTts {
         let env = galion_consent::Env::process();
         let mut approved = [false; 2];
         let mut cc0 = [false; 2];
+        let mut approvals = Vec::new();
         let mut refused = Vec::new();
         for (i, voice) in ["samantha", "jarvis"].into_iter().enumerate() {
             match galion_consent::clone_gate(voice, &env) {
                 Ok(a) if ref_allowlisted(voice) => {
                     approved[i] = true;
                     cc0[i] = a.cc0;
+                    approvals.push(a);
                 }
                 Ok(_) => refused.push(format!("{voice}: reference not allowlisted (GALION_CLIP_STORE sidecar or REFS.sha256)")),
                 Err(e) => refused.push(e.to_string()),
@@ -1180,6 +1459,7 @@ impl CloneTts {
             ref_gate: true,
             approved,
             cc0,
+            approvals,
             worker: None,
             frames: Arc::new(CloneFrameDrain::new()),
             spawns: 0,
@@ -1207,6 +1487,7 @@ impl CloneTts {
             ref_gate: false,
             approved: [true; 2],
             cc0: [false; 2],
+            approvals: Vec::new(),
             frames: worker.frames(),
             worker: Some(worker),
             spawns: 1,
@@ -1257,7 +1538,9 @@ impl CloneTts {
     /// Did `persona` pass the consent gate when this slot was built?
     pub fn voice_approved(&self, persona: &str) -> bool {
         let i = usize::from(persona_name(persona) == "jarvis");
-        self.approved[i] && (!self.cc0[i] || galion_consent::cc0_acceptances().active_accepted())
+        // CC0 voices: the licence acceptance is a clone/registration-time
+        // verdict (galion_consent::cc0_register), read here, never re-checked.
+        self.approved[i] && (!self.cc0[i] || galion_consent::cc0_acceptances().licensed())
     }
 
     /// Test hook: mark voices as CC0 (needs the session's CC0 acceptance).
@@ -1294,6 +1577,9 @@ impl CloneTts {
             Arc::clone(&self.frames),
         )?;
         worker.set_prosody(self.prosody);
+        let store = clip_store_from(std::env::var("GALION_CLIP_STORE").ok().as_deref());
+        let enabled = clone_cache::cache_enabled(std::env::var("GALION_CLONE_COND_CACHE").ok().as_deref());
+        worker.set_cond_cache(CondCtx::new(store.as_deref(), enabled, &repo_root(), self.approvals.clone()));
         self.worker = Some(worker);
         self.spawns += 1;
         Ok(())
@@ -1310,16 +1596,6 @@ impl TtsEngine for CloneTts {
         let body = body.trim().replace(['\n', '\r'], " ");
         if body.is_empty() {
             return Err(VoiceError::EmptyInput);
-        }
-        // Server-side CC0 gate (owner t628u): a CC0 voice is refused unless
-        // the active session ticked the CC0 licence box.
-        if self.ref_gate {
-            let i = usize::from(self.persona == "jarvis");
-            if self.approved[i] && self.cc0[i] && !galion_consent::cc0_acceptances().active_accepted() {
-                return Err(VoiceError::Backend(
-                    galion_consent::CloneRefused { persona: self.persona.to_string(), reason: "cc0_licence" }.to_string(),
-                ));
-            }
         }
         self.ensure()?;
         let pcm = self.worker.as_mut().unwrap().synthesize(&body)?;
@@ -1501,6 +1777,17 @@ fn with_prosody(line: String, prosody: FrameProsody) -> String {
     );
     match line.strip_suffix("}\n") {
         Some(stripped) => format!("{stripped}{extra}}}\n"),
+        None => line,
+    }
+}
+
+/// Append raw JSON fields (leading comma) to a request line.
+fn with_fields(line: String, fields: &str) -> String {
+    if fields.is_empty() {
+        return line;
+    }
+    match line.strip_suffix("}\n") {
+        Some(stripped) => format!("{stripped}{fields}}}\n"),
         None => line,
     }
 }
@@ -2109,7 +2396,7 @@ mod tests {
         perm.set_mode(0o755);
         std::fs::set_permissions(&script, perm).unwrap();
         let before = entries(&dir);
-        let mut w = CloneWorker::spawn(&script, CloneModel::Nano, "jarvis").unwrap();
+        let mut w = CloneWorker::spawn_for_test(&script, CloneModel::Nano, "jarvis");
         let pid = w.pid();
         let a = w.synthesize("turn one [laugh]").unwrap();
         let b = w.synthesize("turn two says hi").unwrap();
@@ -2346,11 +2633,95 @@ mod tests {
         v
     }
 
+    #[test]
+    fn clone_plans_split_the_cores_and_never_oversubscribe() {
+        assert_eq!(ClonePlan::parse("auto", 8), Some(DEDICATED_PLAN));
+        assert_eq!(ClonePlan::parse("", 4), Some(ClonePlan::Session));
+        assert_eq!(ClonePlan::parse("3+3", 8), Some(ClonePlan::Split3));
+        assert_eq!(ClonePlan::parse("bogus", 8), None);
+        let s4 = ClonePlacement::for_persona(ClonePlan::Split4, "samantha", 8);
+        let j4 = ClonePlacement::for_persona(ClonePlan::Split4, "jarvis", 8);
+        assert_eq!((s4.cpu_list().as_str(), s4.threads), ("0-3", 4));
+        assert_eq!((j4.cpu_list().as_str(), j4.threads), ("4-7", 4));
+        let s3 = ClonePlacement::for_persona(ClonePlan::Split3, "samantha", 8);
+        let j3 = ClonePlacement::for_persona(ClonePlan::Split3, "jarvis", 8);
+        assert_eq!((s3.cpu_list().as_str(), s3.threads), ("0-2", 3));
+        assert_eq!((j3.cpu_list().as_str(), j3.threads), ("3-5", 3));
+        assert_eq!(ClonePlan::Split3.reserved_cpus(), vec![6, 7]);
+        assert_eq!(ClonePlan::parse_with("auto", 8, true), Some(LOCAL_LLM_PLAN));
+        assert_eq!(ClonePlan::parse_with("auto", 4, true), Some(ClonePlan::Session));
+        assert_eq!(ClonePlan::parse("live", 8), Some(ClonePlan::Off));
+        let off = ClonePlacement::for_persona(ClonePlan::Off, "jarvis", 8);
+        assert_eq!((off.cpus.len(), off.threads), (0, 0));
+        for (a, b) in [(&s4, &j4), (&s3, &j3)] {
+            assert!(a.cpus.iter().all(|c| !b.cpus.contains(c)), "disjoint");
+            assert!(a.threads as usize <= a.cpus.len() && b.threads as usize <= b.cpus.len());
+        }
+        let small = ClonePlacement::for_persona(ClonePlan::Split4, "jarvis", 4);
+        assert_eq!(
+            small,
+            ClonePlacement {
+                plan: ClonePlan::Session,
+                cpus: vec![],
+                threads: 1
+            }
+        );
+        assert_eq!(parse_cpu_list("0-2,6"), Some(vec![0, 1, 2, 6]));
+        assert_eq!(parse_cpu_list("3-1"), None);
+        assert_eq!(parse_cpu_list("x"), None);
+        assert_eq!(format_cpu_list(&[0, 1, 2, 6]), "0-2,6");
+    }
+
+    #[test]
+    fn plan_off_refuses_to_spawn_a_clone_during_a_live_call() {
+        let off = ClonePlacement::for_persona(ClonePlan::Off, "samantha", 8);
+        let err = CloneWorker::spawn_placed(Path::new("/bin/true"), CloneModel::Nano, "samantha", &off)
+            .err()
+            .expect("off refuses");
+        assert!(err.to_string().contains("Piper speaks"), "{err}");
+    }
+
+    #[test]
+    fn real_stub_takes_split_threads_up_to_its_pinned_cores() {
+        let script = worker_script().expect("worker script");
+        let k = usable_cpus().min(4);
+        let cpus: Vec<usize> = (0..k).collect();
+        let mut cmd = Command::new("python3");
+        cmd.arg(&script)
+            .env("GALION_CLONE_STUB_PCM", "1")
+            .env("GALION_CLONE_CPU_PLAN", "split4")
+            .env("GALION_CLONE_THREADS", "8")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+        apply_affinity(&mut cmd, &cpus);
+        let mut child = cmd.spawn().unwrap();
+        {
+            let mut stdin = child.stdin.take().unwrap();
+            stdin
+                .write_all(b"{\"text\":\"hi\",\"persona\":\"jarvis\"}\n")
+                .unwrap();
+        }
+        let out = child.wait_with_output().unwrap();
+        let log = String::from_utf8_lossy(&out.stderr);
+        assert!(out.status.success(), "{log}");
+        assert!(log.contains(&format!("threads={k} ")), "{log}");
+        assert!(log.contains(&format!("asked=8 applied={k}")), "{log}");
+    }
+
     const FAKE_CLONE: &str = r#"#!/usr/bin/env python3
 import json, os, struct, sys
 keys = ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS", "TORCH_NUM_THREADS", "GALION_CLONE_THREADS")
-if any(os.environ.get(k) != "1" for k in keys):
+want = os.environ.get("GALION_CLONE_THREADS", "")
+plan = os.environ.get("GALION_CLONE_CPU_PLAN", "")
+if not want.isdigit() or int(want) < 1 or any(os.environ.get(k) != want for k in keys):
     sys.stderr.write("galion-clone-refuse: cpu pin missing\n")
+    sys.exit(3)
+if plan not in ("session", "split4", "split3") or (plan == "session" and want != "1"):
+    sys.stderr.write("galion-clone-refuse: cpu plan missing\n")
+    sys.exit(3)
+if plan != "session" and int(want) > len(os.sched_getaffinity(0)):
+    sys.stderr.write("galion-clone-refuse: threads exceed pinned cores\n")
     sys.exit(3)
 if os.environ.get("GALION_CLONE_DEVICE") != "cpu" or os.environ.get("CUDA_VISIBLE_DEVICES") != "" or os.environ.get("GALION_CLONE_DENOISE") != "0":
     sys.stderr.write("galion-clone-refuse: cpu pin missing\n")

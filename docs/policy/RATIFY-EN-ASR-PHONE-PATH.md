@@ -52,3 +52,7 @@ Why: no GGML, no ONNX, a permissive licence, it fits CPU real time on phone-clas
 - [ ] Gate check on the phone target: ASR partials do not push `onset_p50_max_ms = 300` / `barge_in_max_ms = 200` over budget.
 
 Owner: Maciej Grajczyk — letter A, 2026-11-03 (Europe/Zagreb). Vosk LOCKS text not applied.
+
+---
+
+© G.A.L.I.O.N. — General Autonomous Local Intelligence Open Network. All rights reserved and claims reserved. · CC0 voices: you must tick the consent box agreeing to the CC0 licence before using any CC0 voice; use is at your own responsibility. · No cookies. · De-Googled: no Google services. · All current Galion builds are open source under the Galion perpetual open MIT licence.

@@ -1,0 +1,22 @@
+[package]
+name = "galion-voicecheck"
+version = "0.1.0"
+edition = "2021"
+description = "Automatic per-voice check + gated emotion/prosody fixes for Galion Cloning V2"
+license = "MIT"
+
+[[bin]]
+name = "galion-voicecheck"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 4
+
+[workspace]

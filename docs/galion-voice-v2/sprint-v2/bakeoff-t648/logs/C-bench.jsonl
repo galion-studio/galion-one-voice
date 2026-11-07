@@ -1,0 +1,69 @@
+{"label": "C fp32 voiceadd samantha-orig T4", "rc": 0, "wall_s": 7.965, "cpu_s": 7.51, "maxrss_mb": 2221.8}
+{"label": "C fp32 samantha-orig s1 rep1 T4", "rc": 0, "wall_s": 14.279, "cpu_s": 39.94, "maxrss_mb": 2547.8}
+{"label": "C fp32 samantha-orig s2 rep1 T4", "rc": 0, "wall_s": 14.51, "cpu_s": 40.556, "maxrss_mb": 2519.1}
+{"label": "C fp32 samantha-orig s3 rep1 T4", "rc": 0, "wall_s": 16.149, "cpu_s": 45.472, "maxrss_mb": 2509.0}
+{"label": "C fp32 samantha-orig s1 rep2 T4", "rc": 0, "wall_s": 14.42, "cpu_s": 40.99, "maxrss_mb": 2490.8}
+{"label": "C fp32 samantha-orig s2 rep2 T4", "rc": 0, "wall_s": 14.79, "cpu_s": 41.902, "maxrss_mb": 2517.3}
+{"label": "C fp32 samantha-orig s3 rep2 T4", "rc": 0, "wall_s": 16.217, "cpu_s": 45.103, "maxrss_mb": 2532.9}
+{"label": "C fp32 voiceadd samantha-ALT-src-17.84-29.25 T4", "rc": 0, "wall_s": 6.063, "cpu_s": 7.62, "maxrss_mb": 2238.3}
+{"label": "C fp32 samantha-ALT-src-17.84-29.25 s1 rep1 T4", "rc": 0, "wall_s": 17.326, "cpu_s": 50.787, "maxrss_mb": 2551.1}
+{"label": "C fp32 samantha-ALT-src-17.84-29.25 s2 rep1 T4", "rc": 0, "wall_s": 13.769, "cpu_s": 38.63, "maxrss_mb": 2546.5}
+{"label": "C fp32 samantha-ALT-src-17.84-29.25 s3 rep1 T4", "rc": 0, "wall_s": 16.116, "cpu_s": 46.783, "maxrss_mb": 2511.7}
+{"label": "C fp32 samantha-ALT-src-17.84-29.25 s1 rep2 T4", "rc": 0, "wall_s": 14.71, "cpu_s": 42.317, "maxrss_mb": 2544.5}
+{"label": "C fp32 samantha-ALT-src-17.84-29.25 s2 rep2 T4", "rc": 0, "wall_s": 14.979, "cpu_s": 40.126, "maxrss_mb": 2541.1}
+{"label": "C fp32 samantha-ALT-src-17.84-29.25 s3 rep2 T4", "rc": 0, "wall_s": 15.717, "cpu_s": 45.785, "maxrss_mb": 2528.2}
+{"label": "C fp32 voiceadd jarvis-orig T4", "rc": 0, "wall_s": 6.611, "cpu_s": 8.446, "maxrss_mb": 2221.6}
+{"label": "C fp32 jarvis-orig s1 rep1 T4", "rc": 0, "wall_s": 15.183, "cpu_s": 41.416, "maxrss_mb": 2507.4}
+{"label": "C fp32 jarvis-orig s2 rep1 T4", "rc": 0, "wall_s": 12.664, "cpu_s": 36.453, "maxrss_mb": 2536.5}
+{"label": "C fp32 jarvis-orig s3 rep1 T4", "rc": 0, "wall_s": 14.414, "cpu_s": 44.83, "maxrss_mb": 2532.3}
+{"label": "C fp32 jarvis-orig s1 rep2 T4", "rc": 0, "wall_s": 16.395, "cpu_s": 45.525, "maxrss_mb": 2492.0}
+{"label": "C fp32 jarvis-orig s2 rep2 T4", "rc": 0, "wall_s": 12.243, "cpu_s": 35.799, "maxrss_mb": 2480.7}
+{"label": "C fp32 jarvis-orig s3 rep2 T4", "rc": 0, "wall_s": 16.224, "cpu_s": 44.165, "maxrss_mb": 2541.5}
+{"label": "C fp32 samantha-orig s1 rep3 T4", "rc": 0, "wall_s": 13.779, "cpu_s": 39.516, "maxrss_mb": 2521.2}
+{"label": "C fp32 samantha-orig s2 rep3 T4", "rc": 0, "wall_s": 15.052, "cpu_s": 41.636, "maxrss_mb": 2513.4}
+{"label": "C fp32 samantha-orig s3 rep3 T4", "rc": 0, "wall_s": 14.119, "cpu_s": 42.368, "maxrss_mb": 2512.7}
+{"label": "C fp32 samantha-orig s1 rep4 T4", "rc": 0, "wall_s": 14.241, "cpu_s": 41.748, "maxrss_mb": 2520.2}
+{"label": "C fp32 samantha-orig s2 rep4 T4", "rc": 0, "wall_s": 14.281, "cpu_s": 40.194, "maxrss_mb": 2517.5}
+{"label": "C fp32 samantha-orig s3 rep4 T4", "rc": 0, "wall_s": 15.052, "cpu_s": 44.329, "maxrss_mb": 2515.3}
+{"label": "C fp32 samantha-orig s1 rep5 T4", "rc": 0, "wall_s": 13.322, "cpu_s": 39.978, "maxrss_mb": 2513.1}
+{"label": "C fp32 samantha-orig s2 rep5 T4", "rc": 0, "wall_s": 13.081, "cpu_s": 39.079, "maxrss_mb": 2495.6}
+{"label": "C fp32 samantha-orig s3 rep5 T4", "rc": 0, "wall_s": 14.593, "cpu_s": 43.2, "maxrss_mb": 2549.5}
+{"label": "C fp32 samantha-ALT-src-17.84-29.25 s1 rep3 T4", "rc": 0, "wall_s": 15.017, "cpu_s": 46.035, "maxrss_mb": 2484.6}
+{"label": "C fp32 samantha-ALT-src-17.84-29.25 s2 rep3 T4", "rc": 0, "wall_s": 12.375, "cpu_s": 35.41, "maxrss_mb": 2527.1}
+{"label": "C fp32 samantha-ALT-src-17.84-29.25 s3 rep3 T4", "rc": 0, "wall_s": 14.082, "cpu_s": 41.725, "maxrss_mb": 2565.8}
+{"label": "C fp32 samantha-ALT-src-17.84-29.25 s1 rep4 T4", "rc": 0, "wall_s": 15.164, "cpu_s": 47.024, "maxrss_mb": 2499.1}
+{"label": "C fp32 samantha-ALT-src-17.84-29.25 s2 rep4 T4", "rc": 0, "wall_s": 12.62, "cpu_s": 37.145, "maxrss_mb": 2531.1}
+{"label": "C fp32 samantha-ALT-src-17.84-29.25 s3 rep4 T4", "rc": 0, "wall_s": 14.385, "cpu_s": 43.054, "maxrss_mb": 2562.4}
+{"label": "C fp32 samantha-ALT-src-17.84-29.25 s1 rep5 T4", "rc": 0, "wall_s": 13.954, "cpu_s": 40.698, "maxrss_mb": 2520.5}
+{"label": "C fp32 samantha-ALT-src-17.84-29.25 s2 rep5 T4", "rc": 0, "wall_s": 12.184, "cpu_s": 35.219, "maxrss_mb": 2484.5}
+{"label": "C fp32 samantha-ALT-src-17.84-29.25 s3 rep5 T4", "rc": 0, "wall_s": 13.059, "cpu_s": 39.763, "maxrss_mb": 2547.0}
+{"label": "C fp32 jarvis-orig s1 rep3 T4", "rc": 0, "wall_s": 15.769, "cpu_s": 43.688, "maxrss_mb": 2562.6}
+{"label": "C fp32 jarvis-orig s2 rep3 T4", "rc": 0, "wall_s": 14.138, "cpu_s": 39.323, "maxrss_mb": 2507.9}
+{"label": "C fp32 jarvis-orig s3 rep3 T4", "rc": 0, "wall_s": 13.973, "cpu_s": 41.42, "maxrss_mb": 2546.6}
+{"label": "C fp32 jarvis-orig s1 rep4 T4", "rc": 0, "wall_s": 14.348, "cpu_s": 41.006, "maxrss_mb": 2519.8}
+{"label": "C fp32 jarvis-orig s2 rep4 T4", "rc": 0, "wall_s": 13.188, "cpu_s": 38.904, "maxrss_mb": 2520.2}
+{"label": "C fp32 jarvis-orig s3 rep4 T4", "rc": 0, "wall_s": 14.141, "cpu_s": 41.601, "maxrss_mb": 2515.9}
+{"label": "C fp32 jarvis-orig s1 rep5 T4", "rc": 0, "wall_s": 14.18, "cpu_s": 41.494, "maxrss_mb": 2524.8}
+{"label": "C fp32 jarvis-orig s2 rep5 T4", "rc": 0, "wall_s": 12.872, "cpu_s": 37.444, "maxrss_mb": 2536.6}
+{"label": "C fp32 jarvis-orig s3 rep5 T4", "rc": 0, "wall_s": 13.682, "cpu_s": 41.668, "maxrss_mb": 2556.7}
+{"label": "C quantized voiceadd samantha-orig T4", "rc": 1, "wall_s": 0.192, "cpu_s": 0.242, "maxrss_mb": 76.3}
+{"label": "C quantized samantha-orig s1 rep1 T4", "rc": 1, "wall_s": 0.167, "cpu_s": 0.222, "maxrss_mb": 76.5}
+{"label": "C quantized samantha-orig s2 rep1 T4", "rc": 1, "wall_s": 0.217, "cpu_s": 0.271, "maxrss_mb": 76.4}
+{"label": "C quantized samantha-orig s3 rep1 T4", "rc": 1, "wall_s": 0.182, "cpu_s": 0.237, "maxrss_mb": 76.6}
+{"label": "C quantized samantha-orig s1 rep2 T4", "rc": 1, "wall_s": 0.21, "cpu_s": 0.27, "maxrss_mb": 76.3}
+{"label": "C quantized samantha-orig s2 rep2 T4", "rc": 1, "wall_s": 0.207, "cpu_s": 0.263, "maxrss_mb": 76.6}
+{"label": "C quantized samantha-orig s3 rep2 T4", "rc": 1, "wall_s": 0.175, "cpu_s": 0.231, "maxrss_mb": 76.4}
+{"label": "C quantized voiceadd samantha-ALT-src-17.84-29.25 T4", "rc": 1, "wall_s": 0.181, "cpu_s": 0.238, "maxrss_mb": 76.5}
+{"label": "C quantized samantha-ALT-src-17.84-29.25 s1 rep1 T4", "rc": 1, "wall_s": 0.202, "cpu_s": 0.269, "maxrss_mb": 76.5}
+{"label": "C quantized samantha-ALT-src-17.84-29.25 s2 rep1 T4", "rc": 1, "wall_s": 0.177, "cpu_s": 0.233, "maxrss_mb": 76.5}
+{"label": "C quantized samantha-ALT-src-17.84-29.25 s3 rep1 T4", "rc": 1, "wall_s": 0.176, "cpu_s": 0.238, "maxrss_mb": 76.7}
+{"label": "C quantized samantha-ALT-src-17.84-29.25 s1 rep2 T4", "rc": 1, "wall_s": 0.205, "cpu_s": 0.261, "maxrss_mb": 76.3}
+{"label": "C quantized samantha-ALT-src-17.84-29.25 s2 rep2 T4", "rc": 1, "wall_s": 0.185, "cpu_s": 0.25, "maxrss_mb": 76.6}
+{"label": "C quantized samantha-ALT-src-17.84-29.25 s3 rep2 T4", "rc": 1, "wall_s": 0.184, "cpu_s": 0.246, "maxrss_mb": 76.3}
+{"label": "C quantized voiceadd jarvis-orig T4", "rc": 1, "wall_s": 0.196, "cpu_s": 0.263, "maxrss_mb": 76.3}
+{"label": "C quantized jarvis-orig s1 rep1 T4", "rc": 1, "wall_s": 0.194, "cpu_s": 0.258, "maxrss_mb": 76.3}
+{"label": "C quantized jarvis-orig s2 rep1 T4", "rc": 1, "wall_s": 0.253, "cpu_s": 0.308, "maxrss_mb": 76.4}
+{"label": "C quantized jarvis-orig s3 rep1 T4", "rc": 1, "wall_s": 0.167, "cpu_s": 0.224, "maxrss_mb": 76.7}
+{"label": "C quantized jarvis-orig s1 rep2 T4", "rc": 1, "wall_s": 0.174, "cpu_s": 0.233, "maxrss_mb": 76.5}
+{"label": "C quantized jarvis-orig s2 rep2 T4", "rc": 1, "wall_s": 0.181, "cpu_s": 0.237, "maxrss_mb": 76.5}
+{"label": "C quantized jarvis-orig s3 rep2 T4", "rc": 1, "wall_s": 0.184, "cpu_s": 0.241, "maxrss_mb": 76.4}

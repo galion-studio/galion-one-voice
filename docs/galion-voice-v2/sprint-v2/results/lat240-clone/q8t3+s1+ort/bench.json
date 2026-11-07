@@ -1,0 +1,264 @@
+{
+ "summary": {
+  "cfg": "q8t3+s1+ort",
+  "prompt_s": null,
+  "threads": 4,
+  "load_ms": 3680,
+  "steps": 1,
+  "kv_cache": true,
+  "cond_ms": {
+   "amy": 323,
+   "alan": 324,
+   "pdx": 269
+  },
+  "kv_prefix_ms": {
+   "amy": 43,
+   "alan": 42,
+   "pdx": 35
+  },
+  "loadavg": [
+   5.2919921875,
+   10.6484375,
+   13.5439453125
+  ],
+  "total_ms": {
+   "p50": 1345.1,
+   "p95": 1656.6
+  },
+  "t3_ms": {
+   "p50": 641.0,
+   "p95": 809.0
+  },
+  "prefill_ms": {
+   "p50": 17.3,
+   "p95": 25.2
+  },
+  "flow_ms": {
+   "p50": 334.4,
+   "p95": 379.3
+  },
+  "hift_ms": {
+   "p50": 368.3,
+   "p95": 420.3
+  },
+  "wm_ms": {
+   "p50": 16.0,
+   "p95": 25.4
+  },
+  "long_total_p50": 1522.9,
+  "short_total_p50": 741.0,
+  "rtf_long": 0.346
+ },
+ "rows": [
+  {
+   "voice": "amy",
+   "i": 0,
+   "text": "The train leaves at seven, so pack the night before and set two alarms.",
+   "file": "/workspace/swarm/voice-v2-sprint/results/lat240-clone/q8t3+s1+ort/amy-0.wav",
+   "prefill_ms": 25.245188997359946,
+   "t3_ms": 771.1517050047405,
+   "n_tok": 102,
+   "flow_ms": 339.7201389889233,
+   "hift_ms": 386.43988300464116,
+   "wm_ms": 25.36069499910809,
+   "total_ms": 1522.8996810037643,
+   "audio_ms": 4200.0
+  },
+  {
+   "voice": "amy",
+   "i": 1,
+   "text": "I found the old letters in a shoebox under the stairs, still tied with string.",
+   "file": "/workspace/swarm/voice-v2-sprint/results/lat240-clone/q8t3+s1+ort/amy-1.wav",
+   "prefill_ms": 21.71955499215983,
+   "t3_ms": 786.7614570131991,
+   "n_tok": 115,
+   "flow_ms": 379.3206170084886,
+   "hift_ms": 463.68321901536547,
+   "wm_ms": 26.635092974174768,
+   "total_ms": 1656.635166000342,
+   "audio_ms": 4720.0
+  },
+  {
+   "voice": "amy",
+   "i": 2,
+   "text": "Honestly, the quiet part of the morning is my favourite hour of the day.",
+   "file": "/workspace/swarm/voice-v2-sprint/results/lat240-clone/q8t3+s1+ort/amy-2.wav",
+   "prefill_ms": 17.23577600205317,
+   "t3_ms": 669.073243974708,
+   "n_tok": 100,
+   "flow_ms": 363.10269200475886,
+   "hift_ms": 413.4335450071376,
+   "wm_ms": 21.871846984140575,
+   "total_ms": 1467.6964269892778,
+   "audio_ms": 4120.0
+  },
+  {
+   "voice": "amy",
+   "i": 3,
+   "text": "Sure, give me a second.",
+   "file": "/workspace/swarm/voice-v2-sprint/results/lat240-clone/q8t3+s1+ort/amy-3.wav",
+   "prefill_ms": 17.165091005153954,
+   "t3_ms": 298.2556440110784,
+   "n_tok": 43,
+   "flow_ms": 261.6046380135231,
+   "hift_ms": 186.72275100834668,
+   "wm_ms": 17.869871022412553,
+   "total_ms": 764.6252470149193,
+   "audio_ms": 1840.0
+  },
+  {
+   "voice": "amy",
+   "i": 4,
+   "text": "Okay, that makes sense.",
+   "file": "/workspace/swarm/voice-v2-sprint/results/lat240-clone/q8t3+s1+ort/amy-4.wav",
+   "prefill_ms": 20.48558898968622,
+   "t3_ms": 255.71693299571052,
+   "n_tok": 36,
+   "flow_ms": 238.2677620043978,
+   "hift_ms": 159.63747500791214,
+   "wm_ms": 10.892416001297534,
+   "total_ms": 664.6904999797698,
+   "audio_ms": 1560.0
+  },
+  {
+   "voice": "alan",
+   "i": 0,
+   "text": "The train leaves at seven, so pack the night before and set two alarms.",
+   "file": "/workspace/swarm/voice-v2-sprint/results/lat240-clone/q8t3+s1+ort/alan-0.wav",
+   "prefill_ms": 20.521509984973818,
+   "t3_ms": 744.7621100000106,
+   "n_tok": 110,
+   "flow_ms": 371.5080429974478,
+   "hift_ms": 417.299335997086,
+   "wm_ms": 19.710157008375973,
+   "total_ms": 1553.503052011365,
+   "audio_ms": 4500.0
+  },
+  {
+   "voice": "alan",
+   "i": 1,
+   "text": "I found the old letters in a shoebox under the stairs, still tied with string.",
+   "file": "/workspace/swarm/voice-v2-sprint/results/lat240-clone/q8t3+s1+ort/alan-1.wav",
+   "prefill_ms": 16.842173994518816,
+   "t3_ms": 809.0043679985683,
+   "n_tok": 116,
+   "flow_ms": 363.91705900314264,
+   "hift_ms": 408.6410110176075,
+   "wm_ms": 18.166763009503484,
+   "total_ms": 1599.9477949808352,
+   "audio_ms": 4740.0
+  },
+  {
+   "voice": "alan",
+   "i": 2,
+   "text": "Honestly, the quiet part of the morning is my favourite hour of the day.",
+   "file": "/workspace/swarm/voice-v2-sprint/results/lat240-clone/q8t3+s1+ort/alan-2.wav",
+   "prefill_ms": 17.437317001167685,
+   "t3_ms": 629.2252450075466,
+   "n_tok": 92,
+   "flow_ms": 327.0409300166648,
+   "hift_ms": 368.3257630036678,
+   "wm_ms": 14.903505012625828,
+   "total_ms": 1339.7077930276282,
+   "audio_ms": 3780.0
+  },
+  {
+   "voice": "alan",
+   "i": 3,
+   "text": "Sure, give me a second.",
+   "file": "/workspace/swarm/voice-v2-sprint/results/lat240-clone/q8t3+s1+ort/alan-3.wav",
+   "prefill_ms": 14.358264015754685,
+   "t3_ms": 255.96495397621766,
+   "n_tok": 39,
+   "flow_ms": 246.68546102475375,
+   "hift_ms": 150.29195402166806,
+   "wm_ms": 11.107470985734835,
+   "total_ms": 664.1958999971393,
+   "audio_ms": 1660.0
+  },
+  {
+   "voice": "alan",
+   "i": 4,
+   "text": "Okay, that makes sense.",
+   "file": "/workspace/swarm/voice-v2-sprint/results/lat240-clone/q8t3+s1+ort/alan-4.wav",
+   "prefill_ms": 43.82552599417977,
+   "t3_ms": 331.3908639829606,
+   "n_tok": 43,
+   "flow_ms": 260.95566200092435,
+   "hift_ms": 166.21178700006567,
+   "wm_ms": 8.548598998459056,
+   "total_ms": 767.3313709965441,
+   "audio_ms": 1820.0
+  },
+  {
+   "voice": "pdx",
+   "i": 0,
+   "text": "The train leaves at seven, so pack the night before and set two alarms.",
+   "file": "/workspace/swarm/voice-v2-sprint/results/lat240-clone/q8t3+s1+ort/pdx-0.wav",
+   "prefill_ms": 17.325820022961125,
+   "t3_ms": 750.1271640066989,
+   "n_tok": 114,
+   "flow_ms": 337.3594970034901,
+   "hift_ms": 400.69896198110655,
+   "wm_ms": 15.986364975105971,
+   "total_ms": 1504.4271600199863,
+   "audio_ms": 4680.0
+  },
+  {
+   "voice": "pdx",
+   "i": 1,
+   "text": "I found the old letters in a shoebox under the stairs, still tied with string.",
+   "file": "/workspace/swarm/voice-v2-sprint/results/lat240-clone/q8t3+s1+ort/pdx-1.wav",
+   "prefill_ms": 19.525667012203485,
+   "t3_ms": 904.2502919910476,
+   "n_tok": 124,
+   "flow_ms": 334.3691499903798,
+   "hift_ms": 420.3009319899138,
+   "wm_ms": 16.427669004769996,
+   "total_ms": 1675.6178989890032,
+   "audio_ms": 5080.0
+  },
+  {
+   "voice": "pdx",
+   "i": 2,
+   "text": "Honestly, the quiet part of the morning is my favourite hour of the day.",
+   "file": "/workspace/swarm/voice-v2-sprint/results/lat240-clone/q8t3+s1+ort/pdx-2.wav",
+   "prefill_ms": 16.037469991715625,
+   "t3_ms": 641.046370001277,
+   "n_tok": 89,
+   "flow_ms": 381.1165359802544,
+   "hift_ms": 310.48741601989605,
+   "wm_ms": 12.221024982864037,
+   "total_ms": 1345.0697490188759,
+   "audio_ms": 3680.0
+  },
+  {
+   "voice": "pdx",
+   "i": 3,
+   "text": "Sure, give me a second.",
+   "file": "/workspace/swarm/voice-v2-sprint/results/lat240-clone/q8t3+s1+ort/pdx-3.wav",
+   "prefill_ms": 14.362941990839317,
+   "t3_ms": 339.04599098605104,
+   "n_tok": 42,
+   "flow_ms": 214.6219149872195,
+   "hift_ms": 161.2622019893024,
+   "wm_ms": 9.280912985559553,
+   "total_ms": 724.3922129855491,
+   "audio_ms": 1800.0
+  },
+  {
+   "voice": "pdx",
+   "i": 4,
+   "text": "Okay, that makes sense.",
+   "file": "/workspace/swarm/voice-v2-sprint/results/lat240-clone/q8t3+s1+ort/pdx-4.wav",
+   "prefill_ms": 14.086479000980034,
+   "t3_ms": 303.3111730183009,
+   "n_tok": 44,
+   "flow_ms": 279.2283330054488,
+   "hift_ms": 166.21788701741025,
+   "wm_ms": 8.644896995974705,
+   "total_ms": 757.5835910101887,
+   "audio_ms": 1880.0
+  }
+ ]
+}

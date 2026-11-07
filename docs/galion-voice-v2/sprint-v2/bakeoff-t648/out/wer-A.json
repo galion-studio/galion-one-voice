@@ -1,0 +1,182 @@
+{
+ "out/A/jarvis-orig/s1-r1.wav": {
+  "wer": 0.037,
+  "hyp": "the morning light came slowly over the hills and the whole valley seemed to wake up at once quite and golden as the birds began to sing"
+ },
+ "out/A/jarvis-orig/s1-r2.wav": {
+  "wer": 0.111,
+  "hyp": "the morning light came slowly over the hills and the whole valley seemed to wake up at once quite and golden as the birds begin to say"
+ },
+ "out/A/jarvis-orig/s1-r3.wav": {
+  "wer": 0.074,
+  "hyp": "the morning light came slowly over the hills and the whole valley seemed to wake up at once quite and golden as the birds began to say"
+ },
+ "out/A/jarvis-orig/s1-r4.wav": {
+  "wer": 0.111,
+  "hyp": "the morning light came slowly over the hills and the whole valley seemed to wake up at once quite and golden as the birds begin to say"
+ },
+ "out/A/jarvis-orig/s1-r5.wav": {
+  "wer": 0.037,
+  "hyp": "the morning light came slowly over the hills and the whole valley seemed to wake up at once quite and golden as the birds began to sing"
+ },
+ "out/A/jarvis-orig/s2-r1.wav": {
+  "wer": 0.103,
+  "hyp": "if you meet many figured all tonight just tell me and i will take care of it while you get some rest so nothing important slips through the cracks"
+ },
+ "out/A/jarvis-orig/s2-r2.wav": {
+  "wer": 0.0,
+  "hyp": "if you need anything at all tonight just tell me and i will take care of it while you get some rest so nothing important slips through the cracks"
+ },
+ "out/A/jarvis-orig/s2-r3.wav": {
+  "wer": 0.0,
+  "hyp": "if you need anything at all tonight just tell me and i will take care of it while you get some rest so nothing important slips through the cracks"
+ },
+ "out/A/jarvis-orig/s2-r4.wav": {
+  "wer": 0.0,
+  "hyp": "if you need anything at all tonight just tell me and i will take care of it while you get some rest so nothing important slips through the cracks"
+ },
+ "out/A/jarvis-orig/s2-r5.wav": {
+  "wer": 0.0,
+  "hyp": "if you need anything at all tonight just tell me and i will take care of it while you get some rest so nothing important slips through the cracks"
+ },
+ "out/A/jarvis-orig/s3-r1.wav": {
+  "wer": 0.08,
+  "hyp": "the check the numbers twice this afternoon and the results are clear the new system is faster simpler cheaper to run and far more reliable"
+ },
+ "out/A/jarvis-orig/s3-r2.wav": {
+  "wer": 0.08,
+  "hyp": "the chip the numbers twice this afternoon and the results are clear the new system is faster simpler cheaper to run and far more reliable"
+ },
+ "out/A/jarvis-orig/s3-r3.wav": {
+  "wer": 0.08,
+  "hyp": "the chip the numbers twice this afternoon and the results are clear the new system is faster simpler cheaper to run and far more reliable"
+ },
+ "out/A/jarvis-orig/s3-r4.wav": {
+  "wer": 0.08,
+  "hyp": "the chip the numbers twice this afternoon and the results are clear the new system is faster simpler cheaper to run and far more reliable"
+ },
+ "out/A/jarvis-orig/s3-r5.wav": {
+  "wer": 0.08,
+  "hyp": "the check the numbers twice this afternoon and the results are clear the new system is faster simpler cheaper to run and far more reliable"
+ },
+ "out/A/samantha-ALT-src-17.84-29.25/s1-r1.wav": {
+  "wer": 0.074,
+  "hyp": "the morning like came slowly over the hills and the whole valley seemed to wake up at once quiet and golden as the birds began to say"
+ },
+ "out/A/samantha-ALT-src-17.84-29.25/s1-r2.wav": {
+  "wer": 0.111,
+  "hyp": "the morning like came slowly over the hills and the whole valley seemed to wake up at once quite and golden as the birds began to say"
+ },
+ "out/A/samantha-ALT-src-17.84-29.25/s1-r3.wav": {
+  "wer": 0.074,
+  "hyp": "the morning like came slowly over the hills and the whole valley seemed to wake up at once quiet and golden as the birds began to say"
+ },
+ "out/A/samantha-ALT-src-17.84-29.25/s1-r4.wav": {
+  "wer": 0.074,
+  "hyp": "the morning like came slowly over the hills and the whole valley seemed to wake up at once quiet and golden as the birds began to say"
+ },
+ "out/A/samantha-ALT-src-17.84-29.25/s1-r5.wav": {
+  "wer": 0.074,
+  "hyp": "the morning like came slowly over the hills and the whole valley seemed to wake up at once quiet and golden as the birds began to say"
+ },
+ "out/A/samantha-ALT-src-17.84-29.25/s2-r1.wav": {
+  "wer": 0.0,
+  "hyp": "if you need anything at all tonight just tell me and i will take care of it while you get some rest so nothing important slips through the cracks"
+ },
+ "out/A/samantha-ALT-src-17.84-29.25/s2-r2.wav": {
+  "wer": 0.0,
+  "hyp": "if you need anything at all tonight just tell me and i will take care of it while you get some rest so nothing important slips through the cracks"
+ },
+ "out/A/samantha-ALT-src-17.84-29.25/s2-r3.wav": {
+  "wer": 0.0,
+  "hyp": "if you need anything at all tonight just tell me and i will take care of it while you get some rest so nothing important slips through the cracks"
+ },
+ "out/A/samantha-ALT-src-17.84-29.25/s2-r4.wav": {
+  "wer": 0.0,
+  "hyp": "if you need anything at all tonight just tell me and i will take care of it while you get some rest so nothing important slips through the cracks"
+ },
+ "out/A/samantha-ALT-src-17.84-29.25/s2-r5.wav": {
+  "wer": 0.0,
+  "hyp": "if you need anything at all tonight just tell me and i will take care of it while you get some rest so nothing important slips through the cracks"
+ },
+ "out/A/samantha-ALT-src-17.84-29.25/s3-r1.wav": {
+  "wer": 0.08,
+  "hyp": "the check the numbers twice this afternoon and the results are clear the new system is faster simpler cheaper to run and far more reliable"
+ },
+ "out/A/samantha-ALT-src-17.84-29.25/s3-r2.wav": {
+  "wer": 0.08,
+  "hyp": "the check the numbers twice this afternoon and the results are clear the new system is faster simpler cheaper to run and far more reliable"
+ },
+ "out/A/samantha-ALT-src-17.84-29.25/s3-r3.wav": {
+  "wer": 0.08,
+  "hyp": "the check the numbers twice this afternoon and the results are clear the new system is faster simpler cheaper to run and far more reliable"
+ },
+ "out/A/samantha-ALT-src-17.84-29.25/s3-r4.wav": {
+  "wer": 0.08,
+  "hyp": "the check the numbers twice this afternoon and the results are clear the new system is faster simpler cheaper to run and far more reliable"
+ },
+ "out/A/samantha-ALT-src-17.84-29.25/s3-r5.wav": {
+  "wer": 0.08,
+  "hyp": "the check the numbers twice this afternoon and the results are clear the new system is faster simpler cheaper to run and far more reliable"
+ },
+ "out/A/samantha-orig/s1-r1.wav": {
+  "wer": 0.037,
+  "hyp": "the morning like came slowly over the hills and the whole valley seemed to wake up at once quiet and golden as the birds began to sing"
+ },
+ "out/A/samantha-orig/s1-r2.wav": {
+  "wer": 0.074,
+  "hyp": "the morning like came slowly over the hills and the whole valley seemed to wake up at once quiet and golden as the birds began to say"
+ },
+ "out/A/samantha-orig/s1-r3.wav": {
+  "wer": 0.037,
+  "hyp": "the morning like came slowly over the hills and the whole valley seemed to wake up at once quiet and golden as the birds began to sing"
+ },
+ "out/A/samantha-orig/s1-r4.wav": {
+  "wer": 0.0,
+  "hyp": "the morning light came slowly over the hills and the whole valley seemed to wake up at once quiet and golden as the birds began to sing"
+ },
+ "out/A/samantha-orig/s1-r5.wav": {
+  "wer": 0.0,
+  "hyp": "the morning light came slowly over the hills and the whole valley seemed to wake up at once quiet and golden as the birds began to sing"
+ },
+ "out/A/samantha-orig/s2-r1.wav": {
+  "wer": 0.0,
+  "hyp": "if you need anything at all tonight just tell me and i will take care of it while you get some rest so nothing important slips through the cracks"
+ },
+ "out/A/samantha-orig/s2-r2.wav": {
+  "wer": 0.0,
+  "hyp": "if you need anything at all tonight just tell me and i will take care of it while you get some rest so nothing important slips through the cracks"
+ },
+ "out/A/samantha-orig/s2-r3.wav": {
+  "wer": 0.0,
+  "hyp": "if you need anything at all tonight just tell me and i will take care of it while you get some rest so nothing important slips through the cracks"
+ },
+ "out/A/samantha-orig/s2-r4.wav": {
+  "wer": 0.0,
+  "hyp": "if you need anything at all tonight just tell me and i will take care of it while you get some rest so nothing important slips through the cracks"
+ },
+ "out/A/samantha-orig/s2-r5.wav": {
+  "wer": 0.0,
+  "hyp": "if you need anything at all tonight just tell me and i will take care of it while you get some rest so nothing important slips through the cracks"
+ },
+ "out/A/samantha-orig/s3-r1.wav": {
+  "wer": 0.08,
+  "hyp": "the check the numbers twice this afternoon and the results are clear the new system is faster simpler cheaper to run and far more reliable"
+ },
+ "out/A/samantha-orig/s3-r2.wav": {
+  "wer": 0.08,
+  "hyp": "the check the numbers twice this afternoon and the results are clear the new system is faster simpler cheaper to run and far more reliable"
+ },
+ "out/A/samantha-orig/s3-r3.wav": {
+  "wer": 0.08,
+  "hyp": "the check the numbers twice this afternoon and the results are clear the new system is faster simpler cheaper to run and far more reliable"
+ },
+ "out/A/samantha-orig/s3-r4.wav": {
+  "wer": 0.08,
+  "hyp": "the check the numbers twice this afternoon and the results are clear the new system is faster simpler cheaper to run and far more reliable"
+ },
+ "out/A/samantha-orig/s3-r5.wav": {
+  "wer": 0.08,
+  "hyp": "the check the numbers twice this afternoon and the results are clear the new system is faster simpler cheaper to run and far more reliable"
+ }
+}

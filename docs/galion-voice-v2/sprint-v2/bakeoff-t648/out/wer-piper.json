@@ -1,0 +1,14 @@
+{
+ "out/piper/s1.wav": {
+  "wer": 0.0,
+  "hyp": "the morning light came slowly over the hills and the whole valley seemed to wake up at once quiet and golden as the birds began to sing"
+ },
+ "out/piper/s2.wav": {
+  "wer": 0.0,
+  "hyp": "if you need anything at all tonight just tell me and i will take care of it while you get some rest so nothing important slips through the cracks"
+ },
+ "out/piper/s3.wav": {
+  "wer": 0.0,
+  "hyp": "we checked the numbers twice this afternoon and the results are clear the new system is faster simpler cheaper to run and far more reliable"
+ }
+}

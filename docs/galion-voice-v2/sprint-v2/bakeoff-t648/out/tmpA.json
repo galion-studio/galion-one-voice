@@ -1,0 +1,23 @@
+{
+ "bakeoff-t648/out/A/samantha-orig/s1-r1.wav": {
+  "samantha_orig": 0.2703,
+  "jarvis_orig": -0.0292,
+  "samantha_alt": 0.2663,
+  "samantha_heldout": 0.206,
+  "jarvis_heldout": -0.0774
+ },
+ "bakeoff-t648/out/A/samantha-orig/s2-r1.wav": {
+  "samantha_orig": 0.2515,
+  "jarvis_orig": -0.0139,
+  "samantha_alt": 0.2621,
+  "samantha_heldout": 0.1963,
+  "jarvis_heldout": -0.0603
+ },
+ "bakeoff-t648/out/A/samantha-orig/s3-r1.wav": {
+  "samantha_orig": 0.338,
+  "jarvis_orig": -0.0152,
+  "samantha_alt": 0.31,
+  "samantha_heldout": 0.2652,
+  "jarvis_heldout": -0.0908
+ }
+}

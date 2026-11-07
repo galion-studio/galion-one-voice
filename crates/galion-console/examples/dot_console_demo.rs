@@ -149,6 +149,14 @@ fn run<T: TimingFeed, A: AffectFeed>(args: &[String], mut pump: DemoPump<T, A>, 
     let mut rng = Lcg(13);
     let mut me_voiced_prev = false;
     let mut yielded = false;
+    // Core map: the call loop (heartbeat / bus) runs on the bus core (v3: core 0).
+    // Pinned here, after the web and turn-worker threads exist, so only this
+    // thread moves. Vosk and Piper children pin themselves at spawn. No-op when off.
+    match galion_cores::pin_current_thread_to(galion_cores::CoreRole::Bus) {
+        Ok(p) if p.pinned() => writeln!(out_w, "  core map {} · bus loop on cores {}", p.map.as_str(), p.cpu_list())?,
+        Ok(_) => {}
+        Err(e) => writeln!(out_w, "  core map: bus pin failed: {e}")?,
+    }
     let t0 = Instant::now();
     let mut late_next = false;
     for i in 0..frames {
@@ -196,6 +204,8 @@ fn run<T: TimingFeed, A: AffectFeed>(args: &[String], mut pump: DemoPump<T, A>, 
         if let Some(p) = phone.as_mut() {
             let color = galion_emotion::StubExpressor.voice_color(hb.last_caller_frame().as_ref());
             p.note_prosody(out.prosody(color.prosody));
+            // Thought trace after the step, never inside it (GALION_NERVE_LOG).
+            p.note_frame(out.paused);
         }
         if out.yield_now() {
             yielded = true;

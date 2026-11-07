@@ -1,0 +1,68 @@
+{
+  "backchannels": 22,
+  "barge_in_duck": {
+    "max": 99.2,
+    "mean": 80.4,
+    "min": 78.6,
+    "n": 40,
+    "name": "barge-in onset→duck",
+    "p50": 80.0,
+    "p95": 80.4
+  },
+  "barge_in_silence": {
+    "max": 200.4,
+    "mean": 200.0,
+    "min": 199.4,
+    "n": 31,
+    "name": "barge-in onset→silence (pause)",
+    "p50": 199.9,
+    "p95": 200.3
+  },
+  "endpoint_to_first_audio": {
+    "max": 2400.2,
+    "mean": 164.8,
+    "min": 20.0,
+    "n": 25,
+    "name": "endpoint→first audio (filler/bc ok)",
+    "p50": 40.0,
+    "p95": 604.2
+  },
+  "endpoint_to_first_content_clause": {
+    "max": 8819.7,
+    "mean": 4548.2,
+    "min": 1600.4,
+    "n": 23,
+    "name": "endpoint→first content clause",
+    "p50": 4179.9,
+    "p95": 7943.5
+  },
+  "interjections": 3,
+  "lane": "clone-nano (Chatterbox Nano CPU, CC0 donors)",
+  "llm_cost_usd": 0.0,
+  "llm_model": "qwen2.5-1.5b-instruct-q4_k_m-local",
+  "llm_ttft": {
+    "max": 4467.4,
+    "mean": 1429.1,
+    "min": 221.6,
+    "n": 23,
+    "name": "llm ttft",
+    "p50": 1106.1,
+    "p95": 3394.2
+  },
+  "overlap_s": 5.2,
+  "seconds": 120.0,
+  "synth_ms_per_clause": {
+    "max": 7600.2,
+    "mean": 3055.8,
+    "min": 980.7,
+    "n": 69,
+    "name": "synth per clause",
+    "p50": 2773.4,
+    "p95": 5719.5
+  },
+  "turns": {
+    "jarvis": 14,
+    "samantha": 9
+  },
+  "wav": "results/call-live-3/call-stereo.wav"
+}

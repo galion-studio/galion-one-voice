@@ -1,0 +1,139 @@
+{
+ "ref_vs_ref": {
+  "amy~alan": 0.2067,
+  "amy~pdx": 0.1148,
+  "amy~armstrong": 0.034,
+  "alan~pdx": 0.2327,
+  "alan~armstrong": 0.0252,
+  "pdx~armstrong": 0.0755
+ },
+ "clones": {
+  "amy": [
+   {
+    "file": "/workspace/swarm/voice-v2-sprint/results/clone/amy-clone-0.wav",
+    "vs_amy": 0.6405,
+    "vs_alan": 0.2227,
+    "vs_pdx": 0.0882,
+    "vs_armstrong": -0.0106
+   },
+   {
+    "file": "/workspace/swarm/voice-v2-sprint/results/clone/amy-clone-1.wav",
+    "vs_amy": 0.6237,
+    "vs_alan": 0.1341,
+    "vs_pdx": 0.1116,
+    "vs_armstrong": -0.0335
+   },
+   {
+    "file": "/workspace/swarm/voice-v2-sprint/results/clone/amy-clone-2.wav",
+    "vs_amy": 0.711,
+    "vs_alan": 0.1857,
+    "vs_pdx": 0.0857,
+    "vs_armstrong": 0.0354
+   }
+  ],
+  "alan": [
+   {
+    "file": "/workspace/swarm/voice-v2-sprint/results/clone/alan-clone-0.wav",
+    "vs_amy": 0.1093,
+    "vs_alan": 0.7343,
+    "vs_pdx": 0.2026,
+    "vs_armstrong": -0.0711
+   },
+   {
+    "file": "/workspace/swarm/voice-v2-sprint/results/clone/alan-clone-1.wav",
+    "vs_amy": 0.1658,
+    "vs_alan": 0.7908,
+    "vs_pdx": 0.3237,
+    "vs_armstrong": -0.0267
+   },
+   {
+    "file": "/workspace/swarm/voice-v2-sprint/results/clone/alan-clone-2.wav",
+    "vs_amy": 0.1007,
+    "vs_alan": 0.6578,
+    "vs_pdx": 0.1729,
+    "vs_armstrong": -0.0218
+   }
+  ],
+  "pdx": [
+   {
+    "file": "/workspace/swarm/voice-v2-sprint/results/clone/pdx-clone-0.wav",
+    "vs_amy": 0.1499,
+    "vs_alan": 0.3812,
+    "vs_pdx": 0.6992,
+    "vs_armstrong": -0.0261
+   },
+   {
+    "file": "/workspace/swarm/voice-v2-sprint/results/clone/pdx-clone-1.wav",
+    "vs_amy": 0.1205,
+    "vs_alan": 0.4325,
+    "vs_pdx": 0.709,
+    "vs_armstrong": -0.0312
+   },
+   {
+    "file": "/workspace/swarm/voice-v2-sprint/results/clone/pdx-clone-2.wav",
+    "vs_amy": 0.1377,
+    "vs_alan": 0.2578,
+    "vs_pdx": 0.6637,
+    "vs_armstrong": -0.0654
+   }
+  ]
+ },
+ "piper": {
+  "piper-0.wav": {
+   "vs_amy": 0.0673,
+   "vs_alan": 0.1539,
+   "vs_pdx": 0.114,
+   "vs_armstrong": 0.0207
+  },
+  "piper-1.wav": {
+   "vs_amy": 0.1129,
+   "vs_alan": 0.1063,
+   "vs_pdx": 0.0126,
+   "vs_armstrong": 0.0162
+  },
+  "piper-2.wav": {
+   "vs_amy": 0.121,
+   "vs_alan": 0.147,
+   "vs_pdx": 0.0869,
+   "vs_armstrong": 0.0312
+  }
+ },
+ "moods": {
+  "jarvis-concern.wav": {
+   "vs_amy": 0.1066,
+   "vs_alan": 0.6766
+  },
+  "jarvis-dry.wav": {
+   "vs_amy": 0.1585,
+   "vs_alan": 0.716
+  },
+  "jarvis-firm.wav": {
+   "vs_amy": 0.1998,
+   "vs_alan": 0.7536
+  },
+  "jarvis-neutral.wav": {
+   "vs_amy": 0.1717,
+   "vs_alan": 0.7008
+  },
+  "samantha-joy.wav": {
+   "vs_amy": 0.5685,
+   "vs_alan": 0.1175
+  },
+  "samantha-neutral.wav": {
+   "vs_amy": 0.7149,
+   "vs_alan": 0.2199
+  },
+  "samantha-sad.wav": {
+   "vs_amy": 0.6899,
+   "vs_alan": 0.1297
+  },
+  "samantha-surprise.wav": {
+   "vs_amy": 0.5098,
+   "vs_alan": 0.0644
+  },
+  "samantha-whisper.wav": {
+   "vs_amy": 0.639,
+   "vs_alan": 0.0819
+  }
+ }
+}

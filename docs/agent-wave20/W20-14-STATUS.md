@@ -58,3 +58,7 @@ Full crate: `cargo test -p galion-tensor --offline` → 60 unit + 8 + 4 + 1 pass
 
 ## Not done / guardrails kept
 No change to `gq.rs` or any `src/`; no change to `run-gates.sh`, LEDGER, BACKLOG; no git push/gh/PR; no VPS/SSH; no downloads; no real or invented weights; no he-IL. **Do not read this as "weights path clear".**
+
+---
+
+© G.A.L.I.O.N. — General Autonomous Local Intelligence Open Network. All rights reserved and claims reserved. · CC0 voices: you must tick the consent box agreeing to the CC0 licence before using any CC0 voice; use is at your own responsibility. · No cookies. · De-Googled: no Google services. · All current Galion builds are open source under the Galion perpetual open MIT licence.

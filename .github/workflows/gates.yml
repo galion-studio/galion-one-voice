@@ -19,6 +19,8 @@ jobs:
         run: scripts/check-no-forbidden.sh
       - name: Workspace tests
         run: cargo test --workspace
+      - name: Emotion V2 reference checker
+        run: cargo test --manifest-path tools/emotion-v2/refcheck/Cargo.toml
       - name: One-percent symphony gate
         run: galion-gates/op-one-percent.sh
       - name: Clone worker scaffold (no weight download)

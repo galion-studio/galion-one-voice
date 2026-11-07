@@ -1,0 +1,179 @@
+{
+ "summary": {
+  "cfg": "s1",
+  "prompt_s": null,
+  "threads": 2,
+  "load_ms": 4576,
+  "steps": 1,
+  "kv_cache": true,
+  "cond_ms": {
+   "amy": 661,
+   "alan": 512,
+   "pdx": 416
+  },
+  "kv_prefix_ms": {
+   "amy": 121,
+   "alan": 117,
+   "pdx": 90
+  },
+  "loadavg": [
+   8.87646484375,
+   13.3935546875,
+   14.70458984375
+  ],
+  "total_ms": {
+   "p50": 3374.0,
+   "p95": 8204.3
+  },
+  "t3_ms": {
+   "p50": 2022.5,
+   "p95": 7077.7
+  },
+  "prefill_ms": {
+   "p50": 38.5,
+   "p95": 40.2
+  },
+  "flow_ms": {
+   "p50": 618.7,
+   "p95": 2415.4
+  },
+  "hift_ms": {
+   "p50": 561.7,
+   "p95": 693.3
+  },
+  "wm_ms": {
+   "p50": 21.6,
+   "p95": 26.0
+  },
+  "long_total_p50": 3374.0,
+  "rtf_long": 0.971
+ },
+ "rows": [
+  {
+   "voice": "amy",
+   "i": 0,
+   "text": "The train leaves at seven, so pack the night before and set two alarms.",
+   "file": "/workspace/swarm/voice-v2-sprint/results/lat240-clone/q-seed3000/s1/amy-0.wav",
+   "prefill_ms": 34.980166994500905,
+   "t3_ms": 2022.5302899780218,
+   "n_tok": 114,
+   "flow_ms": 2415.4445369786117,
+   "hift_ms": 692.0173389953561,
+   "wm_ms": 22.591250977711752,
+   "total_ms": 5152.795412985142,
+   "audio_ms": 4680.0
+  },
+  {
+   "voice": "amy",
+   "i": 1,
+   "text": "I found the old letters in a shoebox under the stairs, still tied with string.",
+   "file": "/workspace/swarm/voice-v2-sprint/results/lat240-clone/q-seed3000/s1/amy-1.wav",
+   "prefill_ms": 40.20110299461521,
+   "t3_ms": 2098.15176500706,
+   "n_tok": 115,
+   "flow_ms": 654.5712810184341,
+   "hift_ms": 597.9891140013933,
+   "wm_ms": 23.09541800059378,
+   "total_ms": 3374.0468350006267,
+   "audio_ms": 4720.0
+  },
+  {
+   "voice": "amy",
+   "i": 2,
+   "text": "Honestly, the quiet part of the morning is my favourite hour of the day.",
+   "file": "/workspace/swarm/voice-v2-sprint/results/lat240-clone/q-seed3000/s1/amy-2.wav",
+   "prefill_ms": 38.685003004502505,
+   "t3_ms": 1599.2711170110852,
+   "n_tok": 94,
+   "flow_ms": 618.7241489824373,
+   "hift_ms": 502.3193370143417,
+   "wm_ms": 19.980265002232045,
+   "total_ms": 2740.539915015688,
+   "audio_ms": 3880.0
+  },
+  {
+   "voice": "alan",
+   "i": 0,
+   "text": "The train leaves at seven, so pack the night before and set two alarms.",
+   "file": "/workspace/swarm/voice-v2-sprint/results/lat240-clone/q-seed3000/s1/alan-0.wav",
+   "prefill_ms": 38.57869899366051,
+   "t3_ms": 1947.517741995398,
+   "n_tok": 109,
+   "flow_ms": 685.934219014598,
+   "hift_ms": 693.2706789812073,
+   "wm_ms": 22.54929201444611,
+   "total_ms": 3349.5040560083,
+   "audio_ms": 4460.0
+  },
+  {
+   "voice": "alan",
+   "i": 1,
+   "text": "I found the old letters in a shoebox under the stairs, still tied with string.",
+   "file": "/workspace/swarm/voice-v2-sprint/results/lat240-clone/q-seed3000/s1/alan-1.wav",
+   "prefill_ms": 39.871740009402856,
+   "t3_ms": 3140.6227059778757,
+   "n_tok": 111,
+   "flow_ms": 875.66131199128,
+   "hift_ms": 642.3734199779574,
+   "wm_ms": 26.009575987700373,
+   "total_ms": 4684.919878985966,
+   "audio_ms": 4540.0
+  },
+  {
+   "voice": "alan",
+   "i": 2,
+   "text": "Honestly, the quiet part of the morning is my favourite hour of the day.",
+   "file": "/workspace/swarm/voice-v2-sprint/results/lat240-clone/q-seed3000/s1/alan-2.wav",
+   "prefill_ms": 38.46053799497895,
+   "t3_ms": 7077.683908981271,
+   "n_tok": 92,
+   "flow_ms": 593.1862240249757,
+   "hift_ms": 513.1541430018842,
+   "wm_ms": 20.09274301235564,
+   "total_ms": 8204.302247992018,
+   "audio_ms": 3780.0
+  },
+  {
+   "voice": "pdx",
+   "i": 0,
+   "text": "The train leaves at seven, so pack the night before and set two alarms.",
+   "file": "/workspace/swarm/voice-v2-sprint/results/lat240-clone/q-seed3000/s1/pdx-0.wav",
+   "prefill_ms": 37.94331301469356,
+   "t3_ms": 3734.911025996553,
+   "n_tok": 115,
+   "flow_ms": 521.4374520001002,
+   "hift_ms": 541.0071540100034,
+   "wm_ms": 19.949792011175305,
+   "total_ms": 4817.504400009057,
+   "audio_ms": 4720.0
+  },
+  {
+   "voice": "pdx",
+   "i": 1,
+   "text": "I found the old letters in a shoebox under the stairs, still tied with string.",
+   "file": "/workspace/swarm/voice-v2-sprint/results/lat240-clone/q-seed3000/s1/pdx-1.wav",
+   "prefill_ms": 36.58755001379177,
+   "t3_ms": 1744.2988420079928,
+   "n_tok": 106,
+   "flow_ms": 504.9878970021382,
+   "hift_ms": 561.7079520015977,
+   "wm_ms": 21.550384000875056,
+   "total_ms": 2832.7432259975467,
+   "audio_ms": 4360.0
+  },
+  {
+   "voice": "pdx",
+   "i": 2,
+   "text": "Honestly, the quiet part of the morning is my favourite hour of the day.",
+   "file": "/workspace/swarm/voice-v2-sprint/results/lat240-clone/q-seed3000/s1/pdx-2.wav",
+   "prefill_ms": 35.545552003895864,
+   "t3_ms": 1632.0785190036986,
+   "n_tok": 92,
+   "flow_ms": 504.34847999713384,
+   "hift_ms": 490.2503370249178,
+   "wm_ms": 18.74739900813438,
+   "total_ms": 2645.5988279776648,
+   "audio_ms": 3800.0
+  }
+ ]
+}

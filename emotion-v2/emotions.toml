@@ -1,0 +1,481 @@
+# Galion Voice — Perpetual Open MIT License
+# (c) 2026 Maciej Grajczyk / G.A.L.I.O.N.
+#
+# Samantha, Emotion V2. Machine-readable inventory.
+# Prose, citations, and the scoring problem: docs/emotion-v2/TAXONOMY.md
+#
+# Pitch centre is the just unison 1/1 at 432 Hz. Emotional pitch is a
+# 5-limit just ratio times that centre. The centre is never moved to 440 Hz.
+# A range may contain 440 Hz inside it. That is not a retune.
+#
+# Valence and arousal are design coordinates on Russell's circumplex axes
+# (pleasure positive, arousal positive), each in [-1, 1]. Where coordinate_basis
+# is russell-1980-angle, the pair is round(cos θ, 2), round(sin θ, 2) for the
+# angle Russell (1980) states in running text. Radius 1 is the perimeter.
+# Russell's P is intersubject agreement, not this radius. Other pairs are
+# design points and must not be read as his measurements.
+#
+# Intensity scales prosody from the neutral full target toward this emotion's
+# full target. Neutral allows only full, because it is the origin of that scale.
+
+schema = "galion-emotion-v2/1"
+persona = "samantha"
+status = "design"
+pitch_centre_hz = 432
+pitch_centre_ratio = "1/1"
+pitch_retune_forbidden_hz = [440]
+
+[intensity]
+low = 0.35
+mid = 0.65
+full = 1.0
+
+[superb]
+model = "superb/wav2vec2-base-superb-er"
+labels = ["neu", "hap", "ang", "sad"]
+
+[emotion2vec_plus]
+model = "emotion2vec/emotion2vec_plus_large"
+labels = ["angry", "disgusted", "fearful", "happy", "neutral", "other", "sad", "surprised", "unknown"]
+
+# The live scorer's one mixed vector is recorded here so it cannot be mistaken
+# for a target. known_context is the rounded brief (it sums to 1.01). The
+# in-repo example is a different vector and does sum to 1. Neither is a
+# per-emotion reference.
+[legacy_scorer]
+role = "not-a-target"
+emotion_match_cap_known = 0.80
+known_context = { neu = 0.35, hap = 0.20, ang = 0.14, sad = 0.32 }
+in_repo_profile_example = { neu = 0.350, hap = 0.213, ang = 0.119, sad = 0.318 }
+
+[sources.ekman1992]
+citation = "Ekman, P. (1992). An argument for basic emotions. Cognition and Emotion, 6(3-4), 169-200."
+doi = "10.1080/02699939208411068"
+
+[sources.ekman1993]
+citation = "Ekman, P. (1993). Facial expression and emotion. American Psychologist, 48(4), 384-392."
+doi = "10.1037/0003-066X.48.4.384"
+
+[sources.russell1980]
+citation = "Russell, J. A. (1980). A circumplex model of affect. Journal of Personality and Social Psychology, 39(6), 1161-1178."
+
+[sources.cowen2017]
+citation = "Cowen, A. S., & Keltner, D. (2017). Self-report captures 27 distinct categories of emotion bridged by continuous gradients. Proceedings of the National Academy of Sciences, 114(38), E7900-E7909."
+doi = "10.1073/pnas.1702247114"
+
+[sources.cowen2019]
+citation = "Cowen, A. S., Elfenbein, H. A., Laukka, P., & Keltner, D. (2019). Mapping 24 emotions conveyed by brief human vocalization. American Psychologist, 74(6), 698-712."
+doi = "10.1037/amp0000399"
+
+[sources.posner2005]
+citation = "Posner, J., Russell, J. A., & Peterson, B. S. (2005). The circumplex model of affect: An integrative approach to affective neuroscience, cognitive development, and psychopathology. Development and Psychopathology."
+
+[sources.superb_er]
+citation = "superb/wav2vec2-base-superb-er. Hugging Face model card. Emotion recognition head on IEMOCAP with four classes."
+url = "https://huggingface.co/superb/wav2vec2-base-superb-er"
+
+[sources.emotion2vec_plus]
+citation = "emotion2vec/emotion2vec_plus_large. Hugging Face model card. Nine-class speech-emotion head."
+url = "https://huggingface.co/emotion2vec/emotion2vec_plus_large"
+
+[[emotions]]
+id = "neutral"
+name = "Neutral"
+sector = "grounded"
+order = 1
+valence = 0.0
+arousal = 0.0
+coordinate_basis = "circumplex-origin"
+coordinate_note = "Design centre at the circumplex origin. Neutral is not one of Russell's 28 perimeter adjectives."
+superb = "neu"
+superb_in_set = true
+superb_note = "Neutral is class neu in the four-class SUPERB head."
+emotion2vec = "neutral"
+emotion2vec_in_set = true
+emotion2vec_note = "Neutral is one of the nine emotion2vec+ classes."
+intensities = ["full"]
+blends = [{ id = "calm", basis = "sector-neighbor" }]
+texts = [
+  "The notes are in the folder on the desk.",
+  "Thursday at four still works.",
+  "I can read that back if you want.",
+]
+
+[emotions.prosody]
+pace = 1.0
+energy = 1.0
+breathiness = 0.15
+pitch_low_ratio = "24/25"
+pitch_high_ratio = "25/24"
+pitch_median_ratio = "1/1"
+
+[[emotions]]
+id = "calm"
+name = "Calm"
+sector = "grounded"
+order = 2
+valence = 0.72
+arousal = -0.69
+coordinate_basis = "russell-1980-angle"
+russell_angle_deg = 316.2
+coordinate_note = "Russell 1980 places calm at 316.2 degrees. Stored pair is the unit-circle projection of that angle."
+superb = "neu"
+superb_in_set = false
+superb_note = "SUPERB drops unbalanced IEMOCAP classes and has no calm label. Coarse projection: neu."
+emotion2vec = "neutral"
+emotion2vec_in_set = false
+emotion2vec_note = "emotion2vec+ has no calm class. other is a residual bin, not calm. Coarse projection: neutral."
+intensities = ["low", "mid", "full"]
+blends = [
+  { id = "neutral", basis = "sector-neighbor" },
+  { id = "tender", basis = "design-adjacency" },
+]
+texts = [
+  "We can leave it there for now.",
+  "Nothing else has to move today.",
+  "I'll wait while you find the page.",
+]
+
+[emotions.prosody]
+pace = 0.92
+energy = 0.90
+breathiness = 0.32
+pitch_low_ratio = "15/16"
+pitch_high_ratio = "25/24"
+pitch_median_ratio = "1/1"
+
+[[emotions]]
+id = "happy"
+name = "Happy"
+sector = "bright"
+order = 3
+valence = 0.99
+arousal = 0.14
+coordinate_basis = "russell-1980-angle"
+russell_angle_deg = 7.8
+coordinate_note = "Russell 1980 places happy at 7.8 degrees, near pleasure rather than excitement. Inventory name Happy; the papers say happiness, enjoyment, or joy."
+superb = "hap"
+superb_in_set = true
+superb_note = "Happy is class hap in the four-class SUPERB head."
+emotion2vec = "happy"
+emotion2vec_in_set = true
+emotion2vec_note = "Happy is one of the nine emotion2vec+ classes."
+intensities = ["low", "mid", "full"]
+blends = [
+  { id = "amused", basis = "sector-neighbor" },
+  { id = "tender", basis = "sector-neighbor" },
+]
+texts = [
+  "They kept the Thursday slot for you.",
+  "That came out right.",
+  "The room went quiet, and then they clapped.",
+]
+
+[emotions.prosody]
+pace = 1.04
+energy = 1.04
+breathiness = 0.20
+pitch_low_ratio = "24/25"
+pitch_high_ratio = "9/8"
+pitch_median_ratio = "25/24"
+
+[[emotions]]
+id = "amused"
+name = "Amused"
+sector = "bright"
+order = 4
+valence = 0.74
+arousal = 0.42
+coordinate_basis = "design"
+coordinate_note = "Design point in the pleasure-excitement quadrant. Russell gives no angle for amused. Cowen and Keltner 2017 treat amusement as its own category. Ekman 1993 has amusement sharing the enjoyment smile, so the face does not separate it."
+superb = "hap"
+superb_in_set = false
+superb_note = "No amusement class. Coarse projection: hap. A four-class score cannot accept or reject amusement."
+emotion2vec = "happy"
+emotion2vec_in_set = false
+emotion2vec_note = "No amusement class among the nine. Coarse projection: happy."
+intensities = ["low", "mid", "full"]
+blends = [
+  { id = "happy", basis = "sector-neighbor" },
+  { id = "excited", basis = "sector-neighbor" },
+]
+texts = [
+  "You did not just name the printer.",
+  "That one landed.",
+  "I keep hearing the way you said spreadsheet.",
+]
+
+[emotions.prosody]
+pace = 1.02
+energy = 1.0
+breathiness = 0.30
+pitch_low_ratio = "15/16"
+pitch_high_ratio = "10/9"
+pitch_median_ratio = "1/1"
+
+[[emotions]]
+id = "excited"
+name = "Excited"
+sector = "bright"
+order = 5
+valence = 0.66
+arousal = 0.75
+coordinate_basis = "russell-1980-angle"
+russell_angle_deg = 48.6
+coordinate_note = "Russell 1980 places excited at 48.6 degrees. Not Cowen et al. 2019 positive surprise."
+superb = "hap"
+superb_in_set = false
+superb_note = "The shipped four-class head has no excited label. Coarse projection: hap. This file does not claim SUPERB merged IEMOCAP exc into hap."
+emotion2vec = "happy"
+emotion2vec_in_set = false
+emotion2vec_note = "No excited class among the nine. Coarse projection: happy."
+intensities = ["low", "mid", "full"]
+blends = [{ id = "amused", basis = "sector-neighbor" }]
+texts = [
+  "It is Thursday, and they said yes.",
+  "The build finished. All of it.",
+  "Tell me the part where it actually worked.",
+]
+
+[emotions.prosody]
+pace = 1.12
+energy = 1.10
+breathiness = 0.16
+pitch_low_ratio = "1/1"
+pitch_high_ratio = "6/5"
+pitch_median_ratio = "10/9"
+
+[[emotions]]
+id = "tender"
+name = "Tender"
+sector = "bright"
+order = 6
+valence = 0.58
+arousal = -0.18
+coordinate_basis = "design"
+coordinate_note = "Design point: positive, low arousal, above calm. Cowen et al. 2019 summarise Juslin and Laukka 2003 as recognising tenderness in speech prosody, and separately find sympathy in vocal bursts. Tender is not a Cowen and Keltner 2017 dimension name."
+superb = "hap"
+superb_in_set = false
+superb_note = "No tenderness class. Coarse projection: hap. Soft tender speech may instead score neu. The four-class head is not the acceptance test."
+emotion2vec = "happy"
+emotion2vec_in_set = false
+emotion2vec_note = "No tenderness or sympathy class among the nine. Coarse projection: happy."
+intensities = ["low", "mid", "full"]
+blends = [
+  { id = "happy", basis = "sector-neighbor" },
+  { id = "calm", basis = "design-adjacency" },
+  { id = "sad", basis = "cowen-2017-coload" },
+]
+texts = [
+  "You do not have to explain the whole thing.",
+  "I'm glad you told me that piece.",
+  "That part matters. We can stay with the fact.",
+]
+
+[emotions.prosody]
+pace = 0.90
+energy = 0.86
+breathiness = 0.46
+pitch_low_ratio = "9/10"
+pitch_high_ratio = "25/24"
+pitch_median_ratio = "24/25"
+
+[[emotions]]
+id = "sad"
+name = "Sad"
+sector = "heavy"
+order = 7
+valence = -0.89
+arousal = -0.46
+coordinate_basis = "russell-1980-angle"
+russell_angle_deg = 207.5
+coordinate_note = "Russell 1980 places sad at 207.5 degrees."
+superb = "sad"
+superb_in_set = true
+superb_note = "Sad is class sad in the four-class SUPERB head."
+emotion2vec = "sad"
+emotion2vec_in_set = true
+emotion2vec_note = "Sad is one of the nine emotion2vec+ classes."
+intensities = ["low", "mid", "full"]
+blends = [
+  { id = "disappointed", basis = "sector-neighbor" },
+  { id = "tender", basis = "cowen-2017-coload" },
+]
+texts = [
+  "Your mother died this morning.",
+  "The house is going to feel different tonight.",
+  "I don't have a better sentence for that.",
+]
+
+[emotions.prosody]
+pace = 0.86
+energy = 0.80
+breathiness = 0.55
+pitch_low_ratio = "5/6"
+pitch_high_ratio = "1/1"
+pitch_median_ratio = "9/10"
+
+[[emotions]]
+id = "disappointed"
+name = "Disappointed"
+sector = "heavy"
+order = 8
+valence = -0.52
+arousal = -0.12
+coordinate_basis = "design"
+coordinate_note = "Design point: negative, less extreme and less deactivated than sad. Cowen et al. 2019 find disappointment as its own vocal-burst dimension. Cowen and Keltner 2017 do not: disappointment coloads on anger, and that cluster loads on sadness if the anger dimension is dropped."
+superb = "sad"
+superb_in_set = false
+superb_note = "No disappointment class. Coarse projection: sad. Angry bleed is the known failure of a single mixed reference, not a reason to retarget this category at ang."
+emotion2vec = "sad"
+emotion2vec_in_set = false
+emotion2vec_note = "No disappointment class among the nine. Coarse projection: sad."
+intensities = ["low", "mid", "full"]
+blends = [
+  { id = "sad", basis = "sector-neighbor" },
+  { id = "angry", basis = "cowen-2017-coload" },
+]
+texts = [
+  "I thought we were going to finish it today.",
+  "That is not the version I was hoping you would hear.",
+  "I wanted that to go the other way.",
+]
+
+[emotions.prosody]
+pace = 0.94
+energy = 0.88
+breathiness = 0.34
+pitch_low_ratio = "15/16"
+pitch_high_ratio = "25/24"
+pitch_median_ratio = "24/25"
+
+[[emotions]]
+id = "angry"
+name = "Angry"
+sector = "sharp"
+order = 9
+valence = -0.68
+arousal = 0.55
+coordinate_basis = "design"
+coordinate_note = "Design point in the high-arousal displeasure quadrant where Russell's figure places angry. The 1980 running text gives no degree for angry. Alarmed is 96.5 degrees and miserable is 188.7; this point sits between those published anchors in quadrant, not on either angle."
+superb = "ang"
+superb_in_set = true
+superb_note = "Angry is class ang in the four-class SUPERB head."
+emotion2vec = "angry"
+emotion2vec_in_set = true
+emotion2vec_note = "Angry is one of the nine emotion2vec+ classes."
+intensities = ["low", "mid", "full"]
+blends = [
+  { id = "fearful", basis = "sector-neighbor" },
+  { id = "disgusted", basis = "sector-neighbor" },
+  { id = "disappointed", basis = "cowen-2017-coload" },
+]
+texts = [
+  "That was not yours to decide.",
+  "Say it again, plainly, without the excuse.",
+  "I am not raising my voice. I am not letting it pass.",
+]
+
+[emotions.prosody]
+pace = 1.04
+energy = 0.98
+breathiness = 0.08
+pitch_low_ratio = "8/9"
+pitch_high_ratio = "16/15"
+pitch_median_ratio = "15/16"
+
+[[emotions]]
+id = "fearful"
+name = "Fearful"
+sector = "sharp"
+order = 10
+valence = -0.42
+arousal = 0.78
+coordinate_basis = "design"
+coordinate_note = "Design point in the high-arousal displeasure quadrant, higher arousal and less extreme valence than angry. Posner, Russell, and Peterson 2005 describe fear as negative valence with heightened arousal. No published Russell degree is copied."
+superb = "ang"
+superb_in_set = false
+superb_note = "SUPERB has no fear class. Coarse projection: ang, because the head's high-arousal negative class is anger. That collapse is why fear needs its own reference."
+emotion2vec = "fearful"
+emotion2vec_in_set = true
+emotion2vec_note = "Fearful is one of the nine emotion2vec+ classes."
+intensities = ["low", "mid", "full"]
+blends = [
+  { id = "angry", basis = "sector-neighbor" },
+  { id = "surprised", basis = "cowen-2019-adjacency" },
+]
+texts = [
+  "Something in the hallway just changed, and I don't know what.",
+  "If that alarm is real, we stop and check.",
+  "I need a second. That did not sound right.",
+]
+
+[emotions.prosody]
+pace = 1.10
+energy = 0.92
+breathiness = 0.38
+pitch_low_ratio = "24/25"
+pitch_high_ratio = "6/5"
+pitch_median_ratio = "16/15"
+
+[[emotions]]
+id = "surprised"
+name = "Surprised"
+sector = "sharp"
+order = 11
+valence = -0.08
+arousal = 0.88
+coordinate_basis = "design"
+coordinate_note = "Design point near the arousal axis, slightly unpleasant. This slot follows Cowen et al. 2019 negative surprise. It is not Russell's astonished at 69.8 degrees, which is still pleasant of the arousal axis (projection about +0.35, +0.94)."
+superb = "neu"
+superb_in_set = false
+superb_note = "SUPERB has no surprise class. Coarse projection: neu, because the design valence is near zero. Startled speech may score ang. The four-class head is not the acceptance test."
+emotion2vec = "surprised"
+emotion2vec_in_set = true
+emotion2vec_note = "Surprised is one of the nine emotion2vec+ classes. The head does not split positive and negative surprise."
+intensities = ["low", "mid", "full"]
+blends = [{ id = "fearful", basis = "cowen-2019-adjacency" }]
+texts = [
+  "Wait. That is not the number I had.",
+  "They moved it to Thursday. I did not see that coming.",
+  "You finished it already?",
+]
+
+[emotions.prosody]
+pace = 1.08
+energy = 1.06
+breathiness = 0.18
+pitch_low_ratio = "15/16"
+pitch_high_ratio = "5/4"
+pitch_median_ratio = "10/9"
+
+[[emotions]]
+id = "disgusted"
+name = "Disgusted"
+sector = "sharp"
+order = 12
+valence = -0.74
+arousal = 0.18
+coordinate_basis = "design"
+coordinate_note = "Design point: negative valence, moderate arousal, below angry. Ekman 1992 lists disgust among the basic emotions. Russell's 28 terms do not include disgust, so no angle is projected."
+superb = "ang"
+superb_in_set = false
+superb_note = "SUPERB has no disgust class. Coarse projection: ang. The four-class head cannot separate disgust from anger."
+emotion2vec = "disgusted"
+emotion2vec_in_set = true
+emotion2vec_note = "Disgusted is one of the nine emotion2vec+ classes."
+intensities = ["low", "mid", "full"]
+blends = [{ id = "angry", basis = "sector-neighbor" }]
+texts = [
+  "That smell does not belong in a kitchen.",
+  "Leave the rest of it. I don't want it described.",
+  "We are not putting that back on the table.",
+]
+
+[emotions.prosody]
+pace = 0.96
+energy = 0.94
+breathiness = 0.10
+pitch_low_ratio = "5/6"
+pitch_high_ratio = "25/24"
+pitch_median_ratio = "15/16"

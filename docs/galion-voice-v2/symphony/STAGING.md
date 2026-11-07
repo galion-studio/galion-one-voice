@@ -55,3 +55,7 @@ Routes the edge forwards: `GET /`, `GET /screen`, `GET /dot`, `POST /mic`, `POST
 **BLOCKED** when no tunnel is up. Local loopback can still be scored on its own row. Staging stays **BLOCKED** until the `https://` name exists.
 
 — Maciej Grajczyk
+
+---
+
+© G.A.L.I.O.N. — General Autonomous Local Intelligence Open Network. All rights reserved and claims reserved. · CC0 voices: you must tick the consent box agreeing to the CC0 licence before using any CC0 voice; use is at your own responsibility. · No cookies. · De-Googled: no Google services. · All current Galion builds are open source under the Galion perpetual open MIT licence.

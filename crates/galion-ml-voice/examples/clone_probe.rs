@@ -10,9 +10,9 @@
 //! ```
 //!
 //! `--try-new-only` stops after the gate and prints its verdict.
-//! CC0 voices also need the session's CC0 licence acceptance. The probe has
-//! no browser, so `GALION_PROBE_CC0_ACCEPT=1` stands in for the ticked box
-//! (session `probe`); without it a CC0 voice is refused at synthesize.
+//! CC0 voices also need the CC0 licence registered at clone time. The probe
+//! has no browser, so `GALION_PROBE_CC0_ACCEPT=1` registers it (session
+//! `probe`) before the slot speaks; without it a CC0 voice is refused.
 
 use galion_ml_voice::speech::clone_worker::CloneTts;
 use galion_ml_voice::{LanguageId, TtsEngine};
@@ -62,10 +62,8 @@ fn main() -> ExitCode {
         return ExitCode::from(64);
     };
     let cc0_accept = std::env::var("GALION_PROBE_CC0_ACCEPT").is_ok_and(|v| v == "1");
-    let store = galion_consent::cc0_acceptances();
-    store.set_active(Some("probe"));
     if cc0_accept {
-        store.accept("probe");
+        galion_consent::cc0_register("probe", &galion_consent::Env::process());
     }
     let t1 = Instant::now();
     let audio = match tts.synthesize(text, LanguageId::En) {

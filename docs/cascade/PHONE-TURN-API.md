@@ -39,3 +39,7 @@ Errors: `PhoneError::{Empty, BadWav, AsrUnratified, AsrUnavailable, NoSpeech, Su
 Smoke: `GALION_ASR=vosk cargo run -p galion-cascade --features cascade --example phone_turn [in.wav [out.wav]]` after `scripts/asr/fetch-vosk.sh`.
 
 Virtual user (offline, `127.0.0.1` only): `scripts/eval/virtual-user.sh`. Report under `galion-gates/results/presence-eval/`. See `docs/eval/PRESENCE-EVAL.md`. `text-inject` is the harness supplying words. It is not recognition. Interim stays `interim-placeholder`.
+
+---
+
+© G.A.L.I.O.N. — General Autonomous Local Intelligence Open Network. All rights reserved and claims reserved. · CC0 voices: you must tick the consent box agreeing to the CC0 licence before using any CC0 voice; use is at your own responsibility. · No cookies. · De-Googled: no Google services. · All current Galion builds are open source under the Galion perpetual open MIT licence.

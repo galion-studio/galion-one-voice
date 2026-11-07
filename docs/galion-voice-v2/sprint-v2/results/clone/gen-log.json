@@ -1,0 +1,210 @@
+[
+ {
+  "ok": true,
+  "op": "ready",
+  "load_ms": 19524,
+  "threads": 8,
+  "sr": 24000
+ },
+ {
+  "ev": "cond",
+  "voice": "amy",
+  "ok": true,
+  "op": "cond",
+  "ms": 2877
+ },
+ {
+  "ev": "say",
+  "voice": "amy",
+  "i": 0,
+  "text": "The train leaves at seven, so pack the night before and set two alarms.",
+  "ok": true,
+  "op": "say",
+  "ms": 4214,
+  "audio_ms": 4600
+ },
+ {
+  "ev": "say",
+  "voice": "amy",
+  "i": 1,
+  "text": "I found the old letters in a shoebox under the stairs, still tied with string.",
+  "ok": true,
+  "op": "say",
+  "ms": 2206,
+  "audio_ms": 4520
+ },
+ {
+  "ev": "say",
+  "voice": "amy",
+  "i": 2,
+  "text": "Honestly, the quiet part of the morning is my favourite hour of the day.",
+  "ok": true,
+  "op": "say",
+  "ms": 2064,
+  "audio_ms": 3960
+ },
+ {
+  "ev": "cond",
+  "voice": "alan",
+  "ok": true,
+  "op": "cond",
+  "ms": 468
+ },
+ {
+  "ev": "say",
+  "voice": "alan",
+  "i": 0,
+  "text": "The train leaves at seven, so pack the night before and set two alarms.",
+  "ok": true,
+  "op": "say",
+  "ms": 2377,
+  "audio_ms": 4500
+ },
+ {
+  "ev": "say",
+  "voice": "alan",
+  "i": 1,
+  "text": "I found the old letters in a shoebox under the stairs, still tied with string.",
+  "ok": true,
+  "op": "say",
+  "ms": 2445,
+  "audio_ms": 4300
+ },
+ {
+  "ev": "say",
+  "voice": "alan",
+  "i": 2,
+  "text": "Honestly, the quiet part of the morning is my favourite hour of the day.",
+  "ok": true,
+  "op": "say",
+  "ms": 2804,
+  "audio_ms": 4020
+ },
+ {
+  "ev": "cond",
+  "voice": "pdx",
+  "ok": true,
+  "op": "cond",
+  "ms": 442
+ },
+ {
+  "ev": "say",
+  "voice": "pdx",
+  "i": 0,
+  "text": "The train leaves at seven, so pack the night before and set two alarms.",
+  "ok": true,
+  "op": "say",
+  "ms": 2512,
+  "audio_ms": 4640
+ },
+ {
+  "ev": "say",
+  "voice": "pdx",
+  "i": 1,
+  "text": "I found the old letters in a shoebox under the stairs, still tied with string.",
+  "ok": true,
+  "op": "say",
+  "ms": 2235,
+  "audio_ms": 4800
+ },
+ {
+  "ev": "say",
+  "voice": "pdx",
+  "i": 2,
+  "text": "Honestly, the quiet part of the morning is my favourite hour of the day.",
+  "ok": true,
+  "op": "say",
+  "ms": 2018,
+  "audio_ms": 4440
+ },
+ {
+  "ev": "say",
+  "voice": "samantha",
+  "mood": "neutral",
+  "text": "I picked up the groceries and the bread was still warm.",
+  "ok": true,
+  "op": "say",
+  "ms": 1507,
+  "audio_ms": 2760
+ },
+ {
+  "ev": "say",
+  "voice": "samantha",
+  "mood": "joy",
+  "text": "[laugh] Biscuit came home! He just walked in like nothing happened!",
+  "ok": true,
+  "op": "say",
+  "ms": 2560,
+  "audio_ms": 4760
+ },
+ {
+  "ev": "say",
+  "voice": "samantha",
+  "mood": "sad",
+  "text": "[sigh] Lena moves to Lisbon on Friday. I keep pretending it's fine.",
+  "ok": true,
+  "op": "say",
+  "ms": 2312,
+  "audio_ms": 4280
+ },
+ {
+  "ev": "say",
+  "voice": "samantha",
+  "mood": "whisper",
+  "text": "[whispering] Come closer, I don't want to wake anyone up.",
+  "ok": true,
+  "op": "say",
+  "ms": 1500,
+  "audio_ms": 2480
+ },
+ {
+  "ev": "say",
+  "voice": "samantha",
+  "mood": "surprise",
+  "text": "[gasp] Wait, you already knew? Since when?",
+  "ok": true,
+  "op": "say",
+  "ms": 1484,
+  "audio_ms": 2880
+ },
+ {
+  "ev": "say",
+  "voice": "jarvis",
+  "mood": "neutral",
+  "text": "I picked up the groceries and the bread was still warm.",
+  "ok": true,
+  "op": "say",
+  "ms": 1836,
+  "audio_ms": 2820
+ },
+ {
+  "ev": "say",
+  "voice": "jarvis",
+  "mood": "dry",
+  "text": "[chuckle] Remarkable. The dog managed what the search party could not.",
+  "ok": true,
+  "op": "say",
+  "ms": 2246,
+  "audio_ms": 3860
+ },
+ {
+  "ev": "say",
+  "voice": "jarvis",
+  "mood": "concern",
+  "text": "That sounds heavy. Do you want company on Friday, or quiet?",
+  "ok": true,
+  "op": "say",
+  "ms": 2413,
+  "audio_ms": 3700
+ },
+ {
+  "ev": "say",
+  "voice": "jarvis",
+  "mood": "firm",
+  "text": "[angry] No. We are not driving through the storm tonight.",
+  "ok": true,
+  "op": "say",
+  "ms": 1841,
+  "audio_ms": 3220
+ }
+]

@@ -1,0 +1,33 @@
+== english T2 s1
+INFO: Loading model from config at english.yaml...
+INFO: Loading TTSModel weights from hf://kyutai/pocket-tts/languages/english/model.safetensors@db04f0e653473e5c7333c69686ac92b7460b0c1d
+INFO: Loading tokenizers json from hf://kyutai/pocket-tts-without-voice-cloning/languages/english/tokenizer.json@00eac05ed3d16bdc3f6b5d598874019c34a89214
+INFO: Prompting text took 71 ms
+INFO: Average generation step time: 19 ms
+INFO: Generated: 7520 ms of audio in 2006 ms so 3.75x faster than real-time
+INFO: Results written in /workspace/swarm/voice-v2-sprint/bakeoff-t648/out/B/rtf-english-T2/s1.wav
+INFO: --------------------
+INFO: If you want to try multiple voices and prompts quickly, try the `serve` command.
+INFO: If you like Kyutai projects, comment, like, subscribe at https://x.com/kyutai_labs
+== english T2 s2
+INFO: Loading model from config at english.yaml...
+INFO: Loading TTSModel weights from hf://kyutai/pocket-tts/languages/english/model.safetensors@db04f0e653473e5c7333c69686ac92b7460b0c1d
+INFO: Loading tokenizers json from hf://kyutai/pocket-tts-without-voice-cloning/languages/english/tokenizer.json@00eac05ed3d16bdc3f6b5d598874019c34a89214
+INFO: Prompting text took 58 ms
+INFO: Average generation step time: 18 ms
+INFO: Generated: 6960 ms of audio in 1751 ms so 3.97x faster than real-time
+INFO: Results written in /workspace/swarm/voice-v2-sprint/bakeoff-t648/out/B/rtf-english-T2/s2.wav
+INFO: --------------------
+INFO: If you want to try multiple voices and prompts quickly, try the `serve` command.
+INFO: If you like Kyutai projects, comment, like, subscribe at https://x.com/kyutai_labs
+== english T2 s3
+INFO: Loading model from config at english.yaml...
+INFO: Loading TTSModel weights from hf://kyutai/pocket-tts/languages/english/model.safetensors@db04f0e653473e5c7333c69686ac92b7460b0c1d
+INFO: Loading tokenizers json from hf://kyutai/pocket-tts-without-voice-cloning/languages/english/tokenizer.json@00eac05ed3d16bdc3f6b5d598874019c34a89214
+INFO: Prompting text took 67 ms
+INFO: Average generation step time: 19 ms
+INFO: Generated: 8080 ms of audio in 2071 ms so 3.90x faster than real-time
+INFO: Results written in /workspace/swarm/voice-v2-sprint/bakeoff-t648/out/B/rtf-english-T2/s3.wav
+INFO: --------------------
+INFO: If you want to try multiple voices and prompts quickly, try the `serve` command.
+INFO: If you like Kyutai projects, comment, like, subscribe at https://x.com/kyutai_labs

@@ -13,3 +13,7 @@ Related code (EN-only today):
 - `crates/galion-cascade` — cascade lane stubs: ASR / LLM / TTS / inbound emotion slots (W20-10).
 
 Rules: no weights downloaded or vendored; no foreign runtimes or legacy container formats (see `LOCKS.toml` `[formats]`, gate G2); no new `LanguageId` variants without owner sign-off; he-IL out of scope. Model/language-coverage claims tagged `[verify]` need checking against model cards and the A21 licence memo.
+
+---
+
+© G.A.L.I.O.N. — General Autonomous Local Intelligence Open Network. All rights reserved and claims reserved. · CC0 voices: you must tick the consent box agreeing to the CC0 licence before using any CC0 voice; use is at your own responsibility. · No cookies. · De-Googled: no Google services. · All current Galion builds are open source under the Galion perpetual open MIT licence.

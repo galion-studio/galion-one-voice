@@ -1,0 +1,11 @@
+{
+  "voice": "own-samantha-v2-blendfix-coherent",
+  "persona": "samantha",
+  "dtype": "fp32",
+  "temperature": 0,
+  "seed": 0,
+  "timbre_match": 0.5,
+  "timbre_ref": "$GALION_CLIP_STORE/samantha/reference.wav",
+  "prosody": false,
+  "notes": "emotion-blend candidate (d): A's global-fix coherent prefix rotation; T0 + timbre 0.5"
+}

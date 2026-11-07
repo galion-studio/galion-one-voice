@@ -21,6 +21,7 @@ Paths in the Doc column live in this directory. The Anchor column is the page th
 |---|---|---|---|
 | Compiler | [COMPILER.md](COMPILER.md) | Chatterbox clone output compiled into the Galion voice file (`.gq` and the clip ABI) the Rust stack runs. | [GALION-VOICE-V2.md](../GALION-VOICE-V2.md) |
 | Clone | [CLONE.md](CLONE.md) | Current Samantha and Jarvis models. WAV refs only. Voice lands as PCM from the out-of-process worker. | [CLONE-WORKER.md](../CLONE-WORKER.md), [VOICE-CLONING.md](../VOICE-CLONING.md) |
+| Emotion blend | [EMOTION-BLEND.md](EMOTION-BLEND.md) | Opt-in cbx conditioning prep (coherent rotation / montage). OFF by default. Samantha coherent blendfix promoted 2026-11-05. | [CBX-CLONE-WORKER.md](../CBX-CLONE-WORKER.md), `tools/cloning-v2/` |
 | Persona | [PERSONA.md](PERSONA.md) | Personality, behaviour, and emotion in the voice. Timbre is the body. The feeling band is the person. | [personas/README.md](../personas/README.md), [SAMANTHA-V2.md](../SAMANTHA-V2.md) |
 | One-dot | [ONE-DOT.md](ONE-DOT.md) | One surface at `/`. Speak, the page records, the workflow proceeds. `GET /v2` redirects to `/`. | [ONE-UI.md](../ONE-UI.md), [ORB.md](../ORB.md) |
 | Runbooks | [RUNBOOKS.md](RUNBOOKS.md) | How each environment is started. The commands below are the short form. | [V1-DEMO.md](../../V1-DEMO.md), [LIVE-DEMO.md](../../LIVE-DEMO.md) |
@@ -247,3 +248,7 @@ The host plan is CPU only, no GPU. The flagship app node is an AMD EPYC 9655P. P
 The tick bar is [LATENCY.md](LATENCY.md). The ledger is [SELF-EVAL.md](SELF-EVAL.md). A section there is complete only when its check exits 0.
 
 — Maciej Grajczyk
+
+---
+
+© G.A.L.I.O.N. — General Autonomous Local Intelligence Open Network. All rights reserved and claims reserved. · CC0 voices: you must tick the consent box agreeing to the CC0 licence before using any CC0 voice; use is at your own responsibility. · No cookies. · De-Googled: no Google services. · All current Galion builds are open source under the Galion perpetual open MIT licence.

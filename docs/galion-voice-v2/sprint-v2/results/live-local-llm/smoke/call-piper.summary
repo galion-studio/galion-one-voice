@@ -1,0 +1,68 @@
+{
+  "backchannels": 4,
+  "barge_in_duck": {
+    "max": 80.2,
+    "mean": 80.0,
+    "min": 79.6,
+    "n": 4,
+    "name": "barge-in onset→duck",
+    "p50": 80.0,
+    "p95": 80.2
+  },
+  "barge_in_silence": {
+    "max": 200.1,
+    "mean": 199.9,
+    "min": 199.8,
+    "n": 4,
+    "name": "barge-in onset→silence (pause)",
+    "p50": 199.8,
+    "p95": 200.0
+  },
+  "endpoint_to_first_audio": {
+    "max": 340.2,
+    "mean": 112.0,
+    "min": 40.0,
+    "n": 5,
+    "name": "endpoint→first audio (filler/bc ok)",
+    "p50": 59.9,
+    "p95": 284.1
+  },
+  "endpoint_to_first_content_clause": {
+    "max": 1955.0,
+    "mean": 727.0,
+    "min": 340.2,
+    "n": 5,
+    "name": "endpoint→first content clause",
+    "p50": 460.0,
+    "p95": 1659.9
+  },
+  "interjections": 0,
+  "lane": "piper A21 CPU",
+  "llm_cost_usd": 0.0,
+  "llm_model": "qwen2.5-1.5b-instruct",
+  "llm_ttft": {
+    "max": 1671.9,
+    "mean": 430.4,
+    "min": 93.9,
+    "n": 5,
+    "name": "llm ttft",
+    "p50": 131.7,
+    "p95": 1365.1
+  },
+  "overlap_s": 0.8,
+  "seconds": 20.0,
+  "synth_ms_per_clause": {
+    "max": 348.2,
+    "mean": 171.5,
+    "min": 81.9,
+    "n": 15,
+    "name": "synth per clause",
+    "p50": 130.6,
+    "p95": 328.5
+  },
+  "turns": {
+    "jarvis": 2,
+    "samantha": 3
+  },
+  "wav": "/workspace/swarm/voice-v2-sprint/results/live-local-llm/call-piper/call-stereo.wav"
+}
