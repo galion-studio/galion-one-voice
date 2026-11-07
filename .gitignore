@@ -29,3 +29,15 @@ docs/galion-voice-v2/personas/**/*.[Mm][Pp]3.[Pp]laceholder
 
 # #54 sample voices: fetch per scripts/eval/sample-voices/SAMPLE-VOICES.md (WAVs are not committed)
 scripts/eval/sample-voices/*.wav
+
+# Emotion V2 capture audio stays outside git. Originals are the owner's own
+# recordings: read-only, sha256-manifested, never committed. The spec and the
+# checker are tracked. No voice clips, weights, or secrets.
+docs/emotion-v2/**/*.wav
+docs/emotion-v2/**/*.wave
+docs/emotion-v2/**/*.mp3
+docs/emotion-v2/**/*.flac
+tools/emotion-v2/**/*.wav
+tools/emotion-v2/**/*.wave
+tools/emotion-v2/**/*.mp3
+tools/emotion-v2/**/*.flac
