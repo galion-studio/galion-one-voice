@@ -353,10 +353,30 @@ fn steps_allocate_nothing() {
     assert!(hb.paused_frames() > 0, "late frames paused");
 }
 
-#[test]
-fn harness_budget_and_verdict() {
-    let pcm = [0.1f32; FRAME_SAMPLES];
-    let slot = [0.2f32; FRAME_SAMPLES];
+/// Odd, so the median is one of the passes and not an average of two.
+const BUDGET_TRIALS: usize = 5;
+
+struct BudgetPass {
+    p99_us: f64,
+    max_us: f64,
+    n_warm: usize,
+    nano_frames: u32,
+    dropped: u32,
+}
+
+fn median_us(samples: &mut [f64]) -> f64 {
+    assert!(!samples.is_empty());
+    assert!(
+        samples.len() % 2 == 1,
+        "median pass index needs an odd count"
+    );
+    samples.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    samples[samples.len() / 2]
+}
+
+/// One warm pass: 64 frames dropped, then the rest ranked. Same timed region
+/// as the original single pass (ring fill stays outside `Instant`).
+fn budget_pass(pcm: &[f32], slot: &[f32]) -> BudgetPass {
     let mut me = [0.0f32; FRAME_SAMPLES];
     let mut hb = hb(true);
     let mut wire = SymphonyWire::new();
@@ -366,12 +386,12 @@ fn harness_budget_and_verdict() {
     let mut nano_frames = 0u32;
     for i in 0..n {
         if ring.queued() < FRAME_SAMPLES {
-            ring.push(&slot);
+            ring.push(slot);
         }
         let t0 = Instant::now();
-        let frame = hb.step(&fin(&pcm, i % 64 == 63));
+        let frame = hb.step(&fin(pcm, i % 64 == 63));
         let emit = wire.me_emit(&frame, me.len());
-        let slot_now: &[f32] = if emit { &slot } else { &[] };
+        let slot_now: &[f32] = if emit { slot } else { &[] };
         let sector = wire.step(
             &frame,
             view(i % 3 == 0, 0.4, true, slot_now),
@@ -385,22 +405,69 @@ fn harness_budget_and_verdict() {
     }
     let warm = &mut times[64..];
     warm.sort_by(|a, b| a.partial_cmp(b).unwrap());
-    let p99 = warm[warm.len() * 99 / 100];
-    let max = *warm.last().unwrap();
+    BudgetPass {
+        p99_us: warm[warm.len() * 99 / 100],
+        max_us: *warm.last().unwrap(),
+        n_warm: warm.len(),
+        nano_frames,
+        dropped: ring.dropped(),
+    }
+}
+
+#[test]
+fn budget_median_ignores_one_spike_and_still_fails_a_slow_step() {
+    // The CI flake was one pass at 849 µs, and a loaded box has recorded a
+    // single 4 ms preemption. Those are outliers. A step that is actually
+    // at or over the ceiling is slow on every pass, so the median fails.
+    let mut p99 = [100.0, 110.0, 849.0, 105.0, 108.0];
+    let mut max = [120.0, 130.0, 4_000.0, 140.0, 125.0];
+    assert!((median_us(&mut p99) - 108.0).abs() < 1e-9);
+    assert!((median_us(&mut max) - 130.0).abs() < 1e-9);
+    assert!(median_us(&mut max) < f64::from(STEP_BUDGET_US));
+    let mut slow = [849.0, 860.0, 900.0, 910.0, 920.0];
+    assert!(median_us(&mut slow) >= f64::from(STEP_BUDGET_US));
+}
+
+#[test]
+fn harness_budget_and_verdict() {
+    // Median of independent passes, still compared with STEP_BUDGET_US (800).
+    // A CI multiplier is the wrong fix: the recorded 4 ms spike is 5× the
+    // ceiling, and a multiplier that absorbs it would also pass a real
+    // regression. A 1.1× multiplier would let a true 849 µs step through,
+    // which is the regression this ceiling exists to catch.
+    // An opt-in bench would drop the check from `cargo test`.
+    assert_eq!(BUDGET_TRIALS % 2, 1);
+    let pcm = [0.1f32; FRAME_SAMPLES];
+    let slot = [0.2f32; FRAME_SAMPLES];
+    let mut passes = Vec::with_capacity(BUDGET_TRIALS);
+    for _ in 0..BUDGET_TRIALS {
+        let pass = budget_pass(&pcm, &slot);
+        assert_eq!(FRAME_MS, 80);
+        assert!(pass.nano_frames > 0, "the timed step drained the Nano ring");
+        assert_eq!(pass.dropped, 0, "the harness must not overflow the ring");
+        assert_eq!(pass.n_warm, 4032);
+        passes.push(pass);
+    }
+    let mut p99s: Vec<f64> = passes.iter().map(|p| p.p99_us).collect();
+    let mut maxes: Vec<f64> = passes.iter().map(|p| p.max_us).collect();
+    let worst_p99 = p99s.iter().copied().fold(0.0_f64, f64::max);
+    let worst_max = maxes.iter().copied().fold(0.0_f64, f64::max);
+    let p99 = median_us(&mut p99s);
+    let max = median_us(&mut maxes);
+    let budget = f64::from(STEP_BUDGET_US);
     assert!(
-        p99 < f64::from(STEP_BUDGET_US),
-        "p99 {p99:.2} us >= {STEP_BUDGET_US}"
+        p99 < budget,
+        "median p99 {p99:.2} us >= {STEP_BUDGET_US} (worst {worst_p99:.2})"
     );
     assert!(
-        max < f64::from(STEP_BUDGET_US),
-        "max {max:.2} us >= {STEP_BUDGET_US}"
+        max < budget,
+        "median max {max:.2} us >= {STEP_BUDGET_US} (worst {worst_max:.2})"
     );
-    assert_eq!(FRAME_MS, 80);
-    assert!(nano_frames > 0, "the timed step drained the Nano ring");
-    assert_eq!(ring.dropped(), 0, "the harness must not overflow the ring");
+    let trial_max: Vec<String> = passes.iter().map(|p| format!("{:.3}", p.max_us)).collect();
     println!(
-        "verdict=PASS frame_ms={FRAME_MS} bands=3 sectors=3 allocs=0 late=pause p99_us={p99:.3} max_us={max:.3} budget_us={STEP_BUDGET_US} n={}",
-        warm.len()
+        "verdict=PASS frame_ms={FRAME_MS} bands=3 sectors=3 allocs=0 late=pause p99_us={p99:.3} max_us={max:.3} budget_us={STEP_BUDGET_US} n={} trials={BUDGET_TRIALS} gate=median worst_p99_us={worst_p99:.3} worst_max_us={worst_max:.3} trial_max_us={}",
+        passes[0].n_warm,
+        trial_max.join(",")
     );
 }
 

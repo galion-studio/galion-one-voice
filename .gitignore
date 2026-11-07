@@ -97,3 +97,12 @@ datasets/emotion-v2/
 
 # Never commit rendered clips from the dataset tool, even outside that root.
 tools/emotion-v2/**/*.ogg
+
+# Laptop runbooks write JSON and audio only under the cache outside this repo.
+# Anything dropped beside the scripts stays untracked.
+tools/laptop-runbooks/out/
+tools/laptop-runbooks/**/*.wav
+tools/laptop-runbooks/**/*.wave
+tools/laptop-runbooks/**/*.flac
+tools/laptop-runbooks/**/*.mp3
+tools/laptop-runbooks/**/*.ogg
