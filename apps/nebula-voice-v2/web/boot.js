@@ -1,14 +1,18 @@
-import { cie as cieHex } from "./cie.js";
+import { cie as cieHex } from "./cie.js?v=abde48e";
+import { createGpuRenderer, probeGpu } from "./gpu.js?v=abde48e";
 
 // Gesture glue for the fullscreen nebula. No visible controls.
 const params = new URLSearchParams(location.search);
 const voice = document.body.dataset.voice || params.get("voice") || "samantha";
-const quality = params.get("quality") || "normal";
+const qualityOverride = params.get("quality");
+const rendererOverride = (params.get("renderer") || "").toLowerCase();
+const showHud = params.get("fps") === "1" || params.get("fps") === "true";
 
-const canvas = document.getElementById("nebula");
 const overlay = document.getElementById("overlay");
 const strip = document.getElementById("strip");
 const labels = document.getElementById("labels");
+let canvas = document.getElementById("nebula");
+const hud = document.getElementById("hud");
 
 function refreshHz() {
   return new Promise((resolve) => {
@@ -39,13 +43,33 @@ function safeInsets() {
   };
 }
 
-function fit() {
+function chooseDpr(gpu) {
   const mobile = Math.min(window.innerWidth, window.innerHeight) < 800;
-  const cap = mobile ? 1.5 : 2;
-  const dpr = Math.min(window.devicePixelRatio || 1, cap);
-  canvas.style.width = "100vw";
-  canvas.style.height = "100dvh";
+  const cap = gpu ? 3 : (mobile ? 1.5 : 2);
+  let dpr = Math.min(window.devicePixelRatio || 1, cap);
+  const cssW = canvas.clientWidth || window.innerWidth;
+  const cssH = canvas.clientHeight || window.innerHeight;
+  // CPU splat stays at the iPhone 14 / 1.5 budget. GPU can fill a 3× phone.
+  const maxPixels = gpu ? 390 * 844 * 3 * 3 : 390 * 844 * 1.5 * 1.5;
+  const area = Math.max(1, cssW * cssH);
+  if (area * dpr * dpr > maxPixels) {
+    dpr = Math.max(1, Math.sqrt(maxPixels / area));
+  }
   return dpr;
+}
+
+function fit(gpu) {
+  const dpr = chooseDpr(gpu);
+  canvas.style.width = "100%";
+  canvas.style.height = "100%";
+  const cssW = canvas.clientWidth || window.innerWidth;
+  const cssH = canvas.clientHeight || window.innerHeight;
+  const w = Math.max(2, Math.round(cssW * dpr));
+  const h = Math.max(2, Math.round(cssH * dpr));
+  if (canvas.width !== w) canvas.width = w;
+  if (canvas.height !== h) canvas.height = h;
+  canvas.dataset.dpr = String(dpr);
+  return { dpr, cssW, cssH, width: w, height: h };
 }
 
 let pointers = new Map();
@@ -80,23 +104,74 @@ function drawStrip(app) {
     mark.style.left = `${x}px`;
     mark.textContent = `${row.emotion}  ${row.gas}  ${row.nm} nm`;
     labels.appendChild(mark);
+    const half = mark.offsetWidth / 2;
+    const inset = half + 4;
+    const max = Math.max(inset, strip.clientWidth - inset);
+    mark.style.left = `${Math.min(Math.max(x, inset), max)}px`;
   }
 }
 
-// CIE 1931 approximate locus used for the overlay strip. The presentation
-// page uses the same function. It is not a CSS hue gradient.
 function cie(nm) { return cieHex(nm); }
 
+function spriteView(mod, app, count) {
+  const mem = mod.wasm_memory();
+  return new Float32Array(mem.buffer, app.sprites_ptr(), count * 8);
+}
+
 export async function start(mod) {
-  fit();
   const hz = await refreshHz();
-  const renderer = (navigator.gpu && "discrete") || "";
-  const discrete = /nvidia|radeon rx|geforce|rtx|arc\(tm\)/i.test(renderer);
-  const app = new mod.Nebula(voice, quality, innerWidth, innerHeight, hz, discrete);
+  const probe = rendererOverride === "cpu"
+    ? { name: "", strong: false, discrete: false }
+    : await probeGpu();
+  const quality = qualityOverride || (probe.strong ? "high" : "normal");
+  let prefer = rendererOverride;
+  if (!prefer && /swiftshader|llvmpipe|softpipe|microsoft basic render/.test((probe.name || "").toLowerCase())) {
+    prefer = "webgl2";
+  }
+  let gpu = rendererOverride === "cpu"
+    ? null
+    : await createGpuRenderer(canvas, prefer);
+  if (gpu && gpu.canvas !== canvas) {
+    canvas = gpu.canvas;
+  }
+  canvas = document.getElementById("nebula");
+  const usingGpu = !!gpu;
+  fit(usingGpu);
+  const app = new mod.Nebula(
+    voice,
+    quality,
+    innerWidth,
+    innerHeight,
+    hz,
+    !!probe.discrete,
+  );
+  const floor = JSON.parse(app.floor_rgb());
+  const clear = [floor.r, floor.g, floor.b];
+  let rendererName = usingGpu ? gpu.api : "cpu";
+  let measuredFps = 0;
+  let qualityNow = quality;
+  const warmup = [];
+  let warmed = !usingGpu || quality !== "high" || !!qualityOverride;
+  const hudOn = showHud;
+  if (hud && hudOn) hud.hidden = false;
+
+  const snapshot = () => {
+    const state = JSON.parse(app.debug());
+    return {
+      ...state,
+      quality: qualityNow,
+      renderer: rendererName,
+      gpu: probe.name || "",
+      canvas: [canvas.width, canvas.height],
+      dpr: Number(canvas.dataset.dpr || 1),
+      fpsMeasured: measuredFps,
+    };
+  };
   window.__nebula = {
     ready: true,
-    state: () => JSON.parse(app.debug()),
+    state: snapshot,
   };
+
   canvas.addEventListener("pointerdown", (e) => {
     canvas.setPointerCapture(e.pointerId);
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -149,25 +224,65 @@ export async function start(mod) {
       else canvas.requestFullscreen?.();
     }
   });
-  window.addEventListener("resize", () => { fit(); if (!overlay.hidden) drawStrip(app); });
+  window.addEventListener("resize", () => {
+    fit(usingGpu);
+    if (!overlay.hidden) drawStrip(app);
+  });
+
   let last = performance.now();
+  let fpsEma = 0;
   function tick(now) {
     const dt = now - last;
     last = now;
-    const target = JSON.parse(app.debug()).fps;
-    if (quality === "pi" && dt < 1000 / 30) {
+    if (dt > 0 && dt < 250) {
+      const inst = 1000 / dt;
+      fpsEma = fpsEma ? fpsEma * 0.9 + inst * 0.1 : inst;
+      measuredFps = fpsEma;
+    }
+    const state = JSON.parse(app.debug());
+    const minDt = 1000 / Math.max(1, state.fps);
+    if (state.fps <= 30 && dt < minDt * 0.92) {
       requestAnimationFrame(tick);
       return;
     }
-    if (quality === "high" && dt < 1000 / 120) {
-      requestAnimationFrame(tick);
-      return;
+    if (usingGpu && gpu) {
+      const sized = fit(true);
+      app.step(dt);
+      const count = app.pack_sprites(sized.cssW, sized.cssH, sized.dpr);
+      if (count > 0) {
+        gpu.draw(spriteView(mod, app, count), count, sized.width, sized.height, clear);
+      }
+    } else {
+      fit(false);
+      app.frame(dt, canvas);
     }
-    app.frame(dt, canvas);
     if (!overlay.hidden) drawStrip(app);
+    if (!warmed) {
+      if (dt > 2 && dt < 80) warmup.push(dt);
+      const elapsed = warmup.reduce((a, b) => a + b, 0);
+      if (elapsed >= 1500 && warmup.length >= 20) {
+        warmed = true;
+        const sorted = warmup.slice().sort((a, b) => a - b);
+        const median = sorted[Math.floor(sorted.length / 2)];
+        if (median > minDt * 1.35) {
+          app.apply_quality("normal");
+          qualityNow = "normal";
+        }
+      }
+    }
+    if (hud && hudOn) {
+      const snap = snapshot();
+      hud.textContent = [
+        `${snap.fpsMeasured.toFixed(1)} fps`,
+        `tier ${String(snap.mode).toLowerCase()}  target ${snap.fps}`,
+        `${snap.renderer}  ${snap.particles} p`,
+        `${snap.canvas[0]}×${snap.canvas[1]}  dpr ${snap.dpr.toFixed(2)}`,
+        snap.gpu || "",
+      ].filter(Boolean).join("\n");
+    }
     const _insets = safeInsets();
     requestAnimationFrame(tick);
-    void target;
+    void _insets;
   }
   requestAnimationFrame(tick);
 }

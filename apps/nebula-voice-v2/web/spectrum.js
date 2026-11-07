@@ -1,6 +1,6 @@
-import { cie } from "./cie.js";
-import { DEMO, UNIVERSAL } from "./lines.js";
-import init, { preview_frame } from "./pkg/nebula_voice_v2.js";
+import { cie } from "./cie.js?v=abde48e";
+import { DEMO, UNIVERSAL } from "./lines.js?v=abde48e";
+import init, { preview_frame } from "./pkg/nebula_voice_v2.js?v=abde48e";
 
 const strip = document.getElementById("spectrum");
 function drawSpectrum() {

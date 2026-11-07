@@ -71,6 +71,113 @@ fn splat(sim: &Sim, frame: &NebulaFrame, w: u32, h: u32, budget: &TierBudget, hd
     }
 }
 
+
+/// Eight floats per GPU sprite: clip_x, clip_y, radius_px, alpha, r, g, b, pad.
+pub const SPRITE_STRIDE: usize = 8;
+
+/// Pack projected, shaded sprites for the GPU path.
+///
+/// `glow` uses larger additive halos and a stronger voice illuminant so a
+/// high-tier Snapdragon/Adreno view reads as a dense coloured nebula
+/// instead of a handful of grey CPU dots.
+pub fn write_sprites(
+    sim: &Sim,
+    frame: &NebulaFrame,
+    width: u32,
+    height: u32,
+    budget: &TierBudget,
+    glow: bool,
+    out: &mut [f32],
+) -> u32 {
+    let w = width.max(2);
+    let h = height.max(2);
+    let aspect = w as f32 / h as f32;
+    let fov = 50.0_f32.to_radians();
+    let focal = 1.0 / (fov * 0.5).tan();
+    let distance = 3.15_f32;
+    let eye = [distance * 0.15, 0.05, distance];
+    let forward = normalize([-eye[0], -eye[1], -eye[2]]);
+    let right = normalize(cross(forward, [0.0, 1.0, 0.0]));
+    let up = cross(right, forward);
+    let active = budget.particles.min(sim.particles.len());
+    let min_side = (w.min(h)) as f32;
+    let target_px = if glow {
+        (min_side * 0.018).clamp(6.0, 24.0)
+    } else {
+        match budget.device {
+            crate::quality::DeviceClass::Pi => (min_side * 0.02).clamp(3.0, 8.0),
+            crate::quality::DeviceClass::Phone => (min_side * 0.016).clamp(2.5, 9.0),
+            _ => (min_side * 0.01).clamp(2.0, 12.0),
+        }
+    };
+    let star = frame.voice.star_linear();
+    let mut n = 0usize;
+    let slots = out.len() / SPRITE_STRIDE;
+    for particle in &sim.particles[..active] {
+        let weight = frame.weights.get(particle.emotion as usize).copied().unwrap_or(0.0);
+        if weight < 0.02 {
+            continue;
+        }
+        let Some(line) = DEMO.get(particle.emotion as usize) else { continue };
+        let rel = [particle.pos[0] - eye[0], particle.pos[1] - eye[1], particle.pos[2] - eye[2]];
+        let cam_x = dot(rel, right);
+        let cam_y = dot(rel, up);
+        let cam_z = dot(rel, forward);
+        if cam_z < 0.2 {
+            continue;
+        }
+        let ndc_x = (focal * cam_x / cam_z) / aspect;
+        let ndc_y = focal * cam_y / cam_z;
+        if ndc_x.abs() > 1.35 || ndc_y.abs() > 1.35 {
+            continue;
+        }
+        let world = target_px / (focal * h as f32 * 0.5) * cam_z * (0.75 + 0.5 * line.motion.min(1.2));
+        let mut radius = (world / cam_z * focal * h as f32 * 0.5).clamp(1.5, if glow { 28.0 } else { 18.0 });
+        let density = sim.sample_density(particle.pos);
+        let view_dir = normalize(rel);
+        let star_dir = normalize([0.2, 0.4, 1.0]);
+        let cos_theta = dot(view_dir, star_dir);
+        let mut rgb = shade(line, weight, density, cos_theta, frame.voice, budget.scatter_samples);
+        let mut alpha = 0.22 + 0.5 * weight;
+        if glow {
+            rgb = [
+                rgb[0] * 0.82 + star[0] * 0.22,
+                rgb[1] * 0.82 + star[1] * 0.22,
+                rgb[2] * 0.82 + star[2] * 0.22,
+            ];
+            rgb = [rgb[0] * 1.18, rgb[1] * 1.18, rgb[2] * 1.18];
+            alpha = 0.24 + 0.40 * weight;
+            radius = (radius * 1.35).clamp(6.0, 28.0);
+        }
+        if n >= slots {
+            break;
+        }
+        let i = n * SPRITE_STRIDE;
+        out[i] = ndc_x;
+        out[i + 1] = ndc_y;
+        out[i + 2] = radius;
+        out[i + 3] = alpha;
+        out[i + 4] = rgb[0];
+        out[i + 5] = rgb[1];
+        out[i + 6] = rgb[2];
+        out[i + 7] = 0.0;
+        n += 1;
+        if glow && n < slots {
+            let j = n * SPRITE_STRIDE;
+            out[j] = ndc_x;
+            out[j + 1] = ndc_y;
+            out[j + 2] = (radius * 2.05).min(46.0);
+            out[j + 3] = alpha * 0.20;
+            out[j + 4] = rgb[0] * 0.40 + star[0] * 0.60;
+            out[j + 5] = rgb[1] * 0.40 + star[1] * 0.60;
+            out[j + 6] = rgb[2] * 0.40 + star[2] * 0.60;
+            out[j + 7] = 0.0;
+            n += 1;
+        }
+    }
+    n as u32
+}
+
 fn paint(hdr: &mut [f32], w: u32, h: u32, cx: f32, cy: f32, radius: f32, rgb: [f32; 3], alpha: f32) {
     let r = radius.ceil() as i32;
     let x0 = (cx as i32 - r).max(0);
@@ -257,5 +364,30 @@ mod tests {
         assert_eq!(image.height, 180);
         assert!(image.rgba.iter().any(|b| *b > 8));
         assert_eq!(&encode_png(&image)[..8], &[137, 80, 78, 71, 13, 10, 26, 10]);
+    }
+
+    #[test]
+    fn gpu_sprites_are_dense_and_warm_for_samantha() {
+        let budget = budget_for(QualityMode::High, DeviceClass::Phone, 120.0, GpuClass::Integrated);
+        let sim = Sim::create(11, budget.particles);
+        let frame = crate::demo::frame_at(Voice::Samantha, 1.2);
+        let mut buf = vec![0.0f32; budget.particles * SPRITE_STRIDE * 2];
+        let n = write_sprites(&sim, &frame, 1080, 2400, &budget, true, &mut buf);
+        assert!(n > 2_000, "high-tier glow should emit thousands of sprites, got {n}");
+        let mut r = 0.0f32;
+        let mut b = 0.0f32;
+        let mut warm = 0u32;
+        for i in 0..n as usize {
+            let o = i * SPRITE_STRIDE;
+            r += buf[o + 4];
+            b += buf[o + 6];
+            if buf[o + 4] > buf[o + 6] {
+                warm += 1;
+            }
+        }
+        assert!(r > b, "samantha sprites should lean warm, r={r} b={b}");
+        assert!(warm * 2 > n, "most samantha sprites should have r > b");
+        let mean_radius: f32 = (0..n as usize).map(|i| buf[i * SPRITE_STRIDE + 2]).sum::<f32>() / n as f32;
+        assert!(mean_radius < 36.0, "glow sprites should not fill the screen, mean radius {mean_radius}");
     }
 }

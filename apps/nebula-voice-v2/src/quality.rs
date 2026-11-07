@@ -195,6 +195,24 @@ pub fn device_particles(device: DeviceClass) -> usize {
     }
 }
 
+/// Pick a particle class from a CSS-pixel viewport.
+///
+/// A short side under 800 CSS px is a phone, including tablets such as
+/// an iPad mini (768×1024). That matches the browser `fit()` mobile test.
+/// Larger windows still use the area thresholds: under 1_400_000 CSS px
+/// is a laptop, otherwise a desktop.
+pub fn device_from_viewport(w: f32, h: f32) -> DeviceClass {
+    let min_side = w.min(h);
+    let px = w * h;
+    if min_side < 800.0 || px < 520_000.0 {
+        DeviceClass::Phone
+    } else if px < 1_400_000.0 {
+        DeviceClass::Laptop
+    } else {
+        DeviceClass::Desktop
+    }
+}
+
 pub fn budget_for(mode: QualityMode, device: DeviceClass, refresh_hz: f32, gpu: GpuClass) -> TierBudget {
     let mode = resolve_mode(mode, gpu);
     let device = if mode == QualityMode::Pi { DeviceClass::Pi } else { device };
@@ -390,5 +408,18 @@ mod tests {
         assert_eq!(step_normal_target(60.0, 144.0, true), 90.0);
         assert_eq!(step_normal_target(60.0, 60.0, true), 60.0);
         assert_eq!(step_normal_target(60.0, 144.0, false), 45.0);
+    }
+
+    #[test]
+    fn viewport_class_treats_phones_and_tablets_as_phone() {
+        assert_eq!(device_from_viewport(375.0, 667.0), DeviceClass::Phone);
+        assert_eq!(device_from_viewport(390.0, 844.0), DeviceClass::Phone);
+        assert_eq!(device_from_viewport(844.0, 390.0), DeviceClass::Phone);
+        assert_eq!(device_from_viewport(412.0, 915.0), DeviceClass::Phone);
+        assert_eq!(device_from_viewport(360.0, 800.0), DeviceClass::Phone);
+        assert_eq!(device_from_viewport(768.0, 1024.0), DeviceClass::Phone);
+        assert_eq!(device_from_viewport(1024.0, 768.0), DeviceClass::Phone);
+        assert_eq!(device_from_viewport(1440.0, 900.0), DeviceClass::Laptop);
+        assert_eq!(device_from_viewport(1920.0, 1080.0), DeviceClass::Desktop);
     }
 }

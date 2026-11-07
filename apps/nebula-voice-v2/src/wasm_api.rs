@@ -9,8 +9,8 @@ use web_sys::HtmlCanvasElement;
 use crate::demo::frame_at;
 use crate::frame::NebulaFrame;
 use crate::quality::{
-    budget_for, initial_normal_target, ladder_at_most, parse_quality, step_normal_target, DeviceClass,
-    GpuClass, QualityMode, TierBudget, NORMAL_FPS_LADDER, NORMAL_PACING, ULTRA_FRAME_BUDGET_MS,
+    budget_for, initial_normal_target, ladder_at_most, parse_quality, step_normal_target,
+    GpuClass, QualityMode, TierBudget, HIGH_FPS_TARGET, NORMAL_FPS_LADDER, NORMAL_PACING, ULTRA_FRAME_BUDGET_MS,
 };
 use crate::render::render;
 use crate::shade::Voice;
@@ -32,6 +32,8 @@ pub struct Nebula {
     cool: u32,
     hot: u32,
     supersample: f32,
+    sprite_buf: Vec<f32>,
+    sprite_count: u32,
 }
 
 #[wasm_bindgen]
@@ -42,10 +44,14 @@ impl Nebula {
         let voice = Voice::parse(voice).unwrap_or(Voice::Samantha);
         let requested = parse_quality(quality).unwrap_or(QualityMode::Normal);
         let gpu = if discrete_gpu { GpuClass::Discrete } else { GpuClass::Integrated };
-        let device = device_from_css(css_w, css_h);
+        let device = crate::quality::device_from_viewport(css_w, css_h);
         let mut budget = budget_for(requested, device, refresh_hz, gpu);
         if budget.mode == QualityMode::Normal {
             budget.fps_target = initial_normal_target(refresh_hz, gpu);
+        }
+        if budget.mode == QualityMode::High {
+            let refresh = if refresh_hz.is_finite() && refresh_hz > 1.0 { refresh_hz } else { 60.0 };
+            budget.fps_target = HIGH_FPS_TARGET.min(ladder_at_most(refresh));
         }
         let particles = budget.particle_ceiling.max(budget.particles);
         Nebula {
@@ -63,6 +69,8 @@ impl Nebula {
             cool: 0,
             hot: 0,
             supersample: 1.0,
+            sprite_buf: vec![0.0; particles.max(1) * crate::render::SPRITE_STRIDE * 2],
+            sprite_count: 0,
         }
     }
 
@@ -76,8 +84,13 @@ impl Nebula {
         self.sim.step(&drive, 1.0 / self.budget.fps_target.max(1.0));
         let css_w = canvas.client_width().max(2) as u32;
         let css_h = canvas.client_height().max(2) as u32;
-        let scale = self.budget.render_scale * self.supersample;
-        let image = render(&self.sim, &self.frame, (css_w as f32 * scale) as u32, (css_h as f32 * scale) as u32, &self.budget, true);
+        let dpr = canvas_dpr(canvas, css_w, css_h);
+        // `render` already multiplies by `budget.render_scale`. Passing
+        // CSS × scale here used to shrink Pi previews to 0.25× and also
+        // dropped the device pixel ratio, so phones looked soft.
+        let buf_w = ((css_w as f32) * dpr * self.supersample).round().max(2.0) as u32;
+        let buf_h = ((css_h as f32) * dpr * self.supersample).round().max(2.0) as u32;
+        let image = render(&self.sim, &self.frame, buf_w, buf_h, &self.budget, true);
         paint_canvas(canvas, &image);
     }
 
@@ -92,6 +105,66 @@ impl Nebula {
 
     pub fn cycle(&mut self) {
         self.blend += 8.0;
+    }
+
+    pub fn step(&mut self, dt_ms: f32) {
+        let dt = (dt_ms / 1000.0).clamp(1.0 / 240.0, 0.05);
+        self.smoothed_ms = self.smoothed_ms * 0.9 + dt_ms.max(0.1) * 0.1;
+        self.adapt();
+        self.blend += dt;
+        self.frame = frame_at(self.voice, self.blend);
+        let drive = crate::frame::drive_from(&self.frame, self.budget.particles, self.budget.octaves);
+        self.sim.step(&drive, 1.0 / self.budget.fps_target.max(1.0));
+    }
+
+    pub fn pack_sprites(&mut self, css_w: f32, css_h: f32, dpr: f32) -> u32 {
+        let dpr = if dpr.is_finite() && dpr > 0.0 { dpr } else { 1.0 };
+        let buf_w = (css_w.max(2.0) * dpr).round().max(2.0) as u32;
+        let buf_h = (css_h.max(2.0) * dpr).round().max(2.0) as u32;
+        let need = self.budget.particles.max(1) * crate::render::SPRITE_STRIDE * 2;
+        if self.sprite_buf.len() < need {
+            self.sprite_buf.resize(need, 0.0);
+        }
+        self.sprite_count = crate::render::write_sprites(
+            &self.sim,
+            &self.frame,
+            buf_w,
+            buf_h,
+            &self.budget,
+            true,
+            &mut self.sprite_buf,
+        );
+        self.sprite_count
+    }
+
+    pub fn sprites_ptr(&self) -> u32 {
+        self.sprite_buf.as_ptr() as u32
+    }
+
+    pub fn sprites_count(&self) -> u32 {
+        self.sprite_count
+    }
+
+    pub fn apply_quality(&mut self, quality: &str) {
+        let requested = parse_quality(quality).unwrap_or(QualityMode::Normal);
+        let mut budget = budget_for(requested, self.budget.device, self.refresh_hz, self.gpu);
+        if budget.mode == QualityMode::Normal {
+            budget.fps_target = initial_normal_target(self.refresh_hz, self.gpu);
+        }
+        if budget.mode == QualityMode::High {
+            budget.fps_target = HIGH_FPS_TARGET.min(ladder_at_most(self.refresh_hz));
+        }
+        budget.particle_ceiling = budget.particle_ceiling.min(self.sim.particles.len());
+        budget.particles = budget.particles.min(self.sim.particles.len());
+        self.budget = budget;
+    }
+
+    pub fn floor_rgb(&self) -> String {
+        let c = match self.voice {
+            Voice::Samantha => [0.012, 0.008, 0.004],
+            Voice::Jarvis => [0.004, 0.006, 0.016],
+        };
+        format!("{{\"r\":{},\"g\":{},\"b\":{}}}", c[0], c[1], c[2])
     }
 
     pub fn toggle_overlay(&mut self) -> bool {
@@ -116,22 +189,17 @@ impl Nebula {
 
     pub fn debug(&self) -> String {
         format!(
-            "{{\"mode\":\"{:?}\",\"pacing\":\"{:?}\",\"fps\":{},\"particles\":{},\"scale\":{},\"overlay\":{},\"supersample\":{}}}",
-            self.budget.mode, self.budget.pacing, self.budget.fps_target, self.budget.particles, self.budget.render_scale, self.overlay, self.supersample
+            "{{\"mode\":\"{:?}\",\"pacing\":\"{:?}\",\"fps\":{},\"particles\":{},\"scale\":{},\"overlay\":{},\"supersample\":{},\"device\":\"{:?}\"}}",
+            self.budget.mode, self.budget.pacing, self.budget.fps_target, self.budget.particles, self.budget.render_scale, self.overlay, self.supersample, self.budget.device
         )
     }
 }
 
-fn device_from_css(w: f32, h: f32) -> DeviceClass {
-    let px = w * h;
-    if px < 520_000.0 {
-        DeviceClass::Phone
-    } else if px < 1_400_000.0 {
-        DeviceClass::Laptop
-    } else {
-        DeviceClass::Desktop
-    }
+#[wasm_bindgen]
+pub fn wasm_memory() -> JsValue {
+    wasm_bindgen::memory()
 }
+
 
 impl Nebula {
     fn adapt(&mut self) {
@@ -186,6 +254,34 @@ impl Nebula {
     }
 }
 
+
+fn canvas_dpr(canvas: &HtmlCanvasElement, css_w: u32, css_h: u32) -> f32 {
+    if let Some(raw) = canvas.get_attribute("data-dpr") {
+        if let Ok(value) = raw.parse::<f32>() {
+            if value.is_finite() && value > 0.0 {
+                return value;
+            }
+        }
+    }
+    let raw = web_sys::window()
+        .map(|window| window.device_pixel_ratio() as f32)
+        .unwrap_or(1.0);
+    capped_dpr(raw, css_w, css_h)
+}
+
+fn capped_dpr(raw: f32, css_w: u32, css_h: u32) -> f32 {
+    let raw = if raw.is_finite() && raw > 0.0 { raw } else { 1.0 };
+    let cap = if css_w.min(css_h) < 800 { 1.5 } else { 2.0 };
+    let mut dpr = raw.min(cap);
+    let area = css_w as f32 * css_h as f32;
+    // Match `chooseDpr()` in boot.js: iPhone 14 CSS size at the 1.5 cap.
+    let max_pixels = 390.0 * 844.0 * 1.5 * 1.5;
+    if area > 0.0 && area * dpr * dpr > max_pixels {
+        dpr = (max_pixels / area).sqrt().max(1.0);
+    }
+    dpr
+}
+
 fn paint_canvas(canvas: &HtmlCanvasElement, image: &crate::render::Image) {
     use wasm_bindgen::JsCast;
     canvas.set_width(image.width);
@@ -218,7 +314,7 @@ fn preview_slot(voice: &str) -> &'static std::thread::LocalKey<RefCell<Option<Ne
 pub fn preview_frame(voice: &str, canvas: &HtmlCanvasElement) {
     preview_slot(voice).with(|slot| {
         let mut slot = slot.borrow_mut();
-        let nebula = slot.get_or_insert_with(|| Nebula::new(voice, "pi", 320.0, 180.0, 30.0, false));
+        let nebula = slot.get_or_insert_with(|| Nebula::new(voice, "normal", 320.0, 180.0, 30.0, false));
         nebula.frame(33.0, canvas);
     });
 }
