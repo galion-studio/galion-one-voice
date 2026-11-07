@@ -155,6 +155,21 @@ impl PiperWorker {
         matches!(self.child.as_mut().map(|c| c.try_wait()), Some(Ok(None)))
     }
 
+    /// A write failed because the child already closed its stdin (it exited
+    /// before the first audio, the same way a missing onnxruntime library does).
+    /// `try_wait` can still report the process as running until the kernel's
+    /// exit notification lands, which makes the caller think a dead runtime is
+    /// hung. Block until the exit is collected. Kill only if it has not exited.
+    fn reap_failed_child(&mut self) {
+        self.stdin.take();
+        let Some(child) = self.child.as_mut() else { return };
+        if matches!(child.try_wait(), Ok(Some(_))) {
+            return;
+        }
+        let _ = child.kill();
+        let _ = child.wait();
+    }
+
     /// One JSON line on stdin. Does not read stdout. The ring feed calls this,
     /// then [`Self::poll_pipes`], off `Heartbeat::step`.
     pub fn write_text(&mut self, text: &str) -> Result<(), VoiceError> {
@@ -243,10 +258,19 @@ impl PiperWorker {
     pub fn synthesize_stream(&mut self, text: &str, on_pcm: &mut dyn FnMut(&[i16])) -> Result<(), VoiceError> {
         let t0 = Instant::now();
         let line = json_line_speaker(text, self.speaker_id);
-        {
-            let stdin = self.stdin.as_mut().ok_or_else(|| VoiceError::Backend("A21 piper stdin closed".into()))?;
-            stdin.write_all(line.as_bytes()).map_err(|e| VoiceError::Backend(format!("A21 piper stdin: {e}")))?;
-            stdin.flush().map_err(|e| VoiceError::Backend(format!("A21 piper stdin flush: {e}")))?;
+        let write_err = {
+            let stdin = match self.stdin.as_mut() {
+                Some(stdin) => stdin,
+                None => return Err(VoiceError::Backend("A21 piper stdin closed".into())),
+            };
+            match stdin.write_all(line.as_bytes()) {
+                Ok(()) => stdin.flush().err().map(|e| format!("A21 piper stdin flush: {e}")),
+                Err(e) => Some(format!("A21 piper stdin: {e}")),
+            }
+        };
+        if let Some(msg) = write_err {
+            self.reap_failed_child();
+            return Err(VoiceError::Backend(msg));
         }
         self.pcm_buf.clear();
         self.first_chunk_ms = None;
@@ -259,7 +283,14 @@ impl PiperWorker {
             buf.drain(..whole);
             on_pcm(&pcm);
         };
-        self.read_utterance(Duration::from_secs(60), &mut emit)?;
+        if let Err(e) = self.read_utterance(Duration::from_secs(60), &mut emit) {
+            // The child can still look alive for a moment after it closes its
+            // pipes. Collect that exit before the caller checks `is_alive`.
+            if self.is_alive() {
+                self.reap_failed_child();
+            }
+            return Err(e);
+        }
         self.first_chunk_ms = first;
         if first.is_none() {
             return Err(VoiceError::Backend(format!("A21 piper returned no PCM ({})", tail(&self.err_log))));
