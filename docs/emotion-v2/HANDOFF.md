@@ -6,11 +6,11 @@ This is a starting point for a new Grok Ultra account, not a production release.
 - Draft PR #89: 12-emotion taxonomy, branch `cursor/emotion-v2-taxonomy`, tip `d035e1c8c33de52fa73d1983b6487ba56292dfcd`.
 - Draft PR #90: per-emotion CI harness, 20 tests and a CPU stub, branch `cursor/emotion-v2-ci`, tip `d75950488aa06580d4641f84cba791d6573ebf60`.
 - Draft PR #91: dataset pipeline, 49 tests, branch `cursor/emotion-v2-dataset`, tip `ba66a37081ba54d662ca7977df8df0c4f6833e56`. It has only run with a stub tone/noise generator producing 192 clips, not real Samantha training data.
-- All three branches were confirmed on GitHub. No remote `cursor/emotion-v2-capture` branch was found at handoff time.
+- The three original branches were confirmed on GitHub. Draft PR #93 (https://github.com/galion-studio/galion-one-voice/pull/93), branch `cursor/emotion-v2-capture`, adds the capture protocol and Rust refcheck CLI (22 tests reported passing), uses the 432 Hz capture standard, and commits no audio. It is not merged.
 - The foundation specification and landscape research are included alongside this note.
 
 ## Pending
-None of these three draft PRs is merged. Continue from their branches and verify all reported test results before release.
+None of these four draft PRs is merged. Continue from their branches and verify all reported test results before release.
 PR #90's `test` gate fails on flaky `dead_default_runtime_falls_back_to_legacy`; its fix is reported only on the symphony branch / PR #87, not main. Do not alter that branch as part of this handoff.
 Samantha emotion_match remains about 0.46–0.81, below the 0.83 gate.
 The rollout gates are WER ≤1.8%, ECAPA >0.7057, and emotion_match ≥0.83. Stub tests are not evidence that these gates pass.
