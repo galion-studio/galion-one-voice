@@ -1,0 +1,23 @@
+# Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+[package]
+name = "galion-refcheck"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+publish = false
+description = "Controlled-reference capture checker for Galion Voice Emotion V2 (432 Hz standard)"
+
+[[bin]]
+name = "refcheck"
+path = "src/main.rs"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+toml = "0.8"
+# indexmap 2.14 needs edition 2024 (Rust 1.85+). Pin the 1.83-compatible line.
+indexmap = "=2.2.6"
+
+# Own workspace: the voice runtime does not build this tool.
+[workspace]
