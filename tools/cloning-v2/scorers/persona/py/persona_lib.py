@@ -15,6 +15,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from detectors import DetectorScore, decision_scores, load_detectors  # noqa: E402
+from nebula import field_for_clips  # noqa: E402
 
 ALIASES = {
     "happy": "joyful",
@@ -244,6 +245,8 @@ def emotion_match(
         "angry", "disgusted", "fearful", "happy", "neutral",
         "other", "sad", "surprised", "unknown",
     ),
+    nebula_reference: Mapping[str, Any] | Sequence[Mapping[str, Any]] | None = None,
+    nebula_reference_recs: Sequence[Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Persona-aware blend: only judged emotions enter category_blend.
 
@@ -253,6 +256,12 @@ def emotion_match(
       score_C = 0.55*max_i match_i + 0.45*mean_i match_i
       category_blend = Σ strength_C · score_C / Σ strength_C   over in-set C
       emotion_match = 0.70 * category_blend + 0.30 * emb_sim
+
+    ``nebula`` is an additional offline report on the twelve Emotion V2
+    emotions (plus Samantha-only seductive) and on valence/arousal/dominance.
+    It is not an input to the formula above. It does not change ``pass``
+    or the 0.83 gate. Payloads live on each clip under ``nebula``, or in
+    ``nebula_reference``. Missing payloads leave the field present and unscored.
     """
     dets = list(detectors) if detectors is not None else load_detectors()
     leaderboard = []
@@ -341,10 +350,17 @@ def emotion_match(
 
     passed = None if em is None else bool(em + 1e-12 >= persona.gate)
     leaderboard.sort(key=lambda r: -r["score"])
+    nebula = field_for_clips(
+        samantha=persona.in_set("seductive"),
+        rendered_recs=line_recs,
+        reference_recs=nebula_reference_recs,
+        reference=nebula_reference,
+    )
     return {
         "persona_id": persona.id,
         "gate": persona.gate,
         "emotion_match": em,
+        "nebula": nebula,
         "category_blend": cat_blend,
         "emb_sim": emb_sim,
         "pass": passed,
