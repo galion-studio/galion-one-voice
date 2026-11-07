@@ -1,0 +1,47 @@
+# Cloning V2 shared reference-prep default. Same file for every voice.
+# Per-voice behaviour comes only from measurements (noise floor, f99, ECAPA consistency).
+sample_rate = 24000
+
+[gate]            # denoise gate: stationary spectral gate (E-mild/noisereduce params) or time-domain expander
+enabled = true
+floor_percentile = 0.10   # noise floor = this percentile of 20 ms frame RMS
+open_above_floor_db = 8.0 # frames > floor+8 dB are fully open
+max_atten_db = 12.0       # attenuation applied at/below the floor
+min_snr_db = 45.0         # if p90/p10 frame SNR >= this, gate is skipped (already clean) - data-driven per voice
+spectral = true           # true: stationary spectral gate; false: time-domain expander below
+n_std = 1.8
+prop_decrease = 0.55
+smooth_hz = 500.0
+smooth_ms = 50.0
+
+[declick]
+enabled = true
+threshold = 0.35
+
+[trim]
+pad_s = 0.10
+
+[select]
+mode = "ecapa_consistent"  # ecapa_consistent | multiclip_windows | full
+min_seg_s = 1.5
+max_seg_s = 6.0
+pause_s = 0.20             # silence run that splits phrases
+max_gap_s = 0.30           # natural pauses kept between kept phrases are capped to this
+mad_k = 2.0                # drop phrase if cos < median - mad_k * 1.4826*MAD
+abs_floor_drop = 0.10      # ...or if cos < median - 0.10 (whichever is the larger threshold)
+min_keep_s = 10.0          # never keep less speech than this
+xfade_ms = 15.0
+ecapa_bin = "/workspace/swarm/voice-v2-sprint/cloning-v2/scorers/ecapa/target/release/galion-ecapa"
+ecapa_threads = 2
+
+[hf_shelf]        # E-mild params (hf-samantha/refs/E-mild_meta.json); applied only when input f99 < trigger
+enabled = true
+trigger_f99_hz = 3500.0
+freq_hz = 2800.0
+gain_db = 2.5
+q = 0.707
+exciter_mix = 0.08
+
+[loudness]        # BS.1770 integrated loudness + true-peak ceiling
+target_lufs = -23.0
+true_peak_dbtp = -1.0

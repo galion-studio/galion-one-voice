@@ -1,0 +1,75 @@
+{
+  "asr": "/workspace/swarm/voice-v2-sprint/repo/weights/asr/vosk-model-small-en-us-0.15",
+  "files": [
+    {
+      "del": 0,
+      "duration_s": 8.76,
+      "errors": 0,
+      "hyp": "after reviewing the quarterly report the board decided to approve the budget increase for research and development contingent on a detailed timeline being delivered by next friday",
+      "ins": 0,
+      "ms": 1215.0,
+      "n_ref_words": 27,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/hf-samantha/wav/own-samantha-v2-hf-b-shelf/t09.wav",
+      "sub": 0,
+      "wer": 0.0,
+      "wer_raw": 0.0
+    },
+    {
+      "del": 0,
+      "duration_s": 5.6,
+      "errors": 1,
+      "hyp": "call me back at five five five zero one two three extension for seven",
+      "ins": 0,
+      "ms": 785.9,
+      "n_ref_words": 14,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/hf-samantha/wav/own-samantha-v2-hf-b-shelf/t10.wav",
+      "sub": 1,
+      "wer": 0.071,
+      "wer_raw": 0.071429
+    },
+    {
+      "del": 0,
+      "duration_s": 8.52,
+      "errors": 0,
+      "hyp": "the package has tracking number one two three four five six seven eight nine and it should arrive between the twelfth and the fourteenth of november",
+      "ins": 0,
+      "ms": 1042.4,
+      "n_ref_words": 26,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/hf-samantha/wav/own-samantha-v2-hf-b-shelf/t11.wav",
+      "sub": 0,
+      "wer": 0.0,
+      "wer_raw": 0.0
+    },
+    {
+      "del": 0,
+      "duration_s": 5.68,
+      "errors": 2,
+      "hyp": "he let me think about that for a second yes i believe we can move the appointment a half past two",
+      "ins": 0,
+      "ms": 833.5,
+      "n_ref_words": 21,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/hf-samantha/wav/own-samantha-v2-hf-b-shelf/t12.wav",
+      "sub": 2,
+      "wer": 0.095,
+      "wer_raw": 0.095238
+    }
+  ],
+  "normalisation": "wer_t648.py: lower, [^a-z' ]->space, split",
+  "summary": {
+    "frac_le_10pct": 1.0,
+    "max": 0.095,
+    "mean": 0.041,
+    "mean_raw": 0.04167,
+    "min": 0.0,
+    "n": 4,
+    "sd": 0.042
+  },
+  "timing": {
+    "audio_s": 28.56,
+    "jobs": 2,
+    "load_s": 0.254,
+    "rtf": 0.0717,
+    "score_s": 2.049
+  },
+  "tool": "galion-wer"
+}

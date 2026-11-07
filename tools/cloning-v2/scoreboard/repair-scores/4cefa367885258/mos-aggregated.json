@@ -1,0 +1,129 @@
+{
+  "files": [
+    {
+      "duration_s": 5.0,
+      "mos": 3.6408,
+      "ms": 862.9,
+      "path": "/workspace/samples/v2/pipeline/samantha/t01-hygiene-only.wav",
+      "pesq": 4.0873,
+      "si_sdr": 31.3423,
+      "stoi": 0.9988,
+      "file": "/workspace/samples/v2/pipeline/samantha/t01-hygiene-only.wav"
+    },
+    {
+      "duration_s": 3.8,
+      "mos": 3.6834,
+      "ms": 585.3,
+      "path": "/workspace/samples/v2/pipeline/samantha/t02-hygiene-only.wav",
+      "pesq": 3.4757,
+      "si_sdr": 22.5585,
+      "stoi": 0.9944,
+      "file": "/workspace/samples/v2/pipeline/samantha/t02-hygiene-only.wav"
+    },
+    {
+      "duration_s": 3.24,
+      "mos": 3.481,
+      "ms": 488.3,
+      "path": "/workspace/samples/v2/pipeline/samantha/t03-hygiene-only.wav",
+      "pesq": 3.9475,
+      "si_sdr": 29.5303,
+      "stoi": 0.9984,
+      "file": "/workspace/samples/v2/pipeline/samantha/t03-hygiene-only.wav"
+    },
+    {
+      "duration_s": 2.68,
+      "mos": 3.4004,
+      "ms": 421.3,
+      "path": "/workspace/samples/v2/pipeline/samantha/t04-hygiene-only.wav",
+      "pesq": 3.6871,
+      "si_sdr": 26.7457,
+      "stoi": 0.9915,
+      "file": "/workspace/samples/v2/pipeline/samantha/t04-hygiene-only.wav"
+    },
+    {
+      "duration_s": 3.08,
+      "mos": 4.3045,
+      "ms": 487.8,
+      "path": "/workspace/samples/v2/pipeline/samantha/t05-hygiene-only.wav",
+      "pesq": 3.9021,
+      "si_sdr": 29.4878,
+      "stoi": 0.9963,
+      "file": "/workspace/samples/v2/pipeline/samantha/t05-hygiene-only.wav"
+    },
+    {
+      "duration_s": 3.76,
+      "mos": 3.6443,
+      "ms": 601.6,
+      "path": "/workspace/samples/v2/pipeline/samantha/t06-hygiene-only.wav",
+      "pesq": 3.8115,
+      "si_sdr": 28.177,
+      "stoi": 0.9987,
+      "file": "/workspace/samples/v2/pipeline/samantha/t06-hygiene-only.wav"
+    },
+    {
+      "duration_s": 3.84,
+      "mos": 3.7074,
+      "ms": 612.8,
+      "path": "/workspace/samples/v2/pipeline/samantha/t07-hygiene-only.wav",
+      "pesq": 3.7047,
+      "si_sdr": 28.7059,
+      "stoi": 0.9973,
+      "file": "/workspace/samples/v2/pipeline/samantha/t07-hygiene-only.wav"
+    },
+    {
+      "duration_s": 8.04,
+      "mos": 3.7795,
+      "ms": 1925.6,
+      "path": "/workspace/samples/v2/pipeline/samantha/t08-hygiene-only.wav",
+      "pesq": 4.0323,
+      "si_sdr": 29.7789,
+      "stoi": 0.9991,
+      "file": "/workspace/samples/v2/pipeline/samantha/t08-hygiene-only.wav"
+    },
+    {
+      "duration_s": 8.76,
+      "mos": 3.7942,
+      "ms": 2235.8,
+      "path": "/workspace/samples/v2/pipeline/samantha/t09-hygiene-only.wav",
+      "pesq": 4.2378,
+      "si_sdr": 29.0953,
+      "stoi": 0.9989,
+      "file": "/workspace/samples/v2/pipeline/samantha/t09-hygiene-only.wav"
+    },
+    {
+      "duration_s": 5.72,
+      "mos": 3.8672,
+      "ms": 971.7,
+      "path": "/workspace/samples/v2/pipeline/samantha/t10-hygiene-only.wav",
+      "pesq": 4.0162,
+      "si_sdr": 31.0984,
+      "stoi": 0.9979,
+      "file": "/workspace/samples/v2/pipeline/samantha/t10-hygiene-only.wav"
+    },
+    {
+      "duration_s": 8.08,
+      "mos": 3.7575,
+      "ms": 1985.5,
+      "path": "/workspace/samples/v2/pipeline/samantha/t11-hygiene-only.wav",
+      "pesq": 4.068,
+      "si_sdr": 30.0807,
+      "stoi": 0.9989,
+      "file": "/workspace/samples/v2/pipeline/samantha/t11-hygiene-only.wav"
+    },
+    {
+      "duration_s": 6.0,
+      "mos": 3.8861,
+      "ms": 1126.1,
+      "path": "/workspace/samples/v2/pipeline/samantha/t12-hygiene-only.wav",
+      "pesq": 3.9774,
+      "si_sdr": 30.5704,
+      "stoi": 0.9991,
+      "file": "/workspace/samples/v2/pipeline/samantha/t12-hygiene-only.wav"
+    }
+  ],
+  "provenance": [
+    "/workspace/swarm/voice-v2-sprint/cloning-v2/scoreboard/repair-scores/4cefa367885258-4cefa3/mos.json"
+  ],
+  "aggregation": "select original Rust per-file scores by identical WAV path; no Python metric computation",
+  "nmr": "/workspace/swarm/voice-v2-sprint/clip-store-own/jarvis/reference.wav"
+}

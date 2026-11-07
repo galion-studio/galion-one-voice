@@ -1,0 +1,122 @@
+{
+  "categories": [
+    {
+      "best_window_id": null,
+      "best_window_path": null,
+      "best_window_span": null,
+      "category": "joyful",
+      "present": false,
+      "source": "trained class (emotion2vec+)",
+      "strength": 0.000019109384084003977
+    },
+    {
+      "best_window_id": null,
+      "best_window_path": null,
+      "best_window_span": null,
+      "category": "aggressive",
+      "present": false,
+      "source": "trained class (emotion2vec+)",
+      "strength": 3.867121733946988e-7
+    },
+    {
+      "best_window_id": null,
+      "best_window_path": null,
+      "best_window_span": null,
+      "category": "disgust",
+      "present": false,
+      "source": "trained class (emotion2vec+)",
+      "strength": 4.866391378754997e-8
+    },
+    {
+      "best_window_id": null,
+      "best_window_path": null,
+      "best_window_span": null,
+      "category": "fear",
+      "present": false,
+      "source": "trained class (emotion2vec+)",
+      "strength": 4.301395861716628e-8
+    },
+    {
+      "best_window_id": null,
+      "best_window_path": null,
+      "best_window_span": null,
+      "category": "sad",
+      "present": false,
+      "source": "trained class (emotion2vec+)",
+      "strength": 6.123056550677575e-7
+    },
+    {
+      "best_window_id": "w00",
+      "best_window_path": "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/missing-emotion-targets/runs/own-jarvis/windows/w00_0.000_2.500.wav",
+      "best_window_span": "0.000-2.500",
+      "category": "neutral",
+      "present": true,
+      "source": "trained class (emotion2vec+)",
+      "strength": 1.0
+    },
+    {
+      "best_window_id": null,
+      "best_window_path": null,
+      "best_window_span": null,
+      "category": "surprise",
+      "present": false,
+      "source": "trained class (emotion2vec+)",
+      "strength": 5.437885874925996e-8
+    },
+    {
+      "best_window_id": null,
+      "best_window_path": null,
+      "best_window_span": null,
+      "category": "love",
+      "present": false,
+      "source": "zero-shot text prompt (CLAP)",
+      "strength": 0.07858831804582597
+    },
+    {
+      "best_window_id": null,
+      "best_window_path": null,
+      "best_window_span": null,
+      "category": "seductive",
+      "present": false,
+      "source": "zero-shot text prompt (CLAP)",
+      "strength": 0.040377384454186774
+    },
+    {
+      "best_window_id": "w01",
+      "best_window_path": "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/missing-emotion-targets/runs/own-jarvis/windows/w01_2.500_5.000.wav",
+      "best_window_span": "2.500-5.000",
+      "category": "yelling",
+      "present": true,
+      "source": "efficientat",
+      "strength": 0.8217737674713135
+    },
+    {
+      "best_window_id": null,
+      "best_window_path": null,
+      "best_window_span": null,
+      "category": "crying",
+      "present": false,
+      "source": "efficientat",
+      "strength": 0.113712877035141
+    },
+    {
+      "best_window_id": null,
+      "best_window_path": null,
+      "best_window_span": null,
+      "category": "laughter",
+      "present": false,
+      "source": "efficientat",
+      "strength": 0.12559571862220764
+    },
+    {
+      "best_window_id": "w03",
+      "best_window_path": "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/missing-emotion-targets/runs/own-jarvis/windows/w03_7.500_10.000.wav",
+      "best_window_span": "7.500-10.000",
+      "category": "logic",
+      "present": true,
+      "source": "zero-shot text prompt (CLAP)",
+      "strength": 0.8240682595995334
+    }
+  ],
+  "presence_floor": 0.2
+}

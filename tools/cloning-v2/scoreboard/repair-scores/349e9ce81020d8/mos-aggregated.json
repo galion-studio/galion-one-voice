@@ -1,0 +1,129 @@
+{
+  "files": [
+    {
+      "duration_s": 5.862,
+      "mos": 4.2849,
+      "ms": 1212.3,
+      "path": "/workspace/samples/v2/pipeline/samantha/t01-hygiene-pace.wav",
+      "pesq": 3.749,
+      "si_sdr": 24.9364,
+      "stoi": 0.987,
+      "file": "/workspace/samples/v2/pipeline/samantha/t01-hygiene-pace.wav"
+    },
+    {
+      "duration_s": 4.457,
+      "mos": 4.4859,
+      "ms": 723.5,
+      "path": "/workspace/samples/v2/pipeline/samantha/t02-hygiene-pace.wav",
+      "pesq": 2.8662,
+      "si_sdr": 18.5187,
+      "stoi": 0.969,
+      "file": "/workspace/samples/v2/pipeline/samantha/t02-hygiene-pace.wav"
+    },
+    {
+      "duration_s": 3.793,
+      "mos": 4.4049,
+      "ms": 654.2,
+      "path": "/workspace/samples/v2/pipeline/samantha/t03-hygiene-pace.wav",
+      "pesq": 3.4047,
+      "si_sdr": 18.2198,
+      "stoi": 0.9737,
+      "file": "/workspace/samples/v2/pipeline/samantha/t03-hygiene-pace.wav"
+    },
+    {
+      "duration_s": 3.141,
+      "mos": 4.4603,
+      "ms": 490.3,
+      "path": "/workspace/samples/v2/pipeline/samantha/t04-hygiene-pace.wav",
+      "pesq": 3.3891,
+      "si_sdr": 24.1504,
+      "stoi": 0.9732,
+      "file": "/workspace/samples/v2/pipeline/samantha/t04-hygiene-pace.wav"
+    },
+    {
+      "duration_s": 3.605,
+      "mos": 4.4785,
+      "ms": 583.2,
+      "path": "/workspace/samples/v2/pipeline/samantha/t05-hygiene-pace.wav",
+      "pesq": 3.65,
+      "si_sdr": 18.2699,
+      "stoi": 0.9703,
+      "file": "/workspace/samples/v2/pipeline/samantha/t05-hygiene-pace.wav"
+    },
+    {
+      "duration_s": 4.407,
+      "mos": 4.439,
+      "ms": 797.4,
+      "path": "/workspace/samples/v2/pipeline/samantha/t06-hygiene-pace.wav",
+      "pesq": 3.3745,
+      "si_sdr": 18.0495,
+      "stoi": 0.966,
+      "file": "/workspace/samples/v2/pipeline/samantha/t06-hygiene-pace.wav"
+    },
+    {
+      "duration_s": 4.508,
+      "mos": 4.445,
+      "ms": 965.0,
+      "path": "/workspace/samples/v2/pipeline/samantha/t07-hygiene-pace.wav",
+      "pesq": 3.3499,
+      "si_sdr": 20.4612,
+      "stoi": 0.977,
+      "file": "/workspace/samples/v2/pipeline/samantha/t07-hygiene-pace.wav"
+    },
+    {
+      "duration_s": 9.436,
+      "mos": 4.4665,
+      "ms": 2699.2,
+      "path": "/workspace/samples/v2/pipeline/samantha/t08-hygiene-pace.wav",
+      "pesq": 3.6757,
+      "si_sdr": 19.3127,
+      "stoi": 0.9799,
+      "file": "/workspace/samples/v2/pipeline/samantha/t08-hygiene-pace.wav"
+    },
+    {
+      "duration_s": 10.289,
+      "mos": 4.4752,
+      "ms": 3136.2,
+      "path": "/workspace/samples/v2/pipeline/samantha/t09-hygiene-pace.wav",
+      "pesq": 3.363,
+      "si_sdr": 22.2715,
+      "stoi": 0.9814,
+      "file": "/workspace/samples/v2/pipeline/samantha/t09-hygiene-pace.wav"
+    },
+    {
+      "duration_s": 6.715,
+      "mos": 4.4499,
+      "ms": 1672.3,
+      "path": "/workspace/samples/v2/pipeline/samantha/t10-hygiene-pace.wav",
+      "pesq": 3.5159,
+      "si_sdr": 23.0775,
+      "stoi": 0.9772,
+      "file": "/workspace/samples/v2/pipeline/samantha/t10-hygiene-pace.wav"
+    },
+    {
+      "duration_s": 9.487,
+      "mos": 4.4666,
+      "ms": 2315.2,
+      "path": "/workspace/samples/v2/pipeline/samantha/t11-hygiene-pace.wav",
+      "pesq": 3.4178,
+      "si_sdr": 18.9405,
+      "stoi": 0.9768,
+      "file": "/workspace/samples/v2/pipeline/samantha/t11-hygiene-pace.wav"
+    },
+    {
+      "duration_s": 7.041,
+      "mos": 4.4609,
+      "ms": 1682.2,
+      "path": "/workspace/samples/v2/pipeline/samantha/t12-hygiene-pace.wav",
+      "pesq": 3.3183,
+      "si_sdr": 20.644,
+      "stoi": 0.9766,
+      "file": "/workspace/samples/v2/pipeline/samantha/t12-hygiene-pace.wav"
+    }
+  ],
+  "provenance": [
+    "/workspace/swarm/voice-v2-sprint/cloning-v2/scoreboard/repair-scores/349e9ce81020d8-349e9c/mos.json"
+  ],
+  "aggregation": "select original Rust per-file scores by identical WAV path; no Python metric computation",
+  "nmr": "/workspace/swarm/voice-v2-sprint/clip-store-own/jarvis/reference.wav"
+}

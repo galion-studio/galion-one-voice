@@ -1,0 +1,71 @@
+{
+  "baseline": false,
+  "board_wall_s": 2.22,
+  "builtin_rust": {
+    "hygiene": {
+      "max_true_peak_dbtp": 0.17,
+      "mean_f99_hz": 3080.0,
+      "total_clicks": 0,
+      "total_clips": 13
+    },
+    "n_clips": 12,
+    "prosody": {
+      "clone_energy_dr_db": 41.31,
+      "clone_f0_median_hz": 192.1,
+      "clone_f0_sd_st": 6.58,
+      "clone_rate_wps": 3.5,
+      "delta_energy_dr_db": 5.15,
+      "delta_f0_hz": 19.43,
+      "delta_f0_sd_st": 0.26,
+      "ref_energy_dr_db": 36.16,
+      "ref_f0_median_hz": 172.66,
+      "ref_f0_sd_st": 6.32,
+      "ref_f99_hz": 2813.0
+    }
+  },
+  "generation": {
+    "cpu_s": null,
+    "note": "no timing.json emitted by generator",
+    "rtf": null
+  },
+  "metrics": {
+    "articulation": {
+      "bin": "/workspace/swarm/voice-v2-sprint/cloning-v2/scorers/articulation/galion-artic/target/release/galion-artic",
+      "error": "scorer ran but produced no parseable JSON",
+      "source": "rust"
+    },
+    "similarity": {
+      "bin": "/workspace/swarm/voice-v2-sprint/cloning-v2/scorers/ecapa/target/release/galion-ecapa",
+      "error": "scorer ran but produced no parseable JSON",
+      "source": "rust"
+    }
+  },
+  "persona": {
+    "emotion": "pending",
+    "hf": {
+      "baseline_f99_hz": 2612,
+      "dist_hz": -920.0,
+      "f99_hz": 3080.0,
+      "target_hz": 4000
+    },
+    "mouth": {
+      "bin": "/workspace/swarm/voice-v2-sprint/cloning-v2/scorers/articulation/galion-artic/target/release/galion-artic",
+      "error": "scorer ran but produced no parseable JSON",
+      "source": "rust"
+    },
+    "pace": {
+      "clone_wps": 3.5,
+      "dist_wps": 0.68,
+      "target_wps": 2.82
+    },
+    "pitch": {
+      "clone_hz": 192.1,
+      "dist_hz": 14.1,
+      "target_hz": 178.0
+    }
+  },
+  "reference": "/workspace/swarm/voice-v2-sprint/cloning-v2/similarity/inputs/samantha-reference.wav",
+  "speaker": "samantha",
+  "voice": "own-samantha-v2-hf-a-clean",
+  "wav_dir": "/workspace/swarm/voice-v2-sprint/cloning-v2/hf-samantha/wav/own-samantha-v2-hf-a-clean"
+}

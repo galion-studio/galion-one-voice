@@ -1,0 +1,14 @@
+tag              n  ecapa   emo_d   avd_d   A      V      D     labels           pass
+jar_old           4 0.7458 0.4786 0.2245 0.511 0.503 0.594 {'neu': 4}       BASE
+jd_m1_ln          4 0.7326 0.5528 0.2362 0.506 0.494 0.587 {'hap': 2, 'neu': 2} ecapa_fail
+jd_m2_warm        4 0.7353 0.4452 0.2259 0.512 0.500 0.594 {'hap': 1, 'neu': 3} ecapa_fail
+jd_m3_sim         4 0.7506 0.4822 0.2376 0.506 0.489 0.591 {'hap': 1, 'neu': 3} emo_fail
+jd_m4_simc        4 0.7472 0.5128 0.2274 0.500 0.505 0.587 {'hap': 1, 'neu': 3} PASS
+jd_m5_mup         4 0.7551 0.4881 0.2384 0.515 0.487 0.598 {'hap': 1, 'neu': 3} emo_fail
+jd_m6_ln_mup      4 0.7416 0.5610 0.2479 0.506 0.477 0.589 {'hap': 1, 'neu': 3} emo_fail
+jd_m7_sim_mup     4 0.7434 0.5239 0.2478 0.494 0.483 0.588 {'hap': 1, 'neu': 3} emo_fail
+jd_m8_r2          4 0.7106 0.5221 0.2354 0.533 0.481 0.610 {'neu': 4}       ecapa_fail
+jd_m9_w8          4 0.7467 0.4225 0.2351 0.501 0.494 0.588 {'hap': 1, 'neu': 3} PASS
+jd_m10_qln        4 0.7134 0.5777 0.2308 0.505 0.499 0.587 {'hap': 1, 'neu': 3} ecapa_fail
+jd_m11_simc_w10   4 0.7469 0.4988 0.2256 0.506 0.502 0.592 {'hap': 1, 'neu': 3} emo_fail
+baseline ecapa floor 0.7358; ref valence target ~0.698

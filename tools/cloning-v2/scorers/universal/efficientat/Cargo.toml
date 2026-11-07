@@ -1,0 +1,19 @@
+[package]
+name = "galion-efficientat"
+version = "0.1.0"
+edition = "2021"
+description = "EfficientAT mn10_as AudioSet tagger (ONNX) for yelling/crying/laughter in Galion universal emotion"
+
+[[bin]]
+name = "galion-efficientat"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1"
+hound = "3.5"
+ort = { version = "2.0.0-rc.10", default-features = false, features = ["std", "load-dynamic"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[profile.release]
+opt-level = 3

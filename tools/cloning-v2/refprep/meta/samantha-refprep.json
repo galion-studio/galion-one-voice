@@ -1,0 +1,135 @@
+{
+  "config": {
+    "declick": {
+      "enabled": true,
+      "threshold": 0.3499999940395355
+    },
+    "gate": {
+      "enabled": true,
+      "floor_percentile": 0.10000000149011612,
+      "max_atten_db": 12.0,
+      "min_snr_db": 45.0,
+      "n_std": 1.8,
+      "open_above_floor_db": 8.0,
+      "prop_decrease": 0.55,
+      "smooth_hz": 500.0,
+      "smooth_ms": 50.0,
+      "spectral": true
+    },
+    "hf_shelf": {
+      "enabled": true,
+      "exciter_mix": 0.08,
+      "freq_hz": 2800.0,
+      "gain_db": 2.5,
+      "q": 0.707,
+      "trigger_f99_hz": 3500.0
+    },
+    "loudness": {
+      "target_lufs": -23.0,
+      "true_peak_dbtp": -1.0
+    },
+    "sample_rate": 24000,
+    "select": {
+      "abs_floor_drop": 0.1,
+      "ecapa_bin": "/workspace/swarm/voice-v2-sprint/cloning-v2/scorers/ecapa/target/release/galion-ecapa",
+      "ecapa_threads": 2,
+      "mad_k": 2.0,
+      "max_gap_s": 0.30000001192092896,
+      "max_seg_s": 6.0,
+      "min_keep_s": 10.0,
+      "min_seg_s": 1.5,
+      "mode": "ecapa_consistent",
+      "pause_s": 0.20000000298023224,
+      "xfade_ms": 15.0
+    },
+    "trim": {
+      "pad_s": 0.10000000149011612
+    }
+  },
+  "config_path": "configs/default.toml",
+  "elapsed_ms": 1886.7990539999998,
+  "in": {
+    "clicks": 3,
+    "duration_s": 17.407208333333333,
+    "f90_hz": 867.1875,
+    "f99_hz": 2660.15625,
+    "integrated_lufs": -20.6,
+    "pct_energy_gt_4k": 0.384,
+    "true_peak_dbtp": -1.89
+  },
+  "input": "/workspace/swarm/voice-v2-sprint/clip-store-own/samantha/original.wav",
+  "input_channels": 2,
+  "input_sr": 44100,
+  "out": {
+    "clicks": 0,
+    "duration_s": 13.965,
+    "f90_hz": 1019.53125,
+    "f99_hz": 3761.71875,
+    "integrated_lufs": -23.0,
+    "pct_energy_gt_4k": 0.921,
+    "true_peak_dbtp": -4.81
+  },
+  "output": "refs/samantha-refprep.wav",
+  "steps": {
+    "declick_fixed": 2,
+    "gate": {
+      "applied": true,
+      "frame_snr_db": 35.688194274902344,
+      "kind": "stationary_spectral",
+      "n_std": 1.8,
+      "noise_floor_dbfs": -52.05598449707031,
+      "prop_decrease": 0.55
+    },
+    "hf_shelf": {
+      "applied": true,
+      "input_f99_hz": 2660.15625,
+      "trigger_f99_hz": 3500.0
+    },
+    "highpass_hz": 60.0,
+    "loudness": {
+      "gain_db": 3.893124473763346,
+      "pre_lufs": -26.893124473763347,
+      "true_peak_limited": false
+    },
+    "select": {
+      "drop_threshold": 0.7371467776444318,
+      "ecapa_ms": 1682.461343,
+      "mad_scaled": 0.0663036506325786,
+      "median_cos": 0.869754078909589,
+      "mode": "ecapa_consistent",
+      "n_kept": 3,
+      "n_phrases": 4,
+      "phrases": [
+        {
+          "ecapa_cos_vs_full": 0.7186141206000549,
+          "end_s": 2.675,
+          "kept": false,
+          "start_s": 0.07
+        },
+        {
+          "ecapa_cos_vs_full": 0.869754078909589,
+          "end_s": 7.435,
+          "kept": true,
+          "start_s": 3.03
+        },
+        {
+          "ecapa_cos_vs_full": 0.8250328792383502,
+          "end_s": 12.855,
+          "kept": true,
+          "start_s": 7.87
+        },
+        {
+          "ecapa_cos_vs_full": 0.8877982758930776,
+          "end_s": 17.025,
+          "kept": true,
+          "start_s": 13.26
+        }
+      ]
+    },
+    "trim_s": [
+      0.0,
+      17.115
+    ]
+  },
+  "tool": "refprep 0.1.0"
+}

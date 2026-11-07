@@ -1,0 +1,40 @@
+{
+  "files": [
+    {
+      "bandwidth": {
+        "energy_frac_gt_4k": 0.05957,
+        "energy_frac_gt_8k": 0.004507,
+        "f90_hz": 1757.8,
+        "f99_hz": 7253.9,
+        "method": "welch hann nfft=2048 hop=1024 mean-detrend, channel mean"
+      },
+      "bits": 16,
+      "channels": 1,
+      "click_thr": 0.3499999940395355,
+      "clicks": 2,
+      "clip_thr": 0.9900000095367432,
+      "clipped_runs": 0,
+      "clipped_samples": 0,
+      "duration_s": 15.952,
+      "float": false,
+      "loudness": {
+        "integrated_lufs": -22.7,
+        "lra_lu": 2.87,
+        "max_momentary_lufs": -19.58,
+        "max_short_term_lufs": -21.36,
+        "note": ""
+      },
+      "max_sample_jump": 0.3549,
+      "ms": 25.03,
+      "path": "/workspace/swarm/voice-v2-sprint/clip-store-own/jarvis/reference.wav",
+      "rms_dbfs": -23.37,
+      "sample_peak_dbfs": -0.63,
+      "sr": 24000,
+      "true_peak_dbtp": -0.63
+    }
+  ],
+  "timing": {
+    "total_s": 0.0251
+  },
+  "tool": "galion-hygiene"
+}

@@ -1,0 +1,386 @@
+{
+  "class_map": {
+    "model": "Chris-Kode/efficientat-mn10-as-onnx",
+    "n_classes": 527,
+    "sample_rate": 32000,
+    "sha256": "bec20620ab8be5e41297b45845f6fb116fbe42cd4da339ad7d44f27630b7a504",
+    "states": {
+      "crying": {
+        "aggregate": "max",
+        "indices": {
+          "Crying, sobbing": 22
+        },
+        "notes": "Baby cry, infant cry (23) excluded for adult Samantha/Jarvis clone eval",
+        "source": "efficientat"
+      },
+      "laughter": {
+        "aggregate": "max over subtypes",
+        "indices": {
+          "Baby laughter": 17,
+          "Belly laugh": 20,
+          "Chuckle, chortle": 21,
+          "Giggle": 18,
+          "Laughter": 16
+        },
+        "source": "efficientat"
+      },
+      "yelling": {
+        "aggregate": "max over family, then max/mean over windows",
+        "indices": {
+          "Children shouting": 13,
+          "Screaming": 14,
+          "Shout": 8,
+          "Yell": 11
+        },
+        "source": "efficientat"
+      }
+    }
+  },
+  "files": [
+    {
+      "duration_s": 5.04,
+      "file": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-blend/global-fix/wav/samantha/t01.wav",
+      "hop_s": 1.25,
+      "model": "Chris-Kode/efficientat-mn10-as-onnx",
+      "n_windows": 3,
+      "per_class_max": {},
+      "sample_rate": 32000,
+      "source": "efficientat",
+      "states": {
+        "crying": {
+          "max": 0.17787891626358032,
+          "mean": 0.10250204801559448,
+          "source": "efficientat"
+        },
+        "laughter": {
+          "max": 0.22802799940109253,
+          "mean": 0.13757291436195374,
+          "source": "efficientat"
+        },
+        "yelling": {
+          "max": 0.9400244951248169,
+          "mean": 0.6050765514373779,
+          "source": "efficientat"
+        }
+      },
+      "window_s": 2.5
+    },
+    {
+      "duration_s": 4.28,
+      "file": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-blend/global-fix/wav/samantha/t02.wav",
+      "hop_s": 1.25,
+      "model": "Chris-Kode/efficientat-mn10-as-onnx",
+      "n_windows": 2,
+      "per_class_max": {},
+      "sample_rate": 32000,
+      "source": "efficientat",
+      "states": {
+        "crying": {
+          "max": 0.08183291554450989,
+          "mean": 0.07172451913356781,
+          "source": "efficientat"
+        },
+        "laughter": {
+          "max": 0.09665647149085999,
+          "mean": 0.08243562281131744,
+          "source": "efficientat"
+        },
+        "yelling": {
+          "max": 0.35901015996932983,
+          "mean": 0.32373857498168945,
+          "source": "efficientat"
+        }
+      },
+      "window_s": 2.5
+    },
+    {
+      "duration_s": 3.2,
+      "file": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-blend/global-fix/wav/samantha/t03.wav",
+      "hop_s": 1.25,
+      "model": "Chris-Kode/efficientat-mn10-as-onnx",
+      "n_windows": 1,
+      "per_class_max": {},
+      "sample_rate": 32000,
+      "source": "efficientat",
+      "states": {
+        "crying": {
+          "max": 0.1519325077533722,
+          "mean": 0.1519325077533722,
+          "source": "efficientat"
+        },
+        "laughter": {
+          "max": 0.2127399444580078,
+          "mean": 0.2127399444580078,
+          "source": "efficientat"
+        },
+        "yelling": {
+          "max": 0.9129129648208618,
+          "mean": 0.9129129648208618,
+          "source": "efficientat"
+        }
+      },
+      "window_s": 2.5
+    },
+    {
+      "duration_s": 2.92,
+      "file": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-blend/global-fix/wav/samantha/t04.wav",
+      "hop_s": 1.25,
+      "model": "Chris-Kode/efficientat-mn10-as-onnx",
+      "n_windows": 1,
+      "per_class_max": {},
+      "sample_rate": 32000,
+      "source": "efficientat",
+      "states": {
+        "crying": {
+          "max": 0.05224812030792236,
+          "mean": 0.05224812030792236,
+          "source": "efficientat"
+        },
+        "laughter": {
+          "max": 0.03336992859840393,
+          "mean": 0.03336992859840393,
+          "source": "efficientat"
+        },
+        "yelling": {
+          "max": 0.5863606929779053,
+          "mean": 0.5863606929779053,
+          "source": "efficientat"
+        }
+      },
+      "window_s": 2.5
+    },
+    {
+      "duration_s": 3.4,
+      "file": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-blend/global-fix/wav/samantha/t05.wav",
+      "hop_s": 1.25,
+      "model": "Chris-Kode/efficientat-mn10-as-onnx",
+      "n_windows": 1,
+      "per_class_max": {},
+      "sample_rate": 32000,
+      "source": "efficientat",
+      "states": {
+        "crying": {
+          "max": 0.04885253310203552,
+          "mean": 0.04885253310203552,
+          "source": "efficientat"
+        },
+        "laughter": {
+          "max": 0.07223096489906311,
+          "mean": 0.07223096489906311,
+          "source": "efficientat"
+        },
+        "yelling": {
+          "max": 0.5260912775993347,
+          "mean": 0.5260912775993347,
+          "source": "efficientat"
+        }
+      },
+      "window_s": 2.5
+    },
+    {
+      "duration_s": 4.2,
+      "file": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-blend/global-fix/wav/samantha/t06.wav",
+      "hop_s": 1.25,
+      "model": "Chris-Kode/efficientat-mn10-as-onnx",
+      "n_windows": 2,
+      "per_class_max": {},
+      "sample_rate": 32000,
+      "source": "efficientat",
+      "states": {
+        "crying": {
+          "max": 0.23511368036270142,
+          "mean": 0.13480977714061737,
+          "source": "efficientat"
+        },
+        "laughter": {
+          "max": 0.14081570506095886,
+          "mean": 0.1119375079870224,
+          "source": "efficientat"
+        },
+        "yelling": {
+          "max": 0.7789828777313232,
+          "mean": 0.4904634356498718,
+          "source": "efficientat"
+        }
+      },
+      "window_s": 2.5
+    },
+    {
+      "duration_s": 3.84,
+      "file": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-blend/global-fix/wav/samantha/t07.wav",
+      "hop_s": 1.25,
+      "model": "Chris-Kode/efficientat-mn10-as-onnx",
+      "n_windows": 2,
+      "per_class_max": {},
+      "sample_rate": 32000,
+      "source": "efficientat",
+      "states": {
+        "crying": {
+          "max": 0.09754198789596558,
+          "mean": 0.07951818406581879,
+          "source": "efficientat"
+        },
+        "laughter": {
+          "max": 0.11953476071357727,
+          "mean": 0.11134661734104156,
+          "source": "efficientat"
+        },
+        "yelling": {
+          "max": 0.8044742345809937,
+          "mean": 0.751677393913269,
+          "source": "efficientat"
+        }
+      },
+      "window_s": 2.5
+    },
+    {
+      "duration_s": 8.04,
+      "file": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-blend/global-fix/wav/samantha/t08.wav",
+      "hop_s": 1.25,
+      "model": "Chris-Kode/efficientat-mn10-as-onnx",
+      "n_windows": 5,
+      "per_class_max": {},
+      "sample_rate": 32000,
+      "source": "efficientat",
+      "states": {
+        "crying": {
+          "max": 0.11387068033218384,
+          "mean": 0.06731894612312317,
+          "source": "efficientat"
+        },
+        "laughter": {
+          "max": 0.11965283751487732,
+          "mean": 0.09070809185504913,
+          "source": "efficientat"
+        },
+        "yelling": {
+          "max": 0.6931831240653992,
+          "mean": 0.5534374117851257,
+          "source": "efficientat"
+        }
+      },
+      "window_s": 2.5
+    },
+    {
+      "duration_s": 9.28,
+      "file": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-blend/global-fix/wav/samantha/t09.wav",
+      "hop_s": 1.25,
+      "model": "Chris-Kode/efficientat-mn10-as-onnx",
+      "n_windows": 6,
+      "per_class_max": {},
+      "sample_rate": 32000,
+      "source": "efficientat",
+      "states": {
+        "crying": {
+          "max": 0.25823962688446045,
+          "mean": 0.1512397974729538,
+          "source": "efficientat"
+        },
+        "laughter": {
+          "max": 0.1831168830394745,
+          "mean": 0.1288694590330124,
+          "source": "efficientat"
+        },
+        "yelling": {
+          "max": 0.7967914342880249,
+          "mean": 0.445737361907959,
+          "source": "efficientat"
+        }
+      },
+      "window_s": 2.5
+    },
+    {
+      "duration_s": 5.6,
+      "file": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-blend/global-fix/wav/samantha/t10.wav",
+      "hop_s": 1.25,
+      "model": "Chris-Kode/efficientat-mn10-as-onnx",
+      "n_windows": 3,
+      "per_class_max": {},
+      "sample_rate": 32000,
+      "source": "efficientat",
+      "states": {
+        "crying": {
+          "max": 0.19319888949394226,
+          "mean": 0.09979001432657242,
+          "source": "efficientat"
+        },
+        "laughter": {
+          "max": 0.17255759239196777,
+          "mean": 0.0950603187084198,
+          "source": "efficientat"
+        },
+        "yelling": {
+          "max": 0.3753485679626465,
+          "mean": 0.286184698343277,
+          "source": "efficientat"
+        }
+      },
+      "window_s": 2.5
+    },
+    {
+      "duration_s": 8.04,
+      "file": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-blend/global-fix/wav/samantha/t11.wav",
+      "hop_s": 1.25,
+      "model": "Chris-Kode/efficientat-mn10-as-onnx",
+      "n_windows": 5,
+      "per_class_max": {},
+      "sample_rate": 32000,
+      "source": "efficientat",
+      "states": {
+        "crying": {
+          "max": 0.20414724946022034,
+          "mean": 0.12621192634105682,
+          "source": "efficientat"
+        },
+        "laughter": {
+          "max": 0.24471977353096008,
+          "mean": 0.12873044610023499,
+          "source": "efficientat"
+        },
+        "yelling": {
+          "max": 0.7875715494155884,
+          "mean": 0.4631909430027008,
+          "source": "efficientat"
+        }
+      },
+      "window_s": 2.5
+    },
+    {
+      "duration_s": 6.76,
+      "file": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-blend/global-fix/wav/samantha/t12.wav",
+      "hop_s": 1.25,
+      "model": "Chris-Kode/efficientat-mn10-as-onnx",
+      "n_windows": 4,
+      "per_class_max": {},
+      "sample_rate": 32000,
+      "source": "efficientat",
+      "states": {
+        "crying": {
+          "max": 0.21293598413467407,
+          "mean": 0.09377212822437286,
+          "source": "efficientat"
+        },
+        "laughter": {
+          "max": 0.10044491291046143,
+          "mean": 0.08225563913583755,
+          "source": "efficientat"
+        },
+        "yelling": {
+          "max": 0.6768220067024231,
+          "mean": 0.4547337591648102,
+          "source": "efficientat"
+        }
+      },
+      "window_s": 2.5
+    }
+  ],
+  "model": {
+    "attribution": "EfficientAT mn10_as © 2022 Florian Schmid; ONNX export Chris-Kode",
+    "id": "Chris-Kode/efficientat-mn10-as-onnx",
+    "licence": "MIT",
+    "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/scorers/universal/efficientat/efficientat-mn10-as.onnx",
+    "sha256": "bec20620ab8be5e41297b45845f6fb116fbe42cd4da339ad7d44f27630b7a504",
+    "url": "https://huggingface.co/Chris-Kode/efficientat-mn10-as-onnx"
+  },
+  "schema": "galion-efficientat/1"
+}

@@ -1,0 +1,25 @@
+{
+  "voice": "own-samantha-v2-blendfix-coherent",
+  "n": 12,
+  "temperature": 0,
+  "timbre_match": 0.5,
+  "selected_start_s": 4.36,
+  "ecapa": 0.7081,
+  "wer": 0.01455,
+  "mos": 3.8757,
+  "emotion_distance": 0.43725114564100903,
+  "labels": {
+    "ang": 9,
+    "hap": 1,
+    "neu": 2
+  },
+  "baseline": {
+    "ecapa": 0.7057,
+    "wer": 0.018,
+    "mos": 4.1323,
+    "emotion_distance": 0.4651
+  },
+  "gate_pass": true,
+  "promotion_recommended": false,
+  "warning": "MOS regressed; single unseeded-decoder trial; Jarvis pending"
+}

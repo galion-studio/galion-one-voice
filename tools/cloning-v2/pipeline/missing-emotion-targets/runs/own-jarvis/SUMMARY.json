@@ -1,0 +1,41 @@
+{
+  "duration_s": 15.9520625,
+  "missing": [
+    "joyful",
+    "aggressive",
+    "disgust",
+    "fear",
+    "sad",
+    "surprise",
+    "love",
+    "seductive",
+    "crying",
+    "laughter"
+  ],
+  "n_windows": 6,
+  "original": "/workspace/swarm/voice-v2-sprint/clip-store-own/jarvis/original.wav",
+  "original_sha256": "c2200b59fa78b3c98d13ac5dc7db3a6c14e802310dca73033d7770bd4b532c60",
+  "presence_floor": 0.2,
+  "present": [
+    {
+      "category": "neutral",
+      "source": "trained class (emotion2vec+)",
+      "span": "0.000-2.500",
+      "strength": 1.0
+    },
+    {
+      "category": "yelling",
+      "source": "efficientat",
+      "span": "2.500-5.000",
+      "strength": 0.8217737674713135
+    },
+    {
+      "category": "logic",
+      "source": "zero-shot text prompt (CLAP)",
+      "span": "7.500-10.000",
+      "strength": 0.8240682595995334
+    }
+  ],
+  "targets": "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/missing-emotion-targets/runs/own-jarvis/TARGETS.json",
+  "voice": "own-jarvis"
+}

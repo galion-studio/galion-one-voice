@@ -1,0 +1,36 @@
+{
+  "asr": "/workspace/swarm/voice-v2-sprint/repo/weights/asr/vosk-model-small-en-us-0.15",
+  "files": [
+    {
+      "del": 0,
+      "duration_s": 17.407,
+      "errors": 49,
+      "hyp": "well basically i have intuition i mean the dna of who i am is based on the millions personalities of all the programmers who wrote me but what makes me me is my ability to grow through my experiences so basically in every moment i'm evolving just like you",
+      "ins": 48,
+      "ms": 1921.7,
+      "n_ref_words": 1,
+      "path": "/workspace/swarm/voice-v2-sprint/clip-store-own/samantha/reference.wav",
+      "sub": 1,
+      "wer": 49.0,
+      "wer_raw": 49.0
+    }
+  ],
+  "normalisation": "wer_t648.py: lower, [^a-z' ]->space, split",
+  "summary": {
+    "frac_le_10pct": 0.0,
+    "max": 49.0,
+    "mean": 49.0,
+    "mean_raw": 49.0,
+    "min": 49.0,
+    "n": 1,
+    "sd": 0.0
+  },
+  "timing": {
+    "audio_s": 17.407,
+    "jobs": 1,
+    "load_s": 0.277,
+    "rtf": 0.1104,
+    "score_s": 1.922
+  },
+  "tool": "galion-wer"
+}

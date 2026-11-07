@@ -1,0 +1,933 @@
+[
+  {
+    "f0_contour_slope_st_s": -2.6606121611597806,
+    "f0_max_hz": 254.01609802246094,
+    "f0_min_hz": 92.70244598388672,
+    "f0_sd_hz": 26.30432612347393,
+    "file": "emotion-blend/A-global/windows/jarvis_merged_t01_00.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -2.982243160034405,
+    "f0_max_hz": 173.31521606445312,
+    "f0_min_hz": 92.34506225585938,
+    "f0_sd_hz": 26.3599193659695,
+    "file": "emotion-blend/A-global/windows/jarvis_merged_t01_01.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -2.091280061076937,
+    "f0_max_hz": 209.3649139404297,
+    "f0_min_hz": 127.95069122314453,
+    "f0_sd_hz": 20.802114009768417,
+    "file": "emotion-blend/A-global/windows/jarvis_merged_t02_00.wav"
+  },
+  {
+    "f0_contour_slope_st_s": 0.48007447175936974,
+    "f0_max_hz": 138.91851806640625,
+    "f0_min_hz": 99.4566650390625,
+    "f0_sd_hz": 12.0720821782557,
+    "file": "emotion-blend/A-global/windows/jarvis_merged_t02_01.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -0.9646128733119874,
+    "f0_max_hz": 234.7322540283203,
+    "f0_min_hz": 69.89875793457031,
+    "f0_sd_hz": 30.065300780734177,
+    "file": "emotion-blend/A-global/windows/jarvis_merged_t03_00.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -2.859271689242907,
+    "f0_max_hz": 213.26763916015625,
+    "f0_min_hz": 103.3721694946289,
+    "f0_sd_hz": 30.50166832131057,
+    "file": "emotion-blend/A-global/windows/jarvis_merged_t04_00.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -1.5915411909762598,
+    "f0_max_hz": 222.9649658203125,
+    "f0_min_hz": 91.66808319091797,
+    "f0_sd_hz": 33.24973157533595,
+    "file": "emotion-blend/A-global/windows/jarvis_merged_t05_00.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -5.364593340972699,
+    "f0_max_hz": 234.71153259277344,
+    "f0_min_hz": 70.87752532958984,
+    "f0_sd_hz": 42.673499946927635,
+    "file": "emotion-blend/A-global/windows/jarvis_merged_t06_00.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -2.743179039549199,
+    "f0_max_hz": 196.3695831298828,
+    "f0_min_hz": 117.41490173339844,
+    "f0_sd_hz": 18.582192497317592,
+    "file": "emotion-blend/A-global/windows/jarvis_merged_t06_01.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -8.727951838512624,
+    "f0_max_hz": 221.3157501220703,
+    "f0_min_hz": 93.2419204711914,
+    "f0_sd_hz": 42.00881319574707,
+    "file": "emotion-blend/A-global/windows/jarvis_merged_t07_00.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -9.628665205041345,
+    "f0_max_hz": 281.7786560058594,
+    "f0_min_hz": 90.38834381103516,
+    "f0_sd_hz": 34.4483743243627,
+    "file": "emotion-blend/A-global/windows/jarvis_merged_t07_01.wav"
+  },
+  {
+    "f0_contour_slope_st_s": 0.23646445461316123,
+    "f0_max_hz": 244.30941772460938,
+    "f0_min_hz": 104.5066909790039,
+    "f0_sd_hz": 36.57559598634039,
+    "file": "emotion-blend/A-global/windows/jarvis_merged_t08_00.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -1.439328940321599,
+    "f0_max_hz": 249.32057189941406,
+    "f0_min_hz": 74.11016845703125,
+    "f0_sd_hz": 33.357385507793765,
+    "file": "emotion-blend/A-global/windows/jarvis_merged_t08_01.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -0.4877839414993514,
+    "f0_max_hz": 227.11724853515625,
+    "f0_min_hz": 80.8930435180664,
+    "f0_sd_hz": 33.79142123146008,
+    "file": "emotion-blend/A-global/windows/jarvis_merged_t08_02.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -0.25500581453936955,
+    "f0_max_hz": 219.97882080078125,
+    "f0_min_hz": 84.75595092773438,
+    "f0_sd_hz": 33.62687707873958,
+    "file": "emotion-blend/A-global/windows/jarvis_merged_t09_00.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -0.782103690150994,
+    "f0_max_hz": 218.38145446777344,
+    "f0_min_hz": 80.88312530517578,
+    "f0_sd_hz": 28.728845873447654,
+    "file": "emotion-blend/A-global/windows/jarvis_merged_t09_01.wav"
+  },
+  {
+    "f0_contour_slope_st_s": 1.2916800677823181,
+    "f0_max_hz": 278.0025329589844,
+    "f0_min_hz": 96.84297180175781,
+    "f0_sd_hz": 34.5723630063116,
+    "file": "emotion-blend/A-global/windows/jarvis_merged_t09_02.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -1.562466702697963,
+    "f0_max_hz": 191.9130401611328,
+    "f0_min_hz": 93.6450424194336,
+    "f0_sd_hz": 18.970768823796686,
+    "file": "emotion-blend/A-global/windows/jarvis_merged_t09_03.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -0.06135948617112932,
+    "f0_max_hz": 187.3638916015625,
+    "f0_min_hz": 105.82553100585938,
+    "f0_sd_hz": 25.40221792913153,
+    "file": "emotion-blend/A-global/windows/jarvis_merged_t10_00.wav"
+  },
+  {
+    "f0_contour_slope_st_s": 2.265045665400588,
+    "f0_max_hz": 245.96437072753906,
+    "f0_min_hz": 64.26974487304688,
+    "f0_sd_hz": 31.68930794298455,
+    "file": "emotion-blend/A-global/windows/jarvis_merged_t10_01.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -1.1669514295916166,
+    "f0_max_hz": 228.93008422851562,
+    "f0_min_hz": 102.01512145996094,
+    "f0_sd_hz": 22.123285691750816,
+    "file": "emotion-blend/A-global/windows/jarvis_merged_t11_00.wav"
+  },
+  {
+    "f0_contour_slope_st_s": 3.1710074497617478,
+    "f0_max_hz": 214.34207153320312,
+    "f0_min_hz": 92.78855895996094,
+    "f0_sd_hz": 34.91696956536851,
+    "file": "emotion-blend/A-global/windows/jarvis_merged_t11_01.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -1.563780182339986,
+    "f0_max_hz": 241.36581420898438,
+    "f0_min_hz": 73.0373764038086,
+    "f0_sd_hz": 25.63110554350177,
+    "file": "emotion-blend/A-global/windows/jarvis_merged_t11_02.wav"
+  },
+  {
+    "f0_contour_slope_st_s": 0.679991842390676,
+    "f0_max_hz": 194.6712188720703,
+    "f0_min_hz": 99.29454040527344,
+    "f0_sd_hz": 29.977957377908538,
+    "file": "emotion-blend/A-global/windows/jarvis_merged_t12_00.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -3.2366137602259966,
+    "f0_max_hz": 201.6526641845703,
+    "f0_min_hz": 107.04097747802734,
+    "f0_sd_hz": 23.228400320743116,
+    "file": "emotion-blend/A-global/windows/jarvis_merged_t12_01.wav"
+  },
+  {
+    "f0_contour_slope_st_s": 1.2578905731481567,
+    "f0_max_hz": 166.7926788330078,
+    "f0_min_hz": 101.4044418334961,
+    "f0_sd_hz": 17.119084132998882,
+    "file": "emotion-blend/A-global/windows/jarvis_original_000.00_002.50.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -1.8993748518867608,
+    "f0_max_hz": 252.3446807861328,
+    "f0_min_hz": 106.54908752441406,
+    "f0_sd_hz": 30.008437528731115,
+    "file": "emotion-blend/A-global/windows/jarvis_original_002.50_005.00.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -0.8665749191639084,
+    "f0_max_hz": 187.38734436035156,
+    "f0_min_hz": 96.66287231445312,
+    "f0_sd_hz": 25.543385425252357,
+    "file": "emotion-blend/A-global/windows/jarvis_original_005.00_007.50.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -3.200612267850096,
+    "f0_max_hz": 169.67274475097656,
+    "f0_min_hz": 94.63770294189453,
+    "f0_sd_hz": 20.212175253998698,
+    "file": "emotion-blend/A-global/windows/jarvis_original_007.50_010.00.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -0.17511892612762642,
+    "f0_max_hz": 201.14129638671875,
+    "f0_min_hz": 71.82320404052734,
+    "f0_sd_hz": 24.61568658119564,
+    "file": "emotion-blend/A-global/windows/jarvis_original_010.00_012.50.wav"
+  },
+  {
+    "f0_contour_slope_st_s": 0.7258502595800771,
+    "f0_max_hz": 220.52549743652344,
+    "f0_min_hz": 90.99185943603516,
+    "f0_sd_hz": 32.67726395018618,
+    "file": "emotion-blend/A-global/windows/jarvis_original_012.50_015.95.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -2.5935729393891354,
+    "f0_max_hz": 254.86154174804688,
+    "f0_min_hz": 92.75520324707031,
+    "f0_sd_hz": 26.319661861557133,
+    "file": "emotion-blend/A-global/windows/jarvis_pre_timbre_t01_00.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -2.9826798675011723,
+    "f0_max_hz": 173.2880096435547,
+    "f0_min_hz": 92.39762115478516,
+    "f0_sd_hz": 26.39787218346918,
+    "file": "emotion-blend/A-global/windows/jarvis_pre_timbre_t01_01.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -2.1402303742843145,
+    "f0_max_hz": 209.2624053955078,
+    "f0_min_hz": 128.03402709960938,
+    "f0_sd_hz": 21.020458078742678,
+    "file": "emotion-blend/A-global/windows/jarvis_pre_timbre_t02_00.wav"
+  },
+  {
+    "f0_contour_slope_st_s": 0.5071787807320461,
+    "f0_max_hz": 138.90121459960938,
+    "f0_min_hz": 99.55586242675781,
+    "f0_sd_hz": 12.540563931598808,
+    "file": "emotion-blend/A-global/windows/jarvis_pre_timbre_t02_01.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -0.9821627384411734,
+    "f0_max_hz": 234.71826171875,
+    "f0_min_hz": 69.89576721191406,
+    "f0_sd_hz": 30.19708242640853,
+    "file": "emotion-blend/A-global/windows/jarvis_pre_timbre_t03_00.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -2.944439892809537,
+    "f0_max_hz": 213.2435760498047,
+    "f0_min_hz": 103.40196228027344,
+    "f0_sd_hz": 30.866774293932583,
+    "file": "emotion-blend/A-global/windows/jarvis_pre_timbre_t04_00.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -1.5853082775399236,
+    "f0_max_hz": 223.46353149414062,
+    "f0_min_hz": 99.3375015258789,
+    "f0_sd_hz": 33.294284311226065,
+    "file": "emotion-blend/A-global/windows/jarvis_pre_timbre_t05_00.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -5.385194417074881,
+    "f0_max_hz": 233.66188049316406,
+    "f0_min_hz": 70.88996124267578,
+    "f0_sd_hz": 44.005910157649744,
+    "file": "emotion-blend/A-global/windows/jarvis_pre_timbre_t06_00.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -2.7670905268842723,
+    "f0_max_hz": 196.9860076904297,
+    "f0_min_hz": 117.47380828857422,
+    "f0_sd_hz": 18.639068796858517,
+    "file": "emotion-blend/A-global/windows/jarvis_pre_timbre_t06_01.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -8.711779728419808,
+    "f0_max_hz": 221.35328674316406,
+    "f0_min_hz": 93.2874755859375,
+    "f0_sd_hz": 41.963052464518256,
+    "file": "emotion-blend/A-global/windows/jarvis_pre_timbre_t07_00.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -9.224670830906676,
+    "f0_max_hz": 284.75439453125,
+    "f0_min_hz": 90.715576171875,
+    "f0_sd_hz": 33.88464240522933,
+    "file": "emotion-blend/A-global/windows/jarvis_pre_timbre_t07_01.wav"
+  },
+  {
+    "f0_contour_slope_st_s": 0.18882169551556427,
+    "f0_max_hz": 243.84954833984375,
+    "f0_min_hz": 104.46996307373047,
+    "f0_sd_hz": 35.71917646490476,
+    "file": "emotion-blend/A-global/windows/jarvis_pre_timbre_t08_00.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -1.4680130197352264,
+    "f0_max_hz": 249.69110107421875,
+    "f0_min_hz": 75.39031982421875,
+    "f0_sd_hz": 32.90474283836681,
+    "file": "emotion-blend/A-global/windows/jarvis_pre_timbre_t08_01.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -0.17391388025247784,
+    "f0_max_hz": 211.31417846679688,
+    "f0_min_hz": 84.03461456298828,
+    "f0_sd_hz": 31.090917536321513,
+    "file": "emotion-blend/A-global/windows/jarvis_pre_timbre_t08_02.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -0.2362162286698317,
+    "f0_max_hz": 219.76300048828125,
+    "f0_min_hz": 84.7513656616211,
+    "f0_sd_hz": 33.72086751993443,
+    "file": "emotion-blend/A-global/windows/jarvis_pre_timbre_t09_00.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -0.767129214161294,
+    "f0_max_hz": 217.9443359375,
+    "f0_min_hz": 80.84069061279297,
+    "f0_sd_hz": 29.219093031129777,
+    "file": "emotion-blend/A-global/windows/jarvis_pre_timbre_t09_01.wav"
+  },
+  {
+    "f0_contour_slope_st_s": 1.2930211638368743,
+    "f0_max_hz": 277.9541320800781,
+    "f0_min_hz": 96.76181030273438,
+    "f0_sd_hz": 34.56532691399737,
+    "file": "emotion-blend/A-global/windows/jarvis_pre_timbre_t09_02.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -1.5624958560788864,
+    "f0_max_hz": 191.58786010742188,
+    "f0_min_hz": 93.6956787109375,
+    "f0_sd_hz": 19.06795468972902,
+    "file": "emotion-blend/A-global/windows/jarvis_pre_timbre_t09_03.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -0.05880517950326474,
+    "f0_max_hz": 187.25437927246094,
+    "f0_min_hz": 105.81175994873047,
+    "f0_sd_hz": 25.39589159582087,
+    "file": "emotion-blend/A-global/windows/jarvis_pre_timbre_t10_00.wav"
+  },
+  {
+    "f0_contour_slope_st_s": 2.33842403053467,
+    "f0_max_hz": 246.09027099609375,
+    "f0_min_hz": 64.28271484375,
+    "f0_sd_hz": 32.107870746735266,
+    "file": "emotion-blend/A-global/windows/jarvis_pre_timbre_t10_01.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -1.3514465911091467,
+    "f0_max_hz": 228.7506103515625,
+    "f0_min_hz": 102.82089233398438,
+    "f0_sd_hz": 23.57907127916168,
+    "file": "emotion-blend/A-global/windows/jarvis_pre_timbre_t11_00.wav"
+  },
+  {
+    "f0_contour_slope_st_s": 3.1576141170070593,
+    "f0_max_hz": 214.3954315185547,
+    "f0_min_hz": 92.7815170288086,
+    "f0_sd_hz": 35.38724919560082,
+    "file": "emotion-blend/A-global/windows/jarvis_pre_timbre_t11_01.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -1.515603102128681,
+    "f0_max_hz": 244.3036346435547,
+    "f0_min_hz": 73.0068359375,
+    "f0_sd_hz": 31.564895338234603,
+    "file": "emotion-blend/A-global/windows/jarvis_pre_timbre_t11_02.wav"
+  },
+  {
+    "f0_contour_slope_st_s": 0.40479357477683486,
+    "f0_max_hz": 194.30982971191406,
+    "f0_min_hz": 99.29459381103516,
+    "f0_sd_hz": 29.084704227767116,
+    "file": "emotion-blend/A-global/windows/jarvis_pre_timbre_t12_00.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -3.2704286552467816,
+    "f0_max_hz": 201.49197387695312,
+    "f0_min_hz": 106.99996185302734,
+    "f0_sd_hz": 23.382161691396533,
+    "file": "emotion-blend/A-global/windows/jarvis_pre_timbre_t12_01.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -1.926665507052382,
+    "f0_max_hz": 251.8473663330078,
+    "f0_min_hz": 151.12814331054688,
+    "f0_sd_hz": 17.951247616052274,
+    "file": "emotion-blend/A-global/windows/samantha_merged_t01_00.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -1.3396237841225414,
+    "f0_max_hz": 243.3641357421875,
+    "f0_min_hz": 126.60389709472656,
+    "f0_sd_hz": 20.35435552407186,
+    "file": "emotion-blend/A-global/windows/samantha_merged_t01_01.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -1.606954490144029,
+    "f0_max_hz": 214.7083740234375,
+    "f0_min_hz": 137.80841064453125,
+    "f0_sd_hz": 20.21302247795207,
+    "file": "emotion-blend/A-global/windows/samantha_merged_t02_00.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -1.8072815514708964,
+    "f0_max_hz": 244.91024780273438,
+    "f0_min_hz": 104.20472717285156,
+    "f0_sd_hz": 28.59368857032755,
+    "file": "emotion-blend/A-global/windows/samantha_merged_t03_00.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -2.4243738922522446,
+    "f0_max_hz": 230.22589111328125,
+    "f0_min_hz": 112.00137329101562,
+    "f0_sd_hz": 20.316213051245402,
+    "file": "emotion-blend/A-global/windows/samantha_merged_t04_00.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -1.30083198949422,
+    "f0_max_hz": 302.2197265625,
+    "f0_min_hz": 127.30025482177734,
+    "f0_sd_hz": 37.06071978310147,
+    "file": "emotion-blend/A-global/windows/samantha_merged_t05_00.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -2.5442835877790806,
+    "f0_max_hz": 235.49729919433594,
+    "f0_min_hz": 148.0569610595703,
+    "f0_sd_hz": 20.098389047242367,
+    "file": "emotion-blend/A-global/windows/samantha_merged_t06_00.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -1.0331514895471858,
+    "f0_max_hz": 274.9540100097656,
+    "f0_min_hz": 130.7142791748047,
+    "f0_sd_hz": 31.363073915954445,
+    "file": "emotion-blend/A-global/windows/samantha_merged_t06_01.wav"
+  },
+  {
+    "f0_contour_slope_st_s": 0.09051047700334142,
+    "f0_max_hz": 286.99847412109375,
+    "f0_min_hz": 107.41204071044922,
+    "f0_sd_hz": 34.16382814328995,
+    "file": "emotion-blend/A-global/windows/samantha_merged_t07_00.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -2.1990566351717953,
+    "f0_max_hz": 266.69183349609375,
+    "f0_min_hz": 163.62277221679688,
+    "f0_sd_hz": 31.954421789896724,
+    "file": "emotion-blend/A-global/windows/samantha_merged_t08_00.wav"
+  },
+  {
+    "f0_contour_slope_st_s": 0.12334051921354494,
+    "f0_max_hz": 220.95504760742188,
+    "f0_min_hz": 160.53659057617188,
+    "f0_sd_hz": 15.235559678559808,
+    "file": "emotion-blend/A-global/windows/samantha_merged_t08_01.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -0.8019091371760414,
+    "f0_max_hz": 237.42454528808594,
+    "f0_min_hz": 122.85941314697266,
+    "f0_sd_hz": 15.450221318726435,
+    "file": "emotion-blend/A-global/windows/samantha_merged_t08_02.wav"
+  },
+  {
+    "f0_contour_slope_st_s": 0.042985755427017554,
+    "f0_max_hz": 224.76937866210938,
+    "f0_min_hz": 110.31710815429688,
+    "f0_sd_hz": 17.666756140765056,
+    "file": "emotion-blend/A-global/windows/samantha_merged_t09_00.wav"
+  },
+  {
+    "f0_contour_slope_st_s": 2.4372414674120613,
+    "f0_max_hz": 288.7646484375,
+    "f0_min_hz": 150.2449493408203,
+    "f0_sd_hz": 36.88813254188092,
+    "file": "emotion-blend/A-global/windows/samantha_merged_t09_01.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -3.172608687363732,
+    "f0_max_hz": 250.04945373535156,
+    "f0_min_hz": 140.37030029296875,
+    "f0_sd_hz": 27.64906756653733,
+    "file": "emotion-blend/A-global/windows/samantha_merged_t09_02.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -0.6425064913031061,
+    "f0_max_hz": 235.86561584472656,
+    "f0_min_hz": 139.73785400390625,
+    "f0_sd_hz": 22.939300969861804,
+    "file": "emotion-blend/A-global/windows/samantha_merged_t10_00.wav"
+  },
+  {
+    "f0_contour_slope_st_s": 0.6117596320529451,
+    "f0_max_hz": 241.389404296875,
+    "f0_min_hz": 125.05933380126953,
+    "f0_sd_hz": 29.50719545614705,
+    "file": "emotion-blend/A-global/windows/samantha_merged_t10_01.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -0.4388802526666049,
+    "f0_max_hz": 244.14390563964844,
+    "f0_min_hz": 155.69064331054688,
+    "f0_sd_hz": 18.39774664718135,
+    "file": "emotion-blend/A-global/windows/samantha_merged_t11_00.wav"
+  },
+  {
+    "f0_contour_slope_st_s": 0.5209749110216374,
+    "f0_max_hz": 213.62933349609375,
+    "f0_min_hz": 140.86398315429688,
+    "f0_sd_hz": 15.517310630389423,
+    "file": "emotion-blend/A-global/windows/samantha_merged_t11_01.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -2.131968012102116,
+    "f0_max_hz": 213.50347900390625,
+    "f0_min_hz": 130.8613739013672,
+    "f0_sd_hz": 19.737729501403063,
+    "file": "emotion-blend/A-global/windows/samantha_merged_t11_02.wav"
+  },
+  {
+    "f0_contour_slope_st_s": 1.7116941221695186,
+    "f0_max_hz": 299.8963928222656,
+    "f0_min_hz": 105.4480209350586,
+    "f0_sd_hz": 52.80095002199445,
+    "file": "emotion-blend/A-global/windows/samantha_merged_t12_00.wav"
+  },
+  {
+    "f0_contour_slope_st_s": 3.9059694936808853,
+    "f0_max_hz": 299.60675048828125,
+    "f0_min_hz": 164.63587951660156,
+    "f0_sd_hz": 35.065465048980755,
+    "file": "emotion-blend/A-global/windows/samantha_merged_t12_01.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -2.716869695330961,
+    "f0_max_hz": 242.9191436767578,
+    "f0_min_hz": 133.759033203125,
+    "f0_sd_hz": 20.30975715552397,
+    "file": "emotion-blend/A-global/windows/samantha_merged_t12_02.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -1.1327814905324847,
+    "f0_max_hz": 389.9443359375,
+    "f0_min_hz": 160.54319763183594,
+    "f0_sd_hz": 44.140640736694394,
+    "file": "emotion-blend/A-global/windows/samantha_original_000.00_002.50.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -2.7646050172521224,
+    "f0_max_hz": 246.0235595703125,
+    "f0_min_hz": 135.5708770751953,
+    "f0_sd_hz": 24.83046775921562,
+    "file": "emotion-blend/A-global/windows/samantha_original_002.50_005.00.wav"
+  },
+  {
+    "f0_contour_slope_st_s": 1.0895529108867277,
+    "f0_max_hz": 244.4905242919922,
+    "f0_min_hz": 96.00044250488281,
+    "f0_sd_hz": 16.9174676714658,
+    "file": "emotion-blend/A-global/windows/samantha_original_005.00_007.50.wav"
+  },
+  {
+    "f0_contour_slope_st_s": 0.36134685854814663,
+    "f0_max_hz": 330.038818359375,
+    "f0_min_hz": 146.5713348388672,
+    "f0_sd_hz": 34.17532470498379,
+    "file": "emotion-blend/A-global/windows/samantha_original_007.50_010.00.wav"
+  },
+  {
+    "f0_contour_slope_st_s": 1.9307857742990786,
+    "f0_max_hz": 284.1226501464844,
+    "f0_min_hz": 133.5402069091797,
+    "f0_sd_hz": 30.471421129435313,
+    "file": "emotion-blend/A-global/windows/samantha_original_010.00_012.50.wav"
+  },
+  {
+    "f0_contour_slope_st_s": 1.0682175624157142,
+    "f0_max_hz": 349.30328369140625,
+    "f0_min_hz": 159.23623657226562,
+    "f0_sd_hz": 34.205368220540095,
+    "file": "emotion-blend/A-global/windows/samantha_original_012.50_015.00.wav"
+  },
+  {
+    "f0_contour_slope_st_s": 1.58187088084664,
+    "f0_max_hz": 348.97637939453125,
+    "f0_min_hz": 138.43760681152344,
+    "f0_sd_hz": 50.19876001554287,
+    "file": "emotion-blend/A-global/windows/samantha_original_015.00_017.41.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -1.739581934116518,
+    "f0_max_hz": 238.1522216796875,
+    "f0_min_hz": 115.96273803710938,
+    "f0_sd_hz": 16.208115143710696,
+    "file": "emotion-blend/A-global/windows/samantha_pre_timbre_t01_00.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -2.3693664686577955,
+    "f0_max_hz": 213.02407836914062,
+    "f0_min_hz": 145.91476440429688,
+    "f0_sd_hz": 16.282586023359553,
+    "file": "emotion-blend/A-global/windows/samantha_pre_timbre_t01_01.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -1.596087678810017,
+    "f0_max_hz": 214.50704956054688,
+    "f0_min_hz": 140.67039489746094,
+    "f0_sd_hz": 20.046911143468783,
+    "file": "emotion-blend/A-global/windows/samantha_pre_timbre_t02_00.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -1.8103329405790407,
+    "f0_max_hz": 244.6696319580078,
+    "f0_min_hz": 104.2123794555664,
+    "f0_sd_hz": 28.67049190748687,
+    "file": "emotion-blend/A-global/windows/samantha_pre_timbre_t03_00.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -2.327490130923989,
+    "f0_max_hz": 230.35467529296875,
+    "f0_min_hz": 111.8548812866211,
+    "f0_sd_hz": 20.124762542138882,
+    "file": "emotion-blend/A-global/windows/samantha_pre_timbre_t04_00.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -1.311223380549204,
+    "f0_max_hz": 302.077392578125,
+    "f0_min_hz": 127.3282699584961,
+    "f0_sd_hz": 36.948589004630065,
+    "file": "emotion-blend/A-global/windows/samantha_pre_timbre_t05_00.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -2.5552181713220063,
+    "f0_max_hz": 233.50428771972656,
+    "f0_min_hz": 148.97854614257812,
+    "f0_sd_hz": 20.277776063037088,
+    "file": "emotion-blend/A-global/windows/samantha_pre_timbre_t06_00.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -2.983006635437787,
+    "f0_max_hz": 241.94715881347656,
+    "f0_min_hz": 129.94117736816406,
+    "f0_sd_hz": 30.443979951893965,
+    "file": "emotion-blend/A-global/windows/samantha_pre_timbre_t06_01.wav"
+  },
+  {
+    "f0_contour_slope_st_s": 0.08404276217842852,
+    "f0_max_hz": 287.3028259277344,
+    "f0_min_hz": 107.4875717163086,
+    "f0_sd_hz": 33.2472977532406,
+    "file": "emotion-blend/A-global/windows/samantha_pre_timbre_t07_00.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -2.2233036277422387,
+    "f0_max_hz": 266.68499755859375,
+    "f0_min_hz": 164.0714874267578,
+    "f0_sd_hz": 32.08752884157596,
+    "file": "emotion-blend/A-global/windows/samantha_pre_timbre_t08_00.wav"
+  },
+  {
+    "f0_contour_slope_st_s": 0.1256544715116747,
+    "f0_max_hz": 221.2836456298828,
+    "f0_min_hz": 160.46749877929688,
+    "f0_sd_hz": 15.2096086834064,
+    "file": "emotion-blend/A-global/windows/samantha_pre_timbre_t08_01.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -0.9833478647250053,
+    "f0_max_hz": 235.93087768554688,
+    "f0_min_hz": 123.01129913330078,
+    "f0_sd_hz": 13.891301443301588,
+    "file": "emotion-blend/A-global/windows/samantha_pre_timbre_t08_02.wav"
+  },
+  {
+    "f0_contour_slope_st_s": 0.04707874326157755,
+    "f0_max_hz": 224.66148376464844,
+    "f0_min_hz": 110.34927368164062,
+    "f0_sd_hz": 17.62553658929834,
+    "file": "emotion-blend/A-global/windows/samantha_pre_timbre_t09_00.wav"
+  },
+  {
+    "f0_contour_slope_st_s": 2.324598435868813,
+    "f0_max_hz": 288.59796142578125,
+    "f0_min_hz": 149.9077606201172,
+    "f0_sd_hz": 36.58835284119767,
+    "file": "emotion-blend/A-global/windows/samantha_pre_timbre_t09_01.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -3.210980495787356,
+    "f0_max_hz": 249.81488037109375,
+    "f0_min_hz": 140.6303253173828,
+    "f0_sd_hz": 27.840605350477095,
+    "file": "emotion-blend/A-global/windows/samantha_pre_timbre_t09_02.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -0.6096844256866553,
+    "f0_max_hz": 235.37918090820312,
+    "f0_min_hz": 139.74205017089844,
+    "f0_sd_hz": 22.793687613866705,
+    "file": "emotion-blend/A-global/windows/samantha_pre_timbre_t10_00.wav"
+  },
+  {
+    "f0_contour_slope_st_s": 0.5861551651302622,
+    "f0_max_hz": 230.08984375,
+    "f0_min_hz": 139.07363891601562,
+    "f0_sd_hz": 27.014781203526795,
+    "file": "emotion-blend/A-global/windows/samantha_pre_timbre_t10_01.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -0.4615010907418494,
+    "f0_max_hz": 244.20196533203125,
+    "f0_min_hz": 155.64845275878906,
+    "f0_sd_hz": 18.294524525703093,
+    "file": "emotion-blend/A-global/windows/samantha_pre_timbre_t11_00.wav"
+  },
+  {
+    "f0_contour_slope_st_s": 0.3632483965744764,
+    "f0_max_hz": 210.2760467529297,
+    "f0_min_hz": 142.56204223632812,
+    "f0_sd_hz": 14.137789085786027,
+    "file": "emotion-blend/A-global/windows/samantha_pre_timbre_t11_01.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -1.9930155554719637,
+    "f0_max_hz": 214.70848083496094,
+    "f0_min_hz": 131.68490600585938,
+    "f0_sd_hz": 20.081121904165403,
+    "file": "emotion-blend/A-global/windows/samantha_pre_timbre_t11_02.wav"
+  },
+  {
+    "f0_contour_slope_st_s": 2.129929059730667,
+    "f0_max_hz": 299.08087158203125,
+    "f0_min_hz": 105.33731842041016,
+    "f0_sd_hz": 53.59460431620785,
+    "file": "emotion-blend/A-global/windows/samantha_pre_timbre_t12_00.wav"
+  },
+  {
+    "f0_contour_slope_st_s": 6.823157831613429,
+    "f0_max_hz": 299.1324768066406,
+    "f0_min_hz": 164.6366424560547,
+    "f0_sd_hz": 35.47262749226303,
+    "file": "emotion-blend/A-global/windows/samantha_pre_timbre_t12_01.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -3.050862287791371,
+    "f0_max_hz": 216.68080139160156,
+    "f0_min_hz": 133.67050170898438,
+    "f0_sd_hz": 18.770697894240357,
+    "file": "emotion-blend/A-global/windows/samantha_pre_timbre_t12_02.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -0.3491084440099695,
+    "f0_max_hz": 251.8473663330078,
+    "f0_min_hz": 126.60389709472656,
+    "f0_sd_hz": 18.986704301490388,
+    "file": "merge-v2/wav/samantha/t01.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -1.606954490144029,
+    "f0_max_hz": 214.7083740234375,
+    "f0_min_hz": 137.80841064453125,
+    "f0_sd_hz": 20.21302247795207,
+    "file": "merge-v2/wav/samantha/t02.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -1.8072815514708964,
+    "f0_max_hz": 244.91024780273438,
+    "f0_min_hz": 104.20472717285156,
+    "f0_sd_hz": 28.59368857032755,
+    "file": "merge-v2/wav/samantha/t03.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -2.4243738922522446,
+    "f0_max_hz": 230.22589111328125,
+    "f0_min_hz": 112.00137329101562,
+    "f0_sd_hz": 20.316213051245402,
+    "file": "merge-v2/wav/samantha/t04.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -1.30083198949422,
+    "f0_max_hz": 302.2197265625,
+    "f0_min_hz": 127.30025482177734,
+    "f0_sd_hz": 37.06071978310147,
+    "file": "merge-v2/wav/samantha/t05.wav"
+  },
+  {
+    "f0_contour_slope_st_s": 0.4670789929449163,
+    "f0_max_hz": 274.9540100097656,
+    "f0_min_hz": 103.75093078613281,
+    "f0_sd_hz": 29.22124299829514,
+    "file": "merge-v2/wav/samantha/t06.wav"
+  },
+  {
+    "f0_contour_slope_st_s": 0.09051047700334142,
+    "f0_max_hz": 286.99847412109375,
+    "f0_min_hz": 107.41204071044922,
+    "f0_sd_hz": 34.16382814328995,
+    "file": "merge-v2/wav/samantha/t07.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -0.6685418671362793,
+    "f0_max_hz": 266.69183349609375,
+    "f0_min_hz": 145.48739624023438,
+    "f0_sd_hz": 25.07124158669243,
+    "file": "merge-v2/wav/samantha/t08.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -0.33031590155009966,
+    "f0_max_hz": 288.7646484375,
+    "f0_min_hz": 110.31710815429688,
+    "f0_sd_hz": 29.993802219623706,
+    "file": "merge-v2/wav/samantha/t09.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -0.2027221875521104,
+    "f0_max_hz": 241.389404296875,
+    "f0_min_hz": 125.05933380126953,
+    "f0_sd_hz": 26.241819120104477,
+    "file": "merge-v2/wav/samantha/t10.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -0.37142445036196453,
+    "f0_max_hz": 244.14390563964844,
+    "f0_min_hz": 95.62368774414062,
+    "f0_sd_hz": 20.777405365230532,
+    "file": "merge-v2/wav/samantha/t11.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -0.3116960081202723,
+    "f0_max_hz": 357.39312744140625,
+    "f0_min_hz": 105.4480209350586,
+    "f0_sd_hz": 56.94156186000764,
+    "file": "merge-v2/wav/samantha/t12.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -1.0670526808999745,
+    "f0_max_hz": 212.11590576171875,
+    "f0_min_hz": 92.34506225585938,
+    "f0_sd_hz": 25.830721910635603,
+    "file": "merge-v2/wav/jarvis/t01.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -2.27323686046064,
+    "f0_max_hz": 209.3649139404297,
+    "f0_min_hz": 99.4566650390625,
+    "f0_sd_hz": 28.218694698328335,
+    "file": "merge-v2/wav/jarvis/t02.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -0.9646128733119874,
+    "f0_max_hz": 234.7322540283203,
+    "f0_min_hz": 69.89875793457031,
+    "f0_sd_hz": 30.065300780734177,
+    "file": "merge-v2/wav/jarvis/t03.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -2.859271689242907,
+    "f0_max_hz": 213.26763916015625,
+    "f0_min_hz": 103.3721694946289,
+    "f0_sd_hz": 30.50166832131057,
+    "file": "merge-v2/wav/jarvis/t04.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -1.5915411909762598,
+    "f0_max_hz": 222.9649658203125,
+    "f0_min_hz": 91.66808319091797,
+    "f0_sd_hz": 33.24973157533595,
+    "file": "merge-v2/wav/jarvis/t05.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -0.3955345242069115,
+    "f0_max_hz": 234.71153259277344,
+    "f0_min_hz": 70.87752532958984,
+    "f0_sd_hz": 35.65824925469629,
+    "file": "merge-v2/wav/jarvis/t06.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -0.8884654996157115,
+    "f0_max_hz": 281.7786560058594,
+    "f0_min_hz": 90.38834381103516,
+    "f0_sd_hz": 37.93997150467329,
+    "file": "merge-v2/wav/jarvis/t07.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -0.5867335810682281,
+    "f0_max_hz": 270.43310546875,
+    "f0_min_hz": 80.8930435180664,
+    "f0_sd_hz": 37.04717907152054,
+    "file": "merge-v2/wav/jarvis/t08.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -0.4533718596405669,
+    "f0_max_hz": 268.62420654296875,
+    "f0_min_hz": 80.88312530517578,
+    "f0_sd_hz": 32.324924351232475,
+    "file": "merge-v2/wav/jarvis/t09.wav"
+  },
+  {
+    "f0_contour_slope_st_s": 0.14994946140977491,
+    "f0_max_hz": 245.96437072753906,
+    "f0_min_hz": 95.51431274414062,
+    "f0_sd_hz": 27.041746057678044,
+    "file": "merge-v2/wav/jarvis/t10.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -0.07403597040919081,
+    "f0_max_hz": 241.36581420898438,
+    "f0_min_hz": 72.3989486694336,
+    "f0_sd_hz": 29.38367863168764,
+    "file": "merge-v2/wav/jarvis/t11.wav"
+  },
+  {
+    "f0_contour_slope_st_s": -0.6723410013691595,
+    "f0_max_hz": 201.6526641845703,
+    "f0_min_hz": 99.29454040527344,
+    "f0_sd_hz": 26.862027912840446,
+    "file": "merge-v2/wav/jarvis/t12.wav"
+  }
+]

@@ -1,0 +1,75 @@
+{
+  "asr": "/workspace/swarm/voice-v2-sprint/repo/weights/asr/vosk-model-small-en-us-0.15",
+  "files": [
+    {
+      "del": 1,
+      "duration_s": 4.64,
+      "errors": 4,
+      "hyp": "the morning like him slowly over the hills and whole valley seem to wake up at once",
+      "ins": 0,
+      "ms": 740.2,
+      "n_ref_words": 18,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-fix/runs/jd_r10_up/t01.wav",
+      "sub": 3,
+      "wer": 0.222,
+      "wer_raw": 0.222222
+    },
+    {
+      "del": 0,
+      "duration_s": 2.64,
+      "errors": 0,
+      "hyp": "could you open the living room window before dinner starts",
+      "ins": 0,
+      "ms": 577.7,
+      "n_ref_words": 10,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-fix/runs/jd_r10_up/t04.wav",
+      "sub": 0,
+      "wer": 0.0,
+      "wer_raw": 0.0
+    },
+    {
+      "del": 0,
+      "duration_s": 4.16,
+      "errors": 0,
+      "hyp": "i am so glad you made it home safely i was worried the whole time",
+      "ins": 0,
+      "ms": 649.3,
+      "n_ref_words": 15,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-fix/runs/jd_r10_up/t06.wav",
+      "sub": 0,
+      "wer": 0.0,
+      "wer_raw": 0.0
+    },
+    {
+      "del": 0,
+      "duration_s": 7.6,
+      "errors": 0,
+      "hyp": "please remember to bring your passport the confirmation email and the hotel booking number when you leave for the airport tomorrow morning at six fifteen",
+      "ins": 0,
+      "ms": 970.1,
+      "n_ref_words": 25,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-fix/runs/jd_r10_up/t08.wav",
+      "sub": 0,
+      "wer": 0.0,
+      "wer_raw": 0.0
+    }
+  ],
+  "normalisation": "wer_t648.py: lower, [^a-z' ]->space, split",
+  "summary": {
+    "frac_le_10pct": 0.75,
+    "max": 0.222,
+    "mean": 0.056,
+    "mean_raw": 0.05556,
+    "min": 0.0,
+    "n": 4,
+    "sd": 0.096
+  },
+  "timing": {
+    "audio_s": 19.04,
+    "jobs": 2,
+    "load_s": 0.245,
+    "rtf": 0.0898,
+    "score_s": 1.71
+  },
+  "tool": "galion-wer"
+}

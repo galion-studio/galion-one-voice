@@ -1,0 +1,64 @@
+{
+  "files": [
+    {
+      "del": 0,
+      "duration_s": 5.24,
+      "errors": 1,
+      "hyp": "the morning light came slowly over the hills and the whole valley seem to wake up at once",
+      "ins": 0,
+      "ms": 763.4,
+      "n_ref_words": 18,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-fix/runs/jd_m5_mup/t01.wav",
+      "sub": 1,
+      "wer": 0.056,
+      "wer_raw": 0.055556,
+      "file": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-fix/runs/jd_m5_mup/t01.wav"
+    },
+    {
+      "del": 0,
+      "duration_s": 3.12,
+      "errors": 0,
+      "hyp": "could you open the living room window before dinner starts",
+      "ins": 0,
+      "ms": 605.7,
+      "n_ref_words": 10,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-fix/runs/jd_m5_mup/t04.wav",
+      "sub": 0,
+      "wer": 0.0,
+      "wer_raw": 0.0,
+      "file": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-fix/runs/jd_m5_mup/t04.wav"
+    },
+    {
+      "del": 0,
+      "duration_s": 4.36,
+      "errors": 0,
+      "hyp": "i am so glad you made it home safely i was worried the whole time",
+      "ins": 0,
+      "ms": 667.8,
+      "n_ref_words": 15,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-fix/runs/jd_m5_mup/t06.wav",
+      "sub": 0,
+      "wer": 0.0,
+      "wer_raw": 0.0,
+      "file": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-fix/runs/jd_m5_mup/t06.wav"
+    },
+    {
+      "del": 0,
+      "duration_s": 11.8,
+      "errors": 0,
+      "hyp": "please remember to bring your passport the confirmation email and the hotel booking number when you leave for the airport tomorrow morning at six fifteen",
+      "ins": 0,
+      "ms": 1056.7,
+      "n_ref_words": 25,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-fix/runs/jd_m5_mup/t08.wav",
+      "sub": 0,
+      "wer": 0.0,
+      "wer_raw": 0.0,
+      "file": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-fix/runs/jd_m5_mup/t08.wav"
+    }
+  ],
+  "provenance": [
+    "/workspace/swarm/voice-v2-sprint/cloning-v2/scoreboard/repair-scores/873e4956a9edbc-873e49/wer.json"
+  ],
+  "aggregation": "select original Rust per-file scores by identical WAV path; no Python metric computation"
+}

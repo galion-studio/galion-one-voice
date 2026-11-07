@@ -1,0 +1,140 @@
+{
+  "files": [
+    {
+      "bandwidth": {
+        "energy_frac_gt_4k": 0.02828,
+        "energy_frac_gt_8k": 0.003551,
+        "f90_hz": 1171.9,
+        "f99_hz": 6128.9,
+        "method": "welch hann nfft=2048 hop=1024 mean-detrend, channel mean"
+      },
+      "bits": 16,
+      "channels": 1,
+      "click_thr": 0.3499999940395355,
+      "clicks": 0,
+      "clip_thr": 0.9900000095367432,
+      "clipped_runs": 0,
+      "clipped_samples": 0,
+      "duration_s": 5.08,
+      "float": false,
+      "loudness": {
+        "integrated_lufs": -21.21,
+        "lra_lu": 1.34,
+        "max_momentary_lufs": -17.5,
+        "max_short_term_lufs": -20.83,
+        "note": ""
+      },
+      "max_sample_jump": 0.2693,
+      "ms": 8.09,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-fix/runs/jd_m3_sim/t01.wav",
+      "rms_dbfs": -21.25,
+      "sample_peak_dbfs": -4.23,
+      "sr": 24000,
+      "true_peak_dbtp": -4.19,
+      "file": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-fix/runs/jd_m3_sim/t01.wav"
+    },
+    {
+      "bandwidth": {
+        "energy_frac_gt_4k": 0.0304,
+        "energy_frac_gt_8k": 0.002209,
+        "f90_hz": 1148.4,
+        "f99_hz": 5261.7,
+        "method": "welch hann nfft=2048 hop=1024 mean-detrend, channel mean"
+      },
+      "bits": 16,
+      "channels": 1,
+      "click_thr": 0.3499999940395355,
+      "clicks": 0,
+      "clip_thr": 0.9900000095367432,
+      "clipped_runs": 0,
+      "clipped_samples": 0,
+      "duration_s": 3.0,
+      "float": false,
+      "loudness": {
+        "integrated_lufs": -20.62,
+        "lra_lu": 0.0,
+        "max_momentary_lufs": -19.07,
+        "max_short_term_lufs": -20.94,
+        "note": ""
+      },
+      "max_sample_jump": 0.313,
+      "ms": 4.29,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-fix/runs/jd_m3_sim/t04.wav",
+      "rms_dbfs": -20.75,
+      "sample_peak_dbfs": -5.78,
+      "sr": 24000,
+      "true_peak_dbtp": -5.78,
+      "file": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-fix/runs/jd_m3_sim/t04.wav"
+    },
+    {
+      "bandwidth": {
+        "energy_frac_gt_4k": 0.0293,
+        "energy_frac_gt_8k": 0.003293,
+        "f90_hz": 1242.2,
+        "f99_hz": 6070.3,
+        "method": "welch hann nfft=2048 hop=1024 mean-detrend, channel mean"
+      },
+      "bits": 16,
+      "channels": 1,
+      "click_thr": 0.3499999940395355,
+      "clicks": 0,
+      "clip_thr": 0.9900000095367432,
+      "clipped_runs": 1,
+      "clipped_samples": 3,
+      "duration_s": 4.04,
+      "float": false,
+      "loudness": {
+        "integrated_lufs": -20.43,
+        "lra_lu": 0.91,
+        "max_momentary_lufs": -17.97,
+        "max_short_term_lufs": -20.47,
+        "note": ""
+      },
+      "max_sample_jump": 0.3347,
+      "ms": 5.78,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-fix/runs/jd_m3_sim/t06.wav",
+      "rms_dbfs": -20.75,
+      "sample_peak_dbfs": -0.0,
+      "sr": 24000,
+      "true_peak_dbtp": 0.07,
+      "file": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-fix/runs/jd_m3_sim/t06.wav"
+    },
+    {
+      "bandwidth": {
+        "energy_frac_gt_4k": 0.0177,
+        "energy_frac_gt_8k": 0.002013,
+        "f90_hz": 1148.4,
+        "f99_hz": 5214.8,
+        "method": "welch hann nfft=2048 hop=1024 mean-detrend, channel mean"
+      },
+      "bits": 16,
+      "channels": 1,
+      "click_thr": 0.3499999940395355,
+      "clicks": 0,
+      "clip_thr": 0.9900000095367432,
+      "clipped_runs": 0,
+      "clipped_samples": 0,
+      "duration_s": 8.36,
+      "float": false,
+      "loudness": {
+        "integrated_lufs": -21.15,
+        "lra_lu": 0.89,
+        "max_momentary_lufs": -17.47,
+        "max_short_term_lufs": -20.4,
+        "note": ""
+      },
+      "max_sample_jump": 0.3079,
+      "ms": 12.2,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-fix/runs/jd_m3_sim/t08.wav",
+      "rms_dbfs": -21.16,
+      "sample_peak_dbfs": -0.56,
+      "sr": 24000,
+      "true_peak_dbtp": -0.54,
+      "file": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-fix/runs/jd_m3_sim/t08.wav"
+    }
+  ],
+  "provenance": [
+    "/workspace/swarm/voice-v2-sprint/cloning-v2/scoreboard/repair-scores/08c59d8eebc55e-08c59d/hygiene.json"
+  ],
+  "aggregation": "select original Rust per-file scores by identical WAV path; no Python metric computation"
+}

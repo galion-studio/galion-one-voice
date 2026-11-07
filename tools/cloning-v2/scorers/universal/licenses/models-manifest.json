@@ -1,0 +1,19 @@
+{
+  "updated": "2026-11-05T23:40:00+01:00",
+  "models": [
+    {
+      "id": "Chris-Kode/efficientat-mn10-as-onnx",
+      "url": "https://huggingface.co/Chris-Kode/efficientat-mn10-as-onnx",
+      "licence": "MIT",
+      "sha256": "bec20620ab8be5e41297b45845f6fb116fbe42cd4da339ad7d44f27630b7a504",
+      "bytes": 20200590,
+      "path": "scorers/universal/efficientat/efficientat-mn10-as.onnx",
+      "role": "PRIMARY yelling/crying/laughter",
+      "attribution": "EfficientAT mn10_as \u00a9 2022 Florian Schmid; ONNX export Chris-Kode",
+      "sample_rate": 32000,
+      "n_classes": 527,
+      "runtime": "Rust ort (galion-efficientat)",
+      "binary_sha256": "2839fcc6ca982dd21890d5246cb6cb9e4374e280105178018f8e1488b77aeaca"
+    }
+  ]
+}

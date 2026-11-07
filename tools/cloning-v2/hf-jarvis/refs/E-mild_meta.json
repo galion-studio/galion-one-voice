@@ -1,0 +1,24 @@
+{
+  "steps": [
+    "denoise_stationary_prop0.55",
+    "declick_fixed=0",
+    "high_shelf_2800Hz_2.5dB",
+    "harmonic_exciter_mix=0.08",
+    "loudness_norm_target=-20.0_LUFS_tp<=-1.0"
+  ],
+  "note": "ESTIMATED mild HF: shelf 2.5dB + light exciter; denoise+declick+loudness (same as Samantha E-mild)",
+  "bw_in": {
+    "f90_hz": 1769.5,
+    "f99_hz": 7265.6,
+    "pct_energy_gt_4k": 6.01
+  },
+  "input_lufs": -28.247306881841777,
+  "bw_out": {
+    "f90_hz": 5027.3,
+    "f99_hz": 8144.5,
+    "pct_energy_gt_4k": 15.691
+  },
+  "peak_dbfs_out": -1.02,
+  "output_lufs": -22.6,
+  "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/hf-jarvis/refs/jarvis-ref-E-mild.wav"
+}

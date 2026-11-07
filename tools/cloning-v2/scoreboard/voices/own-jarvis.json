@@ -1,0 +1,124 @@
+{
+  "baseline": true,
+  "board_wall_s": 2.95,
+  "builtin_rust": {
+    "hygiene": {
+      "max_true_peak_dbtp": 0.16,
+      "mean_f99_hz": 6044.0,
+      "total_clicks": 0,
+      "total_clips": 3
+    },
+    "n_clips": 12,
+    "prosody": {
+      "clone_energy_dr_db": 35.71,
+      "clone_f0_median_hz": 138.9,
+      "clone_f0_sd_st": 6.66,
+      "clone_rate_wps": 3.31,
+      "delta_energy_dr_db": -25.35,
+      "delta_f0_hz": 13.25,
+      "delta_f0_sd_st": 0.93,
+      "ref_energy_dr_db": 61.07,
+      "ref_f0_median_hz": 125.65,
+      "ref_f0_sd_st": 5.74,
+      "ref_f99_hz": 7313.0
+    }
+  },
+  "generation": {
+    "cpu_s": null,
+    "note": "no timing.json emitted by generator",
+    "rtf": null
+  },
+  "metrics": {
+    "articulation": {
+      "bin": "/workspace/swarm/voice-v2-sprint/cloning-v2/scorers/articulation/galion-artic/target/release/galion-artic",
+      "error": "scorer ran but produced no parseable JSON",
+      "source": "rust"
+    },
+    "emotion": {
+      "label_match": "12/12",
+      "ref_top": "neu",
+      "source": "python"
+    },
+    "hygiene_ext": {
+      "artifacts": {
+        "clips_with_clicks": 8,
+        "clips_with_internal_gaps": 4,
+        "clips_with_peak_0dbfs": 1,
+        "leading_silence_s_mean": 0.062,
+        "peak_dbfs_mean": -2.05,
+        "peak_dbfs_min": -4.35,
+        "sample_rates": [
+          24000
+        ],
+        "total_clicks": 39,
+        "total_clipping_samples": 4,
+        "trailing_silence_s_mean": 0.207
+      },
+      "source": "python"
+    },
+    "mos": {
+      "ref_mos": 4.5481,
+      "source": "python",
+      "squim_mos": 4.1418
+    },
+    "prosody_py": {
+      "clone": {
+        "energy_dyn_range_db": 10.0,
+        "f0_median_hz": 143.3,
+        "f0_range_st": 14.53,
+        "f0_sd_st": 3.58,
+        "speaking_rate_wps": 3.311
+      },
+      "ref": {
+        "duration_s": 15.952,
+        "energy_dyn_range_db": 13.24,
+        "energy_sd_db": 6.46,
+        "f0_median_hz": 128.6,
+        "f0_range_st": 14.8,
+        "f0_sd_st": 3.31,
+        "n_words_asr": 42,
+        "pause_count": 6,
+        "pause_mean_s": 0.434,
+        "speaking_rate_wps": 2.633
+      },
+      "source": "python"
+    },
+    "similarity": {
+      "bin": "/workspace/swarm/voice-v2-sprint/cloning-v2/scorers/ecapa/target/release/galion-ecapa",
+      "error": "scorer ran but produced no parseable JSON",
+      "source": "rust"
+    },
+    "wer": {
+      "source": "python",
+      "wer_mean": 0.018
+    }
+  },
+  "persona": {
+    "emotion": {
+      "label_match": "12/12",
+      "result": null,
+      "source": "python",
+      "target": "calm/neutral"
+    },
+    "hf": "n/a (not Jarvis's limit)",
+    "mouth": {
+      "bin": "/workspace/swarm/voice-v2-sprint/cloning-v2/scorers/articulation/galion-artic/target/release/galion-artic",
+      "error": "scorer ran but produced no parseable JSON",
+      "source": "rust"
+    },
+    "pace": {
+      "clone_wps": 3.31,
+      "dist_wps": 0.68,
+      "target_wps": 2.63
+    },
+    "pitch": {
+      "clone_hz": 138.9,
+      "dist_hz": 9.9,
+      "target_hz": 129.0
+    }
+  },
+  "reference": "/workspace/swarm/voice-v2-sprint/cloning-v2/similarity/inputs/jarvis-reference.wav",
+  "speaker": "jarvis",
+  "voice": "own-jarvis",
+  "wav_dir": "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/jarvis"
+}

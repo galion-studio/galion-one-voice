@@ -1,0 +1,71 @@
+{
+  "files": [
+    {
+      "duration_s": 4.48,
+      "mos": 4.1558,
+      "ms": 827.7,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-fix/runs/jd_m8_r2/t01.wav",
+      "pesq": 3.9992,
+      "si_sdr": 25.3833,
+      "stoi": 0.9932
+    },
+    {
+      "duration_s": 3.0,
+      "mos": 4.3736,
+      "ms": 508.4,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-fix/runs/jd_m8_r2/t04.wav",
+      "pesq": 4.1247,
+      "si_sdr": 28.4981,
+      "stoi": 0.997
+    },
+    {
+      "duration_s": 3.88,
+      "mos": 4.3477,
+      "ms": 651.9,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-fix/runs/jd_m8_r2/t06.wav",
+      "pesq": 4.0292,
+      "si_sdr": 27.3636,
+      "stoi": 0.9965
+    },
+    {
+      "duration_s": 7.6,
+      "mos": 4.4081,
+      "ms": 1721.4,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-fix/runs/jd_m8_r2/t08.wav",
+      "pesq": 3.9704,
+      "si_sdr": 19.5547,
+      "stoi": 0.9957
+    }
+  ],
+  "metric": "torchaudio SQUIM_SUBJECTIVE (NORESQA-MOS) + SQUIM_OBJECTIVE, ONNX fp32",
+  "nmr": "/workspace/swarm/voice-v2-sprint/clip-store-own/samantha/reference.wav",
+  "summary": {
+    "mos": {
+      "mean": 4.3213,
+      "n": 4,
+      "sd": 0.0979
+    },
+    "pesq": {
+      "mean": 4.0309,
+      "n": 4,
+      "sd": 0.058
+    },
+    "si_sdr": {
+      "mean": 25.1999,
+      "n": 4,
+      "sd": 3.4446
+    },
+    "stoi": {
+      "mean": 0.9956,
+      "n": 4,
+      "sd": 0.0015
+    }
+  },
+  "threads": 2,
+  "timing": {
+    "load_s": 1.232,
+    "peak_rss_mb": 878.7,
+    "score_s": 3.709
+  },
+  "tool": "galion-mos"
+}

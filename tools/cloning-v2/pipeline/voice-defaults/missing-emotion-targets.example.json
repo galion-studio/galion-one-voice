@@ -1,0 +1,6 @@
+{
+  "missing_emotion_targets": {
+    "enabled": true
+  },
+  "_note": "Example only. Copy fields into a NEW candidate voice-defaults/<name>.json after approval. Default remains off. Do not write this into own-samantha.json or own-jarvis.json without an explicit yes."
+}

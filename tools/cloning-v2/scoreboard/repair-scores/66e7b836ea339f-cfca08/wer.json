@@ -1,0 +1,36 @@
+{
+  "asr": "/workspace/swarm/voice-v2-sprint/repo/weights/asr/vosk-model-small-en-us-0.15",
+  "files": [
+    {
+      "del": 0,
+      "duration_s": 8.76,
+      "errors": 0,
+      "hyp": "after reviewing the quarterly report the board decided to approve the budget increase for research and development contingent on a detailed timeline being delivered by next friday",
+      "ins": 0,
+      "ms": 1146.2,
+      "n_ref_words": 27,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/hf-samantha/wav/own-samantha-v2-hf-b-shelf/t09.wav",
+      "sub": 0,
+      "wer": 0.0,
+      "wer_raw": 0.0
+    }
+  ],
+  "normalisation": "wer_t648.py: lower, [^a-z' ]->space, split",
+  "summary": {
+    "frac_le_10pct": 1.0,
+    "max": 0.0,
+    "mean": 0.0,
+    "mean_raw": 0.0,
+    "min": 0.0,
+    "n": 1,
+    "sd": 0.0
+  },
+  "timing": {
+    "audio_s": 8.76,
+    "jobs": 2,
+    "load_s": 0.251,
+    "rtf": 0.1309,
+    "score_s": 1.146
+  },
+  "tool": "galion-wer"
+}

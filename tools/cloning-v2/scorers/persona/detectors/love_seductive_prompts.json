@@ -1,0 +1,91 @@
+{
+  "version": 1,
+  "notes": "Gender-conditioned CLAP prompt banks for love and seductive. Old universal prompts are included under *_old for before/after comparison. Contrast banks are ordinary/neutral speech and joyful speech, not scored as target emotions.",
+  "love_old": [
+    "a tender loving voice",
+    "a warm affectionate speaking voice",
+    "someone speaking with love and care"
+  ],
+  "seductive_old": [
+    "a seductive flirtatious voice",
+    "a soft sensual speaking voice",
+    "someone speaking in a seductive tone"
+  ],
+  "love_shared": [
+    "a tender loving voice",
+    "a warm affectionate speaking voice",
+    "someone speaking with love and care",
+    "an intimate loving speaking voice",
+    "a soft whispered loving voice",
+    "someone whispering words of love",
+    "a whispered affectionate voice"
+  ],
+  "love_male": [
+    "a man speaking with love and affection",
+    "a tender male voice speaking lovingly",
+    "a warm male voice saying I love you",
+    "a low gentle male voice full of love",
+    "a man speaking tenderly to someone he loves",
+    "an intimate loving male speaking voice",
+    "a soft spoken man expressing love",
+    "a man whispering I love you",
+    "a low tender male whisper full of love"
+  ],
+  "love_female": [
+    "a woman speaking with love and affection",
+    "a tender female voice speaking lovingly",
+    "a warm female voice saying I love you",
+    "a soft gentle female voice full of love",
+    "a woman speaking tenderly to someone she loves",
+    "an intimate loving female speaking voice",
+    "a woman whispering I love you",
+    "a soft tender female whisper full of love"
+  ],
+  "seductive_shared": [
+    "a seductive flirtatious voice",
+    "a soft sensual speaking voice",
+    "someone speaking in a seductive tone",
+    "a whispered seductive voice",
+    "someone whispering seductively",
+    "a soft breathy whispered sensual voice",
+    "a low intimate whispered speaking voice"
+  ],
+  "seductive_male": [
+    "a man speaking in a seductive whisper",
+    "a low sensual male voice",
+    "a flirtatious male whisper",
+    "a man whispering seductively",
+    "a low intimate male whispered speaking voice",
+    "a breathy male seductive whisper",
+    "a soft spoken seductive male voice",
+    "a quiet close intimate male speaking voice"
+  ],
+  "seductive_female": [
+    "a woman whispering seductively",
+    "a breathy feminine seductive voice",
+    "a woman speaking in a seductive whisper",
+    "a soft breathy whispered sensual female voice",
+    "a low intimate whispered feminine speaking voice",
+    "a flirtatious female whisper",
+    "a quiet close intimate female speaking voice"
+  ],
+  "neutral_shared": [
+    "a person speaking in a neutral tone",
+    "a calm ordinary speaking voice",
+    "someone speaking normally without emotion",
+    "a plain conversational voice"
+  ],
+  "neutral_male": [
+    "a man speaking in a neutral conversational voice",
+    "a man speaking normally without emotion"
+  ],
+  "neutral_female": [
+    "a woman speaking in a neutral conversational voice",
+    "a woman speaking normally without emotion"
+  ],
+  "joyful_shared": [
+    "a happy joyful cheerful voice",
+    "someone speaking happily with joy",
+    "a bright upbeat speaking voice"
+  ]
+}
