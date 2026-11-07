@@ -39,12 +39,29 @@ function safeInsets() {
   };
 }
 
-function fit() {
+function chooseDpr() {
   const mobile = Math.min(window.innerWidth, window.innerHeight) < 800;
   const cap = mobile ? 1.5 : 2;
-  const dpr = Math.min(window.devicePixelRatio || 1, cap);
-  canvas.style.width = "100vw";
-  canvas.style.height = "100dvh";
+  let dpr = Math.min(window.devicePixelRatio || 1, cap);
+  const cssW = canvas.clientWidth || window.innerWidth;
+  const cssH = canvas.clientHeight || window.innerHeight;
+  // CPU splat budget: no more pixels than iPhone 14 at the 1.5 mobile cap.
+  // Tablets stay at 1× rather than 1.5× of a 768×1024 canvas (~1.8M px).
+  const maxPixels = 390 * 844 * 1.5 * 1.5;
+  const area = Math.max(1, cssW * cssH);
+  if (area * dpr * dpr > maxPixels) {
+    dpr = Math.max(1, Math.sqrt(maxPixels / area));
+  }
+  return dpr;
+}
+
+function fit() {
+  const dpr = chooseDpr();
+  // Fill the fixed inset:0 body. 100vw can be wider than the visual
+  // viewport on mobile browsers and would let the canvas peek sideways.
+  canvas.style.width = "100%";
+  canvas.style.height = "100%";
+  canvas.dataset.dpr = String(dpr);
   return dpr;
 }
 
@@ -80,6 +97,10 @@ function drawStrip(app) {
     mark.style.left = `${x}px`;
     mark.textContent = `${row.emotion}  ${row.gas}  ${row.nm} nm`;
     labels.appendChild(mark);
+    const half = mark.offsetWidth / 2;
+    const inset = half + 4;
+    const max = Math.max(inset, strip.clientWidth - inset);
+    mark.style.left = `${Math.min(Math.max(x, inset), max)}px`;
   }
 }
 
