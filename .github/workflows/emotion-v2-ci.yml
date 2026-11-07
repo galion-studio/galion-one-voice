@@ -1,0 +1,29 @@
+# Emotion V2 harness. CPU stub only.
+# Unit tests synthesize tones. They do not download weights, install torch,
+# or install transformers. The GPU nightly is an operator run, documented in
+# docs/emotion-v2/CI.md. It is not a job in this file.
+name: emotion-v2
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  harness-cpu-stub:
+    name: emotion-v2 harness (CPU stub)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      EMOTION_V2_BACKEND: stub
+      HF_HUB_OFFLINE: "1"
+      TRANSFORMERS_OFFLINE: "1"
+      HF_DATASETS_OFFLINE: "1"
+      PYTHONPATH: tools/emotion-v2
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Harness unit tests (synthetic signals, no weights)
+        run: python -m unittest discover -s tools/emotion-v2/harness/tests -v
