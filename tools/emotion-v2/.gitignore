@@ -1,0 +1,18 @@
+# Local renders, references, and recogniser weights. Never commit them.
+*.wav
+*.wave
+*.mp3
+*.flac
+*.ogg
+*.bin
+*.safetensors
+*.pt
+*.pth
+*.ckpt
+*.onnx
+*.gguf
+*.npz
+out/
+work/
+__pycache__/
+*.pyc
