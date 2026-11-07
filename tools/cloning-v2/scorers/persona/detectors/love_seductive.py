@@ -35,6 +35,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import os
 import sys
 import time
 from pathlib import Path
@@ -216,6 +217,10 @@ class _ClapEnsemble:
         self.processor = ClapProcessor.from_pretrained(str(CLAP_DIR), local_files_only=True)
         self.model = ClapModel.from_pretrained(str(CLAP_DIR), local_files_only=True)
         self.model.eval()
+        # CPU unless a laptop eval sets GALION_CLAP_DEVICE=cuda. One model, one clip.
+        self.device = os.environ.get("GALION_CLAP_DEVICE", "cpu").strip() or "cpu"
+        if self.device != "cpu":
+            self.model.to(self.device)
         bank = json.loads(PROMPTS_PATH.read_text())
         self.raw_bank = bank
         self.prompt_lists: dict[str, list[str]] = {
@@ -226,6 +231,11 @@ class _ClapEnsemble:
         with torch.no_grad():
             for name, prompts in self.prompt_lists.items():
                 inputs = self.processor(text=prompts, return_tensors="pt", padding=True)
+                if self.device != "cpu":
+                    inputs = {
+                        k: v.to(self.device) if hasattr(v, "to") else v
+                        for k, v in inputs.items()
+                    }
                 out = self.model.get_text_features(
                     input_ids=inputs["input_ids"],
                     attention_mask=inputs.get("attention_mask"),
@@ -242,6 +252,11 @@ class _ClapEnsemble:
         torch = self.torch
         with torch.no_grad():
             inputs = self.processor(audio=wav48, sampling_rate=48000, return_tensors="pt")
+            if self.device != "cpu":
+                inputs = {
+                    k: v.to(self.device) if hasattr(v, "to") else v
+                    for k, v in inputs.items()
+                }
             kw = {"input_features": inputs["input_features"]}
             if "is_longer" in inputs and inputs["is_longer"] is not None:
                 kw["is_longer"] = inputs["is_longer"]

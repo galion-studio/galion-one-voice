@@ -62,6 +62,10 @@ Aliases: `happy` → `joyful`, `reason` → `logic` (not synthesized separately)
 3. Future gate hook (not implemented): `galion-voicecheck` would grow an opt-in `--emotion-targets TARGETS.json` and treat each `moment_wav` as the base moment for that category. Scorer code, `emo_min=0.83`, and presence `0.2` would stay unchanged.
 4. No git merge, push, or live voice switch is part of this stage.
 
+## Expression plan (separate opt-in, branch B)
+
+`pipeline/expression` (`galion-expression`) reads prosody and a score JSON and writes a conditioning candidate. It does not run from this binary, does not change `TARGETS.json`, and does not select reference clips. Crying and yelling stay excluded. Seductive stays Samantha-only. See `pipeline/expression/README.md`.
+
 ## Extension hooks (persona scorer is opt-in; default remains universal)
 
 This crate invokes the current unmodified universal scorer and does not edit `scorers/`. A new scorer version living *next to* the current one, or a persona-specific probe set, can plug in here without changing default behaviour:

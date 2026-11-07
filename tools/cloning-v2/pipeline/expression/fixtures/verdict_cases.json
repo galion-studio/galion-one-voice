@@ -1,0 +1,48 @@
+{
+  "schema": "galion-love-warmth-cases/1",
+  "reference": {
+    "label": "samantha-w03-love",
+    "persona": "own-samantha",
+    "decision": 0.9390544380026881,
+    "love_mean_cos": 0.27918557822704315,
+    "neutral_mean_cos": 0.15484974160790443,
+    "e2v_sad": 0.0003758981474675238,
+    "prosody": {"f0_mean_hz": 180.0, "f0_sd_st": 2.4, "rms_db": -22.0, "spectral_tilt_db_oct": -8.0}
+  },
+  "clones": [
+    {
+      "label": "margin-held-zero",
+      "decision": 0.0,
+      "love_mean_cos": 0.26918557822704315,
+      "neutral_mean_cos": 0.14484974160790443
+    },
+    {
+      "label": "real-loss",
+      "decision": 0.0,
+      "love_mean_cos": 0.04,
+      "neutral_mean_cos": 0.02,
+      "prosody": {"f0_mean_hz": 180.0, "f0_sd_st": 2.4, "rms_db": -16.0, "spectral_tilt_db_oct": -4.0}
+    },
+    {
+      "label": "prosody-held",
+      "decision": 0.0,
+      "love_mean_cos": 0.05,
+      "neutral_mean_cos": 0.03,
+      "prosody": {"f0_mean_hz": 180.0, "f0_sd_st": 2.4, "rms_db": -22.0, "spectral_tilt_db_oct": -8.0}
+    },
+    {
+      "label": "sad-gate",
+      "decision": 0.0,
+      "love_mean_cos": 0.3,
+      "neutral_mean_cos": 0.1,
+      "e2v_sad": 0.9
+    },
+    {
+      "label": "mixed-f0",
+      "decision": 0.0,
+      "love_mean_cos": 0.04,
+      "neutral_mean_cos": 0.02,
+      "prosody": {"f0_mean_hz": 180.0, "f0_sd_st": 1.2, "rms_db": -22.0, "spectral_tilt_db_oct": -8.0}
+    }
+  ]
+}

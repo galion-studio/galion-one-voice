@@ -1,0 +1,83 @@
+{
+  "schema": "galion-love-warmth-cases/1",
+  "gate": 0.83,
+  "align_min": 0.2,
+  "notes": [
+    "Samantha rescore: original love decision 0.9390544380026881, both clones decision 0, match 0.06094556199731194.",
+    "merge-v2 emotion_match 0.6869450087862239 and coherent 0.6713695158531341 fail the 0.83 gate.",
+    "CLAP margins are the committed w03 measurement (love_mean_cos 0.27918557822704315, neutral 0.15484974160790443). Clone margins are absent from the repo, so the published verdict is insufficient_evidence until a laptop eval supplies them.",
+    "Agent 2's window-file decision on the same moment is 0.9228583200845187. The gate used 0.9390544380026881. own-samantha.toml love target 0.8109382317899566 is the legacy universal CLAP value and is not edited.",
+    "Jarvis merge-v2 0.8730685436870271 and coherent 0.8791185805790467 pass. Love and seductive are outside his judged set."
+  ],
+  "reference": {
+    "label": "samantha-w03-love",
+    "persona": "own-samantha",
+    "decision": 0.9390544380026881,
+    "love_mean_cos": 0.27918557822704315,
+    "neutral_mean_cos": 0.15484974160790443,
+    "e2v_sad": 0.0003758981474675238
+  },
+  "clones": [
+    {
+      "label": "merge-v2",
+      "persona": "own-samantha",
+      "decision": 0.0,
+      "match_score": 0.06094556199731194
+    },
+    {
+      "label": "coherent",
+      "persona": "own-samantha",
+      "decision": 0.0,
+      "match_score": 0.06094556199731194
+    }
+  ],
+  "gate_sets": [
+    {
+      "id": "merge-v2",
+      "emb_sim": 0.8581830617138099,
+      "emotion_match": 0.6869450087862239,
+      "rows": [
+        {"category": "neutral", "strength": 1.0, "score": 0.9689200045253754},
+        {"category": "logic", "strength": 0.49966762061927383, "score": 0.9247894142895605},
+        {"category": "laughter", "strength": 0.2743651270866394, "score": 0.8542200412601233},
+        {"category": "aggressive", "strength": 0.9990363121032715, "score": 0.5555290011531206},
+        {"category": "love", "strength": 0.9390544380026881, "score": 0.06094556199731194}
+      ]
+    },
+    {
+      "id": "coherent",
+      "emb_sim": 0.822184857565722,
+      "emotion_match": 0.6713695158531341,
+      "rows": [
+        {"category": "neutral", "strength": 1.0, "score": 0.9646446600659391},
+        {"category": "laughter", "strength": 0.2743651270866394, "score": 0.9248757898807527},
+        {"category": "logic", "strength": 0.49966762061927383, "score": 0.8972519308363274},
+        {"category": "aggressive", "strength": 0.9990363121032715, "score": 0.5288252705675534},
+        {"category": "love", "strength": 0.9390544380026881, "score": 0.06094556199731194}
+      ]
+    }
+  ],
+  "jarvis": {
+    "judged": ["neutral", "logic"],
+    "sets": [
+      {
+        "id": "merge-v2",
+        "emb_sim": 0.8401427527177705,
+        "emotion_match": 0.8730685436870271,
+        "rows": [
+          {"category": "neutral", "strength": 1.0, "score": 0.9649772706921025},
+          {"category": "logic", "strength": 0.8276575418335476, "score": 0.7931821767703076}
+        ]
+      },
+      {
+        "id": "coherent",
+        "emb_sim": 0.9047713214099976,
+        "emotion_match": 0.8791185805790467,
+        "rows": [
+          {"category": "neutral", "strength": 1.0, "score": 0.9823205121087871},
+          {"category": "logic", "strength": 0.8276575418335476, "score": 0.7301496527262888}
+        ]
+      }
+    ]
+  }
+}
