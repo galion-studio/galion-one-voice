@@ -366,6 +366,7 @@ def main() -> None:
         "chunks": None if not product_claim else model.get("chunks"),
         "whole_utt_fail_ms": WHOLE_UTT_FAIL_MS,
         "model_measured": model_measured and product_claim,
+        "measured": bool(product_claim),
         "product_claim": product_claim,
         "stub_clock": "FAIL",
         "stub_engine": stub.get("engine"),

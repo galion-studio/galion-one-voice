@@ -44,6 +44,19 @@ bash scripts/symphony/check-g-latency.sh
 
 Each script prints one `X PASS — …` or `X FAIL — …` line and exits 0 only on PASS.
 
+## This session
+
+galion-laptop. 2026-11-06. Europe/Zagreb. Rows below are commands this session ran. A model engine did not run. Product TTFA is **BLOCKED**. Detail and the exact harness line are in [TTFA.md](TTFA.md).
+
+| Command | Result | Evidence |
+|---|---|---|
+| `scripts/eval/flash-ttfa.sh` | BLOCKED | Exit 2. Stdout `measured: false`, no `ttfa_ms`. The flash example did not link (`cc` missing). |
+| `scripts/eval/piper-stream-ttfa.sh` | BLOCKED | Exit 2. A21 pack absent. JSON `measured: false`. No millisecond field. |
+| `scripts/eval/clone-stream-ttfa.sh` | BLOCKED | Exit 2. Stdout gate `BLOCKED`, `measured: false`. Piper pack absent. |
+| `python3 scripts/eval/piper_lat240_bench.py` | BLOCKED | Exit 2. Piper runtime and voice pack absent. JSON `measured: false`. |
+| `python3 scripts/eval/piper_ort_threads.py` | BLOCKED | Exit 2. Piper runtime and voice pack absent. JSON `measured: false`. |
+| `scripts/eval/v2-hard-loop.sh --self-check` | PASS | Exit 0. Classifiers held. Printed `HARD-PASS of the loop: refused`. |
+
 — Maciej Grajczyk
 
 ---

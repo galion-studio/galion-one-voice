@@ -5,6 +5,10 @@ Europe/Zagreb. Priority 1 of the V2 backlog. Record only.
 
 Master slogan: "The seamless connection with the human being, on the voice only."
 
+## Policy
+
+Cloning is Rust-first. The worker contract, the speech stack, and the cbx engine are Rust. Chatterbox Python stays out of process. Piper training on own-voice clips is forbidden. Piper (`en_US-ljspeech-medium`) remains the speaking fallback when the clone slot is absent. It is not trained on Samantha, Jarvis, or any own-voice clip. Reference wavs stay outside git and are read-only. The deployed Jarvis voice must not change. No WER, ECAPA, MOS, or timing is written here. Unmeasured gates stay **BLOCKED**. No audio file is added. `LOCKS.toml` is not edited.
+
 The clone path is local and self-offline. It exists so the voice can carry
 that connection: Samantha when the talk is human, Jarvis when the talk is a
 command. No cloud TTS API. No weights in git. No film audio.
@@ -40,7 +44,7 @@ Resemble AI **Chatterbox**, used as architecture to borrow, run later out of
 process. Code licence read from upstream `LICENSE` on 2026-11-03: MIT,
 copyright 2025 Resemble AI.
 
-Zero-shot. No fine-tune. `generate` takes a reference wav
+Zero-shot. No fine-tune. Piper training on own-voice clips is forbidden. `generate` takes a reference wav
 (`audio_prompt_path`). Conditioning, from the public Python, is three pieces:
 a VoiceEncoder speaker embedding, speech-token prompt tokens, and an S3Gen
 reference embedding. T3 (token-to-token) then samples speech tokens. S3Gen

@@ -9,6 +9,11 @@
 //! The reference path does not denoise. [`STRIP_REFERENCE_TEXTURE`] stays false.
 //! Jarvis's Tony Stark hub bed (clicks, alarms, room tone) is a character layer
 //! on the me band. It is toggleable. It never reads or writes caller audio.
+//!
+//! Situational mood is this band. [`Feeling::situational`] is [`Feeling::live`]
+//! plus [`Timbre::REFERENCE`]. It does not scale timbre. `None` is consent deny:
+//! `e` is [`crate::express::empathy_weight`] of no frame, which is 0. The mood
+//! is not a second score.
 
 use crate::express::{Oklch, ProsodyControl, StubExpressor};
 use crate::frame::{Affect, EmotionFrame};
@@ -92,6 +97,20 @@ impl HubLayer {
     }
 }
 
+/// Voice body. Not the feeling band.
+///
+/// `match_strength` is an LTAS timbre match. Zero leaves the reference
+/// bit-identical. Situational mood does not write this value.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Timbre {
+    pub match_strength: f32,
+}
+
+impl Timbre {
+    /// Reference body. Mood is not a parameter.
+    pub const REFERENCE: Self = Self { match_strength: 0.0 };
+}
+
 /// Feeling band for one frame. Copy, stack only. No text.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Feeling {
@@ -131,6 +150,15 @@ impl Feeling {
     /// `None` is no frame (no consent, or nothing to answer): e stays 0.
     pub fn live(persona: VoicePersona, caller: Option<&EmotionFrame>) -> Self {
         Self::conduct(persona, caller, true)
+    }
+
+    /// Situational mood on the feeling band.
+    ///
+    /// `caller` is a frame the host already consented to read. `None` is deny.
+    /// `e` is [`crate::express::empathy_weight`] of that frame, never a mood
+    /// valence copied into a score. The timbre is always [`Timbre::REFERENCE`].
+    pub fn situational(persona: VoicePersona, caller: Option<&EmotionFrame>) -> (Self, Timbre) {
+        (Self::live(persona, caller), Timbre::REFERENCE)
     }
 
     /// Same as [`Self::live`], with the hub layer forced on or off.
@@ -303,6 +331,51 @@ mod tests {
         assert_eq!(jj.manner, Manner::Shared);
         assert!((jj.prosody.pitch_shift_st - -0.3).abs() < 1e-4, "jarvis amusement does not brighten");
         assert_eq!(jj.oklch, NEUTRAL_OKLCH);
+    }
+
+    #[test]
+    fn situational_mood_stays_on_the_feeling_band() {
+        use crate::consent::{ConsentDecision, ConsentGate, DefaultConsentGate, Purpose};
+        use crate::express::empathy_weight;
+
+        let gate = DefaultConsentGate::default();
+        assert_eq!(gate.check(Purpose::PersonalAssistant), ConsentDecision::DenyNoConsent);
+
+        let (s_rest, s_body) = Feeling::situational(VoicePersona::Samantha, None);
+        let (j_rest, j_body) = Feeling::situational(VoicePersona::Jarvis, None);
+        assert_eq!(s_rest, Feeling::rest(VoicePersona::Samantha));
+        assert_eq!(j_rest, Feeling::rest(VoicePersona::Jarvis));
+        assert_eq!(s_rest.e, empathy_weight(None));
+        assert_eq!(s_rest.e, 0.0);
+        assert_eq!(j_rest.e, 0.0);
+        assert_eq!(s_body, Timbre::REFERENCE);
+        assert_eq!(j_body, Timbre::REFERENCE);
+        assert_eq!(s_body.match_strength, 0.0);
+
+        let tired = frame(-0.6, 0.2, 0.4, 1.0);
+        let (s, body) = Feeling::situational(VoicePersona::Samantha, Some(&tired));
+        let (j, jbody) = Feeling::situational(VoicePersona::Jarvis, Some(&tired));
+        assert_eq!(s, Feeling::live(VoicePersona::Samantha, Some(&tired)));
+        assert_eq!(j, Feeling::live(VoicePersona::Jarvis, Some(&tired)));
+        assert_eq!(s.e, empathy_weight(Some(&tired)));
+        assert!((s.e - 1.0).abs() < 1e-6);
+        assert_eq!(s.manner, Manner::Answered);
+        assert_eq!(body, Timbre::REFERENCE);
+        assert_eq!(jbody.match_strength, 0.0);
+        assert!(j.hub.enabled, "hub is character on the me band, not timbre");
+
+        let joy = frame(0.8, 0.4, 0.5, 0.9);
+        let (shared, joy_body) = Feeling::situational(VoicePersona::Samantha, Some(&joy));
+        assert_eq!(shared.e, 0.0, "joy is not an empathy score");
+        assert_eq!(shared.e, empathy_weight(Some(&joy)));
+        assert_eq!(shared.manner, Manner::Shared);
+        assert_eq!(joy_body, Timbre::REFERENCE);
+
+        let src = include_str!("persona.rs");
+        let code = src.split("#[cfg(test)]").next().unwrap_or(src).to_ascii_lowercase();
+        assert!(!code.contains(".safetensors"));
+        assert!(!code.contains(".gguf"));
+        assert!(!code.contains("cuda"));
     }
 
     #[test]

@@ -5,3 +5,7 @@ Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
 Box-local cbx voice-profile prep and checks. See
 `docs/galion-voice-v2/symphony/EMOTION-BLEND.md`. Experimental; OFF by default.
 Do not commit WAVs, `.cbxvoice`, or clip-store audio.
+
+`preflight/` (`galion-cloning-preflight`) is the Rust-first gate: it refuses
+Piper training and exits non-zero when the cbx binary or the fp32 weight
+snapshot is absent. It does not download weights or write reference audio.

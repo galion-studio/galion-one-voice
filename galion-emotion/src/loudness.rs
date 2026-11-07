@@ -6,7 +6,7 @@
 //!  caller PCM ─► GatedDetector<E>  (gate FIRST, input checks, seq, EMA)  ─► EmotionFrame
 //!                     │
 //!                     └─ E: AffectEstimator   ← swap this, nothing else changes
-//!                          • LoudnessEstimator   heuristic, RMS/ZCR (today's runtime stub; no valence)
+//!                          • LoudnessEstimator   heuristic, RMS/ZCR (runtime stub; no valence)
 //!                          • SyntheticEstimator  deterministic fixture modes (tests / console / Rika)
 //!                          • ReferenceEstimator  replays an OFFLINE label track (e.g. a SenseVoice-Small
 //!                                                dev-oracle run done elsewhere) — reference only
@@ -99,14 +99,56 @@ impl Default for LoudnessEstimator {
 }
 
 /// Frame RMS and zero-crossing rate (crossings per sample).
+/// One forward pass, same left-to-right sum as a fold. No heap.
+#[inline(always)]
 pub fn rms_zcr(pcm: &[f32]) -> (f32, f32) {
-    if pcm.is_empty() {
+    let n = pcm.len();
+    if n == 0 {
         return (0.0, 0.0);
     }
-    let n = pcm.len() as f32;
-    let rms = (pcm.iter().map(|x| x * x).sum::<f32>() / n).sqrt();
-    let zc = pcm.windows(2).filter(|w| (w[0] >= 0.0) != (w[1] >= 0.0)).count() as f32 / n;
-    (rms, zc)
+    let mut sum = pcm[0] * pcm[0];
+    let mut prev = pcm[0];
+    let mut zc = 0.0f32;
+    let mut i = 1usize;
+    while i < n {
+        let x = pcm[i];
+        sum += x * x;
+        if (prev >= 0.0) != (x >= 0.0) {
+            zc += 1.0;
+        }
+        prev = x;
+        i += 1;
+    }
+    let nf = n as f32;
+    ((sum / nf).sqrt(), zc / nf)
+}
+
+/// Acoustic features this crate already computes for one window.
+/// Recognition reads these. It does not load weights.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct AcousticFeatures {
+    pub rms: f32,
+    pub zcr: f32,
+}
+
+impl AcousticFeatures {
+    pub fn from_pcm(pcm: &[f32]) -> Self {
+        let (rms, zcr) = rms_zcr(pcm);
+        Self { rms, zcr }
+    }
+}
+
+impl LoudnessEstimator {
+    /// Same mapping as [`AffectEstimator::estimate`]. Valence stays `None`.
+    pub fn estimate_features(&self, features: AcousticFeatures) -> Estimate {
+        let arousal = (features.rms / self.full_scale_rms).min(1.0);
+        Estimate {
+            valence: None,
+            arousal,
+            dominance: 0.4 + 0.3 * arousal - 0.2 * features.zcr.min(1.0),
+            confidence: if features.rms < self.silence_rms { 0.0 } else { self.confidence },
+        }
+    }
 }
 
 impl AffectEstimator for LoudnessEstimator {
@@ -117,14 +159,7 @@ impl AffectEstimator for LoudnessEstimator {
         "loudness"
     }
     fn estimate(&mut self, pcm: &[f32], _sample_rate: u32, _t_ms: u32) -> Estimate {
-        let (rms, zc) = rms_zcr(pcm);
-        let arousal = (rms / self.full_scale_rms).min(1.0);
-        Estimate {
-            valence: None,
-            arousal,
-            dominance: 0.4 + 0.3 * arousal - 0.2 * zc.min(1.0),
-            confidence: if rms < self.silence_rms { 0.0 } else { self.confidence },
-        }
+        self.estimate_features(AcousticFeatures::from_pcm(pcm))
     }
 }
 
@@ -380,6 +415,57 @@ impl<E> GatedDetector<E> {
     pub fn valence_known(&self) -> bool {
         self.valence_known
     }
+
+    fn commit(&mut self, e: Estimate, pcm_len: usize, sample_rate: u32, t_ms: u32) -> EmotionFrame {
+        self.valence_known = e.valence.is_some();
+        let dur_ms = ((pcm_len as u64 * 1000) / sample_rate as u64).min(u16::MAX as u64) as u16;
+        let raw = EmotionFrame {
+            seq: self.seq,
+            t_ms,
+            dur_ms,
+            valence: e.valence.unwrap_or(0.0),
+            arousal: e.arousal,
+            dominance: e.dominance,
+            confidence: e.confidence,
+        }
+        .clamped();
+        self.seq = self.seq.wrapping_add(1);
+        let out = match self.prev {
+            Some(p) => p.ema(&raw, self.smoothing),
+            None => raw,
+        };
+        self.prev = Some(out);
+        out
+    }
+}
+
+impl GatedDetector<LoudnessEstimator> {
+    /// Same frame as [`AffectDetector::detect`] when `features` is that window's
+    /// RMS and zero-crossing rate. Does not scan the PCM again.
+    pub fn detect_acoustic(
+        &mut self,
+        features: AcousticFeatures,
+        pcm_len: usize,
+        sample_rate: u32,
+        t_ms: u32,
+        gate: &dyn ConsentGate,
+        purpose: Purpose,
+    ) -> Result<EmotionFrame, DetectError> {
+        let decision = gate.check(purpose);
+        gate.audit(purpose, decision);
+        if !decision.allowed() {
+            self.reset();
+            return Err(DetectError::NotPermitted(decision));
+        }
+        if pcm_len == 0 {
+            return Err(DetectError::BadInput("empty window"));
+        }
+        if sample_rate == 0 {
+            return Err(DetectError::BadInput("sample_rate = 0"));
+        }
+        let e = self.estimator.estimate_features(features);
+        Ok(self.commit(e, pcm_len, sample_rate, t_ms))
+    }
 }
 
 impl<E: AffectEstimator> AffectDetector for GatedDetector<E> {
@@ -404,25 +490,7 @@ impl<E: AffectEstimator> AffectDetector for GatedDetector<E> {
             return Err(DetectError::BadInput("sample_rate = 0"));
         }
         let e = self.estimator.estimate(pcm, sample_rate, t_ms);
-        self.valence_known = e.valence.is_some();
-        let dur_ms = ((pcm.len() as u64 * 1000) / sample_rate as u64).min(u16::MAX as u64) as u16;
-        let raw = EmotionFrame {
-            seq: self.seq,
-            t_ms,
-            dur_ms,
-            valence: e.valence.unwrap_or(0.0),
-            arousal: e.arousal,
-            dominance: e.dominance,
-            confidence: e.confidence,
-        }
-        .clamped();
-        self.seq = self.seq.wrapping_add(1);
-        let out = match self.prev {
-            Some(p) => p.ema(&raw, self.smoothing),
-            None => raw,
-        };
-        self.prev = Some(out);
-        Ok(out)
+        Ok(self.commit(e, pcm.len(), sample_rate, t_ms))
     }
 
     fn reset(&mut self) {
@@ -536,6 +604,50 @@ mod tests {
         assert_eq!(f[4].confidence, 0.0, "unknown label → no confidence");
         assert!(!d.valence_known());
         assert_eq!(d.estimator.kind(), EstimatorKind::OfflineReference);
+    }
+
+    #[test]
+    fn rms_zcr_matches_a_left_to_right_fold() {
+        let mut pcm = vec![0.0f32; 17];
+        for (i, s) in pcm.iter_mut().enumerate() {
+            *s = ((i as i32 - 8) as f32) * 0.01;
+        }
+        pcm.push(0.0);
+        pcm.push(-0.0);
+        let n = pcm.len() as f32;
+        let rms = (pcm.iter().map(|x| x * x).sum::<f32>() / n).sqrt();
+        let zc = pcm.windows(2).filter(|w| (w[0] >= 0.0) != (w[1] >= 0.0)).count() as f32 / n;
+        let (got_rms, got_zcr) = rms_zcr(&pcm);
+        assert_eq!(got_rms, rms);
+        assert_eq!(got_zcr, zc);
+        let g = granted();
+        let mut a = GatedDetector::new(LoudnessEstimator::default());
+        let mut b = GatedDetector::new(LoudnessEstimator::default());
+        let frame = a.detect(&pcm, 24_000, 0, &g, Purpose::PersonalAssistant).unwrap();
+        let from_features = b.detect_acoustic(AcousticFeatures { rms: got_rms, zcr: got_zcr }, pcm.len(), 24_000, 0, &g, Purpose::PersonalAssistant).unwrap();
+        assert_eq!(frame, from_features);
+    }
+
+    #[test]
+    fn acoustic_features_match_rms_zcr_and_carry_no_valence() {
+        let est = LoudnessEstimator::default();
+        let mut live = est;
+        for amp in [0.0, 0.02, 0.2, 0.9] {
+            let pcm = tone(amp, 1920);
+            let features = AcousticFeatures::from_pcm(&pcm);
+            let (rms, zcr) = rms_zcr(&pcm);
+            assert_eq!(features.rms, rms);
+            assert_eq!(features.zcr, zcr);
+            let from_features = est.estimate_features(features);
+            let from_pcm = live.estimate(&pcm, 24_000, 0);
+            assert_eq!(from_features, from_pcm);
+            assert!(from_features.valence.is_none());
+        }
+        let quiet = est.estimate_features(AcousticFeatures { rms: 0.2, zcr: 0.01 });
+        let harsh = est.estimate_features(AcousticFeatures { rms: 0.2, zcr: 0.9 });
+        assert!(harsh.dominance < quiet.dominance);
+        assert_eq!(harsh.arousal, quiet.arousal);
+        assert_eq!(est.estimate_features(AcousticFeatures { rms: 0.0, zcr: 0.0 }).confidence, 0.0);
     }
 
     #[test]

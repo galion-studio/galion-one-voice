@@ -199,26 +199,26 @@ Replace `PASS / FAIL / BLOCKED` with one token. Evidence is a path, a command, o
 
 | Section | Gate | Result | Evidence | When |
 |---|---|---|---|---|
-| Compiler | Round-trip fixture. The Rust path opens the Galion voice file. | PASS / FAIL / BLOCKED | | |
-| Clone | Worker PCM. Ref sha256 matches. Smoke speak logged. | PASS / FAIL / BLOCKED | | |
-| Persona | Emotion maps to prosody and the wash. Words stay on the matter. | PASS / FAIL / BLOCKED | | |
-| One-dot | `GET /` is the only screen. Mic records. `GET /v2` redirects to `/`. | PASS / FAIL / BLOCKED | | |
-| Runbooks | Commands in [RUNBOOKS.md](RUNBOOKS.md) match their outputs. | PASS / FAIL / BLOCKED | | |
-| 80 ms | Frame is 80 ms. Streaming budget measured or marked stub-measured. | PASS / FAIL / BLOCKED | | |
-| Self-eval | The rows in this file are the record of the gates. | PASS / FAIL / BLOCKED | | |
-| Eureka | Presence replay and the heartbeat harness ran. Scores are in the log. | PASS / FAIL / BLOCKED | | |
-| Plus / Ultra / Research | Local, Plus, Ultra, and Research are written with their figures. | PASS / FAIL / BLOCKED | | |
-| Rust translation | A Galion voice file loads on the Rust path. PyTorch stays a child process. | PASS / FAIL / BLOCKED | | |
-| Jarvis texture | Hub clicks, alarms, and ambience remain against a clean-speech baseline. | PASS / FAIL / BLOCKED | | |
-| Samantha emotions | Her prosody column is the one the feeling band applies. | PASS / FAIL / BLOCKED | | |
-| One-percent | Non-inference CPU ≤ 1% of the host. Tick p99 well under 800 µs. Late pauses. | PASS / FAIL / BLOCKED | | |
-| Heartbeat | `Heartbeat::step` advances one frame and allocates nothing on that path. | PASS / FAIL / BLOCKED | | |
-| Clip store | Both WAV refs exist. sha256 matches. Git holds no reference audio. | PASS / FAIL / BLOCKED | | |
-| Auto-workflow | A spoken turn records itself and the workflow hook fires. | PASS / FAIL / BLOCKED | | |
-| TTFA | Default harness prints `measured: false`. A product claim names a model. | PASS / FAIL / BLOCKED | | |
-| Staging | Loopback bind holds. Public name has auth. CORS origin is exact. | PASS / FAIL / BLOCKED | | |
+| Compiler | Round-trip fixture. The Rust path opens the Galion voice file. | BLOCKED | `cargo` and `rustc` are absent on galion-laptop. No `.gq` voice file is in the tree. `python3 scripts/symphony/eval.py` at 17:18 CET names the source witness `crates/galion-ml-voice/src/artifact.rs`. The fixture was not compiled. | 2026-11-06 |
+| Clone | Worker PCM. Ref sha256 matches. Smoke speak logged. | BLOCKED | Same command: protocol stub emitted 402 B PCM; the worker refused a reference clip; `samantha.wav` absent; `jarvis.wav` absent; no smoke-speak log names both ref hashes. `weights/clone` is absent. | 2026-11-06 |
+| Persona | Emotion maps to prosody and the wash. Words stay on the matter. | BLOCKED | Harness D read the persona docs, `e0`/`e1` prosody and wash, `voice_color`, and the 80 ms feeling band. A spoken turn was not run. | 2026-11-06 |
+| One-dot | `GET /` is the only screen. Mic records. `GET /v2` redirects to `/`. | BLOCKED | The screen process is not running. Harness E read one canvas, the mic path, and `crates/galion-console/src/auto_workflow.rs`. Live `GET /` and `GET /v2` were not issued. | 2026-11-06 |
+| Runbooks | Commands in [RUNBOOKS.md](RUNBOOKS.md) match their outputs. | BLOCKED | `rustc`/`cargo` are absent, so the runbook commands were not executed. Harness F: `bash -n` passed for the 8 README scripts. | 2026-11-06 |
+| 80 ms | Frame is 80 ms. Streaming budget measured or marked stub-measured. | BLOCKED | Realtime demo was not run. Harness G read `frame_ms` 80 and the flash-ttfa stub path. `docs/galion-voice-v2/symphony/scripts/ttfa-gate.sh` stopped with `FileNotFoundError: cargo`. | 2026-11-06 |
+| Self-eval | The rows in this file are the record of the gates. | PASS | This ledger. Branch `cursor/symphony-v2-benchmarks-d379`. Host galion-laptop. Unrun section gates in this table are BLOCKED. | 2026-11-06 |
+| Eureka | Presence replay and the heartbeat harness ran. Scores are in the log. | BLOCKED | Presence replay did not start. `specs/presence.json` is in the tree. `cargo` is absent, so `galion-heartbeat-presence` was not built. | 2026-11-06 |
+| Plus / Ultra / Research | Local, Plus, Ultra, and Research are written with their figures. | BLOCKED | Plan text is [PLUS-ULTRA-RESEARCH.md](PLUS-ULTRA-RESEARCH.md). No tok/s or vCPU benchmark was run on this machine. | 2026-11-06 |
+| Rust translation | A Galion voice file loads on the Rust path. PyTorch stays a child process. | BLOCKED | No emitted Galion voice file is in the tree. `cargo run -p galion-symphony -- eval` was not run. | 2026-11-06 |
+| Jarvis texture | Hub clicks, alarms, and ambience remain against a clean-speech baseline. | BLOCKED | `docs/galion-voice-v2/personas/refs/` has placeholders only. Harness C: synthetic tone self-test passed; `jarvis.toml` has no `[texture] preserve` toggle. | 2026-11-06 |
+| Samantha emotions | Her prosody column is the one the feeling band applies. | BLOCKED | `cargo test -p galion-emotion` was not run. `rustc` is absent. | 2026-11-06 |
+| One-percent | Non-inference CPU ≤ 1% of the host. Tick p99 well under 800 µs. Late pauses. | BLOCKED | No host sample was taken. `cargo` is absent, so `galion-gates/op-one-percent.sh` was not run. | 2026-11-06 |
+| Heartbeat | `Heartbeat::step` advances one frame and allocates nothing on that path. | BLOCKED | `cargo test --offline -p galion-heartbeat` was not run. `rustc` and `cargo` are absent. | 2026-11-06 |
+| Clip store | Both WAV refs exist. sha256 matches. Git holds no reference audio. | BLOCKED | `samantha.wav` and `jarvis.wav` are absent. Placeholders only. `/workspace/galion-clip-store` is absent. | 2026-11-06 |
+| Auto-workflow | A spoken turn records itself and the workflow hook fires. | BLOCKED | Hook source is `crates/galion-console/src/auto_workflow.rs`. The test was not executed. `cargo` is absent. | 2026-11-06 |
+| TTFA | Default harness prints `measured: false`. A product claim names a model. | BLOCKED | `ttfa-gate.sh` exited before printing JSON (`FileNotFoundError: cargo`). No product `ttfa_ms` was recorded on this run. | 2026-11-06 |
+| Staging | Loopback bind holds. Public name has auth. CORS origin is exact. | BLOCKED | No listener on `127.0.0.1:7878`. No staging `https://` name was brought up. | 2026-11-06 |
 
-No row above has been scored by the landing of this index. Fill a row when its gate has been run.
+Recorded 2026-11-06 17:18 CET on galion-laptop, branch `cursor/symphony-v2-benchmarks-d379`. The matrix markers later in this file are `python3 scripts/symphony/eval.py` from that same pass. Earlier sections keep the dates they were written with.
 # Symphony self-evaluation
 
 Europe/Zagreb. A section is complete when its gate passes and the run is written here.
@@ -452,31 +452,32 @@ scripts/symphony/gates/a.sh
 ## Matrix
 
 <!-- SYMPHONY-MATRIX-START -->
-Recorded 2026-11-03 10:51 CET. A row closes only when this run says PASS.
+Recorded 2026-11-06 17:18 CET. A row closes only when this run says PASS.
 
 | ID | Section | Status | Evidence |
-| A | Compiler | OPEN | .gq container is reader-only in galion-tensor; no clone-to-Galion clip compiler round-trip that refuses Chatterbox as the primary path |
+|---|---|---|---|
+| A | Compiler | PASS | compiler witness crates/galion-ml-voice/src/artifact.rs round-trips a Galion clip and refuses Chatterbox as primary |
 | B | Clone landing | OPEN | protocol stub emitted 402 B PCM (not a ref speak); worker refused a reference clip; samantha.wav absent; jarvis.wav absent; no smoke-speak log names both ref sha256 values |
 | C | Jarvis texture toggle | OPEN | checker self-test passed on a synthetic tone; jarvis.toml has no [texture] preserve toggle |
 | D | Persona and emotion | PASS | persona docs, e0/e1 prosody and wash, voice_color, feeling band at 80 ms; canned replies have no scripted empathy lines |
-| E | One-dot | OPEN | no test shows speak, auto-record, then a workflow hook |
+| E | One-dot | PASS | one / surface, mic records on that page, workflow hook in crates/galion-console/src/auto_workflow.rs |
 | F | Runbooks | PASS | bash -n ok for 8 README scripts: scripts/asr/fetch-vosk.sh, scripts/a21/fetch-a21.sh, scripts/run-v1-screen.sh, scripts/run-v1-demo.sh, scripts/eval/virtual-user.sh, scripts/check-phone-pipeline.sh, scripts/check-locks.sh, scripts/check-no-forbidden.sh |
 | G | 80 ms frame | PASS | frame_ms=80, 24 kHz, p95 budget <= 60 ms, late frame pauses; streaming doc names 80 ms; flash-ttfa stub-measures and prints no ttfa_ms |
 
-Closed: D, F, G. Open: A, B, C, E.
+Closed: A, D, E, F, G. Open: B, C.
 <!-- SYMPHONY-MATRIX-END -->
 
 ## Last run
 
 <!-- SYMPHONY-RUN-START -->
-stamp: 2026-11-03 10:51 CET
-locks_sha256: 6b69ffe258bffab8608566d808aefad4dba310d691aa97d1216c7844c0eb6397
+stamp: 2026-11-06 17:18 CET
+locks_sha256: b97fa057f6136d724f1283bdeb77d9d175a08a0245177ad85ae8e94ca3040f59
 command: scripts/symphony/self-eval.sh
-A OPEN — .gq container is reader-only in galion-tensor; no clone-to-Galion clip compiler round-trip that refuses Chatterbox as the primary path
+A PASS — compiler witness crates/galion-ml-voice/src/artifact.rs round-trips a Galion clip and refuses Chatterbox as primary
 B OPEN — protocol stub emitted 402 B PCM (not a ref speak); worker refused a reference clip; samantha.wav absent; jarvis.wav absent; no smoke-speak log names both ref sha256 values
 C OPEN — checker self-test passed on a synthetic tone; jarvis.toml has no [texture] preserve toggle
 D PASS — persona docs, e0/e1 prosody and wash, voice_color, feeling band at 80 ms; canned replies have no scripted empathy lines
-E OPEN — no test shows speak, auto-record, then a workflow hook
+E PASS — one / surface, mic records on that page, workflow hook in crates/galion-console/src/auto_workflow.rs
 F PASS — bash -n ok for 8 README scripts: scripts/asr/fetch-vosk.sh, scripts/a21/fetch-a21.sh, scripts/run-v1-screen.sh, scripts/run-v1-demo.sh, scripts/eval/virtual-user.sh, scripts/check-phone-pipeline.sh, scripts/check-locks.sh, scripts/check-no-forbidden.sh
 G PASS — frame_ms=80, 24 kHz, p95 budget <= 60 ms, late frame pauses; streaming doc names 80 ms; flash-ttfa stub-measures and prints no ttfa_ms
 exit: 1

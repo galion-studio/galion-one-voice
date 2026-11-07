@@ -47,6 +47,25 @@ A product number is copied into [SELF-EVAL.md](SELF-EVAL.md) when `engine` is `m
 
 **BLOCKED** when a model engine has not spoken, so the product clock has no sample. The harness itself can still **PASS** on the default line.
 
+## This session
+
+galion-laptop. 2026-11-06. Europe/Zagreb. No model engine ran. Product TTFA is **BLOCKED**. The harness line is `measured: false` and has no `ttfa_ms`.
+
+Exact line, stdout of `scripts/eval/flash-ttfa.sh` (exit 2; the example did not link, `cc` is missing):
+
+```text
+{"measured":false,"product_claim":false,"engine":null,"note":"flash example did not run; no model engine ran; no TTFA number"}
+```
+
+| Command | Result | What the command printed |
+|---|---|---|
+| `scripts/eval/flash-ttfa.sh` | BLOCKED | The line above. Exit 2. |
+| `scripts/eval/piper-stream-ttfa.sh` | BLOCKED | `{"engine": "piper", "voice": "en_US-ljspeech-medium", "measured": false, "stub": false, "product_claim": false, "pack": "absent", "reason": "A21 pack missing (run scripts/a21/fetch-a21.sh)"}`. Exit 2. |
+| `scripts/eval/clone-stream-ttfa.sh` | BLOCKED | `{"engine":null,"gate":"BLOCKED","hard_pass":false,"measured":false,"model_measured":false,"note":"Piper pack absent. No model engine ran. product_claim is false.","piper_measured":false,"product_claim":false,"stub":false}`. Exit 2. |
+| `python3 scripts/eval/piper_lat240_bench.py` | BLOCKED | `{"engine":"piper","measured":false,"product_claim":false,"reason":"Piper runtime or voice pack is not on this machine; no TTFA number"}`. Exit 2. |
+| `python3 scripts/eval/piper_ort_threads.py` | BLOCKED | `{"engine":"piper","measured":false,"product_claim":false,"reason":"Piper runtime or voice pack is not on this machine; no TTFA number"}`. Exit 2. |
+| `scripts/eval/v2-hard-loop.sh --self-check` | PASS | Exit 0. Classifiers held. The script printed `HARD-PASS of the loop: refused`. No product TTFA. |
+
 — Maciej Grajczyk
 # TTFA — live-sector streaming latency
 

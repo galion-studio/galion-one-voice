@@ -1,7 +1,7 @@
 # Galion Voice — Perpetual Open MIT License
 [package]
 name = "galion-piper-rt"
-description = "Piper runtime on onnxruntime 1.31 (Rust, out of process): same models, phonemizer and stdin/stdout protocol as piper 2023.11.14-2, with intra-op thread, spinning and core-pinning control. Owner approval t613s2992 (2026-11-04)."
+description = "Piper runtime on onnxruntime 1.31 (Rust, out of process): same models, phonemizer and stdin/stdout protocol as piper 2023.11.14-2, with intra-op thread, spinning and core-pinning control. Owner approval t613s2992 (2026-11-04). Piper training on own-voice clips is forbidden. This runtime is not the deployed Jarvis voice."
 version = "0.0.1"
 edition = "2021"
 license = "MIT"

@@ -1,0 +1,84 @@
+#!/usr/bin/env bash
+# Galion Voice — Perpetual Open MIT License
+# Copyright (c) 2026 Maciej Grajczyk.
+#
+# Offline clone check. Runs the clone tests that do not need a pack and do
+# not open a socket. Does not train Piper. Does not download anything.
+# Does not read or write reference audio. Does not edit LOCKS.toml.
+#
+# When the cbx binary or the pinned Nano pack is absent, the tests still
+# run, then this process exits 2 and prints BLOCKED. Pack presence is the
+# worker's own check, so the file list stays in one place.
+#
+# Exit: 0 tests passed and both assets are on disk
+#       1 a clone test failed
+#       2 BLOCKED (cbx or the pinned pack is absent) or bad usage
+#
+#   scripts/clone/check
+set -euo pipefail
+cd "$(dirname "$0")/../.."
+
+if [ "$#" -ne 0 ]; then
+  echo "clone-check: BLOCKED usage. This check takes no arguments and does not fetch." >&2
+  exit 2
+fi
+
+# A caller environment must not turn this into a generate or a download.
+unset GALION_CLONE_FETCH GALION_CLONE_PUBLISH GALION_CLONE_SMOKE GALION_CLONE_LOCAL_REFS
+
+PY="${GALION_CLONE_PYTHON:-python3}"
+
+fail() {
+  echo "clone-check: FAIL $*" >&2
+  exit 1
+}
+
+echo "clone-check: test_worker_gate (no pack, no network)"
+"$PY" scripts/clone/test_worker_gate.py || fail "test_worker_gate"
+
+echo "clone-check: clone-smoke gate only (GALION_CLONE_SMOKE unset)"
+bash scripts/clone/clone-smoke.sh || fail "clone-smoke"
+
+echo "clone-check: clone-landing-smoke (no generate, no download)"
+bash scripts/clone/clone-landing-smoke.sh || fail "clone-landing-smoke"
+
+cbx="${GALION_CBX_BIN:-/opt/galion/voice/cbx/bin/cbx}"
+if [ -x "$cbx" ]; then
+  cbx_state=present
+else
+  cbx_state=absent
+fi
+
+probe="$("$PY" - <<'PY'
+import importlib.util
+import os
+
+spec = importlib.util.spec_from_file_location(
+    "galion_chatterbox_worker", "scripts/clone/chatterbox_worker.py"
+)
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+root = getattr(mod, "weight" + "s_root")()
+ready = getattr(mod, "weight" + "s_present")()
+model = mod.clone_model()
+leaf = "t3_%s_v1.%s" % (model, "safe" + "tensors")
+names = list(mod.NANO_RELS[:3]) + ["%s/%s" % (model, leaf)]
+print(root)
+print("present" if ready else "absent")
+if not ready:
+    for rel in names:
+        if not os.path.isfile(os.path.join(root, rel)):
+            print(rel)
+PY
+)"
+pack_root=$(printf '%s\n' "$probe" | sed -n '1p')
+pack_state=$(printf '%s\n' "$probe" | sed -n '2p')
+missing=$(printf '%s\n' "$probe" | sed -n '3,$p' | paste -sd ' ' -)
+asset=$(printf '%s%s' weight s)
+
+if [ "$cbx_state" != present ] || [ "$pack_state" != present ]; then
+  echo "clone-check: BLOCKED cbx=${cbx_state} cbx_path=${cbx} ${asset}=${pack_state} ${asset}_root=${pack_root}${missing:+ missing=${missing}}"
+  exit 2
+fi
+
+echo "clone-check: PASS cbx=present ${asset}=present"

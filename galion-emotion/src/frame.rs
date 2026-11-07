@@ -1,6 +1,10 @@
 //! Core affect representation: dimensional (valence/arousal/dominance) first,
 //! categorical label second. Dimensional is cheaper, continuous and blends
 //! naturally over time — the right primitive for a real-time band.
+//!
+//! A live window is one 80 ms frame of 24 kHz mono audio (1920 samples).
+//! `live_frame` under `cfg(test)` names that arithmetic. It is the clock,
+//! not a measured score.
 
 /// Coarse categorical label, derived from VAD. Kept small on purpose.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -103,12 +107,62 @@ impl EmotionFrame {
     }
 }
 
+/// Live heartbeat window. Compiled only for tests so the affect types stay
+/// the production surface. 80 ms at 24 kHz is 1920 mono samples, 12.5 Hz.
+#[cfg(test)]
+pub mod live_frame {
+    /// Heartbeat period. Same quantum as LOCKS `[clock] frame_ms`.
+    pub const FRAME_MS: u32 = 80;
+    /// You / me / feeling audio rate.
+    pub const SAMPLE_RATE_HZ: u32 = 24_000;
+    /// `SAMPLE_RATE_HZ * FRAME_MS / 1000`. Exact: the product divides 1000.
+    pub const FRAME_SAMPLES: usize = (SAMPLE_RATE_HZ as usize * FRAME_MS as usize) / 1000;
+    /// 12.5 Hz written as millihertz so the test does not use a float literal.
+    pub const FRAME_MHZ: u32 = 12_500;
+
+    /// Samples in one frame. `None` when the window does not land on a sample.
+    pub fn samples_in(sample_rate_hz: u32, frame_ms: u32) -> Option<usize> {
+        let ticks = u64::from(sample_rate_hz) * u64::from(frame_ms);
+        if ticks % 1000 != 0 {
+            None
+        } else {
+            Some((ticks / 1000) as usize)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     fn f(v: f32, a: f32, d: f32, c: f32) -> EmotionFrame {
-        EmotionFrame { seq: 0, t_ms: 0, dur_ms: 80, valence: v, arousal: a, dominance: d, confidence: c }
+        EmotionFrame {
+            seq: 0,
+            t_ms: 0,
+            dur_ms: live_frame::FRAME_MS as u16,
+            valence: v,
+            arousal: a,
+            dominance: d,
+            confidence: c,
+        }
+    }
+
+    #[test]
+    fn live_frame_is_80ms_at_24khz() {
+        assert_eq!(live_frame::FRAME_MS, 80);
+        assert_eq!(live_frame::SAMPLE_RATE_HZ, 24_000);
+        assert_eq!(live_frame::samples_in(live_frame::SAMPLE_RATE_HZ, live_frame::FRAME_MS), Some(1920));
+        assert_eq!(live_frame::FRAME_SAMPLES, 1920);
+        // 12.5 Hz: 2 * 1000 ms = 25 * 80 ms, and millihertz is 12_500.
+        assert_eq!(2 * 1000, 25 * live_frame::FRAME_MS);
+        assert_eq!(live_frame::FRAME_MHZ, 12_500);
+        assert_eq!(u64::from(live_frame::SAMPLE_RATE_HZ) * u64::from(live_frame::FRAME_MS) % 1000, 0);
+        assert_eq!(live_frame::samples_in(24_001, live_frame::FRAME_MS), None);
+        let n = EmotionFrame::neutral(1, live_frame::FRAME_MS, live_frame::FRAME_MS as u16);
+        assert_eq!(n.dur_ms, live_frame::FRAME_MS as u16);
+        assert_eq!(n.t_ms, live_frame::FRAME_MS);
+        assert_eq!(n.confidence, 0.0);
+        assert_eq!(n.label(), Affect::Neutral);
     }
 
     #[test]

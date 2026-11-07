@@ -72,6 +72,16 @@ class Piper:
     def close(self):
         self.p.stdin.close(); self.p.kill(); self.p.wait()
 
+def absent(reason):
+    print(json.dumps({
+        "engine": "piper",
+        "measured": False,
+        "product_claim": False,
+        "reason": reason,
+    }, separators=(",", ":")))
+    raise SystemExit(2)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--model", default=str(ROOT / "weights/tts/en_US-ljspeech-medium.onnx"))
@@ -85,6 +95,10 @@ def main():
     ap.add_argument("--label", default="")
     ap.add_argument("--replay", default="", help="full-loop.ndjson: replay each run's real first_clause after a 'Mm-hm.' backchannel, like the loop")
     a = ap.parse_args()
+    runtime = Path(a.runtime)
+    model = Path(a.model)
+    if not runtime.is_file() or not os.access(runtime, os.X_OK) or not model.is_file() or not Path(str(model) + ".json").is_file():
+        absent("Piper runtime or voice pack is not on this machine; no TTFA number")
     cpus = None
     if a.cpus:
         cpus = set()

@@ -1,0 +1,14 @@
+BLOCKED
+
+galion-piper-rt did not build.
+
+Command: cargo build --offline --locked --manifest-path runtimes/galion-piper-rt/Cargo.toml
+Exit: 101
+
+error: no matching package named `libloading` found
+location searched: crates.io index
+required by package `ort v2.0.0-rc.15`
+    ... which satisfies dependency `ort = "=2.0.0-rc.15"` (locked to 2.0.0-rc.15) of package `galion-piper-rt v0.0.1 (/home/galion/workspace/galion/src/swarms/synthesis/runtimes/galion-piper-rt)`
+note: offline mode (via `--offline`) can sometimes cause surprising resolution failures
+
+Reason: this excluded crate cannot build without network. Cargo.lock pins `ort` 2.0.0-rc.15 and `ort-sys` 2.0.0-rc.15. Those crate files are not in the local cargo registry cache. The cache has `ort` 2.0.0-rc.10 and `ort-sys` 2.0.0-rc.10. Fetching the locked ort crate would be a network download. Pointing the manifest at the cached rc.10 would be a new ort dependency. Neither was done. onnxruntime was not vendored. Weights were not downloaded. No training was run.

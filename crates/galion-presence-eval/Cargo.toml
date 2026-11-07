@@ -1,7 +1,7 @@
 # Galion Voice — Perpetual Open MIT License
 [package]
 name = "galion-presence-eval"
-description = "Galion Voice virtual-user presence eval. Offline loopback T0–T2. No engagement metrics."
+description = "Galion Voice virtual-user presence eval. Offline loopback T0–T2 and an in-process headless T0 check. No engagement metrics."
 version.workspace = true
 edition.workspace = true
 license.workspace = true

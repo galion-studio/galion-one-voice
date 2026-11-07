@@ -17,7 +17,12 @@
 //!
 //! The locked circle stays `#F5F5F7`. `e` may pull the amber↔violet background
 //! wash toward a mid mix. Spectrum does not set hue.
+//!
+//! The phone lane uses [`StubExpressor::phone_lane`]. Caller affect is read
+//! there only when [`crate::consent::sense_granted`] is true. A session starts
+//! denied, so the lane stays on the neutral-warm decision.
 
+use crate::consent::{sense_granted, ConsentGate, Purpose};
 use crate::frame::{Affect, EmotionFrame};
 
 /// Decoder-agnostic prosody knobs. Neutral = all defaults.
@@ -240,6 +245,22 @@ impl StubExpressor {
             oklch: NEUTRAL_OKLCH.lerp_lab(EMPATHY_OKLCH, e),
         }
     }
+
+    /// Phone-lane decision. Caller affect is applied only when sense is granted
+    /// (in-band `SENSE` bit and an [`crate::consent::ConsentDecision::Allow`]).
+    /// A denied session does not read `caller`; the result matches `voice_color(None)`.
+    pub fn phone_lane<G: ConsentGate + ?Sized>(
+        &self,
+        caller: Option<&EmotionFrame>,
+        bits: u8,
+        purpose: Purpose,
+        gate: &G,
+    ) -> VoiceColor {
+        let decision = gate.check(purpose);
+        gate.audit(purpose, decision);
+        let caller = if sense_granted(bits, decision) { caller } else { None };
+        self.voice_color(caller)
+    }
 }
 
 #[cfg(test)]
@@ -346,6 +367,41 @@ mod tests {
         assert_eq!(p.voice_color(None).e, 0.0);
         let unsure = EmotionFrame { confidence: 0.1, ..f(-0.9, 0.9, 0.9) };
         assert_eq!(p.voice_color(Some(&unsure)).e, 0.0, "low confidence is not a guess");
+    }
+
+    #[test]
+    fn denied_session_does_not_apply_caller_affect_on_the_phone_lane() {
+        use crate::band::consent_bits;
+        use crate::consent::{ConsentDecision, DefaultConsentGate, Purpose};
+
+        let p = StubExpressor;
+        let caller = f(-0.8, 0.9, 0.8);
+        let applied = p.voice_color(Some(&caller));
+        let neutral = p.voice_color(None);
+        assert_ne!(applied, neutral, "the fixture must be one the lane could leak");
+        assert!(applied.e > 0.8);
+
+        let denied = DefaultConsentGate::default();
+        assert_eq!(denied.state, crate::consent::ConsentState::Denied);
+        let bits = consent_bits::SENSE | consent_bits::ADAPT;
+        let lane = p.phone_lane(Some(&caller), bits, Purpose::PersonalAssistant, &denied);
+        assert_eq!(lane, neutral, "denied session applied caller affect");
+        assert_ne!(lane.prosody, applied.prosody);
+        assert_ne!(lane.target, applied.target);
+        assert_eq!(lane.e, 0.0);
+
+        let mut granted = DefaultConsentGate::denied();
+        granted.grant(1, "en", Purpose::PersonalAssistant);
+        let open = p.phone_lane(Some(&caller), bits, Purpose::PersonalAssistant, &granted);
+        assert_eq!(open, applied, "sense granted admits the caller frame");
+        let no_sense = p.phone_lane(Some(&caller), consent_bits::ADAPT, Purpose::PersonalAssistant, &granted);
+        assert_eq!(no_sense, neutral, "adapt without sense does not admit caller affect");
+
+        let mut workplace = DefaultConsentGate::denied();
+        workplace.grant(1, "en", Purpose::Workplace);
+        let blocked = p.phone_lane(Some(&caller), bits, Purpose::Workplace, &workplace);
+        assert_eq!(blocked, neutral, "a prohibited purpose is still a denied session");
+        assert_eq!(workplace.check(Purpose::Workplace), ConsentDecision::DenyProhibitedPurpose);
     }
 
     #[test]

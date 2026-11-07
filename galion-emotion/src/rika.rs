@@ -36,6 +36,8 @@
 //! * **SENSE + ADAPT required** (Q10), plus an allowed [`ConsentGate`]
 //!   decision: Workplace / Education → `DenyProhibitedPurpose` → OFF (Q12).
 //!   With consent missing, the feature closure (= PCM read) is never called.
+//!   Caller affect reaches the phone lane only through [`admit_caller_affect`],
+//!   and only when sense is granted. A session starts denied.
 //! * **RAM only.** No persistence of any kind; all affect state is wiped on
 //!   OFF. Zero heap allocation in [`Rika::step`].
 //! * Late frames never advance hysteresis and never cause catch-up bursts.
@@ -202,13 +204,8 @@ pub struct FrameFeatures {
 impl FrameFeatures {
     /// RMS + zero-crossing rate over one frame of mono PCM. No allocation.
     pub fn from_pcm(pcm: &[f32]) -> Self {
-        if pcm.is_empty() {
-            return Self { rms: 0.0, zcr: 0.0, affect: None, tension: None };
-        }
-        let n = pcm.len() as f32;
-        let rms = (pcm.iter().map(|x| x * x).sum::<f32>() / n).sqrt();
-        let zc = pcm.windows(2).filter(|w| (w[0] >= 0.0) != (w[1] >= 0.0)).count() as f32 / n;
-        Self { rms, zcr: zc, affect: None, tension: None }
+        let (rms, zcr) = crate::loudness::rms_zcr(pcm);
+        Self { rms, zcr, affect: None, tension: None }
     }
     pub fn with_affect(mut self, a: Option<EmotionFrame>) -> Self {
         self.affect = a;
@@ -298,6 +295,28 @@ impl RikaOutput {
 
 fn db_to_gain(db: f32) -> f32 {
     10f32.powf(db / 20.0)
+}
+
+/// Caller affect for the phone lane. The frame is dropped unless sense is granted.
+pub fn admit_caller_affect(
+    bits: u8,
+    decision: ConsentDecision,
+    caller: Option<EmotionFrame>,
+) -> Option<EmotionFrame> {
+    if crate::consent::sense_granted(bits, decision) {
+        caller
+    } else {
+        None
+    }
+}
+
+/// Features the phone lane may see. Caller affect and tension stay only with sense.
+pub fn prepare_phone_features(mut features: FrameFeatures, bits: u8, decision: ConsentDecision) -> FrameFeatures {
+    features.affect = admit_caller_affect(bits, decision, features.affect);
+    if !crate::consent::sense_granted(bits, decision) {
+        features.tension = None;
+    }
+    features
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -588,6 +607,8 @@ impl Rika {
         }
 
         let f = features();
+        let decision = gate.check(ctx.purpose);
+        let f = prepare_phone_features(f, ctx.consent_bits, decision);
         let voiced = f.rms >= self.cfg.voice_rms && f.zcr <= self.cfg.voice_zcr_max;
         let present = f.rms >= self.cfg.presence_rms;
         if voiced {
@@ -1160,6 +1181,47 @@ mod tests {
         assert!(r.explain().contains("not reading"));
         let run1 = run(RikaConfig::v0_enabled(), &fixture_r1(), &g, |_| ctx(SA));
         assert!(run1.rika.explain().contains("took a breath"));
+    }
+
+    #[test]
+    fn denied_session_does_not_apply_caller_affect() {
+        let angry = EmotionFrame {
+            seq: 4,
+            t_ms: 320,
+            dur_ms: 80,
+            valence: -0.8,
+            arousal: 0.9,
+            dominance: 0.8,
+            confidence: 1.0,
+        };
+        let raw = FrameFeatures { rms: 0.02, zcr: 0.1, affect: Some(angry), tension: Some(0.9) };
+        let denied_features = prepare_phone_features(raw, SA, ConsentDecision::DenyNoConsent);
+        assert!(denied_features.affect.is_none(), "denied session applied caller affect");
+        assert!(denied_features.tension.is_none(), "denied session applied caller affect");
+        let no_sense = prepare_phone_features(raw, consent_bits::ADAPT, ConsentDecision::Allow);
+        assert!(no_sense.affect.is_none() && no_sense.tension.is_none());
+        let open = prepare_phone_features(raw, SA, ConsentDecision::Allow);
+        assert_eq!(open.affect, Some(angry));
+        assert_eq!(open.tension, Some(0.9));
+
+        let gate = DefaultConsentGate::default();
+        assert_eq!(gate.state, crate::consent::ConsentState::Denied);
+        assert!(admit_caller_affect(SA, gate.check(Purpose::PersonalAssistant), Some(angry)).is_none());
+        let mut rika = Rika::new(RikaConfig::v0_enabled());
+        let mut calls = 0u32;
+        let out = rika.step(ctx(SA), &gate, || {
+            calls += 1;
+            raw
+        });
+        assert_eq!(calls, 0, "denied session read caller affect");
+        assert_eq!(out.off, Some(OffReason::Gate(ConsentDecision::DenyNoConsent)));
+        assert_eq!(out.lean_in, 0.0);
+        assert_eq!(out.apply_prosody(ProsodyControl::default()), ProsodyControl::default());
+
+        let lane = StubExpressor.phone_lane(Some(&angry), SA, Purpose::PersonalAssistant, &gate);
+        let applied = StubExpressor.voice_color(Some(&angry));
+        assert_ne!(lane, applied, "denied session applied caller affect");
+        assert_eq!(lane, StubExpressor.voice_color(None));
     }
 
     #[test]

@@ -486,4 +486,15 @@ mod tests {
         std::fs::write(d.join("tts.safetensors.sha256"), "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad").unwrap();
         let s = WeightStatus::inspect(&d).unwrap(); assert!(!s.verified()); assert_eq!(s.id(), "present-unverified");
     }
+    /// No directory is created and no pack is fetched. `Absent` cannot open Piper.
+    #[test]
+    fn absent_piper_pack_does_not_open_a_slot() {
+        let status = WeightStatus::Absent { searched: vec!["unit-test: no piper voice pack".into()] };
+        let err = match A21WeightTts::try_new(&status) {
+            Err(e) => e,
+            Ok(_) => panic!("absent piper pack must not open A21"),
+        };
+        assert!(err.contains("ABSENT"), "{err}");
+        assert_eq!(status.id(), "absent");
+    }
 }
