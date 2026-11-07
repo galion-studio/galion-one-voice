@@ -10,7 +10,7 @@ use crate::demo::frame_at;
 use crate::frame::NebulaFrame;
 use crate::quality::{
     budget_for, initial_normal_target, ladder_at_most, parse_quality, step_normal_target,
-    GpuClass, QualityMode, TierBudget, NORMAL_FPS_LADDER, NORMAL_PACING, ULTRA_FRAME_BUDGET_MS,
+    GpuClass, QualityMode, TierBudget, HIGH_FPS_TARGET, NORMAL_FPS_LADDER, NORMAL_PACING, ULTRA_FRAME_BUDGET_MS,
 };
 use crate::render::render;
 use crate::shade::Voice;
@@ -32,6 +32,8 @@ pub struct Nebula {
     cool: u32,
     hot: u32,
     supersample: f32,
+    sprite_buf: Vec<f32>,
+    sprite_count: u32,
 }
 
 #[wasm_bindgen]
@@ -46,6 +48,10 @@ impl Nebula {
         let mut budget = budget_for(requested, device, refresh_hz, gpu);
         if budget.mode == QualityMode::Normal {
             budget.fps_target = initial_normal_target(refresh_hz, gpu);
+        }
+        if budget.mode == QualityMode::High {
+            let refresh = if refresh_hz.is_finite() && refresh_hz > 1.0 { refresh_hz } else { 60.0 };
+            budget.fps_target = HIGH_FPS_TARGET.min(ladder_at_most(refresh));
         }
         let particles = budget.particle_ceiling.max(budget.particles);
         Nebula {
@@ -63,6 +69,8 @@ impl Nebula {
             cool: 0,
             hot: 0,
             supersample: 1.0,
+            sprite_buf: vec![0.0; particles.max(1) * crate::render::SPRITE_STRIDE * 2],
+            sprite_count: 0,
         }
     }
 
@@ -99,6 +107,66 @@ impl Nebula {
         self.blend += 8.0;
     }
 
+    pub fn step(&mut self, dt_ms: f32) {
+        let dt = (dt_ms / 1000.0).clamp(1.0 / 240.0, 0.05);
+        self.smoothed_ms = self.smoothed_ms * 0.9 + dt_ms.max(0.1) * 0.1;
+        self.adapt();
+        self.blend += dt;
+        self.frame = frame_at(self.voice, self.blend);
+        let drive = crate::frame::drive_from(&self.frame, self.budget.particles, self.budget.octaves);
+        self.sim.step(&drive, 1.0 / self.budget.fps_target.max(1.0));
+    }
+
+    pub fn pack_sprites(&mut self, css_w: f32, css_h: f32, dpr: f32) -> u32 {
+        let dpr = if dpr.is_finite() && dpr > 0.0 { dpr } else { 1.0 };
+        let buf_w = (css_w.max(2.0) * dpr).round().max(2.0) as u32;
+        let buf_h = (css_h.max(2.0) * dpr).round().max(2.0) as u32;
+        let need = self.budget.particles.max(1) * crate::render::SPRITE_STRIDE * 2;
+        if self.sprite_buf.len() < need {
+            self.sprite_buf.resize(need, 0.0);
+        }
+        self.sprite_count = crate::render::write_sprites(
+            &self.sim,
+            &self.frame,
+            buf_w,
+            buf_h,
+            &self.budget,
+            true,
+            &mut self.sprite_buf,
+        );
+        self.sprite_count
+    }
+
+    pub fn sprites_ptr(&self) -> u32 {
+        self.sprite_buf.as_ptr() as u32
+    }
+
+    pub fn sprites_count(&self) -> u32 {
+        self.sprite_count
+    }
+
+    pub fn apply_quality(&mut self, quality: &str) {
+        let requested = parse_quality(quality).unwrap_or(QualityMode::Normal);
+        let mut budget = budget_for(requested, self.budget.device, self.refresh_hz, self.gpu);
+        if budget.mode == QualityMode::Normal {
+            budget.fps_target = initial_normal_target(self.refresh_hz, self.gpu);
+        }
+        if budget.mode == QualityMode::High {
+            budget.fps_target = HIGH_FPS_TARGET.min(ladder_at_most(self.refresh_hz));
+        }
+        budget.particle_ceiling = budget.particle_ceiling.min(self.sim.particles.len());
+        budget.particles = budget.particles.min(self.sim.particles.len());
+        self.budget = budget;
+    }
+
+    pub fn floor_rgb(&self) -> String {
+        let c = match self.voice {
+            Voice::Samantha => [0.012, 0.008, 0.004],
+            Voice::Jarvis => [0.004, 0.006, 0.016],
+        };
+        format!("{{\"r\":{},\"g\":{},\"b\":{}}}", c[0], c[1], c[2])
+    }
+
     pub fn toggle_overlay(&mut self) -> bool {
         self.overlay = !self.overlay;
         self.overlay
@@ -121,10 +189,15 @@ impl Nebula {
 
     pub fn debug(&self) -> String {
         format!(
-            "{{\"mode\":\"{:?}\",\"pacing\":\"{:?}\",\"fps\":{},\"particles\":{},\"scale\":{},\"overlay\":{},\"supersample\":{}}}",
-            self.budget.mode, self.budget.pacing, self.budget.fps_target, self.budget.particles, self.budget.render_scale, self.overlay, self.supersample
+            "{{\"mode\":\"{:?}\",\"pacing\":\"{:?}\",\"fps\":{},\"particles\":{},\"scale\":{},\"overlay\":{},\"supersample\":{},\"device\":\"{:?}\"}}",
+            self.budget.mode, self.budget.pacing, self.budget.fps_target, self.budget.particles, self.budget.render_scale, self.overlay, self.supersample, self.budget.device
         )
     }
+}
+
+#[wasm_bindgen]
+pub fn wasm_memory() -> JsValue {
+    wasm_bindgen::memory()
 }
 
 
