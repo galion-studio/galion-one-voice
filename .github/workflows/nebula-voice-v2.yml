@@ -1,0 +1,29 @@
+# Nebula Galion Voice V2. Unit tests only. No deploy, no weights, no GPU.
+name: nebula-voice-v2
+
+on:
+  pull_request:
+    paths:
+      - "apps/nebula-voice-v2/**"
+      - "crates/nebula-elements/**"
+      - "emotion-v2/elements.py"
+      - ".github/workflows/nebula-voice-v2.yml"
+  push:
+    branches: [main]
+    paths:
+      - "apps/nebula-voice-v2/**"
+      - "crates/nebula-elements/**"
+      - "emotion-v2/elements.py"
+      - ".github/workflows/nebula-voice-v2.yml"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.85.0
+      - name: Element table
+        run: cargo test --manifest-path crates/nebula-elements/Cargo.toml
+      - name: Nebula library
+        run: cargo test --manifest-path apps/nebula-voice-v2/Cargo.toml --no-default-features --lib
