@@ -50,7 +50,15 @@ def main():
     ap.add_argument("--reuse-lines", action="append", default=[], help="name=path to line-score JSON")
     ap.add_argument("--out", required=True)
     ap.add_argument("--plugin-dir", default=None)
+    ap.add_argument(
+        "--nebula-reference",
+        default=None,
+        help="JSON payload or list of payloads (weights + vad) for the offline nebula field. Does not change emotion_match.",
+    )
     args = ap.parse_args()
+    nebula_reference = None
+    if args.nebula_reference:
+        nebula_reference = json.loads(Path(args.nebula_reference).read_text())
 
     persona = load_persona(resolve_persona_path(args.persona))
     detectors = load_detectors(plugin_dir=Path(args.plugin_dir) if args.plugin_dir else None)
@@ -116,7 +124,12 @@ def main():
         for i, ln in enumerate(lines):
             ln.setdefault("id", Path(str(ln.get("path") or ln.get("file") or f"t{i:02d}")).stem)
         sets[name] = emotion_match(
-            line_recs=lines, moments=moments, persona=persona, detectors=detectors
+            line_recs=lines,
+            moments=moments,
+            persona=persona,
+            detectors=detectors,
+            nebula_reference=nebula_reference,
+            nebula_reference_recs=windows,
         )
 
     # ceiling: score windows against themselves if we have them
@@ -128,7 +141,12 @@ def main():
             rec.setdefault("id", w.get("id") or f"w{i:02d}")
             ceil_lines.append(rec)
         ceiling = emotion_match(
-            line_recs=ceil_lines, moments=moments, persona=persona, detectors=detectors
+            line_recs=ceil_lines,
+            moments=moments,
+            persona=persona,
+            detectors=detectors,
+            nebula_reference=nebula_reference,
+            nebula_reference_recs=windows,
         )
 
     out = {

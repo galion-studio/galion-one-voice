@@ -293,6 +293,20 @@ def emb_sim_vs_windows(lines, windows):
     return float(np.mean(scores)) if scores else None
 
 
+def _nebula_field(persona: str, reference_recs, rendered_recs):
+    """Offline distribution report. Not an input to emotion_match."""
+    py = Path(__file__).resolve().parents[2] / "persona" / "py"
+    if str(py) not in sys.path:
+        sys.path.insert(0, str(py))
+    from nebula import field_for_clips
+
+    return field_for_clips(
+        samantha=(persona == "samantha"),
+        reference_recs=reference_recs,
+        rendered_recs=rendered_recs,
+    )
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--persona", required=True, choices=["samantha", "jarvis"])
@@ -396,7 +410,9 @@ def main():
                      } if m["window"].get("efficientat") else None,
                      } for m in moments],
         "BASE-self-ceiling": {
-            "emotion_match": emotion_match_c, "category_blend": cat_c, "emb_sim": emb_c,
+            "emotion_match": emotion_match_c,
+            "nebula": _nebula_field(args.persona, windows, windows),
+            "category_blend": cat_c, "emb_sim": emb_c,
             "leaderboard": lb_c,
         },
         "sets": {},
@@ -427,7 +443,10 @@ def main():
         if cat_b is not None and emb_s is not None:
             em = 0.70 * cat_b + 0.30 * emb_s
         results["sets"][name] = {
-            "n": len(lines), "emotion_match": em, "category_blend": cat_b, "emb_sim": emb_s,
+            "n": len(lines),
+            "emotion_match": em,
+            "nebula": _nebula_field(args.persona, windows, lines),
+            "category_blend": cat_b, "emb_sim": emb_s,
             "leaderboard": lb, "renders": str(d),
         }
         print(f"=== {name} emotion_match={em} cat={cat_b} emb={emb_s}", file=sys.stderr)
