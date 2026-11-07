@@ -45,6 +45,10 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         self.path = urlunsplit(parts._replace(path=value))
         return "ok", None
 
+    def end_headers(self):
+        self.send_header("Cache-Control", "no-cache, max-age=0, must-revalidate")
+        super().end_headers()
+
     def do_GET(self):
         kind, loc = self._prepare()
         if kind == "redirect":

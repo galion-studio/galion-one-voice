@@ -1,4 +1,4 @@
-import { cie as cieHex } from "./cie.js";
+import { cie as cieHex } from "./cie.js?v=abde48e";
 
 // Gesture glue for the fullscreen nebula. No visible controls.
 const params = new URLSearchParams(location.search);
