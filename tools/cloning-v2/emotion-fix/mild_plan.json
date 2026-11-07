@@ -1,0 +1,15 @@
+{
+  "baseline_matched_dev4": {"ecapa": 0.7458, "emotion_distance": 0.4786, "valence": 0.503, "floor_ecapa": 0.7358},
+  "ref_avd": {"arousal": 0.567, "valence": 0.698, "dominance": 0.679},
+  "failed_do_not_repeat": ["jd_ln_up(-27+up)", "jd_r6_up", "jd_r10_up", "jd_base_up(temp0.8)", "jd_base_grU", "jd_base_leg"],
+  "insight": "Jarvis ref valence peaks at start (0-4s ~0.79); r6/r10 rotated colder material into encoder/decoder first window",
+  "configs": [
+    {"tag": "jd_m1_ln", "voice": "own-jarvis-v2-emo-m1", "ref": "prepped/jarvis-ln-half.wav", "norm": -24.85, "batch": "temp0 default"},
+    {"tag": "jd_m2_warm", "voice": "own-jarvis-v2-emo-m2", "ref": "prepped/jarvis-warm10.wav", "batch": "temp0 default"},
+    {"tag": "jd_m3_sim", "voice": "own-jarvis-v2-emo-m3", "ref": "similarity/refs/jarvis-multiclip-long-ln.wav", "batch": "temp0 default"},
+    {"tag": "jd_m4_simc", "voice": "own-jarvis-v2-emo-m4", "ref": "similarity/refs/jarvis-cleaned-ln.wav", "batch": "temp0 default"},
+    {"tag": "jd_m5_mup", "voice": "own-jarvis", "batch": "temp0.4 topk1000 topp0.975 rep-unique punc-norm (half up)"},
+    {"tag": "jd_m6_ln_mup", "voice": "own-jarvis-v2-emo-m1", "batch": "mild up"},
+    {"tag": "jd_m7_sim_mup", "voice": "own-jarvis-v2-emo-m3", "batch": "mild up"}
+  ]
+}

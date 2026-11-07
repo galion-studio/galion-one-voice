@@ -1,0 +1,392 @@
+{
+  "files": [
+    {
+      "bandwidth": {
+        "energy_frac_gt_4k": 0.02703,
+        "energy_frac_gt_8k": 0.002261,
+        "f90_hz": 1500.0,
+        "f99_hz": 6152.3,
+        "method": "welch hann nfft=2048 hop=1024 mean-detrend, channel mean"
+      },
+      "bits": 16,
+      "channels": 1,
+      "click_thr": 0.3499999940395355,
+      "clicks": 0,
+      "clip_thr": 0.9900000095367432,
+      "clipped_runs": 0,
+      "clipped_samples": 0,
+      "duration_s": 4.058,
+      "float": false,
+      "loudness": {
+        "integrated_lufs": -26.22,
+        "lra_lu": 0.77,
+        "max_momentary_lufs": -23.4,
+        "max_short_term_lufs": -26.03,
+        "note": ""
+      },
+      "max_sample_jump": 0.1613,
+      "ms": 6.37,
+      "path": "/workspace/samples/v2/pipeline/jarvis/t01-postonly.wav",
+      "rms_dbfs": -26.26,
+      "sample_peak_dbfs": -6.71,
+      "sr": 24000,
+      "true_peak_dbtp": -6.67
+    },
+    {
+      "bandwidth": {
+        "energy_frac_gt_4k": 0.02228,
+        "energy_frac_gt_8k": 0.001276,
+        "f90_hz": 2062.5,
+        "f99_hz": 5308.6,
+        "method": "welch hann nfft=2048 hop=1024 mean-detrend, channel mean"
+      },
+      "bits": 16,
+      "channels": 1,
+      "click_thr": 0.3499999940395355,
+      "clicks": 0,
+      "clip_thr": 0.9900000095367432,
+      "clipped_runs": 0,
+      "clipped_samples": 0,
+      "duration_s": 3.323,
+      "float": false,
+      "loudness": {
+        "integrated_lufs": -27.38,
+        "lra_lu": 0.17,
+        "max_momentary_lufs": -25.34,
+        "max_short_term_lufs": -27.29,
+        "note": ""
+      },
+      "max_sample_jump": 0.1355,
+      "ms": 4.59,
+      "path": "/workspace/samples/v2/pipeline/jarvis/t02-postonly.wav",
+      "rms_dbfs": -27.88,
+      "sample_peak_dbfs": -10.99,
+      "sr": 24000,
+      "true_peak_dbtp": -10.97
+    },
+    {
+      "bandwidth": {
+        "energy_frac_gt_4k": 0.0496,
+        "energy_frac_gt_8k": 0.003058,
+        "f90_hz": 2097.7,
+        "f99_hz": 6832.0,
+        "method": "welch hann nfft=2048 hop=1024 mean-detrend, channel mean"
+      },
+      "bits": 16,
+      "channels": 1,
+      "click_thr": 0.3499999940395355,
+      "clicks": 0,
+      "clip_thr": 0.9900000095367432,
+      "clipped_runs": 0,
+      "clipped_samples": 0,
+      "duration_s": 3.026,
+      "float": false,
+      "loudness": {
+        "integrated_lufs": -27.0,
+        "lra_lu": 0.0,
+        "max_momentary_lufs": -23.62,
+        "max_short_term_lufs": -27.29,
+        "note": ""
+      },
+      "max_sample_jump": 0.1624,
+      "ms": 4.21,
+      "path": "/workspace/samples/v2/pipeline/jarvis/t03-postonly.wav",
+      "rms_dbfs": -27.73,
+      "sample_peak_dbfs": -8.54,
+      "sr": 24000,
+      "true_peak_dbtp": -8.51
+    },
+    {
+      "bandwidth": {
+        "energy_frac_gt_4k": 0.03565,
+        "energy_frac_gt_8k": 0.002479,
+        "f90_hz": 1558.6,
+        "f99_hz": 6234.4,
+        "method": "welch hann nfft=2048 hop=1024 mean-detrend, channel mean"
+      },
+      "bits": 16,
+      "channels": 1,
+      "click_thr": 0.3499999940395355,
+      "clicks": 0,
+      "clip_thr": 0.9900000095367432,
+      "clipped_runs": 0,
+      "clipped_samples": 0,
+      "duration_s": 2.239,
+      "float": false,
+      "loudness": {
+        "integrated_lufs": -27.04,
+        "lra_lu": null,
+        "max_momentary_lufs": -24.68,
+        "max_short_term_lufs": null,
+        "note": "clip < 3 s: LRA/short-term undefined"
+      },
+      "max_sample_jump": 0.1661,
+      "ms": 2.94,
+      "path": "/workspace/samples/v2/pipeline/jarvis/t04-postonly.wav",
+      "rms_dbfs": -27.42,
+      "sample_peak_dbfs": -7.4,
+      "sr": 24000,
+      "true_peak_dbtp": -7.38
+    },
+    {
+      "bandwidth": {
+        "energy_frac_gt_4k": 0.02995,
+        "energy_frac_gt_8k": 0.001352,
+        "f90_hz": 2039.1,
+        "f99_hz": 6175.8,
+        "method": "welch hann nfft=2048 hop=1024 mean-detrend, channel mean"
+      },
+      "bits": 16,
+      "channels": 1,
+      "click_thr": 0.3499999940395355,
+      "clicks": 0,
+      "clip_thr": 0.9900000095367432,
+      "clipped_runs": 0,
+      "clipped_samples": 0,
+      "duration_s": 2.841,
+      "float": false,
+      "loudness": {
+        "integrated_lufs": -26.64,
+        "lra_lu": null,
+        "max_momentary_lufs": -24.38,
+        "max_short_term_lufs": null,
+        "note": "clip < 3 s: LRA/short-term undefined"
+      },
+      "max_sample_jump": 0.1383,
+      "ms": 4.06,
+      "path": "/workspace/samples/v2/pipeline/jarvis/t05-postonly.wav",
+      "rms_dbfs": -26.72,
+      "sample_peak_dbfs": -8.54,
+      "sr": 24000,
+      "true_peak_dbtp": -8.49
+    },
+    {
+      "bandwidth": {
+        "energy_frac_gt_4k": 0.03265,
+        "energy_frac_gt_8k": 0.003057,
+        "f90_hz": 1558.6,
+        "f99_hz": 6246.1,
+        "method": "welch hann nfft=2048 hop=1024 mean-detrend, channel mean"
+      },
+      "bits": 16,
+      "channels": 1,
+      "click_thr": 0.3499999940395355,
+      "clicks": 0,
+      "clip_thr": 0.9900000095367432,
+      "clipped_runs": 0,
+      "clipped_samples": 0,
+      "duration_s": 3.235,
+      "float": false,
+      "loudness": {
+        "integrated_lufs": -26.43,
+        "lra_lu": 0.75,
+        "max_momentary_lufs": -23.36,
+        "max_short_term_lufs": -26.08,
+        "note": ""
+      },
+      "max_sample_jump": 0.1873,
+      "ms": 4.41,
+      "path": "/workspace/samples/v2/pipeline/jarvis/t06-postonly.wav",
+      "rms_dbfs": -26.6,
+      "sample_peak_dbfs": -7.68,
+      "sr": 24000,
+      "true_peak_dbtp": -7.67
+    },
+    {
+      "bandwidth": {
+        "energy_frac_gt_4k": 0.02975,
+        "energy_frac_gt_8k": 0.002155,
+        "f90_hz": 2062.5,
+        "f99_hz": 6257.8,
+        "method": "welch hann nfft=2048 hop=1024 mean-detrend, channel mean"
+      },
+      "bits": 16,
+      "channels": 1,
+      "click_thr": 0.3499999940395355,
+      "clicks": 0,
+      "clip_thr": 0.9900000095367432,
+      "clipped_runs": 0,
+      "clipped_samples": 0,
+      "duration_s": 3.123,
+      "float": false,
+      "loudness": {
+        "integrated_lufs": -27.25,
+        "lra_lu": 0.32,
+        "max_momentary_lufs": -23.91,
+        "max_short_term_lufs": -27.11,
+        "note": ""
+      },
+      "max_sample_jump": 0.144,
+      "ms": 4.39,
+      "path": "/workspace/samples/v2/pipeline/jarvis/t07-postonly.wav",
+      "rms_dbfs": -27.72,
+      "sample_peak_dbfs": -8.13,
+      "sr": 24000,
+      "true_peak_dbtp": -7.99
+    },
+    {
+      "bandwidth": {
+        "energy_frac_gt_4k": 0.02001,
+        "energy_frac_gt_8k": 0.001511,
+        "f90_hz": 1546.9,
+        "f99_hz": 5203.1,
+        "method": "welch hann nfft=2048 hop=1024 mean-detrend, channel mean"
+      },
+      "bits": 16,
+      "channels": 1,
+      "click_thr": 0.3499999940395355,
+      "clicks": 0,
+      "clip_thr": 0.9900000095367432,
+      "clipped_runs": 0,
+      "clipped_samples": 0,
+      "duration_s": 6.715,
+      "float": false,
+      "loudness": {
+        "integrated_lufs": -26.4,
+        "lra_lu": 1.84,
+        "max_momentary_lufs": -21.78,
+        "max_short_term_lufs": -25.59,
+        "note": ""
+      },
+      "max_sample_jump": 0.1756,
+      "ms": 9.99,
+      "path": "/workspace/samples/v2/pipeline/jarvis/t08-postonly.wav",
+      "rms_dbfs": -26.75,
+      "sample_peak_dbfs": -6.56,
+      "sr": 24000,
+      "true_peak_dbtp": -6.39
+    },
+    {
+      "bandwidth": {
+        "energy_frac_gt_4k": 0.01706,
+        "energy_frac_gt_8k": 0.000922,
+        "f90_hz": 1171.9,
+        "f99_hz": 5168.0,
+        "method": "welch hann nfft=2048 hop=1024 mean-detrend, channel mean"
+      },
+      "bits": 16,
+      "channels": 1,
+      "click_thr": 0.3499999940395355,
+      "clicks": 0,
+      "clip_thr": 0.9900000095367432,
+      "clipped_runs": 0,
+      "clipped_samples": 0,
+      "duration_s": 8.274,
+      "float": false,
+      "loudness": {
+        "integrated_lufs": -26.42,
+        "lra_lu": 1.65,
+        "max_momentary_lufs": -21.69,
+        "max_short_term_lufs": -25.54,
+        "note": ""
+      },
+      "max_sample_jump": 0.1825,
+      "ms": 11.65,
+      "path": "/workspace/samples/v2/pipeline/jarvis/t09-postonly.wav",
+      "rms_dbfs": -26.41,
+      "sample_peak_dbfs": -5.47,
+      "sr": 24000,
+      "true_peak_dbtp": -5.47
+    },
+    {
+      "bandwidth": {
+        "energy_frac_gt_4k": 0.02348,
+        "energy_frac_gt_8k": 0.001823,
+        "f90_hz": 1535.2,
+        "f99_hz": 6058.6,
+        "method": "welch hann nfft=2048 hop=1024 mean-detrend, channel mean"
+      },
+      "bits": 16,
+      "channels": 1,
+      "click_thr": 0.3499999940395355,
+      "clicks": 0,
+      "clip_thr": 0.9900000095367432,
+      "clipped_runs": 0,
+      "clipped_samples": 0,
+      "duration_s": 4.733,
+      "float": false,
+      "loudness": {
+        "integrated_lufs": -25.78,
+        "lra_lu": 2.7,
+        "max_momentary_lufs": -20.91,
+        "max_short_term_lufs": -25.15,
+        "note": ""
+      },
+      "max_sample_jump": 0.2053,
+      "ms": 6.48,
+      "path": "/workspace/samples/v2/pipeline/jarvis/t10-postonly.wav",
+      "rms_dbfs": -26.38,
+      "sample_peak_dbfs": -5.58,
+      "sr": 24000,
+      "true_peak_dbtp": -5.58
+    },
+    {
+      "bandwidth": {
+        "energy_frac_gt_4k": 0.02017,
+        "energy_frac_gt_8k": 0.001524,
+        "f90_hz": 1546.9,
+        "f99_hz": 5285.2,
+        "method": "welch hann nfft=2048 hop=1024 mean-detrend, channel mean"
+      },
+      "bits": 16,
+      "channels": 1,
+      "click_thr": 0.3499999940395355,
+      "clicks": 0,
+      "clip_thr": 0.9900000095367432,
+      "clipped_runs": 0,
+      "clipped_samples": 0,
+      "duration_s": 6.441,
+      "float": false,
+      "loudness": {
+        "integrated_lufs": -25.76,
+        "lra_lu": 1.13,
+        "max_momentary_lufs": -21.18,
+        "max_short_term_lufs": -24.93,
+        "note": ""
+      },
+      "max_sample_jump": 0.1907,
+      "ms": 8.88,
+      "path": "/workspace/samples/v2/pipeline/jarvis/t11-postonly.wav",
+      "rms_dbfs": -26.07,
+      "sample_peak_dbfs": -6.64,
+      "sr": 24000,
+      "true_peak_dbtp": -6.63
+    },
+    {
+      "bandwidth": {
+        "energy_frac_gt_4k": 0.04571,
+        "energy_frac_gt_8k": 0.00292,
+        "f90_hz": 2015.6,
+        "f99_hz": 6855.5,
+        "method": "welch hann nfft=2048 hop=1024 mean-detrend, channel mean"
+      },
+      "bits": 16,
+      "channels": 1,
+      "click_thr": 0.3499999940395355,
+      "clicks": 0,
+      "clip_thr": 0.9900000095367432,
+      "clipped_runs": 0,
+      "clipped_samples": 0,
+      "duration_s": 4.96,
+      "float": false,
+      "loudness": {
+        "integrated_lufs": -27.84,
+        "lra_lu": 1.06,
+        "max_momentary_lufs": -24.31,
+        "max_short_term_lufs": -27.58,
+        "note": ""
+      },
+      "max_sample_jump": 0.1839,
+      "ms": 6.76,
+      "path": "/workspace/samples/v2/pipeline/jarvis/t12-postonly.wav",
+      "rms_dbfs": -28.74,
+      "sample_peak_dbfs": -8.2,
+      "sr": 24000,
+      "true_peak_dbtp": -8.19
+    }
+  ],
+  "timing": {
+    "total_s": 0.0749
+  },
+  "tool": "galion-hygiene"
+}

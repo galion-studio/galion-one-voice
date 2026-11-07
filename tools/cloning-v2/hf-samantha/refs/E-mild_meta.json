@@ -1,0 +1,24 @@
+{
+  "steps": [
+    "denoise_stationary_prop0.55",
+    "declick_fixed=0",
+    "high_shelf_2800Hz_2.5dB",
+    "harmonic_exciter_mix=0.08",
+    "loudness_norm_target=-20.0_LUFS_tp<=-1.0"
+  ],
+  "note": "ESTIMATED mild HF: shelf 2.5dB + light exciter; denoise+declick+loudness",
+  "bw_in": {
+    "f90_hz": 867.2,
+    "f99_hz": 2666.0,
+    "pct_energy_gt_4k": 0.396
+  },
+  "input_lufs": -25.680228314080765,
+  "bw_out": {
+    "f90_hz": 1388.7,
+    "f99_hz": 4394.5,
+    "pct_energy_gt_4k": 1.374
+  },
+  "peak_dbfs_out": -1.01,
+  "output_lufs": -23.01,
+  "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/hf-samantha/refs/samantha-ref-E-mild.wav"
+}

@@ -1,0 +1,23 @@
+[package]
+name = "galion-emotion"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0 OR MIT"
+description = "Rust-native emotion scorer for voice clones (SER + A/V/D + acoustic proxies + clone-vs-ref distance)"
+
+[[bin]]
+name = "galion-emotion"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1.0.95"
+hound = "3.5.1"
+ort = { version = "2.0.0-rc.10", default-features = false, features = ["std", "load-dynamic"] }
+rustfft = "6"
+serde = { version = "1.0.217", features = ["derive"] }
+serde_json = "1.0.145"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 4

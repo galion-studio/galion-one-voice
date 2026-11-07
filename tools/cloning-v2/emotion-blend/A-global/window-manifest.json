@@ -1,0 +1,80 @@
+[
+  {
+    "persona": "samantha",
+    "start_s": 0.0,
+    "end_s": 2.5,
+    "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-blend/A-global/windows/samantha_original_000.00_002.50.wav"
+  },
+  {
+    "persona": "samantha",
+    "start_s": 2.5,
+    "end_s": 5.0,
+    "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-blend/A-global/windows/samantha_original_002.50_005.00.wav"
+  },
+  {
+    "persona": "samantha",
+    "start_s": 5.0,
+    "end_s": 7.5,
+    "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-blend/A-global/windows/samantha_original_005.00_007.50.wav"
+  },
+  {
+    "persona": "samantha",
+    "start_s": 7.5,
+    "end_s": 10.0,
+    "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-blend/A-global/windows/samantha_original_007.50_010.00.wav"
+  },
+  {
+    "persona": "samantha",
+    "start_s": 10.0,
+    "end_s": 12.5,
+    "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-blend/A-global/windows/samantha_original_010.00_012.50.wav"
+  },
+  {
+    "persona": "samantha",
+    "start_s": 12.5,
+    "end_s": 15.0,
+    "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-blend/A-global/windows/samantha_original_012.50_015.00.wav"
+  },
+  {
+    "persona": "samantha",
+    "start_s": 15.0,
+    "end_s": 17.40718820861678,
+    "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-blend/A-global/windows/samantha_original_015.00_017.41.wav"
+  },
+  {
+    "persona": "jarvis",
+    "start_s": 0.0,
+    "end_s": 2.5,
+    "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-blend/A-global/windows/jarvis_original_000.00_002.50.wav"
+  },
+  {
+    "persona": "jarvis",
+    "start_s": 2.5,
+    "end_s": 5.0,
+    "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-blend/A-global/windows/jarvis_original_002.50_005.00.wav"
+  },
+  {
+    "persona": "jarvis",
+    "start_s": 5.0,
+    "end_s": 7.5,
+    "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-blend/A-global/windows/jarvis_original_005.00_007.50.wav"
+  },
+  {
+    "persona": "jarvis",
+    "start_s": 7.5,
+    "end_s": 10.0,
+    "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-blend/A-global/windows/jarvis_original_007.50_010.00.wav"
+  },
+  {
+    "persona": "jarvis",
+    "start_s": 10.0,
+    "end_s": 12.5,
+    "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-blend/A-global/windows/jarvis_original_010.00_012.50.wav"
+  },
+  {
+    "persona": "jarvis",
+    "start_s": 12.5,
+    "end_s": 15.9520625,
+    "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-blend/A-global/windows/jarvis_original_012.50_015.95.wav"
+  }
+]

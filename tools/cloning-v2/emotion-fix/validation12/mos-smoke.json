@@ -1,0 +1,44 @@
+{
+  "files": [
+    {
+      "duration_s": 5.0,
+      "mos": 3.6408,
+      "ms": 1877.3,
+      "path": "runs/sd_old/t01.wav",
+      "pesq": 4.0873,
+      "si_sdr": 31.3423,
+      "stoi": 0.9988
+    }
+  ],
+  "metric": "torchaudio SQUIM_SUBJECTIVE (NORESQA-MOS) + SQUIM_OBJECTIVE, ONNX fp32",
+  "nmr": "../../clip-store-own/jarvis/reference.wav",
+  "summary": {
+    "mos": {
+      "mean": 3.6408,
+      "n": 1,
+      "sd": 0.0
+    },
+    "pesq": {
+      "mean": 4.0873,
+      "n": 1,
+      "sd": 0.0
+    },
+    "si_sdr": {
+      "mean": 31.3423,
+      "n": 1,
+      "sd": 0.0
+    },
+    "stoi": {
+      "mean": 0.9988,
+      "n": 1,
+      "sd": 0.0
+    }
+  },
+  "threads": 2,
+  "timing": {
+    "load_s": 2.406,
+    "peak_rss_mb": 816.5,
+    "score_s": 1.877
+  },
+  "tool": "galion-mos"
+}

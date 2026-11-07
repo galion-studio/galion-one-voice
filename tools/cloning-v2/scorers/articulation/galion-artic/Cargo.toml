@@ -1,0 +1,18 @@
+[package]
+name = "galion-artic"
+version = "0.1.0"
+edition = "2021"
+description = "Rust-native acoustic articulation / mouth-expression scorer (F0, formants, VSA, rate, consonant clarity, MCD-DTW, pauses)"
+
+[dependencies]
+hound = "3.5"
+rustfft = "6.4"
+realfft = "3.5"
+rubato = "0.16"
+serde_json = "1"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 4
+debug = false

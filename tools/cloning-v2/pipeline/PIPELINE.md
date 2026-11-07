@@ -38,3 +38,12 @@ Sam `--pace 0.85` · Jar `--pace 0.82` · keep pitch at 0.
 New-voice entry point: `bin/cbx-add-voice`. Explicit `--emotion-blend` or per-voice
 `emotion_blend.enabled=true` selects a diverse <=6s reference while retaining original
 identity tensors. Legacy cbx executable is not replaced. See [EMOTION-BLEND.md](EMOTION-BLEND.md).
+
+## Missing-emotion targets (off by default)
+Opt-in stage: detect scorer categories below presence 0.2 on the original, synthesize
+probe lines for the missing ones, score them with the unmodified universal scorer, and
+write per-emotion `TARGETS.json`. Entry: `missing-emotion-targets/` (`galion-emotion-targets`)
+or `bin/cbx-add-voice --missing-emotion-targets --targets-work-dir NEW_DIR`. Default path
+is unchanged (universal scorer). Opt-in persona scoring: `--scorer persona` on
+`galion-emotion-targets`, or `--targets-scorer persona` on `cbx-add-voice`.
+See [missing-emotion-targets/README.md](missing-emotion-targets/README.md).

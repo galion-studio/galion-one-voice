@@ -1,0 +1,2 @@
+-rw-r--r-- 1 box box 781480 Nov  5 20:02 /home/box/.cache/huggingface/cbx/voices/own-samantha-v2-sim-cleaned.cbxvoice
+-rw-r--r-- 1 box box 781480 Nov  5 20:02 /home/box/.cache/huggingface/cbx/voices/own-samantha-v2-sim-multi.cbxvoice

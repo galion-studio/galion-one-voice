@@ -1,0 +1,290 @@
+[
+  {
+    "tag": "jar_old",
+    "persona": "jarvis",
+    "set": "all12",
+    "n": 12,
+    "emotion_distance": 0.5113990157842636,
+    "avd_distance": 0.23046110508342585,
+    "persona_prosody_distance": 6.167537270663052,
+    "ecapa": 0.732725,
+    "f0_hz": 142.36217910361546,
+    "rate_wps": 3.311093531950236,
+    "labels": {
+      "ang": 0,
+      "hap": 0,
+      "neu": 12,
+      "sad": 0
+    }
+  },
+  {
+    "tag": "jar_old",
+    "persona": "jarvis",
+    "set": "dev4",
+    "n": 4,
+    "emotion_distance": 0.4786435067653656,
+    "avd_distance": 0.22451066970825195,
+    "persona_prosody_distance": 6.745098551441438,
+    "ecapa": 0.74575,
+    "f0_hz": 135.38969754386446,
+    "rate_wps": 3.4950235295725407,
+    "labels": {
+      "ang": 0,
+      "hap": 0,
+      "neu": 4,
+      "sad": 0
+    }
+  },
+  {
+    "tag": "jd_base_grU",
+    "persona": "jarvis",
+    "set": "dev4",
+    "n": 4,
+    "emotion_distance": 0.5030666068196297,
+    "avd_distance": 0.2209911271929741,
+    "persona_prosody_distance": 7.10876650529417,
+    "ecapa": 0.73125,
+    "f0_hz": 138.5973598375986,
+    "rate_wps": 3.4682480154826703,
+    "labels": {
+      "ang": 0,
+      "hap": 1,
+      "neu": 3,
+      "sad": 0
+    }
+  },
+  {
+    "tag": "jd_base_leg",
+    "persona": "jarvis",
+    "set": "dev4",
+    "n": 4,
+    "emotion_distance": 0.48130206763744354,
+    "avd_distance": 0.22556574642658234,
+    "persona_prosody_distance": 6.564601906753719,
+    "ecapa": 0.751575,
+    "f0_hz": 136.5090155730383,
+    "rate_wps": 3.4950235295725407,
+    "labels": {
+      "ang": 0,
+      "hap": 1,
+      "neu": 3,
+      "sad": 0
+    }
+  },
+  {
+    "tag": "jd_base_up",
+    "persona": "jarvis",
+    "set": "dev4",
+    "n": 4,
+    "emotion_distance": 0.5378502383828163,
+    "avd_distance": 0.21590073592960835,
+    "persona_prosody_distance": 7.02702005517418,
+    "ecapa": 0.743775,
+    "f0_hz": 135.4139150435352,
+    "rate_wps": 3.457518440864836,
+    "labels": {
+      "ang": 0,
+      "hap": 2,
+      "neu": 2,
+      "sad": 0
+    }
+  },
+  {
+    "tag": "jd_ln_up",
+    "persona": "jarvis",
+    "set": "dev4",
+    "n": 4,
+    "emotion_distance": 0.46689698100090027,
+    "avd_distance": 0.24667151272296906,
+    "persona_prosody_distance": 7.796205325617571,
+    "ecapa": 0.708075,
+    "f0_hz": 145.25492898556345,
+    "rate_wps": 3.4293377680005586,
+    "labels": {
+      "ang": 0,
+      "hap": 1,
+      "neu": 3,
+      "sad": 0
+    }
+  },
+  {
+    "tag": "jd_r10_up",
+    "persona": "jarvis",
+    "set": "dev4",
+    "n": 4,
+    "emotion_distance": 0.5095452144742012,
+    "avd_distance": 0.2604180611670017,
+    "persona_prosody_distance": 6.346587884493464,
+    "ecapa": 0.701175,
+    "f0_hz": 132.16004308411144,
+    "rate_wps": 3.640608011921533,
+    "labels": {
+      "ang": 0,
+      "hap": 2,
+      "neu": 2,
+      "sad": 0
+    }
+  },
+  {
+    "tag": "jd_r6_up",
+    "persona": "jarvis",
+    "set": "dev4",
+    "n": 4,
+    "emotion_distance": 0.48373134434223175,
+    "avd_distance": 0.24286533147096634,
+    "persona_prosody_distance": 5.88704232717998,
+    "ecapa": 0.706275,
+    "f0_hz": 133.9884018818629,
+    "rate_wps": 3.5934312484646522,
+    "labels": {
+      "ang": 0,
+      "hap": 0,
+      "neu": 4,
+      "sad": 0
+    }
+  },
+  {
+    "tag": "sam_old",
+    "persona": "samantha",
+    "set": "all12",
+    "n": 12,
+    "emotion_distance": 0.5062032217780749,
+    "avd_distance": 0.09693861737226446,
+    "persona_prosody_distance": 6.122014611919527,
+    "ecapa": 0.7071916666666667,
+    "f0_hz": 202.97253189484516,
+    "rate_wps": 3.4896846285762213,
+    "labels": {
+      "ang": 7,
+      "hap": 2,
+      "neu": 3,
+      "sad": 0
+    }
+  },
+  {
+    "tag": "sam_old",
+    "persona": "samantha",
+    "set": "dev4",
+    "n": 4,
+    "emotion_distance": 0.5333890095353127,
+    "avd_distance": 0.11050981655716896,
+    "persona_prosody_distance": 6.641960338696374,
+    "ecapa": 0.71155,
+    "f0_hz": 205.91170266183357,
+    "rate_wps": 3.6075394305070394,
+    "labels": {
+      "ang": 2,
+      "hap": 1,
+      "neu": 1,
+      "sad": 0
+    }
+  },
+  {
+    "tag": "sd_base_grU",
+    "persona": "samantha",
+    "set": "dev4",
+    "n": 4,
+    "emotion_distance": 0.5765275731682777,
+    "avd_distance": 0.10391802806407213,
+    "persona_prosody_distance": 7.043379750505371,
+    "ecapa": 0.6915,
+    "f0_hz": 207.77375117631468,
+    "rate_wps": 3.6273701239784577,
+    "labels": {
+      "ang": 3,
+      "hap": 1,
+      "neu": 0,
+      "sad": 0
+    }
+  },
+  {
+    "tag": "sd_base_leg",
+    "persona": "samantha",
+    "set": "dev4",
+    "n": 4,
+    "emotion_distance": 0.6159745901823044,
+    "avd_distance": 0.10990733467042446,
+    "persona_prosody_distance": 6.713563624847309,
+    "ecapa": 0.7196750000000001,
+    "f0_hz": 209.01936870182553,
+    "rate_wps": 3.6075394305070394,
+    "labels": {
+      "ang": 3,
+      "hap": 0,
+      "neu": 1,
+      "sad": 0
+    }
+  },
+  {
+    "tag": "sd_base_up",
+    "persona": "samantha",
+    "set": "dev4",
+    "n": 4,
+    "emotion_distance": 0.5305459797382355,
+    "avd_distance": 0.11473507340997458,
+    "persona_prosody_distance": 5.081180004275193,
+    "ecapa": 0.7380249999999999,
+    "f0_hz": 197.04985843225984,
+    "rate_wps": 3.4589238628872776,
+    "labels": {
+      "ang": 2,
+      "hap": 0,
+      "neu": 2,
+      "sad": 0
+    }
+  },
+  {
+    "tag": "sd_ln_up",
+    "persona": "samantha",
+    "set": "dev4",
+    "n": 4,
+    "emotion_distance": 0.4802795276045799,
+    "avd_distance": 0.12609744910150766,
+    "persona_prosody_distance": 6.560543150653871,
+    "ecapa": 0.70165,
+    "f0_hz": 208.04728911585693,
+    "rate_wps": 3.661574881332946,
+    "labels": {
+      "ang": 0,
+      "hap": 2,
+      "neu": 2,
+      "sad": 0
+    }
+  },
+  {
+    "tag": "sd_r2_up",
+    "persona": "samantha",
+    "set": "dev4",
+    "n": 4,
+    "emotion_distance": 0.460298515856266,
+    "avd_distance": 0.10077102016657591,
+    "persona_prosody_distance": 5.043379483587165,
+    "ecapa": 0.737975,
+    "f0_hz": 186.48583934637765,
+    "rate_wps": 3.606552581962418,
+    "labels": {
+      "ang": 1,
+      "hap": 1,
+      "neu": 2,
+      "sad": 0
+    }
+  },
+  {
+    "tag": "sd_r9_up",
+    "persona": "samantha",
+    "set": "dev4",
+    "n": 4,
+    "emotion_distance": 0.5143659114837646,
+    "avd_distance": 0.12788322661072016,
+    "persona_prosody_distance": 5.769985112882248,
+    "ecapa": 0.716575,
+    "f0_hz": 205.22110347393354,
+    "rate_wps": 3.527579876264087,
+    "labels": {
+      "ang": 3,
+      "hap": 0,
+      "neu": 1,
+      "sad": 0
+    }
+  }
+]

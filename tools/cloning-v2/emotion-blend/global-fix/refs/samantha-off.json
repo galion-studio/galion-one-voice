@@ -1,0 +1,6 @@
+{
+  "enabled": false,
+  "input": "../clip-store-own/samantha/original.wav",
+  "mode": "byte-copy",
+  "output": "emotion-blend/global-fix/refs/samantha-off.wav"
+}

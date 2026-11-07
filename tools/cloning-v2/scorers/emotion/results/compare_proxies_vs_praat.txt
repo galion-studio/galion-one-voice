@@ -1,0 +1,8 @@
+Rust galion-emotion proxies vs Praat/parselmouth 0.4.7 (two-pass floor/ceiling), n=26 files
+f0_mean_hz             rust 173.997 praat 171.746 mean|d|  3.703 r=0.991
+f0_median_hz           rust 167.896 praat 165.552 mean|d|  3.088 r=0.994
+f0_sd_st               rust   3.472 praat   3.370 mean|d|  0.239 r=0.819
+f0_range_st_p5_p95     rust  11.130 praat  10.948 mean|d|  0.817 r=0.746
+jitter_local_pct       rust   2.925 praat   2.400 mean|d|  0.720 r=-0.063
+shimmer_local_pct      rust   9.481 praat   9.762 mean|d|  0.937 r=0.634
+energy_dr_db (numpy)   rust  26.242 numpy  26.210 mean|d|  0.161 r=0.995

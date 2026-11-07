@@ -1,0 +1,127 @@
+{
+  "asr": "/workspace/swarm/voice-v2-sprint/repo/weights/asr/vosk-model-small-en-us-0.15",
+  "files": [
+    {
+      "del": 0,
+      "duration_s": 4.96,
+      "errors": 1,
+      "hyp": "the morning light came slowly over the hills and the whole valley seem to wake up at once",
+      "ins": 0,
+      "ms": 992.0,
+      "n_ref_words": 18,
+      "path": "wav/own-samantha-v2-hf-a-clean/t01.wav",
+      "sub": 1,
+      "wer": 0.056,
+      "wer_raw": 0.055556
+    },
+    {
+      "del": 0,
+      "duration_s": 3.72,
+      "errors": 0,
+      "hyp": "if you need anything at all tonight just tell me and i will take care of it",
+      "ins": 0,
+      "ms": 917.6,
+      "n_ref_words": 17,
+      "path": "wav/own-samantha-v2-hf-a-clean/t02.wav",
+      "sub": 0,
+      "wer": 0.0,
+      "wer_raw": 0.0
+    },
+    {
+      "del": 0,
+      "duration_s": 3.2,
+      "errors": 0,
+      "hyp": "we checked the numbers twice this afternoon and the results are clear",
+      "ins": 0,
+      "ms": 691.4,
+      "n_ref_words": 12,
+      "path": "wav/own-samantha-v2-hf-a-clean/t03.wav",
+      "sub": 0,
+      "wer": 0.0,
+      "wer_raw": 0.0
+    },
+    {
+      "del": 0,
+      "duration_s": 2.64,
+      "errors": 0,
+      "hyp": "could you open the living room window before dinner starts",
+      "ins": 0,
+      "ms": 913.4,
+      "n_ref_words": 10,
+      "path": "wav/own-samantha-v2-hf-a-clean/t04.wav",
+      "sub": 0,
+      "wer": 0.0,
+      "wer_raw": 0.0
+    },
+    {
+      "del": 0,
+      "duration_s": 3.12,
+      "errors": 0,
+      "hyp": "are you sure the meeting is still at three thirty on thursday",
+      "ins": 0,
+      "ms": 649.5,
+      "n_ref_words": 12,
+      "path": "wav/own-samantha-v2-hf-a-clean/t05.wav",
+      "sub": 0,
+      "wer": 0.0,
+      "wer_raw": 0.0
+    },
+    {
+      "del": 0,
+      "duration_s": 3.92,
+      "errors": 0,
+      "hyp": "i am so glad you made it home safely i was worried the whole time",
+      "ins": 0,
+      "ms": 731.9,
+      "n_ref_words": 15,
+      "path": "wav/own-samantha-v2-hf-a-clean/t06.wav",
+      "sub": 0,
+      "wer": 0.0,
+      "wer_raw": 0.0
+    },
+    {
+      "del": 0,
+      "duration_s": 3.8,
+      "errors": 1,
+      "hyp": "that was an incredible performance he should be really proud of yourself",
+      "ins": 0,
+      "ms": 692.9,
+      "n_ref_words": 12,
+      "path": "wav/own-samantha-v2-hf-a-clean/t07.wav",
+      "sub": 1,
+      "wer": 0.083,
+      "wer_raw": 0.083333
+    },
+    {
+      "del": 0,
+      "duration_s": 7.6,
+      "errors": 0,
+      "hyp": "please remember to bring your passport the confirmation email and the hotel booking number when you leave for the airport tomorrow morning at six fifteen",
+      "ins": 0,
+      "ms": 994.4,
+      "n_ref_words": 25,
+      "path": "wav/own-samantha-v2-hf-a-clean/t08.wav",
+      "sub": 0,
+      "wer": 0.0,
+      "wer_raw": 0.0
+    }
+  ],
+  "normalisation": "wer_t648.py: lower, [^a-z' ]->space, split",
+  "summary": {
+    "frac_le_10pct": 1.0,
+    "max": 0.083,
+    "mean": 0.017,
+    "mean_raw": 0.01736,
+    "min": 0.0,
+    "n": 8,
+    "sd": 0.031
+  },
+  "timing": {
+    "audio_s": 32.96,
+    "jobs": 2,
+    "load_s": 0.634,
+    "rtf": 0.1102,
+    "score_s": 3.632
+  },
+  "tool": "galion-wer"
+}

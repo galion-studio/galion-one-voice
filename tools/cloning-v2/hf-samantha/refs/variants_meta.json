@@ -1,0 +1,129 @@
+{
+  "disclaimer": "Any energy above ~2.7 kHz is ESTIMATED / synthesized, not recovered from the recording.",
+  "variants": {
+    "A-clean": {
+      "steps": [
+        "denoise_stationary_prop0.55",
+        "declick_fixed=0",
+        "loudness_norm_target=-20.0_LUFS_tp<=-1.0"
+      ],
+      "note": "control: dual-mono\u2192mono already; denoise+declick+loudness; NO HF restore",
+      "bw_in": {
+        "f90_hz": 867.2,
+        "f99_hz": 2666.0,
+        "pct_energy_gt_4k": 0.396
+      },
+      "input_lufs": -25.79717403385943,
+      "bw_out": {
+        "f90_hz": 1224.6,
+        "f99_hz": 3140.6,
+        "pct_energy_gt_4k": 0.705
+      },
+      "peak_dbfs_out": -1.18,
+      "output_lufs": -21.88,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/hf-samantha/refs/samantha-ref-A-clean.wav",
+      "sr": 24000,
+      "duration_s": 17.407
+    },
+    "B-shelf": {
+      "steps": [
+        "denoise_stationary_prop0.55",
+        "declick_fixed=0",
+        "high_shelf_2800Hz_5.0dB",
+        "harmonic_exciter_mix=0.14",
+        "loudness_norm_target=-20.0_LUFS_tp<=-1.0"
+      ],
+      "note": "ESTIMATED HF via high-shelf + mild harmonic exciter",
+      "bw_in": {
+        "f90_hz": 867.2,
+        "f99_hz": 2666.0,
+        "pct_energy_gt_4k": 0.396
+      },
+      "input_lufs": -25.36714302805132,
+      "bw_out": {
+        "f90_hz": 2050.8,
+        "f99_hz": 6451.2,
+        "pct_energy_gt_4k": 2.49
+      },
+      "peak_dbfs_out": -1.12,
+      "output_lufs": -23.92,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/hf-samantha/refs/samantha-ref-B-shelf.wav",
+      "sr": 24000,
+      "duration_s": 17.407
+    },
+    "C-bwe": {
+      "steps": [
+        "denoise_stationary_prop0.55",
+        "declick_fixed=0",
+        "spectral_mirror_bwe_ESTIMATED",
+        "high_shelf_2800Hz_4.0dB",
+        "harmonic_exciter_mix=0.12",
+        "loudness_norm_target=-20.0_LUFS_tp<=-1.0"
+      ],
+      "note": "ESTIMATED HF via spectral-mirror BWE + shelf + exciter",
+      "bw_in": {
+        "f90_hz": 867.2,
+        "f99_hz": 2666.0,
+        "pct_energy_gt_4k": 0.396
+      },
+      "input_lufs": -25.76945880253452,
+      "bw_out": {
+        "f90_hz": 1242.2,
+        "f99_hz": 4242.2,
+        "pct_energy_gt_4k": 1.078
+      },
+      "peak_dbfs_out": -1.04,
+      "output_lufs": -21.42,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/hf-samantha/refs/samantha-ref-C-bwe.wav",
+      "sr": 24000,
+      "duration_s": 17.407
+    },
+    "D-orig44-bwe": {
+      "steps": [
+        "denoise_stationary_prop0.55",
+        "declick_fixed=0",
+        "spectral_mirror_bwe_ESTIMATED",
+        "high_shelf_2800Hz_4.5dB",
+        "harmonic_exciter_mix=0.13",
+        "loudness_norm_target=-20.0_LUFS_tp<=-1.0"
+      ],
+      "note": "ESTIMATED HF at 44.1k from original then downsample to 24k",
+      "bw_in": {
+        "f90_hz": 872.1,
+        "f99_hz": 2670.1,
+        "pct_energy_gt_4k": 0.407
+      },
+      "input_lufs": -25.64210204367201,
+      "bw_out": {
+        "f90_hz": 1313.5,
+        "f99_hz": 4209.7,
+        "pct_energy_gt_4k": 1.081
+      },
+      "peak_dbfs_out": -1.01,
+      "output_lufs": -21.25,
+      "bw_out_24k": {
+        "f90_hz": 1312.5,
+        "f99_hz": 4095.7,
+        "pct_energy_gt_4k": 1.031
+      },
+      "peak_dbfs_out_24k": -1.01,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/hf-samantha/refs/samantha-ref-D-orig44-bwe.wav",
+      "sr": 24000,
+      "duration_s": 17.407
+    }
+  },
+  "inputs": {
+    "original": {
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/hf-samantha/inputs/original.wav",
+      "f90_hz": 872.1,
+      "f99_hz": 2670.1,
+      "pct_energy_gt_4k": 0.407
+    },
+    "reference": {
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/hf-samantha/inputs/reference.wav",
+      "f90_hz": 867.2,
+      "f99_hz": 2666.0,
+      "pct_energy_gt_4k": 0.396
+    }
+  }
+}

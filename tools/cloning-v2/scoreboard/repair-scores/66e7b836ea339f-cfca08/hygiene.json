@@ -1,0 +1,40 @@
+{
+  "files": [
+    {
+      "bandwidth": {
+        "energy_frac_gt_4k": 0.01063,
+        "energy_frac_gt_8k": 0.001432,
+        "f90_hz": 1488.3,
+        "f99_hz": 4066.4,
+        "method": "welch hann nfft=2048 hop=1024 mean-detrend, channel mean"
+      },
+      "bits": 16,
+      "channels": 1,
+      "click_thr": 0.3499999940395355,
+      "clicks": 13,
+      "clip_thr": 0.9900000095367432,
+      "clipped_runs": 2,
+      "clipped_samples": 3,
+      "duration_s": 8.76,
+      "float": false,
+      "loudness": {
+        "integrated_lufs": -22.98,
+        "lra_lu": 1.38,
+        "max_momentary_lufs": -18.6,
+        "max_short_term_lufs": -21.76,
+        "note": ""
+      },
+      "max_sample_jump": 0.45,
+      "ms": 14.31,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/hf-samantha/wav/own-samantha-v2-hf-b-shelf/t09.wav",
+      "rms_dbfs": -22.78,
+      "sample_peak_dbfs": -0.0,
+      "sr": 24000,
+      "true_peak_dbtp": 0.33
+    }
+  ],
+  "timing": {
+    "total_s": 0.0143
+  },
+  "tool": "galion-hygiene"
+}

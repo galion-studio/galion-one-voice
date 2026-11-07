@@ -1,0 +1,286 @@
+{
+  "schema": "galion-persona-match/1",
+  "wrapper": "results-persona/persona_match_cached.py (Agent 3; path-cached detectors)",
+  "persona": {
+    "id": "own-samantha",
+    "display_name": "Samantha",
+    "gate": 0.83,
+    "judged": [
+      "joyful",
+      "aggressive",
+      "love",
+      "laughter",
+      "logic",
+      "neutral",
+      "seductive"
+    ],
+    "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/personas/own-samantha.toml"
+  },
+  "BASE-self-ceiling": {
+    "persona_id": "own-samantha",
+    "gate": 0.83,
+    "emotion_match": 0.8650308818595598,
+    "category_blend": 0.8218196099645128,
+    "emb_sim": 0.9658571829480033,
+    "pass": true,
+    "leaderboard": [
+      {
+        "category": "neutral",
+        "source": "trained class (emotion2vec+)",
+        "strength": 1.0,
+        "score": 0.9622746039020298,
+        "best_line": "w00",
+        "best_match": 1.0,
+        "mean_match": 0.9161657864489549,
+        "n": 8
+      },
+      {
+        "category": "laughter",
+        "source": "efficientat",
+        "strength": 0.2743651270866394,
+        "score": 0.916485469415784,
+        "best_line": "w00",
+        "best_match": 1.0,
+        "mean_match": 0.8144121542572975,
+        "n": 8
+      },
+      {
+        "category": "logic",
+        "source": "zero-shot text prompt (CLAP)",
+        "strength": 0.49966762061927383,
+        "score": 0.8518575610910404,
+        "best_line": "w06",
+        "best_match": 1.0,
+        "mean_match": 0.6707945802023119,
+        "n": 8
+      },
+      {
+        "category": "aggressive",
+        "source": "trained class (emotion2vec+)",
+        "strength": 0.9990363121032715,
+        "score": 0.8202779419639838,
+        "best_line": "w03",
+        "best_match": 1.0,
+        "mean_match": 0.6006176488088528,
+        "n": 8
+      },
+      {
+        "category": "love",
+        "source": "love_seductive clap-prompt-ensemble (gender-conditioned mean-target vs mean-neutral, sad-gated; love also requires mean cosine > 0.20)",
+        "strength": 0.9390544380026881,
+        "score": 0.6302473150364416,
+        "best_line": "w03",
+        "best_match": 1.0,
+        "mean_match": 0.17832736674764793,
+        "n": 8
+      }
+    ],
+    "na_categories": [],
+    "judged": [
+      "joyful",
+      "aggressive",
+      "love",
+      "laughter",
+      "logic",
+      "neutral",
+      "seductive"
+    ],
+    "formula": "emotion_match = 0.70*category_blend + 0.30*emb_sim over persona target emotions only; out-of-set categories are n/a (dropped, not 0); crying decision = emotion2vec+ sad"
+  },
+  "sets": {
+    "merge-v2": {
+      "persona_id": "own-samantha",
+      "gate": 0.83,
+      "emotion_match": 0.6869450087862239,
+      "category_blend": 0.6135572718172585,
+      "emb_sim": 0.8581830617138099,
+      "pass": false,
+      "leaderboard": [
+        {
+          "category": "neutral",
+          "source": "trained class (emotion2vec+)",
+          "strength": 1.0,
+          "score": 0.9689200045253754,
+          "best_line": "t12",
+          "best_match": 0.9999999979782276,
+          "mean_match": 0.9309333458607782,
+          "n": 12
+        },
+        {
+          "category": "logic",
+          "source": "zero-shot text prompt (CLAP)",
+          "strength": 0.49966762061927383,
+          "score": 0.9247894142895605,
+          "best_line": "t08",
+          "best_match": 0.9823947580814477,
+          "mean_match": 0.854382882988365,
+          "n": 12
+        },
+        {
+          "category": "laughter",
+          "source": "efficientat",
+          "strength": 0.2743651270866394,
+          "score": 0.8542200412601233,
+          "best_line": "t09",
+          "best_match": 0.8753917217254639,
+          "mean_match": 0.8283435429135958,
+          "n": 12
+        },
+        {
+          "category": "aggressive",
+          "source": "trained class (emotion2vec+)",
+          "strength": 0.9990363121032715,
+          "score": 0.5555290011531206,
+          "best_line": "t07",
+          "best_match": 0.5742796720554101,
+          "mean_match": 0.5326115144947666,
+          "n": 12
+        },
+        {
+          "category": "love",
+          "source": "love_seductive clap-prompt-ensemble (gender-conditioned mean-target vs mean-neutral, sad-gated; love also requires mean cosine > 0.20)",
+          "strength": 0.9390544380026881,
+          "score": 0.060945561997311944,
+          "best_line": "t01",
+          "best_match": 0.06094556199731194,
+          "mean_match": 0.06094556199731194,
+          "n": 12
+        }
+      ],
+      "na_categories": [],
+      "judged": [
+        "joyful",
+        "aggressive",
+        "love",
+        "laughter",
+        "logic",
+        "neutral",
+        "seductive"
+      ],
+      "formula": "emotion_match = 0.70*category_blend + 0.30*emb_sim over persona target emotions only; out-of-set categories are n/a (dropped, not 0); crying decision = emotion2vec+ sad"
+    },
+    "coherent": {
+      "persona_id": "own-samantha",
+      "gate": 0.83,
+      "emotion_match": 0.6713695158531341,
+      "category_blend": 0.6067343694048821,
+      "emb_sim": 0.822184857565722,
+      "pass": false,
+      "leaderboard": [
+        {
+          "category": "neutral",
+          "source": "trained class (emotion2vec+)",
+          "strength": 1.0,
+          "score": 0.9646446600659391,
+          "best_line": "t03",
+          "best_match": 0.9999999976877285,
+          "mean_match": 0.9214325807504188,
+          "n": 12
+        },
+        {
+          "category": "laughter",
+          "source": "efficientat",
+          "strength": 0.2743651270866394,
+          "score": 0.9248757898807527,
+          "best_line": "t11",
+          "best_match": 0.9703546464443207,
+          "mean_match": 0.8692905207475027,
+          "n": 12
+        },
+        {
+          "category": "logic",
+          "source": "zero-shot text prompt (CLAP)",
+          "strength": 0.49966762061927383,
+          "score": 0.8972519308363274,
+          "best_line": "t07",
+          "best_match": 0.947357632830641,
+          "mean_match": 0.836011628398833,
+          "n": 12
+        },
+        {
+          "category": "aggressive",
+          "source": "trained class (emotion2vec+)",
+          "strength": 0.9990363121032715,
+          "score": 0.5288252705675534,
+          "best_line": "t07",
+          "best_match": 0.5288265675646632,
+          "mean_match": 0.5288236853488636,
+          "n": 12
+        },
+        {
+          "category": "love",
+          "source": "love_seductive clap-prompt-ensemble (gender-conditioned mean-target vs mean-neutral, sad-gated; love also requires mean cosine > 0.20)",
+          "strength": 0.9390544380026881,
+          "score": 0.060945561997311944,
+          "best_line": "t01",
+          "best_match": 0.06094556199731194,
+          "mean_match": 0.06094556199731194,
+          "n": 12
+        }
+      ],
+      "na_categories": [],
+      "judged": [
+        "joyful",
+        "aggressive",
+        "love",
+        "laughter",
+        "logic",
+        "neutral",
+        "seductive"
+      ],
+      "formula": "emotion_match = 0.70*category_blend + 0.30*emb_sim over persona target emotions only; out-of-set categories are n/a (dropped, not 0); crying decision = emotion2vec+ sad"
+    }
+  },
+  "moments_n": 5,
+  "moments": [
+    {
+      "category": "aggressive",
+      "strength": 0.9990363121032715,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/scorers/universal/results/samantha-universal/windows/w03_7.500_10.000.wav",
+      "id": "w03",
+      "start_s": 7.5,
+      "end_s": 10.0
+    },
+    {
+      "category": "love",
+      "strength": 0.9390544380026881,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/scorers/universal/results/samantha-universal/windows/w03_7.500_10.000.wav",
+      "id": "w03",
+      "start_s": 7.5,
+      "end_s": 10.0
+    },
+    {
+      "category": "laughter",
+      "strength": 0.2743651270866394,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/scorers/universal/results/samantha-universal/windows/w00_0.000_2.500.wav",
+      "id": "w00",
+      "start_s": 0.0,
+      "end_s": 2.5
+    },
+    {
+      "category": "logic",
+      "strength": 0.49966762061927383,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/scorers/universal/results/samantha-universal/windows/w06_15.000_17.407.wav",
+      "id": "w06",
+      "start_s": 15.0,
+      "end_s": 17.40718820861678
+    },
+    {
+      "category": "neutral",
+      "strength": 1.0,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/scorers/universal/results/samantha-universal/windows/w00_0.000_2.500.wav",
+      "id": "w00",
+      "start_s": 0.0,
+      "end_s": 2.5
+    }
+  ],
+  "detector_cache_sizes": {
+    "crying-e2v-sad": 32,
+    "trained-emotion2vec+": 32,
+    "efficientat-yelling-laughter": 32,
+    "clap-logic": 32,
+    "love-seductive-prompt-ensemble": 32
+  },
+  "love_seductive_plugin": "/workspace/swarm/voice-v2-sprint/cloning-v2/scorers/persona/detectors/love_seductive.py",
+  "love_seductive_mtime": 1793960237.3932452
+}

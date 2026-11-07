@@ -1,5 +1,3 @@
-// Galion Voice — Perpetual Open MIT License
-// (c) 2026 Maciej Grajczyk / G.A.L.I.O.N.
 //! Adoption gate: keep a candidate only if WER <= wer_max AND ECAPA > ecapa_min.
 //! Defaults follow the Samantha merge-v2 production baseline (WER 0.018, ECAPA 0.7057).
 

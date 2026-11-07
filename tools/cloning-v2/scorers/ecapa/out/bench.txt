@@ -1,0 +1,7 @@
+py samantha rep1: 44.177 wall 28.891 user 0.764 sys
+rs samantha rep1: 10.721 wall 6.821 user 0.209 sys
+py jarvis rep1: 186.919 wall 35.533 user 4.911 sys
+rs jarvis rep1: 15.626 wall 7.658 user 0.219 sys
+py samantha rep2: 69.517 wall 34.369 user 0.904 sys
+rs samantha rep2: 12.598 wall 7.611 user 0.277 sys
+py jarvis rep2: 

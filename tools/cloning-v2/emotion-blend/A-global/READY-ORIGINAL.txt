@@ -1,0 +1,1 @@
+profile.json and PROFILE.md ready for C; happy-like 10–12.5s; neutral 0–7.5s; anger-like later. Global flag implementation underway.

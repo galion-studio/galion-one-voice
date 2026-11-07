@@ -1,0 +1,148 @@
+# Galion persona emotion targets — own-samantha
+# schema: galion-persona-emotion-targets/1
+# Any emotion not listed here is n/a for this voice (not scored as 0).
+# Target values are the unrounded detector strengths from the cited measurement.
+# love and seductive targets were measured with the current universal CLAP
+# fallback; refresh them when scorers/persona/detectors/love_seductive* lands.
+
+schema = "galion-persona-emotion-targets/1"
+id = "own-samantha"
+display_name = "Samantha"
+gate = 0.83
+presence = 0.20
+
+[persona]
+summary = """Her-inspired conversational register. Test voice. Wide range, earned by the moment: curiosity, delight, tenderness, play, and quiet when something matters. Known cloning blend: happy, a little aggressive, sweet (love) and playful (laughter). Intimate without possession. She answers anger with a quieter voice; she does not perform tears."""
+
+[[docs_cited]]
+path = "docs/galion-voice-v2/symphony/PERSONAS-EMOTIONS.md"
+workspace_copy = "wt-18-results-docs/docs/galion-voice-v2/symphony/PERSONAS-EMOTIONS.md"
+lines = "27"
+quote = "Wide range, earned by the moment: curiosity, delight, tenderness, play, and quiet when something matters."
+
+[[docs_cited]]
+path = "docs/galion-voice-v2/symphony/PERSONAS-EMOTIONS.md"
+workspace_copy = "wt-18-results-docs/docs/galion-voice-v2/symphony/PERSONAS-EMOTIONS.md"
+lines = "41-44"
+quote = "Plain (rest). Answered: Sad, tired, anxious, or angry — quieter, slower, warmer. Shared: Joy or excitement. Tags: [laugh] and [chuckle] may be control tokens on a future clone worker."
+
+[[docs_cited]]
+path = "docs/galion-voice-v2/symphony/SAMANTHA-EMOTIONS.md"
+workspace_copy = "wt-18-results-docs/docs/galion-voice-v2/symphony/SAMANTHA-EMOTIONS.md"
+lines = "8"
+quote = "Her range is wide, and the moment has to earn it: curiosity, delight, tenderness, play, wonder, and the small hurt of being misunderstood."
+
+[[docs_cited]]
+path = "docs/galion-voice-v2/symphony/SAMANTHA-EMOTIONS.md"
+workspace_copy = "wt-18-results-docs/docs/galion-voice-v2/symphony/SAMANTHA-EMOTIONS.md"
+lines = "57"
+quote = "Curious before clever. Intimate without possession. Playful, then earnest the moment they are serious."
+
+[[docs_cited]]
+path = "docs/galion-voice-v2/symphony/SAMANTHA-EMOTIONS.md"
+workspace_copy = "wt-18-results-docs/docs/galion-voice-v2/symphony/SAMANTHA-EMOTIONS.md"
+lines = "97"
+quote = "The instruction file also refuses performed tears, a breaking voice, a speech about her own pain..."
+
+[[docs_cited]]
+path = "docs/galion-voice-v2/symphony/SAMANTHA-EMOTIONS.md"
+workspace_copy = "wt-18-results-docs/docs/galion-voice-v2/symphony/SAMANTHA-EMOTIONS.md"
+lines = "246-248"
+quote = "Delight uses the Joy / Excited row. Tenderness uses the Sad / Tired row. Play uses the laugh rule."
+
+[[docs_cited]]
+path = "docs/galion-voice-v2/symphony/PERSONA.md"
+workspace_copy = "wt-18-results-docs/docs/galion-voice-v2/symphony/PERSONA.md"
+lines = "8,14"
+quote = "A persona is behaviour, emotion, and sound together. Samantha: Test / internal."
+
+[[assumptions]]
+id = "exclude-yelling"
+text = "Yelling is not a Samantha target even though EfficientAT reports 0.6654093861579895 on original window 15.000-17.407. PERSONAS-EMOTIONS.md:42 says anger is met with a quieter voice and pitch does not rise. The original-voice probe also scored EfficientAT yelling about 0.7943884432315826 on her neutral lines, so the original 'yelling' moment is treated as a detector false-fire, not a persona quality."
+
+[[assumptions]]
+id = "exclude-crying"
+text = "Crying is not a Samantha target. SAMANTHA-EMOTIONS.md:97 refuses performed tears and a breaking voice. Tenderness (the Sad/Tired answered column) is how she meets a caller's sadness, not a request that she cry. The crying detector itself still exists for other voices and for probe diagnostics."
+
+[[assumptions]]
+id = "include-seductive"
+text = "Seductive is Samantha-only (owner t798u/t799u). Included because she is the Her-inspired intimate register (SAMANTHA-EMOTIONS.md:57 'Intimate without possession') and the owner named Jarvis as the voice that is not scored on seductive."
+
+[[assumptions]]
+id = "include-logic"
+text = "Logic is included because it is present on the original (window 15.000-17.407, CLAP 0.49966762061927383; RESULTS.json rounded this to 0.4997) and SAMANTHA-EMOTIONS.md:57 describes her as 'Quick with a fact, unhurried with a feeling.'"
+
+[[assumptions]]
+id = "include-neutral"
+text = "Neutral is the rest column (PERSONAS-EMOTIONS.md:41 Plain / rest). Original window 0.000-2.500 is emotion2vec+ neutral 1.0."
+
+[[assumptions]]
+id = "love-seductive-targets-pending-plugin"
+text = "love and seductive target numbers below were measured by the unmodified universal CLAP detector. Agent 2's love_seductive plugin should remeasure them; the persona SET does not change."
+
+# --- emotions in the judged set ---
+
+[[emotions]]
+id = "joyful"
+aliases = ["happy"]
+target = 0.9999996423721313
+origin = "synthesized"
+detector = "trained-class-emotion2vec+"
+source_detail = "Original has no joyful moment ≥ 0.20 (RESULTS.json moments). Target is emotion2vec+ happy on scorer-probe/wav/samantha/joy01.wav = 0.9999996423721313 (joy02.wav = 0.9999339580535889). pick-best-probe style."
+docs = ["PERSONAS-EMOTIONS.md:27 delight", "PERSONAS-EMOTIONS.md:43 Shared. Joy or excitement", "SAMANTHA-EMOTIONS.md:246 Delight uses the Joy / Excited row", "owner: known blend includes happy"]
+
+[[emotions]]
+id = "aggressive"
+aliases = []
+target = 0.9990363121032715
+origin = "original-present"
+detector = "trained-class-emotion2vec+"
+source_detail = "Original window w03 7.500-10.000, emotion2vec+ angry = 0.9990363121032715 (RESULTS.json moments listed this as 0.999)."
+docs = ["owner: a little aggressive", "PERSONAS-EMOTIONS.md:42 Answered includes angry (answered, not copied)"]
+
+[[emotions]]
+id = "love"
+aliases = []
+target = 0.8109382317899566
+origin = "original-present"
+detector = "love_seductive-or-legacy-clap"
+target_measured_by = "universal-clap"
+source_detail = "Original window w03 7.500-10.000, universal CLAP love = 0.8109382317899566 (RESULTS.json moments listed this as 0.8109). Remeasure when love_seductive plugin lands."
+docs = ["owner: sweet (love)", "SAMANTHA-EMOTIONS.md:8 tenderness"]
+
+[[emotions]]
+id = "laughter"
+aliases = []
+target = 0.2743651270866394
+origin = "original-present"
+detector = "efficientat"
+source_detail = "Original window w00 0.000-2.500, EfficientAT laughter max = 0.2743651270866394 (RESULTS.json moments listed this as 0.2744)."
+docs = ["owner: playful (laughter)", "PERSONAS-EMOTIONS.md:44 [laugh] and [chuckle]", "SAMANTHA-EMOTIONS.md:248 Play uses the laugh rule"]
+
+[[emotions]]
+id = "logic"
+aliases = ["reason"]
+target = 0.49966762061927383
+origin = "original-present"
+detector = "zero-shot-clap"
+source_detail = "Original window w06 15.000-17.407, universal CLAP logic = 0.49966762061927383 (RESULTS.json moments listed this as 0.4997)."
+docs = ["SAMANTHA-EMOTIONS.md:57 Quick with a fact", "RESULTS.json original moment"]
+
+[[emotions]]
+id = "neutral"
+aliases = []
+target = 1.0
+origin = "original-present"
+detector = "trained-class-emotion2vec+"
+source_detail = "Original window w00 0.000-2.500, emotion2vec+ neutral = 1.0."
+docs = ["PERSONAS-EMOTIONS.md:41 Plain. Her rest column."]
+
+[[emotions]]
+id = "seductive"
+aliases = []
+target = 0.33438899274060635
+origin = "synthesized"
+detector = "love_seductive-or-legacy-clap"
+target_measured_by = "universal-clap"
+source_detail = "Original has no seductive moment ≥ 0.20. Target is universal CLAP seductive on scorer-probe/wav/samantha/sed04.wav = 0.33438899274060635 (sed01 = 0.21242489922715546, sed02 = 0.09575001362314822, sed03 = 0.15666967712967103). pick-best-probe style. Remeasure when love_seductive plugin lands."
+docs = ["owner t798u/t799u: seductive is Samantha-only", "SAMANTHA-EMOTIONS.md:57 Intimate without possession"]

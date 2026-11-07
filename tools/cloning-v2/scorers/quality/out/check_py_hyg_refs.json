@@ -1,0 +1,18 @@
+{
+ "/workspace/swarm/voice-v2-sprint/clip-store-own/samantha/reference.wav": {
+  "sample_peak_dbfs": -2.043003417569322,
+  "clipped": 0,
+  "clicks": 3,
+  "max_jump": 0.46014404296875,
+  "f90": 867.1875,
+  "f99": 2671.875
+ },
+ "/workspace/swarm/voice-v2-sprint/clip-store-own/jarvis/reference.wav": {
+  "sample_peak_dbfs": -0.6304094349495324,
+  "clipped": 0,
+  "clicks": 2,
+  "max_jump": 0.354888916015625,
+  "f90": 1757.8125,
+  "f99": 7253.90625
+ }
+}

@@ -1,0 +1,36 @@
+{
+  "asr": "/workspace/swarm/voice-v2-sprint/repo/weights/asr/vosk-model-small-en-us-0.15",
+  "files": [
+    {
+      "del": 0,
+      "duration_s": 5.0,
+      "errors": 1,
+      "hyp": "the morning light came slowly over the hills and the whole valley seem to wake up at once",
+      "ins": 0,
+      "ms": 1811.0,
+      "n_ref_words": 18,
+      "path": "runs/sd_old/t01.wav",
+      "sub": 1,
+      "wer": 0.056,
+      "wer_raw": 0.055556
+    }
+  ],
+  "normalisation": "wer_t648.py: lower, [^a-z' ]->space, split",
+  "summary": {
+    "frac_le_10pct": 1.0,
+    "max": 0.056,
+    "mean": 0.056,
+    "mean_raw": 0.05556,
+    "min": 0.056,
+    "n": 1,
+    "sd": 0.0
+  },
+  "timing": {
+    "audio_s": 5.0,
+    "jobs": 2,
+    "load_s": 0.617,
+    "rtf": 0.3622,
+    "score_s": 1.811
+  },
+  "tool": "galion-wer"
+}

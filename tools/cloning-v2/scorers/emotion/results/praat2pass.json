@@ -1,0 +1,342 @@
+{
+ "files": [
+  {
+   "file": "/workspace/swarm/voice-v2-sprint/clip-store-own/jarvis/reference.wav",
+   "floor": 85.3918164694539,
+   "ceiling": 223.52738921573092,
+   "praat": {
+    "f0_mean_hz": 130.00423662763154,
+    "f0_median_hz": 124.12427675033356,
+    "f0_sd_st": 3.251764657790852,
+    "f0_range_st_p5_p95": 11.031728117547736,
+    "jitter_local_pct": 2.663315321516103,
+    "shimmer_local_pct": 11.586731887042209
+   }
+  },
+  {
+   "file": "/workspace/swarm/voice-v2-sprint/clip-store-own/samantha/reference.wav",
+   "floor": 124.25635207783398,
+   "ceiling": 321.2701911713705,
+   "praat": {
+    "f0_mean_hz": 189.72291174164116,
+    "f0_median_hz": 176.88835513562418,
+    "f0_sd_st": 2.832585495154635,
+    "f0_range_st_p5_p95": 9.036995576615308,
+    "jitter_local_pct": 1.910126209550064,
+    "shimmer_local_pct": 7.886983922267783
+   }
+  },
+  {
+   "file": "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/jarvis/t01.wav",
+   "floor": 87.71682259508432,
+   "ceiling": 226.38403563960236,
+   "praat": {
+    "f0_mean_hz": 132.65573912407038,
+    "f0_median_hz": 129.94576012841864,
+    "f0_sd_st": 3.125132813274859,
+    "f0_range_st_p5_p95": 10.642945887457495,
+    "jitter_local_pct": 3.2048250141393884,
+    "shimmer_local_pct": 12.110852048778932
+   }
+  },
+  {
+   "file": "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/jarvis/t02.wav",
+   "floor": 95.51375628219196,
+   "ceiling": 269.71329963948403,
+   "praat": {
+    "f0_mean_hz": 149.79993675515345,
+    "f0_median_hz": 144.38458551608335,
+    "f0_sd_st": 3.627854948498136,
+    "f0_range_st_p5_p95": 12.041170243374609,
+    "jitter_local_pct": 2.97376510034969,
+    "shimmer_local_pct": 10.314351802308618
+   }
+  },
+  {
+   "file": "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/jarvis/t03.wav",
+   "floor": 87.13431507946461,
+   "ceiling": 233.6279616349495,
+   "praat": {
+    "f0_mean_hz": 127.60204842985912,
+    "f0_median_hz": 124.61564069202454,
+    "f0_sd_st": 3.5809154285484994,
+    "f0_range_st_p5_p95": 11.59315082177083,
+    "jitter_local_pct": 2.75691070332884,
+    "shimmer_local_pct": 12.223964077625821
+   }
+  },
+  {
+   "file": "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/jarvis/t04.wav",
+   "floor": 91.54143823732602,
+   "ceiling": 221.7291009672966,
+   "praat": {
+    "f0_mean_hz": 141.52835808537864,
+    "f0_median_hz": 133.87088722348494,
+    "f0_sd_st": 3.281046940806653,
+    "f0_range_st_p5_p95": 11.0234714180006,
+    "jitter_local_pct": 2.30275561054543,
+    "shimmer_local_pct": 10.919400543618822
+   }
+  },
+  {
+   "file": "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/jarvis/t05.wav",
+   "floor": 84.8332366041871,
+   "ceiling": 235.49255163711635,
+   "praat": {
+    "f0_mean_hz": 139.21514150863646,
+    "f0_median_hz": 137.01246053375797,
+    "f0_sd_st": 3.6710876766006035,
+    "f0_range_st_p5_p95": 12.434433887944213,
+    "jitter_local_pct": 2.3137037228934827,
+    "shimmer_local_pct": 9.912506248026729
+   }
+  },
+  {
+   "file": "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/jarvis/t06.wav",
+   "floor": 85.44104230142206,
+   "ceiling": 253.83712777494247,
+   "praat": {
+    "f0_mean_hz": 142.39792482788326,
+    "f0_median_hz": 132.60838420962833,
+    "f0_sd_st": 4.425661308127518,
+    "f0_range_st_p5_p95": 14.173552662547937,
+    "jitter_local_pct": 2.704191211338979,
+    "shimmer_local_pct": 10.70879848478192
+   }
+  },
+  {
+   "file": "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/jarvis/t07.wav",
+   "floor": 109.45196914490269,
+   "ceiling": 328.7238955310437,
+   "praat": {
+    "f0_mean_hz": 169.3770689589979,
+    "f0_median_hz": 159.13913740627686,
+    "f0_sd_st": 3.856664704647129,
+    "f0_range_st_p5_p95": 12.363593948220071,
+    "jitter_local_pct": 3.9780977722086748,
+    "shimmer_local_pct": 11.142754547840122
+   }
+  },
+  {
+   "file": "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/jarvis/t08.wav",
+   "floor": 83.3804310532644,
+   "ceiling": 251.26684794515842,
+   "praat": {
+    "f0_mean_hz": 141.14502731174812,
+    "f0_median_hz": 139.40454705879125,
+    "f0_sd_st": 4.22529308810477,
+    "f0_range_st_p5_p95": 13.901876542032296,
+    "jitter_local_pct": 2.5769422601357284,
+    "shimmer_local_pct": 10.345079768599403
+   }
+  },
+  {
+   "file": "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/jarvis/t09.wav",
+   "floor": 86.29399826477174,
+   "ceiling": 247.22532557802384,
+   "praat": {
+    "f0_mean_hz": 144.80710570271737,
+    "f0_median_hz": 140.1188757465053,
+    "f0_sd_st": 4.08331335675027,
+    "f0_range_st_p5_p95": 13.575695350952104,
+    "jitter_local_pct": 2.667083782627112,
+    "shimmer_local_pct": 10.791569545691967
+   }
+  },
+  {
+   "file": "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/jarvis/t10.wav",
+   "floor": 87.0842354592235,
+   "ceiling": 260.7166738972045,
+   "praat": {
+    "f0_mean_hz": 134.26082804086377,
+    "f0_median_hz": 123.63525529738733,
+    "f0_sd_st": 3.6019764854986756,
+    "f0_range_st_p5_p95": 10.843707410447323,
+    "jitter_local_pct": 2.252654753295399,
+    "shimmer_local_pct": 9.765685626158447
+   }
+  },
+  {
+   "file": "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/jarvis/t11.wav",
+   "floor": 85.80935638557474,
+   "ceiling": 219.53731755944352,
+   "praat": {
+    "f0_mean_hz": 132.94942993481698,
+    "f0_median_hz": 128.68320493723118,
+    "f0_sd_st": 3.1470020727592622,
+    "f0_range_st_p5_p95": 11.233729479518708,
+    "jitter_local_pct": 2.272414178744216,
+    "shimmer_local_pct": 10.904079227728404
+   }
+  },
+  {
+   "file": "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/jarvis/t12.wav",
+   "floor": 92.7108863367864,
+   "ceiling": 267.895256004776,
+   "praat": {
+    "f0_mean_hz": 151.24659413881545,
+    "f0_median_hz": 146.31571263206195,
+    "f0_sd_st": 3.449751746356176,
+    "f0_range_st_p5_p95": 10.145525798487085,
+    "jitter_local_pct": 3.227205048169044,
+    "shimmer_local_pct": 12.006501515715197
+   }
+  },
+  {
+   "file": "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/samantha/t01.wav",
+   "floor": 131.17157359004352,
+   "ceiling": 312.26503518598645,
+   "praat": {
+    "f0_mean_hz": 192.83348553615764,
+    "f0_median_hz": 186.3864689438322,
+    "f0_sd_st": 2.502728058453646,
+    "f0_range_st_p5_p95": 8.607050109002767,
+    "jitter_local_pct": 1.6542448264884122,
+    "shimmer_local_pct": 7.611926430998654
+   }
+  },
+  {
+   "file": "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/samantha/t02.wav",
+   "floor": 131.83235668781882,
+   "ceiling": 366.55537723160944,
+   "praat": {
+    "f0_mean_hz": 210.48509373369538,
+    "f0_median_hz": 206.27264656140133,
+    "f0_sd_st": 3.6109753866795478,
+    "f0_range_st_p5_p95": 11.130471888330618,
+    "jitter_local_pct": 2.4582462443264936,
+    "shimmer_local_pct": 8.414299871684475
+   }
+  },
+  {
+   "file": "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/samantha/t03.wav",
+   "floor": 120.95762474745455,
+   "ceiling": 338.1020534849587,
+   "praat": {
+    "f0_mean_hz": 194.72901684110616,
+    "f0_median_hz": 184.38932887428732,
+    "f0_sd_st": 3.3771898252258734,
+    "f0_range_st_p5_p95": 10.314289659732871,
+    "jitter_local_pct": 2.4288527832525255,
+    "shimmer_local_pct": 9.56827586022821
+   }
+  },
+  {
+   "file": "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/samantha/t04.wav",
+   "floor": 137.82380186262043,
+   "ceiling": 381.5360588321635,
+   "praat": {
+    "f0_mean_hz": 216.5032514223521,
+    "f0_median_hz": 206.58462108748205,
+    "f0_sd_st": 3.134647024805718,
+    "f0_range_st_p5_p95": 9.800551049087666,
+    "jitter_local_pct": 2.421207469105525,
+    "shimmer_local_pct": 7.549293368006923
+   }
+  },
+  {
+   "file": "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/samantha/t05.wav",
+   "floor": 126.12656047276286,
+   "ceiling": 335.7546130704528,
+   "praat": {
+    "f0_mean_hz": 193.461113366334,
+    "f0_median_hz": 181.7448016707864,
+    "f0_sd_st": 3.002757375797552,
+    "f0_range_st_p5_p95": 9.649885271789152,
+    "jitter_local_pct": 1.7969225662050676,
+    "shimmer_local_pct": 8.393955508127636
+   }
+  },
+  {
+   "file": "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/samantha/t06.wav",
+   "floor": 145.5243619025631,
+   "ceiling": 363.1105227974997,
+   "praat": {
+    "f0_mean_hz": 217.93450070563313,
+    "f0_median_hz": 217.74248626866725,
+    "f0_sd_st": 2.8136774467744265,
+    "f0_range_st_p5_p95": 9.516796935043983,
+    "jitter_local_pct": 2.1808292515184844,
+    "shimmer_local_pct": 8.513344859239522
+   }
+  },
+  {
+   "file": "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/samantha/t07.wav",
+   "floor": 142.44698597164648,
+   "ceiling": 364.3771807193563,
+   "praat": {
+    "f0_mean_hz": 217.27286279090936,
+    "f0_median_hz": 220.38568183329912,
+    "f0_sd_st": 3.366363629478967,
+    "f0_range_st_p5_p95": 11.473984875285836,
+    "jitter_local_pct": 1.7834790302993084,
+    "shimmer_local_pct": 8.944901749938461
+   }
+  },
+  {
+   "file": "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/samantha/t08.wav",
+   "floor": 131.8867350412831,
+   "ceiling": 342.8589552532916,
+   "praat": {
+    "f0_mean_hz": 200.4621397282792,
+    "f0_median_hz": 191.09576596996203,
+    "f0_sd_st": 2.9613817542464993,
+    "f0_range_st_p5_p95": 9.359327560376848,
+    "jitter_local_pct": 1.8820497823143039,
+    "shimmer_local_pct": 9.174460418105712
+   }
+  },
+  {
+   "file": "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/samantha/t09.wav",
+   "floor": 131.86742630731692,
+   "ceiling": 348.0482295797226,
+   "praat": {
+    "f0_mean_hz": 207.59725811847483,
+    "f0_median_hz": 204.31655369288373,
+    "f0_sd_st": 3.2322746590854874,
+    "f0_range_st_p5_p95": 10.88095078344395,
+    "jitter_local_pct": 2.1767812139766103,
+    "shimmer_local_pct": 8.670129925382005
+   }
+  },
+  {
+   "file": "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/samantha/t10.wav",
+   "floor": 120.35602560875587,
+   "ceiling": 313.65974577006386,
+   "praat": {
+    "f0_mean_hz": 190.32637821706282,
+    "f0_median_hz": 190.8382341835949,
+    "f0_sd_st": 2.7047862840528922,
+    "f0_range_st_p5_p95": 8.14794517799897,
+    "jitter_local_pct": 1.6366733080758529,
+    "shimmer_local_pct": 7.661554585448675
+   }
+  },
+  {
+   "file": "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/samantha/t11.wav",
+   "floor": 129.64177392058792,
+   "ceiling": 321.01293250879166,
+   "praat": {
+    "f0_mean_hz": 194.7400003678519,
+    "f0_median_hz": 188.4804146367008,
+    "f0_sd_st": 2.682896698309727,
+    "f0_range_st_p5_p95": 9.140369000928644,
+    "jitter_local_pct": 1.8640899004943499,
+    "shimmer_local_pct": 8.974460598639556
+   }
+  },
+  {
+   "file": "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/samantha/t12.wav",
+   "floor": 120.23250990729206,
+   "ceiling": 352.69151652357857,
+   "praat": {
+    "f0_mean_hz": 202.3387239066815,
+    "f0_median_hz": 185.37739237507563,
+    "f0_sd_st": 4.073221637717045,
+    "f0_range_st_p5_p95": 12.595126519298953,
+    "jitter_local_pct": 2.3227860148936648,
+    "shimmer_local_pct": 9.725956740272542
+   }
+  }
+ ]
+}

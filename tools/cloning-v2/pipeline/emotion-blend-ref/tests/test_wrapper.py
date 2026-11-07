@@ -5,7 +5,7 @@ WRAPPER=ROOT/'bin/cbx-add-voice'
 class Wrapper(unittest.TestCase):
     def setUp(self):
         # Keep test evidence; no automatic temp-dir deletion.
-        self.work=pathlib.Path(tempfile.mkdtemp(prefix='blend-wrapper-',dir=None))
+        self.work=pathlib.Path(tempfile.mkdtemp(prefix='blend-wrapper-',dir=ROOT.parent/'emotion-blend/A-global'))
         self.log=self.work/'calls.jsonl'
         stub=self.work/'stub'
         stub.write_text('#!/usr/bin/env python3\nimport os,sys,json\nwith open(os.environ["CAPTURE"],"a") as f: f.write(json.dumps(sys.argv)+"\\n")\n')

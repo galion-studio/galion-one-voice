@@ -1,0 +1,38 @@
+[
+  {
+    "end_s": 2.5,
+    "id": "w00",
+    "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/missing-emotion-targets/runs/own-jarvis/windows/w00_0.000_2.500.wav",
+    "start_s": 0.0
+  },
+  {
+    "end_s": 5.0,
+    "id": "w01",
+    "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/missing-emotion-targets/runs/own-jarvis/windows/w01_2.500_5.000.wav",
+    "start_s": 2.5
+  },
+  {
+    "end_s": 7.5,
+    "id": "w02",
+    "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/missing-emotion-targets/runs/own-jarvis/windows/w02_5.000_7.500.wav",
+    "start_s": 5.0
+  },
+  {
+    "end_s": 10.0,
+    "id": "w03",
+    "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/missing-emotion-targets/runs/own-jarvis/windows/w03_7.500_10.000.wav",
+    "start_s": 7.5
+  },
+  {
+    "end_s": 12.5,
+    "id": "w04",
+    "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/missing-emotion-targets/runs/own-jarvis/windows/w04_10.000_12.500.wav",
+    "start_s": 10.0
+  },
+  {
+    "end_s": 15.0,
+    "id": "w05",
+    "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/pipeline/missing-emotion-targets/runs/own-jarvis/windows/w05_12.500_15.000.wav",
+    "start_s": 12.5
+  }
+]

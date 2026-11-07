@@ -1,5 +1,3 @@
-// Galion Voice — Perpetual Open MIT License
-// (c) 2026 Maciej Grajczyk / G.A.L.I.O.N.
 //! Invoke galion-emotion / galion-ecapa / galion-wer and build line deltas.
 
 use anyhow::{bail, Context, Result};

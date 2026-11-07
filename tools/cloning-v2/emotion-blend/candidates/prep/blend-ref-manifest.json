@@ -1,0 +1,94 @@
+{
+  "ecapa_floor": 0.6793,
+  "ecapa_median": 0.7793,
+  "dropped": [
+    {
+      "start_s": 7.5,
+      "end_s": 10.0,
+      "ecapa": 0.5562
+    }
+  ],
+  "segments_in_order": [
+    {
+      "start_s": 10.0,
+      "end_s": 12.5,
+      "ecapa_vs_original": 0.7793,
+      "entropy_bits": 1.362223416038387,
+      "ser": {
+        "ang": 0.10184568166732788,
+        "hap": 0.36311182379722595,
+        "neu": 0.533745527267456,
+        "sad": 0.0012970695970579982
+      },
+      "role": "blend-first"
+    },
+    {
+      "start_s": 12.5,
+      "end_s": 15.0,
+      "ecapa_vs_original": 0.8107,
+      "entropy_bits": 1.122255700077006,
+      "ser": {
+        "ang": 0.6933254599571228,
+        "hap": 0.008373471908271313,
+        "neu": 0.2552792429924011,
+        "sad": 0.043021801859140396
+      },
+      "role": "blend-first"
+    },
+    {
+      "start_s": 5.0,
+      "end_s": 7.5,
+      "ecapa_vs_original": 0.8017,
+      "entropy_bits": 0.4622630560683615,
+      "ser": {
+        "ang": 0.0024314504116773605,
+        "hap": 0.0901852622628212,
+        "neu": 0.9073255062103271,
+        "sad": 5.77935206820257e-05
+      },
+      "role": "blend-first"
+    },
+    {
+      "start_s": 2.5,
+      "end_s": 5.0,
+      "ecapa_vs_original": 0.7417,
+      "entropy_bits": 0.37776890772613675,
+      "ser": {
+        "ang": 0.006395835429430008,
+        "hap": 0.03354165703058243,
+        "neu": 0.9452386498451233,
+        "sad": 0.01482368353754282
+      },
+      "role": "identity-tail"
+    },
+    {
+      "start_s": 0.0,
+      "end_s": 2.5,
+      "ecapa_vs_original": 0.7254,
+      "entropy_bits": 0.3715622155905706,
+      "ser": {
+        "ang": 0.011955111287534237,
+        "hap": 0.03467749059200287,
+        "neu": 0.9461318254470825,
+        "sad": 0.0072355614975094795
+      },
+      "role": "identity-tail"
+    },
+    {
+      "start_s": 15.0,
+      "end_s": 17.40718820861678,
+      "ecapa_vs_original": 0.8163,
+      "entropy_bits": 0.22312294302250124,
+      "ser": {
+        "ang": 0.9705052971839905,
+        "hap": 0.006611949298530817,
+        "neu": 0.021212274208664894,
+        "sad": 0.0016705449670553207
+      },
+      "role": "identity-tail"
+    }
+  ],
+  "blend_ref_wav": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-blend/candidates/prep/samantha-blend-ref.wav",
+  "calm_target_wav": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-blend/candidates/prep/samantha-calm-target.wav",
+  "notes": "Blend windows (hap 10-12.5, ang 12.5-15, neu+hap 5-7.5) placed first for Turbo 6s/10s crops; low-ECAPA 7.5-10 dropped; relative dynamics preserved (no LUFS norm)."
+}

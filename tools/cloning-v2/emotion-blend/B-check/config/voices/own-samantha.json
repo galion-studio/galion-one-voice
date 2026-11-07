@@ -1,0 +1,27 @@
+{
+  "base": "/workspace/swarm/voice-v2-sprint/clip-store-own/samantha/original.wav",
+  "persona": "samantha",
+  "ecapa_threshold": 0.7057,
+  "wer_max": 0.018,
+  "require_beat_prefix": false,
+  "emotion_enabled": true,
+  "emotion_backend": "universal",
+  "emotion_window_s": 2.5,
+  "emotion_window": [
+    9.947,
+    12.434
+  ],
+  "emotion_presence": 0.28,
+  "emo_min": 0.83,
+  "notes": "Happy/joyful moment: FINDINGS 2.5s grid 10.00\u201312.50s (hap=0.363); config also forces PROFILE phrase window 9.947\u201312.434. emo_min=0.83 \u2248 merge-v2 blended emotion_match 0.8389 minus ~0.01 noise margin. On existing box renders the coherent-rotation candidate IMPROVES WER/ECAPA but REGRESSES blended emotion_match (0.8164) and joyful (0.778 vs pre 0.859) \u2014 it would FAIL the emotion gate. Per-category soft mins are diagnostic only. Backend pluggable (emotion_backend). Universal backend=emotion2vec++CLAP; emo_min kept 0.83 (scale differs from legacy SUPERB blend \u2014 see UNIVERSAL-EMOTION.md).",
+  "emo_per_category_soft_min": {
+    "joyful": 0.84,
+    "aggressive": 0.79,
+    "yelling": 0.79,
+    "fear": 0.79,
+    "logic": 0.77,
+    "love": 0.76,
+    "seductive": 0.76,
+    "neutral": 0.78
+  }
+}

@@ -1,0 +1,136 @@
+{
+  "files": [
+    {
+      "bandwidth": {
+        "energy_frac_gt_4k": 0.00244,
+        "energy_frac_gt_8k": 0.000569,
+        "f90_hz": 949.2,
+        "f99_hz": 2554.7,
+        "method": "welch hann nfft=2048 hop=1024 mean-detrend, channel mean"
+      },
+      "bits": 16,
+      "channels": 1,
+      "click_thr": 0.3499999940395355,
+      "clicks": 0,
+      "clip_thr": 0.9900000095367432,
+      "clipped_runs": 0,
+      "clipped_samples": 0,
+      "duration_s": 5.0,
+      "float": false,
+      "loudness": {
+        "integrated_lufs": -19.45,
+        "lra_lu": 1.81,
+        "max_momentary_lufs": -14.7,
+        "max_short_term_lufs": -19.09,
+        "note": ""
+      },
+      "max_sample_jump": 0.2519,
+      "ms": 7.74,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-fix/runs/sd_base_leg/t01.wav",
+      "rms_dbfs": -19.46,
+      "sample_peak_dbfs": -2.45,
+      "sr": 24000,
+      "true_peak_dbtp": -2.41
+    },
+    {
+      "bandwidth": {
+        "energy_frac_gt_4k": 0.00196,
+        "energy_frac_gt_8k": 0.00042,
+        "f90_hz": 609.4,
+        "f99_hz": 1992.2,
+        "method": "welch hann nfft=2048 hop=1024 mean-detrend, channel mean"
+      },
+      "bits": 16,
+      "channels": 1,
+      "click_thr": 0.3499999940395355,
+      "clicks": 0,
+      "clip_thr": 0.9900000095367432,
+      "clipped_runs": 0,
+      "clipped_samples": 0,
+      "duration_s": 2.68,
+      "float": false,
+      "loudness": {
+        "integrated_lufs": -18.01,
+        "lra_lu": null,
+        "max_momentary_lufs": -15.74,
+        "max_short_term_lufs": null,
+        "note": "clip < 3 s: LRA/short-term undefined"
+      },
+      "max_sample_jump": 0.1484,
+      "ms": 3.84,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-fix/runs/sd_base_leg/t04.wav",
+      "rms_dbfs": -18.06,
+      "sample_peak_dbfs": -4.64,
+      "sr": 24000,
+      "true_peak_dbtp": -4.61
+    },
+    {
+      "bandwidth": {
+        "energy_frac_gt_4k": 0.00365,
+        "energy_frac_gt_8k": 0.001164,
+        "f90_hz": 1464.8,
+        "f99_hz": 2625.0,
+        "method": "welch hann nfft=2048 hop=1024 mean-detrend, channel mean"
+      },
+      "bits": 16,
+      "channels": 1,
+      "click_thr": 0.3499999940395355,
+      "clicks": 22,
+      "clip_thr": 0.9900000095367432,
+      "clipped_runs": 3,
+      "clipped_samples": 4,
+      "duration_s": 3.76,
+      "float": false,
+      "loudness": {
+        "integrated_lufs": -18.6,
+        "lra_lu": 1.22,
+        "max_momentary_lufs": -15.25,
+        "max_short_term_lufs": -18.26,
+        "note": ""
+      },
+      "max_sample_jump": 0.569,
+      "ms": 5.57,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-fix/runs/sd_base_leg/t06.wav",
+      "rms_dbfs": -18.73,
+      "sample_peak_dbfs": -0.0,
+      "sr": 24000,
+      "true_peak_dbtp": 0.18
+    },
+    {
+      "bandwidth": {
+        "energy_frac_gt_4k": 0.0063,
+        "energy_frac_gt_8k": 0.000662,
+        "f90_hz": 1136.7,
+        "f99_hz": 2882.8,
+        "method": "welch hann nfft=2048 hop=1024 mean-detrend, channel mean"
+      },
+      "bits": 16,
+      "channels": 1,
+      "click_thr": 0.3499999940395355,
+      "clicks": 0,
+      "clip_thr": 0.9900000095367432,
+      "clipped_runs": 0,
+      "clipped_samples": 0,
+      "duration_s": 8.04,
+      "float": false,
+      "loudness": {
+        "integrated_lufs": -20.6,
+        "lra_lu": 1.62,
+        "max_momentary_lufs": -16.95,
+        "max_short_term_lufs": -19.57,
+        "note": ""
+      },
+      "max_sample_jump": 0.2398,
+      "ms": 11.87,
+      "path": "/workspace/swarm/voice-v2-sprint/cloning-v2/emotion-fix/runs/sd_base_leg/t08.wav",
+      "rms_dbfs": -20.49,
+      "sample_peak_dbfs": -2.31,
+      "sr": 24000,
+      "true_peak_dbtp": -2.31
+    }
+  ],
+  "timing": {
+    "total_s": 0.0291
+  },
+  "tool": "galion-hygiene"
+}

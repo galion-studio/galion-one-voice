@@ -1,0 +1,15 @@
+{
+ "ref": "/workspace/swarm/voice-v2-sprint/clip-store-own/samantha/reference.wav",
+ "half_vs_half_ceiling": 0.8283,
+ "scores": {
+  "out/fmt_22050_24.wav": 0.7608,
+  "out/fmt_44100_16.wav": 0.761,
+  "out/fmt_48000_32.wav": 0.761
+ },
+ "mean": 0.7609,
+ "timing": {
+  "wall_s_total": 18.179,
+  "wall_s_scoring": 15.648,
+  "cpu_s_total": 13.888
+ }
+}

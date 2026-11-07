@@ -41,5 +41,3 @@ tempfile = "3.14.0"
 [[bin]]
 name = "cbx-blend"
 path = "src/bin/cbx_blend.rs"
-
-[workspace]

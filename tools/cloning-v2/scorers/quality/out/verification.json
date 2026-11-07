@@ -1,0 +1,313 @@
+{
+  "coverage": {
+    "clones": 24,
+    "references": 2
+  },
+  "hygiene_max_abs_diff": {
+    "sample_peak_dbfs": 0.004984174118459528,
+    "clipped": 0,
+    "clicks": 0,
+    "max_jump": 4.995117187500675e-05,
+    "f90": 0.049999999999954525,
+    "f99": 0.0500000000001819,
+    "rms_dbfs": 0.0048946207020605925
+  },
+  "wer_max_abs_diff": 0.0,
+  "wer_jobs2_max_abs_diff": 0.0,
+  "hypothesis_mismatches": 0,
+  "squim_max_abs_diff": {
+    "mos": 5.164985656724852e-05,
+    "stoi": 4.9387836456249445e-05,
+    "pesq": 0.0002841735839842485,
+    "si_sdr": 0.0019071701049799827
+  },
+  "ffmpeg_max_abs_diff": {
+    "lufs_diff": 0.05000000000000071,
+    "lra_diff": 20.0,
+    "true_peak_diff": 0.09000000000000002
+  },
+  "lra_null_files": [
+    "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/samantha/t04.wav",
+    "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/jarvis/t04.wav"
+  ],
+  "ffmpeg_per_file": [
+    {
+      "path": "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/samantha/t01.wav",
+      "lufs_diff": 0.00999999999999801,
+      "lra_diff": 0.09000000000000008,
+      "true_peak_diff": 0.029999999999999805
+    },
+    {
+      "path": "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/samantha/t02.wav",
+      "lufs_diff": 0.020000000000003126,
+      "lra_diff": 0.19999999999999996,
+      "true_peak_diff": 0.020000000000000018
+    },
+    {
+      "path": "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/samantha/t03.wav",
+      "lufs_diff": 0.029999999999997584,
+      "lra_diff": 19.71,
+      "true_peak_diff": 0.010000000000000231
+    },
+    {
+      "path": "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/samantha/t04.wav",
+      "lufs_diff": 0.03999999999999915,
+      "lra_diff": null,
+      "true_peak_diff": 0.010000000000000231
+    },
+    {
+      "path": "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/samantha/t05.wav",
+      "lufs_diff": 0.010000000000001563,
+      "lra_diff": 20.0,
+      "true_peak_diff": 0.01
+    },
+    {
+      "path": "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/samantha/t06.wav",
+      "lufs_diff": 0.05000000000000071,
+      "lra_diff": 0.19000000000000017,
+      "true_peak_diff": 0.08000000000000002
+    },
+    {
+      "path": "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/samantha/t07.wav",
+      "lufs_diff": 0.030000000000001137,
+      "lra_diff": 0.3900000000000001,
+      "true_peak_diff": 0.0
+    },
+    {
+      "path": "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/samantha/t08.wav",
+      "lufs_diff": 0.019999999999999574,
+      "lra_diff": 0.48,
+      "true_peak_diff": 0.0
+    },
+    {
+      "path": "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/samantha/t09.wav",
+      "lufs_diff": 0.030000000000001137,
+      "lra_diff": 0.14000000000000012,
+      "true_peak_diff": 0.07
+    },
+    {
+      "path": "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/samantha/t10.wav",
+      "lufs_diff": 0.030000000000001137,
+      "lra_diff": 0.03000000000000025,
+      "true_peak_diff": 0.09000000000000002
+    },
+    {
+      "path": "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/samantha/t11.wav",
+      "lufs_diff": 0.03999999999999915,
+      "lra_diff": 0.0,
+      "true_peak_diff": 0.03
+    },
+    {
+      "path": "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/samantha/t12.wav",
+      "lufs_diff": 0.03999999999999915,
+      "lra_diff": 0.030000000000000027,
+      "true_peak_diff": 0.009999999999999981
+    },
+    {
+      "path": "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/jarvis/t01.wav",
+      "lufs_diff": 0.019999999999999574,
+      "lra_diff": 0.18999999999999995,
+      "true_peak_diff": 0.040000000000000036
+    },
+    {
+      "path": "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/jarvis/t02.wav",
+      "lufs_diff": 0.030000000000001137,
+      "lra_diff": 0.0,
+      "true_peak_diff": 0.04999999999999982
+    },
+    {
+      "path": "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/jarvis/t03.wav",
+      "lufs_diff": 0.030000000000001137,
+      "lra_diff": 0.20999999999999996,
+      "true_peak_diff": 0.0
+    },
+    {
+      "path": "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/jarvis/t04.wav",
+      "lufs_diff": 0.03999999999999915,
+      "lra_diff": null,
+      "true_peak_diff": 0.03000000000000025
+    },
+    {
+      "path": "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/jarvis/t05.wav",
+      "lufs_diff": 0.010000000000001563,
+      "lra_diff": 0.16999999999999998,
+      "true_peak_diff": 0.010000000000000009
+    },
+    {
+      "path": "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/jarvis/t06.wav",
+      "lufs_diff": 0.010000000000001563,
+      "lra_diff": 0.27,
+      "true_peak_diff": 0.06
+    },
+    {
+      "path": "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/jarvis/t07.wav",
+      "lufs_diff": 0.029999999999997584,
+      "lra_diff": 0.30000000000000004,
+      "true_peak_diff": 0.009999999999999787
+    },
+    {
+      "path": "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/jarvis/t08.wav",
+      "lufs_diff": 0.019999999999999574,
+      "lra_diff": 0.050000000000000044,
+      "true_peak_diff": 0.009999999999999981
+    },
+    {
+      "path": "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/jarvis/t09.wav",
+      "lufs_diff": 0.029999999999997584,
+      "lra_diff": 0.040000000000000036,
+      "true_peak_diff": 0.020000000000000018
+    },
+    {
+      "path": "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/jarvis/t10.wav",
+      "lufs_diff": 0.019999999999999574,
+      "lra_diff": 0.08999999999999986,
+      "true_peak_diff": 0.040000000000000036
+    },
+    {
+      "path": "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/jarvis/t11.wav",
+      "lufs_diff": 0.05000000000000071,
+      "lra_diff": 0.010000000000000009,
+      "true_peak_diff": 0.03000000000000025
+    },
+    {
+      "path": "/workspace/swarm/voice-v2-sprint/own-clone-analysis/wav/jarvis/t12.wav",
+      "lufs_diff": 0.020000000000003126,
+      "lra_diff": 0.040000000000000036,
+      "true_peak_diff": 0.020000000000000018
+    },
+    {
+      "path": "/workspace/swarm/voice-v2-sprint/clip-store-own/samantha/reference.wav",
+      "lufs_diff": 0.0,
+      "lra_diff": 0.030000000000000027,
+      "true_peak_diff": 0.010000000000000009
+    },
+    {
+      "path": "/workspace/swarm/voice-v2-sprint/clip-store-own/jarvis/reference.wav",
+      "lufs_diff": 0.0,
+      "lra_diff": 0.029999999999999805,
+      "true_peak_diff": 0.030000000000000027
+    }
+  ],
+  "baselines": {
+    "samantha": {
+      "wer_rust_mean": 0.05025,
+      "wer_python_mean": 0.05025,
+      "wer_raw_rust_mean": 0.050264583333333335,
+      "mos_rust_mean": 3.728466666666667,
+      "mos_python_mean": 3.728466033935547,
+      "ref_mos_rust": 4.3255,
+      "ref_mos_python": 4.325541019439697,
+      "clipped_samples": 9,
+      "clicks": 32,
+      "f99_mean_hz": 2813.475
+    },
+    "jarvis": {
+      "wer_rust_mean": 0.0185,
+      "wer_python_mean": 0.0185,
+      "wer_raw_rust_mean": 0.018518583333333335,
+      "mos_rust_mean": 4.14175,
+      "mos_python_mean": 4.141759951909383,
+      "ref_mos_rust": 4.5481,
+      "ref_mos_python": 4.548079013824463,
+      "clipped_samples": 4,
+      "clicks": 39,
+      "f99_mean_hz": 6023.45
+    }
+  },
+  "benchmark": [
+    {
+      "task": "hygiene",
+      "impl": "python",
+      "wall_s": 0.403,
+      "user_s": 0.212,
+      "sys_s": 0.03,
+      "cpu_s": 0.242,
+      "avg_cpu_pct": 60.04962779156327,
+      "wall_speedup_vs_python": 1.0,
+      "cpu_speedup_vs_python": 1.0
+    },
+    {
+      "task": "hygiene",
+      "impl": "ffmpeg-r128",
+      "wall_s": 2.58,
+      "user_s": 1.243,
+      "sys_s": 0.446,
+      "cpu_s": 1.689,
+      "avg_cpu_pct": 65.46511627906976,
+      "wall_speedup_vs_python": 0.1562015503875969,
+      "cpu_speedup_vs_python": 0.14328004736530492
+    },
+    {
+      "task": "hygiene",
+      "impl": "rust",
+      "wall_s": 0.189,
+      "user_s": 0.168,
+      "sys_s": 0.012,
+      "cpu_s": 0.18000000000000002,
+      "avg_cpu_pct": 95.23809523809526,
+      "wall_speedup_vs_python": 2.1322751322751325,
+      "cpu_speedup_vs_python": 1.3444444444444443
+    },
+    {
+      "task": "wer",
+      "impl": "python",
+      "wall_s": 22.043,
+      "user_s": 20.966,
+      "sys_s": 0.552,
+      "cpu_s": 21.518,
+      "avg_cpu_pct": 97.61829152111783,
+      "wall_speedup_vs_python": 1.0,
+      "cpu_speedup_vs_python": 1.0
+    },
+    {
+      "task": "wer",
+      "impl": "rust",
+      "wall_s": 21.037,
+      "user_s": 19.405,
+      "sys_s": 0.171,
+      "cpu_s": 19.576,
+      "avg_cpu_pct": 93.0550934068546,
+      "wall_speedup_vs_python": 1.0478205067262443,
+      "cpu_speedup_vs_python": 1.0992031058438905
+    },
+    {
+      "task": "wer",
+      "impl": "rust-jobs2",
+      "wall_s": 21.293,
+      "user_s": 20.519,
+      "sys_s": 0.439,
+      "cpu_s": 20.958,
+      "avg_cpu_pct": 98.4267130042737,
+      "wall_speedup_vs_python": 1.035222843187902,
+      "cpu_speedup_vs_python": 1.0267201068804277
+    },
+    {
+      "task": "mos",
+      "impl": "python",
+      "wall_s": 151.504,
+      "user_s": 105.341,
+      "sys_s": 14.855,
+      "cpu_s": 120.196,
+      "avg_cpu_pct": 79.33519907065161,
+      "wall_speedup_vs_python": 1.0,
+      "cpu_speedup_vs_python": 1.0
+    },
+    {
+      "task": "mos",
+      "impl": "rust",
+      "wall_s": 59.399,
+      "user_s": 69.67,
+      "sys_s": 19.643,
+      "cpu_s": 89.313,
+      "avg_cpu_pct": 150.3611171905251,
+      "wall_speedup_vs_python": 2.5506153302244146,
+      "cpu_speedup_vs_python": 1.3457839284314712
+    }
+  ],
+  "additional_hygiene_max_abs_diff": {
+    "rms_dbfs": 0.0048946207020605925,
+    "clipped_runs": 0,
+    "energy_frac_gt_4k": 4.960187099833924e-06,
+    "energy_frac_gt_8k": 4.852361047137351e-07
+  }
+}

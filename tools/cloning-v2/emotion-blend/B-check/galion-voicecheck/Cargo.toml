@@ -1,0 +1,17 @@
+[package]
+name = "galion-voicecheck"
+version = "0.1.0"
+edition = "2021"
+description = "Galion Voice V2 / Cloning V2: automatic per-voice check (render 12 lines, analyse vs base, up to 3 fixes, WER+ECAPA gate)"
+
+[[bin]]
+name = "galion-voicecheck"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1"
+serde_json = "1"
+hound = "3.5"
+
+[profile.release]
+opt-level = 3
