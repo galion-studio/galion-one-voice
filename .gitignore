@@ -29,3 +29,13 @@ docs/galion-voice-v2/personas/**/*.[Mm][Pp]3.[Pp]laceholder
 
 # #54 sample voices: fetch per scripts/eval/sample-voices/SAMPLE-VOICES.md (WAVs are not committed)
 scripts/eval/sample-voices/*.wav
+
+# Emotion V2 training data. Audio, manifests, and run output stay local.
+datasets/emotion-v2/
+
+# Never commit rendered clips from the dataset tool, even outside that root.
+tools/emotion-v2/**/*.wav
+tools/emotion-v2/**/*.wave
+tools/emotion-v2/**/*.flac
+tools/emotion-v2/**/*.mp3
+tools/emotion-v2/**/*.ogg
