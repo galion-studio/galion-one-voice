@@ -1,0 +1,4148 @@
+{
+  "generated_at_cet": "2026-11-08T04:25:33+01:00",
+  "main_tip": "3e1f5a12c53cd8e0dd47d111676d61d608540559",
+  "method": "gh api commits/{sha}/check-runs and /status. Historical green-at-merge is whatever conclusion is still stored. This audit did not re-run CI. Skipped conclusions are counted separately from success.",
+  "prs": [
+    {
+      "number": 1,
+      "title": "Add the V1 one-dot demo, README, and MIT LICENSE",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/1",
+      "merged_at_cet": "2026-11-02T19:00:50+01:00",
+      "merge_commit": "8a6636de823cd487190c1989c104eaaa981e81da",
+      "head_sha": "3747bcc9ee633a3bfc468b3712f21312fbaa0ff2",
+      "on_main_first_parent": true,
+      "additions": 31940,
+      "deletions": 1,
+      "changed_files": 262,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {},
+        "runs": [],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {},
+        "runs": [],
+        "error": null
+      },
+      "tree_stat": "262 files changed, 31940 insertions(+), 1 deletion(-)",
+      "tree_file_count": 262
+    },
+    {
+      "number": 2,
+      "title": "Add CREDENTIALS.md and CONTRIBUTIONS.md",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/2",
+      "merged_at_cet": "2026-11-02T19:02:19+01:00",
+      "merge_commit": "253c1d1a9cee4250be14ed2f153c3a59d8ebeadd",
+      "head_sha": "aa9bc0f78f574278e7491e17f74ae836379d57a3",
+      "on_main_first_parent": true,
+      "additions": 161,
+      "deletions": 0,
+      "changed_files": 2,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {},
+        "runs": [],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {},
+        "runs": [],
+        "error": null
+      },
+      "tree_stat": "2 files changed, 161 insertions(+)",
+      "tree_file_count": 2
+    },
+    {
+      "number": 3,
+      "title": "Galion Voice V2 plan + Plan V5 + phone path + orb foundation",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/3",
+      "merged_at_cet": "2026-11-02T22:19:49+01:00",
+      "merge_commit": "9a5ebe187097f6810c44cec515eec90ae828b467",
+      "head_sha": "9a5ebe187097f6810c44cec515eec90ae828b467",
+      "on_main_first_parent": true,
+      "additions": 4281,
+      "deletions": 194,
+      "changed_files": 33,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 2
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41527344374/job/125558381540"
+          },
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41527104735/job/125557555704"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 2
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41527344374/job/125558381540"
+          },
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41527104735/job/125557555704"
+          }
+        ],
+        "error": null
+      },
+      "tree_stat": null,
+      "tree_file_count": null
+    },
+    {
+      "number": 4,
+      "title": "Add the CPU orb spring foundation (V2-S2)",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/4",
+      "merged_at_cet": "2026-11-03T01:55:45+01:00",
+      "merge_commit": "8973e6fb8620685a8b5f3794c9e58f630f61f2a1",
+      "head_sha": "7db837ea8d47231c3175e0b84cf68709cf4701b4",
+      "on_main_first_parent": true,
+      "additions": 1125,
+      "deletions": 11,
+      "changed_files": 11,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41547252799/job/125625742231"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41556300779/job/125655900459"
+          }
+        ],
+        "error": null
+      },
+      "tree_stat": null,
+      "tree_file_count": null
+    },
+    {
+      "number": 5,
+      "title": "Add an offline loopback virtual user for presence-eval T0\u2013T2",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/5",
+      "merged_at_cet": "2026-11-03T02:12:44+01:00",
+      "merge_commit": "ba3ce81b9e22dc5e492b4489ed2238379f61af2e",
+      "head_sha": "ab2c2861df198a7bd887accc47177a8a00c89498",
+      "on_main_first_parent": true,
+      "additions": 1989,
+      "deletions": 7,
+      "changed_files": 19,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41558017987/job/125661542228"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41558223523/job/125662232820"
+          }
+        ],
+        "error": null
+      },
+      "tree_stat": null,
+      "tree_file_count": null
+    },
+    {
+      "number": 6,
+      "title": "Harden the Galion Voice edge (V2-S3)",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/6",
+      "merged_at_cet": "2026-11-03T02:21:20+01:00",
+      "merge_commit": "80b6fdedac0daa94564b254044c7c3d81153d5a2",
+      "head_sha": "9bc4c706e10f20e7003f4031b3c8ad5d5fe6cabc",
+      "on_main_first_parent": true,
+      "additions": 1289,
+      "deletions": 97,
+      "changed_files": 14,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41558469488/job/125663032456"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41559199282/job/125665418347"
+          }
+        ],
+        "error": null
+      },
+      "tree_stat": null,
+      "tree_file_count": null
+    },
+    {
+      "number": 9,
+      "title": "Warm Piper worker on the phone lane (V2-S6)",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/9",
+      "merged_at_cet": "2026-11-03T02:54:56+01:00",
+      "merge_commit": "8f97cabf31bfad95b9e9a5395131b33f8150d041",
+      "head_sha": "0803c0bb662dd85b2c86dcc3214cf0ff7ca8bf9a",
+      "on_main_first_parent": true,
+      "additions": 1062,
+      "deletions": 62,
+      "changed_files": 15,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41559492379/job/125666385962"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41562803095/job/125677105897"
+          }
+        ],
+        "error": null
+      },
+      "tree_stat": null,
+      "tree_file_count": null
+    },
+    {
+      "number": 10,
+      "title": "Record V2 owner decisions: Piper pin, Vosk A, Chatterbox",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/10",
+      "merged_at_cet": "2026-11-03T03:20:19+01:00",
+      "merge_commit": "a75e065ff685eef873a8db84b2ac1245ebf49029",
+      "head_sha": "c56585edd90870e7d694fa35e5ce647f6ed206c8",
+      "on_main_first_parent": true,
+      "additions": 441,
+      "deletions": 95,
+      "changed_files": 16,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41564924852/job/125684038590"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41565482887/job/125685859385"
+          }
+        ],
+        "error": null
+      },
+      "tree_stat": null,
+      "tree_file_count": null
+    },
+    {
+      "number": 11,
+      "title": "Add the Open Mind nerve and cortex seam",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/11",
+      "merged_at_cet": "2026-11-03T04:32:55+01:00",
+      "merge_commit": "12108e16ae1b7b93bf10668c59cb1b6670d6524e",
+      "head_sha": "105f929028be80172871cce19cfb98a07ebdf6a8",
+      "on_main_first_parent": true,
+      "additions": 1680,
+      "deletions": 2,
+      "changed_files": 18,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41572808396/job/125709397504"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41572856971/job/125709554385"
+          }
+        ],
+        "error": null
+      },
+      "tree_stat": null,
+      "tree_file_count": null
+    },
+    {
+      "number": 13,
+      "title": "Add the empathy weight to prosody and the background wash",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/13",
+      "merged_at_cet": "2026-11-03T04:33:13+01:00",
+      "merge_commit": "e362050f45abefa490d2ea4d623bf817dc5d1353",
+      "head_sha": "04ffe43242e949f4f75fe3a0406cfff7ab5be11a",
+      "on_main_first_parent": true,
+      "additions": 413,
+      "deletions": 35,
+      "changed_files": 11,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41572871350/job/125709599704"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41572887734/job/125709652688"
+          }
+        ],
+        "error": null
+      },
+      "tree_stat": null,
+      "tree_file_count": null
+    },
+    {
+      "number": 7,
+      "title": "Add the V2-S1 process bus next to the turn worker",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/7",
+      "merged_at_cet": "2026-11-03T04:35:45+01:00",
+      "merge_commit": "5ab3d38f55975eb75f6053dfc5643f1da7e1d57d",
+      "head_sha": "31922895a60ff1e8ae2c393149fa5345dbfc1c7f",
+      "on_main_first_parent": true,
+      "additions": 1454,
+      "deletions": 70,
+      "changed_files": 5,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41573065134/job/125710218736"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41573147524/job/125710477619"
+          }
+        ],
+        "error": null
+      },
+      "tree_stat": null,
+      "tree_file_count": null
+    },
+    {
+      "number": 8,
+      "title": "Galion Voice V2 research docs (2026-11-03)",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/8",
+      "merged_at_cet": "2026-11-03T04:37:47+01:00",
+      "merge_commit": "5fd164210ea3329d9f32be63baab9201767d3054",
+      "head_sha": "fef5e04e535d8400732c29ca133abf0b6f95237b",
+      "on_main_first_parent": true,
+      "additions": 1239,
+      "deletions": 0,
+      "changed_files": 18,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41573278328/job/125710889499"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41573348768/job/125711110648"
+          }
+        ],
+        "error": null
+      },
+      "tree_stat": null,
+      "tree_file_count": null
+    },
+    {
+      "number": 12,
+      "title": "Name the Luti easing profile and count the orb step in-process",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/12",
+      "merged_at_cet": "2026-11-03T04:51:23+01:00",
+      "merge_commit": "b584a56db60b0e77ef185b6b8b1bd6123fed6689",
+      "head_sha": "c6bcfac45962e8d02b2a74fcb67477e49da1d9f7",
+      "on_main_first_parent": true,
+      "additions": 497,
+      "deletions": 64,
+      "changed_files": 16,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41574586739/job/125715030562"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41574662804/job/125715266200"
+          }
+        ],
+        "error": null
+      },
+      "tree_stat": null,
+      "tree_file_count": null
+    },
+    {
+      "number": 15,
+      "title": "Scaffold the Galion Voice V2-S14 clone worker and Persona bus body",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/15",
+      "merged_at_cet": "2026-11-03T04:53:38+01:00",
+      "merge_commit": "d1db9a401ab134d3a2f504ed7de82123e4f93ee7",
+      "head_sha": "3b587f58bb865d9ea26c7a530e8fc23a69a9d4b9",
+      "on_main_first_parent": true,
+      "additions": 1965,
+      "deletions": 66,
+      "changed_files": 23,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41574779161/job/125715637454"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41574877522/job/125715947202"
+          }
+        ],
+        "error": null
+      },
+      "tree_stat": null,
+      "tree_file_count": null
+    },
+    {
+      "number": 14,
+      "title": "Add Galion Voice persona instruction files",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/14",
+      "merged_at_cet": "2026-11-03T05:21:59+01:00",
+      "merge_commit": "eb3e80ef2f751241f5d1b91b1551b2ecbfd1a807",
+      "head_sha": "2aa7b418e8e1fefcefb6ecb59e5b807c79abe809",
+      "on_main_first_parent": true,
+      "additions": 539,
+      "deletions": 0,
+      "changed_files": 8,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41577368431/job/125723900975"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41577700376/job/125724952573"
+          }
+        ],
+        "error": null
+      },
+      "tree_stat": "8 files changed, 539 insertions(+)",
+      "tree_file_count": 8
+    },
+    {
+      "number": 17,
+      "title": "Draft Samantha and Jarvis V2 voice configs",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/17",
+      "merged_at_cet": "2026-11-03T05:22:05+01:00",
+      "merge_commit": "04cc193c78e78cdc18bff7e3d3c74a6f1279b7ca",
+      "head_sha": "c0dd0f77e6601af794785f49870cc58318ea1bcd",
+      "on_main_first_parent": true,
+      "additions": 276,
+      "deletions": 0,
+      "changed_files": 7,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41577392869/job/125723979485"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41577710117/job/125724984038"
+          }
+        ],
+        "error": null
+      },
+      "tree_stat": "7 files changed, 276 insertions(+)",
+      "tree_file_count": 7
+    },
+    {
+      "number": 18,
+      "title": "Add the V2-S14 rights-clearance checklist for Samantha and Jarvis",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/18",
+      "merged_at_cet": "2026-11-03T05:28:24+01:00",
+      "merge_commit": "8ea7a6561ecd29a284fa988b1f8cdc54db100f34",
+      "head_sha": "c3830a0663df25b7012722313b064c61f6549b14",
+      "on_main_first_parent": true,
+      "additions": 377,
+      "deletions": 4,
+      "changed_files": 7,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41577555263/job/125724487589"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41578320496/job/125726941406"
+          }
+        ],
+        "error": null
+      },
+      "tree_stat": "7 files changed, 377 insertions(+), 4 deletions(-)",
+      "tree_file_count": 7
+    },
+    {
+      "number": 19,
+      "title": "Document the closed film-clip ingest outline",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/19",
+      "merged_at_cet": "2026-11-03T05:29:28+01:00",
+      "merge_commit": "4ecf0d6f5946275a94d9db28305538cbe2db1c60",
+      "head_sha": "845f46ca4bc882f09f7084a3f3442fa1afc8ddb2",
+      "on_main_first_parent": true,
+      "additions": 269,
+      "deletions": 4,
+      "changed_files": 6,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41577584690/job/125724582492"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41578417422/job/125727287161"
+          }
+        ],
+        "error": null
+      },
+      "tree_stat": "6 files changed, 270 insertions(+), 5 deletions(-)",
+      "tree_file_count": 6
+    },
+    {
+      "number": 16,
+      "title": "Document the Galion Voice V2 error state",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/16",
+      "merged_at_cet": "2026-11-03T05:42:58+01:00",
+      "merge_commit": "eed19730fd989ab1d0d9aa698723e6d169c7373d",
+      "head_sha": "bdf5e1fad354316d068c465615749a531bf98990",
+      "on_main_first_parent": true,
+      "additions": 296,
+      "deletions": 1,
+      "changed_files": 7,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41574982494/job/125716274116"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41579722925/job/125731464147"
+          }
+        ],
+        "error": null
+      },
+      "tree_stat": "7 files changed, 296 insertions(+), 1 deletion(-)",
+      "tree_file_count": 7
+    },
+    {
+      "number": 21,
+      "title": "Keep the one-dot mark a calm near-white circle",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/21",
+      "merged_at_cet": "2026-11-03T05:46:22+01:00",
+      "merge_commit": "4f537b48a785d61578519719f62646d2b263ad69",
+      "head_sha": "6dbf97f00a4b8a8c1a7a45101aba8167130bdd54",
+      "on_main_first_parent": true,
+      "additions": 319,
+      "deletions": 128,
+      "changed_files": 11,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {},
+        "runs": [],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41580045675/job/125732486887"
+          }
+        ],
+        "error": null
+      },
+      "tree_stat": "11 files changed, 384 insertions(+), 341 deletions(-)",
+      "tree_file_count": 11
+    },
+    {
+      "number": 22,
+      "title": "Add the V2 persona dot and mood wash",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/22",
+      "merged_at_cet": "2026-11-03T06:03:36+01:00",
+      "merge_commit": "986a6dbd331003350cbb5e9e83b19b2dcc3a8db1",
+      "head_sha": "215943ef06dc1b7f152f5ed01de555c693eff679",
+      "on_main_first_parent": true,
+      "additions": 1485,
+      "deletions": 30,
+      "changed_files": 17,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41581527394/job/125737241832"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41581652075/job/125737638343"
+          }
+        ],
+        "error": null
+      },
+      "tree_stat": "17 files changed, 1485 insertions(+), 30 deletions(-)",
+      "tree_file_count": 17
+    },
+    {
+      "number": 26,
+      "title": "Use out-of-process Vosk for the phone mic",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/26",
+      "merged_at_cet": "2026-11-03T09:50:07+01:00",
+      "merge_commit": "235481b0f2ffd24ed0e93eb571bfc77b6ed6b413",
+      "head_sha": "12cb30d58d18454c696ed88f2e96aaf588465f2e",
+      "on_main_first_parent": true,
+      "additions": 2086,
+      "deletions": 113,
+      "changed_files": 27,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41606028208/job/125815940837"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41606238244/job/125816645049"
+          }
+        ],
+        "error": null
+      },
+      "tree_stat": "27 files changed, 2086 insertions(+), 113 deletions(-)",
+      "tree_file_count": 27
+    },
+    {
+      "number": 25,
+      "title": "One phone-ready circle: mic, text, persona, and Piper",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/25",
+      "merged_at_cet": "2026-11-03T09:50:35+01:00",
+      "merge_commit": "b1f5e0c5712f4498048b37d41a541a040787e74d",
+      "head_sha": "dbb45142a9a286fee1822e99e6305ab493d7c083",
+      "on_main_first_parent": true,
+      "additions": 634,
+      "deletions": 309,
+      "changed_files": 12,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41605753093/job/125815026883"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41606300344/job/125816850889"
+          }
+        ],
+        "error": null
+      },
+      "tree_stat": "12 files changed, 634 insertions(+), 309 deletions(-)",
+      "tree_file_count": 12
+    },
+    {
+      "number": 51,
+      "title": "Fetch Chatterbox clone weights from GitHub Release assets",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/51",
+      "merged_at_cet": "2026-11-03T12:54:36+01:00",
+      "merge_commit": "ed933060e80a4b665d376b8390e46f7078b655cc",
+      "head_sha": "29923a01463259dfb26ad555dbca667aa5329b61",
+      "on_main_first_parent": true,
+      "additions": 897,
+      "deletions": 39,
+      "changed_files": 15,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41630585392/job/125898816285"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41631314711/job/125901297534"
+          }
+        ],
+        "error": null
+      },
+      "tree_stat": null,
+      "tree_file_count": null
+    },
+    {
+      "number": 58,
+      "title": "Piper CPU stream TTFA live demo (t301) \u2014 refs #54 #55",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/58",
+      "merged_at_cet": "2026-11-03T13:12:05+01:00",
+      "merge_commit": "8162456f988beffcdbe12015efbe015f9dfdb5e8",
+      "head_sha": "8c92aef1f7b89758d54e79d296167508a347e088",
+      "on_main_first_parent": true,
+      "additions": 274,
+      "deletions": 0,
+      "changed_files": 3,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41633226974/job/125907802485"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41633713831/job/125909452844"
+          }
+        ],
+        "error": null
+      },
+      "tree_stat": null,
+      "tree_file_count": null
+    },
+    {
+      "number": 27,
+      "title": "Add the Plus SKU plan for Galion Voice V2 symphony",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/27",
+      "merged_at_cet": "2026-11-03T17:26:16+01:00",
+      "merge_commit": "4bca8c2e93df012ae4971378e8ef9fa3f48c380d",
+      "head_sha": "4ccedb52c8ae646bb662b290fd47e950d3e04317",
+      "on_main_first_parent": true,
+      "additions": 117,
+      "deletions": 0,
+      "changed_files": 1,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41613038799/job/125839486647"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "failure": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "failure",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41674198146/job/126050283346"
+          }
+        ],
+        "error": null
+      },
+      "tree_stat": "1 file changed, 117 insertions(+)",
+      "tree_file_count": 1
+    },
+    {
+      "number": 28,
+      "title": "Wire Eureka into the Galion Voice V2 symphony docs",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/28",
+      "merged_at_cet": "2026-11-03T17:26:24+01:00",
+      "merge_commit": "efbde9bfdf7fe0321c79cd102f5593dc741c5e29",
+      "head_sha": "8a79e1f68cc0f2e7d8f874b9626d1000360f9f8a",
+      "on_main_first_parent": true,
+      "additions": 200,
+      "deletions": 0,
+      "changed_files": 3,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41613191715/job/125840003950"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41674219749/job/126050361606"
+          }
+        ],
+        "error": null
+      },
+      "tree_stat": "3 files changed, 200 insertions(+)",
+      "tree_file_count": 3
+    },
+    {
+      "number": 29,
+      "title": "Add the Galion Voice V3 symphony plan (docs only)",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/29",
+      "merged_at_cet": "2026-11-03T17:26:26+01:00",
+      "merge_commit": "0dbe96a92baa751f984b230097a896e518ce822a",
+      "head_sha": "9bdaa5c8a93a52c3203b90c8f6ef1cf00659b93e",
+      "on_main_first_parent": true,
+      "additions": 396,
+      "deletions": 0,
+      "changed_files": 1,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41613314438/job/125840421306"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41674222451/job/126050368996"
+          }
+        ],
+        "error": null
+      },
+      "tree_stat": "1 file changed, 396 insertions(+)",
+      "tree_file_count": 1
+    },
+    {
+      "number": 38,
+      "title": "Compile Chatterbox PCM into a .gqvoice packet",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/38",
+      "merged_at_cet": "2026-11-03T17:26:28+01:00",
+      "merge_commit": "0d615c429bf5a0c07c50fa34c77d3203efc82d8c",
+      "head_sha": "d210fba23cccf51d5122b1612b663212f6964274",
+      "on_main_first_parent": true,
+      "additions": 1442,
+      "deletions": 84,
+      "changed_files": 11,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41614171717/job/125843330577"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41674227560/job/126050387485"
+          }
+        ],
+        "error": null
+      },
+      "tree_stat": "11 files changed, 1442 insertions(+), 84 deletions(-)",
+      "tree_file_count": 11
+    },
+    {
+      "number": 40,
+      "title": "Ignore Samantha and Jarvis indoor voice references",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/40",
+      "merged_at_cet": "2026-11-03T17:26:30+01:00",
+      "merge_commit": "b01c80508c0032c85886c7b6eca0cbef940b1baa",
+      "head_sha": "7849b868c449e355b1bc7c5ce610d5235face27e",
+      "on_main_first_parent": true,
+      "additions": 37,
+      "deletions": 1,
+      "changed_files": 2,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41614539345/job/125844564476"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41674233786/job/126050406770"
+          }
+        ],
+        "error": null
+      },
+      "tree_stat": "2 files changed, 37 insertions(+), 1 deletion(-)",
+      "tree_file_count": 2
+    },
+    {
+      "number": 46,
+      "title": "Document Symphony puzzle pieces (MIT / Apache inventory)",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/46",
+      "merged_at_cet": "2026-11-03T17:26:32+01:00",
+      "merge_commit": "179a884e50542165645e2d1a7623925834c9e26c",
+      "head_sha": "bf41952001a4dbcc0ab3221cb7bf61717a621999",
+      "on_main_first_parent": true,
+      "additions": 440,
+      "deletions": 0,
+      "changed_files": 1,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41614976946/job/125846044958"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41674240583/job/126050434682"
+          }
+        ],
+        "error": null
+      },
+      "tree_stat": "1 file changed, 440 insertions(+)",
+      "tree_file_count": 1
+    },
+    {
+      "number": 50,
+      "title": "Wire the Samantha and Jarvis voice-to-voice outline",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/50",
+      "merged_at_cet": "2026-11-03T17:26:34+01:00",
+      "merge_commit": "e173fbb8ff968fd6570c18b3c67565958d2d2c78",
+      "head_sha": "be8c9f3958c6f6a7bdd3a40f2af16da62e92c388",
+      "on_main_first_parent": true,
+      "additions": 834,
+      "deletions": 3,
+      "changed_files": 8,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41632350568/job/125904812240"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41674246921/job/126050456735"
+          }
+        ],
+        "error": null
+      },
+      "tree_stat": "8 files changed, 834 insertions(+), 3 deletions(-)",
+      "tree_file_count": 8
+    },
+    {
+      "number": 57,
+      "title": "Add Galion Voice V3 planning docs",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/57",
+      "merged_at_cet": "2026-11-03T17:26:38+01:00",
+      "merge_commit": "0f3c463b9155682b35267593046b34d689e1b162",
+      "head_sha": "ce1bc0f25706c1f5bb7313d413f0e4509524ca24",
+      "on_main_first_parent": true,
+      "additions": 892,
+      "deletions": 0,
+      "changed_files": 8,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41632465106/job/125905208275"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41674256708/job/126050489275"
+          }
+        ],
+        "error": null
+      },
+      "tree_stat": "8 files changed, 892 insertions(+)",
+      "tree_file_count": 8
+    },
+    {
+      "number": 59,
+      "title": "Merge open PRs #20 #30-36 #39 #41 #42 #45 #52 (markdown conflicts resolved by union)",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/59",
+      "merged_at_cet": "2026-11-03T18:31:05+01:00",
+      "merge_commit": "ac6065ce600ac93eaab753f06eab939a86e46da3",
+      "head_sha": "5e7a9232ff6a8719265b5721baab09b1d58f0df1",
+      "on_main_first_parent": true,
+      "additions": 10898,
+      "deletions": 174,
+      "changed_files": 97,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41684999744/job/126088293275"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41685010756/job/126088327788"
+          }
+        ],
+        "error": null
+      },
+      "tree_stat": "97 files changed, 10898 insertions(+), 174 deletions(-)",
+      "tree_file_count": 97
+    },
+    {
+      "number": 30,
+      "title": "Plan Titanaxe staging CPU cascade (Plus CX23 / Ultra CX43)",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/30",
+      "merged_at_cet": "2026-11-03T18:31:07+01:00",
+      "merge_commit": "44b334792ae9d51ac75ed63699f31f52847fca28",
+      "head_sha": "1de760b0442cc7fe422476c312d892e50b1d9093",
+      "on_main_first_parent": false,
+      "additions": 237,
+      "deletions": 2,
+      "changed_files": 4,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41613461028/job/125840916983"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {},
+        "runs": [],
+        "error": null
+      },
+      "tree_stat": null,
+      "tree_file_count": null
+    },
+    {
+      "number": 52,
+      "title": "Add a hard Galion Voice loop harness and schedule the Admin UI check",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/52",
+      "merged_at_cet": "2026-11-03T18:31:07+01:00",
+      "merge_commit": "88e9796c4e44861a251b627ae79f3a270d93705d",
+      "head_sha": "a1568c634f5d5c5d4482ba924b6adcf1695ab91d",
+      "on_main_first_parent": false,
+      "additions": 1857,
+      "deletions": 4,
+      "changed_files": 10,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41633734879/job/125909521894"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41677721336/job/126062726188"
+          }
+        ],
+        "error": null
+      },
+      "tree_stat": null,
+      "tree_file_count": null
+    },
+    {
+      "number": 45,
+      "title": "Wire V6 one-percent engine metrics into symphony",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/45",
+      "merged_at_cet": "2026-11-03T18:31:07+01:00",
+      "merge_commit": "db6835dde9ac11a1f16431c061a5ae8682c9bf55",
+      "head_sha": "39991df53dd9974e9cf28fcd951cd9a74919b443",
+      "on_main_first_parent": false,
+      "additions": 1317,
+      "deletions": 4,
+      "changed_files": 14,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41614826068/job/125845532277"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {},
+        "runs": [],
+        "error": null
+      },
+      "tree_stat": null,
+      "tree_file_count": null
+    },
+    {
+      "number": 42,
+      "title": "Compile clone PCM into a Galion .gq voice clip",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/42",
+      "merged_at_cet": "2026-11-03T18:31:07+01:00",
+      "merge_commit": "bb821dbb654f2af46f3b2c7c3c15946919ad3f88",
+      "head_sha": "d616e5e2100f9864bb3b2efaaf504c06db299c6f",
+      "on_main_first_parent": false,
+      "additions": 1776,
+      "deletions": 2,
+      "changed_files": 12,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41614578531/job/125844699284"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {},
+        "runs": [],
+        "error": null
+      },
+      "tree_stat": null,
+      "tree_file_count": null
+    },
+    {
+      "number": 41,
+      "title": "Land Chatterbox Nano clone wiring and Galion clip emit",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/41",
+      "merged_at_cet": "2026-11-03T18:31:07+01:00",
+      "merge_commit": "08698c62fbc5b53b178be1287eddd17c149fa50e",
+      "head_sha": "9927fe14e7949804e389d86d86b3bcf5a53825bb",
+      "on_main_first_parent": false,
+      "additions": 1659,
+      "deletions": 147,
+      "changed_files": 22,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41614569600/job/125844666972"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {},
+        "runs": [],
+        "error": null
+      },
+      "tree_stat": null,
+      "tree_file_count": null
+    },
+    {
+      "number": 39,
+      "title": "Add Eureka self-eval gates for symphony A\u2013G",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/39",
+      "merged_at_cet": "2026-11-03T18:31:07+01:00",
+      "merge_commit": "dc07f4ffad3f42efe42c3ab196d00cd2b0aafd7a",
+      "head_sha": "155ef6046da44282705a8b31cdec536e6a42817e",
+      "on_main_first_parent": false,
+      "additions": 690,
+      "deletions": 0,
+      "changed_files": 10,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41614475449/job/125844356897"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {},
+        "runs": [],
+        "error": null
+      },
+      "tree_stat": null,
+      "tree_file_count": null
+    },
+    {
+      "number": 36,
+      "title": "Plan the Galion Research console as its own async desk",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/36",
+      "merged_at_cet": "2026-11-03T18:31:07+01:00",
+      "merge_commit": "5113ec1dd9e2d2770c3f65f6f37b7b78400bd330",
+      "head_sha": "30c1decf0345b2f0a9be4ee19c30c8fcd5558d8e",
+      "on_main_first_parent": false,
+      "additions": 314,
+      "deletions": 0,
+      "changed_files": 2,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41613837147/job/125842184944"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {},
+        "runs": [],
+        "error": null
+      },
+      "tree_stat": null,
+      "tree_file_count": null
+    },
+    {
+      "number": 35,
+      "title": "TTFA gate: 80 ms live-sector frame, presence onset / barge-in / e-to-a",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/35",
+      "merged_at_cet": "2026-11-03T18:31:07+01:00",
+      "merge_commit": "322f6ecca2ddf632eecdf08017b0696ebf664e8f",
+      "head_sha": "39e87a2f5bd55c303514655f5054b5be75bff6ce",
+      "on_main_first_parent": false,
+      "additions": 967,
+      "deletions": 0,
+      "changed_files": 9,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41613836645/job/125842182722"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {},
+        "runs": [],
+        "error": null
+      },
+      "tree_stat": null,
+      "tree_file_count": null
+    },
+    {
+      "number": 34,
+      "title": "One-dot auto-record proceeds on the mic path",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/34",
+      "merged_at_cet": "2026-11-03T18:31:07+01:00",
+      "merge_commit": "e833dbdf87915e96c897c70f772ea17f14a37509",
+      "head_sha": "627ce857f901d77e6013031c62722bfc82447b43",
+      "on_main_first_parent": false,
+      "additions": 373,
+      "deletions": 5,
+      "changed_files": 11,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "failure": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "failure",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41613658045/job/125841575132"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {},
+        "runs": [],
+        "error": null
+      },
+      "tree_stat": null,
+      "tree_file_count": null
+    },
+    {
+      "number": 33,
+      "title": "Document Samantha emotions as live prosody, not a script",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/33",
+      "merged_at_cet": "2026-11-03T18:31:07+01:00",
+      "merge_commit": "aa41d959be94f547e06c9ca9e3738af01e55c869",
+      "head_sha": "77f51127415424de5dac9df7ca6810ab4ea1b71a",
+      "on_main_first_parent": false,
+      "additions": 279,
+      "deletions": 0,
+      "changed_files": 2,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41613586255/job/125841333022"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {},
+        "runs": [],
+        "error": null
+      },
+      "tree_stat": null,
+      "tree_file_count": null
+    },
+    {
+      "number": 32,
+      "title": "Add the Galion Voice V2 symphony index",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/32",
+      "merged_at_cet": "2026-11-03T18:31:07+01:00",
+      "merge_commit": "372c5d0cc89990bb79d9d581c1388346023d6250",
+      "head_sha": "b54e44fc6acdf66cf60f11c0cf210650be44cbcd",
+      "on_main_first_parent": false,
+      "additions": 967,
+      "deletions": 0,
+      "changed_files": 19,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41613541683/job/125841191600"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {},
+        "runs": [],
+        "error": null
+      },
+      "tree_stat": null,
+      "tree_file_count": null
+    },
+    {
+      "number": 31,
+      "title": "Add the Ultra symphony host plan ($220, CX43-class)",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/31",
+      "merged_at_cet": "2026-11-03T18:31:07+01:00",
+      "merge_commit": "73662830da106b82cc6c1b9bc3cbb6566df44382",
+      "head_sha": "c53dc3325658303e5b86e64da5267abbc09654ef",
+      "on_main_first_parent": false,
+      "additions": 289,
+      "deletions": 7,
+      "changed_files": 6,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41613463407/job/125840926074"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {},
+        "runs": [],
+        "error": null
+      },
+      "tree_stat": null,
+      "tree_file_count": null
+    },
+    {
+      "number": 20,
+      "title": "Plan the Chatterbox Nano out-of-process clone worker",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/20",
+      "merged_at_cet": "2026-11-03T18:31:07+01:00",
+      "merge_commit": "071a73f5e6eae55a09ab75df2e5189db8e273cea",
+      "head_sha": "92975fc5951e7b6b65b4f826c3d87fb828c10dab",
+      "on_main_first_parent": false,
+      "additions": 231,
+      "deletions": 3,
+      "changed_files": 6,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {},
+        "runs": [],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {},
+        "runs": [],
+        "error": null
+      },
+      "tree_stat": null,
+      "tree_file_count": null
+    },
+    {
+      "number": 60,
+      "title": "Merge open PRs #37 #44 #47 #48 #49 (code conflicts resolved)",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/60",
+      "merged_at_cet": "2026-11-03T18:32:30+01:00",
+      "merge_commit": "cc4e6e81da3d2f331feaa236d240c60a7a78e027",
+      "head_sha": "5c936ac77a480ad6e75739732ff26906044cbec4",
+      "on_main_first_parent": true,
+      "additions": 8151,
+      "deletions": 38,
+      "changed_files": 73,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41685221272/job/126089061813"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41685250180/job/126089162423"
+          }
+        ],
+        "error": null
+      },
+      "tree_stat": "73 files changed, 8151 insertions(+), 38 deletions(-)",
+      "tree_file_count": 73
+    },
+    {
+      "number": 48,
+      "title": "Translate clone interchange into the Galion symphony load path",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/48",
+      "merged_at_cet": "2026-11-03T18:32:32+01:00",
+      "merge_commit": "7366a3382ad321e6d46a61b4a308e190c4302fab",
+      "head_sha": "8dee2457eccefe0bfcae37fc4c2b1687fa2cc308",
+      "on_main_first_parent": false,
+      "additions": 4052,
+      "deletions": 1,
+      "changed_files": 22,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41615341005/job/125847283251"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {},
+        "runs": [],
+        "error": null
+      },
+      "tree_stat": null,
+      "tree_file_count": null
+    },
+    {
+      "number": 49,
+      "title": "Sit clone, persona, and the one dot on the 80 ms heartbeat",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/49",
+      "merged_at_cet": "2026-11-03T18:32:32+01:00",
+      "merge_commit": "b8a981af75c123722ef8bcf27f87a03ecb200502",
+      "head_sha": "e58381092067042413380bc4552a39e53da84ca7",
+      "on_main_first_parent": false,
+      "additions": 977,
+      "deletions": 25,
+      "changed_files": 17,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41615394798/job/125847467565"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {},
+        "runs": [],
+        "error": null
+      },
+      "tree_stat": null,
+      "tree_file_count": null
+    },
+    {
+      "number": 44,
+      "title": "Add a toggleable Jarvis hub texture layer",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/44",
+      "merged_at_cet": "2026-11-03T18:32:32+01:00",
+      "merge_commit": "cefd7120a89e6399c4cc7e6b77fc80098807cd3f",
+      "head_sha": "98506005ed776475ca544d140b34acbe10b91782",
+      "on_main_first_parent": false,
+      "additions": 1245,
+      "deletions": 2,
+      "changed_files": 12,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41614823641/job/125845523896"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {},
+        "runs": [],
+        "error": null
+      },
+      "tree_stat": null,
+      "tree_file_count": null
+    },
+    {
+      "number": 37,
+      "title": "Persona feeling on the heartbeat, one-dot workflow hook",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/37",
+      "merged_at_cet": "2026-11-03T18:32:32+01:00",
+      "merge_commit": "90307fee74cb5d20f8a87fd40038116bbaad9927",
+      "head_sha": "c49a9bc7978fd2c94f66a9a29301b897b811550d",
+      "on_main_first_parent": false,
+      "additions": 892,
+      "deletions": 8,
+      "changed_files": 13,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41614139994/job/125843221453"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {},
+        "runs": [],
+        "error": null
+      },
+      "tree_stat": null,
+      "tree_file_count": null
+    },
+    {
+      "number": 47,
+      "title": "Add symphony runbooks and the 80 ms self-eval",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/47",
+      "merged_at_cet": "2026-11-03T18:32:34+01:00",
+      "merge_commit": "927abeae1635908699b97fc032f4152086b31212",
+      "head_sha": "50d835589e5fe2a924d6020062c8b4064c6592c9",
+      "on_main_first_parent": false,
+      "additions": 1060,
+      "deletions": 3,
+      "changed_files": 20,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41615093662/job/125846442209"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {},
+        "runs": [],
+        "error": null
+      },
+      "tree_stat": null,
+      "tree_file_count": null
+    },
+    {
+      "number": 61,
+      "title": "Merge clone cluster + Hermes PRs (#53 #55 #54 #43 #56 #24 #23)",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/61",
+      "merged_at_cet": "2026-11-03T19:11:41+01:00",
+      "merge_commit": "5114f6550896429f69af352f2943093424842264",
+      "head_sha": "3f39560de36b2a3cf0483a7d1abee3011b6d5bc2",
+      "on_main_first_parent": true,
+      "additions": 7898,
+      "deletions": 497,
+      "changed_files": 69,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41691189480/job/126109901813"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "failure": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "failure",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41691443819/job/126110774244"
+          }
+        ],
+        "error": null
+      },
+      "tree_stat": "69 files changed, 7898 insertions(+), 497 deletions(-)",
+      "tree_file_count": 69
+    },
+    {
+      "number": 55,
+      "title": "Drain one Chatterbox PCM frame on the 80 ms heartbeat",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/55",
+      "merged_at_cet": "2026-11-03T19:11:43+01:00",
+      "merge_commit": "7a73229cc5b89a64d445b054dded1636d9a0e644",
+      "head_sha": "8132c07612496395f546afe5d07f2556e0cb92d1",
+      "on_main_first_parent": false,
+      "additions": 1993,
+      "deletions": 39,
+      "changed_files": 24,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41633590839/job/125909034238"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {},
+        "runs": [],
+        "error": null
+      },
+      "tree_stat": null,
+      "tree_file_count": null
+    },
+    {
+      "number": 54,
+      "title": "Stream TTFA: Piper script is the live path, stub clocks fail",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/54",
+      "merged_at_cet": "2026-11-03T19:11:43+01:00",
+      "merge_commit": "d6d604a91a90504dda9bb93cb1315a7cd7832276",
+      "head_sha": "29e12be5f83fa530f2eae50ce4d5164a7d4ada0c",
+      "on_main_first_parent": false,
+      "additions": 1993,
+      "deletions": 81,
+      "changed_files": 21,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41633813757/job/125909787899"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {},
+        "runs": [],
+        "error": null
+      },
+      "tree_stat": null,
+      "tree_file_count": null
+    },
+    {
+      "number": 43,
+      "title": "Unlock the clip store on the t273 private clearance",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/43",
+      "merged_at_cet": "2026-11-03T19:11:43+01:00",
+      "merge_commit": "5fa00771f21dfd75097a7796f24e23623c7cc691",
+      "head_sha": "db5f8917ba807fb6e45977c01241778a3126d6cc",
+      "on_main_first_parent": false,
+      "additions": 1253,
+      "deletions": 49,
+      "changed_files": 20,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41614599966/job/125844771898"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {},
+        "runs": [],
+        "error": null
+      },
+      "tree_stat": null,
+      "tree_file_count": null
+    },
+    {
+      "number": 24,
+      "title": "Run Chatterbox Nano out of process, gated on consented refs",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/24",
+      "merged_at_cet": "2026-11-03T19:11:43+01:00",
+      "merge_commit": "d3604147f0ef89f1d59d94a76a17f970a5bb0539",
+      "head_sha": "7f8e107448e35dbc3003a3cf231942dc0bd4a6dd",
+      "on_main_first_parent": false,
+      "additions": 1310,
+      "deletions": 129,
+      "changed_files": 19,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41605701476/job/125814849882"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {},
+        "runs": [],
+        "error": null
+      },
+      "tree_stat": null,
+      "tree_file_count": null
+    },
+    {
+      "number": 23,
+      "title": "Wire Hermes into the live reply path",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/23",
+      "merged_at_cet": "2026-11-03T19:11:43+01:00",
+      "merge_commit": "3f39560de36b2a3cf0483a7d1abee3011b6d5bc2",
+      "head_sha": "df24be24697241692dd210213d5afe0d265dc3ba",
+      "on_main_first_parent": false,
+      "additions": 1340,
+      "deletions": 234,
+      "changed_files": 14,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41605002740/job/125812526795"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41691189480/job/126109901813"
+          }
+        ],
+        "error": null
+      },
+      "tree_stat": null,
+      "tree_file_count": null
+    },
+    {
+      "number": 56,
+      "title": "Make Chatterbox Nano the V2 clone backend, Piper fallback",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/56",
+      "merged_at_cet": "2026-11-03T19:11:43+01:00",
+      "merge_commit": "21932c77137d026ef8ca357d126f5280d49c72f5",
+      "head_sha": "ced36aef622f8bbfbab1625c108177c0fb0c5775",
+      "on_main_first_parent": false,
+      "additions": 1209,
+      "deletions": 122,
+      "changed_files": 17,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41632138620/job/125904100972"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {},
+        "runs": [],
+        "error": null
+      },
+      "tree_stat": null,
+      "tree_file_count": null
+    },
+    {
+      "number": 53,
+      "title": "Wire Chatterbox Nano generate in the clone worker",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/53",
+      "merged_at_cet": "2026-11-03T19:11:44+01:00",
+      "merge_commit": "dda7a60106d4bf88e5e3ad6d9311e7d3d1c56639",
+      "head_sha": "c6e440e805d173629e449366812dc465758d20a4",
+      "on_main_first_parent": false,
+      "additions": 1222,
+      "deletions": 124,
+      "changed_files": 15,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41631954323/job/125903496511"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {},
+        "runs": [],
+        "error": null
+      },
+      "tree_stat": null,
+      "tree_file_count": null
+    },
+    {
+      "number": 63,
+      "title": "Consent check at clone time only (Rust, in process); no per-turn consent subprocess",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/63",
+      "merged_at_cet": "2026-11-04T03:01:27+01:00",
+      "merge_commit": "3b1acc9e9c2c44d76f125bed1c84727bac57579c",
+      "head_sha": "fdf06482faf61f6ad3339d8099b1d0ccd8e75465",
+      "on_main_first_parent": true,
+      "additions": 1919,
+      "deletions": 69,
+      "changed_files": 27,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41757819486/job/126338004714"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41757983517/job/126338517411"
+          }
+        ],
+        "error": null
+      },
+      "tree_stat": "27 files changed, 1919 insertions(+), 69 deletions(-)",
+      "tree_file_count": 27
+    },
+    {
+      "number": 62,
+      "title": "latency-240/01: galion-piper-rt (ORT 1.31.1) default Piper runtime + streaming/pre-warm (owner t613s2992)",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/62",
+      "merged_at_cet": "2026-11-04T07:46:27+01:00",
+      "merge_commit": "5fe846b628f34a23744c9d6d174aa0d2517d63df",
+      "head_sha": "d74d847ed3ebf013cd4b24352ca72310614a4373",
+      "on_main_first_parent": true,
+      "additions": 1435,
+      "deletions": 37,
+      "changed_files": 22,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41787314813/job/126433061245"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "failure": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "failure",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41787765911/job/126433742845"
+          }
+        ],
+        "error": null
+      },
+      "tree_stat": "22 files changed, 1435 insertions(+), 37 deletions(-)",
+      "tree_file_count": 22
+    },
+    {
+      "number": 64,
+      "title": "Hard-test harness: apply the six REPORT \u00a75b fixes (local LLM run: HARD-FAIL, gaps named)",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/64",
+      "merged_at_cet": "2026-11-04T17:51:38+01:00",
+      "merge_commit": "508cfe64d001fc1ec11419b9f7828815e5c3d2e5",
+      "head_sha": "d51a08c7a6d8eb8995e081bd31f940e4f0eb1e77",
+      "on_main_first_parent": true,
+      "additions": 279,
+      "deletions": 38,
+      "changed_files": 2,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41811691934/job/126512248223"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41871737856/job/126720357458"
+          }
+        ],
+        "error": null
+      },
+      "tree_stat": "2 files changed, 279 insertions(+), 38 deletions(-)",
+      "tree_file_count": 2
+    },
+    {
+      "number": 72,
+      "title": "a21: build-piper-rt.sh builds and copies from the same target dir",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/72",
+      "merged_at_cet": "2026-11-05T03:36:34+01:00",
+      "merge_commit": "4b87ed5902be6c40a4ed008d26508c43a79015e9",
+      "head_sha": "c263bf6d69f04318c52654c235c5fc5d1b760e49",
+      "on_main_first_parent": true,
+      "additions": 6,
+      "deletions": 1,
+      "changed_files": 1,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41856617963/job/126666883507"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41956335012/job/127012002667"
+          }
+        ],
+        "error": null
+      },
+      "tree_stat": "1 file changed, 6 insertions(+), 1 deletion(-)",
+      "tree_file_count": 1
+    },
+    {
+      "number": 66,
+      "title": "latency-240 lane 02: V2 core map + ClonePlan CPU pinning (clone off during live calls)",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/66",
+      "merged_at_cet": "2026-11-05T03:36:41+01:00",
+      "merge_commit": "9b6ffeed1830b188e8d4e6157155749ba67e8240",
+      "head_sha": "d7832d6dd4166861ff92b5377254cef6f89abb1d",
+      "on_main_first_parent": true,
+      "additions": 608,
+      "deletions": 21,
+      "changed_files": 5,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41812046360/job/126513425884"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "failure": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "failure",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41956346481/job/127012041086"
+          }
+        ],
+        "error": null
+      },
+      "tree_stat": "5 files changed, 608 insertions(+), 21 deletions(-)",
+      "tree_file_count": 5
+    },
+    {
+      "number": 68,
+      "title": "Core map v3 (owner map): bus+retrieval 0, Vosk 1, in-house reasoning 2-5, Piper Samantha 6 / Jarvis 7; no Qwen",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/68",
+      "merged_at_cet": "2026-11-05T03:36:54+01:00",
+      "merge_commit": "fc4d72d7d66484b3853c93f668648820b6062c21",
+      "head_sha": "6d5a4c583f5081876da18431887630e4939d141c",
+      "on_main_first_parent": true,
+      "additions": 888,
+      "deletions": 275,
+      "changed_files": 17,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41900455645/job/126821133733"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41956369331/job/127012117846"
+          }
+        ],
+        "error": null
+      },
+      "tree_stat": "17 files changed, 888 insertions(+), 275 deletions(-)",
+      "tree_file_count": 17
+    },
+    {
+      "number": 65,
+      "title": "latency-240 lane 04: pipeline (LLM at ASR final, first-clause cap fix, two-stage endpointer, warm client)",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/65",
+      "merged_at_cet": "2026-11-05T03:37:01+01:00",
+      "merge_commit": "86c5d4466f83b1687d4265a015497f645c5687b5",
+      "head_sha": "44563f71da6c251837d1a31df64d0875b230b781",
+      "on_main_first_parent": true,
+      "additions": 2154,
+      "deletions": 0,
+      "changed_files": 18,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41955843872/job/127010415108"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41956384263/job/127012162513"
+          }
+        ],
+        "error": null
+      },
+      "tree_stat": "18 files changed, 2154 insertions(+)",
+      "tree_file_count": 18
+    },
+    {
+      "number": 75,
+      "title": "lat240 wt-14: GALION_LLM=canned local reply + in-tree Piper runtime default (eos->first audio 178.9/221.9 ms canned, n=24)",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/75",
+      "merged_at_cet": "2026-11-05T03:37:08+01:00",
+      "merge_commit": "3e6583a641c76a2d7bf89aa6413446640fbc1f54",
+      "head_sha": "c036d929f10d4717153a4f8204e7a1205160b2a8",
+      "on_main_first_parent": true,
+      "additions": 2158,
+      "deletions": 0,
+      "changed_files": 18,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41956089216/job/127011204972"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "failure": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "failure",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41956394988/job/127012196811"
+          }
+        ],
+        "error": null
+      },
+      "tree_stat": "1 file changed, 8 insertions(+), 1 deletion(-)",
+      "tree_file_count": 1
+    },
+    {
+      "number": 67,
+      "title": "latency-240 lane 03: Chatterbox Nano clone efficiency (bench-only; q8t3+s1 RTF 0.553\u21920.358)",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/67",
+      "merged_at_cet": "2026-11-05T03:37:16+01:00",
+      "merge_commit": "d12f9cc09706bf44ede068401d6565200bfde1c4",
+      "head_sha": "722553e577803ebbf74f4c8a6745a235206b0c71",
+      "on_main_first_parent": true,
+      "additions": 568,
+      "deletions": 0,
+      "changed_files": 8,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41812074300/job/126513519045"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41956411194/job/127012250543"
+          }
+        ],
+        "error": null
+      },
+      "tree_stat": "8 files changed, 568 insertions(+)",
+      "tree_file_count": 8
+    },
+    {
+      "number": 70,
+      "title": "Clone: CC0 donors ON (owner t628u) + CC0 licence checkbox enforced per session; re-cut tool, TOKENIZER.sha256 fix, clone_probe",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/70",
+      "merged_at_cet": "2026-11-05T03:37:23+01:00",
+      "merge_commit": "6c706ff9353d11b54b5abf346d70d0bd3c72e313",
+      "head_sha": "1cfb8bdaad6cc230630b9a5ba3bca148a9112962",
+      "on_main_first_parent": true,
+      "additions": 1241,
+      "deletions": 67,
+      "changed_files": 29,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41955842370/job/127010410089"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "failure": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "failure",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41956423005/job/127012290709"
+          }
+        ],
+        "error": null
+      },
+      "tree_stat": "29 files changed, 1241 insertions(+), 67 deletions(-)",
+      "tree_file_count": 29
+    },
+    {
+      "number": 71,
+      "title": "Clone: cache Chatterbox conditioning as safetensors in the clip store (consent-gated, sha+pin keyed)",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/71",
+      "merged_at_cet": "2026-11-05T03:39:45+01:00",
+      "merge_commit": "382e2e45f9e13e658b4d0291c1e308f7b23c8ee1",
+      "head_sha": "90fc1a8efc8ed59370be1ab00f230fd7c1f47ad4",
+      "on_main_first_parent": true,
+      "additions": 1269,
+      "deletions": 3,
+      "changed_files": 5,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41956475242/job/127012467919"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41956660470/job/127013085629"
+          }
+        ],
+        "error": null
+      },
+      "tree_stat": "5 files changed, 1269 insertions(+), 3 deletions(-)",
+      "tree_file_count": 5
+    },
+    {
+      "number": 73,
+      "title": "Plan: re-anchor V2 on a PersonaPlex-style integrated dual-band model with RL (doc only, owner item 9)",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/73",
+      "merged_at_cet": "2026-11-05T03:39:51+01:00",
+      "merge_commit": "d729f0000855a3886e78404db7301f96f1a65fcb",
+      "head_sha": "d88a40c4da431e74da264d428f3d0c6f0b345c7a",
+      "on_main_first_parent": true,
+      "additions": 171,
+      "deletions": 0,
+      "changed_files": 1,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41900535562/job/126821411865"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41956671761/job/127013124933"
+          }
+        ],
+        "error": null
+      },
+      "tree_stat": "1 file changed, 171 insertions(+)",
+      "tree_file_count": 1
+    },
+    {
+      "number": 74,
+      "title": "docs: add one-line G.A.L.I.O.N. footer to README and Markdown docs",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/74",
+      "merged_at_cet": "2026-11-05T03:42:00+01:00",
+      "merge_commit": "bbb34376526e46d338b14b4a30b96cfa5bcc196f",
+      "head_sha": "bc94582f64b812abb8a8f2e622f4acd58219ae87",
+      "on_main_first_parent": true,
+      "additions": 600,
+      "deletions": 0,
+      "changed_files": 150,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41956704341/job/127013229145"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41956895590/job/127013856415"
+          }
+        ],
+        "error": null
+      },
+      "tree_stat": "150 files changed, 600 insertions(+)",
+      "tree_file_count": 150
+    },
+    {
+      "number": 76,
+      "title": "hardtest-sweep: ban 'so sorry' class, in-house reflect floor, Jarvis hub on playback, nerve thought trace; pinned persona drives the mouth",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/76",
+      "merged_at_cet": "2026-11-05T03:43:58+01:00",
+      "merge_commit": "4245a80553e20eec862ae04d24ccba5510af09cf",
+      "head_sha": "bfdfe61413037d9ce2de76258aa9c225aa72eba4",
+      "on_main_first_parent": true,
+      "additions": 742,
+      "deletions": 21,
+      "changed_files": 11,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41956910165/job/127013900525"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "failure": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "failure",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41957103310/job/127014526933"
+          }
+        ],
+        "error": null
+      },
+      "tree_stat": "11 files changed, 742 insertions(+), 21 deletions(-)",
+      "tree_file_count": 11
+    },
+    {
+      "number": 77,
+      "title": "V2: persona mood (PersonaPlex-style) + persona-conditioned Piper voice; premium Piper voice eval + listening-set results",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/77",
+      "merged_at_cet": "2026-11-05T03:49:09+01:00",
+      "merge_commit": "8bcbf85ba285c93c46b1fe56c2f7033985142b63",
+      "head_sha": "8a27b02929e956bbc9eddc0933449520bce79be0",
+      "on_main_first_parent": true,
+      "additions": 2827,
+      "deletions": 18,
+      "changed_files": 27,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41957117727/job/127015615130"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "failure": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "failure",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41957648288/job/127016293275"
+          }
+        ],
+        "error": null
+      },
+      "tree_stat": "27 files changed, 2827 insertions(+), 18 deletions(-)",
+      "tree_file_count": 27
+    },
+    {
+      "number": 79,
+      "title": "V2 voice screen: pure voice-to-voice (one dot + one full-screen object, no text/UI) + integration of the V2 PR stack (deployed build)",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/79",
+      "merged_at_cet": "2026-11-05T03:49:33+01:00",
+      "merge_commit": "3f9ae80e4d3271586f709b2c3e6490e885cf4a6a",
+      "head_sha": "a0c4db000dc525dada3abbd0067b1c144566137f",
+      "on_main_first_parent": true,
+      "additions": 10806,
+      "deletions": 205,
+      "changed_files": 256,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41956104545/job/127011253336"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "failure": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "failure",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41957687581/job/127016423035"
+          }
+        ],
+        "error": null
+      },
+      "tree_stat": "5 files changed, 29 insertions(+), 103 deletions(-)",
+      "tree_file_count": 5
+    },
+    {
+      "number": 80,
+      "title": "docs: V2 sprint results, bake-off t648 report + scoring tools, research notes, listening set",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/80",
+      "merged_at_cet": "2026-11-05T03:49:45+01:00",
+      "merge_commit": "2302be1fd943d398135507bf1064a6b0bec6061f",
+      "head_sha": "d676e1b42f1c39f0d77414b9a1faf67bab151e51",
+      "on_main_first_parent": true,
+      "additions": 19513,
+      "deletions": 0,
+      "changed_files": 259,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41956272403/job/127011802855"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "failure": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "failure",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41957708558/job/127016491613"
+          }
+        ],
+        "error": null
+      },
+      "tree_stat": "259 files changed, 19513 insertions(+)",
+      "tree_file_count": 259
+    },
+    {
+      "number": 81,
+      "title": "galion-clone-cbx: Chatterbox Turbo ONNX fp32 clone worker (separate unit, loopback, consent-gated, off during live calls)",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/81",
+      "merged_at_cet": "2026-11-05T03:57:12+01:00",
+      "merge_commit": "b72e6a5da3d8646a0b0d1cf53fe63fa658c27b55",
+      "head_sha": "0708257ccbea0a39318479b02fa7d0adebe638ad",
+      "on_main_first_parent": true,
+      "additions": 509,
+      "deletions": 1,
+      "changed_files": 6,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41958264068/job/127018249606"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "failure": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "failure",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41958488165/job/127018969166"
+          }
+        ],
+        "error": null
+      },
+      "tree_stat": "6 files changed, 509 insertions(+), 1 deletion(-)",
+      "tree_file_count": 6
+    },
+    {
+      "number": 82,
+      "title": "galion-clone-cbx: consent gate without Nano weight check; CC0 clip store in unit",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/82",
+      "merged_at_cet": "2026-11-05T04:23:27+01:00",
+      "merge_commit": "3479f23fa4e3063f73408252f11d6e9554e9b850",
+      "head_sha": "a02e78fcd8dc73011e8be0a52725b23ee44d06f7",
+      "on_main_first_parent": true,
+      "additions": 19,
+      "deletions": 3,
+      "changed_files": 2,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41961080009/job/127027333458"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "failure": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "failure",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/41961292345/job/127028015111"
+          }
+        ],
+        "error": null
+      },
+      "tree_stat": "2 files changed, 19 insertions(+), 3 deletions(-)",
+      "tree_file_count": 2
+    },
+    {
+      "number": 84,
+      "title": "cloning-v2: emotion-blend tooling (Samantha coherent-rotation)",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/84",
+      "merged_at_cet": "2026-11-06T07:12:46+01:00",
+      "merge_commit": "7e8819dcd619b76d7989fa0be840a1923bdfd442",
+      "head_sha": "a4be847c717f5377dcaa07f4f43ca58edf44a369",
+      "on_main_first_parent": true,
+      "additions": 12457,
+      "deletions": 0,
+      "changed_files": 80,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/42117696779/job/127561611079"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "failure": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "failure",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/42173011267/job/127744978448"
+          }
+        ],
+        "error": null
+      },
+      "tree_stat": "80 files changed, 12457 insertions(+)",
+      "tree_file_count": 80
+    },
+    {
+      "number": 89,
+      "title": "Emotion V2 A: Samantha 12-emotion taxonomy",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/89",
+      "merged_at_cet": "2026-11-07T13:32:34+01:00",
+      "merge_commit": "4e19b4b4052d1a9ac864547080fe443332891c4b",
+      "head_sha": "d035e1c8c33de52fa73d1983b6487ba56292dfcd",
+      "on_main_first_parent": true,
+      "additions": 1360,
+      "deletions": 0,
+      "changed_files": 4,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/42371634804/job/128404322214"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "failure": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "failure",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/42372952865/job/128404644634"
+          }
+        ],
+        "error": null
+      },
+      "tree_stat": "4 files changed, 1360 insertions(+)",
+      "tree_file_count": 4
+    },
+    {
+      "number": 90,
+      "title": "Emotion V2 C: per-emotion CI test harness",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/90",
+      "merged_at_cet": "2026-11-07T13:35:46+01:00",
+      "merge_commit": "d07ab70b663faef53f51d6d4fed21dccdc204aec",
+      "head_sha": "d75950488aa06580d4641f84cba791d6573ebf60",
+      "on_main_first_parent": true,
+      "additions": 2343,
+      "deletions": 0,
+      "changed_files": 42,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 2
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/42371875288/job/128404968747"
+          },
+          {
+            "name": "emotion-v2 harness (CPU stub)",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/42371875359/job/128401496708"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "failure": 1,
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "failure",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/42373193306/job/128405353292"
+          },
+          {
+            "name": "emotion-v2 harness (CPU stub)",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/42373193199/job/128405352866"
+          }
+        ],
+        "error": null
+      },
+      "tree_stat": "42 files changed, 2343 insertions(+)",
+      "tree_file_count": 42
+    },
+    {
+      "number": 91,
+      "title": "Emotion V2 D: generic training-data pipeline",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/91",
+      "merged_at_cet": "2026-11-07T13:36:08+01:00",
+      "merge_commit": "5ba85c347d8f63a821dceb2a47b7dbcbad7022e1",
+      "head_sha": "ba66a37081ba54d662ca7977df8df0c4f6833e56",
+      "on_main_first_parent": true,
+      "additions": 3909,
+      "deletions": 0,
+      "changed_files": 28,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/42372265630/job/128402645866"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "failure": 1,
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "failure",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/42373220830/job/128405433580"
+          },
+          {
+            "name": "emotion-v2 harness (CPU stub)",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/42373220729/job/128405432830"
+          }
+        ],
+        "error": null
+      },
+      "tree_stat": "28 files changed, 3909 insertions(+)",
+      "tree_file_count": 28
+    },
+    {
+      "number": 94,
+      "title": "docs: regenerated Emotion V2 foundation spec and landscape",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/94",
+      "merged_at_cet": "2026-11-07T14:43:55+01:00",
+      "merge_commit": "f648ca7328855478991d3cf93756477116aac52b",
+      "head_sha": "6d8182e0278de819909c6cc9ac6b81d11ce7178b",
+      "on_main_first_parent": true,
+      "additions": 569,
+      "deletions": 0,
+      "changed_files": 2,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 2
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/42373257163/job/128405541204"
+          },
+          {
+            "name": "emotion-v2 harness (CPU stub)",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/42373257168/job/128405541196"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "failure": 1,
+          "success": 1
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "failure",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/42378299938/job/128420365925"
+          },
+          {
+            "name": "emotion-v2 harness (CPU stub)",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/42378299837/job/128420365552"
+          }
+        ],
+        "error": null
+      },
+      "tree_stat": "2 files changed, 569 insertions(+)",
+      "tree_file_count": 2
+    },
+    {
+      "number": 93,
+      "title": "Emotion V2 B: controlled reference capture + checker",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/93",
+      "merged_at_cet": "2026-11-07T14:49:48+01:00",
+      "merge_commit": "bec463dcaf3b8cd31ce76a68b7fad2371b5038d9",
+      "head_sha": "c0ad8c2b07ce1b8428066d17990764f5ca0c70c4",
+      "on_main_first_parent": true,
+      "additions": 3509,
+      "deletions": 4,
+      "changed_files": 16,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 2
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/42378327787/job/128421337694"
+          },
+          {
+            "name": "emotion-v2 harness (CPU stub)",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/42378327801/job/128420449432"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 2
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/42378739320/job/128421668308"
+          },
+          {
+            "name": "emotion-v2 harness (CPU stub)",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/42378739325/job/128421668286"
+          }
+        ],
+        "error": null
+      },
+      "tree_stat": "16 files changed, 3509 insertions(+), 4 deletions(-)",
+      "tree_file_count": 16
+    },
+    {
+      "number": 95,
+      "title": "Reap a Piper child that exits before the first audio",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/95",
+      "merged_at_cet": "2026-11-07T15:18:39+01:00",
+      "merge_commit": "1a2be8529406c05154e4676ae50f8e585f585477",
+      "head_sha": "4ae48d18a9c5899708fdefc540ad980eeb36906d",
+      "on_main_first_parent": true,
+      "additions": 36,
+      "deletions": 5,
+      "changed_files": 1,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 2
+        },
+        "runs": [
+          {
+            "name": "emotion-v2 harness (CPU stub)",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/42379714602/job/128424562344"
+          },
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/42379714483/job/128424562012"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1,
+          "failure": 1
+        },
+        "runs": [
+          {
+            "name": "emotion-v2 harness (CPU stub)",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/42380993863/job/128428378435"
+          },
+          {
+            "name": "test",
+            "conclusion": "failure",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/42380993862/job/128428378228"
+          }
+        ],
+        "error": null
+      },
+      "tree_stat": "1 file changed, 36 insertions(+), 5 deletions(-)",
+      "tree_file_count": 1
+    },
+    {
+      "number": 92,
+      "title": "Emotion V2 handoff: starting point for new account",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/92",
+      "merged_at_cet": "2026-11-07T15:18:43+01:00",
+      "merge_commit": "9c2b94d6a68d6fabff86397070559609ac4545dc",
+      "head_sha": "4f249be0b86b86fb45978af92461ca807a30377f",
+      "on_main_first_parent": true,
+      "additions": 57,
+      "deletions": 5,
+      "changed_files": 2,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 2
+        },
+        "runs": [
+          {
+            "name": "emotion-v2 harness (CPU stub)",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/42379392995/job/128423619654"
+          },
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/42379393022/job/128423619629"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 2
+        },
+        "runs": [
+          {
+            "name": "emotion-v2 harness (CPU stub)",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/42380999702/job/128428395923"
+          },
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/42380999661/job/128428395744"
+          }
+        ],
+        "error": null
+      },
+      "tree_stat": "1 file changed, 21 insertions(+)",
+      "tree_file_count": 1
+    },
+    {
+      "number": 85,
+      "title": "save: cloning-v2 persona scorer and pipeline sources",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/85",
+      "merged_at_cet": "2026-11-07T15:18:48+01:00",
+      "merge_commit": "b9bd890a304656188993022d3a64e37c28d21abe",
+      "head_sha": "2ba95c017d25637317e195da7eccccf0d4e38377",
+      "on_main_first_parent": true,
+      "additions": 606583,
+      "deletions": 39,
+      "changed_files": 1408,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 2
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/42379507939/job/128423961405"
+          },
+          {
+            "name": "emotion-v2 harness (CPU stub)",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/42379507945/job/128423961373"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 2
+        },
+        "runs": [
+          {
+            "name": "emotion-v2 harness (CPU stub)",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/42381005180/job/128428412927"
+          },
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/42381005182/job/128428412796"
+          }
+        ],
+        "error": null
+      },
+      "tree_stat": "1407 files changed, 606547 insertions(+), 34 deletions(-)",
+      "tree_file_count": 1407
+    },
+    {
+      "number": 88,
+      "title": "Symphony V2 emotion42: unified symphony stack (alpha)",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/88",
+      "merged_at_cet": "2026-11-07T16:00:57+01:00",
+      "merge_commit": "754643b7aab24a8c02bb65bb118aa6b05ec1e277",
+      "head_sha": "9bcba92f40e9630bab35aec2d5d7e065401769b6",
+      "on_main_first_parent": true,
+      "additions": 8225,
+      "deletions": 668,
+      "changed_files": 78,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 2
+        },
+        "runs": [
+          {
+            "name": "emotion-v2 harness (CPU stub)",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/42384047688/job/128437560199"
+          },
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/42384047642/job/128437560169"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 2
+        },
+        "runs": [
+          {
+            "name": "emotion-v2 harness (CPU stub)",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/42384295046/job/128438315801"
+          },
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/42384295003/job/128438315602"
+          }
+        ],
+        "error": null
+      },
+      "tree_stat": "78 files changed, 8225 insertions(+), 668 deletions(-)",
+      "tree_file_count": 78
+    },
+    {
+      "number": 99,
+      "title": "Fix heartbeat budget flake and add laptop runbooks",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/99",
+      "merged_at_cet": "2026-11-07T16:03:25+01:00",
+      "merge_commit": "598e1da815176928ec1071c23a410ee8803112c4",
+      "head_sha": "7dbe23d1307df814515937b2e15850d02a167cb2",
+      "on_main_first_parent": true,
+      "additions": 1236,
+      "deletions": 22,
+      "changed_files": 12,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 2
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/42384379063/job/128438565901"
+          },
+          {
+            "name": "emotion-v2 harness (CPU stub)",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/42384379064/job/128438565759"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 2
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/42384499951/job/128438920811"
+          },
+          {
+            "name": "emotion-v2 harness (CPU stub)",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/42384499897/job/128438920745"
+          }
+        ],
+        "error": null
+      },
+      "tree_stat": "12 files changed, 1236 insertions(+), 22 deletions(-)",
+      "tree_file_count": 12
+    },
+    {
+      "number": 98,
+      "title": "Add the Nebula live emotion feed",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/98",
+      "merged_at_cet": "2026-11-07T16:04:22+01:00",
+      "merge_commit": "6e9eb85cc3987a7ec0b37a62fee6080408792820",
+      "head_sha": "9330b1fbb1cbadcf596c66d5fbffde6052fa51fa",
+      "on_main_first_parent": true,
+      "additions": 1528,
+      "deletions": 0,
+      "changed_files": 12,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 2
+        },
+        "runs": [
+          {
+            "name": "emotion-v2 harness (CPU stub)",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/42384371623/job/128438542948"
+          },
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/42384371591/job/128438542737"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 1,
+          "failure": 1
+        },
+        "runs": [
+          {
+            "name": "emotion-v2 harness (CPU stub)",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/42384575595/job/128439152130"
+          },
+          {
+            "name": "test",
+            "conclusion": "failure",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/42384575616/job/128439152107"
+          }
+        ],
+        "error": null
+      },
+      "tree_stat": "12 files changed, 1528 insertions(+)",
+      "tree_file_count": 12
+    },
+    {
+      "number": 100,
+      "title": "Add offline nebula emotion scoring beside emotion_match",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/100",
+      "merged_at_cet": "2026-11-07T17:58:08+01:00",
+      "merge_commit": "b7049d99879f2ffde0459ed14f76a71dc9e6087b",
+      "head_sha": "323cc0e9c1280f750b73eab6fca69aef8c54f05c",
+      "on_main_first_parent": true,
+      "additions": 889,
+      "deletions": 4,
+      "changed_files": 6,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 2
+        },
+        "runs": [
+          {
+            "name": "emotion-v2 harness (CPU stub)",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/42384408611/job/128438654993"
+          },
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/42384408609/job/128438654958"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 2
+        },
+        "runs": [
+          {
+            "name": "emotion-v2 harness (CPU stub)",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/42393930704/job/128467165885"
+          },
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/42393930706/job/128467165825"
+          }
+        ],
+        "error": null
+      },
+      "tree_stat": "6 files changed, 889 insertions(+), 4 deletions(-)",
+      "tree_file_count": 6
+    },
+    {
+      "number": 101,
+      "title": "Nebula Galion Voice V2 (draft)",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/101",
+      "merged_at_cet": "2026-11-07T17:58:17+01:00",
+      "merge_commit": "8d6e55646916badd26f2f9309b9cff45a41695ad",
+      "head_sha": "e660e12879926b2e40929cba742aa5368b37dc3d",
+      "on_main_first_parent": true,
+      "additions": 6508,
+      "deletions": 1,
+      "changed_files": 36,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 3
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/42386056820/job/128443545714"
+          },
+          {
+            "name": "emotion-v2 harness (CPU stub)",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/42386056776/job/128443545685"
+          },
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/42386056852/job/128443545568"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 3
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/42393941782/job/128467200446"
+          },
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/42393941735/job/128467200315"
+          },
+          {
+            "name": "emotion-v2 harness (CPU stub)",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/42393941738/job/128467200207"
+          }
+        ],
+        "error": null
+      },
+      "tree_stat": "36 files changed, 6508 insertions(+), 1 deletion(-)",
+      "tree_file_count": 36
+    },
+    {
+      "number": 102,
+      "title": "Fix phone canvas sharpness and spectrum preview scale",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/102",
+      "merged_at_cet": "2026-11-07T20:02:31+01:00",
+      "merge_commit": "3e1f5a12c53cd8e0dd47d111676d61d608540559",
+      "head_sha": "6a516c0eb9b1248000dbffc06cfb76f60d29139b",
+      "on_main_first_parent": true,
+      "additions": 1044,
+      "deletions": 58,
+      "changed_files": 14,
+      "head": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 3
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/42398395058/job/128480644751"
+          },
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/42398395078/job/128480644724"
+          },
+          {
+            "name": "emotion-v2 harness (CPU stub)",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/42398395004/job/128480644366"
+          }
+        ],
+        "error": null
+      },
+      "merge": {
+        "combined_legacy_status": "pending",
+        "conclusions": {
+          "success": 3
+        },
+        "runs": [
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/42404250313/job/128498418508"
+          },
+          {
+            "name": "test",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/42404250229/job/128498418481"
+          },
+          {
+            "name": "emotion-v2 harness (CPU stub)",
+            "conclusion": "success",
+            "status": "completed",
+            "url": "https://github.com/galion-studio/galion-one-voice/actions/runs/42404250238/job/128498418258"
+          }
+        ],
+        "error": null
+      },
+      "tree_stat": "14 files changed, 1044 insertions(+), 58 deletions(-)",
+      "tree_file_count": 14
+    }
+  ],
+  "not_merged": [
+    {
+      "number": 69,
+      "state": "CLOSED",
+      "note": "local Qwen path; not merged"
+    },
+    {
+      "number": 78,
+      "state": "OPEN"
+    },
+    {
+      "number": 83,
+      "state": "OPEN"
+    },
+    {
+      "number": 86,
+      "state": "OPEN"
+    },
+    {
+      "number": 87,
+      "state": "OPEN"
+    },
+    {
+      "number": 96,
+      "state": "OPEN"
+    },
+    {
+      "number": 97,
+      "state": "OPEN"
+    }
+  ]
+}
