@@ -1,0 +1,389 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "galion-context.personaplex-indoor-join/proposed-2026-11-08",
+  "title": "Proposed indoor PersonaPlex join row",
+  "description": "PROPOSED schema only. Not a populated database, not a training manifest, and not a consent record. See docs/galion-context/2026-11-08/05-voice-v2-universal-datasets.md. Do not put audio bytes, store paths, owner private clips, film extracts, or consent.txt contents in a file that uses this schema inside git.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "record_status",
+    "subject_persona",
+    "source_speaker",
+    "emotion",
+    "intensity",
+    "environment",
+    "indoor",
+    "scenario_id",
+    "split",
+    "synthetic_signal",
+    "provenance",
+    "consent",
+    "retention",
+    "withdrawal",
+    "leakage"
+  ],
+  "properties": {
+    "schema": {
+      "const": "galion-context.personaplex-indoor-join/proposed-2026-11-08"
+    },
+    "record_status": {
+      "description": "example-not-a-dataset-row is the only status this document publishes. populated and trained are rejected so a copy of this file cannot be mistaken for a corpus.",
+      "const": "example-not-a-dataset-row"
+    },
+    "subject_persona": {
+      "description": "Test identity. Not the source speaker.",
+      "enum": ["samantha", "jarvis"]
+    },
+    "source_speaker": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "role", "licence", "pin_status"],
+      "properties": {
+        "id": {
+          "description": "Active CC0 pins are amy-koenig (samantha only) and alan-davis-drake (jarvis only). stub-sine is the synthetic fixture. pdx, armstrong, film performers, and owner private clips are not valid.",
+          "enum": ["stub-sine", "amy-koenig", "alan-davis-drake"]
+        },
+        "role": {
+          "const": "source-speaker"
+        },
+        "licence": {
+          "enum": ["synthetic-fixture", "cc0-1.0-public-domain-librivox"]
+        },
+        "pin_status": {
+          "enum": ["not-a-pin", "active-ref-t623u"]
+        },
+        "pin_sha256": {
+          "description": "Optional. When present, must be the active digest already published in scripts/clone/REFS.sha256. Omit for stub-sine. Do not put a retired t273 digest here.",
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "emotion": {
+      "description": "Emotion V2 dataset twelve. Seductive is not in this set.",
+      "enum": [
+        "neutral",
+        "calm",
+        "happy",
+        "amused",
+        "excited",
+        "tender",
+        "sad",
+        "disappointed",
+        "angry",
+        "fearful",
+        "surprised",
+        "disgusted"
+      ]
+    },
+    "intensity": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "environment": {
+      "description": "Indoor subset of the existing synthetic environment matrix. Car, street, cafe/babble, and phone are outside this schema.",
+      "enum": [
+        "dry studio",
+        "small room",
+        "living room",
+        "headset/bluetooth codec"
+      ]
+    },
+    "snr_db": {
+      "type": ["number", "null"]
+    },
+    "indoor": {
+      "const": true
+    },
+    "scenario_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Split atom. Every environment of this id stays in the same split."
+    },
+    "text": {
+      "type": "string",
+      "description": "Scenario line. Do not paste a film quotation or an owner private transcript."
+    },
+    "split": {
+      "enum": ["train", "dev", "eval", "reject"]
+    },
+    "synthetic_signal": {
+      "type": "boolean"
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "render_backend",
+        "pitch_standard_hz",
+        "ir_licence",
+        "noise_licence",
+        "personaplex_adapter",
+        "audio_in_git"
+      ],
+      "properties": {
+        "render_backend": {
+          "enum": ["stub", "chatterbox"]
+        },
+        "pitch_standard_hz": {
+          "const": 432
+        },
+        "pitch_centre_hz": {
+          "type": "number"
+        },
+        "ir_source": {
+          "type": "string"
+        },
+        "ir_licence": {
+          "const": "CC0-1.0"
+        },
+        "noise_source": {
+          "type": "string"
+        },
+        "noise_licence": {
+          "enum": ["CC0-1.0", "n/a"]
+        },
+        "personaplex_adapter": {
+          "description": "Existing exporter assumption. Not evidence of a fine-tune.",
+          "enum": ["moshi", "community", "none"]
+        },
+        "audio_in_git": {
+          "const": false
+        },
+        "wav_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "consent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scope", "training_authorized", "public_demo", "counsel_consulted"],
+      "properties": {
+        "scope": {
+          "description": "local-zero-shot-conditioning does not authorize a non-synthetic row.",
+          "enum": ["none-synthetic-fixture", "training-data-generation"]
+        },
+        "training_authorized": {
+          "type": "boolean"
+        },
+        "public_demo": {
+          "const": false
+        },
+        "counsel_consulted": {
+          "type": "boolean"
+        },
+        "instrument_in_git": {
+          "const": false
+        }
+      }
+    },
+    "retention": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sunset", "store"],
+      "properties": {
+        "sunset": {
+          "const": "2027-02-01"
+        },
+        "store": {
+          "const": "outside-git"
+        }
+      }
+    },
+    "withdrawal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["deletes_audio_and_derivatives", "tombstone_keeps_audio"],
+      "properties": {
+        "deletes_audio_and_derivatives": {
+          "const": true
+        },
+        "tombstone_keeps_audio": {
+          "const": false
+        }
+      }
+    },
+    "leakage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "grouped_by",
+        "owner_clip",
+        "retired_film_ref",
+        "cross_persona_source"
+      ],
+      "properties": {
+        "grouped_by": {
+          "const": "scenario_id+subject_persona"
+        },
+        "owner_clip": {
+          "const": "forbidden"
+        },
+        "retired_film_ref": {
+          "const": "forbidden"
+        },
+        "cross_persona_source": {
+          "const": "forbidden"
+        }
+      }
+    },
+    "release": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["licence_reviewed", "consent_reviewed", "privacy_reviewed", "public_release"],
+      "properties": {
+        "licence_reviewed": { "type": "boolean" },
+        "consent_reviewed": { "type": "boolean" },
+        "privacy_reviewed": { "type": "boolean" },
+        "public_release": {
+          "description": "Must stay false until the three reviews are true in a writing that is not this schema.",
+          "const": false
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "source_speaker": { "properties": { "id": { "const": "stub-sine" } } } },
+        "required": ["source_speaker"]
+      },
+      "then": {
+        "properties": {
+          "synthetic_signal": { "const": true },
+          "source_speaker": {
+            "properties": {
+              "licence": { "const": "synthetic-fixture" },
+              "pin_status": { "const": "not-a-pin" }
+            }
+          },
+          "consent": {
+            "properties": {
+              "scope": { "const": "none-synthetic-fixture" },
+              "training_authorized": { "const": false }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "source_speaker": { "properties": { "id": { "const": "amy-koenig" } } } },
+        "required": ["source_speaker"]
+      },
+      "then": {
+        "properties": {
+          "subject_persona": { "const": "samantha" },
+          "source_speaker": {
+            "properties": {
+              "licence": { "const": "cc0-1.0-public-domain-librivox" },
+              "pin_status": { "const": "active-ref-t623u" },
+              "pin_sha256": { "const": "e4bc60c33f697108cf5585dead213da1065979010f5be1d513574893584a4641" }
+            },
+            "required": ["pin_sha256"]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "source_speaker": { "properties": { "id": { "const": "alan-davis-drake" } } } },
+        "required": ["source_speaker"]
+      },
+      "then": {
+        "properties": {
+          "subject_persona": { "const": "jarvis" },
+          "source_speaker": {
+            "properties": {
+              "licence": { "const": "cc0-1.0-public-domain-librivox" },
+              "pin_status": { "const": "active-ref-t623u" },
+              "pin_sha256": { "const": "60ad5457dac31af915a9679760705296f9aad17e15ee84885385509b58b8f6b6" }
+            },
+            "required": ["pin_sha256"]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "synthetic_signal": { "const": false } },
+        "required": ["synthetic_signal"]
+      },
+      "then": {
+        "properties": {
+          "consent": {
+            "properties": {
+              "scope": { "const": "training-data-generation" },
+              "training_authorized": { "const": true },
+              "counsel_consulted": { "const": true }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "examples": [
+    {
+      "schema": "galion-context.personaplex-indoor-join/proposed-2026-11-08",
+      "record_status": "example-not-a-dataset-row",
+      "subject_persona": "samantha",
+      "source_speaker": {
+        "id": "stub-sine",
+        "role": "source-speaker",
+        "licence": "synthetic-fixture",
+        "pin_status": "not-a-pin"
+      },
+      "emotion": "calm",
+      "intensity": 1.0,
+      "environment": "small room",
+      "snr_db": 25,
+      "indoor": true,
+      "scenario_id": "example-not-a-real-scenario",
+      "text": "Example line. Not a captured utterance.",
+      "split": "reject",
+      "synthetic_signal": true,
+      "provenance": {
+        "render_backend": "stub",
+        "pitch_standard_hz": 432,
+        "pitch_centre_hz": 216,
+        "ir_source": "in-process synthetic room impulse",
+        "ir_licence": "CC0-1.0",
+        "noise_source": "in-process synthetic noise",
+        "noise_licence": "CC0-1.0",
+        "personaplex_adapter": "none",
+        "audio_in_git": false
+      },
+      "consent": {
+        "scope": "none-synthetic-fixture",
+        "training_authorized": false,
+        "public_demo": false,
+        "counsel_consulted": false,
+        "instrument_in_git": false
+      },
+      "retention": {
+        "sunset": "2027-02-01",
+        "store": "outside-git"
+      },
+      "withdrawal": {
+        "deletes_audio_and_derivatives": true,
+        "tombstone_keeps_audio": false
+      },
+      "leakage": {
+        "grouped_by": "scenario_id+subject_persona",
+        "owner_clip": "forbidden",
+        "retired_film_ref": "forbidden",
+        "cross_persona_source": "forbidden"
+      },
+      "release": {
+        "licence_reviewed": false,
+        "consent_reviewed": false,
+        "privacy_reviewed": false,
+        "public_release": false
+      }
+    }
+  ]
+}
