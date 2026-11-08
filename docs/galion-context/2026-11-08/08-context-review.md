@@ -39,6 +39,10 @@ Commits with author time from 17:00 CET on 7 November are the phone, cache, and 
 | [107](https://github.com/galion-studio/galion-one-voice/pull/107) `71beae77` | `cursor/galion-os-base-02-7b1e` | Operating-system repository at `e48f3d4` is the README, the MIT licence, and voice-profile docs. No image and no `galion-init` or `galion-voiced` binary. Voice code in this repository is not proof of that image. The note also records `WindowSurface::open` as unsupported. |
 | [108](https://github.com/galion-studio/galion-one-voice/pull/108) `c995a898` | `cursor/galion-os-boot-sounds-f784` | No real boot asset or playback hook in the public trees or the local inventory. The tracked wav files (listening-set speech and presence fixtures) are not boot sounds. The cascade earcon is a generated demo tone ladder. A warm-up utterance is not a boot sound. No quality measurement and no listening test, because nothing eligible was found. |
 | [109](https://github.com/galion-studio/galion-one-voice/pull/109) `2a3a49c5` | `cursor/voice-v2-universal-datasets-7d6b` | Proposed persona, emotion, and indoor-environment joins. No corpus filled and no model trained. Active pins remain the CC0 donors Amy Koenig and Alan Davis Drake. Movie references stay retired. `datasets/emotion-v2/` is gitignored. Rights and consent text in the tree is a gate description, not a new clearance. |
+| [110](https://github.com/galion-studio/galion-one-voice/pull/110) `db35455b` | `cursor/personaplex-indoor-rl-plan-6208` | Indoor PersonaPlex reinforcement learning is a plan. No weights, no download, no training. `galion-mimi` `IS_STUB` is true. The student backend reports not placed. `exporters.py` writes one synthetic speaker on the left and silence on the right. That layout is not a duplex training set. Subject fields `samantha` and `jarvis` are registers, not a licence to train on a private recording. |
+| [111](https://github.com/galion-studio/galion-one-voice/pull/111) `d6b5f1b8` | `cursor/openmind-stack-context-90ee` | Same Open Mind tip `7ba85b603d` (28 October), read as code. Desk localhost 8646. `galion-one` text 8091 and mouth 8002, not the Voice persona. Mouth stub without `GALION_MOUTH`. `omnode` pair is payload-only. Hermes v1 memory can capture, recall, search, and end a session; seed and v2-data routes return 501. That is not emotion persistence. Student refuses load. No SSH and no host probe. |
+| [112](https://github.com/galion-studio/galion-one-voice/pull/112) `a628099f` | `cursor/obsidian-desktop-context-2a8d` | No public product is titled Obsidian Desktop. A Markdown desk, the Open Mind stack, and the obsidian colour are not the third-party Obsidian app. The operator surface in code is `galion-desk` plus a partial console. The OS image and its GUI are a plan. The native window open path is a stub. An October note of a live desk is historical, not a current host probe. `hermes-research` at brand commit `e204789ce73306c645dcb95b4b509cc764ca2c47` is another repository’s brand file, not an implementation of Galion Research. |
+| [113](https://github.com/galion-studio/galion-one-voice/pull/113) `72d3e029` | `cursor/real-audio-quality-2942` | No fresh audio measurement. `PiperProsody::with_emotion` clones the same scales for Neutral and for every other label (`piper_worker.rs`). `noise_scale` and `noise_w` are 0 unless `GALION_A21_NOISE=natural`. Inference PCM is not a harness tone or a pitch slide. Headers of listening-set wav files (mono, 22050 Hz in that note’s count of 82) are not a listening test or a MOS. Older gate numbers stay in their own snapshots. A 7 November brief figure 480/29 is a prior run report, not a benchmark row committed as the current result; naming it does not delete that run. A heartbeat allocation subset of 13 tests passing is not all 41 tests and not product audio quality. No fresh Nano result and no boot-sound proof. |
 
 ## Nebula V3 work that did not land
 
@@ -53,6 +57,17 @@ What that fetch showed, as repository text only:
 - Crate `crates/galion-one` is in that repo. `deploy/boot/rendered/galion-one.service` says staged and not installed.
 - `crates/galion-boot` supervises units and does not play audio.
 - The README calls `persona-plex-relay` a scaffold and says the first public release was still ahead of the commit date on the page. A crate in git is not a running service.
+
+[Pull request 111](https://github.com/galion-studio/galion-one-voice/pull/111) (`d6b5f1b8`, `04-openmind-stack.md`) reads the same Open Mind tip and goes further into the crates. Taken as code at that commit, not as a host probe:
+
+- `galion-desk` is written for localhost port 8646.
+- The `galion-one` binary binds text on 8091 and a mouth on 8002. That process is not the Voice product persona of the same name.
+- The mouth path is an unavailable stub unless `GALION_MOUTH` is configured and a serve is loaded.
+- `omnode` pair prints a payload and does not enroll a device.
+- Hermes v1 memory in that tree implements capture, recall, search, and session end. Seed and v2-data routes answer 501. That memory is not proof that emotion baselines persist.
+- The student backend refuses to load.
+
+No deployment was claimed, and no SSH was used. Operating-system **spec** stays the documentation repository at `e48f3d4` ([pull request 107](https://github.com/galion-studio/galion-one-voice/pull/107)). Open Mind **code** is the crate tree above. Neither is a running machine.
 
 Pull request 104’s line that Voice docs name no second Galion One repository is true of the voice tree. It is not a finding that Open Mind lacks `galion-one`. Both statements stand: the voice tree does not vendor it, and the other repository contains the crate. Neither statement is a live-host fact.
 

@@ -13,7 +13,8 @@ Voice tip: `3e1f5a12`. Plan date for the re-anchor: `docs/galion-voice-v2/PERSON
 | Claim | Class |
 |---|---|
 | Persona / emotion / indoor-environment join | Proposed. The schema file is a document. |
-| Emotion V2 pipeline and a Moshi-shaped PersonaPlex exporter exist as code or docs | Present as programs and notes. Not a training run. |
+| Emotion V2 pipeline and a Moshi-shaped PersonaPlex exporter exist as code or docs | Present as programs and notes. Not a training run. `exporters.py` puts the line on the left and writes silence on the right (`np.zeros`). The module says these clips are single-speaker lines, not duplex conversations. |
+| Indoor PersonaPlex RL | Plan only. [Pull request 110](https://github.com/galion-studio/galion-one-voice/pull/110) (`db35455b`, `11-personaplex-indoor-rl.md`). `crates/galion-mimi` `IS_STUB = true` and the crate comment forbids adding weights. The student backend is unplaced. No training and no download. |
 | `datasets/emotion-v2/` | Ignored (`.gitignore`). No tracked populated dataset. |
 | Student slot | Stub. Configs, no trained weights in git. |
 | Active conditioning pins | CC0 Amy Koenig (Samantha register) and Alan Davis Drake (Jarvis register), named in the persona voice notes. Clips are gitignored. |
@@ -67,7 +68,7 @@ Owner direction: universal voice databases where **Samantha** and **Jarvis** are
 | `session_id` | One sitting: room, device, clock, consent id. |
 | `provenance` | Who captured it, where the bytes live, hash, licence SPDX. |
 
-A row that sets `persona_id` without `subject_id` and `source_speaker_id` is invalid in this proposal.
+A row that sets `persona_id` without `subject_id` and `source_speaker_id` is invalid in this proposal. Setting `persona_id` to `samantha` or `jarvis` is not permission to train on a private wav. Those names are registers. A training byte still needs its own consent record, separate from REMEMBER.
 
 ### Indoor environment
 
