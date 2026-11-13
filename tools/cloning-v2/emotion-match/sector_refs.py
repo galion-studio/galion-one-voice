@@ -16,10 +16,113 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import os
 from dataclasses import dataclass
-from pathlib import Path
 
 from scorelib import CATEGORY_W, EMB_W, FORMULA, GATE
+
+
+class Path:
+    """Local-path helper for the stub scorer.
+
+    pathlib is not imported on this path: it pulls in urllib.parse, and the
+    offline stub-path test blocks the urllib package so the scorer cannot
+    open a network connection. os.path is enough for the operations below.
+    """
+
+    __slots__ = ("_path",)
+
+    def __init__(self, *parts):
+        if not parts:
+            self._path = ""
+            return
+        bits = []
+        for part in parts:
+            bits.append(part._path if isinstance(part, Path) else os.fspath(part))
+        self._path = bits[0] if len(bits) == 1 else os.path.join(*bits)
+
+    def __fspath__(self) -> str:
+        return self._path
+
+    def __str__(self) -> str:
+        return self._path
+
+    def __repr__(self) -> str:
+        return f"Path({self._path!r})"
+
+    def __truediv__(self, other):
+        other_path = other._path if isinstance(other, Path) else os.fspath(other)
+        return Path(os.path.join(self._path, other_path))
+
+    def __eq__(self, other):
+        try:
+            return self._path == os.fspath(other)
+        except TypeError:
+            return NotImplemented
+
+    def __hash__(self):
+        return hash(self._path)
+
+    def __lt__(self, other):
+        try:
+            return self._path < os.fspath(other)
+        except TypeError:
+            return NotImplemented
+
+    @property
+    def name(self) -> str:
+        return os.path.basename(self._path)
+
+    @property
+    def suffix(self) -> str:
+        return os.path.splitext(self.name)[1]
+
+    @property
+    def stem(self) -> str:
+        return os.path.splitext(self.name)[0]
+
+    @property
+    def parent(self):
+        dirname = os.path.dirname(self._path)
+        if dirname == "":
+            return Path(".")
+        return Path(dirname)
+
+    def is_absolute(self) -> bool:
+        return os.path.isabs(self._path)
+
+    def is_file(self) -> bool:
+        return os.path.isfile(self._path)
+
+    def is_dir(self) -> bool:
+        return os.path.isdir(self._path)
+
+    def expanduser(self):
+        return Path(os.path.expanduser(self._path))
+
+    def resolve(self):
+        return Path(os.path.realpath(self._path))
+
+    def open(self, *args, **kwargs):
+        return open(self._path, *args, **kwargs)
+
+    def read_text(self, encoding: str = "utf-8") -> str:
+        with open(self._path, "r", encoding=encoding) as handle:
+            return handle.read()
+
+    def mkdir(self, parents: bool = False, exist_ok: bool = False) -> None:
+        if parents:
+            os.makedirs(self._path, exist_ok=exist_ok)
+            return
+        try:
+            os.mkdir(self._path)
+        except FileExistsError:
+            if not exist_ok:
+                raise
+
+    def iterdir(self):
+        for name in os.listdir(self._path):
+            yield self / name
 
 SCHEMA = "galion-emotion-v2-sector-refs/1"
 

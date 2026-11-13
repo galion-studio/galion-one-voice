@@ -40,6 +40,7 @@ from scorelib import (  # noqa: E402
     score_sector,
 )
 from sector_refs import (  # noqa: E402
+    Path,
     SectorRefError,
     collect_jobs,
     load_manifest,
@@ -296,8 +297,6 @@ def _resolve_backend(name: str, threads: int):
 
 
 def run_per_sector(args: dict) -> int:
-    from pathlib import Path
-
     try:
         manifest = load_manifest(
             Path(args["manifest"]),

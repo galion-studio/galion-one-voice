@@ -12,10 +12,9 @@ from __future__ import annotations
 import math
 import struct
 import wave
-from pathlib import Path
 
 from scorelib import as_prob, as_unit, softmax
-from sector_refs import KNOWN_SECTORS, SHARED_SECTORS
+from sector_refs import KNOWN_SECTORS, Path, SHARED_SECTORS
 
 # Shared-sector frequencies match the Emotion V2 harness so a 432 Hz sine
 # is still the Amused fixture (the 432 Hz tuning standard). Seductive is
