@@ -1,0 +1,79 @@
+{
+  "schema": "galion-context-bot-outputs/1",
+  "timezone": "Europe/Zagreb",
+  "written_cet": "2026-11-08T04:29:59+01:00",
+  "author": "specialist-07",
+  "pair": "bc-4066bdd7-c5f2-5944-9212-0dd221231872",
+  "lead": "bc-43d26d8a-4e4c-5a18-973e-22de9b04b3fd",
+  "base": "3e1f5a12c53cd8e0dd47d111676d61d608540559",
+  "publication": "docs/galion-context/2026-11-08/07-bot-outputs-publication.md",
+  "swarm_window_cet": "2026-11-08T04:18:00+01:00/2026-11-08T04:22:00+01:00",
+  "measured": {
+    "fps": null,
+    "p50_ms": null,
+    "p95_ms": null,
+    "p99_ms": null,
+    "drops": null,
+    "gpu_time_ms": null,
+    "commits_by_swarm": 0,
+    "prs_by_swarm": 0,
+    "tests_run_by_swarm": 0,
+    "builds_by_swarm": 0,
+    "harness_written": false,
+    "assets_fetched": false
+  },
+  "verification_on_this_machine_cet": "2026-11-08T04:28:47+01:00",
+  "verification": {
+    "origin_main": "3e1f5a12c53cd8e0dd47d111676d61d608540559",
+    "pr84_ancestor": "7e8819dcd619b76d7989fa0be840a1923bdfd442",
+    "pr102_head_ancestor": "6a516c0eb9b1248000dbffc06cfb76f60d29139b",
+    "lead_branch_on_origin": false,
+    "lead_branch_name_reported": "cursor/nebula-v3-integration-b3fd",
+    "docs_nebula_v3_present": false,
+    "v3_module_present": false,
+    "dev_dri": false,
+    "cpu": "4 vCPU Intel(R) Xeon(R) Processor",
+    "chrome": "Google Chrome 156.0.8078.47",
+    "rustc": "1.83.0",
+    "wasm_bindgen": false,
+    "opt_galion": false,
+    "shade_star_linear": {
+      "samantha": [1.0, 0.72, 0.38],
+      "jarvis": [0.35, 0.48, 1.0]
+    },
+    "shade_grade_linear": {
+      "samantha": [1.05, 0.86, 0.55],
+      "jarvis": [0.55, 0.7, 1.1]
+    }
+  },
+  "bots": [
+    {"n": "01", "bc": "bc-43d26d8a-4e4c-5a18-973e-22de9b04b3fd", "role": "lead", "stored_status": "finished", "repo_edits_on_origin": false, "output": "local uncommitted DESIGN.md, ROSTER.md, v3/mod.rs, v3/input.rs; field.rs absent; branch not on origin"},
+    {"n": "02", "bc": "bc-0421640c-f485-5437-be4c-1f14d9b07b1e", "role": "render", "stored_status": "finished", "repo_edits_on_origin": false, "output": "git log, hardware probe, read wasm_api.rs"},
+    {"n": "03", "bc": "bc-d884070b-071c-5878-8bb1-2ff14b982a8d", "role": "gas", "stored_status": "finished", "repo_edits_on_origin": false, "output": "git status/log, read nebula-elements"},
+    {"n": "04", "bc": "bc-6edf5b3c-d7b3-5f73-b8a8-fc748d7490ee", "role": "waves", "stored_status": "finished", "repo_edits_on_origin": false, "output": "git and gh pr list, EMOTION-BLEND.md search"},
+    {"n": "05", "bc": "bc-ac80a4cb-3e55-5a3c-a9bd-57beb0da7d6b", "role": "mapping", "stored_status": "finished", "repo_edits_on_origin": false, "output": "PR84 and PR102 stat, read RESEARCH.md"},
+    {"n": "06", "bc": "bc-af4582f7-36f5-58df-b21b-0d15b12ac0a0", "role": "warm", "stored_status": "finished", "repo_edits_on_origin": false, "output": "git, gh branches and open PRs, gh pr view 84"},
+    {"n": "07", "bc": "bc-70e00867-7bbf-5d94-ae4c-acd84aebb4f0", "role": "profiling", "stored_status": "finished", "repo_edits_on_origin": false, "output": "git, gh pr view 102, lead transcript parse, rustc 1.83, wasm-bindgen absent; no harness"},
+    {"n": "08", "bc": "bc-4066bdd7-c5f2-5944-9212-0dd221231872", "role": "review", "stored_status": "finished", "repo_edits_on_origin": false, "output": "git and PR84; later commit-history listing; no edits; CI not checked"},
+    {"n": "09", "bc": "bc-a10b6402-632d-5f18-9a9d-1f5a2d13c17b", "role": "science", "stored_status": "finished", "repo_edits_on_origin": false, "output": "nine web searches; no asset fetched"},
+    {"n": "10", "bc": "bc-2d21c215-643f-5de9-9539-e9ae0aa6f784", "role": "mobile", "stored_status": "finished", "repo_edits_on_origin": false, "output": "PR102 detail; headless Chrome probe output empty"},
+    {"n": "11", "bc": "bc-0b6d0589-a28a-5026-98ce-41c8dab26208", "role": "bridge", "stored_status": "finished", "repo_edits_on_origin": false, "output": "transcript, PR84 stat, briefing path absent"},
+    {"n": "12", "bc": "bc-7e5fba95-d191-5a56-9e40-0a184a322942", "role": "validation", "stored_status": "finished", "repo_edits_on_origin": false, "output": "git, gh pr view 102, hardware; no tests"}
+  ],
+  "status_list": {"bullets": 84, "finished_stored": 83, "error_stored": 1, "error_bc": "bc-d7e9980b-2372-5520-9c84-c2fd4dc702fb"},
+  "pricing_direction": {"research_ultra_usd": 220, "one_usd": 20, "existing_main_docs_edited": false},
+  "withheld": [
+    "jsonl transcripts",
+    "raw 84-row status dump",
+    "lead v3 sources and DESIGN.md reconstruction",
+    "audio",
+    "weights",
+    "datasets",
+    "secrets",
+    "LOCKS.toml",
+    "jarvis.toml",
+    "REFS.sha256",
+    "Hubble/JWST/ESA pixels",
+    "/opt/galion briefing"
+  ]
+}
