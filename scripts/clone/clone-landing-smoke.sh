@@ -39,7 +39,7 @@ python3 - <<'PY' || fail "REFS.sha256 drifted from the current Samantha and Jarv
 import pathlib
 text = pathlib.Path("scripts/clone/REFS.sha256").read_text()
 need = {
-    "samantha": "e4bc60c33f697108cf5585dead213da1065979010f5be1d513574893584a4641",
+    "samantha": "1636428272b85d4b4f6c67bb859bfe33d9983ff9439646519305ff13e6921005",
     "jarvis": "60ad5457dac31af915a9679760705296f9aad17e15ee84885385509b58b8f6b6",
 }
 for persona, sha in need.items():

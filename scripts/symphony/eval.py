@@ -21,7 +21,7 @@ from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-SAMANTHA_SHA = "e4bc60c33f697108cf5585dead213da1065979010f5be1d513574893584a4641"
+SAMANTHA_SHA = "1636428272b85d4b4f6c67bb859bfe33d9983ff9439646519305ff13e6921005"
 JARVIS_SHA = "60ad5457dac31af915a9679760705296f9aad17e15ee84885385509b58b8f6b6"
 EMPATHY_BANNED = (
     "I know this is difficult",

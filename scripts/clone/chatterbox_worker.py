@@ -826,7 +826,131 @@ def wav_to_s16le(wav) -> bytes:
     return raw.tobytes()
 
 
-def render(model, text: str, path: str, cache: dict) -> bytes:
+# --- samantha-investigation EXPERIMENT HOOK (local branch swarm/samantha-exp only; never shipped) ---
+# Active only with GALION_EXP=1. Request field "exp" (dict) or env GALION_EXP_SEED may set:
+# seed, temperature, top_p, top_k, repetition_penalty, norm_loudness, steps (n_cfm_timesteps),
+# s3gen ("meanflow"|"full"), dec_len_s, enc_len_s, extra_refs (list of wavs whose sidecar sha
+# matches; speaker embeddings averaged), watermark (bool), out (wav path written beside the PCM).
+_EXP_FULL = {}
+
+
+def exp_cfg(msg: dict):
+    if os.environ.get("GALION_EXP") != "1":
+        return None
+    cfg = dict(msg.get("exp") or {})
+    if "seed" not in cfg and os.environ.get("GALION_EXP_SEED", "").strip():
+        cfg["seed"] = int(os.environ["GALION_EXP_SEED"])
+    return cfg
+
+
+def exp_threads() -> None:
+    raw = os.environ.get("GALION_EXP_THREADS", "").strip() if os.environ.get("GALION_EXP") == "1" else ""
+    if raw:
+        import torch
+
+        torch.set_num_threads(int(raw))
+        sys.stderr.write(f"galion-exp: threads={raw}\n")
+
+
+def _exp_conds(model, path: str, cfg: dict):
+    import torch
+
+    from chatterbox.tts_turbo import Conditionals
+
+    cls = type(model)
+    dec0, enc0 = cls.DEC_COND_LEN, cls.ENC_COND_LEN
+    try:
+        if cfg.get("dec_len_s"):
+            model.DEC_COND_LEN = int(float(cfg["dec_len_s"]) * 24000)
+        if cfg.get("enc_len_s"):
+            model.ENC_COND_LEN = int(float(cfg["enc_len_s"]) * 16000)
+        nl = bool(cfg.get("norm_loudness", True))
+        model.prepare_conditionals(path, norm_loudness=nl)
+        extras = list(cfg.get("extra_refs") or [])
+        if extras:
+            spk = [model.conds.t3.speaker_emb]
+            xv = [model.conds.gen["embedding"]]
+            main = model.conds
+            for extra in extras:
+                side = sidecar_digest(extra)
+                if side is None or side != sha256_file(extra):
+                    refuse("experiment extra ref has no matching sidecar")
+                model.prepare_conditionals(extra, norm_loudness=nl)
+                spk.append(model.conds.t3.speaker_emb)
+                xv.append(model.conds.gen["embedding"])
+            main.t3.speaker_emb = torch.nn.functional.normalize(torch.stack(spk).mean(0), dim=-1)
+            gen = dict(main.gen)
+            gen["embedding"] = torch.stack(xv).mean(0)
+            model.conds = Conditionals(main.t3, gen)
+    finally:
+        model.DEC_COND_LEN, model.ENC_COND_LEN = dec0, enc0
+
+
+def _exp_s3gen(model, kind: str):
+    if kind != "full":
+        return _EXP_FULL.setdefault("meanflow", model.s3gen)
+    if "full" not in _EXP_FULL:
+        from chatterbox.models.s3gen import S3Gen
+        from safetensors.torch import load_file
+
+        _EXP_FULL.setdefault("meanflow", model.s3gen)
+        full = S3Gen(meanflow=False)
+        full.load_state_dict(load_file(os.path.join(weights_root(), "shared", "s3gen.safetensors")), strict=False)
+        _EXP_FULL["full"] = full.to("cpu").eval()
+    return _EXP_FULL["full"]
+
+
+def render_exp(model, text: str, path: str, cache: dict, cfg: dict) -> bytes:
+    import random
+
+    import numpy as np
+    import torch
+
+    from chatterbox.models.s3gen.const import S3GEN_SIL
+    from chatterbox.tts_turbo import punc_norm
+
+    kind = str(cfg.get("s3gen", "meanflow"))
+    model.s3gen = _exp_s3gen(model, kind)
+    key = json.dumps([path, kind, {k: cfg.get(k) for k in ("dec_len_s", "enc_len_s", "norm_loudness", "extra_refs")}])
+    if cache.get("exp_key") != key:
+        _exp_conds(model, path, cfg)
+        cache["exp_key"] = key
+        cache["path"] = None
+    if "seed" in cfg:
+        seed = int(cfg["seed"])
+        torch.manual_seed(seed)
+        random.seed(seed)
+        np.random.seed(seed % (2**32))
+    sys.stderr.write(f"galion-exp: cfg={json.dumps(cfg)}\n")
+    sys.stderr.flush()
+    toks = model.tokenizer(punc_norm(text), return_tensors="pt", padding=True, truncation=True).input_ids
+    speech = model.t3.inference_turbo(
+        t3_cond=model.conds.t3,
+        text_tokens=toks,
+        temperature=float(cfg.get("temperature", 0.8)),
+        top_k=int(cfg.get("top_k", 1000)),
+        top_p=float(cfg.get("top_p", 0.95)),
+        repetition_penalty=float(cfg.get("repetition_penalty", 1.2)),
+    )
+    speech = speech[speech < 6561]
+    speech = torch.cat([speech, torch.tensor([S3GEN_SIL] * 3).long()])
+    steps = int(cfg.get("steps", 2 if kind != "full" else 10))
+    wav, _ = model.s3gen.inference(speech_tokens=speech, ref_dict=model.conds.gen, n_cfm_timesteps=steps)
+    wav = wav.squeeze(0).detach().cpu().numpy()
+    if cfg.get("watermark", True):
+        wav = model.watermarker.apply_watermark(wav, sample_rate=model.sr)
+    if cfg.get("out"):
+        import soundfile as sf
+
+        sf.write(cfg["out"], wav, model.sr, subtype="PCM_16")
+    return wav_to_s16le(torch.from_numpy(np.asarray(wav, dtype=np.float32)).unsqueeze(0))
+# --- end EXPERIMENT HOOK ---
+
+
+def render(model, text: str, path: str, cache: dict, msg: dict | None = None) -> bytes:
+    cfg = exp_cfg(msg or {})
+    if cfg is not None:
+        return render_exp(model, text, path, cache, cfg)
     sys.stderr.write("galion-clone-gen: start\n")
     sys.stderr.flush()
     # Reuse conditionals when the allowlisted path is unchanged. The first
@@ -995,13 +1119,16 @@ def run_nano(pcm_fd: int, allow: dict[str, tuple[str, str]]) -> None:
             if not tokenizer_ready(root):
                 absent("tokenizer files missing or not pinned")
             model = load_nano(build_ckpt(root))
-        if cache.get("path") != path:
+            exp_threads()
+        # GALION_EXP=1 prepares its own conditionals inside render_exp.
+        # Otherwise keep main's cond-cache: load or build once per reference path.
+        if exp_cfg(msg) is None and cache.get("path") != path:
             try:
                 if use_cond_cache(model, msg, persona, path):
                     cache["path"] = path
             except Exception as exc:
                 refuse(f"chatterbox nano conditioning failed ({type(exc).__name__}: {one_line(exc)})")
-        pcm = render(model, text, path, cache)
+        pcm = render(model, text, path, cache, msg)
         sys.stderr.write("galion-clone-emit: galion-vc\n")
         frame_utterance(pcm_fd, pcm, "chatterbox-nano", persona)
 

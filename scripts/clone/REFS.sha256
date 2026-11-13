@@ -8,5 +8,7 @@
 # jarvis c2200b59fa78b3c98d13ac5dc7db3a6c14e802310dca73033d7770bd4b532c60 15.95 48000 2 16 docs/galion-voice-v2/personas/refs/jarvis.wav jarvis/reference.wav preserve-hub
 # t623u CC0 donors (LibriVox public domain, Voice Zero CC0): Amy Koenig -> samantha, Alan Davis Drake -> jarvis.
 # Cut 2026-11-04 to 8-12 s mono s16 at 44.1 kHz, no denoise. Provenance and consent.txt live beside each clip in the store.
-samantha e4bc60c33f697108cf5585dead213da1065979010f5be1d513574893584a4641 9.60 44100 1 16 docs/galion-voice-v2/personas/refs/samantha.wav samantha/reference.wav preserve
+# samantha e4bc60c33f697108cf5585dead213da1065979010f5be1d513574893584a4641 9.60 44100 1 16 docs/galion-voice-v2/personas/refs/samantha.wav samantha/reference.wav preserve
+# samantha-exp (proposal, needs owner/Slavik sign-off): Amy Koenig source 17.84-29.25 s (poem lines 5-9), same LibriVox PD recording, no denoise, no gain.
+samantha 1636428272b85d4b4f6c67bb859bfe33d9983ff9439646519305ff13e6921005 11.41 44100 1 16 docs/galion-voice-v2/personas/refs/samantha.wav samantha/reference.wav preserve
 jarvis 60ad5457dac31af915a9679760705296f9aad17e15ee84885385509b58b8f6b6 10.71 44100 1 16 docs/galion-voice-v2/personas/refs/jarvis.wav jarvis/reference.wav preserve-hub
