@@ -27,5 +27,7 @@ jobs:
           python-version: "3.12"
       - name: Harness unit tests (synthetic signals, no weights)
         run: python -m unittest discover -s tools/emotion-v2/harness/tests -v
+      - name: emotion_match per-sector tests (synthetic signals, no weights)
+        run: python -m unittest discover -s tools/cloning-v2/emotion-match/tests -v
       - name: Nebula live feed unit tests (no audio)
         run: python -m unittest discover -s tools/emotion-v2/nebula/tests -v
