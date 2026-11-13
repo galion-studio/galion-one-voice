@@ -39,6 +39,18 @@ Run the same tests locally:
 python -m unittest discover -s tools/emotion-v2/harness/tests -v
 ```
 
+The same job also runs the `emotion_match` per-sector tests. Those score each
+synthetic render against its own sector reference through
+`0.70*category_blend+0.30*emb_sim`, with the 0.83 gate applied per sector.
+A manifest maps each emotion to a reference path and sha256. A missing or
+mismatched pin is a hard failure. The tests use the CPU stub and sines in a
+temporary directory. They do not load SUPERB weights and they do not commit
+audio. Real capture-kit references are still required before a live score.
+
+```bash
+python -m unittest discover -s tools/cloning-v2/emotion-match/tests -v
+```
+
 Score a local render tree with the stub (no weights):
 
 ```bash

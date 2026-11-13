@@ -1,0 +1,16 @@
+# Local renders, references, and reports. Never commit audio or weights.
+*.wav
+*.wave
+*.mp3
+*.flac
+*.ogg
+*.bin
+*.safetensors
+*.pt
+*.pth
+*.ckpt
+*.onnx
+out/
+work/
+__pycache__/
+*.pyc
