@@ -1,0 +1,55 @@
+{
+  "schema": "galion-os-boot-sounds-evidence/1",
+  "reviewed": "2026-11-08",
+  "timezone": "Europe/Zagreb",
+  "voice_repository": {
+    "name": "galion-one-voice",
+    "commit_reviewed": "3e1f5a12c53cd8e0dd47d111676d61d608540559"
+  },
+  "os_repository": {
+    "name": "galion-operating-system",
+    "commit_reviewed": "e48f3d4f6b7f2f0e0ae77ba4784ab427fb54587d",
+    "audio_files": 0,
+    "cargo_workspace": false,
+    "galion_init_source": false
+  },
+  "boot_assets": [],
+  "objective_measurements": null,
+  "measurement_reason": "No confirmed public boot recording was eligible to hash or probe. Null is not a duration of zero and not a pass.",
+  "perceptual_test": "not_run",
+  "runtime_boot_observed": false,
+  "this_checkout": {
+    "opt_galion": "absent"
+  },
+  "voice_tree": {
+    "tracked_wav_files": 84,
+    "listening_set_emotion_sweep_wav": 46,
+    "listening_set_piper_premium_wav": 36,
+    "specs_fixtures_wav": 2,
+    "boot_like_filenames": 0,
+    "files_decoded_for_this_note": 0,
+    "galion_init_crate": false,
+    "galion_voiced_crate": false,
+    "sample_voice_wavs_committed": false
+  },
+  "local_inventory": {
+    "date": "2026-11-08",
+    "audio_paths_counted": 47,
+    "count_includes_duplicates": true,
+    "confirmed_boot_recordings": 0,
+    "confirmed_boot_playback_wiring": false,
+    "cue_like_filename": "en-cascade-earcon.wav",
+    "cue_boot_designation": false,
+    "cue_decoded": false,
+    "quality_measured": false,
+    "opt_galion": "absent",
+    "private_paths_copied": false
+  },
+  "substitutes_rejected": [
+    "cascade earcon() tone ladder",
+    "SpeechStack::prewarm throwaway lines",
+    "listening-set speech renders",
+    "presence mic fixtures",
+    "uncommitted sample-voice clips"
+  ]
+}
