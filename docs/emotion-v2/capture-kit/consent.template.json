@@ -1,0 +1,28 @@
+{
+  "_comment": "TEMPLATE ONLY. This is not a consent record. Do not copy it into a session and treat it as signed. Fill a private copy only when the named person actually signs. Never invent a signer, a date, or a signature. Never commit a signed copy.",
+  "schema": "galion-emotion-v2-capture-consent/1",
+  "standard": "galion-voice-v2-432",
+  "consent_kind": "template",
+  "recording_consent": {
+    "required_from": "Mate Grajczyk",
+    "purpose": "Recording of the owner's own voice for the Emotion V2 controlled-reference register. consent=owner-own-recordings-only. Not a recording of another person, not a film or call clip, and not model output.",
+    "signer_name": "",
+    "signed_date": "",
+    "signature": "",
+    "granted": false
+  },
+  "training_consent": {
+    "required_from": "Slavik",
+    "required_when": "If and only if any take from this session is used for training-data-generation.",
+    "consent_scope": [
+      "training-data-generation"
+    ],
+    "scope_note": "The clone-time scope local-zero-shot-conditioning does not authorize this use. An unfilled template is not a grant.",
+    "voice_id": "",
+    "owner": "",
+    "signer_name": "",
+    "signed_date": "",
+    "signature": "",
+    "granted": false
+  }
+}

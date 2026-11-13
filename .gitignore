@@ -106,3 +106,6 @@ tools/laptop-runbooks/**/*.wave
 tools/laptop-runbooks/**/*.flac
 tools/laptop-runbooks/**/*.mp3
 tools/laptop-runbooks/**/*.ogg
+
+# Emotion V2 capture originals (owner recordings + session manifests). Never commit.
+/originals/

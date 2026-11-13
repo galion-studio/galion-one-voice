@@ -1,0 +1,201 @@
+{
+  "schema": "galion-emotion-v2-capture-prompts/1",
+  "standard": "galion-voice-v2-432",
+  "taxonomy": "docs/emotion-v2/TAXONOMY.md",
+  "protocol": "docs/emotion-v2/CAPTURE-PROTOCOL.md",
+  "note": "The owner may replace the suggested carrier with their own words. The same carrier is used for all twelve official emotions on a line. Taxonomy lines are optional color/warm-up only.",
+  "shared_carrier": {
+    "samantha": "The note is on the table. I will read it at four.",
+    "jarvis": "The report is on the desk. I will open it at four."
+  },
+  "sectors": {
+    "grounded": [
+      "neutral",
+      "calm"
+    ],
+    "bright": [
+      "happy",
+      "amused",
+      "excited",
+      "tender"
+    ],
+    "heavy": [
+      "sad",
+      "disappointed"
+    ],
+    "sharp": [
+      "angry",
+      "fearful",
+      "surprised",
+      "disgusted"
+    ]
+  },
+  "official_emotions": [
+    "neutral",
+    "calm",
+    "happy",
+    "amused",
+    "excited",
+    "tender",
+    "sad",
+    "disappointed",
+    "angry",
+    "fearful",
+    "surprised",
+    "disgusted"
+  ],
+  "emotions": {
+    "neutral": {
+      "sector": "grounded",
+      "taxonomy_lines": [
+        "The notes are in the folder on the desk.",
+        "Thursday at four still works.",
+        "I can read that back if you want."
+      ],
+      "delivery": {
+        "samantha": "Even pace, no smile in the voice, no weight, no extra air. Rest reference, not a flat computer.",
+        "jarvis": "Even pace, no smile in the voice, no weight. Rest reference, diction clean."
+      }
+    },
+    "calm": {
+      "sector": "grounded",
+      "taxonomy_lines": [
+        "We can leave it there for now.",
+        "Nothing else has to move today.",
+        "I'll wait while you find the page."
+      ],
+      "delivery": {
+        "samantha": "Unhurried, slightly lower energy, still present.",
+        "jarvis": "Measured, quiet authority, no softness that turns into Tender."
+      }
+    },
+    "happy": {
+      "sector": "bright",
+      "taxonomy_lines": [
+        "They kept the Thursday slot for you.",
+        "That came out right.",
+        "The room went quiet, and then they clapped."
+      ],
+      "delivery": {
+        "samantha": "Warmth you can hear, not a laugh and not a shout.",
+        "jarvis": "Clear satisfaction, still precise. No giggle."
+      }
+    },
+    "amused": {
+      "sector": "bright",
+      "taxonomy_lines": [
+        "You did not just name the printer.",
+        "That one landed.",
+        "I keep hearing the way you said spreadsheet."
+      ],
+      "delivery": {
+        "samantha": "A short private smile in the voice. Not a performed laugh track.",
+        "jarvis": "Dry recognition that something landed. Not teasing."
+      }
+    },
+    "excited": {
+      "sector": "bright",
+      "taxonomy_lines": [
+        "It is Thursday, and they said yes.",
+        "The build finished. All of it.",
+        "Tell me the part where it actually worked."
+      ],
+      "delivery": {
+        "samantha": "Forward pace and lift, still on the mark, no clip.",
+        "jarvis": "Urgency without shout. The news is good; the diction stays clean."
+      }
+    },
+    "tender": {
+      "sector": "bright",
+      "taxonomy_lines": [
+        "You do not have to explain the whole thing.",
+        "I'm glad you told me that piece.",
+        "That part matters. We can stay with the fact."
+      ],
+      "delivery": {
+        "samantha": "Close and low, not breathy enough to hide the words.",
+        "jarvis": "Care without intimacy. Stay formal. Do not lean into the optional Samantha slot."
+      }
+    },
+    "sad": {
+      "sector": "heavy",
+      "taxonomy_lines": [
+        "Your mother died this morning.",
+        "The house is going to feel different tonight.",
+        "I don't have a better sentence for that."
+      ],
+      "delivery": {
+        "samantha": "Slower, heavier, no sob and no whisper that kills the level.",
+        "jarvis": "Slower, heavier, no sob and no whisper that kills the level."
+      }
+    },
+    "disappointed": {
+      "sector": "heavy",
+      "taxonomy_lines": [
+        "I thought we were going to finish it today.",
+        "That is not the version I was hoping you would hear.",
+        "I wanted that to go the other way."
+      ],
+      "delivery": {
+        "samantha": "The air goes out of the line. Not anger.",
+        "jarvis": "Clipped expectation that was not met. Not a reprimand (that is Angry)."
+      }
+    },
+    "angry": {
+      "sector": "sharp",
+      "taxonomy_lines": [
+        "That was not yours to decide.",
+        "Say it again, plainly, without the excuse.",
+        "I am not raising my voice. I am not letting it pass."
+      ],
+      "delivery": {
+        "samantha": "Firm and held. Not a scream. Scorer reference only.",
+        "jarvis": "Controlled steel. Consonants stay clean. No shout that clips."
+      }
+    },
+    "fearful": {
+      "sector": "sharp",
+      "taxonomy_lines": [
+        "Something in the hallway just changed, and I don't know what.",
+        "If that alarm is real, we stop and check.",
+        "I need a second. That did not sound right."
+      ],
+      "delivery": {
+        "samantha": "Tighter and smaller, not a theatrical gasp.",
+        "jarvis": "Tighter and smaller, not a theatrical gasp."
+      }
+    },
+    "surprised": {
+      "sector": "sharp",
+      "taxonomy_lines": [
+        "Wait. That is not the number I had.",
+        "They moved it to Thursday. I did not see that coming.",
+        "You finished it already?"
+      ],
+      "delivery": {
+        "samantha": "The turn happens on the first stress. Recover enough that the rest is audible.",
+        "jarvis": "The turn happens on the first stress. Recover enough that the rest is audible."
+      }
+    },
+    "disgusted": {
+      "sector": "sharp",
+      "taxonomy_lines": [
+        "That smell does not belong in a kitchen.",
+        "Leave the rest of it. I don't want it described.",
+        "We are not putting that back on the table."
+      ],
+      "delivery": {
+        "samantha": "Withdraw, do not perform a cartoon ugh.",
+        "jarvis": "Rejection of the fact, still articulated."
+      }
+    }
+  },
+  "optional_samantha_only": {
+    "seductive": {
+      "required_for_session_seal": false,
+      "jarvis": null,
+      "carrier": "Stay a moment. I wanted you to hear this from me.",
+      "delivery": "Closer and lower than Tender, still on the mark, still intelligible, no whisper that fails the noise or loudness gate. Samantha only. Not a film line. Not explicit."
+    }
+  }
+}

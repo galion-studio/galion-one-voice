@@ -1,0 +1,561 @@
+{
+  "_comment": "TEMPLATE ONLY. Empty sha256/bytes/verdict mean no take has been hashed yet. This file contains no audio. Paths are relative to the session directory.",
+  "tool": "capture-kit",
+  "standard": "galion-voice-v2-432",
+  "persona": "",
+  "consent": "owner-own-recordings-only",
+  "originals": "read-only",
+  "line": "",
+  "session_id": "",
+  "files": [
+    {
+      "path": "calibration/take-01.wav",
+      "sha256": "",
+      "bytes": 0,
+      "emotion": null,
+      "role": "calibration",
+      "verdict": null,
+      "format_verdict": null
+    },
+    {
+      "path": "neutral/take-01.wav",
+      "sha256": "",
+      "bytes": 0,
+      "emotion": "neutral",
+      "role": "emotion",
+      "verdict": null,
+      "format_verdict": null
+    },
+    {
+      "path": "neutral/take-02.wav",
+      "sha256": "",
+      "bytes": 0,
+      "emotion": "neutral",
+      "role": "emotion",
+      "verdict": null,
+      "format_verdict": null
+    },
+    {
+      "path": "neutral/take-03.wav",
+      "sha256": "",
+      "bytes": 0,
+      "emotion": "neutral",
+      "role": "emotion",
+      "verdict": null,
+      "format_verdict": null
+    },
+    {
+      "path": "neutral/take-04.wav",
+      "sha256": "",
+      "bytes": 0,
+      "emotion": "neutral",
+      "role": "emotion",
+      "verdict": null,
+      "format_verdict": null
+    },
+    {
+      "path": "neutral/take-05.wav",
+      "sha256": "",
+      "bytes": 0,
+      "emotion": "neutral",
+      "role": "emotion",
+      "verdict": null,
+      "format_verdict": null
+    },
+    {
+      "path": "calm/take-01.wav",
+      "sha256": "",
+      "bytes": 0,
+      "emotion": "calm",
+      "role": "emotion",
+      "verdict": null,
+      "format_verdict": null
+    },
+    {
+      "path": "calm/take-02.wav",
+      "sha256": "",
+      "bytes": 0,
+      "emotion": "calm",
+      "role": "emotion",
+      "verdict": null,
+      "format_verdict": null
+    },
+    {
+      "path": "calm/take-03.wav",
+      "sha256": "",
+      "bytes": 0,
+      "emotion": "calm",
+      "role": "emotion",
+      "verdict": null,
+      "format_verdict": null
+    },
+    {
+      "path": "calm/take-04.wav",
+      "sha256": "",
+      "bytes": 0,
+      "emotion": "calm",
+      "role": "emotion",
+      "verdict": null,
+      "format_verdict": null
+    },
+    {
+      "path": "calm/take-05.wav",
+      "sha256": "",
+      "bytes": 0,
+      "emotion": "calm",
+      "role": "emotion",
+      "verdict": null,
+      "format_verdict": null
+    },
+    {
+      "path": "happy/take-01.wav",
+      "sha256": "",
+      "bytes": 0,
+      "emotion": "happy",
+      "role": "emotion",
+      "verdict": null,
+      "format_verdict": null
+    },
+    {
+      "path": "happy/take-02.wav",
+      "sha256": "",
+      "bytes": 0,
+      "emotion": "happy",
+      "role": "emotion",
+      "verdict": null,
+      "format_verdict": null
+    },
+    {
+      "path": "happy/take-03.wav",
+      "sha256": "",
+      "bytes": 0,
+      "emotion": "happy",
+      "role": "emotion",
+      "verdict": null,
+      "format_verdict": null
+    },
+    {
+      "path": "happy/take-04.wav",
+      "sha256": "",
+      "bytes": 0,
+      "emotion": "happy",
+      "role": "emotion",
+      "verdict": null,
+      "format_verdict": null
+    },
+    {
+      "path": "happy/take-05.wav",
+      "sha256": "",
+      "bytes": 0,
+      "emotion": "happy",
+      "role": "emotion",
+      "verdict": null,
+      "format_verdict": null
+    },
+    {
+      "path": "amused/take-01.wav",
+      "sha256": "",
+      "bytes": 0,
+      "emotion": "amused",
+      "role": "emotion",
+      "verdict": null,
+      "format_verdict": null
+    },
+    {
+      "path": "amused/take-02.wav",
+      "sha256": "",
+      "bytes": 0,
+      "emotion": "amused",
+      "role": "emotion",
+      "verdict": null,
+      "format_verdict": null
+    },
+    {
+      "path": "amused/take-03.wav",
+      "sha256": "",
+      "bytes": 0,
+      "emotion": "amused",
+      "role": "emotion",
+      "verdict": null,
+      "format_verdict": null
+    },
+    {
+      "path": "amused/take-04.wav",
+      "sha256": "",
+      "bytes": 0,
+      "emotion": "amused",
+      "role": "emotion",
+      "verdict": null,
+      "format_verdict": null
+    },
+    {
+      "path": "amused/take-05.wav",
+      "sha256": "",
+      "bytes": 0,
+      "emotion": "amused",
+      "role": "emotion",
+      "verdict": null,
+      "format_verdict": null
+    },
+    {
+      "path": "excited/take-01.wav",
+      "sha256": "",
+      "bytes": 0,
+      "emotion": "excited",
+      "role": "emotion",
+      "verdict": null,
+      "format_verdict": null
+    },
+    {
+      "path": "excited/take-02.wav",
+      "sha256": "",
+      "bytes": 0,
+      "emotion": "excited",
+      "role": "emotion",
+      "verdict": null,
+      "format_verdict": null
+    },
+    {
+      "path": "excited/take-03.wav",
+      "sha256": "",
+      "bytes": 0,
+      "emotion": "excited",
+      "role": "emotion",
+      "verdict": null,
+      "format_verdict": null
+    },
+    {
+      "path": "excited/take-04.wav",
+      "sha256": "",
+      "bytes": 0,
+      "emotion": "excited",
+      "role": "emotion",
+      "verdict": null,
+      "format_verdict": null
+    },
+    {
+      "path": "excited/take-05.wav",
+      "sha256": "",
+      "bytes": 0,
+      "emotion": "excited",
+      "role": "emotion",
+      "verdict": null,
+      "format_verdict": null
+    },
+    {
+      "path": "tender/take-01.wav",
+      "sha256": "",
+      "bytes": 0,
+      "emotion": "tender",
+      "role": "emotion",
+      "verdict": null,
+      "format_verdict": null
+    },
+    {
+      "path": "tender/take-02.wav",
+      "sha256": "",
+      "bytes": 0,
+      "emotion": "tender",
+      "role": "emotion",
+      "verdict": null,
+      "format_verdict": null
+    },
+    {
+      "path": "tender/take-03.wav",
+      "sha256": "",
+      "bytes": 0,
+      "emotion": "tender",
+      "role": "emotion",
+      "verdict": null,
+      "format_verdict": null
+    },
+    {
+      "path": "tender/take-04.wav",
+      "sha256": "",
+      "bytes": 0,
+      "emotion": "tender",
+      "role": "emotion",
+      "verdict": null,
+      "format_verdict": null
+    },
+    {
+      "path": "tender/take-05.wav",
+      "sha256": "",
+      "bytes": 0,
+      "emotion": "tender",
+      "role": "emotion",
+      "verdict": null,
+      "format_verdict": null
+    },
+    {
+      "path": "sad/take-01.wav",
+      "sha256": "",
+      "bytes": 0,
+      "emotion": "sad",
+      "role": "emotion",
+      "verdict": null,
+      "format_verdict": null
+    },
+    {
+      "path": "sad/take-02.wav",
+      "sha256": "",
+      "bytes": 0,
+      "emotion": "sad",
+      "role": "emotion",
+      "verdict": null,
+      "format_verdict": null
+    },
+    {
+      "path": "sad/take-03.wav",
+      "sha256": "",
+      "bytes": 0,
+      "emotion": "sad",
+      "role": "emotion",
+      "verdict": null,
+      "format_verdict": null
+    },
+    {
+      "path": "sad/take-04.wav",
+      "sha256": "",
+      "bytes": 0,
+      "emotion": "sad",
+      "role": "emotion",
+      "verdict": null,
+      "format_verdict": null
+    },
+    {
+      "path": "sad/take-05.wav",
+      "sha256": "",
+      "bytes": 0,
+      "emotion": "sad",
+      "role": "emotion",
+      "verdict": null,
+      "format_verdict": null
+    },
+    {
+      "path": "disappointed/take-01.wav",
+      "sha256": "",
+      "bytes": 0,
+      "emotion": "disappointed",
+      "role": "emotion",
+      "verdict": null,
+      "format_verdict": null
+    },
+    {
+      "path": "disappointed/take-02.wav",
+      "sha256": "",
+      "bytes": 0,
+      "emotion": "disappointed",
+      "role": "emotion",
+      "verdict": null,
+      "format_verdict": null
+    },
+    {
+      "path": "disappointed/take-03.wav",
+      "sha256": "",
+      "bytes": 0,
+      "emotion": "disappointed",
+      "role": "emotion",
+      "verdict": null,
+      "format_verdict": null
+    },
+    {
+      "path": "disappointed/take-04.wav",
+      "sha256": "",
+      "bytes": 0,
+      "emotion": "disappointed",
+      "role": "emotion",
+      "verdict": null,
+      "format_verdict": null
+    },
+    {
+      "path": "disappointed/take-05.wav",
+      "sha256": "",
+      "bytes": 0,
+      "emotion": "disappointed",
+      "role": "emotion",
+      "verdict": null,
+      "format_verdict": null
+    },
+    {
+      "path": "angry/take-01.wav",
+      "sha256": "",
+      "bytes": 0,
+      "emotion": "angry",
+      "role": "emotion",
+      "verdict": null,
+      "format_verdict": null
+    },
+    {
+      "path": "angry/take-02.wav",
+      "sha256": "",
+      "bytes": 0,
+      "emotion": "angry",
+      "role": "emotion",
+      "verdict": null,
+      "format_verdict": null
+    },
+    {
+      "path": "angry/take-03.wav",
+      "sha256": "",
+      "bytes": 0,
+      "emotion": "angry",
+      "role": "emotion",
+      "verdict": null,
+      "format_verdict": null
+    },
+    {
+      "path": "angry/take-04.wav",
+      "sha256": "",
+      "bytes": 0,
+      "emotion": "angry",
+      "role": "emotion",
+      "verdict": null,
+      "format_verdict": null
+    },
+    {
+      "path": "angry/take-05.wav",
+      "sha256": "",
+      "bytes": 0,
+      "emotion": "angry",
+      "role": "emotion",
+      "verdict": null,
+      "format_verdict": null
+    },
+    {
+      "path": "fearful/take-01.wav",
+      "sha256": "",
+      "bytes": 0,
+      "emotion": "fearful",
+      "role": "emotion",
+      "verdict": null,
+      "format_verdict": null
+    },
+    {
+      "path": "fearful/take-02.wav",
+      "sha256": "",
+      "bytes": 0,
+      "emotion": "fearful",
+      "role": "emotion",
+      "verdict": null,
+      "format_verdict": null
+    },
+    {
+      "path": "fearful/take-03.wav",
+      "sha256": "",
+      "bytes": 0,
+      "emotion": "fearful",
+      "role": "emotion",
+      "verdict": null,
+      "format_verdict": null
+    },
+    {
+      "path": "fearful/take-04.wav",
+      "sha256": "",
+      "bytes": 0,
+      "emotion": "fearful",
+      "role": "emotion",
+      "verdict": null,
+      "format_verdict": null
+    },
+    {
+      "path": "fearful/take-05.wav",
+      "sha256": "",
+      "bytes": 0,
+      "emotion": "fearful",
+      "role": "emotion",
+      "verdict": null,
+      "format_verdict": null
+    },
+    {
+      "path": "surprised/take-01.wav",
+      "sha256": "",
+      "bytes": 0,
+      "emotion": "surprised",
+      "role": "emotion",
+      "verdict": null,
+      "format_verdict": null
+    },
+    {
+      "path": "surprised/take-02.wav",
+      "sha256": "",
+      "bytes": 0,
+      "emotion": "surprised",
+      "role": "emotion",
+      "verdict": null,
+      "format_verdict": null
+    },
+    {
+      "path": "surprised/take-03.wav",
+      "sha256": "",
+      "bytes": 0,
+      "emotion": "surprised",
+      "role": "emotion",
+      "verdict": null,
+      "format_verdict": null
+    },
+    {
+      "path": "surprised/take-04.wav",
+      "sha256": "",
+      "bytes": 0,
+      "emotion": "surprised",
+      "role": "emotion",
+      "verdict": null,
+      "format_verdict": null
+    },
+    {
+      "path": "surprised/take-05.wav",
+      "sha256": "",
+      "bytes": 0,
+      "emotion": "surprised",
+      "role": "emotion",
+      "verdict": null,
+      "format_verdict": null
+    },
+    {
+      "path": "disgusted/take-01.wav",
+      "sha256": "",
+      "bytes": 0,
+      "emotion": "disgusted",
+      "role": "emotion",
+      "verdict": null,
+      "format_verdict": null
+    },
+    {
+      "path": "disgusted/take-02.wav",
+      "sha256": "",
+      "bytes": 0,
+      "emotion": "disgusted",
+      "role": "emotion",
+      "verdict": null,
+      "format_verdict": null
+    },
+    {
+      "path": "disgusted/take-03.wav",
+      "sha256": "",
+      "bytes": 0,
+      "emotion": "disgusted",
+      "role": "emotion",
+      "verdict": null,
+      "format_verdict": null
+    },
+    {
+      "path": "disgusted/take-04.wav",
+      "sha256": "",
+      "bytes": 0,
+      "emotion": "disgusted",
+      "role": "emotion",
+      "verdict": null,
+      "format_verdict": null
+    },
+    {
+      "path": "disgusted/take-05.wav",
+      "sha256": "",
+      "bytes": 0,
+      "emotion": "disgusted",
+      "role": "emotion",
+      "verdict": null,
+      "format_verdict": null
+    }
+  ]
+}

@@ -1,0 +1,315 @@
+{
+  "_comment": "TEMPLATE ONLY. Empty path and sha256 mean no reference has been selected. Not a sealed map. Schema galion-emotion-v2-per-sector-refs/1: key is line/emotion, value is path + sha256 of the original take bytes. Agent 3 (cursor/emotion-v2-per-sector-refs) consumes this shape. Do not copy or rewrite audio into this file.",
+  "schema": "galion-emotion-v2-per-sector-refs/1",
+  "standard": "galion-voice-v2-432",
+  "consent": "owner-own-recordings-only",
+  "originals": "read-only",
+  "refs": {
+    "samantha/neutral": {
+      "line": "samantha",
+      "emotion": "neutral",
+      "path": "",
+      "sha256": ""
+    },
+    "samantha/calm": {
+      "line": "samantha",
+      "emotion": "calm",
+      "path": "",
+      "sha256": ""
+    },
+    "samantha/happy": {
+      "line": "samantha",
+      "emotion": "happy",
+      "path": "",
+      "sha256": ""
+    },
+    "samantha/amused": {
+      "line": "samantha",
+      "emotion": "amused",
+      "path": "",
+      "sha256": ""
+    },
+    "samantha/excited": {
+      "line": "samantha",
+      "emotion": "excited",
+      "path": "",
+      "sha256": ""
+    },
+    "samantha/tender": {
+      "line": "samantha",
+      "emotion": "tender",
+      "path": "",
+      "sha256": ""
+    },
+    "samantha/sad": {
+      "line": "samantha",
+      "emotion": "sad",
+      "path": "",
+      "sha256": ""
+    },
+    "samantha/disappointed": {
+      "line": "samantha",
+      "emotion": "disappointed",
+      "path": "",
+      "sha256": ""
+    },
+    "samantha/angry": {
+      "line": "samantha",
+      "emotion": "angry",
+      "path": "",
+      "sha256": ""
+    },
+    "samantha/fearful": {
+      "line": "samantha",
+      "emotion": "fearful",
+      "path": "",
+      "sha256": ""
+    },
+    "samantha/surprised": {
+      "line": "samantha",
+      "emotion": "surprised",
+      "path": "",
+      "sha256": ""
+    },
+    "samantha/disgusted": {
+      "line": "samantha",
+      "emotion": "disgusted",
+      "path": "",
+      "sha256": ""
+    },
+    "jarvis/neutral": {
+      "line": "jarvis",
+      "emotion": "neutral",
+      "path": "",
+      "sha256": ""
+    },
+    "jarvis/calm": {
+      "line": "jarvis",
+      "emotion": "calm",
+      "path": "",
+      "sha256": ""
+    },
+    "jarvis/happy": {
+      "line": "jarvis",
+      "emotion": "happy",
+      "path": "",
+      "sha256": ""
+    },
+    "jarvis/amused": {
+      "line": "jarvis",
+      "emotion": "amused",
+      "path": "",
+      "sha256": ""
+    },
+    "jarvis/excited": {
+      "line": "jarvis",
+      "emotion": "excited",
+      "path": "",
+      "sha256": ""
+    },
+    "jarvis/tender": {
+      "line": "jarvis",
+      "emotion": "tender",
+      "path": "",
+      "sha256": ""
+    },
+    "jarvis/sad": {
+      "line": "jarvis",
+      "emotion": "sad",
+      "path": "",
+      "sha256": ""
+    },
+    "jarvis/disappointed": {
+      "line": "jarvis",
+      "emotion": "disappointed",
+      "path": "",
+      "sha256": ""
+    },
+    "jarvis/angry": {
+      "line": "jarvis",
+      "emotion": "angry",
+      "path": "",
+      "sha256": ""
+    },
+    "jarvis/fearful": {
+      "line": "jarvis",
+      "emotion": "fearful",
+      "path": "",
+      "sha256": ""
+    },
+    "jarvis/surprised": {
+      "line": "jarvis",
+      "emotion": "surprised",
+      "path": "",
+      "sha256": ""
+    },
+    "jarvis/disgusted": {
+      "line": "jarvis",
+      "emotion": "disgusted",
+      "path": "",
+      "sha256": ""
+    },
+    "samantha/seductive": {
+      "line": "samantha",
+      "emotion": "seductive",
+      "path": "",
+      "sha256": "",
+      "optional": true,
+      "note": "Samantha only. Not part of the #89 inventory. Not required for a sealed session. Never used for Jarvis."
+    }
+  },
+  "refs_list": [
+    {
+      "line": "samantha",
+      "emotion": "neutral",
+      "path": "",
+      "sha256": ""
+    },
+    {
+      "line": "samantha",
+      "emotion": "calm",
+      "path": "",
+      "sha256": ""
+    },
+    {
+      "line": "samantha",
+      "emotion": "happy",
+      "path": "",
+      "sha256": ""
+    },
+    {
+      "line": "samantha",
+      "emotion": "amused",
+      "path": "",
+      "sha256": ""
+    },
+    {
+      "line": "samantha",
+      "emotion": "excited",
+      "path": "",
+      "sha256": ""
+    },
+    {
+      "line": "samantha",
+      "emotion": "tender",
+      "path": "",
+      "sha256": ""
+    },
+    {
+      "line": "samantha",
+      "emotion": "sad",
+      "path": "",
+      "sha256": ""
+    },
+    {
+      "line": "samantha",
+      "emotion": "disappointed",
+      "path": "",
+      "sha256": ""
+    },
+    {
+      "line": "samantha",
+      "emotion": "angry",
+      "path": "",
+      "sha256": ""
+    },
+    {
+      "line": "samantha",
+      "emotion": "fearful",
+      "path": "",
+      "sha256": ""
+    },
+    {
+      "line": "samantha",
+      "emotion": "surprised",
+      "path": "",
+      "sha256": ""
+    },
+    {
+      "line": "samantha",
+      "emotion": "disgusted",
+      "path": "",
+      "sha256": ""
+    },
+    {
+      "line": "jarvis",
+      "emotion": "neutral",
+      "path": "",
+      "sha256": ""
+    },
+    {
+      "line": "jarvis",
+      "emotion": "calm",
+      "path": "",
+      "sha256": ""
+    },
+    {
+      "line": "jarvis",
+      "emotion": "happy",
+      "path": "",
+      "sha256": ""
+    },
+    {
+      "line": "jarvis",
+      "emotion": "amused",
+      "path": "",
+      "sha256": ""
+    },
+    {
+      "line": "jarvis",
+      "emotion": "excited",
+      "path": "",
+      "sha256": ""
+    },
+    {
+      "line": "jarvis",
+      "emotion": "tender",
+      "path": "",
+      "sha256": ""
+    },
+    {
+      "line": "jarvis",
+      "emotion": "sad",
+      "path": "",
+      "sha256": ""
+    },
+    {
+      "line": "jarvis",
+      "emotion": "disappointed",
+      "path": "",
+      "sha256": ""
+    },
+    {
+      "line": "jarvis",
+      "emotion": "angry",
+      "path": "",
+      "sha256": ""
+    },
+    {
+      "line": "jarvis",
+      "emotion": "fearful",
+      "path": "",
+      "sha256": ""
+    },
+    {
+      "line": "jarvis",
+      "emotion": "surprised",
+      "path": "",
+      "sha256": ""
+    },
+    {
+      "line": "jarvis",
+      "emotion": "disgusted",
+      "path": "",
+      "sha256": ""
+    },
+    {
+      "line": "samantha",
+      "emotion": "seductive",
+      "path": "",
+      "sha256": "",
+      "optional": true,
+      "note": "Samantha only. Not part of the #89 inventory. Not required for a sealed session. Never used for Jarvis."
+    }
+  ]
+}
