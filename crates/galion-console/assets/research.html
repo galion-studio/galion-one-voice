@@ -303,12 +303,12 @@ function tone(id){
       ol.appendChild(li);
     });
   }
-  var LOCAL="The research path is not reachable from here. Local. What is already known stays marked local.";
+  var LOCAL="Offline. The research path is not reachable from here. Local. What is already known stays marked local.";
   var helpers=document.getElementById("helpers");
   function carryLocal(q){
-    hermesStatus("Hermes · Unreachable");
+    hermesStatus("Offline");
     helpers.hidden=false;
-    helpers.textContent="Helpers are quiet. Local knowledge carries the question.";
+    helpers.textContent="Offline. Local notes and attached sources only.";
     document.getElementById("reading-question").textContent=q;
     document.getElementById("reading-question").hidden=false;
     document.getElementById("reading-body").textContent=LOCAL;
@@ -316,8 +316,9 @@ function tone(id){
       fillList(document.getElementById("local-list"), ["Local. What is already known stays marked local."]);
       document.getElementById("source-empty").hidden=true;
     }
+    fillPile("found", []);
     fillPile("unknown", [LOCAL]);
-    paintHistory([{status:"Unreachable", question:q}]);
+    paintHistory([{status:"Offline", question:q}]);
     tone("local");
   }
   function showTurn(j){
@@ -338,11 +339,11 @@ function tone(id){
     fillPile("inferred", j.inferred);
     fillPile("unknown", j.unknown);
     var standing=j.status||"Unknown";
-    if(standing!=="Found"&&standing!=="Inferred"&&standing!=="Unknown"&&standing!=="Unreachable"&&standing!=="Denied") standing="Unknown";
-    hermesStatus("Hermes · "+standing);
+    if(standing!=="Found"&&standing!=="Inferred"&&standing!=="Unknown"&&standing!=="Unreachable"&&standing!=="Denied"&&standing!=="Offline") standing="Unknown";
+    hermesStatus(standing==="Offline"?"Offline":"Hermes · "+standing);
     helpers.hidden=false;
-    helpers.textContent=standing==="Unreachable"?"Helpers are quiet. Local knowledge carries the question.":standing;
-    tone(j.status==="Unreachable"?"local":"returned");
+    helpers.textContent=standing==="Offline"?"Offline. Local notes and attached sources only.":(standing==="Unreachable"?"Helpers are quiet. Local knowledge carries the question.":standing);
+    tone(j.status==="Offline"||j.status==="Unreachable"?"local":"returned");
   }
   function fillPile(id, rows){
     var list=document.getElementById(id+"-list");

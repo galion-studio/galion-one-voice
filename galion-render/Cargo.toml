@@ -29,3 +29,7 @@ galion-consent = { path = "../crates/galion-consent" }
 
 [[example]]
 name = "demo"
+
+[[example]]
+name = "research_desk"
+required-features = ["web"]

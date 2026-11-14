@@ -20,8 +20,11 @@
 //!   GET /research, /research/ -> the Galion Research desk, same gate as /one.
 //!   GET /research/hermes, GET /research/history, POST /research/ask -> Hermes
 //!                      research app. The gateway key stays on the server.
+//!                      When the gateway does not answer, the ask is Offline:
+//!                      attached files plus the bundled local notes. No paid API.
 //!   POST /research/sources, GET /research/sources -> files the user attached.
-//!                      A citation may name only those files.
+//!                      A citation may name only those files, or a bundled local
+//!                      note when the reply is Offline.
 //! `/dot` also carries `"mode"` (idle|listening|speaking|rika), `"lean"` (Rika lean-in 0..1),
 //! `"level"` (0..1, the band driving the state), `"e"` (empathy weight 0..1),
 //! `"engine"` (one Luti step), and `"emotion"` (sense, label, valence, arousal, lean)
@@ -680,6 +683,8 @@ const V2_REDIRECT_HTML: &str = "<!doctype html><html lang=\"en\"><head><meta cha
 /// Galion Research. Served at `/research` and `/research/` when a product page is set,
 /// the same gate as `/one`.
 const RESEARCH_HTML: &str = include_str!("../../../crates/galion-console/assets/research.html");
+/// Local notes used when the Hermes gateway does not answer. No network.
+const RESEARCH_LOCAL_NOTES: &str = include_str!("../../../crates/galion-console/assets/research-local-notes.txt");
 
 struct ResearchNote {
     id: u64,
@@ -908,6 +913,12 @@ fn research_history_json(desk: &ResearchDesk) -> String {
     format!("{{\"schema\":\"galion-research/1\",\"app\":\"hermes\",\"items\":[{}]}}", items.join(","))
 }
 
+/// Local notes plus the session's files. Does not use the Hermes client.
+fn local_research(question: &str, sources: &[galion_cascade::hermes::ResearchSource]) -> galion_cascade::hermes::ResearchAnswer {
+    let notes = galion_cascade::hermes::parse_local_notes(RESEARCH_LOCAL_NOTES);
+    galion_cascade::hermes::offline_research(question, sources, &notes)
+}
+
 fn research_ask(desk: &Arc<Mutex<ResearchDesk>>, question: &str) -> String {
     let (id, client, model_fallback, sources) = {
         let Ok(mut d) = desk.lock() else {
@@ -921,42 +932,43 @@ fn research_ask(desk: &Arc<Mutex<ResearchDesk>>, question: &str) -> String {
         }).collect();
         (d.next_id, d.client.clone(), model, sources)
     };
+    // One gateway attempt when a client is configured. Unreachable falls back
+    // to local text. The fallback does not dial again and does not call a paid API.
     let turn = match client {
-        Some(c) => c.research_turn(question, &sources),
-        None => galion_cascade::hermes::ResearchAnswer {
-            text: galion_cascade::UNREACHABLE.into(),
-            citations: Vec::new(),
-            found: Vec::new(),
-            inferred: Vec::new(),
-            unknown: Vec::new(),
-            standing: "Unreachable",
-        },
+        Some(c) => {
+            let turn = c.research_turn(question, &sources);
+            if turn.standing == "Unreachable" {
+                local_research(question, &sources)
+            } else {
+                turn
+            }
+        }
+        None => local_research(question, &sources),
     };
     let status = turn.standing;
-    let reply = if status == "Unreachable" {
-        "The research path is not reachable from here. Local. What is already known stays marked local.".to_string()
-    } else {
-        turn.text
-    };
-    let citations = if status == "Unreachable" || status == "Denied" { Vec::new() } else { turn.citations };
-    let mut found = if status == "Found" { turn.found } else { Vec::new() };
+    let reply = turn.text;
+    let citations = if status == "Denied" { Vec::new() } else { turn.citations };
+    let mut found = if status == "Found" || status == galion_cascade::hermes::OFFLINE_STANDING { turn.found } else { Vec::new() };
     let mut inferred = if status == "Found" || status == "Inferred" { turn.inferred } else { Vec::new() };
-    let mut unknown = if status == "Found" || status == "Inferred" || status == "Unknown" { turn.unknown } else { Vec::new() };
-    if status == "Unreachable" {
-        found.clear();
-        inferred.clear();
-        unknown.clear();
-        unknown.push(reply.clone());
-    }
+    let mut unknown = if status == "Found" || status == "Inferred" || status == "Unknown" || status == galion_cascade::hermes::OFFLINE_STANDING {
+        turn.unknown
+    } else {
+        Vec::new()
+    };
     if status == "Found" && found.is_empty() && !reply.is_empty() {
         found.push(reply.clone());
     }
     if status == "Inferred" && inferred.is_empty() && !reply.is_empty() {
         inferred.push(reply.clone());
     }
-    if status == "Unknown" && unknown.is_empty() && !reply.is_empty() {
+    if (status == "Unknown" || status == galion_cascade::hermes::OFFLINE_STANDING) && unknown.is_empty() && !reply.is_empty() {
         unknown.push(reply.clone());
     }
+    let shown_model = if status == galion_cascade::hermes::OFFLINE_STANDING {
+        "offline".to_string()
+    } else {
+        model_fallback
+    };
     let note = ResearchNote {
         id,
         question: question.to_string(),
@@ -970,7 +982,7 @@ fn research_ask(desk: &Arc<Mutex<ResearchDesk>>, question: &str) -> String {
     };
     let body = format!(
         "{{\"schema\":\"galion-research/1\",\"app\":\"hermes\",\"model\":{},{}",
-        galion_cascade::hermes::json_string(&model_fallback),
+        galion_cascade::hermes::json_string(&shown_model),
         research_note_json(&note).trim_start_matches('{')
     );
     if let Ok(mut d) = desk.lock() {
@@ -1568,6 +1580,8 @@ mod tests {
                 "id=\"helpers\"",
                 "ratio:\"5:4\"",
                 "Local. What is already known stays marked local.",
+                "Offline. Local notes and attached sources only.",
+                "standing!==\"Offline\"",
                 "hz:432",
                 "hz:216",
                 "hz:540",
@@ -1618,10 +1632,17 @@ mod tests {
         assert!(off.contains("\"app\":\"hermes\"") && off.contains("\"key\":\"none\"") && off.contains("\"status\":\"Unreachable\""), "{off}");
         assert!(!off.contains(key) && !off.contains("Bearer") && !off.contains("GALION_LLM_KEY"), "{off}");
         let denied = post_json(a, "/research/ask", r#"{"question":"Where is the source?"}"#);
-        assert!(denied.contains("HTTP/1.1 200") && denied.contains("The research path is not reachable from here."), "{denied}");
+        assert!(denied.contains("HTTP/1.1 200") && denied.contains("\"status\":\"Offline\""), "{denied}");
+        assert!(denied.contains("The research path is not reachable from here."), "{denied}");
+        assert!(denied.contains("\"model\":\"offline\""), "{denied}");
+        assert!(denied.contains("local note: evidence"), "{denied}");
+        assert!(denied.contains("host handed it to you"), "{denied}");
+        assert!(denied.contains("\"found\":[") && denied.contains("\"unknown\":["), "{denied}");
         assert!(!denied.contains(key), "{denied}");
+        assert!(!denied.contains("http://") && !denied.contains("https://") && !denied.contains("Journal"), "{denied}");
         let hist = get(a, "/research/history");
-        assert!(hist.contains("Where is the source?") && hist.contains("\"status\":\"Unreachable\""), "{hist}");
+        assert!(hist.contains("Where is the source?") && hist.contains("\"status\":\"Offline\""), "{hist}");
+        assert!(!hist.contains("\"status\":\"Unreachable\""), "{hist}");
         let empty = post_json(a, "/research/ask", r#"{"question":"  "}"#);
         assert!(empty.starts_with("HTTP/1.1 400"), "{empty}");
         w.close().unwrap();
@@ -1672,6 +1693,51 @@ mod tests {
         let hist = get(a, "/research/history");
         assert!(hist.contains("What colour is the wash?") && hist.contains("\"status\":\"Unknown\""), "{hist}");
         assert!(!hist.contains(key) && !hist.contains("Galion brand note"), "{hist}");
+        w.close().unwrap();
+    }
+
+    #[test]
+    fn research_ask_offline_when_the_gateway_refuses() {
+        let key = "test-gateway-key-not-for-git";
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        drop(listener);
+        let mut w = WebSurface::serve("127.0.0.1:0".parse().unwrap()).with_page("<!doctype html><canvas></canvas>");
+        w.set_research_hermes(galion_cascade::HermesLlm::new(
+            &format!("http://{addr}/v1/chat/completions"),
+            "hermes-agent",
+            key,
+            Duration::from_millis(200),
+        ));
+        w.open().unwrap();
+        let a = w.local_addr().unwrap();
+        let file = post_json(
+            a,
+            "/research/sources",
+            r#"{"name":"wash-note.txt","kind":"file","text":"The wash is amber."}"#,
+        );
+        assert!(file.contains("wash-note.txt"), "{file}");
+        let started = Instant::now();
+        let asked = post_json(a, "/research/ask", r#"{"question":"What colour is the wash?"}"#);
+        assert!(started.elapsed() < Duration::from_secs(2), "offline fallback waited on the gateway");
+        assert!(asked.contains("HTTP/1.1 200") && asked.contains("\"status\":\"Offline\""), "{asked}");
+        assert!(asked.contains("\"model\":\"offline\""), "{asked}");
+        assert!(asked.contains("The wash is amber."), "{asked}");
+        assert!(asked.contains("wash-note.txt") && asked.contains("\"n\":1"), "{asked}");
+        assert!(asked.contains("The research path is not reachable from here."), "{asked}");
+        assert!(asked.contains("\"inferred\":[]"), "{asked}");
+        assert!(!asked.contains("local note:"), "a note that does not mention the wash is not a citation: {asked}");
+        assert!(!asked.contains(key) && !asked.contains("Bearer") && !asked.contains("Journal"), "{asked}");
+        let gap = post_json(a, "/research/ask", r#"{"question":"zyzzyva quartz"}"#);
+        assert!(gap.contains("\"status\":\"Offline\"") && gap.contains("\"citations\":[]"), "{gap}");
+        assert!(gap.contains("do not settle this"), "{gap}");
+        assert!(!gap.contains("The wash is amber."), "{gap}");
+        let named = post_json(a, "/research/ask", r#"{"question":"What was Galion Research previously called?"}"#);
+        assert!(named.contains("\"status\":\"Offline\""), "{named}");
+        assert!(named.contains("previously called Hermes Research"), "{named}");
+        assert!(named.contains("local note: Galion Research"), "{named}");
+        assert!(!named.contains("wash-note.txt"), "the wash file is not a citation for this question: {named}");
+        assert!(!named.contains(key), "{named}");
         w.close().unwrap();
     }
 

@@ -487,6 +487,268 @@ fn blank_research(text: &str, standing: &'static str) -> ResearchAnswer {
     }
 }
 
+/// Standing when the gateway did not answer and the reply is local text only.
+/// No socket, no key, and no paid API are used to produce it.
+pub const OFFLINE_STANDING: &str = "Offline";
+
+const QUESTION_STOP: &[&str] = &[
+    "a", "an", "the", "is", "are", "was", "were", "be", "been", "being", "of", "to", "in", "on",
+    "for", "and", "or", "with", "from", "that", "this", "it", "as", "at", "by", "we", "you", "your",
+    "our", "not", "what", "where", "when", "who", "why", "how", "does", "do", "did", "can", "could",
+    "would", "should", "about", "into", "than", "then", "there", "their", "have", "has", "had", "its",
+    "if", "but", "so",
+];
+
+/// Bundled notes file. A licence header is ignored. A record is `id<TAB>name`,
+/// then text lines, then a line `---`. At most [`MAX_RESEARCH_SOURCES`] notes.
+/// Duplicate ids are dropped. This parser does not open a socket.
+pub fn parse_local_notes(raw: &str) -> Vec<ResearchSource> {
+    let mut out = Vec::new();
+    let mut id: Option<u32> = None;
+    let mut name = String::new();
+    let mut text = String::new();
+    for line in raw.lines() {
+        let t = line.trim();
+        if t == "---" {
+            finish_note(&mut out, &mut id, &mut name, &mut text);
+            continue;
+        }
+        if t.is_empty() || t.starts_with('#') {
+            continue;
+        }
+        if let Some((idv, name_v)) = note_header(t) {
+            finish_note(&mut out, &mut id, &mut name, &mut text);
+            id = Some(idv);
+            name = name_v;
+            text.clear();
+            continue;
+        }
+        if id.is_some() {
+            if !text.is_empty() {
+                text.push(' ');
+            }
+            text.push_str(t);
+        }
+    }
+    finish_note(&mut out, &mut id, &mut name, &mut text);
+    out
+}
+
+fn note_header(line: &str) -> Option<(u32, String)> {
+    let (id_s, name_s) = line.split_once('\t')?;
+    let id_s = id_s.trim();
+    if id_s.is_empty() || !id_s.chars().all(|c| c.is_ascii_digit()) {
+        return None;
+    }
+    let idv: u32 = id_s.parse().ok()?;
+    let name = name_s.trim();
+    if idv == 0 || name.is_empty() {
+        return None;
+    }
+    Some((idv, clip_chars(name, 80)))
+}
+
+fn finish_note(out: &mut Vec<ResearchSource>, id: &mut Option<u32>, name: &mut String, text: &mut String) {
+    let Some(idv) = id.take() else { return };
+    let name_v = std::mem::take(name).trim().to_string();
+    let text_v = std::mem::take(text).split_whitespace().collect::<Vec<_>>().join(" ");
+    if idv == 0 || name_v.is_empty() || text_v.is_empty() {
+        return;
+    }
+    if out.len() >= MAX_RESEARCH_SOURCES || out.iter().any(|s| s.id == idv) {
+        return;
+    }
+    out.push(ResearchSource {
+        id: idv,
+        name: name_v,
+        text: clip_chars(&text_v, MAX_RESEARCH_SOURCE_CHARS),
+    });
+}
+
+struct LocalHit {
+    origin: u8,
+    id: u32,
+    name: String,
+    text: String,
+    score: usize,
+    sentences: Vec<(usize, String)>,
+}
+
+/// Answer from `sources` (this session's files) and `notes` (the bundled index) only.
+///
+/// A Found line is a sentence copied from one of those records. A citation is
+/// that record's id and name, and only when a Found line was taken from it.
+/// Unknown says what those records do not settle. Nothing is fetched.
+pub fn offline_research(question: &str, sources: &[ResearchSource], notes: &[ResearchSource]) -> ResearchAnswer {
+    let terms = question_terms(question);
+    let mut hits: Vec<LocalHit> = Vec::new();
+    if !terms.is_empty() {
+        collect_hits(&mut hits, sources, &terms, 0);
+        collect_hits(&mut hits, notes, &terms, 1);
+        hits.retain(|h| h.origin == 0 || sources.iter().all(|s| s.id != h.id));
+        if let Some(best) = hits.iter().map(|h| h.score).max() {
+            let floor = if best >= 2 { best - 1 } else { best };
+            hits.retain(|h| h.score >= floor);
+            hits.sort_by(|a, b| b.score.cmp(&a.score).then(a.origin.cmp(&b.origin)).then(a.id.cmp(&b.id)));
+            hits.truncate(3);
+        }
+    }
+
+    let mut found = Vec::new();
+    let mut citations = Vec::new();
+    for hit in &hits {
+        let mut ranked = hit.sentences.clone();
+        ranked.sort_by(|a, b| b.0.cmp(&a.0));
+        let mut used = false;
+        for (_, sent) in ranked.into_iter().take(2) {
+            if found.len() >= 3 {
+                break;
+            }
+            let sent = clip_chars(sent.trim(), 400);
+            if sent.is_empty() || !squash(&hit.text).contains(&squash(&sent)) {
+                continue;
+            }
+            found.push(sent);
+            used = true;
+        }
+        if used {
+            push_unique(&mut citations, hit.id, hit.name.trim());
+        }
+    }
+
+    let limit = "Offline. The research path is not reachable from here. Nothing beyond the attached sources and the local notes was checked.";
+    let mut unknown = Vec::new();
+    let text = if found.is_empty() {
+        unknown.push("Unknown. The attached sources and the local notes do not settle this.".to_string());
+        unknown.push(limit.to_string());
+        "Offline. Unknown. The research path is not reachable from here. The attached sources and the local notes do not settle this.".to_string()
+    } else {
+        unknown.push(limit.to_string());
+        format!("Offline. {} The research path is not reachable from here.", found.join(" "))
+    };
+    ResearchAnswer {
+        text,
+        citations,
+        found,
+        inferred: Vec::new(),
+        unknown,
+        standing: OFFLINE_STANDING,
+    }
+}
+
+fn collect_hits(into: &mut Vec<LocalHit>, recs: &[ResearchSource], terms: &[String], origin: u8) {
+    for rec in recs.iter().take(MAX_RESEARCH_SOURCES) {
+        let name = rec.name.trim();
+        let text = rec.text.trim();
+        if rec.id == 0 || name.is_empty() || text.is_empty() {
+            continue;
+        }
+        let score = term_score(text, terms);
+        if score == 0 {
+            continue;
+        }
+        let sentences = matching_sentences(text, terms);
+        if sentences.is_empty() {
+            continue;
+        }
+        into.push(LocalHit {
+            origin,
+            id: rec.id,
+            name: name.to_string(),
+            text: text.to_string(),
+            score,
+            sentences,
+        });
+    }
+}
+
+fn question_terms(question: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    for word in tokenize(question) {
+        if word.len() < 3 || QUESTION_STOP.iter().any(|s| *s == word) {
+            continue;
+        }
+        if !out.contains(&word) {
+            out.push(word);
+        }
+        if out.len() == 12 {
+            break;
+        }
+    }
+    out
+}
+
+fn tokenize(s: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut cur = String::new();
+    for c in s.chars() {
+        if c.is_alphanumeric() {
+            for lower in c.to_lowercase() {
+                cur.push(lower);
+            }
+        } else if !cur.is_empty() {
+            out.push(std::mem::take(&mut cur));
+        }
+    }
+    if !cur.is_empty() {
+        out.push(cur);
+    }
+    out
+}
+
+fn word_hits(word: &str, term: &str) -> bool {
+    if word == term {
+        return true;
+    }
+    let plural_s = word.len() == term.len() + 1 && word.starts_with(term) && word.ends_with('s');
+    let plural_es = word.len() == term.len() + 2 && word.starts_with(term) && word.ends_with("es");
+    plural_s || plural_es
+}
+
+fn term_score(text: &str, terms: &[String]) -> usize {
+    let words = tokenize(text);
+    terms.iter().filter(|t| words.iter().any(|w| word_hits(w, t))).count()
+}
+
+fn matching_sentences(text: &str, terms: &[String]) -> Vec<(usize, String)> {
+    let mut out = Vec::new();
+    for sent in split_sentences(text) {
+        let score = term_score(&sent, terms);
+        if score > 0 {
+            out.push((score, sent));
+        }
+    }
+    out
+}
+
+fn split_sentences(text: &str) -> Vec<String> {
+    let chars: Vec<char> = text.chars().collect();
+    let mut out = Vec::new();
+    let mut cur = String::new();
+    for (i, c) in chars.iter().enumerate() {
+        cur.push(*c);
+        if matches!(*c, '.' | '?' | '!') {
+            let next = chars.get(i + 1).copied();
+            if next.is_none() || next == Some(' ') {
+                let s = cur.trim().to_string();
+                if s.chars().any(|ch| ch.is_alphanumeric()) {
+                    out.push(s);
+                }
+                cur.clear();
+            }
+        }
+    }
+    let tail = cur.trim().to_string();
+    if tail.chars().any(|ch| ch.is_alphanumeric()) {
+        out.push(tail);
+    }
+    out
+}
+
+fn squash(s: &str) -> String {
+    s.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
 /// The Sources block appended to the question. Only these ids may be cited.
 pub fn research_source_block(sources: &[ResearchSource]) -> String {
     let kept: Vec<&ResearchSource> = sources
@@ -1599,5 +1861,86 @@ Found
             llm.reply(&tr("  "), Emotion::Neutral),
             Err(CascadeError::Empty)
         ));
+    }
+
+    #[test]
+    fn offline_research_quotes_the_attached_file_and_does_not_cite_the_notes() {
+        let notes = [ResearchSource {
+            id: 1001,
+            name: "local note: Galion Research".into(),
+            text: "This product was previously called Hermes Research.".into(),
+        }];
+        let sources = [ResearchSource {
+            id: 2,
+            name: "wash-note.txt".into(),
+            text: "The wash is amber.".into(),
+        }];
+        let turn = offline_research("What colour is the wash?", &sources, &notes);
+        assert_eq!(turn.standing, OFFLINE_STANDING);
+        assert!(turn.text.starts_with("Offline."), "{}", turn.text);
+        assert!(turn.found.iter().any(|s| s.contains("The wash is amber.")), "{turn:?}");
+        assert_eq!(turn.citations, vec![(2, "wash-note.txt".into())]);
+        assert!(turn.inferred.is_empty(), "{turn:?}");
+        assert!(turn.unknown.iter().any(|s| s.contains("not reachable")), "{turn:?}");
+        assert!(!turn.text.contains("Hermes Research"), "{turn:?}");
+        assert_found_is_quoted(&turn, &sources, &notes);
+    }
+
+    #[test]
+    fn offline_research_cites_the_bundled_note_by_its_own_name() {
+        let raw = include_str!("../../../crates/galion-console/assets/research-local-notes.txt");
+        let notes = parse_local_notes(raw);
+        let ids: Vec<u32> = notes.iter().map(|n| n.id).collect();
+        assert_eq!(ids, vec![1001, 1002, 1003, 1004, 1005], "{notes:?}");
+        assert!(notes.iter().any(|n| n.name == "local note: Galion Research"));
+        for n in &notes {
+            let low = n.text.to_ascii_lowercase();
+            assert!(!low.contains("http"), "{}", n.text);
+            assert!(!low.contains("arxiv"), "{}", n.text);
+            assert!(!n.text.contains("Journal"), "{}", n.text);
+            assert!(!n.text.contains("Copyright"), "{}", n.text);
+        }
+        let turn = offline_research("What was Galion Research previously called?", &[], &notes);
+        assert_eq!(turn.standing, OFFLINE_STANDING, "{turn:?}");
+        assert!(turn.found.iter().any(|s| s.contains("previously called Hermes Research")), "{turn:?}");
+        assert_eq!(turn.citations, vec![(1001, "local note: Galion Research".into())]);
+        assert!(turn.inferred.is_empty(), "{turn:?}");
+        assert!(turn.unknown.iter().any(|s| s.starts_with("Offline.")), "{turn:?}");
+        assert_found_is_quoted(&turn, &[], &notes);
+        let gap = offline_research("zyzzyva quartz", &[], &notes);
+        assert_eq!(gap.standing, OFFLINE_STANDING);
+        assert!(gap.found.is_empty(), "{gap:?}");
+        assert!(gap.citations.is_empty(), "{gap:?}");
+        assert!(gap.unknown.iter().any(|s| s.starts_with("Unknown.")), "{gap:?}");
+        assert!(!gap.text.contains("Hermes Research"), "{gap:?}");
+    }
+
+    #[test]
+    fn offline_research_does_not_cite_a_note_that_reuses_a_file_id() {
+        let sources = [ResearchSource {
+            id: 2,
+            name: "wash-note.txt".into(),
+            text: "The wash is amber.".into(),
+        }];
+        let notes = [ResearchSource {
+            id: 2,
+            name: "local note: invented title".into(),
+            text: "The wash is violet according to a journal.".into(),
+        }];
+        let turn = offline_research("What colour is the wash?", &sources, &notes);
+        assert_eq!(turn.citations, vec![(2, "wash-note.txt".into())]);
+        assert!(turn.found.iter().all(|s| !s.contains("violet") && !s.contains("journal")), "{turn:?}");
+        assert!(!turn.text.contains("invented title"), "{turn:?}");
+    }
+
+    fn assert_found_is_quoted(turn: &ResearchAnswer, sources: &[ResearchSource], notes: &[ResearchSource]) {
+        for line in &turn.found {
+            let owned = sources.iter().chain(notes.iter()).any(|s| squash(&s.text).contains(&squash(line)));
+            assert!(owned, "found line is not in a handed record: {line}");
+        }
+        for (_, label) in &turn.citations {
+            let owned = sources.iter().chain(notes.iter()).any(|s| s.name == *label);
+            assert!(owned, "citation label was not handed in: {label}");
+        }
     }
 }

@@ -1,0 +1,48 @@
+G.A.L.I.O.N. — General Autonomous Local Intelligence Open Network
+Developed and distributed by Galion Labs
+Perpetual Open MIT License
+Copyright © 2026 Galion Labs. All rights reserved.
+
+MIT License
+
+Copyright (c) 2026 Maciej Grajczyk
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+# Local notes for /research/ask when the Hermes gateway does not answer.
+# A record is: id, a tab, the name, the text, then a line of ---.
+# Ids start at 1001 so they do not collide with a session file id.
+# Eight notes is the cap. The lines below are already in this repo.
+# No measurement was added.
+
+1001	local note: Galion Research
+This product was previously called Hermes Research. Hermes remains the access layer behind you. The spelling is Galion. Product voice for Galion Research, the research voice of the set.
+---
+1002	local note: local knowledge
+Local when the far path is down. You say the path is down, and you continue with what you already hold, marked as local. The research path is not reachable from here.
+---
+1003	local note: retrieval cap
+The side band retrieval cap is 3 seconds. If nothing usable is back, you say so and you speak from local knowledge.
+---
+1004	local note: sound standard
+Cue unison is 432 Hz. Cue ratios include 2:1, 3:2, and 5:4. Cue hum is 216 Hz and 108 Hz.
+---
+1005	local note: evidence
+Name a source only when the host handed it to you. Do not invent a paper, a URL, a date, or a measurement. Keep three piles: found, inferred, unknown.
+---

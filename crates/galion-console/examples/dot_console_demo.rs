@@ -111,7 +111,8 @@ fn run<T: TimingFeed, A: AffectFeed>(args: &[String], mut pump: DemoPump<T, A>, 
                     phone = Some(galion_console::phone_host::PhoneHost::from_surface(&web));
                 }
                 // Galion Research desk: its own Hermes client from GALION_RESEARCH_*.
-                // Unset leaves the desk on the Unreachable reply. The key is never printed.
+                // Unset leaves /research/ask on the offline local-notes reply.
+                // The gateway status stays Unreachable. The key is never printed.
                 match galion_cascade::HermesLlm::research_from_env() {
                     Some(client) => {
                         notes.push(format!("research → hermes model {} (key {})", client.label(), client.key_state()));
