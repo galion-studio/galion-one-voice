@@ -383,6 +383,47 @@ impl HermesLlm {
         }
     }
 
+    /// Plan, helper asks, and a synthesis, under the call budget in `cfg`.
+    ///
+    /// This is the only research path that opens a socket, and only when this
+    /// client has a loopback target. A stub belongs in
+    /// [`crate::research_split::split_question`], which does not connect.
+    pub fn research_split(
+        &self,
+        question: &str,
+        sources: &[ResearchSource],
+        cfg: crate::research_split::SplitConfig,
+    ) -> crate::research_split::SplitResearch {
+        crate::research_split::split_question(question, sources, cfg, &|role, user| {
+            let system = match role {
+                crate::research_split::AskRole::Plan => crate::research_split::PLAN_PROMPT,
+                crate::research_split::AskRole::Helper => RESEARCH_PROMPT,
+                crate::research_split::AskRole::Synthesize => crate::research_split::SYNTH_PROMPT,
+            };
+            self.complete_system(system, user)
+        })
+    }
+
+    /// One completion with the caller's system prompt. Raw model text, so the
+    /// research splitter can read headings and citation markers. A miss is
+    /// [`UNREACHABLE`]. The key stays on this client.
+    fn complete_system(&self, system: &str, user: &str) -> String {
+        let Some(target) = self.target.clone() else {
+            return UNREACHABLE.to_string();
+        };
+        if !self.key.is_empty() && !key_ok(&self.key) {
+            return UNREACHABLE.to_string();
+        }
+        if user.trim().is_empty() {
+            return UNREACHABLE.to_string();
+        }
+        match post_chat(&target, &self.model, &self.key, system, user, self.timeout) {
+            Ok(text) if text.trim().is_empty() => UNREACHABLE.to_string(),
+            Ok(text) => text,
+            Err(()) => UNREACHABLE.to_string(),
+        }
+    }
+
     /// `set` or `none`. Never the key bytes.
     pub fn key_state(&self) -> &'static str {
         if self.key.is_empty() { "none" } else { "set" }
@@ -1368,6 +1409,26 @@ mod tests {
         }
         assert!(system_prompt("jarvis").starts_with("You are Jarvis"));
         assert!(system_prompt("samantha").starts_with("You are Samantha"));
+    }
+
+    #[test]
+    fn research_split_without_a_loopback_target_does_not_call_out() {
+        let llm = HermesLlm::new(
+            "http://example.invalid/v1/chat/completions",
+            "hermes-agent",
+            "",
+            Duration::from_millis(50),
+        );
+        let t = Instant::now();
+        let out = llm.research_split(
+            "What colour is the wash?",
+            &[],
+            crate::research_split::SplitConfig::default(),
+        );
+        assert!(t.elapsed() < Duration::from_millis(200), "{:?}", t.elapsed());
+        assert_eq!(out.answer.standing, "Unreachable");
+        assert_eq!(out.calls, 1, "a dead planner must not spend the rest of the budget");
+        assert!(out.helpers.is_empty());
     }
 
     #[test]

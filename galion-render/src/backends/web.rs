@@ -19,7 +19,9 @@
 //!                      galion-console, this crate only serves the bytes); 404 otherwise
 //!   GET /research, /research/ -> the Galion Research desk, same gate as /one.
 //!   GET /research/hermes, GET /research/history, POST /research/ask -> Hermes
-//!                      research app. The gateway key stays on the server.
+//!                      research app. A hard question is planned into helper asks,
+//!                      then merged. Citations stay inside the session's sources.
+//!                      The gateway key stays on the server.
 //!   POST /research/sources, GET /research/sources -> files the user attached.
 //!                      A citation may name only those files.
 //! `/dot` also carries `"mode"` (idle|listening|speaking|rika), `"lean"` (Rika lean-in 0..1),
@@ -673,6 +675,17 @@ impl WebSurface {
             desk.client = Some(client);
         }
     }
+    /// In-process Hermes for `POST /research/ask`. While this is set, the desk
+    /// does not open a socket. Tests and a local desk use it so a question
+    /// can be planned without a gateway.
+    pub fn set_research_stub<F>(&self, ask: F)
+    where
+        F: Fn(galion_cascade::research_split::AskRole, &str) -> String + Send + Sync + 'static,
+    {
+        if let Ok(mut desk) = self.sh.research.lock() {
+            desk.stub = Some(Arc::new(ask));
+        }
+    }
 }
 
 const V2_REDIRECT_HTML: &str = "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta http-equiv=\"refresh\" content=\"0; url=/\"><title>Galion Voice</title><script>location.replace(\"/\");</script></head><body><p><a href=\"/\">Galion Voice</a></p></body></html>";
@@ -680,6 +693,12 @@ const V2_REDIRECT_HTML: &str = "<!doctype html><html lang=\"en\"><head><meta cha
 /// Galion Research. Served at `/research` and `/research/` when a product page is set,
 /// the same gate as `/one`.
 const RESEARCH_HTML: &str = include_str!("../../../crates/galion-console/assets/research.html");
+
+struct HelperNote {
+    question: String,
+    status: &'static str,
+    reply: String,
+}
 
 struct ResearchNote {
     id: u64,
@@ -690,6 +709,8 @@ struct ResearchNote {
     found: Vec<String>,
     inferred: Vec<String>,
     unknown: Vec<String>,
+    helpers: Vec<HelperNote>,
+    calls: usize,
     at: Instant,
 }
 
@@ -703,6 +724,9 @@ struct DeskSource {
 
 struct ResearchDesk {
     client: Option<galion_cascade::HermesLlm>,
+    /// In-process Hermes. When this is set, the desk does not open a socket.
+    stub: Option<Arc<dyn Fn(galion_cascade::research_split::AskRole, &str) -> String + Send + Sync>>,
+    split: galion_cascade::research_split::SplitConfig,
     next_id: u64,
     next_source: u32,
     sources: Vec<DeskSource>,
@@ -712,8 +736,18 @@ struct ResearchDesk {
 
 impl ResearchDesk {
     fn new() -> Self {
+        // Tests pin the small defaults. A developer shell that exports
+        // GALION_RESEARCH_* must not flip parallel tests. The demo binary
+        // is not built with cfg(test) and reads the environment here.
+        let split = if cfg!(test) {
+            galion_cascade::research_split::SplitConfig::default()
+        } else {
+            galion_cascade::research_split::SplitConfig::from_env()
+        };
         Self {
             client: if cfg!(test) { None } else { galion_cascade::HermesLlm::attached_from_env() },
+            stub: None,
+            split,
             next_id: 0,
             next_source: 0,
             sources: Vec::new(),
@@ -885,12 +919,26 @@ fn research_status_json(desk: &ResearchDesk) -> String {
     )
 }
 
+fn helper_note_json(note: &HelperNote) -> String {
+    format!(
+        "{{\"question\":{},\"status\":\"{}\",\"reply\":{}}}",
+        galion_cascade::hermes::json_string(&note.question),
+        note.status,
+        galion_cascade::hermes::json_string(&note.reply)
+    )
+}
+
+fn clip_note(s: &str, max: usize) -> String {
+    s.chars().take(max).collect()
+}
+
 fn research_note_json(note: &ResearchNote) -> String {
     let cites: Vec<String> = note.citations.iter().map(|(n, text)| {
         format!("{{\"n\":{n},\"text\":{}}}", galion_cascade::hermes::json_string(text))
     }).collect();
+    let helpers: Vec<String> = note.helpers.iter().map(helper_note_json).collect();
     format!(
-        "{{\"id\":{},\"status\":\"{}\",\"age_s\":{},\"question\":{},\"reply\":{},\"citations\":[{}],\"found\":[{}],\"inferred\":[{}],\"unknown\":[{}]}}",
+        "{{\"id\":{},\"status\":\"{}\",\"age_s\":{},\"question\":{},\"reply\":{},\"citations\":[{}],\"found\":[{}],\"inferred\":[{}],\"unknown\":[{}],\"calls\":{},\"helpers\":[{}]}}",
         note.id,
         note.status,
         note.at.elapsed().as_secs(),
@@ -899,7 +947,9 @@ fn research_note_json(note: &ResearchNote) -> String {
         cites.join(","),
         json_list(&note.found),
         json_list(&note.inferred),
-        json_list(&note.unknown)
+        json_list(&note.unknown),
+        note.calls,
+        helpers.join(",")
     )
 }
 
@@ -909,7 +959,7 @@ fn research_history_json(desk: &ResearchDesk) -> String {
 }
 
 fn research_ask(desk: &Arc<Mutex<ResearchDesk>>, question: &str) -> String {
-    let (id, client, model_fallback, sources) = {
+    let (id, client, stub, model_fallback, sources, cfg) = {
         let Ok(mut d) = desk.lock() else {
             return "{\"schema\":\"galion-research/1\",\"app\":\"hermes\",\"status\":\"Unreachable\",\"reply\":\"The research path is not reachable from here.\",\"citations\":[]}".into();
         };
@@ -919,19 +969,23 @@ fn research_ask(desk: &Arc<Mutex<ResearchDesk>>, question: &str) -> String {
         let sources: Vec<galion_cascade::hermes::ResearchSource> = d.sources.iter().map(|s| {
             galion_cascade::hermes::ResearchSource { id: s.id, name: s.name.clone(), text: s.text.clone() }
         }).collect();
-        (d.next_id, d.client.clone(), model, sources)
+        (d.next_id, d.client.clone(), d.stub.clone(), model, sources, d.split)
     };
-    let turn = match client {
-        Some(c) => c.research_turn(question, &sources),
-        None => galion_cascade::hermes::ResearchAnswer {
-            text: galion_cascade::UNREACHABLE.into(),
-            citations: Vec::new(),
-            found: Vec::new(),
-            inferred: Vec::new(),
-            unknown: Vec::new(),
-            standing: "Unreachable",
-        },
+    // The lock is not held across the asks. A helper run must not stall the desk.
+    let split = if let Some(stub) = stub {
+        galion_cascade::research_split::split_question(question, &sources, cfg, &|role, user| stub(role, user))
+    } else if let Some(c) = client {
+        c.research_split(question, &sources, cfg)
+    } else {
+        galion_cascade::research_split::SplitResearch::unreachable()
     };
+    let turn = split.answer;
+    let helpers: Vec<HelperNote> = split.helpers.iter().map(|h| HelperNote {
+        question: h.question.clone(),
+        status: h.answer.standing,
+        reply: clip_note(&h.answer.text, 500),
+    }).collect();
+    let calls = split.calls;
     let status = turn.standing;
     let reply = if status == "Unreachable" {
         "The research path is not reachable from here. Local. What is already known stays marked local.".to_string()
@@ -966,6 +1020,8 @@ fn research_ask(desk: &Arc<Mutex<ResearchDesk>>, question: &str) -> String {
         found,
         inferred,
         unknown,
+        helpers,
+        calls,
         at: Instant::now(),
     };
     let body = format!(
@@ -1566,6 +1622,9 @@ mod tests {
                 "data-voice-to-voice=\"on\"",
                 "id=\"ui-toggle\"",
                 "id=\"helpers\"",
+                "id=\"notebook-helpers\"",
+                "id=\"helper-list\"",
+                "Helpers are quiet.",
                 "ratio:\"5:4\"",
                 "Local. What is already known stays marked local.",
                 "hz:432",
@@ -1608,6 +1667,90 @@ mod tests {
         out
     }
 
+    /// Loopback stand-in for Hermes. Accepts several calls on one question so a
+    /// planner, helpers, and a synthesis can all land. It is not a public host.
+    fn serve_repeating(payload: &str) -> (SocketAddr, Arc<Mutex<String>>) {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        let seen = Arc::new(Mutex::new(String::new()));
+        let seen_w = seen.clone();
+        let payload = payload.to_string();
+        std::thread::spawn(move || {
+            let _ = listener.set_nonblocking(true);
+            let mut last = Instant::now();
+            let mut handled = 0usize;
+            while handled < 8 {
+                let quiet = if handled == 0 { Duration::from_secs(5) } else { Duration::from_millis(400) };
+                if last.elapsed() > quiet {
+                    break;
+                }
+                match listener.accept() {
+                    Ok((mut sock, _)) => {
+                        let _ = sock.set_nonblocking(false);
+                        let _ = sock.set_read_timeout(Some(Duration::from_millis(800)));
+                        let mut buf = [0u8; 8192];
+                        let mut got = Vec::new();
+                        let mut header_end = None;
+                        loop {
+                            match sock.read(&mut buf) {
+                                Ok(0) | Err(_) => break,
+                                Ok(n) => {
+                                    got.extend_from_slice(&buf[..n]);
+                                    if got.len() > 64 * 1024 {
+                                        break;
+                                    }
+                                    if header_end.is_none() {
+                                        header_end = got.windows(4).position(|w| w == b"\r\n\r\n").map(|p| p + 4);
+                                    }
+                                    if let Some(end) = header_end {
+                                        let head = String::from_utf8_lossy(&got[..end]);
+                                        let len = head.lines().find_map(|l| {
+                                            let (k, v) = l.split_once(':')?;
+                                            if !k.trim().eq_ignore_ascii_case("content-length") {
+                                                return None;
+                                            }
+                                            v.trim().parse::<usize>().ok()
+                                        }).unwrap_or(0);
+                                        if got.len() >= end + len {
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        if let Ok(s) = String::from_utf8(got) {
+                            let mut g = seen_w.lock().unwrap();
+                            if !g.is_empty() {
+                                g.push_str("\n----\n");
+                            }
+                            g.push_str(&s);
+                        }
+                        let resp = format!(
+                            "HTTP/1.0 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{payload}",
+                            payload.len()
+                        );
+                        let _ = sock.write_all(resp.as_bytes());
+                        handled += 1;
+                        last = Instant::now();
+                    }
+                    Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                        std::thread::sleep(Duration::from_millis(5));
+                    }
+                    Err(_) => break,
+                }
+            }
+        });
+        (addr, seen)
+    }
+
+    fn json_usize_field(body: &str, key: &str) -> Option<usize> {
+        let needle = format!("\"{key}\":");
+        let i = body.find(&needle)?;
+        let rest = body[i + needle.len()..].trim_start();
+        let digits: String = rest.chars().take_while(|c| c.is_ascii_digit()).collect();
+        digits.parse().ok()
+    }
+
     #[test]
     fn research_ask_reaches_hermes_without_leaking_the_key() {
         let key = "test-gateway-key-not-for-git";
@@ -1627,28 +1770,7 @@ mod tests {
         w.close().unwrap();
 
         let payload = "{\"choices\":[{\"message\":{\"content\":\"The wash is amber to violet.\\n[1] Galion brand note\"}}]}";
-        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
-        let addr = listener.local_addr().unwrap();
-        std::thread::spawn(move || {
-            let Ok((mut sock, _)) = listener.accept() else { return };
-            let _ = sock.set_read_timeout(Some(Duration::from_millis(500)));
-            let mut buf = [0u8; 8192];
-            let mut got = Vec::new();
-            loop {
-                match sock.read(&mut buf) {
-                    Ok(0) | Err(_) => break,
-                    Ok(n) => {
-                        got.extend_from_slice(&buf[..n]);
-                        if got.windows(4).any(|w| w == b"\r\n\r\n") { break; }
-                    }
-                }
-            }
-            let resp = format!(
-                "HTTP/1.0 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{payload}",
-                payload.len()
-            );
-            let _ = sock.write_all(resp.as_bytes());
-        });
+        let (addr, seen) = serve_repeating(payload);
         let mut w = WebSurface::serve("127.0.0.1:0".parse().unwrap()).with_page("<!doctype html><canvas></canvas>");
         w.set_research_hermes(galion_cascade::HermesLlm::new(
             &format!("http://{addr}/v1/chat/completions"),
@@ -1669,6 +1791,11 @@ mod tests {
         assert!(!asked.contains("NotFound") && !asked.contains("\"status\":\"Returned\""), "{asked}");
         assert!(asked.contains("\"app\":\"hermes\""), "{asked}");
         assert!(!asked.contains(key) && !asked.contains("Bearer"), "{asked}");
+        let calls = json_usize_field(&asked, "calls").unwrap_or(99);
+        assert!(calls >= 1 && calls <= 4, "call budget {calls} in {asked}");
+        let upstream = seen.lock().unwrap().clone();
+        let posts = upstream.matches("POST ").count();
+        assert_eq!(posts, calls, "every kept call is one the budget allowed\n{upstream}");
         let hist = get(a, "/research/history");
         assert!(hist.contains("What colour is the wash?") && hist.contains("\"status\":\"Unknown\""), "{hist}");
         assert!(!hist.contains(key) && !hist.contains("Galion brand note"), "{hist}");
@@ -1680,49 +1807,7 @@ mod tests {
         let key = "test-gateway-key-not-for-git";
         let content = "The wash is amber.\\nFound\\n- The wash is amber. [2]\\n- A paper measured violet. [3]\\nInferred\\n- A cooler mix would read as night.\\nUnknown\\n- The hex is not in the note.\\n[2] wash-note.txt\\n[3] Invented Journal 2024";
         let payload = format!("{{\"choices\":[{{\"message\":{{\"content\":\"{content}\"}}}}]}}");
-        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
-        let addr = listener.local_addr().unwrap();
-        let seen = Arc::new(Mutex::new(String::new()));
-        let seen_w = seen.clone();
-        std::thread::spawn(move || {
-            let Ok((mut sock, _)) = listener.accept() else { return };
-            let _ = sock.set_read_timeout(Some(Duration::from_millis(800)));
-            let mut buf = [0u8; 8192];
-            let mut got = Vec::new();
-            let mut header_end = None;
-            loop {
-                match sock.read(&mut buf) {
-                    Ok(0) | Err(_) => break,
-                    Ok(n) => {
-                        got.extend_from_slice(&buf[..n]);
-                        if header_end.is_none() {
-                            header_end = got.windows(4).position(|w| w == b"\r\n\r\n").map(|p| p + 4);
-                        }
-                        if let Some(end) = header_end {
-                            let head = String::from_utf8_lossy(&got[..end]);
-                            let len = head.lines().find_map(|l| {
-                                let (k, v) = l.split_once(':')?;
-                                if !k.trim().eq_ignore_ascii_case("content-length") {
-                                    return None;
-                                }
-                                v.trim().parse::<usize>().ok()
-                            }).unwrap_or(0);
-                            if got.len() >= end + len {
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
-            if let Ok(s) = String::from_utf8(got) {
-                *seen_w.lock().unwrap() = s;
-            }
-            let resp = format!(
-                "HTTP/1.0 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{payload}",
-                payload.len()
-            );
-            let _ = sock.write_all(resp.as_bytes());
-        });
+        let (addr, seen) = serve_repeating(&payload);
         let mut w = WebSurface::serve("127.0.0.1:0".parse().unwrap()).with_page("<!doctype html><canvas></canvas>");
         w.set_research_hermes(galion_cascade::HermesLlm::new(
             &format!("http://{addr}/v1/chat/completions"),
@@ -1760,9 +1845,56 @@ mod tests {
         assert!(upstream.contains("The wash is amber."), "{upstream}");
         assert!(!upstream.contains("Invented Journal"), "{upstream}");
         assert!(upstream.contains("Authorization: Bearer "), "{upstream}");
+        let calls = json_usize_field(&asked, "calls").unwrap_or(99);
+        assert!(calls >= 1 && calls <= 4, "call budget {calls} in {asked}");
+        assert_eq!(upstream.matches("POST ").count(), calls, "{upstream}");
         let hist = get(a, "/research/history");
         assert!(hist.contains("\"status\":\"Found\"") && !hist.contains("Invented Journal"), "{hist}");
         w.close().unwrap();
+    }
+
+    #[test]
+    fn research_ask_uses_a_stub_hermes_and_keeps_session_citations() {
+        let desk = Arc::new(Mutex::new(ResearchDesk::new()));
+        let calls = Arc::new(AtomicUsize::new(0));
+        let calls_w = calls.clone();
+        {
+            let mut d = desk.lock().unwrap();
+            d.split = galion_cascade::research_split::SplitConfig {
+                helpers: 4,
+                concurrency: 2,
+                budget: 4,
+            };
+            d.stub = Some(Arc::new(move |role, _user| {
+                let n = calls_w.fetch_add(1, Ordering::SeqCst);
+                assert!(n < 4, "call budget guard let call {n} through");
+                match role {
+                    galion_cascade::research_split::AskRole::Plan => {
+                        "Which note names the wash?\nWhat is the hex code?\nWho published the measurement?\nWhere was the note printed?".into()
+                    }
+                    galion_cascade::research_split::AskRole::Helper => {
+                        "Found\n- The wash is amber. [1]\n[1] wash-note.txt\n[9] Invented Journal".into()
+                    }
+                    galion_cascade::research_split::AskRole::Synthesize => {
+                        "The wash is amber.\nFound\n- The wash is amber. [1]\n[1] wash-note.txt\n[9] Invented Journal".into()
+                    }
+                }
+            }));
+        }
+        assert!(desk.lock().unwrap().client.is_none(), "the stub must be the only Hermes");
+        research_add_source(&desk, r#"{"name":"wash-note.txt","text":"The wash is amber."}"#).unwrap();
+        let body = research_ask(&desk, "What colour is the wash?");
+        assert_eq!(calls.load(Ordering::SeqCst), 4, "{body}");
+        assert!(body.contains("Which note names the wash?"), "{body}");
+        assert!(body.contains("What is the hex code?"), "{body}");
+        assert!(!body.contains("Who published the measurement?"), "the budget drops the third helper: {body}");
+        assert!(!body.contains("Where was the note printed?"), "{body}");
+        assert!(body.contains("wash-note.txt"), "{body}");
+        assert!(!body.contains("Invented Journal"), "{body}");
+        assert!(body.contains("\"n\":1"), "{body}");
+        assert!(!body.contains("\"n\":9"), "{body}");
+        assert!(body.contains("\"helpers\":["), "{body}");
+        assert_eq!(json_usize_field(&body, "calls"), Some(4), "{body}");
     }
 
     #[test]

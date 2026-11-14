@@ -105,15 +105,23 @@ textarea::placeholder{color:color-mix(in srgb, var(--ink) 36%, transparent)}
 .citations{margin-top:8px;padding-top:12px;border-top:1px solid color-mix(in srgb, var(--ink) 10%, transparent)}
 #citation-list{color:color-mix(in srgb, var(--ink) 78%, transparent);font:14px/1.45 system-ui,sans-serif}
 #citation-list .mark{color:var(--amber);margin-right:.4em}
-#helpers{margin:18px 0 0;text-align:center;font:13px/1.4 system-ui,sans-serif;letter-spacing:.04em;color:color-mix(in srgb, var(--ink) 46%, transparent)}
+#notebook-helpers{margin:0 0 14px}
+#notebook-helpers summary{cursor:pointer;font:13px/1.4 system-ui,sans-serif;letter-spacing:.04em;color:color-mix(in srgb, var(--ink) 46%, transparent)}
+#helper-list{margin:10px 0 0;padding-left:1.2em}
+#helper-list li{margin:0 0 8px;font:15px/1.45 system-ui,sans-serif;color:color-mix(in srgb, var(--ink) 88%, transparent)}
 #ui-toggle{width:auto;height:40px;padding:0 14px;border-radius:999px;font:12px/1 system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase}
 body[data-ui="minimal"] #rail,
-body[data-ui="minimal"] .work,
 body[data-ui="minimal"] #add-image{display:none}
+body[data-ui="minimal"] .work{display:block;width:100%;margin:0}
+body[data-ui="minimal"] .work > :not(#notebook){display:none}
+body[data-ui="minimal"] #notebook{border:0;background:transparent;padding:0;min-height:0}
+body[data-ui="minimal"] #notebook > h2,
+body[data-ui="minimal"] #notebook .book{display:none}
+body[data-ui="minimal"] #notebook-helpers{margin:0;text-align:center}
+body[data-ui="minimal"] #helper-list{display:inline-block;text-align:left}
 body[data-ui="minimal"] .app{display:block}
 body[data-ui="minimal"] .stage{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;width:min(880px,calc(100vw - 80px));margin:0 auto;padding:0;gap:18px}
 body[data-ui="minimal"] .ask{width:100%}
-body[data-ui="minimal"] #helpers{margin:0}
 .sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0}
 @media (max-width:800px){
   .desk{width:min(1080px,calc(100vw - 32px))}
@@ -164,7 +172,6 @@ body[data-ui="minimal"] #helpers{margin:0}
       <canvas id="voice-dot" width="240" height="240" aria-hidden="true"></canvas>
     </button>
   </form>
-  <p id="helpers" hidden>Helpers are quiet.</p>
   <div class="work">
     <section class="panel" id="sources" aria-labelledby="sources-label">
       <h2 id="sources-label">Sources</h2>
@@ -181,6 +188,10 @@ body[data-ui="minimal"] #helpers{margin:0}
     </section>
     <section class="panel" id="notebook" aria-labelledby="notebook-label">
       <h2 id="notebook-label">Notebook</h2>
+      <details id="notebook-helpers">
+        <summary id="helpers">Helpers are quiet.</summary>
+        <ol id="helper-list"></ol>
+      </details>
       <div class="book">
         <div id="found"><h3>Found</h3><ul id="found-list"></ul><p id="found-empty">Empty.</p></div>
         <div id="inferred"><h3>Inferred</h3><ul id="inferred-list"></ul><p id="inferred-empty">Empty.</p></div>
@@ -304,11 +315,30 @@ function tone(id){
     });
   }
   var LOCAL="The research path is not reachable from here. Local. What is already known stays marked local.";
-  var helpers=document.getElementById("helpers");
+  function paintHelpers(rows, standing){
+    var list=document.getElementById("helper-list");
+    var summary=document.getElementById("helpers");
+    var items=Array.isArray(rows)?rows:[];
+    fillList(list, items.map(function(h){
+      var q=(h&&h.question)||"";
+      var st=(h&&h.status)||"";
+      var reply=(h&&h.reply)||"";
+      var line=q;
+      if(st) line=line?line+" · "+st:st;
+      if(reply) line=line?line+" · "+reply:reply;
+      return line;
+    }));
+    if(!items.length){
+      summary.textContent=standing==="Unreachable"
+        ?"Helpers are quiet. Local knowledge carries the question."
+        :"Helpers are quiet.";
+      return;
+    }
+    summary.textContent="Helpers · "+items.length;
+  }
   function carryLocal(q){
     hermesStatus("Hermes · Unreachable");
-    helpers.hidden=false;
-    helpers.textContent="Helpers are quiet. Local knowledge carries the question.";
+    paintHelpers([], "Unreachable");
     document.getElementById("reading-question").textContent=q;
     document.getElementById("reading-question").hidden=false;
     document.getElementById("reading-body").textContent=LOCAL;
@@ -340,8 +370,7 @@ function tone(id){
     var standing=j.status||"Unknown";
     if(standing!=="Found"&&standing!=="Inferred"&&standing!=="Unknown"&&standing!=="Unreachable"&&standing!=="Denied") standing="Unknown";
     hermesStatus("Hermes · "+standing);
-    helpers.hidden=false;
-    helpers.textContent=standing==="Unreachable"?"Helpers are quiet. Local knowledge carries the question.":standing;
+    paintHelpers(j.helpers, standing);
     tone(j.status==="Unreachable"?"local":"returned");
   }
   function fillPile(id, rows){
@@ -423,8 +452,7 @@ function tone(id){
     if(!q) return;
     if(pending>0){ waiting=true; return; }
     hermesStatus("Hermes · Running");
-    helpers.hidden=false;
-    helpers.textContent="Helpers: reading, sources, notebook.";
+    document.getElementById("helpers").textContent="Helpers · reading";
     fillList(document.getElementById("arriving-list"), [q]);
     document.getElementById("arriving-empty").hidden=true;
     tone("ask");
@@ -444,6 +472,9 @@ function tone(id){
       ev.preventDefault();
       commitQuestion();
     }
+  });
+  document.getElementById("notebook-helpers").addEventListener("toggle", function(ev){
+    if(ev.currentTarget.open) tone("helper");
   });
   document.getElementById("ui-toggle").addEventListener("click", function(ev){
     var minimal=document.body.getAttribute("data-ui")==="minimal";
