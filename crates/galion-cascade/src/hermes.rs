@@ -275,6 +275,40 @@ impl HermesLlm {
         }
     }
 
+    /// Galion Research client, separate from the voice LLM (`GALION_LLM` stays as it is).
+    ///
+    /// `GALION_RESEARCH_URL` (loopback chat URL) turns it on; unset or not loopback is `None`,
+    /// and the desk keeps answering Unreachable. `GALION_RESEARCH_MODEL` (default
+    /// `hermes-agent`), `GALION_RESEARCH_TIMEOUT_MS` (default 60000, clamped 1000..=90000).
+    /// Key: `GALION_RESEARCH_KEY`, or one `NAME=value` line named by `GALION_RESEARCH_KEY_NAME`
+    /// in the dotenv file `GALION_RESEARCH_KEY_FILE`. The key is never logged or returned.
+    pub fn research_from_env() -> Option<Self> {
+        Self::research_from_vars(|k| std::env::var(k).ok(), |p| std::fs::read_to_string(p).ok())
+    }
+
+    /// [`HermesLlm::research_from_env`] with injected lookups (tests).
+    pub fn research_from_vars(
+        var: impl Fn(&str) -> Option<String>,
+        read: impl Fn(&str) -> Option<String>,
+    ) -> Option<Self> {
+        let get = |k: &str| var(k).map(|v| v.trim().to_string()).filter(|v| !v.is_empty());
+        let url = get("GALION_RESEARCH_URL")?;
+        parse_loopback_chat_url(&url)?;
+        let model = get("GALION_RESEARCH_MODEL").unwrap_or_else(|| LLM_NAME.to_string());
+        let key = match get("GALION_RESEARCH_KEY") {
+            Some(k) => k,
+            None => match (get("GALION_RESEARCH_KEY_FILE"), get("GALION_RESEARCH_KEY_NAME")) {
+                (Some(file), Some(name)) => read(&file).and_then(|t| dotenv_value(&t, &name)).unwrap_or_default(),
+                _ => String::new(),
+            },
+        };
+        let timeout_ms: u64 = get("GALION_RESEARCH_TIMEOUT_MS")
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(60_000)
+            .clamp(1_000, 90_000);
+        Some(Self::new(&url, &model, &key, Duration::from_millis(timeout_ms)))
+    }
+
     /// `hermes-agent`, or `GALION_LLM_MODEL` when that name is set.
     pub fn label(&self) -> &str {
         if self.model.is_empty() {
@@ -372,6 +406,29 @@ fn key_ok(key: &str) -> bool {
 
 fn clip_chars(s: &str, max: usize) -> String {
     s.chars().take(max).collect()
+}
+
+/// `NAME=value` from dotenv text. `export`, quotes, and `#` comment lines are handled.
+fn dotenv_value(text: &str, name: &str) -> Option<String> {
+    for line in text.lines() {
+        let t = line.trim();
+        if t.is_empty() || t.starts_with('#') {
+            continue;
+        }
+        let t = t.strip_prefix("export ").unwrap_or(t);
+        let Some((k, v)) = t.split_once('=') else { continue };
+        if k.trim() != name {
+            continue;
+        }
+        let v = v.trim();
+        let v = v
+            .strip_prefix('"').and_then(|x| x.strip_suffix('"'))
+            .or_else(|| v.strip_prefix('\'').and_then(|x| x.strip_suffix('\'')))
+            .unwrap_or(v);
+        let v = v.trim();
+        return if v.is_empty() { None } else { Some(v.to_string()) };
+    }
+    None
 }
 
 /// `[1] Author, title` lines. Read before brackets are stripped from the spoken text.
@@ -924,6 +981,42 @@ mod tests {
         assert!(seen.contains("Galion Research"), "{seen}");
         assert!(seen.contains("Authorization: Bearer "));
         assert!(!format!("{llm:?}").contains(key));
+    }
+
+    #[test]
+    fn research_from_vars_reads_url_model_and_key_file() {
+        use std::collections::HashMap;
+        let env: HashMap<&str, &str> = [
+            ("GALION_RESEARCH_URL", "http://127.0.0.1:8642/v1/chat/completions"),
+            ("GALION_RESEARCH_MODEL", "river-flash"),
+            ("GALION_RESEARCH_KEY_FILE", "/x/.env"),
+            ("GALION_RESEARCH_KEY_NAME", "API_SERVER_KEY"),
+        ]
+        .into_iter()
+        .collect();
+        let file = "# c\nOTHER=1\nexport API_SERVER_KEY=\"test-key-not-for-git\"\n";
+        let llm = HermesLlm::research_from_vars(
+            |k| env.get(k).map(|v| v.to_string()),
+            |p| (p == "/x/.env").then(|| file.to_string()),
+        )
+        .expect("configured");
+        assert_eq!(llm.label(), "river-flash");
+        assert_eq!(llm.key_state(), "set");
+        assert!(!format!("{llm:?}").contains("test-key-not-for-git"));
+        assert_eq!(dotenv_value(file, "API_SERVER_KEY").as_deref(), Some("test-key-not-for-git"));
+        assert_eq!(dotenv_value(file, "MISSING"), None);
+    }
+
+    #[test]
+    fn research_from_vars_is_none_without_a_loopback_url() {
+        let none = |_: &str| None::<String>;
+        assert!(HermesLlm::research_from_vars(none, none).is_none());
+        let remote = |k: &str| (k == "GALION_RESEARCH_URL").then(|| "http://example.com/v1/chat/completions".to_string());
+        assert!(HermesLlm::research_from_vars(remote, none).is_none());
+        let bare = |k: &str| (k == "GALION_RESEARCH_URL").then(|| "http://127.0.0.1:8642".to_string());
+        let llm = HermesLlm::research_from_vars(bare, none).expect("loopback");
+        assert_eq!(llm.key_state(), "none");
+        assert_eq!(llm.label(), LLM_NAME);
     }
 
     #[test]
