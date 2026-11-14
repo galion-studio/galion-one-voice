@@ -95,7 +95,10 @@ textarea::placeholder{color:color-mix(in srgb, var(--ink) 36%, transparent)}
 #answer{grid-column:1 / -1}
 #sources,#plan{min-height:168px}
 #plan-list,#source-list,#citation-list{margin:0;padding-left:1.2em}
-#plan-list li,#source-list li{margin:0 0 8px;font:15px/1.45 system-ui,sans-serif;color:color-mix(in srgb, var(--ink) 88%, transparent)}
+#plan-list li,#source-list li,#local-list li{margin:0 0 8px;font:15px/1.45 system-ui,sans-serif;color:color-mix(in srgb, var(--ink) 88%, transparent)}
+#local-list li{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.remove-source{appearance:none;flex:none;border:1px solid color-mix(in srgb, var(--ink) 16%, transparent);background:transparent;color:color-mix(in srgb, var(--ink) 72%, transparent);border-radius:999px;padding:2px 8px;font:12px/1.4 system-ui,sans-serif;cursor:pointer}
+.remove-source:hover,.remove-source:focus-visible{border-color:color-mix(in srgb, var(--sky) 70%, transparent);color:var(--ink);outline:none}
 #live-question{color:var(--ink)}
 #source-empty,#citation-empty{margin:0;font:15px/1.45 system-ui,sans-serif;color:color-mix(in srgb, var(--ink) 62%, transparent)}
 #reading{max-width:68ch;min-height:11em}
@@ -286,13 +289,29 @@ function tone(id){
   var waiting=false;
   function paintSources(rows){
     attached=rows||[];
-    fillList(document.getElementById("local-list"), attached.map(function(s){
+    var ol=document.getElementById("local-list");
+    while(ol.firstChild) ol.removeChild(ol.firstChild);
+    attached.forEach(function(s){
+      var li=document.createElement("li");
       var kind=s.kind==="image"?"image":"file";
       var chars=(typeof s.chars==="number"&&s.kind!=="image")?" · "+s.chars+" chars":"";
-      return "["+s.id+"] "+(s.name||"file")+" · "+kind+chars;
-    }));
+      li.appendChild(document.createTextNode("["+s.id+"] "+(s.name||"file")+" · "+kind+chars));
+      var btn=document.createElement("button");
+      btn.type="button";
+      btn.className="remove-source";
+      btn.textContent="Remove";
+      btn.setAttribute("aria-label","Remove "+(s.name||"file"));
+      btn.addEventListener("click", function(){ removeSource(s.id); });
+      li.appendChild(btn);
+      ol.appendChild(li);
+    });
     document.getElementById("source-empty").hidden=attached.length>0;
     if(!attached.length) document.getElementById("source-empty").textContent="No source yet.";
+  }
+  function removeSource(id){
+    fetch("/research/sources/"+id,{method:"DELETE",cache:"no-store",credentials:"same-origin"})
+      .then(function(r){ return r.ok?r.json():null; })
+      .then(function(j){ if(j&&Array.isArray(j.sources)) paintSources(j.sources); });
   }
   function hermesStatus(text){ statusEl.textContent=text; }
   function fillList(ol, rows){
@@ -358,19 +377,19 @@ function tone(id){
     }));
     document.getElementById("history-empty").hidden=(items||[]).length>0;
   }
-  fetch("/research/hermes",{cache:"no-store"}).then(function(r){ return r.ok?r.json():null; }).then(function(j){
+  fetch("/research/hermes",{cache:"no-store",credentials:"same-origin"}).then(function(r){ return r.ok?r.json():null; }).then(function(j){
     if(!j){ hermesStatus("Hermes · Unreachable"); return; }
     hermesStatus("Hermes · "+(j.status||"Idle"));
   }).catch(function(){ hermesStatus("Hermes · Unreachable"); });
-  fetch("/research/history",{cache:"no-store"}).then(function(r){ return r.ok?r.json():null; }).then(function(j){
+  fetch("/research/history",{cache:"no-store",credentials:"same-origin"}).then(function(r){ return r.ok?r.json():null; }).then(function(j){
     if(j&&Array.isArray(j.items)) paintHistory(j.items);
   }).catch(function(){});
-  fetch("/research/sources",{cache:"no-store"}).then(function(r){ return r.ok?r.json():null; }).then(function(j){
+  fetch("/research/sources",{cache:"no-store",credentials:"same-origin"}).then(function(r){ return r.ok?r.json():null; }).then(function(j){
     if(j&&Array.isArray(j.sources)) paintSources(j.sources);
   }).catch(function(){});
   function postSource(file, text, kind){
     pending++;
-    fetch("/research/sources",{method:"POST",cache:"no-store",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:file.name,text:text,kind:kind})})
+    fetch("/research/sources",{method:"POST",cache:"no-store",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:file.name,text:text,kind:kind})})
       .then(function(r){ return r.ok?r.json():null; })
       .then(function(j){
         if(j&&Array.isArray(j.sources)) paintSources(j.sources);
@@ -429,12 +448,12 @@ function tone(id){
     document.getElementById("arriving-empty").hidden=true;
     tone("ask");
     setTimeout(function(){ tone("helper"); }, 180);
-    fetch("/research/ask",{method:"POST",cache:"no-store",headers:{"Content-Type":"application/json"},body:JSON.stringify({question:q})})
+    fetch("/research/ask",{method:"POST",cache:"no-store",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({question:q})})
       .then(function(r){ return r.ok?r.json():null; })
       .then(function(j){
         if(!j){ carryLocal(q); return; }
         showTurn(j);
-        return fetch("/research/history",{cache:"no-store"}).then(function(r){ return r.ok?r.json():null; });
+        return fetch("/research/history",{cache:"no-store",credentials:"same-origin"}).then(function(r){ return r.ok?r.json():null; });
       })
       .then(function(h){ if(h&&Array.isArray(h.items)) paintHistory(h.items); })
       .catch(function(){ carryLocal(q); });
