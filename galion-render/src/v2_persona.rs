@@ -866,6 +866,78 @@ pub fn annotate_dot(dot: &str, persona: &str, mood: Option<&str>) -> String {
     }
 }
 
+pub struct SessionDecision {
+    pub id: &'static str,
+    pub text: &'static str,
+}
+
+/// Desktop Samantha session questions. Not a lock and not a price.
+pub fn session_decisions() -> &'static [SessionDecision] {
+    &[
+        SessionDecision { id: "here", text: "Keep this session on this machine" },
+        SessionDecision { id: "quiet", text: "Stay quiet when the turn ends" },
+        SessionDecision { id: "english", text: "Keep replies in English" },
+    ]
+}
+
+pub fn decisions_json() -> String {
+    let items: Vec<String> = session_decisions()
+        .iter()
+        .map(|item| format!("{{\"id\":\"{}\",\"text\":\"{}\"}}", item.id, item.text))
+        .collect();
+    format!(
+        "{{\"schema\":\"galion-session-decision/1\",\"persona\":\"samantha\",\"items\":[{}]}}",
+        items.join(",")
+    )
+}
+
+/// One structured reply for a complete Yes/No set. Incomplete input is `None`.
+pub fn decision_reply(body: &str) -> Option<String> {
+    let items = session_decisions();
+    let mut answers: Vec<(&str, bool)> = Vec::new();
+    let mut rest = body;
+    while let Some(i) = rest.find("\"id\"") {
+        let after = rest[i + 4..].trim_start().strip_prefix(':')?.trim_start();
+        let after = after.strip_prefix('"')?;
+        let end = after.find('"')?;
+        let id = &after[..end];
+        let tail = &after[end + 1..];
+        let yes_at = tail.find("\"yes\"")?;
+        let yes_rest = tail[yes_at + 5..].trim_start().strip_prefix(':')?.trim_start();
+        let yes = if yes_rest.starts_with("true") {
+            true
+        } else if yes_rest.starts_with("false") {
+            false
+        } else {
+            return None;
+        };
+        if !items.iter().any(|item| item.id == id) || answers.iter().any(|(seen, _)| *seen == id) {
+            return None;
+        }
+        answers.push((id, yes));
+        rest = yes_rest;
+    }
+    if answers.len() != items.len() {
+        return None;
+    }
+    let mut clauses = Vec::new();
+    let mut ordered = Vec::new();
+    for item in items {
+        let yes = answers.iter().find(|(id, _)| *id == item.id)?.1;
+        clauses.push(format!("{}: {}", item.text, if yes { "yes" } else { "no" }));
+        ordered.push(format!(
+            "{{\"id\":\"{}\",\"yes\":{}}}",
+            item.id,
+            if yes { "true" } else { "false" }
+        ));
+    }
+    Some(format!(
+        "{{\"schema\":\"galion-session-decision/1\",\"persona\":\"samantha\",\"reply\":\"{}\",\"answers\":[{}]}}",
+        clauses.join(". "),
+        ordered.join(",")
+    ))
+}
+
 fn mood_of(user: &str, reply: &str, silence: bool) -> &'static str {
     if silence {
         return "quiet";
@@ -1333,6 +1405,18 @@ mod tests {
         assert!(!s.reply.to_ascii_lowercase().contains("browser"), "{}", s.reply);
         assert!(f.mood_from_turn());
         no_script(&s);
+    }
+
+    #[test]
+    fn one_decision_reply_names_every_item() {
+        let body = r#"{"answers":[{"id":"quiet","yes":false},{"id":"here","yes":true},{"id":"english","yes":true}]}"#;
+        let out = decision_reply(body).unwrap();
+        assert!(out.contains("\"schema\":\"galion-session-decision/1\""), "{out}");
+        assert!(out.contains("Keep this session on this machine: yes"), "{out}");
+        assert!(out.contains("Stay quiet when the turn ends: no"), "{out}");
+        assert!(out.contains("Keep replies in English: yes"), "{out}");
+        assert!(decision_reply(r#"{"answers":[{"id":"here","yes":true}]}"#).is_none());
+        assert!(decisions_json().contains("\"id\":\"here\""));
     }
 
     #[test]
