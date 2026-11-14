@@ -18,10 +18,14 @@
 //!                      [`WebSurface::with_page`] (V1-01; the page itself is owned by
 //!                      galion-console, this crate only serves the bytes); 404 otherwise
 //!   GET /research, /research/ -> the Galion Research desk, same gate as /one.
+//!                      The response sets an opaque `galion_research` cookie.
 //!   GET /research/hermes, GET /research/history, POST /research/ask -> Hermes
 //!                      research app. The gateway key stays on the server.
-//!   POST /research/sources, GET /research/sources -> files the user attached.
-//!                      A citation may name only those files.
+//!                      History, and the files handed to Hermes, belong to the
+//!                      visitor named by that cookie or by `X-Galion-Research`.
+//!   POST /research/sources, GET /research/sources -> files that visitor attached.
+//!                      A citation may name only those files. Another visitor's
+//!                      files are not listed and are not sent.
 //! `/dot` also carries `"mode"` (idle|listening|speaking|rika), `"lean"` (Rika lean-in 0..1),
 //! `"level"` (0..1, the band driving the state), `"e"` (empathy weight 0..1),
 //! `"engine"` (one Luti step), and `"emotion"` (sense, label, valence, arousal, lean)
@@ -92,7 +96,7 @@ pub const MAX_PENDING_TURNS: usize = 8;
 pub const MAX_STORED_REPLIES: usize = 8;
 /// CORS `Access-Control-Allow-Headers` sent on every response (incl. OPTIONS preflight).
 pub const CORS_ALLOW_HEADERS: &str =
-    "Content-Type, X-Turn-Id, X-Sample-Rate, X-Barge-In, X-Galion-Proceed, X-Galion-Session, ngrok-skip-browser-warning";
+    "Content-Type, X-Turn-Id, X-Sample-Rate, X-Barge-In, X-Galion-Proceed, X-Galion-Session, X-Galion-Research, ngrok-skip-browser-warning";
 
 pub use super::edge::{
     bind_decision, cors_allow_origin, parse_json_string_field, AI_DISCLOSURE_EN, AI_DISCLOSURE_HR,
@@ -443,7 +447,15 @@ pub fn encode_wav_pcm16(rate: u32, channels: u16, samples: &[i16]) -> Vec<u8> {
 // HTTP request reading.
 // ---------------------------------------------------------------------------------------
 
-struct Request { method: String, path: String, query: String, headers: Vec<(String, String)>, body: Vec<u8> }
+struct Request {
+    method: String,
+    path: String,
+    query: String,
+    headers: Vec<(String, String)>,
+    body: Vec<u8>,
+    /// Response header lines for this request. Each line ends in CRLF.
+    extra_headers: String,
+}
 
 impl Request {
     fn header(&self, name: &str) -> Option<&str> {
@@ -479,7 +491,7 @@ fn read_request<S: Read + Write>(s: &mut S, max_body: usize) -> Result<Request, 
     let target = parts.next().unwrap_or("/");
     let (path, query) = match target.split_once('?') { Some((p, q)) => (p.to_string(), q.to_string()), None => (target.to_string(), String::new()) };
     let headers: Vec<(String, String)> = lines.filter_map(|l| l.split_once(':')).map(|(k, v)| (k.trim().to_string(), v.trim().to_string())).collect();
-    let mut req = Request { method, path, query, headers, body: Vec::new() };
+    let mut req = Request { method, path, query, headers, body: Vec::new(), extra_headers: String::new() };
     if req.header("transfer-encoding").is_some_and(|v| v.to_ascii_lowercase().contains("chunked")) {
         return Err(("411 Length Required", "chunked bodies unsupported; send Content-Length"));
     }
@@ -648,6 +660,13 @@ impl WebSurface {
         self.sh.sessions = Arc::new(SessionStore::new(ttl));
         self
     }
+    /// Idle lifetime of one visitor's research files (tests).
+    pub fn with_research_session_ttl(self, ttl: Duration) -> Self {
+        if let Ok(mut desk) = self.sh.research.lock() {
+            desk.ttl = ttl;
+        }
+        self
+    }
     /// Latest `/dot` JSON exactly as served (includes `"reply"` when one is published).
     pub fn latest_dot_json(&self) -> String {
         let d = self.sh.latest_dot.lock().map(|g| g.clone()).unwrap_or_default();
@@ -693,7 +712,7 @@ struct ResearchNote {
     at: Instant,
 }
 
-/// A file the user attached. `kind` is `file` or `image`. Image pixels are not read.
+/// A file one visitor attached. `kind` is `file` or `image`. Image pixels are not read.
 struct DeskSource {
     id: u32,
     name: String,
@@ -701,23 +720,54 @@ struct DeskSource {
     kind: &'static str,
 }
 
+/// Idle time before a visitor's files are dropped.
+const RESEARCH_SESSION_TTL: Duration = Duration::from_secs(30 * 60);
+/// Visitor desks kept at once. Past this, the oldest is dropped.
+const RESEARCH_SESSION_CAP: usize = 32;
+/// Questions remembered for one visitor.
+const RESEARCH_NOTES_PER_SESSION: usize = 32;
+/// Cookie and header name for the research desk. The value is 32 random bytes, hex.
+const RESEARCH_COOKIE: &str = "galion_research";
+
+/// One visitor. Files, notes, and the ids handed to Hermes stay inside this desk.
+struct ResearchVisitor {
+    id: String,
+    sources: Vec<DeskSource>,
+    next_source: u32,
+    next_note: u64,
+    notes: VecDeque<ResearchNote>,
+    touched: Instant,
+}
+
+impl ResearchVisitor {
+    fn new(id: String) -> Self {
+        Self {
+            id,
+            sources: Vec::new(),
+            next_source: 0,
+            next_note: 0,
+            notes: VecDeque::new(),
+            touched: Instant::now(),
+        }
+    }
+}
+
 struct ResearchDesk {
     client: Option<galion_cascade::HermesLlm>,
-    next_id: u64,
-    next_source: u32,
-    sources: Vec<DeskSource>,
-    notes: VecDeque<ResearchNote>,
+    visitors: VecDeque<ResearchVisitor>,
+    ttl: Duration,
     status: &'static str,
 }
 
 impl ResearchDesk {
     fn new() -> Self {
+        Self::with_ttl(RESEARCH_SESSION_TTL)
+    }
+    fn with_ttl(ttl: Duration) -> Self {
         Self {
             client: if cfg!(test) { None } else { galion_cascade::HermesLlm::attached_from_env() },
-            next_id: 0,
-            next_source: 0,
-            sources: Vec::new(),
-            notes: VecDeque::new(),
+            visitors: VecDeque::new(),
+            ttl,
             status: "idle",
         }
     }
@@ -734,10 +784,99 @@ impl ResearchDesk {
             self.status
         }
     }
+    fn drop_expired(&mut self) {
+        let ttl = self.ttl;
+        let mut keep = VecDeque::new();
+        while let Some(mut v) = self.visitors.pop_front() {
+            if v.touched.elapsed() < ttl {
+                keep.push_back(v);
+            } else {
+                wipe_visitor(&mut v);
+            }
+        }
+        self.visitors = keep;
+    }
+    fn contains(&self, id: &str) -> bool {
+        self.visitors.iter().any(|v| research_ids_eq(&v.id, id))
+    }
+    fn touch(&mut self, id: &str) {
+        if let Some(i) = self.visitors.iter().position(|v| research_ids_eq(&v.id, id)) {
+            self.visitors[i].touched = Instant::now();
+            if let Some(v) = self.visitors.remove(i) {
+                self.visitors.push_back(v);
+            }
+        }
+    }
+    /// A new opaque id. Client-chosen strings are not stored.
+    fn mint(&mut self) -> String {
+        self.drop_expired();
+        let id = loop {
+            let next = research_session_id();
+            if !self.contains(&next) {
+                break next;
+            }
+        };
+        while self.visitors.len() >= RESEARCH_SESSION_CAP {
+            if let Some(mut old) = self.visitors.pop_front() {
+                wipe_visitor(&mut old);
+            } else {
+                break;
+            }
+        }
+        self.visitors.push_back(ResearchVisitor::new(id.clone()));
+        id
+    }
+    /// Header wins when it names a live desk. Otherwise the cookie. Anything
+    /// else starts an empty desk. The returned id was minted here.
+    fn open(&mut self, header: Option<&str>, cookie: Option<&str>) -> String {
+        self.drop_expired();
+        let header_id = header.and_then(canonical_research_id);
+        let cookie_id = cookie.and_then(canonical_research_id);
+        if let Some(ref id) = header_id {
+            if self.contains(id) {
+                self.touch(id);
+                return id.clone();
+            }
+        }
+        if let Some(ref id) = cookie_id {
+            if self.contains(id) {
+                self.touch(id);
+                return id.clone();
+            }
+        }
+        if let Some(mut id) = header_id { wipe_string(&mut id); }
+        if let Some(mut id) = cookie_id { wipe_string(&mut id); }
+        self.mint()
+    }
+    fn visitor_mut(&mut self, id: &str) -> Option<&mut ResearchVisitor> {
+        let i = self.visitors.iter().position(|v| research_ids_eq(&v.id, id))?;
+        Some(&mut self.visitors[i])
+    }
+    fn sources_json(&mut self, id: &str) -> String {
+        self.drop_expired();
+        match self.visitors.iter().find(|v| research_ids_eq(&v.id, id)) {
+            Some(v) => research_sources_json(&v.sources),
+            None => research_sources_json(&[]),
+        }
+    }
+    fn history_json(&mut self, id: &str) -> String {
+        self.drop_expired();
+        let items = self.visitors.iter().find(|v| research_ids_eq(&v.id, id)).map(|v| {
+            v.notes.iter().rev().map(research_note_json).collect::<Vec<_>>()
+        }).unwrap_or_default();
+        format!(
+            "{{\"schema\":\"galion-research/1\",\"app\":\"hermes\",\"items\":[{}]}}",
+            items.join(",")
+        )
+    }
+    fn note_count(&mut self, id: &str) -> usize {
+        self.drop_expired();
+        self.visitors.iter().find(|v| research_ids_eq(&v.id, id)).map(|v| v.notes.len()).unwrap_or(0)
+    }
 }
 
-fn research_sources_json(desk: &ResearchDesk) -> String {
-    let items: Vec<String> = desk.sources.iter().map(|s| {
+fn research_sources_json(sources: &[DeskSource]) -> String {
+    let items: Vec<String> = sources.iter().map(|s| {
         format!(
             "{{\"id\":{},\"name\":{},\"kind\":\"{}\",\"chars\":{}}}",
             s.id,
@@ -750,6 +889,101 @@ fn research_sources_json(desk: &ResearchDesk) -> String {
         "{{\"schema\":\"galion-research/1\",\"app\":\"hermes\",\"sources\":[{}]}}",
         items.join(",")
     )
+}
+
+fn canonical_research_id(raw: &str) -> Option<String> {
+    let t = raw.trim();
+    if t.len() == 64 && t.bytes().all(|b| b.is_ascii_hexdigit()) {
+        Some(t.to_ascii_lowercase())
+    } else {
+        None
+    }
+}
+
+fn research_ids_eq(a: &str, b: &str) -> bool {
+    if a.len() != b.len() {
+        return false;
+    }
+    let mut diff = 0u8;
+    for (x, y) in a.bytes().zip(b.bytes()) {
+        diff |= x ^ y;
+    }
+    diff == 0
+}
+
+fn research_session_id() -> String {
+    let mut b = [0u8; 32];
+    if let Ok(mut f) = std::fs::File::open("/dev/urandom") {
+        if std::io::Read::read_exact(&mut f, &mut b).is_ok() {
+            return b.iter().map(|x| format!("{x:02x}")).collect();
+        }
+    }
+    static N: AtomicU64 = AtomicU64::new(1);
+    let n = N.fetch_add(1, Ordering::Relaxed);
+    let t = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(0);
+    format!("{t:032x}{n:032x}")
+}
+
+fn research_cookie(header: Option<&str>) -> Option<String> {
+    let header = header?;
+    for part in header.split(';') {
+        let part = part.trim();
+        let Some((k, v)) = part.split_once('=') else { continue };
+        if k.trim().eq_ignore_ascii_case(RESEARCH_COOKIE) {
+            return canonical_research_id(v.trim().trim_matches('"'));
+        }
+    }
+    None
+}
+
+/// `Set-Cookie` plus `X-Galion-Research`. The id is 64 hex digits minted by the desk.
+/// No `Secure` attribute: this surface is loopback http. `SameSite=Strict` and
+/// `HttpOnly` keep the id off other sites and out of page script.
+fn research_session_headers(id: &str, ttl: Duration) -> String {
+    let max_age = ttl.as_secs().max(1);
+    format!(
+        "Set-Cookie: {RESEARCH_COOKIE}={id}; HttpOnly; SameSite=Strict; Path=/research; Max-Age={max_age}\r\nX-Galion-Research: {id}\r\n"
+    )
+}
+
+fn bind_research_session(req: &mut Request, desk: &Arc<Mutex<ResearchDesk>>) -> Result<String, &'static str> {
+    let from_header = req.header("x-galion-research").map(str::to_string);
+    let from_cookie = research_cookie(req.header("cookie"));
+    let Ok(mut d) = desk.lock() else {
+        if let Some(mut s) = from_header { wipe_string(&mut s); }
+        if let Some(mut s) = from_cookie { wipe_string(&mut s); }
+        return Err("research");
+    };
+    let id = d.open(from_header.as_deref(), from_cookie.as_deref());
+    req.extra_headers = research_session_headers(&id, d.ttl);
+    if let Some(mut s) = from_header { wipe_string(&mut s); }
+    if let Some(mut s) = from_cookie { wipe_string(&mut s); }
+    Ok(id)
+}
+
+fn wipe_source(s: &mut DeskSource) {
+    wipe_string(&mut s.name);
+    wipe_string(&mut s.text);
+}
+
+fn wipe_note(n: &mut ResearchNote) {
+    wipe_string(&mut n.question);
+    wipe_string(&mut n.reply);
+    for (_, text) in n.citations.iter_mut() {
+        wipe_string(text);
+    }
+    for s in n.found.iter_mut() { wipe_string(s); }
+    for s in n.inferred.iter_mut() { wipe_string(s); }
+    for s in n.unknown.iter_mut() { wipe_string(s); }
+}
+
+fn wipe_visitor(v: &mut ResearchVisitor) {
+    wipe_string(&mut v.id);
+    for s in v.sources.iter_mut() { wipe_source(s); }
+    for n in v.notes.iter_mut() { wipe_note(n); }
 }
 
 fn clean_source_name(raw: &str) -> Option<String> {
@@ -850,7 +1084,7 @@ fn parse_json_string_capped(s: &str, cap: usize) -> Option<String> {
     None
 }
 
-fn research_add_source(desk: &Arc<Mutex<ResearchDesk>>, raw: &str) -> Result<String, &'static str> {
+fn research_add_source(desk: &Arc<Mutex<ResearchDesk>>, session: &str, raw: &str) -> Result<String, &'static str> {
     let name = json_object_string(raw, "name", 160).ok_or("name")?;
     let name = clean_source_name(&name).ok_or("name")?;
     let kind_raw = json_object_string(raw, "kind", 16).unwrap_or_default();
@@ -861,27 +1095,30 @@ fn research_add_source(desk: &Arc<Mutex<ResearchDesk>>, raw: &str) -> Result<Str
         json_object_string(raw, "text", galion_cascade::hermes::MAX_RESEARCH_SOURCE_CHARS).unwrap_or_default()
     };
     let Ok(mut d) = desk.lock() else { return Err("research") };
-    if d.sources.len() >= galion_cascade::hermes::MAX_RESEARCH_SOURCES {
-        d.sources.remove(0);
+    d.drop_expired();
+    let Some(v) = d.visitor_mut(session) else { return Err("research") };
+    if v.sources.len() >= galion_cascade::hermes::MAX_RESEARCH_SOURCES {
+        let mut old = v.sources.remove(0);
+        wipe_source(&mut old);
     }
-    d.next_source = d.next_source.saturating_add(1);
-    let id = d.next_source.max(1);
-    d.sources.push(DeskSource { id, name, text, kind });
-    Ok(research_sources_json(&d))
+    v.next_source = v.next_source.saturating_add(1);
+    let id = v.next_source.max(1);
+    v.touched = Instant::now();
+    v.sources.push(DeskSource { id, name, text, kind });
+    Ok(research_sources_json(&v.sources))
 }
 
 fn json_list(items: &[String]) -> String {
     items.iter().map(|s| galion_cascade::hermes::json_string(s)).collect::<Vec<_>>().join(",")
 }
 
-fn research_status_json(desk: &ResearchDesk) -> String {
+fn research_status_json(desk: &ResearchDesk, history: usize) -> String {
     let key = desk.client.as_ref().map(|c| c.key_state()).unwrap_or("none");
     let model = desk.client.as_ref().map(|c| c.label().to_string()).unwrap_or_else(|| galion_cascade::LLM_NAME.into());
     format!(
-        "{{\"schema\":\"galion-research/1\",\"app\":\"hermes\",\"voice\":\"galion-research\",\"product\":\"galion-one\",\"model\":{},\"key\":\"{key}\",\"status\":\"{}\",\"history\":{}}}",
+        "{{\"schema\":\"galion-research/1\",\"app\":\"hermes\",\"voice\":\"galion-research\",\"product\":\"galion-one\",\"model\":{},\"key\":\"{key}\",\"status\":\"{}\",\"history\":{history}}}",
         galion_cascade::hermes::json_string(&model),
-        desk.gateway_status(),
-        desk.notes.len()
+        desk.gateway_status()
     )
 }
 
@@ -903,23 +1140,26 @@ fn research_note_json(note: &ResearchNote) -> String {
     )
 }
 
-fn research_history_json(desk: &ResearchDesk) -> String {
-    let items: Vec<String> = desk.notes.iter().rev().map(research_note_json).collect();
-    format!("{{\"schema\":\"galion-research/1\",\"app\":\"hermes\",\"items\":[{}]}}", items.join(","))
-}
-
-fn research_ask(desk: &Arc<Mutex<ResearchDesk>>, question: &str) -> String {
+fn research_ask(desk: &Arc<Mutex<ResearchDesk>>, session: &str, question: &str) -> String {
     let (id, client, model_fallback, sources) = {
         let Ok(mut d) = desk.lock() else {
             return "{\"schema\":\"galion-research/1\",\"app\":\"hermes\",\"status\":\"Unreachable\",\"reply\":\"The research path is not reachable from here.\",\"citations\":[]}".into();
         };
+        d.drop_expired();
         d.status = "Running";
-        d.next_id = d.next_id.saturating_add(1);
         let model = d.client.as_ref().map(|c| c.label().to_string()).unwrap_or_else(|| galion_cascade::LLM_NAME.into());
-        let sources: Vec<galion_cascade::hermes::ResearchSource> = d.sources.iter().map(|s| {
-            galion_cascade::hermes::ResearchSource { id: s.id, name: s.name.clone(), text: s.text.clone() }
-        }).collect();
-        (d.next_id, d.client.clone(), model, sources)
+        let (note_id, sources) = if let Some(v) = d.visitor_mut(session) {
+            v.next_note = v.next_note.saturating_add(1);
+            v.touched = Instant::now();
+            let note_id = v.next_note.max(1);
+            let sources: Vec<galion_cascade::hermes::ResearchSource> = v.sources.iter().map(|s| {
+                galion_cascade::hermes::ResearchSource { id: s.id, name: s.name.clone(), text: s.text.clone() }
+            }).collect();
+            (note_id, sources)
+        } else {
+            (1, Vec::new())
+        };
+        (note_id, d.client.clone(), model, sources)
     };
     let turn = match client {
         Some(c) => c.research_turn(question, &sources),
@@ -975,9 +1215,18 @@ fn research_ask(desk: &Arc<Mutex<ResearchDesk>>, question: &str) -> String {
     );
     if let Ok(mut d) = desk.lock() {
         d.status = status;
-        d.notes.push_back(note);
-        while d.notes.len() > 32 {
-            d.notes.pop_front();
+        d.drop_expired();
+        if let Some(v) = d.visitor_mut(session) {
+            v.notes.push_back(note);
+            while v.notes.len() > RESEARCH_NOTES_PER_SESSION {
+                if let Some(mut old) = v.notes.pop_front() {
+                    wipe_note(&mut old);
+                }
+            }
+            v.touched = Instant::now();
+        } else {
+            let mut dropped = note;
+            wipe_note(&mut dropped);
         }
     }
     body
@@ -1008,8 +1257,8 @@ fn format_acao(origin: Option<String>) -> String {
 
 fn handle(mut stream: std::net::TcpStream, sh: &Shared) {
     let _ = stream.set_read_timeout(Some(Duration::from_millis(2000)));
-    let (status, ctype, mut body, acao) = match read_request(&mut stream, MAX_BODY_BYTES) {
-        Err((st, msg)) => (st, "text/plain", msg.as_bytes().to_vec(), Acao::Unscoped),
+    let (status, ctype, mut body, acao, mut extra) = match read_request(&mut stream, MAX_BODY_BYTES) {
+        Err((st, msg)) => (st, "text/plain", msg.as_bytes().to_vec(), Acao::Unscoped, String::new()),
         Ok(mut req) => dispatch(&mut req, sh),
     };
     let cors = match acao {
@@ -1020,28 +1269,30 @@ fn handle(mut stream: std::net::TcpStream, sh: &Shared) {
         }
     };
     let location = if status.starts_with("302") { "Location: /\r\n" } else { "" };
-    let head = format!(
-        "HTTP/1.1 {status}\r\nContent-Type: {ctype}\r\nContent-Length: {}\r\nCache-Control: no-store\r\n{location}{cors}Access-Control-Allow-Methods: GET, POST, OPTIONS\r\nAccess-Control-Allow-Headers: {CORS_ALLOW_HEADERS}\r\n{SECURITY_HEADERS}Connection: close\r\n\r\n",
+    let mut head = format!(
+        "HTTP/1.1 {status}\r\nContent-Type: {ctype}\r\nContent-Length: {}\r\nCache-Control: no-store\r\n{location}{extra}{cors}Access-Control-Allow-Methods: GET, POST, OPTIONS\r\nAccess-Control-Allow-Headers: {CORS_ALLOW_HEADERS}\r\n{SECURITY_HEADERS}Connection: close\r\n\r\n",
         body.len()
     );
     let _ = stream.write_all(head.as_bytes());
     let _ = stream.write_all(&body);
     let _ = stream.flush();
-    // The socket has the bytes. Do not leave a token or a WAV sitting in this buffer.
+    // The socket has the bytes. Do not leave a token, a session id, or a WAV in these buffers.
     zeroise_bytes(&mut body);
+    wipe_string(&mut extra);
+    wipe_string(&mut head);
 }
 
-fn dispatch(req: &mut Request, sh: &Shared) -> (&'static str, &'static str, Vec<u8>, Acao) {
+fn dispatch(req: &mut Request, sh: &Shared) -> (&'static str, &'static str, Vec<u8>, Acao, String) {
     if query_carries_token(&req.query) {
         zeroise_bytes(&mut req.body);
-        return ("400 Bad Request", "text/plain", b"session token must not be in the URL".to_vec(), Acao::Omit);
+        return ("400 Bad Request", "text/plain", b"session token must not be in the URL".to_vec(), Acao::Omit, String::new());
     }
     let origin = req.header("origin").map(str::to_string);
     let sensitive = route_is_sensitive(&req.method, &req.path);
     match check_origin(origin.as_deref(), &sh.edge.cors_origins, sensitive) {
         OriginCheck::Reject => {
             zeroise_bytes(&mut req.body);
-            ("403 Forbidden", "text/plain", b"origin rejected".to_vec(), Acao::Omit)
+            ("403 Forbidden", "text/plain", b"origin rejected".to_vec(), Acao::Omit, String::new())
         }
         OriginCheck::Allow { acao } => {
             if route_needs_session(&req.method, &req.path) && sh.edge.session_required() {
@@ -1056,11 +1307,12 @@ fn dispatch(req: &mut Request, sh: &Shared) -> (&'static str, &'static str, Vec<
                 }
                 if !ok {
                     zeroise_bytes(&mut req.body);
-                    return ("401 Unauthorized", "text/plain", b"session required".to_vec(), Acao::Keep(acao));
+                    return ("401 Unauthorized", "text/plain", b"session required".to_vec(), Acao::Keep(acao), String::new());
                 }
             }
             let (st, ct, body) = route(req, sh);
-            (st, ct, body, Acao::Keep(acao))
+            let extra = std::mem::take(&mut req.extra_headers);
+            (st, ct, body, Acao::Keep(acao), extra)
         }
     }
 }
@@ -1087,9 +1339,12 @@ fn cc0_json(accepted: bool) -> String {
 
 fn route(req: &mut Request, sh: &Shared) -> (&'static str, &'static str, Vec<u8>) {
     let head = req.method == "HEAD";
-    let method = if head { "GET" } else { req.method.as_str() };
+    // Owned copies so an arm can mutably borrow `req` (research session headers)
+    // without overlapping the match on method and path.
+    let method = if head { "GET".to_string() } else { req.method.clone() };
+    let path = req.path.clone();
     let txt = |s: &str| s.as_bytes().to_vec();
-    let (st, ct, body) = match (method, req.path.as_str()) {
+    let (st, ct, body) = match (method.as_str(), path.as_str()) {
         ("OPTIONS", _) => ("204 No Content", "text/plain", Vec::new()),
         ("POST", "/session") => {
             if req.body.is_empty() {
@@ -1198,13 +1453,24 @@ fn route(req: &mut Request, sh: &Shared) -> (&'static str, &'static str, Vec<u8>
             if question.is_empty() {
                 return ("400 Bad Request", "text/plain", txt("question"));
             }
-            let json = research_ask(&sh.research, &question);
+            let mut session = match bind_research_session(req, &sh.research) {
+                Ok(id) => id,
+                Err(_) => return ("500 Internal Server Error", "text/plain", txt("research")),
+            };
+            let json = research_ask(&sh.research, &session, &question);
+            wipe_string(&mut session);
             ("200 OK", "application/json", json.into_bytes())
         }
         ("POST", "/research/sources") if sh.page.is_some() => {
             let raw = String::from_utf8_lossy(&req.body).into_owned();
             zeroise_bytes(&mut req.body);
-            match research_add_source(&sh.research, &raw) {
+            let mut session = match bind_research_session(req, &sh.research) {
+                Ok(id) => id,
+                Err(_) => return ("500 Internal Server Error", "text/plain", txt("research")),
+            };
+            let result = research_add_source(&sh.research, &session, &raw);
+            wipe_string(&mut session);
+            match result {
                 Ok(json) => ("200 OK", "application/json", json.into_bytes()),
                 Err("name") => ("400 Bad Request", "text/plain", txt("name")),
                 Err(_) => ("500 Internal Server Error", "text/plain", txt("research")),
@@ -1247,24 +1513,50 @@ fn route(req: &mut Request, sh: &Shared) -> (&'static str, &'static str, Vec<u8>
                     ("200 OK", "text/html; charset=utf-8", page.into_bytes())
                 }
                 "/research/hermes" if sh.page.is_some() => {
-                    let Ok(desk) = sh.research.lock() else {
+                    let mut session = match bind_research_session(req, &sh.research) {
+                        Ok(id) => id,
+                        Err(_) => return ("500 Internal Server Error", "text/plain", txt("research")),
+                    };
+                    let Ok(mut desk) = sh.research.lock() else {
+                        wipe_string(&mut session);
                         return ("500 Internal Server Error", "text/plain", txt("research"));
                     };
-                    ("200 OK", "application/json", research_status_json(&desk).into_bytes())
+                    let n = desk.note_count(&session);
+                    let json = research_status_json(&desk, n);
+                    wipe_string(&mut session);
+                    ("200 OK", "application/json", json.into_bytes())
                 }
                 "/research/history" if sh.page.is_some() => {
-                    let Ok(desk) = sh.research.lock() else {
+                    let mut session = match bind_research_session(req, &sh.research) {
+                        Ok(id) => id,
+                        Err(_) => return ("500 Internal Server Error", "text/plain", txt("research")),
+                    };
+                    let Ok(mut desk) = sh.research.lock() else {
+                        wipe_string(&mut session);
                         return ("500 Internal Server Error", "text/plain", txt("research"));
                     };
-                    ("200 OK", "application/json", research_history_json(&desk).into_bytes())
+                    let json = desk.history_json(&session);
+                    wipe_string(&mut session);
+                    ("200 OK", "application/json", json.into_bytes())
                 }
                 "/research/sources" if sh.page.is_some() => {
-                    let Ok(desk) = sh.research.lock() else {
+                    let mut session = match bind_research_session(req, &sh.research) {
+                        Ok(id) => id,
+                        Err(_) => return ("500 Internal Server Error", "text/plain", txt("research")),
+                    };
+                    let Ok(mut desk) = sh.research.lock() else {
+                        wipe_string(&mut session);
                         return ("500 Internal Server Error", "text/plain", txt("research"));
                     };
-                    ("200 OK", "application/json", research_sources_json(&desk).into_bytes())
+                    let json = desk.sources_json(&session);
+                    wipe_string(&mut session);
+                    ("200 OK", "application/json", json.into_bytes())
                 }
                 "/research" | "/research/" if sh.page.is_some() => {
+                    match bind_research_session(req, &sh.research) {
+                        Ok(mut id) => wipe_string(&mut id),
+                        Err(_) => return ("500 Internal Server Error", "text/plain", txt("research")),
+                    }
                     ("200 OK", "text/html; charset=utf-8", RESEARCH_HTML.as_bytes().to_vec())
                 }
                 "/dot" => {
@@ -1387,7 +1679,8 @@ mod tests {
     #[test]
     fn research_ask_reply_is_one_json_object() {
         let desk = Arc::new(Mutex::new(ResearchDesk::new()));
-        let body = research_ask(&desk, "Is the reply one object?");
+        let session = desk.lock().unwrap().mint();
+        let body = research_ask(&desk, &session, "Is the reply one object?");
         assert!(body.starts_with('{') && body.ends_with("]}") && !body.ends_with("]}}"), "{body}");
         let (mut depth, mut in_str, mut esc, mut closed_at) = (0i32, false, false, None);
         for (i, c) in body.char_indices() {
@@ -1594,18 +1887,108 @@ mod tests {
     }
 
     fn post_json(addr: SocketAddr, path: &str, body: &str) -> String {
+        research_call(addr, "POST", path, ResearchAuth::Absent, Some(body))
+    }
+
+    fn resp_header(resp: &str, name: &str) -> Option<String> {
+        let head = resp.split_once("\r\n\r\n").map(|(h, _)| h).unwrap_or(resp);
+        for line in head.split("\r\n") {
+            if let Some((k, v)) = line.split_once(':') {
+                if k.eq_ignore_ascii_case(name) {
+                    return Some(v.trim().to_string());
+                }
+            }
+        }
+        None
+    }
+
+    fn resp_body(resp: &str) -> &str {
+        resp.split_once("\r\n\r\n").map(|(_, b)| b).unwrap_or("")
+    }
+
+    #[derive(Clone, Copy)]
+    enum ResearchAuth<'a> {
+        Absent,
+        Cookie(&'a str),
+        Header(&'a str),
+    }
+
+    fn research_call(addr: SocketAddr, method: &str, path: &str, auth: ResearchAuth<'_>, body: Option<&str>) -> String {
         let mut s = std::net::TcpStream::connect(addr).unwrap();
-        s.write_all(
-            format!(
-                "POST {path} HTTP/1.1\r\nHost: x\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{body}",
-                body.len()
-            )
-            .as_bytes(),
-        )
-        .unwrap();
+        let mut extra = String::new();
+        match auth {
+            ResearchAuth::Absent => {}
+            ResearchAuth::Cookie(id) => extra.push_str(&format!("Cookie: {RESEARCH_COOKIE}={id}\r\n")),
+            ResearchAuth::Header(id) => extra.push_str(&format!("X-Galion-Research: {id}\r\n")),
+        }
+        let ct = match body {
+            Some(b) => format!("Content-Type: application/json\r\nContent-Length: {}\r\n", b.len()),
+            None => String::new(),
+        };
+        let payload = body.unwrap_or("");
+        s.write_all(format!("{method} {path} HTTP/1.1\r\nHost: x\r\n{extra}{ct}\r\n{payload}").as_bytes()).unwrap();
         let mut out = String::new();
         s.read_to_string(&mut out).unwrap();
         out
+    }
+
+    fn assert_opaque_id(id: &str) {
+        assert_eq!(id.len(), 64, "{id}");
+        assert!(id.bytes().all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase()), "{id}");
+    }
+
+    fn read_http_message(sock: &mut std::net::TcpStream) -> String {
+        let _ = sock.set_read_timeout(Some(Duration::from_millis(1500)));
+        let mut buf = [0u8; 8192];
+        let mut got = Vec::new();
+        let mut header_end = None;
+        loop {
+            match sock.read(&mut buf) {
+                Ok(0) | Err(_) => break,
+                Ok(n) => {
+                    got.extend_from_slice(&buf[..n]);
+                    if header_end.is_none() {
+                        header_end = got.windows(4).position(|w| w == b"\r\n\r\n").map(|p| p + 4);
+                    }
+                    if let Some(end) = header_end {
+                        let head = String::from_utf8_lossy(&got[..end]);
+                        let len = head.lines().find_map(|l| {
+                            let (k, v) = l.split_once(':')?;
+                            if !k.trim().eq_ignore_ascii_case("content-length") {
+                                return None;
+                            }
+                            v.trim().parse::<usize>().ok()
+                        }).unwrap_or(0);
+                        if got.len() >= end + len {
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        String::from_utf8(got).unwrap_or_default()
+    }
+
+    fn spawn_recording_hermes(n: usize, payload: String) -> (std::net::SocketAddr, Arc<Mutex<Vec<String>>>) {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        let seen = Arc::new(Mutex::new(Vec::new()));
+        let seen_w = seen.clone();
+        std::thread::spawn(move || {
+            for _ in 0..n {
+                let Ok((mut sock, _)) = listener.accept() else { return };
+                let got = read_http_message(&mut sock);
+                if let Ok(mut g) = seen_w.lock() {
+                    g.push(got);
+                }
+                let resp = format!(
+                    "HTTP/1.0 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{payload}",
+                    payload.len()
+                );
+                let _ = sock.write_all(resp.as_bytes());
+            }
+        });
+        (addr, seen)
     }
 
     #[test]
@@ -1620,7 +2003,8 @@ mod tests {
         let denied = post_json(a, "/research/ask", r#"{"question":"Where is the source?"}"#);
         assert!(denied.contains("HTTP/1.1 200") && denied.contains("The research path is not reachable from here."), "{denied}");
         assert!(!denied.contains(key), "{denied}");
-        let hist = get(a, "/research/history");
+        let sid = resp_header(&denied, "X-Galion-Research").expect("research session");
+        let hist = research_call(a, "GET", "/research/history", ResearchAuth::Header(&sid), None);
         assert!(hist.contains("Where is the source?") && hist.contains("\"status\":\"Unreachable\""), "{hist}");
         let empty = post_json(a, "/research/ask", r#"{"question":"  "}"#);
         assert!(empty.starts_with("HTTP/1.1 400"), "{empty}");
@@ -1669,7 +2053,8 @@ mod tests {
         assert!(!asked.contains("NotFound") && !asked.contains("\"status\":\"Returned\""), "{asked}");
         assert!(asked.contains("\"app\":\"hermes\""), "{asked}");
         assert!(!asked.contains(key) && !asked.contains("Bearer"), "{asked}");
-        let hist = get(a, "/research/history");
+        let sid = resp_header(&asked, "X-Galion-Research").expect("research session");
+        let hist = research_call(a, "GET", "/research/history", ResearchAuth::Header(&sid), None);
         assert!(hist.contains("What colour is the wash?") && hist.contains("\"status\":\"Unknown\""), "{hist}");
         assert!(!hist.contains(key) && !hist.contains("Galion brand note"), "{hist}");
         w.close().unwrap();
@@ -1739,14 +2124,20 @@ mod tests {
         let image = post_json(a, "/research/sources", r#"{"name":"../shot.png","kind":"image","text":"pixels"}"#);
         assert!(image.contains("HTTP/1.1 200") && image.contains("shot.png") && image.contains("\"kind\":\"image\"") && image.contains("\"chars\":0"), "{image}");
         assert!(!image.contains("../"), "{image}");
-        let file = post_json(
+        assert!(!resp_body(&image).contains("pixels"), "{image}");
+        let sid = resp_header(&image, "X-Galion-Research").expect("research session");
+        assert_opaque_id(&sid);
+        let file = research_call(
             a,
+            "POST",
             "/research/sources",
-            r#"{"name":"notes/wash-note.txt","kind":"file","text":"The wash is amber."}"#,
+            ResearchAuth::Header(&sid),
+            Some(r#"{"name":"notes/wash-note.txt","kind":"file","text":"The wash is amber."}"#),
         );
         assert!(file.contains("wash-note.txt") && file.contains("\"kind\":\"file\"") && file.contains("\"chars\":18") && file.contains("\"id\":2"), "{file}");
         assert!(!file.contains("notes/"), "{file}");
-        let asked = post_json(a, "/research/ask", r#"{"question":"What colour is the wash?"}"#);
+        assert!(!resp_body(&file).contains("The wash is amber."), "file text stays off the list: {file}");
+        let asked = research_call(a, "POST", "/research/ask", ResearchAuth::Header(&sid), Some(r#"{"question":"What colour is the wash?"}"#));
         assert!(asked.contains("HTTP/1.1 200") && asked.contains("\"status\":\"Found\""), "{asked}");
         assert!(asked.contains("wash-note.txt") && asked.contains("\"n\":2"), "{asked}");
         assert!(asked.contains("amber"), "{asked}");
@@ -1760,7 +2151,7 @@ mod tests {
         assert!(upstream.contains("The wash is amber."), "{upstream}");
         assert!(!upstream.contains("Invented Journal"), "{upstream}");
         assert!(upstream.contains("Authorization: Bearer "), "{upstream}");
-        let hist = get(a, "/research/history");
+        let hist = research_call(a, "GET", "/research/history", ResearchAuth::Header(&sid), None);
         assert!(hist.contains("\"status\":\"Found\"") && !hist.contains("Invented Journal"), "{hist}");
         w.close().unwrap();
     }
@@ -1768,15 +2159,261 @@ mod tests {
     #[test]
     fn research_desk_keeps_the_latest_eight_sources() {
         let desk = Arc::new(Mutex::new(ResearchDesk::new()));
+        let a = desk.lock().unwrap().mint();
+        let b = desk.lock().unwrap().mint();
         for i in 1..=9 {
             let body = format!(r#"{{"name":"n{i}.txt","text":"t{i}"}}"#);
-            research_add_source(&desk, &body).unwrap();
+            research_add_source(&desk, &a, &body).unwrap();
         }
+        research_add_source(&desk, &b, r#"{"name":"kept.txt","text":"only-b"}"#).unwrap();
         let d = desk.lock().unwrap();
-        assert_eq!(d.sources.len(), 8);
-        assert_eq!(d.sources[0].name, "n2.txt");
-        assert_eq!(d.sources[7].id, 9);
-        assert_eq!(d.sources[7].name, "n9.txt");
+        let va = d.visitors.iter().find(|v| v.id == a).unwrap();
+        assert_eq!(va.sources.len(), 8);
+        assert_eq!(va.sources[0].name, "n2.txt");
+        assert_eq!(va.sources[7].id, 9);
+        assert_eq!(va.sources[7].name, "n9.txt");
+        assert!(va.sources.iter().all(|s| s.name != "kept.txt"));
+        let vb = d.visitors.iter().find(|v| v.id == b).unwrap();
+        assert_eq!(vb.sources.len(), 1);
+        assert_eq!(vb.sources[0].name, "kept.txt");
+        assert_eq!(vb.sources[0].text, "only-b");
+    }
+
+    #[test]
+    fn research_session_cap_drops_only_the_oldest_visitor() {
+        let desk = Arc::new(Mutex::new(ResearchDesk::new()));
+        let mut ids = Vec::new();
+        for i in 0..RESEARCH_SESSION_CAP {
+            let id = desk.lock().unwrap().mint();
+            let body = format!(r#"{{"name":"v{i}.txt","text":"BODY-{i}-SECRET"}}"#);
+            research_add_source(&desk, &id, &body).unwrap();
+            ids.push(id);
+        }
+        let extra = desk.lock().unwrap().mint();
+        research_add_source(&desk, &extra, r#"{"name":"last.txt","text":"BODY-LAST-SECRET"}"#).unwrap();
+        let first = desk.lock().unwrap().sources_json(&ids[0]);
+        assert!(!first.contains("v0.txt") && !first.contains("BODY-0-SECRET"), "{first}");
+        let mid = desk.lock().unwrap().sources_json(&ids[1]);
+        assert!(mid.contains("v1.txt") && mid.contains("\"chars\":"), "{mid}");
+        assert!(!mid.contains("BODY-1-SECRET"), "{mid}");
+        let last = desk.lock().unwrap().sources_json(&extra);
+        assert!(last.contains("last.txt") && !last.contains("v0.txt") && !last.contains("BODY-LAST-SECRET"), "{last}");
+    }
+
+    #[test]
+    fn research_session_expiry_forgets_the_file_and_does_not_adopt_ids() {
+        let desk = Arc::new(Mutex::new(ResearchDesk::with_ttl(Duration::from_millis(40))));
+        let id = desk.lock().unwrap().mint();
+        research_add_source(&desk, &id, r#"{"name":"quiet.txt","text":"QUIET-FILE-BODY"}"#).unwrap();
+        assert!(desk.lock().unwrap().sources_json(&id).contains("quiet.txt"));
+        std::thread::sleep(Duration::from_millis(80));
+        let after = desk.lock().unwrap().sources_json(&id);
+        assert!(!after.contains("quiet.txt") && !after.contains("QUIET-FILE-BODY"), "{after}");
+        let mut fresh = ResearchDesk::new();
+        let zeros = "0".repeat(64);
+        let minted = fresh.open(Some(&zeros), Some(&zeros));
+        assert_ne!(minted, zeros);
+        assert_opaque_id(&minted);
+        let again = fresh.open(Some(&minted), None);
+        assert_eq!(again, minted);
+        let garbage = fresh.open(Some("nope"), Some("galion_research=short"));
+        assert_ne!(garbage, minted);
+        assert_opaque_id(&garbage);
+    }
+
+    #[test]
+    fn research_visitors_cannot_see_or_cite_each_others_files() {
+        let key = "test-gateway-key-not-for-git";
+        let payload = "{\"choices\":[{\"message\":{\"content\":\"Unknown\\n- Not in the note.\"}}]}".to_string();
+        let (hermes_addr, seen) = spawn_recording_hermes(3, payload);
+        let mut w = WebSurface::serve("127.0.0.1:0".parse().unwrap()).with_page("<!doctype html><canvas></canvas>");
+        w.set_research_hermes(galion_cascade::HermesLlm::new(
+            &format!("http://{hermes_addr}/v1/chat/completions"),
+            "hermes-agent",
+            key,
+            Duration::from_millis(1000),
+        ));
+        w.open().unwrap();
+        let a = w.local_addr().unwrap();
+
+        let (qh, _) = exchange(a, b"GET /research/sources?galion_research=abcdef HTTP/1.1\r\nHost: x\r\n\r\n");
+        assert!(qh.starts_with("HTTP/1.1 400"), "{qh}");
+        assert!(!qh.contains("Set-Cookie"), "{qh}");
+
+        let minted = research_call(a, "GET", "/research/sources", ResearchAuth::Absent, None);
+        let cookie_id = resp_header(&minted, "X-Galion-Research").expect("cookie session");
+        assert_opaque_id(&cookie_id);
+        assert!(
+            minted.contains(&format!(
+                "Set-Cookie: {RESEARCH_COOKIE}={cookie_id}; HttpOnly; SameSite=Strict; Path=/research; Max-Age=1800\r\n"
+            )),
+            "{minted}"
+        );
+        let cookie_line = minted.lines().find(|l| l.starts_with("Set-Cookie:")).unwrap_or("");
+        assert!(!cookie_line.contains("Secure"), "{cookie_line}");
+        assert!(resp_body(&minted).contains("\"sources\":[]"), "{minted}");
+        assert!(!resp_body(&minted).contains(&cookie_id), "session id stays out of the JSON");
+
+        let alpha = research_call(
+            a,
+            "POST",
+            "/research/sources",
+            ResearchAuth::Cookie(&cookie_id),
+            Some(r#"{"name":"alpha-note.txt","kind":"file","text":"ALPHA-FILE-BODY"}"#),
+        );
+        assert!(resp_body(&alpha).contains("alpha-note.txt"), "{alpha}");
+        assert!(!resp_body(&alpha).contains("ALPHA-FILE-BODY"), "{alpha}");
+
+        let minted_b = research_call(a, "GET", "/research/sources", ResearchAuth::Absent, None);
+        let header_id = resp_header(&minted_b, "X-Galion-Research").expect("header session");
+        assert_opaque_id(&header_id);
+        assert_ne!(header_id, cookie_id);
+        let beta = research_call(
+            a,
+            "POST",
+            "/research/sources",
+            ResearchAuth::Header(&header_id),
+            Some(r#"{"name":"beta-note.txt","kind":"file","text":"BETA-FILE-BODY"}"#),
+        );
+        assert!(resp_body(&beta).contains("beta-note.txt"), "{beta}");
+        assert!(!resp_body(&beta).contains("alpha-note.txt") && !resp_body(&beta).contains("ALPHA-FILE-BODY"), "{beta}");
+        assert!(!resp_body(&beta).contains("BETA-FILE-BODY"), "{beta}");
+
+        let alpha_list = research_call(a, "GET", "/research/sources", ResearchAuth::Cookie(&cookie_id), None);
+        assert!(resp_body(&alpha_list).contains("alpha-note.txt"), "{alpha_list}");
+        assert!(!resp_body(&alpha_list).contains("beta-note.txt") && !resp_body(&alpha_list).contains("BETA-FILE-BODY"), "{alpha_list}");
+        let beta_list = research_call(a, "GET", "/research/sources", ResearchAuth::Header(&header_id), None);
+        assert!(resp_body(&beta_list).contains("beta-note.txt"), "{beta_list}");
+        assert!(!resp_body(&beta_list).contains("alpha-note.txt") && !resp_body(&beta_list).contains("ALPHA-FILE-BODY"), "{beta_list}");
+
+        let upper = cookie_id.to_ascii_uppercase();
+        let upper_list = research_call(a, "GET", "/research/sources", ResearchAuth::Header(&upper), None);
+        assert!(resp_body(&upper_list).contains("alpha-note.txt"), "{upper_list}");
+        assert_eq!(resp_header(&upper_list, "X-Galion-Research").as_deref(), Some(cookie_id.as_str()));
+        if upper != cookie_id {
+            let cookie = upper_list.lines().find(|l| l.starts_with("Set-Cookie:")).unwrap_or("");
+            assert!(!cookie.contains(&upper), "the raw header is not reflected: {cookie}");
+        }
+
+        let zeros = "0".repeat(64);
+        let stranger = research_call(a, "GET", "/research/sources", ResearchAuth::Header(&zeros), None);
+        let stranger_id = resp_header(&stranger, "X-Galion-Research").expect("new session");
+        assert_opaque_id(&stranger_id);
+        assert_ne!(stranger_id, zeros);
+        assert_ne!(stranger_id, cookie_id);
+        assert_ne!(stranger_id, header_id);
+        let stranger_body = resp_body(&stranger);
+        assert!(stranger_body.contains("\"sources\":[]"), "{stranger}");
+        assert!(!stranger_body.contains("alpha-note.txt") && !stranger_body.contains("beta-note.txt"), "{stranger}");
+        assert!(!stranger_body.contains("ALPHA-FILE-BODY") && !stranger_body.contains("BETA-FILE-BODY"), "{stranger}");
+
+        let garbage = research_call(a, "GET", "/research/sources", ResearchAuth::Header("nope"), None);
+        let garbage_body = resp_body(&garbage);
+        assert!(garbage_body.contains("\"sources\":[]"), "{garbage}");
+        assert!(!garbage_body.contains("alpha-note.txt") && !garbage_body.contains("beta-note.txt"), "{garbage}");
+
+        let ask_a = research_call(
+            a,
+            "POST",
+            "/research/ask",
+            ResearchAuth::Cookie(&cookie_id),
+            Some(r#"{"question":"What does the alpha note say?"}"#),
+        );
+        let ask_b = research_call(
+            a,
+            "POST",
+            "/research/ask",
+            ResearchAuth::Header(&header_id),
+            Some(r#"{"question":"What does the beta note say?"}"#),
+        );
+        let ask_c = research_call(
+            a,
+            "POST",
+            "/research/ask",
+            ResearchAuth::Absent,
+            Some(r#"{"question":"What does a stranger see?"}"#),
+        );
+        for (label, resp) in [("alpha", &ask_a), ("beta", &ask_b), ("stranger", &ask_c)] {
+            assert!(resp.contains("HTTP/1.1 200"), "{label} {resp}");
+            assert!(!resp.contains(key) && !resp.contains("Bearer"), "{label} {resp}");
+        }
+        assert!(!resp_body(&ask_a).contains("beta-note.txt") && !resp_body(&ask_a).contains("BETA-FILE-BODY"), "{ask_a}");
+        assert!(!resp_body(&ask_b).contains("alpha-note.txt") && !resp_body(&ask_b).contains("ALPHA-FILE-BODY"), "{ask_b}");
+        assert!(!resp_body(&ask_c).contains("alpha-note.txt") && !resp_body(&ask_c).contains("beta-note.txt"), "{ask_c}");
+        assert!(!resp_body(&ask_c).contains("ALPHA-FILE-BODY") && !resp_body(&ask_c).contains("BETA-FILE-BODY"), "{ask_c}");
+
+        let hist_a = research_call(a, "GET", "/research/history", ResearchAuth::Cookie(&cookie_id), None);
+        assert!(resp_body(&hist_a).contains("What does the alpha note say?"), "{hist_a}");
+        assert!(!resp_body(&hist_a).contains("What does the beta note say?"), "{hist_a}");
+        assert!(!resp_body(&hist_a).contains("beta-note.txt") && !resp_body(&hist_a).contains("BETA-FILE-BODY"), "{hist_a}");
+        let hist_b = research_call(a, "GET", "/research/history", ResearchAuth::Header(&header_id), None);
+        assert!(resp_body(&hist_b).contains("What does the beta note say?"), "{hist_b}");
+        assert!(!resp_body(&hist_b).contains("What does the alpha note say?"), "{hist_b}");
+        assert!(!resp_body(&hist_b).contains("alpha-note.txt") && !resp_body(&hist_b).contains("ALPHA-FILE-BODY"), "{hist_b}");
+
+        let ups = seen.lock().unwrap().clone();
+        assert_eq!(ups.len(), 3, "{ups:?}");
+        let up_a = ups.iter().find(|s| s.contains("What does the alpha note say?")).expect("alpha ask");
+        assert!(up_a.contains("alpha-note.txt") && up_a.contains("ALPHA-FILE-BODY"), "{up_a}");
+        assert!(!up_a.contains("beta-note.txt") && !up_a.contains("BETA-FILE-BODY"), "{up_a}");
+        let up_b = ups.iter().find(|s| s.contains("What does the beta note say?")).expect("beta ask");
+        assert!(up_b.contains("beta-note.txt") && up_b.contains("BETA-FILE-BODY"), "{up_b}");
+        assert!(!up_b.contains("alpha-note.txt") && !up_b.contains("ALPHA-FILE-BODY"), "{up_b}");
+        let up_c = ups.iter().find(|s| s.contains("What does a stranger see?")).expect("stranger ask");
+        assert!(up_c.contains("Sources: none"), "{up_c}");
+        assert!(!up_c.contains("alpha-note.txt") && !up_c.contains("beta-note.txt"), "{up_c}");
+        assert!(!up_c.contains("ALPHA-FILE-BODY") && !up_c.contains("BETA-FILE-BODY"), "{up_c}");
+        w.close().unwrap();
+    }
+
+    #[test]
+    fn research_session_expiry_is_enforced_on_the_wire() {
+        let key = "test-gateway-key-not-for-git";
+        let payload = "{\"choices\":[{\"message\":{\"content\":\"Unknown\\n- Not in the note.\"}}]}".to_string();
+        let (hermes_addr, seen) = spawn_recording_hermes(1, payload);
+        let mut w = WebSurface::serve("127.0.0.1:0".parse().unwrap())
+            .with_page("<!doctype html><canvas></canvas>")
+            .with_research_session_ttl(Duration::from_millis(100));
+        w.set_research_hermes(galion_cascade::HermesLlm::new(
+            &format!("http://{hermes_addr}/v1/chat/completions"),
+            "hermes-agent",
+            key,
+            Duration::from_millis(1000),
+        ));
+        w.open().unwrap();
+        let a = w.local_addr().unwrap();
+        let posted = research_call(
+            a,
+            "POST",
+            "/research/sources",
+            ResearchAuth::Absent,
+            Some(r#"{"name":"quiet-note.txt","kind":"file","text":"QUIET-WIRE-BODY"}"#),
+        );
+        let sid = resp_header(&posted, "X-Galion-Research").expect("session");
+        assert!(resp_body(&posted).contains("quiet-note.txt"), "{posted}");
+        let live = research_call(a, "GET", "/research/sources", ResearchAuth::Header(&sid), None);
+        assert!(resp_body(&live).contains("quiet-note.txt"), "{live}");
+        std::thread::sleep(Duration::from_millis(300));
+        let late = research_call(a, "GET", "/research/sources", ResearchAuth::Header(&sid), None);
+        assert!(!late.contains("quiet-note.txt") && !late.contains("QUIET-WIRE-BODY"), "{late}");
+        assert!(resp_body(&late).contains("\"sources\":[]"), "{late}");
+        let late_id = resp_header(&late, "X-Galion-Research").expect("rotated session");
+        assert_ne!(late_id, sid);
+        let asked = research_call(
+            a,
+            "POST",
+            "/research/ask",
+            ResearchAuth::Header(&sid),
+            Some(r#"{"question":"What did the quiet note say?"}"#),
+        );
+        assert!(asked.contains("HTTP/1.1 200"), "{asked}");
+        assert!(!asked.contains("quiet-note.txt") && !asked.contains("QUIET-WIRE-BODY"), "{asked}");
+        let ups = seen.lock().unwrap().clone();
+        assert_eq!(ups.len(), 1, "{ups:?}");
+        assert!(ups[0].contains("What did the quiet note say?"), "{}", ups[0]);
+        assert!(ups[0].contains("Sources: none"), "{}", ups[0]);
+        assert!(!ups[0].contains("quiet-note.txt") && !ups[0].contains("QUIET-WIRE-BODY"), "{}", ups[0]);
+        w.close().unwrap();
     }
 
     #[test]

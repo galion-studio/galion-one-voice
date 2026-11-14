@@ -276,7 +276,8 @@ function tone(id){
     o.start(t); o.stop(t+0.18);
   }catch(e){}
 }
-// Attached files are Sources. The desk cites only those ids.
+// Attached files are this visitor's Sources. The desk cites only those ids.
+// The session cookie is sent with each request. The id is not written into the page.
 (function(){
   var files=document.getElementById("files");
   var prompt=document.getElementById("prompt");
@@ -358,19 +359,19 @@ function tone(id){
     }));
     document.getElementById("history-empty").hidden=(items||[]).length>0;
   }
-  fetch("/research/hermes",{cache:"no-store"}).then(function(r){ return r.ok?r.json():null; }).then(function(j){
+  fetch("/research/hermes",{cache:"no-store",credentials:"same-origin"}).then(function(r){ return r.ok?r.json():null; }).then(function(j){
     if(!j){ hermesStatus("Hermes · Unreachable"); return; }
     hermesStatus("Hermes · "+(j.status||"Idle"));
   }).catch(function(){ hermesStatus("Hermes · Unreachable"); });
-  fetch("/research/history",{cache:"no-store"}).then(function(r){ return r.ok?r.json():null; }).then(function(j){
+  fetch("/research/history",{cache:"no-store",credentials:"same-origin"}).then(function(r){ return r.ok?r.json():null; }).then(function(j){
     if(j&&Array.isArray(j.items)) paintHistory(j.items);
   }).catch(function(){});
-  fetch("/research/sources",{cache:"no-store"}).then(function(r){ return r.ok?r.json():null; }).then(function(j){
+  fetch("/research/sources",{cache:"no-store",credentials:"same-origin"}).then(function(r){ return r.ok?r.json():null; }).then(function(j){
     if(j&&Array.isArray(j.sources)) paintSources(j.sources);
   }).catch(function(){});
   function postSource(file, text, kind){
     pending++;
-    fetch("/research/sources",{method:"POST",cache:"no-store",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:file.name,text:text,kind:kind})})
+    fetch("/research/sources",{method:"POST",cache:"no-store",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:file.name,text:text,kind:kind})})
       .then(function(r){ return r.ok?r.json():null; })
       .then(function(j){
         if(j&&Array.isArray(j.sources)) paintSources(j.sources);
@@ -429,12 +430,12 @@ function tone(id){
     document.getElementById("arriving-empty").hidden=true;
     tone("ask");
     setTimeout(function(){ tone("helper"); }, 180);
-    fetch("/research/ask",{method:"POST",cache:"no-store",headers:{"Content-Type":"application/json"},body:JSON.stringify({question:q})})
+    fetch("/research/ask",{method:"POST",cache:"no-store",credentials:"same-origin",headers:{"Content-Type":"application/json"},body:JSON.stringify({question:q})})
       .then(function(r){ return r.ok?r.json():null; })
       .then(function(j){
         if(!j){ carryLocal(q); return; }
         showTurn(j);
-        return fetch("/research/history",{cache:"no-store"}).then(function(r){ return r.ok?r.json():null; });
+        return fetch("/research/history",{cache:"no-store",credentials:"same-origin"}).then(function(r){ return r.ok?r.json():null; });
       })
       .then(function(h){ if(h&&Array.isArray(h.items)) paintHistory(h.items); })
       .catch(function(){ carryLocal(q); });

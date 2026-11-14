@@ -200,14 +200,15 @@ pub fn route_needs_session(method: &str, path: &str) -> bool {
     }
 }
 
-/// Query keys that must never carry the session. The token belongs in the
+/// Query keys that must never carry a session. The phone token belongs in the
 /// first message body (or the `X-Galion-Session` header on a binary turn).
+/// The research id belongs in the `galion_research` cookie or `X-Galion-Research`.
 pub fn query_carries_token(query: &str) -> bool {
     query.split('&').any(|kv| {
         let key = kv.split_once('=').map(|(k, _)| k).unwrap_or(kv).trim();
         matches!(
             key.to_ascii_lowercase().as_str(),
-            "token" | "session" | "access_token" | "galion_session"
+            "token" | "session" | "access_token" | "galion_session" | "galion_research"
         )
     })
 }
@@ -416,7 +417,10 @@ mod tests {
     fn token_query_is_rejected_and_json_body_is_read() {
         assert!(query_carries_token("token=abc"));
         assert!(query_carries_token("rate=16000&session=abc"));
+        assert!(query_carries_token("galion_research=abc"));
+        assert!(query_carries_token("kiosk=1&galion_research=abc"));
         assert!(!query_carries_token("rate=16000&channels=1"));
+        assert!(!query_carries_token("kiosk=1"));
         assert!(!query_carries_token(""));
         let body = br#"{"rms":0.05,"session":"abc123"}"#;
         assert_eq!(presented_session(None, Some("application/json"), body).as_deref(), Some("abc123"));
