@@ -14,9 +14,10 @@
 //!                  `X-Galion-Proceed: auto` is allowed. It is not a second route.
 //!   GET /reply/<id>.wav -> reply audio the host published with [`ReplyBox::set_reply`];
 //!                  `audio/wav`, 404 when unknown/evicted.
-//!   GET / , /screen -> the caller's single-screen HTML page, only when one was set with
+//!   GET / , /screen, /one, /one/ -> the caller's single-screen HTML page, only when one was set with
 //!                      [`WebSurface::with_page`] (V1-01; the page itself is owned by
 //!                      galion-console, this crate only serves the bytes); 404 otherwise
+//!   GET /research, /research/ -> the Galion Research prompt, same gate as /one
 //! `/dot` also carries `"mode"` (idle|listening|speaking|rika), `"lean"` (Rika lean-in 0..1),
 //! `"level"` (0..1, the band driving the state), `"e"` (empathy weight 0..1),
 //! `"engine"` (one Luti step), and `"emotion"` (sense, label, valence, arousal, lean)
@@ -594,7 +595,8 @@ impl WebSurface {
         s.bind = Some(addr);
         s
     }
-    /// Serve `html` at `/` and `/screen` (set before `open()`).
+    /// Serve `html` at `/`, `/screen`, `/one`, and `/one/` (set before `open()`).
+    /// `GET /research` uses the same gate and serves the research prompt.
     pub fn with_page(mut self, html: &'static str) -> Self {
         self.sh.page = Some(html);
         self
@@ -662,6 +664,10 @@ impl WebSurface {
 }
 
 const V2_REDIRECT_HTML: &str = "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta http-equiv=\"refresh\" content=\"0; url=/\"><title>Galion Voice</title><script>location.replace(\"/\");</script></head><body><p><a href=\"/\">Galion Voice</a></p></body></html>";
+
+/// Galion Research. Served at `/research` and `/research/` when a product page is set,
+/// the same gate as `/one`.
+const RESEARCH_HTML: &str = include_str!("../../../crates/galion-console/assets/research.html");
 
 const SECURITY_HEADERS: &str = concat!(
     "X-Content-Type-Options: nosniff\r\n",
@@ -904,6 +910,9 @@ fn route(req: &mut Request, sh: &Shared) -> (&'static str, &'static str, Vec<u8>
                     let page = if sh.edge.disclosure { html.to_string() } else { strip_ai_disclosure(html) };
                     ("200 OK", "text/html; charset=utf-8", page.into_bytes())
                 }
+                "/research" | "/research/" if sh.page.is_some() => {
+                    ("200 OK", "text/html; charset=utf-8", RESEARCH_HTML.as_bytes().to_vec())
+                }
                 "/dot" => {
                     let d = sh.latest_dot.lock().map(|g| g.clone()).unwrap_or_default();
                     let (persona, mood, from_turn) = sh.floor.lock().map(|g| (g.id().to_string(), g.mood().to_string(), g.mood_from_turn())).unwrap_or_else(|_| ("samantha".into(), "calm".into(), false));
@@ -1070,6 +1079,7 @@ mod tests {
         let mut w = WebSurface::serve("127.0.0.1:0".parse().unwrap());
         w.open().unwrap();
         assert!(get(w.local_addr().unwrap(), "/").starts_with("HTTP/1.1 404"));
+        assert!(get(w.local_addr().unwrap(), "/research").starts_with("HTTP/1.1 404"));
         w.close().unwrap();
         let mut w = WebSurface::serve("127.0.0.1:0".parse().unwrap()).with_page("<!doctype html><canvas></canvas>");
         w.open().unwrap();
@@ -1106,6 +1116,8 @@ mod tests {
         let mut bad = String::new();
         s.read_to_string(&mut bad).unwrap();
         assert!(bad.starts_with("HTTP/1.1 400"), "{bad}");
+        let research = get(a, "/research");
+        assert!(research.starts_with("HTTP/1.1 200") && research.contains("Galion Research"), "{research}");
         let mut f = VizFrame::default();
         f.speak.emotion = crate::frame::Emotion { label: "lean-in", intensity: 0.5, valence: 0.0 };
         w.present(&f).unwrap();
@@ -1117,6 +1129,45 @@ mod tests {
         assert!(!r.contains("#B695CF"), "empathy hue is not a circle fill");
         assert!(r.trim_end().ends_with('}'));
         assert!(r.contains("\"persona\":\"samantha\""), "{r}");
+        w.close().unwrap();
+    }
+
+    #[test]
+    fn research_route_serves_the_prompt() {
+        let mut w = WebSurface::serve("127.0.0.1:0".parse().unwrap()).with_page("<!doctype html><canvas></canvas>");
+        w.open().unwrap();
+        let a = w.local_addr().unwrap();
+        let one = get(a, "/one");
+        assert!(one.starts_with("HTTP/1.1 200") && one.contains("<canvas>") && !one.contains("id=\"prompt\""), "{one}");
+        for p in ["/research", "/research/", "/research?kiosk=1"] {
+            let r = get(a, p);
+            assert!(r.starts_with("HTTP/1.1 200") && r.contains("text/html"), "{p} {r}");
+            let body = r.split_once("\r\n\r\n").map(|(_, b)| b).unwrap_or("");
+            for needle in [
+                "<title>Galion Research</title>",
+                "data-product=\"research\"",
+                "id=\"prompt\"",
+                "id=\"voice\"",
+                "aria-label=\"Voice\"",
+                "id=\"add-file\"",
+                "id=\"add-image\"",
+                "TODO: uploads are stubbed",
+                "Ultra $220/€220 one-time",
+                "G.A.L.I.O.N. — General Autonomous Local Intelligence Open Network",
+                "Developed and distributed by Galion Labs",
+                "Perpetual Open MIT License",
+                "Copyright © 2026 Galion Labs. All rights reserved.",
+                "Permission is hereby granted, free of charge",
+                "Copyright (c) 2026 Maciej Grajczyk",
+                "#0A0A0C",
+                "#F5A524",
+                "#7C3AED",
+                "#F5F5F7",
+            ] {
+                assert!(body.contains(needle), "{p} missing {needle}");
+            }
+            assert!(!body.contains("<canvas"), "research is not the one-dot page");
+        }
         w.close().unwrap();
     }
 

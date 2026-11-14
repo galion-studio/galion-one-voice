@@ -1,0 +1,122 @@
+<!doctype html>
+<!--
+G.A.L.I.O.N. — General Autonomous Local Intelligence Open Network
+Developed and distributed by Galion Labs
+Perpetual Open MIT License
+Copyright © 2026 Galion Labs. All rights reserved.
+
+MIT License
+
+Copyright (c) 2026 Maciej Grajczyk
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0A0A0C">
+<meta name="color-scheme" content="dark">
+<title>Galion Research</title>
+<style>
+:root{--ground:#0A0A0C;--ink:#F5F5F7;--amber:#F5A524;--violet:#7C3AED}
+html,body{margin:0;height:100%;background:var(--ground);color:var(--ink)}
+body{min-height:100vh;min-height:100dvh;display:grid;place-items:center;
+  background:
+    radial-gradient(ellipse 72% 58% at 16% 82%, color-mix(in srgb, var(--amber) 22%, transparent), transparent 62%),
+    radial-gradient(ellipse 68% 52% at 86% 14%, color-mix(in srgb, var(--violet) 30%, transparent), transparent 64%),
+    var(--ground);
+  font-family:system-ui,sans-serif}
+main{width:min(980px,calc(100vw - 128px))}
+.ask{display:flex;align-items:center;gap:22px}
+.field{position:relative;flex:1;min-width:0;border-radius:32px;border:1px solid transparent;padding:26px 26px 16px;
+  background:
+    linear-gradient(color-mix(in srgb, var(--ground) 78%, transparent), color-mix(in srgb, var(--ground) 78%, transparent)) padding-box,
+    linear-gradient(128deg, color-mix(in srgb, var(--amber) 72%, transparent), color-mix(in srgb, var(--violet) 78%, transparent)) border-box;
+  box-shadow:0 30px 90px rgba(0,0,0,.38)}
+.field:focus-within{box-shadow:0 30px 90px rgba(0,0,0,.38), 0 0 0 1px color-mix(in srgb, var(--amber) 28%, transparent)}
+textarea{display:block;width:100%;box-sizing:border-box;min-height:156px;margin:0;padding:0 2px;border:0;resize:none;
+  background:transparent;color:var(--ink);font:28px/1.35 system-ui,sans-serif;letter-spacing:-.02em;outline:none}
+textarea::placeholder{color:color-mix(in srgb, var(--ink) 36%, transparent)}
+.tools{display:flex;gap:8px;margin-top:10px}
+.tools button,.voice{appearance:none;display:grid;place-items:center;padding:0;cursor:pointer;color:var(--ink)}
+.tools button{width:40px;height:40px;border-radius:999px;border:1px solid color-mix(in srgb, var(--ink) 16%, transparent);background:transparent;color:color-mix(in srgb, var(--ink) 72%, transparent)}
+.tools button:hover,.tools button:focus-visible{border-color:color-mix(in srgb, var(--amber) 70%, transparent);color:var(--ink);outline:none}
+.voice{width:76px;height:76px;flex:none;border-radius:999px;border:1px solid color-mix(in srgb, var(--amber) 62%, transparent);
+  background:radial-gradient(circle at 36% 30%, color-mix(in srgb, var(--amber) 50%, transparent), color-mix(in srgb, var(--violet) 38%, transparent) 58%, transparent);
+  box-shadow:0 0 36px color-mix(in srgb, var(--violet) 22%, transparent)}
+.voice:hover,.voice:focus-visible{outline:none;box-shadow:0 0 0 6px color-mix(in srgb, var(--amber) 14%, transparent), 0 0 42px color-mix(in srgb, var(--violet) 40%, transparent)}
+.voice[aria-pressed="true"]{box-shadow:0 0 0 8px color-mix(in srgb, var(--amber) 18%, transparent), 0 0 48px color-mix(in srgb, var(--violet) 55%, transparent)}
+.tools svg,.voice svg{width:22px;height:22px;display:block}
+.voice svg{width:28px;height:28px}
+.price{margin:28px 0 0;text-align:center;font:13px/1.4 system-ui,sans-serif;letter-spacing:.08em;color:color-mix(in srgb, var(--ink) 42%, transparent)}
+.sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0}
+@media (max-width:720px){
+  main{width:min(980px,calc(100vw - 40px))}
+  .ask{flex-direction:column;align-items:stretch}
+  textarea{font-size:22px;min-height:120px}
+  .voice{align-self:center}
+}
+</style>
+</head>
+<body data-product="research">
+<main>
+  <form class="ask" id="ask" action="#" method="post">
+    <div class="field">
+      <label class="sr" for="prompt">Ask</label>
+      <textarea id="prompt" name="prompt" rows="4" placeholder="Ask a big question" autocomplete="off"></textarea>
+      <div class="tools">
+        <button type="button" id="add-file" aria-label="Add files">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8.2 12.4 14.4 6.2a3.1 3.1 0 0 1 4.4 4.4l-8 8a4.4 4.4 0 0 1-6.2-6.2l7.2-7.2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        </button>
+        <button type="button" id="add-image" aria-label="Add an image">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="14" rx="2.2" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="8.5" cy="9.5" r="1.3" fill="currentColor"/><path d="M4 16.2 8.8 12l3.2 2.6 3.1-3.4L20 16.4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/></svg>
+        </button>
+        <input id="files" type="file" multiple hidden tabindex="-1" aria-hidden="true">
+      </div>
+    </div>
+    <button type="button" class="voice" id="voice" aria-label="Voice" aria-pressed="false">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M6.5 11a5.5 5.5 0 0 0 11 0M12 16.5V21" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+    </button>
+  </form>
+  <p class="price">Ultra $220/€220 one-time</p>
+</main>
+<script>
+"use strict";
+// TODO: uploads are stubbed. The add-file and add-image icons are UI only.
+// Do not read, store, or send the chosen files. Wire them to the research turn later.
+(function(){
+  var files=document.getElementById("files");
+  function openPicker(ev){ ev.preventDefault(); files.click(); }
+  document.getElementById("add-file").addEventListener("click", openPicker);
+  document.getElementById("add-image").addEventListener("click", openPicker);
+  files.addEventListener("change", function(){
+    // TODO: accept files here. Nothing is uploaded.
+    files.value="";
+  });
+  document.getElementById("voice").addEventListener("click", function(ev){
+    var btn=ev.currentTarget;
+    var on=btn.getAttribute("aria-pressed")==="true";
+    btn.setAttribute("aria-pressed", on?"false":"true");
+  });
+  document.getElementById("ask").addEventListener("submit", function(ev){ ev.preventDefault(); });
+})();
+</script>
+</body>
+</html>

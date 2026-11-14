@@ -111,7 +111,7 @@ fn run<T: TimingFeed, A: AffectFeed>(args: &[String], mut pump: DemoPump<T, A>, 
                     phone = Some(galion_console::phone_host::PhoneHost::from_surface(&web));
                 }
                 match dc.attach(Box::new(web)) {
-                    Ok(()) => notes.push(format!("web → screen http://{addr}/  · /v2 redirects · /dot /mic /turn /reply")),
+                    Ok(()) => notes.push(format!("web → screen http://{addr}/  · /one · /research · /v2 redirects · /dot /mic /turn /reply")),
                     Err(e) => notes.push(format!("web surface failed: {e}")),
                 }
             }
