@@ -36,47 +36,73 @@ SOFTWARE.
 <title>Galion Research</title>
 <style>
 :root{--ground:#0A0A0C;--ink:#F5F5F7;--amber:#F5A524;--violet:#7C3AED}
-html,body{margin:0;height:100%;background:var(--ground);color:var(--ink)}
-body{min-height:100vh;min-height:100dvh;display:grid;place-items:center;
+html,body{margin:0;min-height:100%;background:var(--ground);color:var(--ink)}
+body{min-height:100vh;min-height:100dvh;
   background:
-    radial-gradient(ellipse 72% 58% at 16% 82%, color-mix(in srgb, var(--amber) 22%, transparent), transparent 62%),
-    radial-gradient(ellipse 68% 52% at 86% 14%, color-mix(in srgb, var(--violet) 30%, transparent), transparent 64%),
+    radial-gradient(ellipse 70% 52% at 12% 88%, color-mix(in srgb, var(--amber) 20%, transparent), transparent 64%),
+    radial-gradient(ellipse 64% 48% at 88% 8%, color-mix(in srgb, var(--violet) 28%, transparent), transparent 66%),
     var(--ground);
   font-family:system-ui,sans-serif}
-main{width:min(980px,calc(100vw - 128px))}
+.desk{width:min(1080px,calc(100vw - 96px));margin:0 auto;padding:32px 0 72px}
+.top{display:flex;align-items:center;justify-content:space-between;margin:0 0 36px}
+.brand{font:13px/1 system-ui,sans-serif;letter-spacing:.16em;text-transform:uppercase;color:color-mix(in srgb, var(--ink) 78%, transparent)}
+#to-one{color:color-mix(in srgb, var(--ink) 48%, transparent);font:13px/1 system-ui,sans-serif;letter-spacing:.14em;text-transform:uppercase;text-decoration:none}
+#to-one:hover,#to-one:focus-visible{color:var(--ink);outline:none}
+#handoff{margin:-18px 0 22px;font:14px/1.4 system-ui,sans-serif;color:color-mix(in srgb, var(--amber) 80%, var(--ink))}
 .ask{display:flex;align-items:center;gap:22px}
-.field{position:relative;flex:1;min-width:0;border-radius:32px;border:1px solid transparent;padding:26px 26px 16px;
+.field{position:relative;flex:1;min-width:0;border-radius:32px;border:1px solid transparent;padding:26px 26px 14px;
   background:
-    linear-gradient(color-mix(in srgb, var(--ground) 78%, transparent), color-mix(in srgb, var(--ground) 78%, transparent)) padding-box,
-    linear-gradient(128deg, color-mix(in srgb, var(--amber) 72%, transparent), color-mix(in srgb, var(--violet) 78%, transparent)) border-box;
-  box-shadow:0 30px 90px rgba(0,0,0,.38)}
-.field:focus-within{box-shadow:0 30px 90px rgba(0,0,0,.38), 0 0 0 1px color-mix(in srgb, var(--amber) 28%, transparent)}
-textarea{display:block;width:100%;box-sizing:border-box;min-height:156px;margin:0;padding:0 2px;border:0;resize:none;
+    linear-gradient(color-mix(in srgb, var(--ground) 82%, transparent), color-mix(in srgb, var(--ground) 82%, transparent)) padding-box,
+    linear-gradient(128deg, color-mix(in srgb, var(--amber) 70%, transparent), color-mix(in srgb, var(--violet) 76%, transparent)) border-box;
+  box-shadow:0 28px 80px rgba(0,0,0,.35)}
+.field:focus-within{box-shadow:0 28px 80px rgba(0,0,0,.35), 0 0 0 1px color-mix(in srgb, var(--amber) 28%, transparent)}
+textarea{display:block;width:100%;box-sizing:border-box;min-height:132px;margin:0;padding:0 2px;border:0;resize:none;
   background:transparent;color:var(--ink);font:28px/1.35 system-ui,sans-serif;letter-spacing:-.02em;outline:none}
 textarea::placeholder{color:color-mix(in srgb, var(--ink) 36%, transparent)}
-.tools{display:flex;gap:8px;margin-top:10px}
+.tools{display:flex;align-items:center;gap:8px;margin-top:8px}
 .tools button,.voice{appearance:none;display:grid;place-items:center;padding:0;cursor:pointer;color:var(--ink)}
 .tools button{width:40px;height:40px;border-radius:999px;border:1px solid color-mix(in srgb, var(--ink) 16%, transparent);background:transparent;color:color-mix(in srgb, var(--ink) 72%, transparent)}
 .tools button:hover,.tools button:focus-visible{border-color:color-mix(in srgb, var(--amber) 70%, transparent);color:var(--ink);outline:none}
-.voice{width:76px;height:76px;flex:none;border-radius:999px;border:1px solid color-mix(in srgb, var(--amber) 62%, transparent);
-  background:radial-gradient(circle at 36% 30%, color-mix(in srgb, var(--amber) 50%, transparent), color-mix(in srgb, var(--violet) 38%, transparent) 58%, transparent);
-  box-shadow:0 0 36px color-mix(in srgb, var(--violet) 22%, transparent)}
-.voice:hover,.voice:focus-visible{outline:none;box-shadow:0 0 0 6px color-mix(in srgb, var(--amber) 14%, transparent), 0 0 42px color-mix(in srgb, var(--violet) 40%, transparent)}
-.voice[aria-pressed="true"]{box-shadow:0 0 0 8px color-mix(in srgb, var(--amber) 18%, transparent), 0 0 48px color-mix(in srgb, var(--violet) 55%, transparent)}
-.tools svg,.voice svg{width:22px;height:22px;display:block}
-.voice svg{width:28px;height:28px}
-.price{margin:28px 0 0;text-align:center;font:13px/1.4 system-ui,sans-serif;letter-spacing:.08em;color:color-mix(in srgb, var(--ink) 42%, transparent)}
+.hint{margin-left:auto;font:12px/1 system-ui,sans-serif;letter-spacing:.04em;color:color-mix(in srgb, var(--ink) 38%, transparent)}
+.voice{width:84px;height:84px;flex:none;border:0;border-radius:999px;background:
+  radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--amber) 28%, transparent), color-mix(in srgb, var(--violet) 22%, transparent) 42%, transparent 68%)}
+.voice:focus-visible{outline:1px solid color-mix(in srgb, var(--amber) 70%, transparent);outline-offset:4px}
+.dot{width:22px;height:22px;border-radius:999px;background:#F5F5F7;box-shadow:0 0 18px color-mix(in srgb, var(--ink) 55%, transparent)}
+.voice[aria-pressed="true"] .dot{width:30px;height:30px;box-shadow:0 0 28px color-mix(in srgb, var(--amber) 55%, transparent), 0 0 42px color-mix(in srgb, var(--violet) 45%, transparent)}
+.tools svg{width:22px;height:22px;display:block}
+.price{margin:22px 0 0;text-align:center;font:13px/1.4 system-ui,sans-serif;letter-spacing:.08em;color:color-mix(in srgb, var(--ink) 42%, transparent)}
+.work{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:28px}
+.panel{border:1px solid color-mix(in srgb, var(--ink) 12%, transparent);border-radius:18px;padding:16px 18px 18px;background:color-mix(in srgb, var(--ground) 40%, transparent);min-width:0}
+.panel h2,.citations h3{margin:0 0 12px;font:12px/1 system-ui,sans-serif;font-weight:560;letter-spacing:.16em;text-transform:uppercase;color:color-mix(in srgb, var(--ink) 52%, transparent)}
+#answer{grid-column:1 / -1}
+#plan-list,#source-list,#citation-list{margin:0;padding-left:1.2em}
+#plan-list li,#source-list li{margin:0 0 8px;font:15px/1.45 system-ui,sans-serif;color:color-mix(in srgb, var(--ink) 88%, transparent)}
+#live-question{color:var(--ink)}
+#source-empty,#citation-empty{margin:0;font:15px/1.45 system-ui,sans-serif;color:color-mix(in srgb, var(--ink) 62%, transparent)}
+#reading{max-width:68ch;min-height:7.5em}
+#reading p{margin:0 0 12px;font:18px/1.6 system-ui,sans-serif}
+#reading-question{color:var(--ink)}
+#reading-local{color:color-mix(in srgb, var(--ink) 72%, transparent)}
+.citations{margin-top:8px;padding-top:12px;border-top:1px solid color-mix(in srgb, var(--ink) 10%, transparent)}
+#citation-list{color:color-mix(in srgb, var(--ink) 78%, transparent);font:14px/1.45 system-ui,sans-serif}
+#citation-list .mark{color:var(--amber);margin-right:.4em}
 .sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0}
-@media (max-width:720px){
-  main{width:min(980px,calc(100vw - 40px))}
+@media (max-width:800px){
+  .desk{width:min(1080px,calc(100vw - 32px))}
   .ask{flex-direction:column;align-items:stretch}
-  textarea{font-size:22px;min-height:120px}
+  textarea{font-size:22px;min-height:112px}
   .voice{align-self:center}
+  .work{grid-template-columns:1fr}
 }
 </style>
 </head>
-<body data-product="research">
-<main>
+<body data-product="research" data-standard="432">
+<div class="desk">
+  <header class="top">
+    <div class="brand">Galion Research</div>
+    <a id="to-one" href="/one">Galion One</a>
+  </header>
+  <p id="handoff" hidden>From Galion One.</p>
   <form class="ask" id="ask" action="#" method="post">
     <div class="field">
       <label class="sr" for="prompt">Ask</label>
@@ -89,33 +115,125 @@ textarea::placeholder{color:color-mix(in srgb, var(--ink) 36%, transparent)}
           <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="14" rx="2.2" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="8.5" cy="9.5" r="1.3" fill="currentColor"/><path d="M4 16.2 8.8 12l3.2 2.6 3.1-3.4L20 16.4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/></svg>
         </button>
         <input id="files" type="file" multiple hidden tabindex="-1" aria-hidden="true">
+        <span class="hint" id="commit-hint">Control Return sets the question</span>
       </div>
     </div>
     <button type="button" class="voice" id="voice" aria-label="Voice" aria-pressed="false">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M6.5 11a5.5 5.5 0 0 0 11 0M12 16.5V21" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      <span class="dot" aria-hidden="true"></span>
     </button>
   </form>
   <p class="price">Ultra $220/€220 one-time</p>
-</main>
+  <div class="work">
+    <section class="panel" id="sources" aria-labelledby="sources-label">
+      <h2 id="sources-label">Sources</h2>
+      <ol id="source-list"></ol>
+      <p id="source-empty">No source yet.</p>
+    </section>
+    <section class="panel" id="plan" aria-labelledby="plan-label">
+      <h2 id="plan-label">Plan</h2>
+      <ol id="plan-list">
+        <li id="live-question" hidden></li>
+        <li>State the question.</li>
+        <li>Separate found, inferred, and unknown.</li>
+        <li>Cite only a source that was handed over.</li>
+        <li>Stop at the limit.</li>
+      </ol>
+    </section>
+    <section class="panel" id="answer" aria-labelledby="answer-label">
+      <h2 id="answer-label">Answer</h2>
+      <article id="reading">
+        <p id="reading-question" hidden></p>
+        <p id="reading-body">The answer sits here, with the limit beside it.</p>
+        <p id="reading-local" hidden>Local. Found, inferred, and unknown stay separate until a source is handed over.</p>
+      </article>
+      <div class="citations" id="citations">
+        <h3>Citations</h3>
+        <p id="citation-empty">None in hand.</p>
+        <ol id="citation-list"></ol>
+      </div>
+    </section>
+  </div>
+</div>
 <script>
 "use strict";
+// 432 Hz just lattice. The same seven tones as Galion One. No wav files.
+var SOUND_SET=[
+  {id:"arrive",hz:216},
+  {id:"listen",hz:432},
+  {id:"think",hz:540},
+  {id:"speak",hz:648},
+  {id:"yes",hz:864},
+  {id:"no",hz:288},
+  {id:"leave",hz:108}
+];
+var audio=null;
+function tone(id){
+  var row=null;
+  for(var i=0;i<SOUND_SET.length;i++) if(SOUND_SET[i].id===id) row=SOUND_SET[i];
+  if(!row) return;
+  var Ctx=window.AudioContext||window.webkitAudioContext;
+  if(!Ctx) return;
+  if(!audio) audio=new Ctx();
+  if(audio.state==="suspended") audio.resume();
+  try{
+    var o=audio.createOscillator(), g=audio.createGain(), t=audio.currentTime;
+    o.type="sine"; o.frequency.value=row.hz;
+    g.gain.setValueAtTime(0.0001,t);
+    g.gain.exponentialRampToValueAtTime(0.045,t+0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001,t+0.16);
+    o.connect(g); g.connect(audio.destination);
+    o.start(t); o.stop(t+0.18);
+  }catch(e){}
+}
 // TODO: uploads are stubbed. The add-file and add-image icons are UI only.
 // Do not read, store, or send the chosen files. Wire them to the research turn later.
 (function(){
   var files=document.getElementById("files");
+  var prompt=document.getElementById("prompt");
+  if(/[?&]from=one(?:&|$)/.test(location.search)){
+    document.getElementById("handoff").hidden=false;
+    document.body.dataset.handoff="one";
+  }
   function openPicker(ev){ ev.preventDefault(); files.click(); }
   document.getElementById("add-file").addEventListener("click", openPicker);
   document.getElementById("add-image").addEventListener("click", openPicker);
   files.addEventListener("change", function(){
     // TODO: accept files here. Nothing is uploaded.
+    var chosen=files.files?files.files.length:0;
     files.value="";
+    if(chosen>0) document.getElementById("source-empty").textContent="No source yet. The file was not attached.";
   });
   document.getElementById("voice").addEventListener("click", function(ev){
     var btn=ev.currentTarget;
     var on=btn.getAttribute("aria-pressed")==="true";
     btn.setAttribute("aria-pressed", on?"false":"true");
+    tone(on?"leave":"listen");
   });
-  document.getElementById("ask").addEventListener("submit", function(ev){ ev.preventDefault(); });
+  function commitQuestion(){
+    var q=prompt.value.replace(/\s+/g," ").trim();
+    if(!q) return;
+    var live=document.getElementById("live-question");
+    live.textContent=q;
+    live.hidden=false;
+    var lead=document.getElementById("reading-question");
+    lead.textContent=q;
+    lead.hidden=false;
+    document.getElementById("reading-body").textContent="I don't have a source for that.";
+    document.getElementById("reading-local").hidden=false;
+    document.getElementById("answer").dataset.set="1";
+    tone("think");
+    setTimeout(function(){ tone("speak"); }, 200);
+  }
+  prompt.addEventListener("keydown", function(ev){
+    if(ev.key==="Enter"&&(ev.ctrlKey||ev.metaKey)){
+      ev.preventDefault();
+      commitQuestion();
+    }
+  });
+  document.getElementById("ask").addEventListener("submit", function(ev){
+    ev.preventDefault();
+    commitQuestion();
+  });
 })();
 </script>
 </body>
