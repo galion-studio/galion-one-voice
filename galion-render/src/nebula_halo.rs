@@ -379,6 +379,25 @@ mod tests {
         let page = include_str!("../../crates/galion-console/assets/v1-screen.html");
         assert!(page.contains("drawNebula"));
         assert!(page.contains("/nebula/vocabulary.mjs"));
+        assert!(page.contains("id:\"arrive\",hz:216"));
+        assert!(page.contains("id:\"listen\",hz:432"));
+        assert!(page.contains("id:\"think\",hz:540"));
+        assert!(page.contains("id:\"speak\",hz:648"));
+        assert!(page.contains("id:\"yes\",hz:864"));
+        assert!(page.contains("id:\"no\",hz:288"));
+        assert!(page.contains("id:\"leave\",hz:108"));
+        assert!(page.contains("id=\"decide\""));
+        assert!(page.contains("#decide{display:none}"));
+        assert!(page.contains("function productIsOne"));
+        assert!(page.contains("Galion One"));
+        assert!(page.contains("v2/decide"));
+        for q in [
+            "Keep this session on this machine",
+            "Stay quiet when the turn ends",
+            "Keep replies in English",
+        ] {
+            assert!(page.contains(q), "{q}");
+        }
         assert!(page.contains("present!==true"));
         assert!(page.contains("estimate===\"none\""));
         assert!(page.contains("#F5F5F7"));

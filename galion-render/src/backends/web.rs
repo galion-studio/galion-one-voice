@@ -819,6 +819,19 @@ fn route(req: &mut Request, sh: &Shared) -> (&'static str, &'static str, Vec<u8>
             wipe_string(&mut token);
             ("200 OK", "application/json", cc0_json(accepted).into_bytes())
         }
+        ("GET", "/v2/decisions") => (
+            "200 OK",
+            "application/json",
+            crate::v2_persona::decisions_json().into_bytes(),
+        ),
+        ("POST", "/v2/decide") => {
+            let raw = String::from_utf8_lossy(&req.body).into_owned();
+            zeroise_bytes(&mut req.body);
+            match crate::v2_persona::decision_reply(&raw) {
+                Some(json) => ("200 OK", "application/json", json.into_bytes()),
+                None => ("400 Bad Request", "text/plain", txt("decisions")),
+            }
+        }
         ("POST", "/v2/say") => {
             if req.body.is_empty() {
                 return ("400 Bad Request", "text/plain", txt("empty body"));
@@ -886,7 +899,7 @@ fn route(req: &mut Request, sh: &Shared) -> (&'static str, &'static str, Vec<u8>
                     Some(js) => ("200 OK", "text/javascript; charset=utf-8", js.as_bytes().to_vec()),
                     None => ("404 Not Found", "text/plain", txt("not found")),
                 },
-                "/" | "/screen" if sh.page.is_some() => {
+                "/" | "/screen" | "/one" | "/one/" if sh.page.is_some() => {
                     let html = sh.page.unwrap_or_default();
                     let page = if sh.edge.disclosure { html.to_string() } else { strip_ai_disclosure(html) };
                     ("200 OK", "text/html; charset=utf-8", page.into_bytes())
@@ -1061,10 +1074,38 @@ mod tests {
         let mut w = WebSurface::serve("127.0.0.1:0".parse().unwrap()).with_page("<!doctype html><canvas></canvas>");
         w.open().unwrap();
         let a = w.local_addr().unwrap();
-        for p in ["/", "/screen", "/?kiosk=1"] {
+        for p in ["/", "/screen", "/one", "/one/", "/?kiosk=1"] {
             let r = get(a, p);
             assert!(r.starts_with("HTTP/1.1 200") && r.contains("text/html") && r.contains("<canvas>"), "{r}");
         }
+        let decisions = get(a, "/v2/decisions");
+        assert!(decisions.contains("galion-session-decision/1") && decisions.contains("\"id\":\"here\""), "{decisions}");
+        let body = r#"{"answers":[{"id":"english","yes":true},{"id":"quiet","yes":false},{"id":"here","yes":true}]}"#;
+        let mut s = std::net::TcpStream::connect(a).unwrap();
+        s.write_all(
+            format!(
+                "POST /v2/decide HTTP/1.1\r\nHost: x\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{body}",
+                body.len()
+            )
+            .as_bytes(),
+        )
+        .unwrap();
+        let mut out = String::new();
+        s.read_to_string(&mut out).unwrap();
+        assert!(out.contains("HTTP/1.1 200") && out.contains("Keep replies in English: yes"), "{out}");
+        let partial = r#"{"answers":[{"id":"here","yes":true}]}"#;
+        let mut s = std::net::TcpStream::connect(a).unwrap();
+        s.write_all(
+            format!(
+                "POST /v2/decide HTTP/1.1\r\nHost: x\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{partial}",
+                partial.len()
+            )
+            .as_bytes(),
+        )
+        .unwrap();
+        let mut bad = String::new();
+        s.read_to_string(&mut bad).unwrap();
+        assert!(bad.starts_with("HTTP/1.1 400"), "{bad}");
         let mut f = VizFrame::default();
         f.speak.emotion = crate::frame::Emotion { label: "lean-in", intensity: 0.5, valence: 0.0 };
         w.present(&f).unwrap();

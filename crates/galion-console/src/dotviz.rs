@@ -471,10 +471,17 @@ mod tests {
         assert!(V2_SCREEN_HTML.contains("location.replace"));
         assert!(!V2_SCREEN_HTML.contains("createRadialGradient"), "the second circle page is gone");
         assert!(SCREEN_HTML.contains("data-persona=\"samantha\""));
-        // Owner t653u: pure voice-to-voice. One dot + one full-screen object; no
-        // text, labels, buttons, inputs, captions or CC0 UI (CC0 is enforced at clone time).
+        // Owner t653u: the voice surface is one dot. Slavik's desktop session
+        // widget lives only inside #decide and stays display:none below 1100px.
+        assert!(SCREEN_HTML.contains("id=\"decide\""));
+        assert!(SCREEN_HTML.contains("#decide{display:none}"));
+        assert!(SCREEN_HTML.contains("@media (min-width:1100px)"));
+        assert!(SCREEN_HTML.contains("<!-- /decide -->"));
+        let (head, tail) = SCREEN_HTML.split_once("<div id=\"decide\">").expect("decide");
+        let (_, after) = tail.split_once("<!-- /decide -->").expect("decide end");
+        let voice = format!("{head}{after}");
         for tag in ["<div", "<form", "<input", "<button", "<label", "<span", "<p>", "<a "] {
-            assert!(!SCREEN_HTML.contains(tag), "{tag} is on the voice screen");
+            assert!(!voice.contains(tag), "{tag} is on the voice screen");
         }
         assert!(!SCREEN_HTML.contains("fillText"), "the canvas draws no text");
         assert!(!SCREEN_HTML.contains("fetch(\"v2/cc0\""));
