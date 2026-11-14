@@ -30,6 +30,8 @@
 //! It does not add a surface.
 //! [`workflow`] (same feature) is the one-dot hook: a recorded utterance becomes
 //! speak, a skill, or a program. It does not add a screen.
+//! [`nebula_vocab`] checks the halo vocabulary shipped beside the page.
+//! The one-dot page does not import it.
 
 pub mod auto_workflow;
 #[cfg(feature = "phone-turn")]
@@ -43,6 +45,7 @@ pub mod heartbeat;
 pub mod live;
 pub mod mic;
 pub mod model;
+pub mod nebula_vocab;
 #[cfg(feature = "phone-turn")]
 pub mod phone_host;
 pub mod source;
