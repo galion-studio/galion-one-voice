@@ -60,7 +60,7 @@ body{min-height:100vh;min-height:100dvh;
 textarea{display:block;width:100%;box-sizing:border-box;min-height:132px;margin:0;padding:0 2px;border:0;resize:none;
   background:transparent;color:var(--ink);font:28px/1.35 system-ui,sans-serif;letter-spacing:-.02em;outline:none}
 textarea::placeholder{color:color-mix(in srgb, var(--ink) 36%, transparent)}
-.tools{display:flex;align-items:center;gap:8px;margin-top:8px}
+.tools{display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap}
 .tools button,.voice{appearance:none;display:grid;place-items:center;padding:0;cursor:pointer;color:var(--ink)}
 .tools button{width:40px;height:40px;border-radius:999px;border:1px solid color-mix(in srgb, var(--ink) 16%, transparent);background:transparent;color:color-mix(in srgb, var(--ink) 72%, transparent)}
 .tools button:hover,.tools button:focus-visible{border-color:color-mix(in srgb, var(--amber) 70%, transparent);color:var(--ink);outline:none}
@@ -106,7 +106,23 @@ textarea::placeholder{color:color-mix(in srgb, var(--ink) 36%, transparent)}
 #citation-list{color:color-mix(in srgb, var(--ink) 78%, transparent);font:14px/1.45 system-ui,sans-serif}
 #citation-list .mark{color:var(--amber);margin-right:.4em}
 #helpers{margin:18px 0 0;text-align:center;font:13px/1.4 system-ui,sans-serif;letter-spacing:.04em;color:color-mix(in srgb, var(--ink) 46%, transparent)}
-#ui-toggle{width:auto;height:40px;padding:0 14px;border-radius:999px;font:12px/1 system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase}
+#ui-toggle,#silence{width:auto;height:40px;padding:0 14px;border-radius:999px;font:12px/1 system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase}
+#silence[aria-pressed="true"]{border-color:color-mix(in srgb, var(--sky) 70%, transparent);color:var(--ink)}
+.panel-head{display:flex;align-items:baseline;justify-content:space-between;gap:16px;margin:0 0 12px}
+.panel-head h2{margin:0}
+.win{display:flex;gap:14px;flex:none}
+.win button{appearance:none;border:0;background:transparent;padding:0;cursor:pointer;color:color-mix(in srgb, var(--ink) 46%, transparent);font:12px/1 system-ui,sans-serif;letter-spacing:.12em;text-transform:uppercase;white-space:nowrap}
+.win button:hover,.win button:focus-visible{color:var(--ink);outline:1px solid color-mix(in srgb, var(--sky) 70%, transparent);outline-offset:3px}
+.panel[data-window="minimised"] .panel-body,
+.panel[data-window="closed"] .panel-body{display:none}
+.panel[data-window="closed"] .win-min{display:none}
+.panel[data-window="minimised"],
+.panel[data-window="closed"],
+#sources[data-window="minimised"],
+#sources[data-window="closed"]{min-height:0}
+@media (prefers-reduced-motion: reduce){
+  .panel-body{transition:none}
+}
 body[data-ui="minimal"] #rail,
 body[data-ui="minimal"] .work,
 body[data-ui="minimal"] #add-image{display:none}
@@ -127,7 +143,7 @@ body[data-ui="minimal"] #helpers{margin:0}
 }
 </style>
 </head>
-<body data-product="research" data-voice="galion-research" data-voice-to-voice="on" data-standard="432" data-ui="minimal">
+<body data-product="research" data-voice="galion-research" data-voice-to-voice="on" data-standard="432" data-ui="minimal" data-resonance="on" data-silence="off" data-motion="full">
 <div class="app">
 <aside id="rail">
   <p class="brand">Galion Research</p>
@@ -157,6 +173,7 @@ body[data-ui="minimal"] #helpers{margin:0}
         </button>
         <input id="files" type="file" multiple hidden tabindex="-1" aria-hidden="true">
         <button type="button" id="ui-toggle" aria-pressed="true">Show interface</button>
+        <button type="button" id="silence" aria-pressed="false">Silence</button>
         <span class="hint" id="commit-hint">Return enqueues the question</span>
       </div>
     </div>
@@ -166,59 +183,260 @@ body[data-ui="minimal"] #helpers{margin:0}
   </form>
   <p id="helpers" hidden>Helpers are quiet.</p>
   <div class="work">
-    <section class="panel" id="sources" aria-labelledby="sources-label">
-      <h2 id="sources-label">Sources</h2>
+    <section class="panel" id="sources" data-window="open" aria-expanded="true" aria-labelledby="sources-label">
+      <div class="panel-head">
+        <h2 id="sources-label">Sources</h2>
+        <div class="win">
+          <button type="button" class="win-min" data-win="minimise" aria-label="Minimise Sources">Minimise</button>
+          <button type="button" class="win-close" data-win="close" aria-label="Close Sources">Close</button>
+        </div>
+      </div>
+      <div class="panel-body">
       <div class="piles">
         <div class="pile" id="sources-local"><h3>Local</h3><ol id="local-list"></ol><p id="source-empty">No source yet.</p></div>
         <div class="pile" id="sources-reading"><h3>Reading</h3><ol id="reading-list"></ol><p id="reading-empty">No source yet.</p></div>
         <div class="pile" id="sources-arriving"><h3>Arriving</h3><ol id="arriving-list"></ol><p id="arriving-empty">No source yet.</p></div>
       </div>
+      </div>
     </section>
-    <section class="panel" id="citations" aria-labelledby="citations-label">
-      <h2 id="citations-label">Citations</h2>
+    <section class="panel" id="citations" data-window="open" aria-expanded="true" aria-labelledby="citations-label">
+      <div class="panel-head">
+        <h2 id="citations-label">Citations</h2>
+        <div class="win">
+          <button type="button" class="win-min" data-win="minimise" aria-label="Minimise Citations">Minimise</button>
+          <button type="button" class="win-close" data-win="close" aria-label="Close Citations">Close</button>
+        </div>
+      </div>
+      <div class="panel-body">
       <p id="citation-empty">None in hand.</p>
       <ol id="citation-list"></ol>
+      </div>
     </section>
-    <section class="panel" id="notebook" aria-labelledby="notebook-label">
-      <h2 id="notebook-label">Notebook</h2>
+    <section class="panel" id="notebook" data-window="open" aria-expanded="true" aria-labelledby="notebook-label">
+      <div class="panel-head">
+        <h2 id="notebook-label">Notebook</h2>
+        <div class="win">
+          <button type="button" class="win-min" data-win="minimise" aria-label="Minimise Notebook">Minimise</button>
+          <button type="button" class="win-close" data-win="close" aria-label="Close Notebook">Close</button>
+        </div>
+      </div>
+      <div class="panel-body">
       <div class="book">
         <div id="found"><h3>Found</h3><ul id="found-list"></ul><p id="found-empty">Empty.</p></div>
         <div id="inferred"><h3>Inferred</h3><ul id="inferred-list"></ul><p id="inferred-empty">Empty.</p></div>
         <div id="unknown"><h3>Unknown</h3><ul id="unknown-list"></ul><p id="unknown-empty">Empty.</p></div>
       </div>
+      </div>
     </section>
-    <section class="panel" id="answer" aria-labelledby="answer-label">
-      <h2 id="answer-label">Open job</h2>
+    <section class="panel" id="answer" data-window="open" aria-expanded="true" aria-labelledby="answer-label">
+      <div class="panel-head">
+        <h2 id="answer-label">Open job</h2>
+        <div class="win">
+          <button type="button" class="win-min" data-win="minimise" aria-label="Minimise Open job">Minimise</button>
+          <button type="button" class="win-close" data-win="close" aria-label="Close Open job">Close</button>
+        </div>
+      </div>
+      <div class="panel-body">
       <article id="reading">
         <p id="reading-question" hidden></p>
         <p id="reading-body">The answer sits here, with the limit beside it.</p>
       </article>
+      </div>
     </section>
-    <section class="panel" id="experiments" aria-labelledby="experiments-label">
-      <h2 id="experiments-label">Experiments</h2>
+    <section class="panel" id="experiments" data-window="open" aria-expanded="true" aria-labelledby="experiments-label">
+      <div class="panel-head">
+        <h2 id="experiments-label">Experiments</h2>
+        <div class="win">
+          <button type="button" class="win-min" data-win="minimise" aria-label="Minimise Experiments">Minimise</button>
+          <button type="button" class="win-close" data-win="close" aria-label="Close Experiments">Close</button>
+        </div>
+      </div>
+      <div class="panel-body">
       <article class="card" id="experiment">
         <p>Ask first. Nothing runs until you allow it.</p>
         <button type="button" id="allow-experiment" aria-pressed="false">Allow this experiment</button>
         <p id="experiment-state">Waiting for permission.</p>
       </article>
+      </div>
     </section>
   </div>
 </main>
 </div>
+<script type="application/json" id="research-cues">
+[
+  {"id": "question", "kind": "resonance", "ratio": "5:4", "notes": [432, 540], "hum": [108, 216], "gain": 0.04, "step": 0.09, "dur": 0.2},
+  {"id": "thinking", "kind": "resonance", "ratio": "1:2", "notes": [108, 216], "hum": [], "gain": 0.008, "dur": 0.7, "soft": true},
+  {"id": "found", "kind": "resonance", "ratio": "2:1", "notes": [540, 864], "hum": [108, 216], "gain": 0.042, "step": 0.1, "dur": 0.24},
+  {"id": "inferred", "kind": "resonance", "ratio": "3:2", "notes": [648, 540], "hum": [108, 216], "gain": 0.036, "step": 0.1, "dur": 0.22},
+  {"id": "unknown", "kind": "resonance", "ratio": "2:3", "notes": [288, 216], "hum": [108, 216], "gain": 0.034, "step": 0.11, "dur": 0.26},
+  {"id": "file", "kind": "resonance", "ratio": "5:4", "notes": [540], "hum": [108, 216], "gain": 0.038, "dur": 0.16},
+  {"id": "hide", "kind": "resonance", "ratio": "1:2", "notes": [216], "hum": [108, 216], "gain": 0.03, "dur": 0.18},
+  {"id": "show", "kind": "resonance", "ratio": "2:1", "notes": [432, 864], "hum": [108, 216], "gain": 0.04, "step": 0.08, "dur": 0.18},
+  {"id": "window-open", "kind": "bell", "ratio": "5:4", "notes": [540, 648, 864], "hum": [], "gain": 0.05, "decays": [0.42, 0.28, 0.16]},
+  {"id": "window-close", "kind": "bell", "ratio": "3:2", "notes": [432, 288, 216], "hum": [], "gain": 0.046, "decays": [0.4, 0.3, 0.22]},
+  {"id": "window-minimise", "kind": "bell", "ratio": "3:4", "notes": [432, 324, 216], "hum": [], "gain": 0.04, "decays": [0.26, 0.2, 0.16]},
+  {"id": "window-settle", "kind": "bell", "ratio": "1:1", "notes": [432], "hum": [108, 216], "gain": 0.028, "decays": [0.55]}
+]
+</script>
 <script>
 "use strict";
-// Research cues. 432 Hz just intonation. Definitions only. No voice audio and no wav files.
-var RESEARCH_CUES=[
-  {id:"ask",ratio:"1:1",hz:432},
-  {id:"listen",ratio:"1:1",hz:432},
-  {id:"helper",ratio:"5:4",hz:540},
-  {id:"local",ratio:"2:3",hz:288},
-  {id:"returned",ratio:"3:2",hz:648},
-  {id:"hide",ratio:"1:2",hz:216},
-  {id:"show",ratio:"2:1",hz:864},
-  {id:"leave",ratio:"1:4",hz:108}
-];
-var SOUND_SET=RESEARCH_CUES;
+// Research cues. docs/07-sound-guide/SOUND-LANGUAGE.md
+// 432 Hz just intonation (2:1, 3:2, 5:4) and the warm hum at 216 and 108.
+// Resonance is the desk. Bells are strikes for window open, close, minimise, and settle only.
+// Oscillators only. No voice audio and no wav files.
+var RESEARCH_CUES=JSON.parse(document.getElementById("research-cues").textContent);
+window.GALION_RESEARCH=RESEARCH_CUES;
+var audio=null, gestured=false, silence=false;
+function motionReduced(){
+  return !!(window.matchMedia&&window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+}
+function paintMotion(){
+  document.body.setAttribute("data-motion", motionReduced()?"reduced":"full");
+}
+function silenceRequested(){
+  try{ if(localStorage.getItem("galion-research-silence")==="1") return true; }catch(e){}
+  return new URLSearchParams(location.search).get("silence")==="1";
+}
+function setSilence(on){
+  silence=!!on;
+  document.body.setAttribute("data-silence", silence?"on":"off");
+  document.body.setAttribute("data-resonance", silence?"off":"on");
+  var btn=document.getElementById("silence");
+  if(btn) btn.setAttribute("aria-pressed", silence?"true":"false");
+  try{ localStorage.setItem("galion-research-silence", silence?"1":"0"); }catch(e){}
+}
+function noteGesture(){ gestured=true; }
+function armAudio(){
+  if(!gestured) return null;
+  var Ctx=window.AudioContext||window.webkitAudioContext;
+  if(!Ctx) return null;
+  try{
+    if(!audio){ audio=new Ctx(); window.__audioStarted=true; }
+    if(audio.state==="suspended") audio.resume();
+    return audio;
+  }catch(e){ return null; }
+}
+function cueById(id){
+  for(var i=0;i<RESEARCH_CUES.length;i++) if(RESEARCH_CUES[i].id===id) return RESEARCH_CUES[i];
+  return null;
+}
+function scheduleTone(ctx,hz,start,dur,peak,bell){
+  var o=ctx.createOscillator(), g=ctx.createGain();
+  o.type="sine";
+  o.frequency.value=hz;
+  var attack=bell?0.004:0.028;
+  var safe=Math.max(attack+0.04, dur);
+  g.gain.setValueAtTime(0.0001, start);
+  g.gain.exponentialRampToValueAtTime(Math.max(0.0002, peak), start+attack);
+  g.gain.exponentialRampToValueAtTime(0.0001, start+safe);
+  o.connect(g); g.connect(ctx.destination);
+  o.start(start); o.stop(start+safe+0.03);
+}
+function playCue(id){
+  if(!gestured||silence||motionReduced()) return;
+  var row=cueById(id);
+  if(!row) return;
+  var ctx=armAudio();
+  if(ctx){
+    try{
+      var t=ctx.currentTime, bell=row.kind==="bell";
+      var notes=row.notes||[], hum=row.hum||[];
+      var gain=typeof row.gain==="number"?row.gain:0.04;
+      var bed=0;
+      if(bell){
+        var decays=row.decays||[];
+        for(var i=0;i<notes.length;i++){
+          var dur=decays[i]||0.28;
+          if(dur>bed) bed=dur;
+          scheduleTone(ctx, notes[i], t, dur, Math.max(0.008, gain*(1-i*0.18)), true);
+        }
+      }else{
+        var step=typeof row.step==="number"?row.step:0;
+        var hold=typeof row.dur==="number"?row.dur:0.2;
+        bed=notes.length*step+hold;
+        for(var n=0;n<notes.length;n++) scheduleTone(ctx, notes[n], t+n*step, hold, gain, false);
+      }
+      var humGain=row.soft?gain:Math.min(gain, 0.012);
+      for(var h=0;h<hum.length;h++){
+        var dup=false;
+        for(var k=0;k<notes.length;k++) if(notes[k]===hum[h]) dup=true;
+        if(!dup) scheduleTone(ctx, hum[h], t, Math.max(0.2, bed), humGain, false);
+      }
+    }catch(e){}
+  }
+  var log=(document.body.getAttribute("data-cues")||"").split(",").filter(Boolean);
+  log.push(id);
+  document.body.setAttribute("data-cues", log.slice(-24).join(","));
+  document.body.setAttribute("data-cue", id);
+}
+function answerCue(status){
+  if(status==="Found") return "found";
+  if(status==="Inferred") return "inferred";
+  return "unknown";
+}
+function windowTitle(panel){
+  var h=panel.querySelector("h2");
+  return h?h.textContent:"window";
+}
+function paintWin(panel){
+  var state=panel.getAttribute("data-window")||"open";
+  var minBtn=panel.querySelector(".win-min");
+  var closeBtn=panel.querySelector(".win-close");
+  var name=windowTitle(panel);
+  if(minBtn){
+    var folded=state==="minimised";
+    minBtn.textContent=folded?"Open":"Minimise";
+    minBtn.setAttribute("aria-label", (folded?"Open ":"Minimise ")+name);
+    minBtn.setAttribute("data-win", folded?"open":"minimise");
+  }
+  if(closeBtn){
+    var shut=state==="closed";
+    closeBtn.textContent=shut?"Open":"Close";
+    closeBtn.setAttribute("aria-label", (shut?"Open ":"Close ")+name);
+    closeBtn.setAttribute("data-win", shut?"open":"close");
+  }
+  panel.setAttribute("aria-expanded", state==="open"?"true":"false");
+}
+function armSettle(panel){
+  var token=(panel._settle||0)+1;
+  panel._settle=token;
+  setTimeout(function(){
+    if(panel._settle!==token) return;
+    playCue("window-settle");
+  }, motionReduced()?0:180);
+}
+function onWindowClick(ev){
+  var btn=ev.target.closest?ev.target.closest("[data-win]"):null;
+  var panel=ev.currentTarget;
+  if(!btn||!panel.contains(btn)) return;
+  var act=btn.getAttribute("data-win");
+  var next=act==="minimise"?"minimised":act==="close"?"closed":"open";
+  var prev=panel.getAttribute("data-window")||"open";
+  if(next===prev) return;
+  panel.setAttribute("data-window", next);
+  paintWin(panel);
+  if(next==="open") playCue("window-open");
+  else if(next==="minimised") playCue("window-minimise");
+  else playCue("window-close");
+  armSettle(panel);
+}
+paintMotion();
+setSilence(silenceRequested());
+if(window.matchMedia){
+  var motionQuery=window.matchMedia("(prefers-reduced-motion: reduce)");
+  if(motionQuery.addEventListener) motionQuery.addEventListener("change", paintMotion);
+}
+document.addEventListener("pointerdown", noteGesture, true);
+document.addEventListener("keydown", noteGesture, true);
+document.getElementById("silence").addEventListener("click", function(ev){
+  ev.preventDefault();
+  setSilence(!silence);
+});
+Array.prototype.forEach.call(document.querySelectorAll(".panel"), function(panel){
+  if(!panel.querySelector(".win")) return;
+  paintWin(panel);
+  panel.addEventListener("click", onWindowClick);
+});
 // Voice V2 disc, restyled as the research entry. Same pigment as the one-dot page. Not the full-screen orb.
 var MARK={core:"#F5F5F7",edge:"#E8E8ED",stroke:"rgba(255,255,255,0.55)",strokePx:1};
 function markInner(warm){
@@ -233,9 +451,10 @@ function paintVoice(){
   var W=Math.max(2, Math.round(css*dpr));
   if(voiceCv.width!==W||voiceCv.height!==W){ voiceCv.width=W; voiceCv.height=W; }
   var listening=document.getElementById("voice").getAttribute("aria-pressed")==="true";
-  var breath=Math.sin(((now-voiceT0)%1600)/1600*2*Math.PI);
-  var aim=(listening?0.46:0.34)+(listening?0.01:0.012)*breath;
-  voiceRad+=(aim-voiceRad)*0.08;
+  var reduce=motionReduced();
+  var breath=reduce?0:Math.sin(((now-voiceT0)%1600)/1600*2*Math.PI);
+  var aim=(listening?0.46:0.34)+(reduce?0:(listening?0.01:0.012)*breath);
+  if(reduce) voiceRad=aim; else voiceRad+=(aim-voiceRad)*0.08;
   var rad=voiceRad*(W/2);
   var k=listening?0.72:0.48+0.08*breath;
   voiceCx.clearRect(0,0,W,W);
@@ -257,25 +476,6 @@ function paintVoice(){
   requestAnimationFrame(paintVoice);
 }
 requestAnimationFrame(paintVoice);
-var audio=null;
-function tone(id){
-  var row=null;
-  for(var i=0;i<SOUND_SET.length;i++) if(SOUND_SET[i].id===id) row=SOUND_SET[i];
-  if(!row) return;
-  var Ctx=window.AudioContext||window.webkitAudioContext;
-  if(!Ctx) return;
-  if(!audio) audio=new Ctx();
-  if(audio.state==="suspended") audio.resume();
-  try{
-    var o=audio.createOscillator(), g=audio.createGain(), t=audio.currentTime;
-    o.type="sine"; o.frequency.value=row.hz;
-    g.gain.setValueAtTime(0.0001,t);
-    g.gain.exponentialRampToValueAtTime(0.045,t+0.02);
-    g.gain.exponentialRampToValueAtTime(0.0001,t+0.16);
-    o.connect(g); g.connect(audio.destination);
-    o.start(t); o.stop(t+0.18);
-  }catch(e){}
-}
 // Attached files are Sources. The desk cites only those ids.
 (function(){
   var files=document.getElementById("files");
@@ -318,7 +518,7 @@ function tone(id){
     }
     fillPile("unknown", [LOCAL]);
     paintHistory([{status:"Unreachable", question:q}]);
-    tone("local");
+    playCue("unknown");
   }
   function showTurn(j){
     var q=j.question||"";
@@ -342,7 +542,7 @@ function tone(id){
     hermesStatus("Hermes · "+standing);
     helpers.hidden=false;
     helpers.textContent=standing==="Unreachable"?"Helpers are quiet. Local knowledge carries the question.":standing;
-    tone(j.status==="Unreachable"?"local":"returned");
+    playCue(answerCue(standing));
   }
   function fillPile(id, rows){
     var list=document.getElementById(id+"-list");
@@ -373,7 +573,7 @@ function tone(id){
     fetch("/research/sources",{method:"POST",cache:"no-store",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:file.name,text:text,kind:kind})})
       .then(function(r){ return r.ok?r.json():null; })
       .then(function(j){
-        if(j&&Array.isArray(j.sources)) paintSources(j.sources);
+        if(j&&Array.isArray(j.sources)){ paintSources(j.sources); playCue("file"); }
         else if(!attached.length) document.getElementById("source-empty").textContent="The file was not attached.";
       })
       .catch(function(){
@@ -397,6 +597,9 @@ function tone(id){
   files.addEventListener("change", function(){
     var list=files.files?Array.prototype.slice.call(files.files):[];
     files.value="";
+    if(!list.length) return;
+    noteGesture();
+    armAudio();
     list.forEach(function(file){
       var image=(file.type||"").indexOf("image/")===0;
       if(image){ postSource(file,"","image"); return; }
@@ -416,19 +619,20 @@ function tone(id){
     var btn=ev.currentTarget;
     var on=btn.getAttribute("aria-pressed")==="true";
     btn.setAttribute("aria-pressed", on?"false":"true");
-    tone(on?"leave":"listen");
   });
   function commitQuestion(){
     var q=prompt.value.replace(/\s+/g," ").trim();
     if(!q) return;
     if(pending>0){ waiting=true; return; }
+    noteGesture();
+    armAudio();
     hermesStatus("Hermes · Running");
     helpers.hidden=false;
     helpers.textContent="Helpers: reading, sources, notebook.";
     fillList(document.getElementById("arriving-list"), [q]);
     document.getElementById("arriving-empty").hidden=true;
-    tone("ask");
-    setTimeout(function(){ tone("helper"); }, 180);
+    playCue("question");
+    playCue("thinking");
     fetch("/research/ask",{method:"POST",cache:"no-store",headers:{"Content-Type":"application/json"},body:JSON.stringify({question:q})})
       .then(function(r){ return r.ok?r.json():null; })
       .then(function(j){
@@ -450,7 +654,7 @@ function tone(id){
     document.body.setAttribute("data-ui", minimal?"":"minimal");
     ev.currentTarget.textContent=minimal?"Hide interface":"Show interface";
     ev.currentTarget.setAttribute("aria-pressed", minimal?"false":"true");
-    tone(minimal?"show":"hide");
+    playCue(minimal?"show":"hide");
   });
   document.getElementById("allow-experiment").addEventListener("click", function(ev){
     var btn=ev.currentTarget;

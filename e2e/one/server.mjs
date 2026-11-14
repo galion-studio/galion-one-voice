@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "../..");
 const html = readFileSync(join(root, "crates/galion-console/assets/v1-screen.html"));
+const research = readFileSync(join(root, "crates/galion-console/assets/research.html"));
 const vocab = readFileSync(join(root, "crates/galion-console/assets/nebula/vocabulary.mjs"));
 
 const neutral = {
@@ -78,6 +79,68 @@ const server = createServer((req, res) => {
   if (req.method === "GET" && (url.pathname === "/one" || url.pathname === "/one/")) {
     res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
     res.end(html);
+    return;
+  }
+  if (req.method === "GET" && (url.pathname === "/research" || url.pathname === "/research/")) {
+    res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
+    res.end(research);
+    return;
+  }
+  if (req.method === "GET" && url.pathname === "/research/hermes") {
+    res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
+    res.end('{"app":"hermes","status":"Idle","key":"none"}');
+    return;
+  }
+  if (req.method === "GET" && url.pathname === "/research/history") {
+    res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
+    res.end('{"items":[]}');
+    return;
+  }
+  if (req.method === "GET" && url.pathname === "/research/sources") {
+    res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
+    res.end('{"sources":[]}');
+    return;
+  }
+  if (req.method === "POST" && (url.pathname === "/research/ask" || url.pathname === "/research/sources")) {
+    const chunks = [];
+    req.on("data", (chunk) => chunks.push(chunk));
+    req.on("end", () => {
+      let body = {};
+      try {
+        body = JSON.parse(Buffer.concat(chunks).toString() || "{}");
+      } catch {
+        body = {};
+      }
+      if (url.pathname === "/research/sources") {
+        const name = typeof body.name === "string" && body.name ? body.name : "note.txt";
+        const kind = body.kind === "image" ? "image" : "file";
+        res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
+        res.end(JSON.stringify({ sources: [{ id: "s1", name, kind, chars: 18 }] }));
+        return;
+      }
+      const question = typeof body.question === "string" ? body.question : "";
+      let status = "Unknown";
+      if (/infer/i.test(question)) status = "Inferred";
+      else if (/found/i.test(question)) status = "Found";
+      const line =
+        status === "Found"
+          ? "The note is in hand."
+          : status === "Inferred"
+            ? "A cooler mix would read as night."
+            : "The hex is not in the note.";
+      res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
+      res.end(
+        JSON.stringify({
+          question,
+          reply: line,
+          citations: [],
+          found: status === "Found" ? [line] : [],
+          inferred: status === "Inferred" ? [line] : [],
+          unknown: status === "Unknown" ? [line] : [],
+          status,
+        }),
+      );
+    });
     return;
   }
   if (req.method === "GET" && url.pathname === "/nebula/vocabulary.mjs") {

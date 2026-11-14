@@ -1566,12 +1566,15 @@ mod tests {
                 "data-voice-to-voice=\"on\"",
                 "id=\"ui-toggle\"",
                 "id=\"helpers\"",
-                "ratio:\"5:4\"",
+                "id=\"silence\"",
+                "id=\"research-cues\"",
+                "galion-research-silence",
+                "prefers-reduced-motion",
+                "\"kind\": \"resonance\"",
+                "\"kind\": \"bell\"",
+                "window-minimise",
+                "window-settle",
                 "Local. What is already known stays marked local.",
-                "hz:432",
-                "hz:216",
-                "hz:540",
-                "hz:648",
                 "G.A.L.I.O.N. — General Autonomous Local Intelligence Open Network",
                 "Developed and distributed by Galion Labs",
                 "Perpetual Open MIT License",
@@ -1591,6 +1594,176 @@ mod tests {
             assert!(!body.contains("data-mark=\"orb\""), "the full-screen orb stays on /one");
         }
         w.close().unwrap();
+    }
+
+    fn on_432_lattice(hz: i64) -> bool {
+        // 432 * 2^a * (3/2)^b * (5/4)^c. Generators are the octave, the fifth, and the major third.
+        if hz <= 0 {
+            return false;
+        }
+        for c in -4i32..=4 {
+            for b in -4i32..=4 {
+                for a in -6i32..=6 {
+                    let mut num: i128 = 432;
+                    let mut den: i128 = 1;
+                    if a >= 0 {
+                        num <<= a as u32;
+                    } else {
+                        den <<= (-a) as u32;
+                    }
+                    if b >= 0 {
+                        num *= 3i128.pow(b as u32);
+                        den <<= b as u32;
+                    } else {
+                        den *= 3i128.pow((-b) as u32);
+                        num <<= (-b) as u32;
+                    }
+                    if c >= 0 {
+                        num *= 5i128.pow(c as u32);
+                        den <<= (2 * c) as u32;
+                    } else {
+                        den *= 5i128.pow((-c) as u32);
+                        num <<= (2 * (-c)) as u32;
+                    }
+                    if den != 0 && num == i128::from(hz) * den {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    }
+
+    fn research_cue_json(html: &str) -> &str {
+        const START: &str = "<script type=\"application/json\" id=\"research-cues\">";
+        let at = html.find(START).expect("research cue table");
+        let rest = &html[at + START.len()..];
+        let end = rest.find("</script>").expect("cue script end");
+        rest[..end].trim()
+    }
+
+    fn cue_objects(json: &str) -> Vec<&str> {
+        let mut out = Vec::new();
+        let mut depth = 0i32;
+        let mut start = 0usize;
+        for (i, c) in json.char_indices() {
+            match c {
+                '{' => {
+                    if depth == 0 {
+                        start = i;
+                    }
+                    depth += 1;
+                }
+                '}' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        out.push(&json[start..=i]);
+                    }
+                }
+                _ => {}
+            }
+        }
+        assert_eq!(depth, 0, "cue json did not close");
+        out
+    }
+
+    fn json_string(obj: &str, key: &str) -> String {
+        let pat = format!("\"{key}\": \"");
+        let i = obj.find(&pat).unwrap_or_else(|| panic!("{key} missing in {obj}"));
+        let rest = &obj[i + pat.len()..];
+        let end = rest.find('"').unwrap();
+        rest[..end].to_string()
+    }
+
+    fn json_numbers(obj: &str, key: &str) -> Vec<i64> {
+        let pat = format!("\"{key}\": [");
+        let i = obj.find(&pat).unwrap_or_else(|| panic!("{key} missing in {obj}"));
+        let rest = &obj[i + pat.len()..];
+        let end = rest.find(']').unwrap();
+        let inner = rest[..end].trim();
+        if inner.is_empty() {
+            return Vec::new();
+        }
+        inner
+            .split(',')
+            .map(|part| part.trim().parse::<i64>().unwrap_or_else(|_| panic!("not an integer hz: {part}")))
+            .collect()
+    }
+
+    fn json_gain(obj: &str) -> f64 {
+        let pat = "\"gain\": ";
+        let i = obj.find(pat).unwrap_or_else(|| panic!("gain missing in {obj}"));
+        let rest = &obj[i + pat.len()..];
+        let end = rest.find([',', '}']).unwrap();
+        rest[..end].trim().parse().unwrap()
+    }
+
+    #[test]
+    fn research_cues_use_only_432_ratios() {
+        let json = research_cue_json(RESEARCH_HTML);
+        let objs = cue_objects(json);
+        let expect = [
+            ("question", "resonance", "5:4", vec![432, 540], vec![108, 216], false),
+            ("thinking", "resonance", "1:2", vec![108, 216], vec![], true),
+            ("found", "resonance", "2:1", vec![540, 864], vec![108, 216], false),
+            ("inferred", "resonance", "3:2", vec![648, 540], vec![108, 216], false),
+            ("unknown", "resonance", "2:3", vec![288, 216], vec![108, 216], false),
+            ("file", "resonance", "5:4", vec![540], vec![108, 216], false),
+            ("hide", "resonance", "1:2", vec![216], vec![108, 216], false),
+            ("show", "resonance", "2:1", vec![432, 864], vec![108, 216], false),
+            ("window-open", "bell", "5:4", vec![540, 648, 864], vec![], false),
+            ("window-close", "bell", "3:2", vec![432, 288, 216], vec![], false),
+            ("window-minimise", "bell", "3:4", vec![432, 324, 216], vec![], false),
+            ("window-settle", "bell", "1:1", vec![432], vec![108, 216], false),
+        ];
+        assert_eq!(objs.len(), expect.len(), "cue count");
+        let bells = ["window-open", "window-close", "window-minimise", "window-settle"];
+        let mut thinking_gain = None;
+        let mut other_gains = Vec::new();
+        for (obj, row) in objs.iter().zip(expect) {
+            let (id, kind, ratio, notes, hum, soft) = row;
+            assert_eq!(json_string(obj, "id"), id);
+            assert_eq!(json_string(obj, "kind"), kind, "{id}");
+            assert_eq!(json_string(obj, "ratio"), ratio, "{id}");
+            let got_notes = json_numbers(obj, "notes");
+            let got_hum = json_numbers(obj, "hum");
+            assert_eq!(got_notes, notes, "{id} notes");
+            assert_eq!(got_hum, hum, "{id} hum");
+            for hz in got_notes.iter().chain(got_hum.iter()) {
+                assert!(on_432_lattice(*hz), "{id} plays {hz}, off the 432 Hz lattice");
+            }
+            let all: Vec<i64> = got_notes.iter().chain(got_hum.iter()).copied().collect();
+            if kind == "resonance" {
+                assert!(all.contains(&108) && all.contains(&216), "{id} leaves out the warm hum");
+                assert!(!bells.contains(&id), "{id} is resonance");
+            } else {
+                assert_eq!(kind, "bell");
+                assert!(bells.contains(&id), "{id} must not be a bell");
+            }
+            assert_eq!(obj.contains("\"soft\": true"), soft, "{id} soft");
+            let gain = json_gain(obj);
+            if id == "thinking" {
+                assert!(gain < 0.02, "thinking stays very soft, gain {gain}");
+                thinking_gain = Some(gain);
+            } else {
+                other_gains.push(gain);
+            }
+        }
+        let thinking_gain = thinking_gain.expect("thinking");
+        for gain in other_gains {
+            assert!(thinking_gain < gain, "thinking {thinking_gain} should sit under {gain}");
+        }
+        assert!(bells.iter().all(|id| json.contains(&format!("\"id\": \"{id}\""))));
+        assert_eq!(json.matches("\"kind\": \"bell\"").count(), bells.len());
+        for hz in [108, 216, 288, 324, 432, 540, 648, 864] {
+            assert!(on_432_lattice(hz), "{hz}");
+        }
+        assert!(!on_432_lattice(440), "440 Hz is not a 432 just ratio");
+        assert!(!on_432_lattice(880), "880 Hz is not a 432 just ratio");
+        assert!(RESEARCH_HTML.contains("o.type=\"sine\""));
+        assert!(!RESEARCH_HTML.contains("sawtooth"));
+        assert!(!RESEARCH_HTML.contains(".type=\"square\""));
+        assert!(!RESEARCH_HTML.contains(".type=\"triangle\""));
     }
 
     fn post_json(addr: SocketAddr, path: &str, body: &str) -> String {
