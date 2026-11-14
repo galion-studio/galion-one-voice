@@ -14,6 +14,12 @@ pub struct Image {
 
 pub fn render(sim: &Sim, frame: &NebulaFrame, width: u32, height: u32, budget: &TierBudget, bloom: bool) -> Image {
     let scale = budget.render_scale.clamp(0.25, budget.max_render_scale);
+    if frame.no_estimate {
+        let w = ((width as f32) * scale).round().max(2.0) as u32;
+        let h = ((height as f32) * scale).round().max(2.0) as u32;
+        let hdr = vec![0.0f32; (w * h * 3) as usize];
+        return Image { width: w, height: h, rgba: quantize(&hdr, w, h, budget.dither, frame.voice) };
+    }
     let w = ((width as f32) * scale).round().max(2.0) as u32;
     let h = ((height as f32) * scale).round().max(2.0) as u32;
     let mut hdr = vec![0.0f32; (w * h * 3) as usize];
@@ -89,6 +95,9 @@ pub fn write_sprites(
     glow: bool,
     out: &mut [f32],
 ) -> u32 {
+    if frame.no_estimate {
+        return 0;
+    }
     let w = width.max(2);
     let h = height.max(2);
     let aspect = w as f32 / h as f32;
@@ -364,6 +373,24 @@ mod tests {
         assert_eq!(image.height, 180);
         assert!(image.rgba.iter().any(|b| *b > 8));
         assert_eq!(&encode_png(&image)[..8], &[137, 80, 78, 71, 13, 10, 26, 10]);
+    }
+
+    #[test]
+    fn a_hold_frame_paints_no_cloud() {
+        let budget = budget_for(QualityMode::Pi, DeviceClass::Pi, 60.0, GpuClass::Integrated);
+        let sim = Sim::create(3, budget.particles);
+        let mut held = NebulaFrame::neutral(Voice::Samantha);
+        held.no_estimate = true;
+        held.weights = [0.0; 13];
+        let image = render(&sim, &held, 320, 180, &budget, false);
+        let mut buf = vec![0.0f32; 8];
+        assert_eq!(write_sprites(&sim, &held, 320, 180, &budget, false, &mut buf), 0);
+        let driven = render(&sim, &NebulaFrame::neutral(Voice::Samantha), 320, 180, &budget, false);
+        let mean = |img: &Image| {
+            let n = (img.width * img.height) as f32;
+            img.rgba.chunks_exact(4).map(|p| p[0] as f32 + p[1] as f32 + p[2] as f32).sum::<f32>() / n
+        };
+        assert!(mean(&image) < mean(&driven), "a hold is darker than a neutral cloud");
     }
 
     #[test]

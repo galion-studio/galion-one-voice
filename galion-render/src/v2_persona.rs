@@ -849,7 +849,12 @@ pub fn annotate_dot(dot: &str, persona: &str, mood: Option<&str>) -> String {
         None => dot.trim().to_string(),
     };
     let extra = match mood {
-        Some(m) => format!("\"persona\":\"{persona}\",\"mood\":\"{}\"", known_mood(m)),
+        Some(m) => {
+            let mood = known_mood(m);
+            let (valence, arousal) = mood_affect(mood);
+            let nebula = crate::nebula_halo::dot_nebula_json(mood, valence, arousal);
+            format!("\"persona\":\"{persona}\",\"mood\":\"{mood}\",{nebula}")
+        }
         None => format!("\"persona\":\"{persona}\""),
     };
     if dot.is_empty() || dot == "{}" {
@@ -1341,9 +1346,17 @@ mod tests {
         assert!(out.contains("\"arousal\":0.420"), "{out}");
         assert!(out.contains("\"lean\":0.500"), "{out}");
         assert!(!out.contains("\"label\":\"calm\""), "{out}");
+        assert!(out.contains("\"nebula\""), "{out}");
+        assert!(out.contains("\"present\":true"), "{out}");
+        assert!(out.contains("\"sad\":1"), "{out}");
+        let quiet = annotate_dot(dot, "samantha", Some("quiet"));
+        assert!(quiet.contains("\"mood\":\"quiet\""), "{quiet}");
+        assert!(quiet.contains("\"present\":false"), "{quiet}");
+        assert!(!quiet.contains("\"weights\""), "{quiet}");
         let idle = annotate_dot(dot, "samantha", None);
         assert!(idle.contains("\"label\":\"calm\""), "{idle}");
         assert!(!idle.contains("\"mood\""), "{idle}");
+        assert!(!idle.contains("\"nebula\""), "{idle}");
     }
 
     #[test]
