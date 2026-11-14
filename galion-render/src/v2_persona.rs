@@ -1347,11 +1347,13 @@ mod tests {
         assert!(out.contains("\"lean\":0.500"), "{out}");
         assert!(!out.contains("\"label\":\"calm\""), "{out}");
         assert!(out.contains("\"nebula\""), "{out}");
-        assert!(out.contains("\"present\":true"), "{out}");
-        assert!(out.contains("\"sad\":1"), "{out}");
+        assert!(out.contains("\"schema\":\"galion-voice-v2-emotion-feed/1\""), "{out}");
+        assert!(out.contains("\"estimate\":\"distribution\""), "{out}");
+        assert!(out.contains("\"element_id\":\"HeII-468.6\""), "{out}");
         let quiet = annotate_dot(dot, "samantha", Some("quiet"));
         assert!(quiet.contains("\"mood\":\"quiet\""), "{quiet}");
-        assert!(quiet.contains("\"present\":false"), "{quiet}");
+        assert!(quiet.contains("\"estimate\":\"none\""), "{quiet}");
+        assert!(quiet.contains("\"schema\":\"galion-voice-v2-emotion-feed/1\""), "{quiet}");
         assert!(!quiet.contains("\"weights\""), "{quiet}");
         let idle = annotate_dot(dot, "samantha", None);
         assert!(idle.contains("\"label\":\"calm\""), "{idle}");

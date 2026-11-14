@@ -98,8 +98,10 @@ with `element_id` (`H-beta`, `H-alpha`). The feed's `gas_line`
 
 `apps/nebula-voice-v2/build-web.sh` writes a static `dist/` (gitignored).
 Serve that directory. `index.html` links to `samantha.html`, `jarvis.html`,
-and `spectrum.html`. The voice pages are a pure nebula until `S` or a
-three-finger tap shows the spectrum strip.
+and `spectrum.html`. The voice pages open `ws://127.0.0.1:8766` (`?feed=`
+overrides the host) and read `galion-voice-v2-emotion-feed/1`. Until a line
+arrives, and again when the socket drops, the cloud stays empty. `?demo=1`
+is the old time-blend. `S` or a three-finger tap shows the spectrum strip.
 
 ## Pi / aarch64
 

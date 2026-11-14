@@ -174,20 +174,66 @@ pub fn drive_for_mood(mood: &str, valence: f32, arousal: f32) -> Drive {
     }
 }
 
-/// JSON object field for `/dot`, including the key. A hold omits weights.
+/// Demo 13 element ids. The picture binds these, not the live-feed gas-line ids.
+pub const ELEMENT_ID: [&str; 13] = [
+    "HeII-541.2",
+    "H-beta",
+    "NII-575.5",
+    "HeI-587.6",
+    "NeI-594.5",
+    "HeI-667.8",
+    "HeII-468.6",
+    "ClIII-551.7",
+    "SIII-631.2",
+    "H-delta",
+    "OIII-495.9",
+    "ClIII-553.8",
+    "H-alpha",
+];
+
+/// Live-feed gas-line ids. Opaque labels. Not particle keys.
+const GAS_LINE_ID: [&str; 13] = [
+    "HeII-541.2",
+    "Hbeta-486.1",
+    "[NII]-575.5",
+    "HeI-587.6",
+    "NeI-594.5",
+    "HeI-667.8",
+    "HeII-468.6",
+    "[ClIII]-551.7",
+    "[SIII]-631.2",
+    "Hdelta-410.2",
+    "[OIII]-495.9",
+    "[ClIII]-553.8",
+    "Halpha-656.3",
+];
+
+pub const FEED_SCHEMA: &str = "galion-voice-v2-emotion-feed/1";
+
+/// JSON object field for `/dot`, including the key.
+///
+/// `estimate: none` has no weights. A distribution names `element_id`.
+/// The schema field stays on both.
 pub fn dot_nebula_json(mood: &str, valence: f32, arousal: f32) -> String {
     let drive = drive_for_mood(mood, valence, arousal);
     if !drive.present {
-        return "\"nebula\":{\"schema\":\"galion-dot-nebula/1\",\"present\":false}".to_string();
+        return format!(
+            "\"nebula\":{{\"schema\":\"{FEED_SCHEMA}\",\"estimate\":\"none\",\"present\":false,\"distribution\":false,\"reason\":null}}"
+        );
     }
-    let name = GASES
-        .iter()
-        .enumerate()
-        .find(|(index, _)| drive.weights[*index] > 0.5)
-        .map(|(_, gas)| gas.emotion)
-        .unwrap_or("calm");
+    let mut weights = String::new();
+    for (index, gas) in GASES.iter().enumerate() {
+        if index > 0 {
+            weights.push(',');
+        }
+        let weight = if drive.weights[index] > 0.5 { 1 } else { 0 };
+        weights.push_str(&format!(
+            "\"{}\":{{\"weight\":{weight},\"element_id\":\"{}\",\"gas_line\":\"{}\"}}",
+            gas.emotion, ELEMENT_ID[index], GAS_LINE_ID[index]
+        ));
+    }
     format!(
-        "\"nebula\":{{\"schema\":\"galion-dot-nebula/1\",\"present\":true,\"distribution\":true,\"weights\":{{\"{name}\":1}},\"valence\":{:.3},\"arousal\":{:.3},\"dominance\":0.500,\"energy\":{:.3}}}",
+        "\"nebula\":{{\"schema\":\"{FEED_SCHEMA}\",\"estimate\":\"distribution\",\"present\":true,\"distribution\":true,\"weights\":{{{weights}}},\"valence\":{:.3},\"arousal\":{:.3},\"dominance\":0.500,\"energy\":{:.3}}}",
         drive.valence, drive.arousal, drive.energy
     )
 }
@@ -316,12 +362,16 @@ mod tests {
     #[test]
     fn dot_json_holds_or_names_one_gas() {
         let grief = dot_nebula_json("grief", -0.55, 0.42);
-        assert!(grief.contains("\"present\":true"), "{grief}");
-        assert!(grief.contains("\"sad\":1"), "{grief}");
-        assert!(!grief.contains("\"happy\""), "{grief}");
+        assert!(grief.contains("\"schema\":\"galion-voice-v2-emotion-feed/1\""), "{grief}");
+        assert!(grief.contains("\"estimate\":\"distribution\""), "{grief}");
+        assert!(grief.contains("\"element_id\":\"HeII-468.6\""), "{grief}");
+        assert!(grief.contains("\"gas_line\":\"HeII-468.6\""), "{grief}");
+        assert!(!grief.contains("\"element_id\":\"Hbeta-486.1\""), "{grief}");
         let quiet = dot_nebula_json("quiet", 0.04, 0.08);
-        assert!(quiet.contains("\"present\":false"), "{quiet}");
+        assert!(quiet.contains("\"schema\":\"galion-voice-v2-emotion-feed/1\""), "{quiet}");
+        assert!(quiet.contains("\"estimate\":\"none\""), "{quiet}");
         assert!(!quiet.contains("weights"), "{quiet}");
+        assert!(!quiet.contains("\"weight\":1"), "{quiet}");
     }
 
     #[test]
@@ -332,8 +382,12 @@ mod tests {
         assert!(page.contains("fifth:2880"));
         assert!(page.contains("third:3456"));
         assert!(page.contains("present!==true"));
-        assert!(page.contains("happy:{m:0.72,w:0.82}"));
-        assert!(page.contains("sad:{m:0.24,w:0.22}"));
+        assert!(page.contains("estimate===\"none\""));
+        assert!(page.contains("id:\"H-beta\""));
+        assert!(page.contains("id:\"NII-575.5\""));
+        assert!(page.contains("id:\"H-alpha\""));
+        assert!(page.contains("happy:{m:0.72,w:0.82,id:\"NII-575.5\"}"));
+        assert!(page.contains("sad:{m:0.24,w:0.22,id:\"HeII-468.6\"}"));
         assert!(page.contains("#F5F5F7"));
     }
 }

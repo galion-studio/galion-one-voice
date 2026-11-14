@@ -117,7 +117,7 @@ fn run_stdin() -> Result<(), String> {
         let names: Vec<&str> = top.iter().map(|l| l.emotion).collect();
         let estimate = if frame.no_estimate { "none" } else { "present" };
         println!(
-            "{{\"voice\":\"{:?}\",\"estimate\":\"{estimate}\",\"dominant\":{}}}",
+            "{{\"schema\":\"galion-voice-v2-emotion-feed/1\",\"estimate\":\"{estimate}\",\"voice\":\"{:?}\",\"dominant\":{}}}",
             voice,
             serde_json::to_string(&names).unwrap_or_else(|_| "[]".into())
         );

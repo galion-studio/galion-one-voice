@@ -138,18 +138,36 @@ let moodWash=0.38, moodAmber=0.46;
 // fund:octave = 2:1, fund:fifth = 3:2, fund:third = 5:4.
 const LATTICE={fund:4320,octave:2160,fifth:2880,third:3456};
 // Demo 13 motion, and a warmth on the locked amber→violet wash. Not a spectral paint.
+const FEED_SCHEMA="galion-voice-v2-emotion-feed/1";
+// id is the Demo 13 element_id. gas_line is not a paint key.
 const GAS={
-  neutral:{m:0.30,w:0.50},calm:{m:0.22,w:0.42},happy:{m:0.72,w:0.82},
-  amused:{m:0.80,w:0.74},excited:{m:1.40,w:0.88},tender:{m:0.30,w:0.70},
-  sad:{m:0.24,w:0.22},disappointed:{m:0.34,w:0.38},angry:{m:1.45,w:0.90},
-  fearful:{m:1.25,w:0.12},surprised:{m:1.15,w:0.55},disgusted:{m:0.78,w:0.48},
-  seductive:{m:0.28,w:0.78}
+  neutral:{m:0.30,w:0.50,id:"HeII-541.2"},calm:{m:0.22,w:0.42,id:"H-beta"},happy:{m:0.72,w:0.82,id:"NII-575.5"},
+  amused:{m:0.80,w:0.74,id:"HeI-587.6"},excited:{m:1.40,w:0.88,id:"NeI-594.5"},tender:{m:0.30,w:0.70,id:"HeI-667.8"},
+  sad:{m:0.24,w:0.22,id:"HeII-468.6"},disappointed:{m:0.34,w:0.38,id:"ClIII-551.7"},angry:{m:1.45,w:0.90,id:"SIII-631.2"},
+  fearful:{m:1.25,w:0.12,id:"H-delta"},surprised:{m:1.15,w:0.55,id:"OIII-495.9"},disgusted:{m:0.78,w:0.48,id:"ClIII-553.8"},
+  seductive:{m:0.28,w:0.78,id:"H-alpha"}
 };
-// No posterior, or sense denied: the wash stays, and no gas is invented.
+// estimate none, a dropped feed, or sense denied: paint nothing. Not Neutral.
 function nebulaDrive(latest){
-  if(!latest||!latest.nebula||latest.nebula.present!==true) return null;
+  const n=latest&&latest.nebula;
+  if(!n||typeof n.schema!=="string"||!n.schema) return null;
+  if(n.estimate==="none"||n.present!==true||n.reason==="disconnected"||n.reason==="rejected") return null;
+  if(n.estimate!=="distribution"&&n.estimate!=="partial") return null;
   if(latest.emotion&&latest.emotion.sense===false) return null;
-  return latest.nebula;
+  return n;
+}
+function feedWeight(weights,name,id){
+  if(!weights) return null;
+  const entry=weights[name];
+  if(typeof entry==="number") return entry;
+  if(!entry||typeof entry!=="object") return null;
+  if(entry.element_id!==id) return null;
+  if(typeof entry.weight!=="number") return null;
+  return entry.weight;
+}
+function clearFeed(){
+  if(!latest) latest={radius:R.idle,t_ms:0};
+  latest.nebula={schema:FEED_SCHEMA,estimate:"none",present:false,distribution:false,reason:"disconnected",origin:"client",weights:null};
 }
 function paintHalo(tms,W,H,mark){
   const drive=nebulaDrive(latest);
@@ -169,8 +187,8 @@ function paintHalo(tms,W,H,mark){
   for(const name in GAS){
     if(!Object.prototype.hasOwnProperty.call(GAS,name)) continue;
     if(name==="seductive"&&!samantha) continue;
-    const w=+weights[name]||0;
-    if(w<0.02) continue;
+    const w=feedWeight(weights,name,g.id);
+    if(w==null||w<0.02) continue;
     const g=GAS[name];
     const n=Math.max(1,Math.round(w*18));
     for(let k=0;k<n;k++,i++){
@@ -321,6 +339,7 @@ function draw(){
   const k=clamp(bP,0,1);
   const side=Math.min(W,H);
   const rad=Math.max(1, clamp(rP,0,0.5)*(0.97+0.03*k)*side);
+  if(shown==="offline") clearFeed();
   paintHalo(now-t0,W,H,rad/side);
   const presence=shown==="offline"?0.5:1;
   cx.save(); cx.translate(W/2,H/2); cx.globalAlpha=presence;
