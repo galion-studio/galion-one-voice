@@ -71,7 +71,11 @@ textarea::placeholder{color:color-mix(in srgb, var(--ink) 36%, transparent)}
 #voice-dot{width:120px;height:120px;display:block;background:transparent}
 .tools svg{width:22px;height:22px;display:block}
 .price{margin:22px 0 0;text-align:center;font:13px/1.4 system-ui,sans-serif;letter-spacing:.08em;color:color-mix(in srgb, var(--ink) 42%, transparent)}
-.work{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:28px}
+.work{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-top:18px}
+#hermes-status{margin:0 0 18px;font:13px/1.4 system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:color-mix(in srgb, var(--amber) 75%, var(--ink))}
+#history-list{margin:0;padding-left:1.2em}
+#history-list li{margin:0 0 8px;font:15px/1.45 system-ui,sans-serif}
+#history-empty{margin:0;font:15px/1.45 system-ui,sans-serif;color:color-mix(in srgb, var(--ink) 62%, transparent)}
 .panel{border:1px solid color-mix(in srgb, var(--ink) 12%, transparent);border-radius:18px;padding:16px 18px 18px;background:color-mix(in srgb, var(--ground) 40%, transparent);min-width:0}
 .panel h2,.citations h3{margin:0 0 12px;font:12px/1 system-ui,sans-serif;font-weight:560;letter-spacing:.16em;text-transform:uppercase;color:color-mix(in srgb, var(--ink) 52%, transparent)}
 #answer{grid-column:1 / -1}
@@ -101,9 +105,10 @@ textarea::placeholder{color:color-mix(in srgb, var(--ink) 36%, transparent)}
 <div class="desk">
   <header class="top">
     <a id="to-one" href="/one">Galion One</a>
-    <p class="voice-name" id="voice-name">Research</p>
+    <p class="voice-name" id="voice-name">Research · Hermes</p>
   </header>
-  <p class="sr" id="product-line">Galion Research is a voice of Galion One. This desk is where that voice works.</p>
+  <p class="sr" id="product-line">Galion Research is the Hermes research app, a voice of Galion One.</p>
+  <p id="hermes-status" data-app="hermes">Hermes</p>
   <p id="handoff" hidden>From Galion One.</p>
   <form class="ask" id="ask" action="#" method="post">
     <div class="field">
@@ -126,6 +131,11 @@ textarea::placeholder{color:color-mix(in srgb, var(--ink) 36%, transparent)}
   </form>
   <p class="price">Ultra $220/€220 one-time</p>
   <div class="work">
+    <section class="panel" id="history" aria-labelledby="history-label">
+      <h2 id="history-label">History</h2>
+      <ol id="history-list"></ol>
+      <p id="history-empty">No request yet.</p>
+    </section>
     <section class="panel" id="sources" aria-labelledby="sources-label">
       <h2 id="sources-label">Sources</h2>
       <ol id="source-list"></ol>
@@ -230,10 +240,58 @@ function tone(id){
 (function(){
   var files=document.getElementById("files");
   var prompt=document.getElementById("prompt");
+  var statusEl=document.getElementById("hermes-status");
+  function hermesStatus(text){ statusEl.textContent=text; }
+  function fillList(ol, rows){
+    while(ol.firstChild) ol.removeChild(ol.firstChild);
+    rows.forEach(function(row){
+      var li=document.createElement("li");
+      li.textContent=row;
+      ol.appendChild(li);
+    });
+  }
+  function showTurn(j){
+    var q=j.question||"";
+    var live=document.getElementById("live-question");
+    live.textContent=q;
+    live.hidden=!q;
+    var lead=document.getElementById("reading-question");
+    lead.textContent=q;
+    lead.hidden=!q;
+    document.getElementById("reading-body").textContent=j.reply||"I don't have a source for that.";
+    document.getElementById("reading-local").hidden=false;
+    document.getElementById("answer").dataset.set="1";
+    var cites=Array.isArray(j.citations)?j.citations:[];
+    var citeList=document.getElementById("citation-list");
+    var sourceList=document.getElementById("source-list");
+    fillList(citeList, cites.map(function(c){ return "["+c.n+"] "+(c.text||""); }));
+    fillList(sourceList, cites.map(function(c){ return c.text||""; }));
+    document.getElementById("citation-empty").hidden=cites.length>0;
+    document.getElementById("source-empty").hidden=cites.length>0;
+    if(!cites.length){
+      document.getElementById("citation-empty").textContent="None in hand.";
+      document.getElementById("source-empty").textContent="No source yet.";
+    }
+    hermesStatus("Hermes · "+(j.status||"answered"));
+  }
+  function paintHistory(items){
+    var list=document.getElementById("history-list");
+    fillList(list, (items||[]).map(function(item){
+      return (item.status||"")+"  "+(item.question||"");
+    }));
+    document.getElementById("history-empty").hidden=(items||[]).length>0;
+  }
   if(/[?&]from=one(?:&|$)/.test(location.search)){
     document.getElementById("handoff").hidden=false;
     document.body.dataset.handoff="one";
   }
+  fetch("/research/hermes",{cache:"no-store"}).then(function(r){ return r.ok?r.json():null; }).then(function(j){
+    if(!j){ hermesStatus("Hermes · unreachable"); return; }
+    hermesStatus("Hermes · "+(j.status||"idle"));
+  }).catch(function(){ hermesStatus("Hermes · unreachable"); });
+  fetch("/research/history",{cache:"no-store"}).then(function(r){ return r.ok?r.json():null; }).then(function(j){
+    if(j&&Array.isArray(j.items)) paintHistory(j.items);
+  }).catch(function(){});
   function openPicker(ev){ ev.preventDefault(); files.click(); }
   document.getElementById("add-file").addEventListener("click", openPicker);
   document.getElementById("add-image").addEventListener("click", openPicker);
@@ -252,17 +310,30 @@ function tone(id){
   function commitQuestion(){
     var q=prompt.value.replace(/\s+/g," ").trim();
     if(!q) return;
-    var live=document.getElementById("live-question");
-    live.textContent=q;
-    live.hidden=false;
-    var lead=document.getElementById("reading-question");
-    lead.textContent=q;
-    lead.hidden=false;
-    document.getElementById("reading-body").textContent="I don't have a source for that.";
-    document.getElementById("reading-local").hidden=false;
-    document.getElementById("answer").dataset.set="1";
+    hermesStatus("Hermes · asking");
     tone("think");
-    setTimeout(function(){ tone("speak"); }, 200);
+    fetch("/research/ask",{method:"POST",cache:"no-store",headers:{"Content-Type":"application/json"},body:JSON.stringify({question:q})})
+      .then(function(r){ return r.ok?r.json():null; })
+      .then(function(j){
+        if(!j){
+          hermesStatus("Hermes · unreachable");
+          document.getElementById("reading-question").textContent=q;
+          document.getElementById("reading-question").hidden=false;
+          document.getElementById("reading-body").textContent="The research path is not reachable from here.";
+          paintHistory([{status:"unreachable", question:q}]);
+          return;
+        }
+        showTurn(j);
+        return fetch("/research/history",{cache:"no-store"}).then(function(r){ return r.ok?r.json():null; });
+      })
+      .then(function(h){ if(h&&Array.isArray(h.items)) paintHistory(h.items); tone("speak"); })
+      .catch(function(){
+        hermesStatus("Hermes · unreachable");
+        document.getElementById("reading-question").textContent=q;
+        document.getElementById("reading-question").hidden=false;
+        document.getElementById("reading-body").textContent="The research path is not reachable from here.";
+        paintHistory([{status:"unreachable", question:q}]);
+      });
   }
   prompt.addEventListener("keydown", function(ev){
     if(ev.key==="Enter"&&(ev.ctrlKey||ev.metaKey)){

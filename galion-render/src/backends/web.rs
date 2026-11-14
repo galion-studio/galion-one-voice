@@ -17,7 +17,9 @@
 //!   GET / , /screen, /one, /one/ -> the caller's single-screen HTML page, only when one was set with
 //!                      [`WebSurface::with_page`] (V1-01; the page itself is owned by
 //!                      galion-console, this crate only serves the bytes); 404 otherwise
-//!   GET /research, /research/ -> the Galion Research prompt, same gate as /one
+//!   GET /research, /research/ -> the Galion Research desk, same gate as /one.
+//!   GET /research/hermes, GET /research/history, POST /research/ask -> Hermes
+//!                      research app. The gateway key stays on the server.
 //! `/dot` also carries `"mode"` (idle|listening|speaking|rika), `"lean"` (Rika lean-in 0..1),
 //! `"level"` (0..1, the band driving the state), `"e"` (empathy weight 0..1),
 //! `"engine"` (one Luti step), and `"emotion"` (sense, label, valence, arousal, lean)
@@ -539,6 +541,7 @@ struct Shared {
     sessions: Arc<SessionStore>,
     /// First accepted `/turn` of this process already carried the Art. 50 line.
     disclosure_sent: Arc<AtomicBool>,
+    research: Arc<Mutex<ResearchDesk>>,
 }
 
 /// Unit tests pin the V1 demo defaults. A developer shell that exports
@@ -578,6 +581,7 @@ impl WebSurface {
             floor: Arc::new(Mutex::new(crate::v2_persona::Floor::new())),
             sessions: Arc::new(SessionStore::new(edge.session_ttl)),
             disclosure_sent: Arc::new(AtomicBool::new(false)),
+            research: Arc::new(Mutex::new(ResearchDesk::new())),
             edge,
         };
         Self {
@@ -661,6 +665,15 @@ impl WebSurface {
             floor.set_hermes(client);
         }
     }
+    /// Hermes client for `POST /research/ask`. The key stays inside the client.
+    pub fn set_research_hermes(&self, client: galion_cascade::HermesLlm) {
+        if let Ok(mut desk) = self.sh.research.lock() {
+            desk.client = Some(client);
+            if desk.status == "idle" {
+                desk.status = "ready";
+            }
+        }
+    }
 }
 
 const V2_REDIRECT_HTML: &str = "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta http-equiv=\"refresh\" content=\"0; url=/\"><title>Galion Voice</title><script>location.replace(\"/\");</script></head><body><p><a href=\"/\">Galion Voice</a></p></body></html>";
@@ -668,6 +681,109 @@ const V2_REDIRECT_HTML: &str = "<!doctype html><html lang=\"en\"><head><meta cha
 /// Galion Research. Served at `/research` and `/research/` when a product page is set,
 /// the same gate as `/one`.
 const RESEARCH_HTML: &str = include_str!("../../../crates/galion-console/assets/research.html");
+
+struct ResearchNote {
+    id: u64,
+    question: String,
+    status: &'static str,
+    reply: String,
+    citations: Vec<(u32, String)>,
+}
+
+struct ResearchDesk {
+    client: Option<galion_cascade::HermesLlm>,
+    next_id: u64,
+    notes: VecDeque<ResearchNote>,
+    status: &'static str,
+}
+
+impl ResearchDesk {
+    fn new() -> Self {
+        Self {
+            client: if cfg!(test) { None } else { galion_cascade::HermesLlm::attached_from_env() },
+            next_id: 0,
+            notes: VecDeque::new(),
+            status: "idle",
+        }
+    }
+    fn gateway_status(&self) -> &'static str {
+        if self.status == "asking" {
+            return "asking";
+        }
+        if self.client.is_none() {
+            return "unreachable";
+        }
+        if self.status == "idle" {
+            "ready"
+        } else {
+            self.status
+        }
+    }
+}
+
+fn research_status_json(desk: &ResearchDesk) -> String {
+    let key = desk.client.as_ref().map(|c| c.key_state()).unwrap_or("none");
+    let model = desk.client.as_ref().map(|c| c.label().to_string()).unwrap_or_else(|| galion_cascade::LLM_NAME.into());
+    format!(
+        "{{\"schema\":\"galion-research/1\",\"app\":\"hermes\",\"voice\":\"galion-research\",\"product\":\"galion-one\",\"model\":{},\"key\":\"{key}\",\"status\":\"{}\",\"history\":{}}}",
+        galion_cascade::hermes::json_string(&model),
+        desk.gateway_status(),
+        desk.notes.len()
+    )
+}
+
+fn research_note_json(note: &ResearchNote) -> String {
+    let cites: Vec<String> = note.citations.iter().map(|(n, text)| {
+        format!("{{\"n\":{n},\"text\":{}}}", galion_cascade::hermes::json_string(text))
+    }).collect();
+    format!(
+        "{{\"id\":{},\"status\":\"{}\",\"question\":{},\"reply\":{},\"citations\":[{}]}}",
+        note.id,
+        note.status,
+        galion_cascade::hermes::json_string(&note.question),
+        galion_cascade::hermes::json_string(&note.reply),
+        cites.join(",")
+    )
+}
+
+fn research_history_json(desk: &ResearchDesk) -> String {
+    let items: Vec<String> = desk.notes.iter().rev().map(research_note_json).collect();
+    format!("{{\"schema\":\"galion-research/1\",\"app\":\"hermes\",\"items\":[{}]}}", items.join(","))
+}
+
+fn research_ask(desk: &Arc<Mutex<ResearchDesk>>, question: &str) -> String {
+    let (id, client, model_fallback) = {
+        let Ok(mut d) = desk.lock() else {
+            return "{\"schema\":\"galion-research/1\",\"app\":\"hermes\",\"status\":\"unreachable\",\"reply\":\"The research path is not reachable from here.\",\"citations\":[]}".into();
+        };
+        d.status = "asking";
+        d.next_id = d.next_id.saturating_add(1);
+        let model = d.client.as_ref().map(|c| c.label().to_string()).unwrap_or_else(|| galion_cascade::LLM_NAME.into());
+        (d.next_id, d.client.clone(), model)
+    };
+    let turn = match client {
+        Some(c) => c.research_turn(question),
+        None => galion_cascade::hermes::ResearchAnswer { text: galion_cascade::UNREACHABLE.into(), citations: Vec::new() },
+    };
+    let unreachable = turn.text == galion_cascade::UNREACHABLE;
+    let reply = if unreachable { "The research path is not reachable from here.".to_string() } else { turn.text };
+    let status = if unreachable { "unreachable" } else { "answered" };
+    let citations = if unreachable { Vec::new() } else { turn.citations };
+    let note = ResearchNote { id, question: question.to_string(), status, reply, citations };
+    let body = format!(
+        "{{\"schema\":\"galion-research/1\",\"app\":\"hermes\",\"model\":{},{}}}",
+        galion_cascade::hermes::json_string(&model_fallback),
+        research_note_json(&note).trim_start_matches('{')
+    );
+    if let Ok(mut d) = desk.lock() {
+        d.status = status;
+        d.notes.push_back(note);
+        while d.notes.len() > 32 {
+            d.notes.pop_front();
+        }
+    }
+    body
+}
 
 const SECURITY_HEADERS: &str = concat!(
     "X-Content-Type-Options: nosniff\r\n",
@@ -874,6 +990,19 @@ fn route(req: &mut Request, sh: &Shared) -> (&'static str, &'static str, Vec<u8>
             zeroise_bytes(&mut req.body);
             ("200 OK", "application/json", json.into_bytes())
         }
+        ("POST", "/research/ask") if sh.page.is_some() => {
+            let raw = String::from_utf8_lossy(&req.body).into_owned();
+            zeroise_bytes(&mut req.body);
+            let Some(question) = crate::v2_persona::json_field_string(&raw, "question") else {
+                return ("400 Bad Request", "text/plain", txt("question"));
+            };
+            let question = question.trim().to_string();
+            if question.is_empty() {
+                return ("400 Bad Request", "text/plain", txt("question"));
+            }
+            let json = research_ask(&sh.research, &question);
+            ("200 OK", "application/json", json.into_bytes())
+        }
         ("POST", "/turn") => {
             if req.header("content-length").is_none() {
                 zeroise_bytes(&mut req.body);
@@ -909,6 +1038,18 @@ fn route(req: &mut Request, sh: &Shared) -> (&'static str, &'static str, Vec<u8>
                     let html = sh.page.unwrap_or_default();
                     let page = if sh.edge.disclosure { html.to_string() } else { strip_ai_disclosure(html) };
                     ("200 OK", "text/html; charset=utf-8", page.into_bytes())
+                }
+                "/research/hermes" if sh.page.is_some() => {
+                    let Ok(desk) = sh.research.lock() else {
+                        return ("500 Internal Server Error", "text/plain", txt("research"));
+                    };
+                    ("200 OK", "application/json", research_status_json(&desk).into_bytes())
+                }
+                "/research/history" if sh.page.is_some() => {
+                    let Ok(desk) = sh.research.lock() else {
+                        return ("500 Internal Server Error", "text/plain", txt("research"));
+                    };
+                    ("200 OK", "application/json", research_history_json(&desk).into_bytes())
                 }
                 "/research" | "/research/" if sh.page.is_some() => {
                     ("200 OK", "text/html; charset=utf-8", RESEARCH_HTML.as_bytes().to_vec())
@@ -1153,7 +1294,13 @@ mod tests {
                 "aria-label=\"Voice\"",
                 "function markInner",
                 "edge:\"#E8E8ED\"",
-                "Galion Research is a voice of Galion One",
+                "Galion Research is the Hermes research app, a voice of Galion One",
+                "id=\"hermes-status\"",
+                "id=\"history\"",
+                "data-app=\"hermes\"",
+                "/research/ask",
+                "/research/hermes",
+                "/research/history",
                 "data-voice=\"galion-research\"",
                 "id=\"add-file\"",
                 "id=\"add-image\"",
@@ -1190,6 +1337,85 @@ mod tests {
             assert!(!body.contains("id=\"s\""), "research is not the full-screen one-dot page");
             assert!(!body.contains("data-mark=\"orb\""), "the full-screen orb stays on /one");
         }
+        w.close().unwrap();
+    }
+
+    fn post_json(addr: SocketAddr, path: &str, body: &str) -> String {
+        let mut s = std::net::TcpStream::connect(addr).unwrap();
+        s.write_all(
+            format!(
+                "POST {path} HTTP/1.1\r\nHost: x\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{body}",
+                body.len()
+            )
+            .as_bytes(),
+        )
+        .unwrap();
+        let mut out = String::new();
+        s.read_to_string(&mut out).unwrap();
+        out
+    }
+
+    #[test]
+    fn research_ask_reaches_hermes_without_leaking_the_key() {
+        let key = "test-gateway-key-not-for-git";
+        let mut w = WebSurface::serve("127.0.0.1:0".parse().unwrap()).with_page("<!doctype html><canvas></canvas>");
+        w.open().unwrap();
+        let a = w.local_addr().unwrap();
+        let off = get(a, "/research/hermes");
+        assert!(off.contains("\"app\":\"hermes\"") && off.contains("\"key\":\"none\"") && off.contains("\"status\":\"unreachable\""), "{off}");
+        assert!(!off.contains(key) && !off.contains("Bearer") && !off.contains("GALION_LLM_KEY"), "{off}");
+        let denied = post_json(a, "/research/ask", r#"{"question":"Where is the source?"}"#);
+        assert!(denied.contains("HTTP/1.1 200") && denied.contains("The research path is not reachable from here."), "{denied}");
+        assert!(!denied.contains(key), "{denied}");
+        let hist = get(a, "/research/history");
+        assert!(hist.contains("Where is the source?") && hist.contains("\"status\":\"unreachable\""), "{hist}");
+        let empty = post_json(a, "/research/ask", r#"{"question":"  "}"#);
+        assert!(empty.starts_with("HTTP/1.1 400"), "{empty}");
+        w.close().unwrap();
+
+        let payload = "{\"choices\":[{\"message\":{\"content\":\"The wash is amber to violet.\\n[1] Galion brand note\"}}]}";
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        std::thread::spawn(move || {
+            let Ok((mut sock, _)) = listener.accept() else { return };
+            let _ = sock.set_read_timeout(Some(Duration::from_millis(500)));
+            let mut buf = [0u8; 8192];
+            let mut got = Vec::new();
+            loop {
+                match sock.read(&mut buf) {
+                    Ok(0) | Err(_) => break,
+                    Ok(n) => {
+                        got.extend_from_slice(&buf[..n]);
+                        if got.windows(4).any(|w| w == b"\r\n\r\n") { break; }
+                    }
+                }
+            }
+            let resp = format!(
+                "HTTP/1.0 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{payload}",
+                payload.len()
+            );
+            let _ = sock.write_all(resp.as_bytes());
+        });
+        let mut w = WebSurface::serve("127.0.0.1:0".parse().unwrap()).with_page("<!doctype html><canvas></canvas>");
+        w.set_research_hermes(galion_cascade::HermesLlm::new(
+            &format!("http://{addr}/v1/chat/completions"),
+            "hermes-agent",
+            key,
+            Duration::from_millis(1000),
+        ));
+        w.open().unwrap();
+        let a = w.local_addr().unwrap();
+        let ready = get(a, "/research/hermes");
+        assert!(ready.contains("\"key\":\"set\"") && ready.contains("\"status\":\"ready\"") && ready.contains("hermes-agent"), "{ready}");
+        assert!(!ready.contains(key), "{ready}");
+        let asked = post_json(a, "/research/ask", r#"{"question":"What colour is the wash?"}"#);
+        assert!(asked.contains("HTTP/1.1 200") && asked.contains("\"status\":\"answered\""), "{asked}");
+        assert!(asked.contains("Galion brand note") && asked.contains("\"n\":1"), "{asked}");
+        assert!(asked.contains("\"app\":\"hermes\""), "{asked}");
+        assert!(!asked.contains(key) && !asked.contains("Bearer"), "{asked}");
+        let hist = get(a, "/research/history");
+        assert!(hist.contains("What colour is the wash?") && hist.contains("\"status\":\"answered\""), "{hist}");
+        assert!(!hist.contains(key), "{hist}");
         w.close().unwrap();
     }
 

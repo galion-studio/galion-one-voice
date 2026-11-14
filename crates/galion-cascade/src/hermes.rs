@@ -20,6 +20,12 @@ use crate::{CascadeError, Emotion, Llm, Transcript};
 
 /// Spoken when the gateway does not answer. Not a canned intent line.
 pub const UNREACHABLE: &str = "model can't be reached";
+/// Galion Research desk. A voice of Galion One, with Hermes as the agent behind it.
+pub const RESEARCH_PROMPT: &str = "You are Galion Research, the research app on Hermes, a voice of Galion One. \
+Answer the question first, then the limit. Separate found, inferred, and unknown. \
+Cite only a source that was handed to you, one per line, starting with [1]. \
+If you have no source, say \"I don't have a source for that.\" \
+Do not invent a paper, a URL, a date, or a measurement. English only.";
 /// Spoken when the model returns a forbidden empathy script.
 pub const REFUSED: &str = "I'll stay on what you said.";
 /// Stable client id when no model name is configured.
@@ -169,6 +175,14 @@ fn prompt_with_bans(head: &str) -> String {
     s
 }
 
+/// One Hermes research reply. `citations` are the `[n]` lines from the model.
+/// `text` is the guarded answer. Neither field carries the gateway key.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ResearchAnswer {
+    pub text: String,
+    pub citations: Vec<(u32, String)>,
+}
+
 /// OpenAI-compatible chat client. `Send`. Connects only when [`HermesLlm::complete_as`] runs.
 #[derive(Clone)]
 pub struct HermesLlm {
@@ -284,6 +298,39 @@ impl HermesLlm {
     }
 
     pub fn complete_as(&self, persona: &str, user: &str) -> String {
+        self.complete_prompt(system_prompt(persona), &user, 480)
+    }
+
+    /// Research turn for the Galion Research desk. The gateway key stays on this
+    /// client. It is not copied into the reply. Citation lines are read before
+    /// the bracket strip, so `[1]` still names a source.
+    pub fn research_turn(&self, user: &str) -> ResearchAnswer {
+        let empty = || ResearchAnswer { text: UNREACHABLE.to_string(), citations: Vec::new() };
+        let Some(target) = self.target.clone() else {
+            return empty();
+        };
+        if !self.key.is_empty() && !key_ok(&self.key) {
+            return empty();
+        }
+        let user = clip_chars(user.trim(), 2_000);
+        if user.is_empty() {
+            return empty();
+        }
+        match post_chat(&target, &self.model, &self.key, RESEARCH_PROMPT, &user, self.timeout) {
+            Ok(text) => ResearchAnswer {
+                citations: cite_lines(&text),
+                text: guard_model_text_cap(&text, 4_000),
+            },
+            Err(()) => empty(),
+        }
+    }
+
+    /// `set` or `none`. Never the key bytes.
+    pub fn key_state(&self) -> &'static str {
+        if self.key.is_empty() { "none" } else { "set" }
+    }
+
+    fn complete_prompt(&self, system: &str, user: &str, cap: usize) -> String {
         let Some(target) = self.target.clone() else {
             return UNREACHABLE.to_string();
         };
@@ -294,15 +341,9 @@ impl HermesLlm {
         if user.is_empty() {
             return UNREACHABLE.to_string();
         }
-        match post_chat(
-            &target,
-            &self.model,
-            &self.key,
-            persona,
-            &user,
-            self.timeout,
-        ) {
-            Ok(text) => guard_model_text(&text),
+        match post_chat(&target, &self.model, &self.key, system, &user, self.timeout) {
+            Ok(text) if cap <= 480 => guard_model_text(&text),
+            Ok(text) => guard_model_text_cap(&text, cap),
             Err(()) => UNREACHABLE.to_string(),
         }
     }
@@ -333,7 +374,28 @@ fn clip_chars(s: &str, max: usize) -> String {
     s.chars().take(max).collect()
 }
 
+/// `[1] Author, title` lines. Read before brackets are stripped from the spoken text.
+fn cite_lines(raw: &str) -> Vec<(u32, String)> {
+    let mut out = Vec::new();
+    for line in raw.lines() {
+        let t = line.trim();
+        let Some(rest) = t.strip_prefix('[') else { continue };
+        let Some((n, after)) = rest.split_once(']') else { continue };
+        let Ok(n) = n.trim().parse::<u32>() else { continue };
+        let text = after.trim().trim_start_matches([':', '-', ' ']).trim();
+        if text.is_empty() || out.len() >= 12 {
+            continue;
+        }
+        out.push((n, clip_chars(text, 240)));
+    }
+    out
+}
+
 fn guard_model_text(raw: &str) -> String {
+    guard_model_text_cap(raw, 480)
+}
+
+fn guard_model_text_cap(raw: &str, cap: usize) -> String {
     let text = strip_tags(raw);
     let text = text.trim();
     if text.is_empty() {
@@ -342,7 +404,8 @@ fn guard_model_text(raw: &str) -> String {
     if contains_forbidden(text) {
         return REFUSED.to_string();
     }
-    let capped = clip_chars(text, 480);
+    let cap = cap.clamp(80, 4_000);
+    let capped = clip_chars(text, cap);
     if capped.chars().count() < text.chars().count() {
         if let Some(i) = capped.rfind(' ') {
             if i > 80 {
@@ -376,14 +439,14 @@ fn post_chat(
     target: &HermesTarget,
     model: &str,
     key: &str,
-    persona: &str,
+    system: &str,
     user: &str,
     timeout: Duration,
 ) -> Result<String, ()> {
     let body = format!(
         "{{\"model\":{model},\"messages\":[{{\"role\":\"system\",\"content\":{system}}},{{\"role\":\"user\",\"content\":{user}}}]}}",
         model = json_string(model),
-        system = json_string(system_prompt(persona)),
+        system = json_string(system),
         user = json_string(user),
     );
     let mut sock = TcpStream::connect_timeout(&target.addr, timeout).map_err(|_| ())?;
@@ -835,6 +898,32 @@ mod tests {
         }
         assert!(system_prompt("jarvis").starts_with("You are Jarvis"));
         assert!(system_prompt("samantha").starts_with("You are Samantha"));
+    }
+
+    #[test]
+    fn research_turn_keeps_the_key_off_the_reply() {
+        let key = "test-gateway-key-not-for-git";
+        let payload = "{\"choices\":[{\"message\":{\"content\":\"The wash is amber to violet.\\n[1] Galion brand note\"}}]}";
+        let srv = serve_body("200 OK", payload, None);
+        let llm = HermesLlm::new(
+            &format!("http://{}/v1/chat/completions", srv.addr),
+            "hermes-agent",
+            key,
+            Duration::from_millis(1000),
+        );
+        let shown = format!("{llm:?}");
+        assert_eq!(llm.key_state(), "set");
+        assert!(!shown.contains(key), "{shown}");
+        let turn = llm.research_turn("What colour is the wash?");
+        assert!(turn.text.contains("amber to violet"), "{}", turn.text);
+        assert_eq!(turn.citations.len(), 1);
+        assert_eq!(turn.citations[0].0, 1);
+        assert!(turn.citations[0].1.contains("Galion brand note"), "{}", turn.citations[0].1);
+        assert!(!turn.text.contains(key));
+        let seen = srv.seen.lock().unwrap().clone();
+        assert!(seen.contains("Galion Research"), "{seen}");
+        assert!(seen.contains("Authorization: Bearer "));
+        assert!(!format!("{llm:?}").contains(key));
     }
 
     #[test]
