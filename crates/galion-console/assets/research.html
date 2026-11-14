@@ -39,8 +39,8 @@ SOFTWARE.
 html,body{margin:0;min-height:100%;background:var(--ground);color:var(--ink)}
 body{min-height:100vh;min-height:100dvh;
   background:
-    radial-gradient(ellipse 70% 52% at 12% 88%, color-mix(in srgb, var(--amber) 20%, transparent), transparent 64%),
-    radial-gradient(ellipse 64% 48% at 88% 8%, color-mix(in srgb, var(--violet) 28%, transparent), transparent 66%),
+    radial-gradient(ellipse 90% 70% at 18% 108%, color-mix(in srgb, var(--amber) 42%, transparent), transparent 58%),
+    radial-gradient(ellipse 78% 62% at 88% -8%, color-mix(in srgb, var(--violet) 40%, transparent), transparent 60%),
     var(--ground);
   font-family:system-ui,sans-serif}
 .desk{width:min(1080px,calc(100vw - 96px));margin:0 auto;padding:32px 0 72px}
@@ -105,6 +105,15 @@ textarea::placeholder{color:color-mix(in srgb, var(--ink) 36%, transparent)}
 .citations{margin-top:8px;padding-top:12px;border-top:1px solid color-mix(in srgb, var(--ink) 10%, transparent)}
 #citation-list{color:color-mix(in srgb, var(--ink) 78%, transparent);font:14px/1.45 system-ui,sans-serif}
 #citation-list .mark{color:var(--amber);margin-right:.4em}
+#helpers{margin:18px 0 0;text-align:center;font:13px/1.4 system-ui,sans-serif;letter-spacing:.04em;color:color-mix(in srgb, var(--ink) 46%, transparent)}
+#ui-toggle{width:auto;height:40px;padding:0 14px;border-radius:999px;font:12px/1 system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase}
+body[data-ui="minimal"] #rail,
+body[data-ui="minimal"] .work,
+body[data-ui="minimal"] #add-image{display:none}
+body[data-ui="minimal"] .app{display:block}
+body[data-ui="minimal"] .stage{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;width:min(880px,calc(100vw - 80px));margin:0 auto;padding:0;gap:18px}
+body[data-ui="minimal"] .ask{width:100%}
+body[data-ui="minimal"] #helpers{margin:0}
 .sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0}
 @media (max-width:800px){
   .desk{width:min(1080px,calc(100vw - 32px))}
@@ -118,7 +127,7 @@ textarea::placeholder{color:color-mix(in srgb, var(--ink) 36%, transparent)}
 }
 </style>
 </head>
-<body data-product="research" data-voice="galion-research" data-voice-to-voice="on" data-standard="432">
+<body data-product="research" data-voice="galion-research" data-voice-to-voice="on" data-standard="432" data-ui="minimal">
 <div class="app">
 <aside id="rail">
   <p class="brand">Galion Research</p>
@@ -141,12 +150,13 @@ textarea::placeholder{color:color-mix(in srgb, var(--ink) 36%, transparent)}
       <textarea id="prompt" name="prompt" rows="4" placeholder="Ask a big question" autocomplete="off"></textarea>
       <div class="tools">
         <button type="button" id="add-file" aria-label="Add files">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8.2 12.4 14.4 6.2a3.1 3.1 0 0 1 4.4 4.4l-8 8a4.4 4.4 0 0 1-6.2-6.2l7.2-7.2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
         </button>
         <button type="button" id="add-image" aria-label="Add an image">
           <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="14" rx="2.2" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="8.5" cy="9.5" r="1.3" fill="currentColor"/><path d="M4 16.2 8.8 12l3.2 2.6 3.1-3.4L20 16.4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/></svg>
         </button>
         <input id="files" type="file" multiple hidden tabindex="-1" aria-hidden="true">
+        <button type="button" id="ui-toggle" aria-pressed="true">Show interface</button>
         <span class="hint" id="commit-hint">Return enqueues the question</span>
       </div>
     </div>
@@ -154,6 +164,7 @@ textarea::placeholder{color:color-mix(in srgb, var(--ink) 36%, transparent)}
       <canvas id="voice-dot" width="240" height="240" aria-hidden="true"></canvas>
     </button>
   </form>
+  <p id="helpers" hidden>Helpers are quiet.</p>
   <div class="work">
     <section class="panel" id="sources" aria-labelledby="sources-label">
       <h2 id="sources-label">Sources</h2>
@@ -196,16 +207,18 @@ textarea::placeholder{color:color-mix(in srgb, var(--ink) 36%, transparent)}
 </div>
 <script>
 "use strict";
-// 432 Hz just lattice. The same seven tones as Galion One. No wav files.
-var SOUND_SET=[
-  {id:"arrive",hz:216},
-  {id:"listen",hz:432},
-  {id:"think",hz:540},
-  {id:"speak",hz:648},
-  {id:"yes",hz:864},
-  {id:"no",hz:288},
-  {id:"leave",hz:108}
+// Research cues. 432 Hz just intonation. Definitions only. No voice audio and no wav files.
+var RESEARCH_CUES=[
+  {id:"ask",ratio:"1:1",hz:432},
+  {id:"listen",ratio:"1:1",hz:432},
+  {id:"helper",ratio:"5:4",hz:540},
+  {id:"local",ratio:"2:3",hz:288},
+  {id:"returned",ratio:"3:2",hz:648},
+  {id:"hide",ratio:"1:2",hz:216},
+  {id:"show",ratio:"2:1",hz:864},
+  {id:"leave",ratio:"1:4",hz:108}
 ];
+var SOUND_SET=RESEARCH_CUES;
 // Voice V2 disc, restyled as the research entry. Same pigment as the one-dot page. Not the full-screen orb.
 var MARK={core:"#F5F5F7",edge:"#E8E8ED",stroke:"rgba(255,255,255,0.55)",strokePx:1};
 function markInner(warm){
@@ -278,11 +291,23 @@ function tone(id){
       ol.appendChild(li);
     });
   }
+  var LOCAL="The research path is not reachable from here. Local. What is already known stays marked local.";
+  var helpers=document.getElementById("helpers");
+  function carryLocal(q){
+    hermesStatus("Hermes · Unreachable");
+    helpers.hidden=false;
+    helpers.textContent="Helpers are quiet. Local knowledge carries the question.";
+    document.getElementById("reading-question").textContent=q;
+    document.getElementById("reading-question").hidden=false;
+    document.getElementById("reading-body").textContent=LOCAL;
+    fillList(document.getElementById("local-list"), ["Local. What is already known stays marked local."]);
+    document.getElementById("source-empty").hidden=true;
+    fillPile("unknown", [LOCAL]);
+    paintHistory([{status:"Unreachable", question:q}]);
+    tone("local");
+  }
   function showTurn(j){
     var q=j.question||"";
-    var live=document.getElementById("live-question");
-    live.textContent=q;
-    live.hidden=!q;
     var lead=document.getElementById("reading-question");
     lead.textContent=q;
     lead.hidden=!q;
@@ -299,6 +324,9 @@ function tone(id){
     fillPile("inferred", j.inferred);
     fillPile("unknown", j.unknown);
     hermesStatus("Hermes · "+(j.status||"Returned"));
+    helpers.hidden=false;
+    helpers.textContent=j.status==="Unreachable"?"Helpers are quiet. Local knowledge carries the question.":"Helpers are quiet.";
+    tone(j.status==="Unreachable"?"local":"returned");
   }
   function fillPile(id, rows){
     var list=document.getElementById(id+"-list");
@@ -340,39 +368,34 @@ function tone(id){
     var q=prompt.value.replace(/\s+/g," ").trim();
     if(!q) return;
     hermesStatus("Hermes · Running");
+    helpers.hidden=false;
+    helpers.textContent="Helpers: reading, sources, notebook.";
     fillList(document.getElementById("arriving-list"), [q]);
     document.getElementById("arriving-empty").hidden=true;
-    tone("think");
+    tone("ask");
+    setTimeout(function(){ tone("helper"); }, 180);
     fetch("/research/ask",{method:"POST",cache:"no-store",headers:{"Content-Type":"application/json"},body:JSON.stringify({question:q})})
       .then(function(r){ return r.ok?r.json():null; })
       .then(function(j){
-        if(!j){
-          hermesStatus("Hermes · Unreachable");
-          document.getElementById("reading-question").textContent=q;
-          document.getElementById("reading-question").hidden=false;
-          document.getElementById("reading-body").textContent="The research path is not reachable from here.";
-          fillPile("unknown", ["The research path is not reachable from here."]);
-          paintHistory([{status:"Unreachable", question:q}]);
-          return;
-        }
+        if(!j){ carryLocal(q); return; }
         showTurn(j);
         return fetch("/research/history",{cache:"no-store"}).then(function(r){ return r.ok?r.json():null; });
       })
-      .then(function(h){ if(h&&Array.isArray(h.items)) paintHistory(h.items); tone("speak"); })
-      .catch(function(){
-        hermesStatus("Hermes · Unreachable");
-        document.getElementById("reading-question").textContent=q;
-        document.getElementById("reading-question").hidden=false;
-        document.getElementById("reading-body").textContent="The research path is not reachable from here.";
-        fillPile("unknown", ["The research path is not reachable from here."]);
-        paintHistory([{status:"Unreachable", question:q}]);
-      });
+      .then(function(h){ if(h&&Array.isArray(h.items)) paintHistory(h.items); })
+      .catch(function(){ carryLocal(q); });
   }
   prompt.addEventListener("keydown", function(ev){
     if(ev.key==="Enter"&&!ev.shiftKey){
       ev.preventDefault();
       commitQuestion();
     }
+  });
+  document.getElementById("ui-toggle").addEventListener("click", function(ev){
+    var minimal=document.body.getAttribute("data-ui")==="minimal";
+    document.body.setAttribute("data-ui", minimal?"":"minimal");
+    ev.currentTarget.textContent=minimal?"Hide interface":"Show interface";
+    ev.currentTarget.setAttribute("aria-pressed", minimal?"false":"true");
+    tone(minimal?"show":"hide");
   });
   document.getElementById("allow-experiment").addEventListener("click", function(ev){
     var btn=ev.currentTarget;

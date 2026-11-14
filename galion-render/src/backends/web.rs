@@ -816,7 +816,11 @@ fn research_ask(desk: &Arc<Mutex<ResearchDesk>>, question: &str) -> String {
         None => galion_cascade::hermes::ResearchAnswer { text: galion_cascade::UNREACHABLE.into(), citations: Vec::new() },
     };
     let unreachable = turn.text == galion_cascade::UNREACHABLE;
-    let reply = if unreachable { "The research path is not reachable from here.".to_string() } else { turn.text };
+    let reply = if unreachable {
+        "The research path is not reachable from here. Local. What is already known stays marked local.".to_string()
+    } else {
+        turn.text
+    };
     let status = research_state(&reply);
     let citations = if unreachable { Vec::new() } else { turn.citations };
     let (mut found, inferred, mut unknown) = notebook_piles(&reply);
@@ -1391,6 +1395,10 @@ mod tests {
                 "id=\"experiment\"",
                 "Ask first",
                 "data-voice-to-voice=\"on\"",
+                "id=\"ui-toggle\"",
+                "id=\"helpers\"",
+                "ratio:\"5:4\"",
+                "Local. What is already known stays marked local.",
                 "hz:432",
                 "hz:216",
                 "hz:540",
