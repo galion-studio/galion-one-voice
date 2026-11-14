@@ -124,7 +124,7 @@ Suggested cadence is once a night on one GPU runner. The pull-request job stays 
 
 ## Nebula live feed
 
-`docs/emotion-v2/NEBULA-LIVE-FEED.md` is the frame schema for `apps/nebula-voice-v2`. The pull-request job runs its unit tests in the same CPU step's environment. Those tests use numeric posteriors. They do not synthesize audio, and they do not download weights.
+`docs/emotion-v2/NEBULA-LIVE-FEED.md` is the frame schema for `apps/nebula-voice-v2`. The UI reading of that schema, including `estimate: none`, is `docs/galion-voice-v2/EMOTION-NEBULA-FEED.md`. The pull-request job runs the unit tests in the same CPU step's environment. Those tests use numeric posteriors. They do not synthesize audio, and they do not download weights.
 
 ```bash
 python -m unittest discover -s tools/emotion-v2/nebula/tests -v

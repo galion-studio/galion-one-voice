@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "galion-voice-v2-emotion-feed/1",
+  "title": "Galion Voice V2 emotion and nebula feed",
+  "description": "One UI frame. estimate none means there is no emotion estimate. The Python checker in tools/emotion-v2/nebula/contract.py is the server-side rule; this file names the fields.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "source_schema",
+    "voice_id",
+    "t_ms",
+    "kind",
+    "estimate",
+    "present",
+    "distribution",
+    "tau_ms",
+    "weights",
+    "valence",
+    "arousal",
+    "dominance",
+    "energy",
+    "seq",
+    "origin",
+    "reason",
+    "detail"
+  ],
+  "properties": {
+    "schema": { "const": "galion-voice-v2-emotion-feed/1" },
+    "source_schema": {
+      "anyOf": [
+        { "const": "galion-nebula-live-feed/1" },
+        { "type": "null" }
+      ]
+    },
+    "voice_id": {
+      "anyOf": [
+        { "enum": ["samantha", "jarvis"] },
+        { "type": "null" }
+      ]
+    },
+    "t_ms": { "type": "integer", "minimum": 0 },
+    "kind": { "enum": ["frame", "utterance"] },
+    "estimate": { "enum": ["none", "distribution", "partial"] },
+    "present": { "type": "boolean" },
+    "distribution": { "type": "boolean" },
+    "tau_ms": { "type": "number", "exclusiveMinimum": 0 },
+    "weights": { "type": "object" },
+    "valence": { "type": ["number", "null"] },
+    "arousal": { "type": ["number", "null"] },
+    "dominance": { "type": ["number", "null"] },
+    "energy": { "type": ["number", "null"] },
+    "seq": { "type": ["integer", "null"], "minimum": 1 },
+    "origin": { "enum": ["server", "client"] },
+    "reason": {
+      "anyOf": [
+        { "enum": ["rejected", "disconnected"] },
+        { "type": "null" }
+      ]
+    },
+    "detail": { "type": ["string", "null"] }
+  }
+}
