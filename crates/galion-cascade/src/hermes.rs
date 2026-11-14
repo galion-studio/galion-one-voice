@@ -360,10 +360,11 @@ impl HermesLlm {
         self.complete_prompt(system_prompt(persona), &user, 480)
     }
 
-    /// Research turn for the Galion Research desk. `sources` are the files the
-    /// user attached. The gateway key stays on this client. It is not copied
-    /// into the reply. A citation whose id or title was not in `sources` is
-    /// dropped before the answer is returned.
+    /// Research turn for the Galion Research desk. `sources` are the files of
+    /// this caller only; the desk must not hand another visitor's files in.
+    /// The gateway key stays on this client. It is not copied into the reply.
+    /// A citation whose id or title was not in `sources` is dropped before the
+    /// answer is returned.
     pub fn research_turn(&self, user: &str, sources: &[ResearchSource]) -> ResearchAnswer {
         let empty = || blank_research(UNREACHABLE, "Unreachable");
         let Some(target) = self.target.clone() else {

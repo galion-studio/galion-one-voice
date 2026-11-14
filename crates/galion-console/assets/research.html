@@ -107,6 +107,11 @@ textarea::placeholder{color:color-mix(in srgb, var(--ink) 36%, transparent)}
 #citation-list .mark{color:var(--amber);margin-right:.4em}
 #helpers{margin:18px 0 0;text-align:center;font:13px/1.4 system-ui,sans-serif;letter-spacing:.04em;color:color-mix(in srgb, var(--ink) 46%, transparent)}
 #ui-toggle{width:auto;height:40px;padding:0 14px;border-radius:999px;font:12px/1 system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase}
+#clear-sources{appearance:none;margin:0 0 12px;border:1px solid color-mix(in srgb, var(--ink) 16%, transparent);background:transparent;color:color-mix(in srgb, var(--ink) 72%, transparent);border-radius:999px;padding:8px 14px;font:12px/1 system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;cursor:pointer}
+#clear-sources:hover,#clear-sources:focus-visible{border-color:color-mix(in srgb, var(--sky) 70%, transparent);color:var(--ink);outline:none}
+.source-row{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+.source-row button{appearance:none;border:0;background:transparent;padding:0;color:color-mix(in srgb, var(--ink) 52%, transparent);font:12px/1 system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;cursor:pointer}
+.source-row button:hover,.source-row button:focus-visible{color:var(--ink);outline:none}
 body[data-ui="minimal"] #rail,
 body[data-ui="minimal"] .work,
 body[data-ui="minimal"] #add-image{display:none}
@@ -168,6 +173,7 @@ body[data-ui="minimal"] #helpers{margin:0}
   <div class="work">
     <section class="panel" id="sources" aria-labelledby="sources-label">
       <h2 id="sources-label">Sources</h2>
+      <button type="button" id="clear-sources">Clear sources</button>
       <div class="piles">
         <div class="pile" id="sources-local"><h3>Local</h3><ol id="local-list"></ol><p id="source-empty">No source yet.</p></div>
         <div class="pile" id="sources-reading"><h3>Reading</h3><ol id="reading-list"></ol><p id="reading-empty">No source yet.</p></div>
@@ -276,7 +282,7 @@ function tone(id){
     o.start(t); o.stop(t+0.18);
   }catch(e){}
 }
-// Attached files are Sources. The desk cites only those ids.
+// Attached files are this browser's Sources. The desk cites only those ids.
 (function(){
   var files=document.getElementById("files");
   var prompt=document.getElementById("prompt");
@@ -286,13 +292,37 @@ function tone(id){
   var waiting=false;
   function paintSources(rows){
     attached=rows||[];
-    fillList(document.getElementById("local-list"), attached.map(function(s){
+    var ol=document.getElementById("local-list");
+    while(ol.firstChild) ol.removeChild(ol.firstChild);
+    attached.forEach(function(s){
       var kind=s.kind==="image"?"image":"file";
       var chars=(typeof s.chars==="number"&&s.kind!=="image")?" · "+s.chars+" chars":"";
-      return "["+s.id+"] "+(s.name||"file")+" · "+kind+chars;
-    }));
+      var li=document.createElement("li");
+      li.className="source-row";
+      var span=document.createElement("span");
+      span.textContent="["+s.id+"] "+(s.name||"file")+" · "+kind+chars;
+      var btn=document.createElement("button");
+      btn.type="button";
+      btn.textContent="Remove";
+      btn.setAttribute("aria-label","Remove "+(s.name||"file"));
+      var sourceId=s.id;
+      btn.addEventListener("click", function(){ deleteSource(sourceId); });
+      li.appendChild(span);
+      li.appendChild(btn);
+      ol.appendChild(li);
+    });
     document.getElementById("source-empty").hidden=attached.length>0;
     if(!attached.length) document.getElementById("source-empty").textContent="No source yet.";
+  }
+  function applySources(j){
+    if(j&&Array.isArray(j.sources)) paintSources(j.sources);
+  }
+  function deleteSource(id){
+    tone("leave");
+    fetch("/research/sources/"+id,{method:"DELETE",cache:"no-store"})
+      .then(function(r){ return r.ok?r.json():null; })
+      .then(applySources)
+      .catch(function(){});
   }
   function hermesStatus(text){ statusEl.textContent=text; }
   function fillList(ol, rows){
@@ -384,6 +414,13 @@ function tone(id){
         if(pending===0&&waiting){ waiting=false; commitQuestion(); }
       });
   }
+  document.getElementById("clear-sources").addEventListener("click", function(){
+    tone("leave");
+    fetch("/research/sources",{method:"DELETE",cache:"no-store"})
+      .then(function(r){ return r.ok?r.json():null; })
+      .then(applySources)
+      .catch(function(){});
+  });
   document.getElementById("add-file").addEventListener("click", function(ev){
     ev.preventDefault();
     files.removeAttribute("accept");

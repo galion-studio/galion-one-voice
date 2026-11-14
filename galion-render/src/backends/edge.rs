@@ -273,7 +273,7 @@ pub fn wipe_string(s: &mut String) {
     zeroise_bytes(&mut v);
 }
 
-fn tokens_eq(a: &str, b: &str) -> bool {
+pub(crate) fn tokens_eq(a: &str, b: &str) -> bool {
     if a.len() != b.len() {
         return false;
     }
@@ -284,7 +284,7 @@ fn tokens_eq(a: &str, b: &str) -> bool {
     diff == 0
 }
 
-fn mint_token() -> String {
+pub(crate) fn mint_token() -> String {
     let mut b = [0u8; 32];
     if let Ok(mut f) = std::fs::File::open("/dev/urandom") {
         if std::io::Read::read_exact(&mut f, &mut b).is_ok() {
