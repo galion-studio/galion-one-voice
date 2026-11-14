@@ -22,6 +22,7 @@ from .config import (
 from .emotions import EMOTIONS, canonical_emotion
 from .report import write_reports
 from .score import score_all
+from .sweep import SweepError, execute as execute_sweep
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -53,7 +54,28 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="score only this emotion; repeat for several. Default: all twelve",
     )
+    sweep = sub.add_parser(
+        "sweep",
+        help="score the frozen emotion-sweep listening set against the rollout gate",
+    )
+    sweep.add_argument("--clips-dir", type=Path, default=None)
+    sweep.add_argument("--csv", type=Path, default=None)
+    sweep.add_argument("--sweep-md", type=Path, default=None)
+    sweep.add_argument("--config", type=Path, default=None)
+    sweep.add_argument("--out-dir", type=Path, required=True)
+    sweep.add_argument(
+        "--backend",
+        default=None,
+        help="auto (default) or superb. stub is recorded as unmeasured and is not a score",
+    )
+    sweep.add_argument(
+        "--require-scorers",
+        action="store_true",
+        help="exit 1 when WER, ECAPA, or emotion_match cannot be measured",
+    )
     args = parser.parse_args(argv)
+    if args.command == "sweep":
+        return _run_sweep(args)
     if args.command != "score":
         parser.error(f"unknown command {args.command}")
     try:
@@ -76,6 +98,33 @@ def main(argv: list[str] | None = None) -> int:
     write_reports(args.out_dir, summary)
     print(render_line(summary), file=sys.stdout)
     return 0 if summary.passed else 1
+
+
+def _run_sweep(args) -> int:
+    try:
+        code, report = execute_sweep(
+            out_dir=args.out_dir,
+            clips_dir=args.clips_dir,
+            csv_path=args.csv,
+            sweep_md=args.sweep_md,
+            config=args.config,
+            backend=args.backend,
+            require_scorers=args.require_scorers,
+        )
+    except (ConfigError, SweepError) as exc:
+        print(f"emotion-v2: {exc}", file=sys.stderr)
+        return 2
+    summary = report["summary"]
+    assert isinstance(summary, dict)
+    print(
+        "emotion-sweep: {measured}/{total} candidates measured, gate {gate}, claimed=false".format(
+            measured=summary["n_measured"],
+            total=summary["n_candidates"],
+            gate=summary["gate"],
+        ),
+        file=sys.stdout,
+    )
+    return code
 
 
 def render_line(summary) -> str:
