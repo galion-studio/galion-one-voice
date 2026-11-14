@@ -109,3 +109,65 @@ tools/laptop-runbooks/**/*.ogg
 
 # Emotion V2 capture originals (owner recordings + session manifests). Never commit.
 /originals/
+
+# G.A.L.I.O.N. hygiene: caches, build output, model weights, audio, OS junk.
+# Own-voice recordings and voice clones stay local. Already-tracked files
+# (including the approved synthetic eval WAVs) are not removed by these rules.
+*.ogg
+*.m4a
+*.aac
+*.aif
+*.aiff
+*.opus
+*.wma
+*.caf
+*.webm
+*.spx
+*.pcm
+*.wave
+*.mp4
+*.m4v
+*.mov
+*.mkv
+*.[Ww][Aa][Vv]
+*.[Ww][Aa][Vv][Ee]
+*.[Mm][Pp]3
+*.[Ff][Ll][Aa][Cc]
+*.[Oo][Gg][Gg]
+*.[Mm]4[Aa]
+*.gguf
+*.ggml
+*.pth
+*.pt2
+*.onnx.data
+*.tflite
+*.pb
+*.h5
+*.hdf5
+*.nemo
+*.mar
+*.npy
+*.npz
+*.pkl
+*.pickle
+dist/
+build/
+*.o
+*.a
+*.so
+*.dylib
+*.wasm
+*.log
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.cache/
+.coverage
+htmlcov/
+coverage/
+*.egg-info/
+.tox/
+.hypothesis/
+.ipynb_checkpoints/
+.DS_Store
+Thumbs.db
