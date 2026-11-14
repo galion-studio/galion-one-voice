@@ -31,16 +31,16 @@ SOFTWARE.
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#0A0A0C">
+<meta name="theme-color" content="#0B0F14">
 <meta name="color-scheme" content="dark">
 <title>Galion Research</title>
 <style>
-:root{--ground:#0A0A0C;--ink:#F5F5F7;--amber:#F5A524;--violet:#7C3AED}
+:root{--ground:#0B0F14;--ink:#E6EDF3;--sky:#58C4FF;--ice:#B8E8FF;--ocean:#0B5FA5;--amber:var(--sky);--violet:var(--ocean)}
 html,body{margin:0;min-height:100%;background:var(--ground);color:var(--ink)}
 body{min-height:100vh;min-height:100dvh;
   background:
-    radial-gradient(ellipse 90% 70% at 18% 108%, color-mix(in srgb, var(--amber) 42%, transparent), transparent 58%),
-    radial-gradient(ellipse 78% 62% at 88% -8%, color-mix(in srgb, var(--violet) 40%, transparent), transparent 60%),
+    radial-gradient(90% 48% at 50% -14%, color-mix(in srgb, var(--ice) 38%, transparent), transparent 62%),
+    radial-gradient(ellipse 70% 50% at 80% 110%, color-mix(in srgb, var(--ocean) 42%, transparent), transparent 58%),
     var(--ground);
   font-family:system-ui,sans-serif}
 .desk{width:min(1080px,calc(100vw - 96px));margin:0 auto;padding:32px 0 72px}
@@ -54,7 +54,7 @@ body{min-height:100vh;min-height:100dvh;
 .field{position:relative;flex:1;min-width:0;border-radius:32px;border:1px solid transparent;padding:26px 26px 14px;
   background:
     linear-gradient(color-mix(in srgb, var(--ground) 82%, transparent), color-mix(in srgb, var(--ground) 82%, transparent)) padding-box,
-    linear-gradient(128deg, color-mix(in srgb, var(--amber) 70%, transparent), color-mix(in srgb, var(--violet) 76%, transparent)) border-box;
+    linear-gradient(135deg, color-mix(in srgb, var(--ice) 80%, transparent), color-mix(in srgb, var(--sky) 70%, transparent) 55%, color-mix(in srgb, var(--ocean) 85%, transparent)) border-box;
   box-shadow:0 28px 80px rgba(0,0,0,.35)}
 .field:focus-within{box-shadow:0 28px 80px rgba(0,0,0,.35), 0 0 0 1px color-mix(in srgb, var(--amber) 28%, transparent)}
 textarea{display:block;width:100%;box-sizing:border-box;min-height:132px;margin:0;padding:0 2px;border:0;resize:none;
@@ -66,7 +66,7 @@ textarea::placeholder{color:color-mix(in srgb, var(--ink) 36%, transparent)}
 .tools button:hover,.tools button:focus-visible{border-color:color-mix(in srgb, var(--amber) 70%, transparent);color:var(--ink);outline:none}
 .hint{margin-left:auto;font:12px/1 system-ui,sans-serif;letter-spacing:.04em;color:color-mix(in srgb, var(--ink) 38%, transparent)}
 .voice{width:120px;height:120px;flex:none;border:0;border-radius:999px;background:
-  radial-gradient(circle at 50% 46%, color-mix(in srgb, var(--amber) 24%, transparent), color-mix(in srgb, var(--violet) 28%, transparent) 48%, transparent 72%)}
+  radial-gradient(circle at 50% 46%, color-mix(in srgb, var(--ice) 50%, transparent), color-mix(in srgb, var(--sky) 36%, transparent) 48%, transparent 72%)}
 .voice:focus-visible{outline:1px solid color-mix(in srgb, var(--amber) 70%, transparent);outline-offset:4px}
 #voice-dot{width:120px;height:120px;display:block;background:transparent}
 .tools svg{width:22px;height:22px;display:block}

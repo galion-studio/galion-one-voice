@@ -1409,9 +1409,10 @@ mod tests {
                 "Copyright © 2026 Galion Labs. All rights reserved.",
                 "Permission is hereby granted, free of charge",
                 "Copyright (c) 2026 Maciej Grajczyk",
-                "#0A0A0C",
-                "#F5A524",
-                "#7C3AED",
+                "#0B0F14",
+                "#58C4FF",
+                "#B8E8FF",
+                "#0B5FA5",
                 "#F5F5F7",
             ] {
                 assert!(body.contains(needle), "{p} missing {needle}");
