@@ -9,7 +9,8 @@ on:
 
 jobs:
   playwright:
-    runs-on: ubuntu-latest
+    # ubuntu-latest is 26.04. Playwright 1.56.1 refuses Chromium there.
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: e2e/one
