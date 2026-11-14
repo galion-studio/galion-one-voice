@@ -302,9 +302,10 @@ impl HermesLlm {
 
     /// Galion Research client, separate from the voice LLM (`GALION_LLM` stays as it is).
     ///
-    /// `GALION_RESEARCH_URL` (loopback chat URL) turns it on; unset or not loopback is `None`,
-    /// and the desk keeps answering Unreachable. `GALION_RESEARCH_MODEL` (default
-    /// `hermes-agent`), `GALION_RESEARCH_TIMEOUT_MS` (default 60000, clamped 1000..=90000).
+    /// `GALION_RESEARCH_URL` (loopback chat URL) turns it on; unset or not loopback is `None`.
+    /// The research desk then answers from the session notes index and labels the turn Offline.
+    /// `GALION_RESEARCH_MODEL` (default `hermes-agent`), `GALION_RESEARCH_TIMEOUT_MS`
+    /// (default 60000, clamped 1000..=90000).
     /// Key: `GALION_RESEARCH_KEY`, or one `NAME=value` line named by `GALION_RESEARCH_KEY_NAME`
     /// in the dotenv file `GALION_RESEARCH_KEY_FILE`. The key is never logged or returned.
     pub fn research_from_env() -> Option<Self> {

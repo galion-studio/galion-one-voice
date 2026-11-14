@@ -87,6 +87,11 @@ textarea::placeholder{color:color-mix(in srgb, var(--ink) 36%, transparent)}
 .card button[aria-pressed="true"]{background:var(--amber);color:var(--ground);border-color:var(--amber)}
 .work{display:grid;gap:16px;margin-top:28px}
 #hermes-status{margin:0 0 18px;font:13px/1.4 system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:color-mix(in srgb, var(--amber) 75%, var(--ink))}
+body[data-path="offline"] #hermes-status{color:color-mix(in srgb, var(--ink) 48%, transparent);letter-spacing:.04em;text-transform:none}
+#offline-state{width:min(68ch,100%);margin:0;text-align:center}
+#offline-mark{margin:0;font:12px/1.4 system-ui,sans-serif;font-weight:450;letter-spacing:.18em;text-transform:uppercase;color:color-mix(in srgb, var(--ink) 42%, transparent)}
+#offline-line{margin:10px 0 0;font:16px/1.55 system-ui,sans-serif;color:color-mix(in srgb, var(--ink) 74%, transparent)}
+#offline-line:empty{display:none;margin:0}
 #history-list{margin:0;padding-left:1.2em}
 #history-list li{margin:0 0 8px;font:15px/1.45 system-ui,sans-serif}
 #history-empty{margin:0;font:15px/1.45 system-ui,sans-serif;color:color-mix(in srgb, var(--ink) 62%, transparent)}
@@ -164,6 +169,10 @@ body[data-ui="minimal"] #helpers{margin:0}
       <canvas id="voice-dot" width="240" height="240" aria-hidden="true"></canvas>
     </button>
   </form>
+  <div id="offline-state" hidden aria-live="polite">
+    <p id="offline-mark">Offline</p>
+    <p id="offline-line"></p>
+  </div>
   <p id="helpers" hidden>Helpers are quiet.</p>
   <div class="work">
     <section class="panel" id="sources" aria-labelledby="sources-label">
@@ -213,6 +222,7 @@ var RESEARCH_CUES=[
   {id:"listen",ratio:"1:1",hz:432},
   {id:"helper",ratio:"5:4",hz:540},
   {id:"local",ratio:"2:3",hz:288},
+  {id:"offline",ratio:"1:2",hz:216},
   {id:"returned",ratio:"3:2",hz:648},
   {id:"hide",ratio:"1:2",hz:216},
   {id:"show",ratio:"2:1",hz:864},
@@ -303,22 +313,33 @@ function tone(id){
       ol.appendChild(li);
     });
   }
-  var LOCAL="The research path is not reachable from here. Local. What is already known stays marked local.";
+  var OFFLINE_LIMIT="Offline. The research path is not reachable from here.";
+  var NO_SOURCE="I don't have a source for that.";
   var helpers=document.getElementById("helpers");
+  function markOffline(){
+    document.getElementById("offline-state").hidden=false;
+    document.body.setAttribute("data-path","offline");
+    hermesStatus("Offline");
+  }
+  function clearOffline(){
+    document.getElementById("offline-state").hidden=true;
+    document.getElementById("offline-line").textContent="";
+    document.body.setAttribute("data-path","live");
+  }
   function carryLocal(q){
-    hermesStatus("Hermes · Unreachable");
-    helpers.hidden=false;
-    helpers.textContent="Helpers are quiet. Local knowledge carries the question.";
+    markOffline();
+    document.getElementById("offline-line").textContent="Unknown. "+NO_SOURCE+" "+OFFLINE_LIMIT;
+    helpers.hidden=true;
     document.getElementById("reading-question").textContent=q;
     document.getElementById("reading-question").hidden=false;
-    document.getElementById("reading-body").textContent=LOCAL;
-    if(!attached.length){
-      fillList(document.getElementById("local-list"), ["Local. What is already known stays marked local."]);
-      document.getElementById("source-empty").hidden=true;
-    }
-    fillPile("unknown", [LOCAL]);
-    paintHistory([{status:"Unreachable", question:q}]);
-    tone("local");
+    document.getElementById("reading-body").textContent="Unknown. "+NO_SOURCE+" "+OFFLINE_LIMIT;
+    fillList(document.getElementById("citation-list"), []);
+    document.getElementById("citation-empty").hidden=false;
+    fillPile("found", []);
+    fillPile("inferred", []);
+    fillPile("unknown", [NO_SOURCE]);
+    paintHistory([{status:"Offline", question:q}]);
+    tone("offline");
   }
   function showTurn(j){
     var q=j.question||"";
@@ -337,12 +358,27 @@ function tone(id){
     fillPile("found", j.found);
     fillPile("inferred", j.inferred);
     fillPile("unknown", j.unknown);
-    var standing=j.status||"Unknown";
-    if(standing!=="Found"&&standing!=="Inferred"&&standing!=="Unknown"&&standing!=="Unreachable"&&standing!=="Denied") standing="Unknown";
+    var standing=j.standing||j.status||"Unknown";
+    if(standing!=="Found"&&standing!=="Inferred"&&standing!=="Unknown"&&standing!=="Denied") standing="Unknown";
+    if(j.status==="Offline"){
+      markOffline();
+      document.getElementById("offline-line").textContent=j.reply||"";
+      helpers.hidden=true;
+      tone("offline");
+      return;
+    }
+    clearOffline();
+    if(j.status==="Unreachable"){
+      markOffline();
+      document.getElementById("offline-line").textContent=j.reply||"";
+      helpers.hidden=true;
+      tone("local");
+      return;
+    }
     hermesStatus("Hermes · "+standing);
     helpers.hidden=false;
-    helpers.textContent=standing==="Unreachable"?"Helpers are quiet. Local knowledge carries the question.":standing;
-    tone(j.status==="Unreachable"?"local":"returned");
+    helpers.textContent=standing;
+    tone("returned");
   }
   function fillPile(id, rows){
     var list=document.getElementById(id+"-list");
@@ -359,9 +395,10 @@ function tone(id){
     document.getElementById("history-empty").hidden=(items||[]).length>0;
   }
   fetch("/research/hermes",{cache:"no-store"}).then(function(r){ return r.ok?r.json():null; }).then(function(j){
-    if(!j){ hermesStatus("Hermes · Unreachable"); return; }
+    if(!j||j.status==="Unreachable"){ markOffline(); return; }
+    if(!document.getElementById("offline-line").textContent) clearOffline();
     hermesStatus("Hermes · "+(j.status||"Idle"));
-  }).catch(function(){ hermesStatus("Hermes · Unreachable"); });
+  }).catch(function(){ markOffline(); });
   fetch("/research/history",{cache:"no-store"}).then(function(r){ return r.ok?r.json():null; }).then(function(j){
     if(j&&Array.isArray(j.items)) paintHistory(j.items);
   }).catch(function(){});
@@ -422,13 +459,16 @@ function tone(id){
     var q=prompt.value.replace(/\s+/g," ").trim();
     if(!q) return;
     if(pending>0){ waiting=true; return; }
-    hermesStatus("Hermes · Running");
-    helpers.hidden=false;
-    helpers.textContent="Helpers: reading, sources, notebook.";
+    var alreadyOffline=document.body.getAttribute("data-path")==="offline";
+    if(!alreadyOffline){
+      hermesStatus("Hermes · Running");
+      helpers.hidden=false;
+      helpers.textContent="Helpers: reading, sources, notebook.";
+    }
     fillList(document.getElementById("arriving-list"), [q]);
     document.getElementById("arriving-empty").hidden=true;
     tone("ask");
-    setTimeout(function(){ tone("helper"); }, 180);
+    if(!alreadyOffline) setTimeout(function(){ tone("helper"); }, 180);
     fetch("/research/ask",{method:"POST",cache:"no-store",headers:{"Content-Type":"application/json"},body:JSON.stringify({question:q})})
       .then(function(r){ return r.ok?r.json():null; })
       .then(function(j){

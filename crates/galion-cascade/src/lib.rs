@@ -16,6 +16,8 @@ pub mod en_lane;
 pub mod canned;
 /// Loopback Hermes chat client (OpenAI-compatible, std `TcpStream`, no TLS).
 pub mod hermes;
+/// Local keyword notes (BM25). No network and no model.
+pub mod notes;
 /// In-house persona reply floor (rules, no model). `GALION_LLM=canned|inhouse`.
 pub mod reflect;
 /// Phone turn: 16 kHz utterance → transcript → reply text → 24 kHz WAV (feature `cascade`).
