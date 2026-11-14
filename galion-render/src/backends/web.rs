@@ -842,7 +842,7 @@ fn research_ask(desk: &Arc<Mutex<ResearchDesk>>, question: &str) -> String {
         at: Instant::now(),
     };
     let body = format!(
-        "{{\"schema\":\"galion-research/1\",\"app\":\"hermes\",\"model\":{},{}}}",
+        "{{\"schema\":\"galion-research/1\",\"app\":\"hermes\",\"model\":{},{}",
         galion_cascade::hermes::json_string(&model_fallback),
         research_note_json(&note).trim_start_matches('{')
     );
@@ -1241,6 +1241,32 @@ impl Drop for WebSurface {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn research_ask_reply_is_one_json_object() {
+        let desk = Arc::new(Mutex::new(ResearchDesk::new()));
+        let body = research_ask(&desk, "Is the reply one object?");
+        assert!(body.starts_with('{') && body.ends_with("]}") && !body.ends_with("]}}"), "{body}");
+        let (mut depth, mut in_str, mut esc, mut closed_at) = (0i32, false, false, None);
+        for (i, c) in body.char_indices() {
+            if in_str {
+                if esc { esc = false } else if c == '\\' { esc = true } else if c == '"' { in_str = false }
+                continue;
+            }
+            match c {
+                '"' => in_str = true,
+                '{' | '[' => depth += 1,
+                '}' | ']' => {
+                    depth -= 1;
+                    if depth == 0 { closed_at = Some(i); }
+                }
+                _ => {}
+            }
+        }
+        assert_eq!(depth, 0, "{body}");
+        assert_eq!(closed_at, Some(body.len() - 1), "{body}");
+    }
+
     #[test]
     fn no_frame_route() {
         let mut w = WebSurface::serve("127.0.0.1:0".parse().unwrap());
