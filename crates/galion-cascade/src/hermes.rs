@@ -21,11 +21,22 @@ use crate::{CascadeError, Emotion, Llm, Transcript};
 /// Spoken when the gateway does not answer. Not a canned intent line.
 pub const UNREACHABLE: &str = "model can't be reached";
 /// Galion Research desk. A voice of Galion One, with Hermes as the agent behind it.
+/// Citations are ids from the Sources list on this turn. A missing source is
+/// Inferred or Unknown. The desk drops any id that was not provided.
 pub const RESEARCH_PROMPT: &str = "You are Galion Research, the research app on Hermes, a voice of Galion One. \
-Answer the question first, then the limit. Separate found, inferred, and unknown. \
-Cite only a source that was handed to you, one per line, starting with [1]. \
-If you have no source, say \"I don't have a source for that.\" \
-Do not invent a paper, a URL, a date, or a measurement. English only.";
+Answer the question first, then the limit. \
+Separate found, inferred, and unknown under those headings, each heading on its own line. \
+A Found line is a claim a provided source states. End it with that source id, written [n]. \
+An Inferred line is a step you reasoned and no provided source states. \
+An Unknown line is a claim you cannot settle from the sources. \
+Cite only an id from the Sources list. One citation per line, written [n] and the source name. \
+If the Sources list says none, write no citation and leave Found empty. \
+Do not invent a paper, a URL, a date, a measurement, or a source id. \
+Do not write that you have no source. English only.";
+/// How many attached files one turn hands to the model.
+pub const MAX_RESEARCH_SOURCES: usize = 8;
+/// Characters of each file kept in the prompt and on the desk.
+pub const MAX_RESEARCH_SOURCE_CHARS: usize = 2_000;
 /// Spoken when the model returns a forbidden empathy script.
 pub const REFUSED: &str = "I'll stay on what you said.";
 /// Stable client id when no model name is configured.
@@ -175,12 +186,26 @@ fn prompt_with_bans(head: &str) -> String {
     s
 }
 
-/// One Hermes research reply. `citations` are the `[n]` lines from the model.
-/// `text` is the guarded answer. Neither field carries the gateway key.
+/// One file the desk handed to this turn. A citation may name only these ids.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ResearchSource {
+    pub id: u32,
+    pub name: String,
+    /// Plain text from the file. Empty when nothing was read (an image).
+    pub text: String,
+}
+
+/// One Hermes research reply. `citations` name only sources that were handed
+/// in. `standing` is `Found`, `Inferred`, `Unknown`, `Unreachable`, or `Denied`.
+/// Neither field carries the gateway key.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ResearchAnswer {
     pub text: String,
     pub citations: Vec<(u32, String)>,
+    pub found: Vec<String>,
+    pub inferred: Vec<String>,
+    pub unknown: Vec<String>,
+    pub standing: &'static str,
 }
 
 /// OpenAI-compatible chat client. `Send`. Connects only when [`HermesLlm::complete_as`] runs.
@@ -335,26 +360,25 @@ impl HermesLlm {
         self.complete_prompt(system_prompt(persona), &user, 480)
     }
 
-    /// Research turn for the Galion Research desk. The gateway key stays on this
-    /// client. It is not copied into the reply. Citation lines are read before
-    /// the bracket strip, so `[1]` still names a source.
-    pub fn research_turn(&self, user: &str) -> ResearchAnswer {
-        let empty = || ResearchAnswer { text: UNREACHABLE.to_string(), citations: Vec::new() };
+    /// Research turn for the Galion Research desk. `sources` are the files the
+    /// user attached. The gateway key stays on this client. It is not copied
+    /// into the reply. A citation whose id or title was not in `sources` is
+    /// dropped before the answer is returned.
+    pub fn research_turn(&self, user: &str, sources: &[ResearchSource]) -> ResearchAnswer {
+        let empty = || blank_research(UNREACHABLE, "Unreachable");
         let Some(target) = self.target.clone() else {
             return empty();
         };
         if !self.key.is_empty() && !key_ok(&self.key) {
             return empty();
         }
-        let user = clip_chars(user.trim(), 2_000);
-        if user.is_empty() {
+        let question = clip_chars(user.trim(), 2_000);
+        if question.is_empty() {
             return empty();
         }
-        match post_chat(&target, &self.model, &self.key, RESEARCH_PROMPT, &user, self.timeout) {
-            Ok(text) => ResearchAnswer {
-                citations: cite_lines(&text),
-                text: guard_model_text_cap(&text, 4_000),
-            },
+        let user_msg = format!("{question}\n\n{}", research_source_block(sources));
+        match post_chat(&target, &self.model, &self.key, RESEARCH_PROMPT, &user_msg, self.timeout) {
+            Ok(text) => classify_research(&text, sources),
             Err(()) => empty(),
         }
     }
@@ -431,21 +455,393 @@ fn dotenv_value(text: &str, name: &str) -> Option<String> {
     None
 }
 
-/// `[1] Author, title` lines. Read before brackets are stripped from the spoken text.
+/// `[1] name` lines. A bare `[1]` is kept so a pointer with no title can still
+/// match a provided source. Read before brackets are stripped from the spoken text.
 fn cite_lines(raw: &str) -> Vec<(u32, String)> {
     let mut out = Vec::new();
     for line in raw.lines() {
-        let t = line.trim();
+        let t = line.trim().trim_start_matches(['-', '*']).trim();
         let Some(rest) = t.strip_prefix('[') else { continue };
         let Some((n, after)) = rest.split_once(']') else { continue };
         let Ok(n) = n.trim().parse::<u32>() else { continue };
-        let text = after.trim().trim_start_matches([':', '-', ' ']).trim();
-        if text.is_empty() || out.len() >= 12 {
+        if n == 0 || out.len() >= 12 {
             continue;
         }
+        // A citation line is the bracket and a title, not a sentence that
+        // happens to start with a marker after a bullet. The marker must be
+        // the whole start of the line, which `strip_prefix` already required.
+        let text = after.trim().trim_start_matches([':', '-', ' ']).trim();
         out.push((n, clip_chars(text, 240)));
     }
     out
+}
+
+fn blank_research(text: &str, standing: &'static str) -> ResearchAnswer {
+    ResearchAnswer {
+        text: text.to_string(),
+        citations: Vec::new(),
+        found: Vec::new(),
+        inferred: Vec::new(),
+        unknown: Vec::new(),
+        standing,
+    }
+}
+
+/// The Sources block appended to the question. Only these ids may be cited.
+pub fn research_source_block(sources: &[ResearchSource]) -> String {
+    let kept: Vec<&ResearchSource> = sources
+        .iter()
+        .filter(|s| s.id >= 1 && !s.name.trim().is_empty())
+        .take(MAX_RESEARCH_SOURCES)
+        .collect();
+    if kept.is_empty() {
+        return "Sources: none. Do not cite.".to_string();
+    }
+    let mut out = String::from("Sources:\n");
+    for s in kept {
+        let name = clip_chars(s.name.trim(), 80);
+        let text = clip_chars(s.text.trim(), MAX_RESEARCH_SOURCE_CHARS);
+        out.push('[');
+        out.push_str(&s.id.to_string());
+        out.push_str("] ");
+        out.push_str(&name);
+        out.push('\n');
+        if text.is_empty() {
+            out.push_str("(no text was read from this file)\n");
+        } else {
+            out.push_str(&text);
+            out.push('\n');
+        }
+    }
+    out
+}
+
+fn norm_cite(s: &str) -> String {
+    s.trim()
+        .trim_matches(|c: char| c == '.' || c == ',' || c == ':' || c == ';')
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .to_ascii_lowercase()
+}
+
+/// A citation label may be empty or the provided file name. Any other title is invented.
+fn label_matches(label: &str, name: &str) -> bool {
+    let label = label.trim();
+    if label.is_empty() {
+        return true;
+    }
+    let name = name.trim();
+    !name.is_empty() && norm_cite(label) == norm_cite(name)
+}
+
+fn is_pile_heading(line: &str) -> Option<u8> {
+    match line.trim().trim_end_matches(':').to_ascii_lowercase().as_str() {
+        "found" => Some(1),
+        "inferred" => Some(2),
+        "unknown" => Some(3),
+        _ => None,
+    }
+}
+
+fn is_citation_line(line: &str) -> bool {
+    let t = line.trim().trim_start_matches(['-', '*']).trim();
+    let Some(rest) = t.strip_prefix('[') else { return false };
+    let Some((n, _)) = rest.split_once(']') else { return false };
+    let n = n.trim();
+    !n.is_empty() && n.chars().all(|c| c.is_ascii_digit())
+}
+
+fn inline_ids(s: &str) -> Vec<u32> {
+    let chars: Vec<char> = s.chars().collect();
+    let mut out = Vec::new();
+    let mut i = 0;
+    while i < chars.len() {
+        if chars[i] == '[' {
+            let mut j = i + 1;
+            let mut num = String::new();
+            while j < chars.len() && chars[j].is_ascii_digit() {
+                num.push(chars[j]);
+                j += 1;
+            }
+            if !num.is_empty() && j < chars.len() && chars[j] == ']' {
+                if let Ok(n) = num.parse::<u32>() {
+                    if n > 0 {
+                        out.push(n);
+                    }
+                }
+                i = j + 1;
+                continue;
+            }
+        }
+        i += 1;
+    }
+    out
+}
+
+fn strip_id_markers(s: &str) -> String {
+    let chars: Vec<char> = s.chars().collect();
+    let mut out = String::new();
+    let mut i = 0;
+    while i < chars.len() {
+        if chars[i] == '[' {
+            let mut j = i + 1;
+            if j < chars.len() && chars[j].is_ascii_digit() {
+                while j < chars.len() && chars[j].is_ascii_digit() {
+                    j += 1;
+                }
+                if j < chars.len() && chars[j] == ']' {
+                    i = j + 1;
+                    continue;
+                }
+            }
+        }
+        out.push(chars[i]);
+        i += 1;
+    }
+    out.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+fn split_piles(raw: &str) -> (Vec<String>, Vec<String>, Vec<String>, bool) {
+    let mut found = Vec::new();
+    let mut inferred = Vec::new();
+    let mut unknown = Vec::new();
+    let mut which = 0u8;
+    let mut headed = false;
+    for line in raw.lines() {
+        let t = line.trim();
+        if t.is_empty() || is_citation_line(t) {
+            continue;
+        }
+        if let Some(k) = is_pile_heading(t) {
+            which = k;
+            headed = true;
+            continue;
+        }
+        if which == 0 {
+            continue;
+        }
+        match which {
+            1 => found.push(t.to_string()),
+            2 => inferred.push(t.to_string()),
+            3 => unknown.push(t.to_string()),
+            _ => {}
+        }
+    }
+    (found, inferred, unknown, headed)
+}
+
+fn prose_of(raw: &str) -> String {
+    let mut out = Vec::new();
+    for line in raw.lines() {
+        let t = line.trim();
+        if is_pile_heading(t).is_some() {
+            break;
+        }
+        if t.is_empty() || is_citation_line(t) {
+            continue;
+        }
+        out.push(strip_id_markers(t));
+    }
+    out.join(" ")
+}
+
+fn admits_unknown(text: &str) -> bool {
+    let low = text.to_ascii_lowercase();
+    low.contains("i don't know")
+        || low.contains("i do not know")
+        || low.contains("don't have a source")
+        || low.contains("do not have a source")
+}
+
+fn clean_claim(line: &str) -> String {
+    let t = line.trim().trim_start_matches(['-', '*']).trim();
+    clip_chars(&strip_id_markers(t), 400)
+}
+
+fn push_unique(into: &mut Vec<(u32, String)>, id: u32, name: &str) {
+    if !into.iter().any(|(n, _)| *n == id) {
+        into.push((id, name.to_string()));
+    }
+}
+
+/// Split a model reply into Found, Inferred, and Unknown.
+///
+/// A citation is kept only when its id is in `sources` and the title on that
+/// line is empty or that source's name. A title the user did not provide is
+/// dropped, and so is any id that was not in the list. Found claims are the
+/// ones that still point at a kept id.
+pub fn classify_research(raw: &str, sources: &[ResearchSource]) -> ResearchAnswer {
+    let guarded_all = guard_model_text_cap(raw, 4_000);
+    if guarded_all == UNREACHABLE {
+        return blank_research(UNREACHABLE, "Unreachable");
+    }
+    if guarded_all == REFUSED {
+        return blank_research(REFUSED, "Denied");
+    }
+
+    let allowed: Vec<&ResearchSource> = sources
+        .iter()
+        .filter(|s| s.id >= 1 && !s.name.trim().is_empty())
+        .take(MAX_RESEARCH_SOURCES)
+        .collect();
+
+    let tries = cite_lines(raw);
+    let mut title_rejected: Vec<u32> = Vec::new();
+    for (n, label) in &tries {
+        let Some(source) = allowed.iter().find(|s| s.id == *n) else { continue };
+        if !label_matches(label, source.name.trim()) && !title_rejected.contains(n) {
+            title_rejected.push(*n);
+        }
+    }
+    let mut citations: Vec<(u32, String)> = Vec::new();
+    let mut saw_foreign = false;
+    for (n, label) in &tries {
+        if allowed.iter().all(|s| s.id != *n) {
+            saw_foreign = true;
+            continue;
+        }
+        if title_rejected.contains(n) {
+            saw_foreign = true;
+            continue;
+        }
+        if let Some(source) = allowed.iter().find(|s| s.id == *n) {
+            if label_matches(label, source.name.trim()) {
+                push_unique(&mut citations, *n, source.name.trim());
+            }
+        }
+    }
+
+    let marker_ok = |id: u32, citations: &mut Vec<(u32, String)>| -> bool {
+        if title_rejected.contains(&id) {
+            return false;
+        }
+        let Some(source) = allowed.iter().find(|s| s.id == id) else {
+            return false;
+        };
+        push_unique(citations, id, source.name.trim());
+        true
+    };
+
+    let (found_lines, inferred_lines, unknown_lines, headed) = split_piles(raw);
+    let mut found = Vec::new();
+    let mut inferred = Vec::new();
+    let mut unknown = Vec::new();
+
+    if headed {
+        for line in &found_lines {
+            let ids = inline_ids(line);
+            let claim = clean_claim(line);
+            if claim.is_empty() {
+                continue;
+            }
+            if ids.is_empty() {
+                // A Found heading with no marker still counts when a real
+                // citation line for a provided source was kept.
+                if citations.is_empty() {
+                    unknown.push(claim);
+                } else {
+                    found.push(claim);
+                }
+                continue;
+            }
+            let mut ok = false;
+            for id in ids {
+                if marker_ok(id, &mut citations) {
+                    ok = true;
+                } else {
+                    saw_foreign = true;
+                }
+            }
+            if ok {
+                found.push(claim);
+            } else {
+                unknown.push(claim);
+            }
+        }
+        for line in &inferred_lines {
+            let claim = clean_claim(line);
+            if !claim.is_empty() {
+                inferred.push(claim);
+            }
+        }
+        for line in &unknown_lines {
+            let claim = clean_claim(line);
+            if !claim.is_empty() {
+                unknown.push(claim);
+            }
+        }
+    }
+
+    let prose = prose_of(raw);
+    if !headed {
+        let claim = clip_chars(&prose, 4_000);
+        if !citations.is_empty() {
+            if !claim.is_empty() {
+                found.push(claim);
+            }
+        } else if saw_foreign {
+            if !claim.is_empty() {
+                unknown.push(claim);
+            }
+        } else if admits_unknown(&claim) {
+            if !claim.is_empty() {
+                unknown.push(claim);
+            }
+        } else if !claim.is_empty() {
+            inferred.push(claim);
+        }
+    } else if found.is_empty() && inferred.is_empty() && unknown.is_empty() {
+        let claim = clip_chars(&prose, 4_000);
+        if !claim.is_empty() {
+            if !citations.is_empty() {
+                found.push(claim);
+            } else if saw_foreign || admits_unknown(&claim) {
+                unknown.push(claim);
+            } else {
+                inferred.push(claim);
+            }
+        }
+    }
+
+    // A kept citation is a Found claim even when the model gave no sentence
+    // under the Found heading. The label is the provided file name, never
+    // a title the model wrote.
+    if found.is_empty() && !citations.is_empty() {
+        for (_, name) in &citations {
+            found.push(name.clone());
+        }
+    }
+
+    let standing = if !found.is_empty() {
+        "Found"
+    } else if !inferred.is_empty() {
+        "Inferred"
+    } else {
+        "Unknown"
+    };
+
+    let text = {
+        let spoken = guard_model_text_cap(&prose, 4_000);
+        if spoken != UNREACHABLE && spoken != REFUSED {
+            spoken
+        } else if let Some(s) = found.first().or(inferred.first()).or(unknown.first()) {
+            s.clone()
+        } else if standing == "Unknown" {
+            "Unknown.".to_string()
+        } else {
+            spoken
+        }
+    };
+
+    ResearchAnswer {
+        text,
+        citations,
+        found,
+        inferred,
+        unknown,
+        standing,
+    }
 }
 
 fn guard_model_text(raw: &str) -> String {
@@ -767,16 +1163,23 @@ mod tests {
             let _ = sock.set_read_timeout(Some(Duration::from_millis(500)));
             let mut buf = vec![0u8; 16_384];
             let mut got = Vec::new();
+            let mut header_end = None;
             loop {
                 match sock.read(&mut buf) {
-                    Ok(0) => break,
+                    Ok(0) | Err(_) => break,
                     Ok(n) => {
                         got.extend_from_slice(&buf[..n]);
-                        if got.windows(4).any(|w| w == b"\r\n\r\n") {
-                            break;
+                        if header_end.is_none() {
+                            header_end = got.windows(4).position(|w| w == b"\r\n\r\n").map(|p| p + 4);
+                        }
+                        if let Some(end) = header_end {
+                            let head = String::from_utf8_lossy(&got[..end]);
+                            let len = content_length(&head);
+                            if got.len() >= end + len {
+                                break;
+                            }
                         }
                     }
-                    Err(_) => break,
                 }
             }
             if let Ok(s) = String::from_utf8(got) {
@@ -792,6 +1195,16 @@ mod tests {
             let _ = sock.write_all(resp.as_bytes());
         });
         Serve { addr, seen }
+    }
+
+    fn content_length(head: &str) -> usize {
+        head.lines().find_map(|l| {
+            let (k, v) = l.split_once(':')?;
+            if !k.trim().eq_ignore_ascii_case("content-length") {
+                return None;
+            }
+            v.trim().parse::<usize>().ok()
+        }).unwrap_or(0)
     }
 
     fn client(addr: SocketAddr, timeout_ms: u64) -> HermesLlm {
@@ -971,16 +1384,133 @@ mod tests {
         let shown = format!("{llm:?}");
         assert_eq!(llm.key_state(), "set");
         assert!(!shown.contains(key), "{shown}");
-        let turn = llm.research_turn("What colour is the wash?");
+        let sources = [ResearchSource {
+            id: 1,
+            name: "Galion brand note".into(),
+            text: "The wash is amber to violet.".into(),
+        }];
+        let turn = llm.research_turn("What colour is the wash?", &sources);
         assert!(turn.text.contains("amber to violet"), "{}", turn.text);
+        assert_eq!(turn.standing, "Found");
         assert_eq!(turn.citations.len(), 1);
         assert_eq!(turn.citations[0].0, 1);
-        assert!(turn.citations[0].1.contains("Galion brand note"), "{}", turn.citations[0].1);
+        assert_eq!(turn.citations[0].1, "Galion brand note");
         assert!(!turn.text.contains(key));
         let seen = srv.seen.lock().unwrap().clone();
         assert!(seen.contains("Galion Research"), "{seen}");
+        assert!(seen.contains("Galion brand note"), "{seen}");
         assert!(seen.contains("Authorization: Bearer "));
         assert!(!format!("{llm:?}").contains(key));
+    }
+
+    #[test]
+    fn research_prompt_does_not_force_a_not_found_line() {
+        let low = RESEARCH_PROMPT.to_ascii_lowercase();
+        assert!(!low.contains("don't have a source"), "{RESEARCH_PROMPT}");
+        assert!(!low.contains("do not have a source"), "{RESEARCH_PROMPT}");
+        assert!(!RESEARCH_PROMPT.contains("NotFound"));
+        assert!(research_source_block(&[]).contains("Sources: none"));
+    }
+
+    #[test]
+    fn classify_research_drops_a_citation_for_a_source_that_was_not_provided() {
+        let sources = [ResearchSource {
+            id: 1,
+            name: "wash-note.txt".into(),
+            text: "The wash is amber.".into(),
+        }];
+        let raw = "\
+The wash is amber.
+Found
+- The wash is amber. [1]
+- A paper measured violet. [2]
+Inferred
+- A cooler mix would read as night.
+Unknown
+- The hex is not in the note.
+[1] wash-note.txt
+[2] Invented Journal 2024
+";
+        let turn = classify_research(raw, &sources);
+        assert_eq!(turn.standing, "Found", "{turn:?}");
+        assert_eq!(turn.citations, vec![(1, "wash-note.txt".into())]);
+        assert!(turn.found.iter().any(|s| s.contains("amber")), "{turn:?}");
+        assert!(
+            turn.found.iter().all(|s| !s.contains("Invented") && !s.to_ascii_lowercase().contains("violet")),
+            "{turn:?}"
+        );
+        assert!(turn.inferred.iter().any(|s| s.contains("cooler")), "{turn:?}");
+        assert!(turn.unknown.iter().any(|s| s.contains("hex")), "{turn:?}");
+        assert!(turn.unknown.iter().any(|s| s.contains("violet")), "{turn:?}");
+        assert!(!turn.text.contains("Invented"), "{}", turn.text);
+        assert!(turn.citations.iter().all(|(_, t)| !t.contains("Invented")));
+    }
+
+    #[test]
+    fn classify_research_rejects_an_invented_title_on_a_real_id() {
+        let sources = [ResearchSource {
+            id: 1,
+            name: "wash-note.txt".into(),
+            text: "The wash is amber.".into(),
+        }];
+        let raw = "\
+Found
+- The wash is amber. [1]
+[1] Nature 1999
+";
+        let turn = classify_research(raw, &sources);
+        assert!(turn.citations.is_empty(), "{turn:?}");
+        assert_ne!(turn.standing, "Found", "{turn:?}");
+        assert!(!turn.text.contains("Nature"), "{}", turn.text);
+        assert!(turn.found.iter().all(|s| !s.contains("Nature")));
+        assert!(turn.unknown.iter().any(|s| s.contains("amber")), "{turn:?}");
+    }
+
+    #[test]
+    fn classify_research_with_no_sources_cannot_cite() {
+        let raw = "The wash is amber to violet.\n[1] Galion brand note\n";
+        let turn = classify_research(raw, &[]);
+        assert!(turn.citations.is_empty(), "{turn:?}");
+        assert_eq!(turn.standing, "Unknown", "{turn:?}");
+        assert!(!turn.text.contains("Galion brand note"), "{}", turn.text);
+        assert!(!turn.text.contains("[1]"), "{}", turn.text);
+        assert!(turn.found.is_empty(), "{turn:?}");
+    }
+
+    #[test]
+    fn classify_research_marks_an_uncited_answer_inferred() {
+        let raw = "Inferred\n- The palette often runs amber when no note is attached.\n";
+        let turn = classify_research(raw, &[]);
+        assert_eq!(turn.standing, "Inferred", "{turn:?}");
+        assert!(turn.citations.is_empty());
+        assert!(turn.found.is_empty());
+        assert!(turn.inferred.iter().any(|s| s.contains("amber")), "{turn:?}");
+    }
+
+    #[test]
+    fn research_turn_sends_only_the_provided_source() {
+        let content = "The wash is amber.\\nFound\\n- The wash is amber. [1]\\n- A paper measured violet. [2]\\nInferred\\n- A cooler mix would read as night.\\nUnknown\\n- The hex is not in the note.\\n[1] wash-note.txt\\n[2] Invented Journal 2024";
+        let payload = format!(
+            "{{\"choices\":[{{\"message\":{{\"content\":\"{content}\"}}}}]}}"
+        );
+        let srv = serve_body("200 OK", &payload, None);
+        let llm = client(srv.addr, 1000);
+        let sources = [ResearchSource {
+            id: 1,
+            name: "wash-note.txt".into(),
+            text: "The wash is amber.".into(),
+        }];
+        let turn = llm.research_turn("What colour is the wash?", &sources);
+        assert_eq!(turn.standing, "Found", "{turn:?}");
+        assert_eq!(turn.citations, vec![(1, "wash-note.txt".into())]);
+        assert!(turn.citations.iter().all(|(_, t)| !t.contains("Invented")));
+        assert!(!turn.text.contains("Invented"), "{}", turn.text);
+        let seen = srv.seen.lock().unwrap().clone();
+        assert!(seen.contains("wash-note.txt"), "{seen}");
+        assert!(seen.contains("The wash is amber."), "{seen}");
+        assert!(seen.contains("Sources:"), "{seen}");
+        assert!(!seen.contains("Invented Journal"), "{seen}");
+        assert!(!seen.contains("NotFound"), "{seen}");
     }
 
     #[test]

@@ -276,12 +276,24 @@ function tone(id){
     o.start(t); o.stop(t+0.18);
   }catch(e){}
 }
-// TODO: uploads are stubbed. The add-file and add-image icons are UI only.
-// Do not read, store, or send the chosen files. Wire them to the research turn later.
+// Attached files are Sources. The desk cites only those ids.
 (function(){
   var files=document.getElementById("files");
   var prompt=document.getElementById("prompt");
   var statusEl=document.getElementById("hermes-status");
+  var attached=[];
+  var pending=0;
+  var waiting=false;
+  function paintSources(rows){
+    attached=rows||[];
+    fillList(document.getElementById("local-list"), attached.map(function(s){
+      var kind=s.kind==="image"?"image":"file";
+      var chars=(typeof s.chars==="number"&&s.kind!=="image")?" · "+s.chars+" chars":"";
+      return "["+s.id+"] "+(s.name||"file")+" · "+kind+chars;
+    }));
+    document.getElementById("source-empty").hidden=attached.length>0;
+    if(!attached.length) document.getElementById("source-empty").textContent="No source yet.";
+  }
   function hermesStatus(text){ statusEl.textContent=text; }
   function fillList(ol, rows){
     while(ol.firstChild) ol.removeChild(ol.firstChild);
@@ -300,8 +312,10 @@ function tone(id){
     document.getElementById("reading-question").textContent=q;
     document.getElementById("reading-question").hidden=false;
     document.getElementById("reading-body").textContent=LOCAL;
-    fillList(document.getElementById("local-list"), ["Local. What is already known stays marked local."]);
-    document.getElementById("source-empty").hidden=true;
+    if(!attached.length){
+      fillList(document.getElementById("local-list"), ["Local. What is already known stays marked local."]);
+      document.getElementById("source-empty").hidden=true;
+    }
     fillPile("unknown", [LOCAL]);
     paintHistory([{status:"Unreachable", question:q}]);
     tone("local");
@@ -311,7 +325,7 @@ function tone(id){
     var lead=document.getElementById("reading-question");
     lead.textContent=q;
     lead.hidden=!q;
-    document.getElementById("reading-body").textContent=j.reply||"I don't have a source for that.";
+    document.getElementById("reading-body").textContent=j.reply||"Unknown.";
     document.getElementById("answer").dataset.set="1";
     var cites=Array.isArray(j.citations)?j.citations:[];
     fillList(document.getElementById("citation-list"), cites.map(function(c){ return "["+c.n+"] "+(c.text||""); }));
@@ -323,9 +337,11 @@ function tone(id){
     fillPile("found", j.found);
     fillPile("inferred", j.inferred);
     fillPile("unknown", j.unknown);
-    hermesStatus("Hermes · "+(j.status||"Returned"));
+    var standing=j.status||"Unknown";
+    if(standing!=="Found"&&standing!=="Inferred"&&standing!=="Unknown"&&standing!=="Unreachable"&&standing!=="Denied") standing="Unknown";
+    hermesStatus("Hermes · "+standing);
     helpers.hidden=false;
-    helpers.textContent=j.status==="Unreachable"?"Helpers are quiet. Local knowledge carries the question.":"Helpers are quiet.";
+    helpers.textContent=standing==="Unreachable"?"Helpers are quiet. Local knowledge carries the question.":standing;
     tone(j.status==="Unreachable"?"local":"returned");
   }
   function fillPile(id, rows){
@@ -349,14 +365,52 @@ function tone(id){
   fetch("/research/history",{cache:"no-store"}).then(function(r){ return r.ok?r.json():null; }).then(function(j){
     if(j&&Array.isArray(j.items)) paintHistory(j.items);
   }).catch(function(){});
-  function openPicker(ev){ ev.preventDefault(); files.click(); }
-  document.getElementById("add-file").addEventListener("click", openPicker);
-  document.getElementById("add-image").addEventListener("click", openPicker);
+  fetch("/research/sources",{cache:"no-store"}).then(function(r){ return r.ok?r.json():null; }).then(function(j){
+    if(j&&Array.isArray(j.sources)) paintSources(j.sources);
+  }).catch(function(){});
+  function postSource(file, text, kind){
+    pending++;
+    fetch("/research/sources",{method:"POST",cache:"no-store",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:file.name,text:text,kind:kind})})
+      .then(function(r){ return r.ok?r.json():null; })
+      .then(function(j){
+        if(j&&Array.isArray(j.sources)) paintSources(j.sources);
+        else if(!attached.length) document.getElementById("source-empty").textContent="The file was not attached.";
+      })
+      .catch(function(){
+        if(!attached.length) document.getElementById("source-empty").textContent="The file was not attached.";
+      })
+      .then(function(){
+        pending=Math.max(0,pending-1);
+        if(pending===0&&waiting){ waiting=false; commitQuestion(); }
+      });
+  }
+  document.getElementById("add-file").addEventListener("click", function(ev){
+    ev.preventDefault();
+    files.removeAttribute("accept");
+    files.click();
+  });
+  document.getElementById("add-image").addEventListener("click", function(ev){
+    ev.preventDefault();
+    files.setAttribute("accept","image/*");
+    files.click();
+  });
   files.addEventListener("change", function(){
-    // TODO: accept files here. Nothing is uploaded.
-    var chosen=files.files?files.files.length:0;
+    var list=files.files?Array.prototype.slice.call(files.files):[];
     files.value="";
-    if(chosen>0) document.getElementById("source-empty").textContent="No source yet. The file was not attached.";
+    list.forEach(function(file){
+      var image=(file.type||"").indexOf("image/")===0;
+      if(image){ postSource(file,"","image"); return; }
+      var reader=new FileReader();
+      reader.onload=function(){
+        var text=typeof reader.result==="string"?reader.result:"";
+        if(text.length>2000) text=text.slice(0,2000);
+        postSource(file,text,"file");
+      };
+      reader.onerror=function(){
+        if(!attached.length) document.getElementById("source-empty").textContent="The file was not attached.";
+      };
+      reader.readAsText(file);
+    });
   });
   document.getElementById("voice").addEventListener("click", function(ev){
     var btn=ev.currentTarget;
@@ -367,6 +421,7 @@ function tone(id){
   function commitQuestion(){
     var q=prompt.value.replace(/\s+/g," ").trim();
     if(!q) return;
+    if(pending>0){ waiting=true; return; }
     hermesStatus("Hermes · Running");
     helpers.hidden=false;
     helpers.textContent="Helpers: reading, sources, notebook.";

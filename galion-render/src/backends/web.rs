@@ -20,6 +20,8 @@
 //!   GET /research, /research/ -> the Galion Research desk, same gate as /one.
 //!   GET /research/hermes, GET /research/history, POST /research/ask -> Hermes
 //!                      research app. The gateway key stays on the server.
+//!   POST /research/sources, GET /research/sources -> files the user attached.
+//!                      A citation may name only those files.
 //! `/dot` also carries `"mode"` (idle|listening|speaking|rika), `"lean"` (Rika lean-in 0..1),
 //! `"level"` (0..1, the band driving the state), `"e"` (empathy weight 0..1),
 //! `"engine"` (one Luti step), and `"emotion"` (sense, label, valence, arousal, lean)
@@ -691,9 +693,19 @@ struct ResearchNote {
     at: Instant,
 }
 
+/// A file the user attached. `kind` is `file` or `image`. Image pixels are not read.
+struct DeskSource {
+    id: u32,
+    name: String,
+    text: String,
+    kind: &'static str,
+}
+
 struct ResearchDesk {
     client: Option<galion_cascade::HermesLlm>,
     next_id: u64,
+    next_source: u32,
+    sources: Vec<DeskSource>,
     notes: VecDeque<ResearchNote>,
     status: &'static str,
 }
@@ -703,6 +715,8 @@ impl ResearchDesk {
         Self {
             client: if cfg!(test) { None } else { galion_cascade::HermesLlm::attached_from_env() },
             next_id: 0,
+            next_source: 0,
+            sources: Vec::new(),
             notes: VecDeque::new(),
             status: "idle",
         }
@@ -722,45 +736,138 @@ impl ResearchDesk {
     }
 }
 
-fn research_state(text: &str) -> &'static str {
-    let low = text.to_ascii_lowercase();
-    if text == galion_cascade::UNREACHABLE || low.contains("not reachable") {
-        "Unreachable"
-    } else if text == galion_cascade::REFUSED || low.contains("not allowed") {
-        "Denied"
-    } else if low.contains("don't have a source") || low.contains("do not have a source") || low.contains("not found") {
-        "NotFound"
-    } else {
-        "Returned"
-    }
+fn research_sources_json(desk: &ResearchDesk) -> String {
+    let items: Vec<String> = desk.sources.iter().map(|s| {
+        format!(
+            "{{\"id\":{},\"name\":{},\"kind\":\"{}\",\"chars\":{}}}",
+            s.id,
+            galion_cascade::hermes::json_string(&s.name),
+            s.kind,
+            s.text.chars().count()
+        )
+    }).collect();
+    format!(
+        "{{\"schema\":\"galion-research/1\",\"app\":\"hermes\",\"sources\":[{}]}}",
+        items.join(",")
+    )
 }
 
-fn notebook_piles(reply: &str) -> (Vec<String>, Vec<String>, Vec<String>) {
-    let mut found = Vec::new();
-    let mut inferred = Vec::new();
-    let mut unknown = Vec::new();
-    let mut which = 0u8;
-    for line in reply.lines() {
-        let t = line.trim();
-        if t.is_empty() {
+fn clean_source_name(raw: &str) -> Option<String> {
+    let base = raw.rsplit(['/', '\\']).next().unwrap_or("").trim();
+    if base.is_empty() || base == "." || base == ".." {
+        return None;
+    }
+    let mut out = String::new();
+    for c in base.chars() {
+        if c.is_control() || matches!(c, '<' | '>' | '"' | '\\') {
             continue;
         }
-        match t.trim_end_matches(':').to_ascii_lowercase().as_str() {
-            "found" => which = 1,
-            "inferred" => which = 2,
-            "unknown" => which = 3,
-            _ => {
-                let item = t.trim_start_matches(['-', ' ']).to_string();
-                match which {
-                    1 => found.push(item),
-                    2 => inferred.push(item),
-                    3 => unknown.push(item),
-                    _ => {}
-                }
-            }
+        out.push(c);
+        if out.chars().count() >= 80 {
+            break;
         }
     }
-    (found, inferred, unknown)
+    let out = out.trim().to_string();
+    if out.is_empty() { None } else { Some(out) }
+}
+
+fn is_image_name(name: &str) -> bool {
+    let low = name.to_ascii_lowercase();
+    [".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".svg", ".heic", ".avif", ".tif", ".tiff"]
+        .iter()
+        .any(|ext| low.ends_with(ext))
+}
+
+/// A JSON string field, scanned so a value cannot be read as a key. `cap` is in chars.
+fn json_object_string(body: &str, key: &str, cap: usize) -> Option<String> {
+    let needle = format!("\"{key}\"");
+    let chars: Vec<(usize, char)> = body.char_indices().collect();
+    let mut i = 0;
+    let mut in_string = false;
+    let mut escaped = false;
+    while i < chars.len() {
+        let (byte_i, c) = chars[i];
+        if in_string {
+            if escaped {
+                escaped = false;
+            } else if c == '\\' {
+                escaped = true;
+            } else if c == '"' {
+                in_string = false;
+            }
+            i += 1;
+            continue;
+        }
+        if c == '"' {
+            let slice = &body[byte_i..];
+            if let Some(after) = slice.strip_prefix(&needle) {
+                let after = after.trim_start();
+                if let Some(after) = after.strip_prefix(':') {
+                    return parse_json_string_capped(after.trim_start(), cap);
+                }
+            }
+            in_string = true;
+        }
+        i += 1;
+    }
+    None
+}
+
+fn parse_json_string_capped(s: &str, cap: usize) -> Option<String> {
+    let mut chars = s.chars();
+    if chars.next() != Some('"') {
+        return None;
+    }
+    let mut out = String::new();
+    while let Some(c) = chars.next() {
+        if c == '\\' {
+            match chars.next()? {
+                '"' => out.push('"'),
+                '\\' => out.push('\\'),
+                'n' => out.push('\n'),
+                'r' => out.push('\r'),
+                't' => out.push('\t'),
+                '/' => out.push('/'),
+                'u' => {
+                    let mut hex = String::new();
+                    for _ in 0..4 {
+                        hex.push(chars.next()?);
+                    }
+                    let code = u32::from_str_radix(&hex, 16).ok()?;
+                    out.push(char::from_u32(code).unwrap_or('\u{FFFD}'));
+                }
+                other => out.push(other),
+            }
+        } else if c == '"' {
+            return Some(out);
+        } else {
+            out.push(c);
+        }
+        if out.chars().count() > cap {
+            return Some(out.chars().take(cap).collect());
+        }
+    }
+    None
+}
+
+fn research_add_source(desk: &Arc<Mutex<ResearchDesk>>, raw: &str) -> Result<String, &'static str> {
+    let name = json_object_string(raw, "name", 160).ok_or("name")?;
+    let name = clean_source_name(&name).ok_or("name")?;
+    let kind_raw = json_object_string(raw, "kind", 16).unwrap_or_default();
+    let kind = if kind_raw == "image" || is_image_name(&name) { "image" } else { "file" };
+    let text = if kind == "image" {
+        String::new()
+    } else {
+        json_object_string(raw, "text", galion_cascade::hermes::MAX_RESEARCH_SOURCE_CHARS).unwrap_or_default()
+    };
+    let Ok(mut d) = desk.lock() else { return Err("research") };
+    if d.sources.len() >= galion_cascade::hermes::MAX_RESEARCH_SOURCES {
+        d.sources.remove(0);
+    }
+    d.next_source = d.next_source.saturating_add(1);
+    let id = d.next_source.max(1);
+    d.sources.push(DeskSource { id, name, text, kind });
+    Ok(research_sources_json(&d))
 }
 
 fn json_list(items: &[String]) -> String {
@@ -802,33 +909,53 @@ fn research_history_json(desk: &ResearchDesk) -> String {
 }
 
 fn research_ask(desk: &Arc<Mutex<ResearchDesk>>, question: &str) -> String {
-    let (id, client, model_fallback) = {
+    let (id, client, model_fallback, sources) = {
         let Ok(mut d) = desk.lock() else {
             return "{\"schema\":\"galion-research/1\",\"app\":\"hermes\",\"status\":\"Unreachable\",\"reply\":\"The research path is not reachable from here.\",\"citations\":[]}".into();
         };
         d.status = "Running";
         d.next_id = d.next_id.saturating_add(1);
         let model = d.client.as_ref().map(|c| c.label().to_string()).unwrap_or_else(|| galion_cascade::LLM_NAME.into());
-        (d.next_id, d.client.clone(), model)
+        let sources: Vec<galion_cascade::hermes::ResearchSource> = d.sources.iter().map(|s| {
+            galion_cascade::hermes::ResearchSource { id: s.id, name: s.name.clone(), text: s.text.clone() }
+        }).collect();
+        (d.next_id, d.client.clone(), model, sources)
     };
     let turn = match client {
-        Some(c) => c.research_turn(question),
-        None => galion_cascade::hermes::ResearchAnswer { text: galion_cascade::UNREACHABLE.into(), citations: Vec::new() },
+        Some(c) => c.research_turn(question, &sources),
+        None => galion_cascade::hermes::ResearchAnswer {
+            text: galion_cascade::UNREACHABLE.into(),
+            citations: Vec::new(),
+            found: Vec::new(),
+            inferred: Vec::new(),
+            unknown: Vec::new(),
+            standing: "Unreachable",
+        },
     };
-    let unreachable = turn.text == galion_cascade::UNREACHABLE;
-    let reply = if unreachable {
+    let status = turn.standing;
+    let reply = if status == "Unreachable" {
         "The research path is not reachable from here. Local. What is already known stays marked local.".to_string()
     } else {
         turn.text
     };
-    let status = research_state(&reply);
-    let citations = if unreachable { Vec::new() } else { turn.citations };
-    let (mut found, inferred, mut unknown) = notebook_piles(&reply);
-    if (status == "NotFound" || status == "Unreachable") && unknown.is_empty() {
+    let citations = if status == "Unreachable" || status == "Denied" { Vec::new() } else { turn.citations };
+    let mut found = if status == "Found" { turn.found } else { Vec::new() };
+    let mut inferred = if status == "Found" || status == "Inferred" { turn.inferred } else { Vec::new() };
+    let mut unknown = if status == "Found" || status == "Inferred" || status == "Unknown" { turn.unknown } else { Vec::new() };
+    if status == "Unreachable" {
+        found.clear();
+        inferred.clear();
+        unknown.clear();
         unknown.push(reply.clone());
     }
-    if status != "Returned" {
-        found.clear();
+    if status == "Found" && found.is_empty() && !reply.is_empty() {
+        found.push(reply.clone());
+    }
+    if status == "Inferred" && inferred.is_empty() && !reply.is_empty() {
+        inferred.push(reply.clone());
+    }
+    if status == "Unknown" && unknown.is_empty() && !reply.is_empty() {
+        unknown.push(reply.clone());
     }
     let note = ResearchNote {
         id,
@@ -1074,6 +1201,15 @@ fn route(req: &mut Request, sh: &Shared) -> (&'static str, &'static str, Vec<u8>
             let json = research_ask(&sh.research, &question);
             ("200 OK", "application/json", json.into_bytes())
         }
+        ("POST", "/research/sources") if sh.page.is_some() => {
+            let raw = String::from_utf8_lossy(&req.body).into_owned();
+            zeroise_bytes(&mut req.body);
+            match research_add_source(&sh.research, &raw) {
+                Ok(json) => ("200 OK", "application/json", json.into_bytes()),
+                Err("name") => ("400 Bad Request", "text/plain", txt("name")),
+                Err(_) => ("500 Internal Server Error", "text/plain", txt("research")),
+            }
+        }
         ("POST", "/turn") => {
             if req.header("content-length").is_none() {
                 zeroise_bytes(&mut req.body);
@@ -1121,6 +1257,12 @@ fn route(req: &mut Request, sh: &Shared) -> (&'static str, &'static str, Vec<u8>
                         return ("500 Internal Server Error", "text/plain", txt("research"));
                     };
                     ("200 OK", "application/json", research_history_json(&desk).into_bytes())
+                }
+                "/research/sources" if sh.page.is_some() => {
+                    let Ok(desk) = sh.research.lock() else {
+                        return ("500 Internal Server Error", "text/plain", txt("research"));
+                    };
+                    ("200 OK", "application/json", research_sources_json(&desk).into_bytes())
                 }
                 "/research" | "/research/" if sh.page.is_some() => {
                     ("200 OK", "text/html; charset=utf-8", RESEARCH_HTML.as_bytes().to_vec())
@@ -1398,10 +1540,11 @@ mod tests {
                 "/research/ask",
                 "/research/hermes",
                 "/research/history",
+                "/research/sources",
+                "readAsText",
                 "data-voice=\"galion-research\"",
                 "id=\"add-file\"",
                 "id=\"add-image\"",
-                "TODO: uploads are stubbed",
                 "id=\"sources\"",
                 "id=\"answer\"",
                 "id=\"citations\"",
@@ -1519,14 +1662,121 @@ mod tests {
         assert!(ready.contains("\"key\":\"set\"") && ready.contains("\"status\":\"Idle\"") && ready.contains("hermes-agent"), "{ready}");
         assert!(!ready.contains(key), "{ready}");
         let asked = post_json(a, "/research/ask", r#"{"question":"What colour is the wash?"}"#);
-        assert!(asked.contains("HTTP/1.1 200") && asked.contains("\"status\":\"Returned\""), "{asked}");
-        assert!(asked.contains("Galion brand note") && asked.contains("\"n\":1"), "{asked}");
+        assert!(asked.contains("HTTP/1.1 200") && asked.contains("\"status\":\"Unknown\""), "{asked}");
+        assert!(asked.contains("amber to violet"), "{asked}");
+        assert!(!asked.contains("Galion brand note"), "an unprovided source must not be cited: {asked}");
+        assert!(asked.contains("\"citations\":[]"), "{asked}");
+        assert!(!asked.contains("NotFound") && !asked.contains("\"status\":\"Returned\""), "{asked}");
         assert!(asked.contains("\"app\":\"hermes\""), "{asked}");
         assert!(!asked.contains(key) && !asked.contains("Bearer"), "{asked}");
         let hist = get(a, "/research/history");
-        assert!(hist.contains("What colour is the wash?") && hist.contains("\"status\":\"Returned\""), "{hist}");
-        assert!(!hist.contains(key), "{hist}");
+        assert!(hist.contains("What colour is the wash?") && hist.contains("\"status\":\"Unknown\""), "{hist}");
+        assert!(!hist.contains(key) && !hist.contains("Galion brand note"), "{hist}");
         w.close().unwrap();
+    }
+
+    #[test]
+    fn research_sources_are_the_only_citations() {
+        let key = "test-gateway-key-not-for-git";
+        let content = "The wash is amber.\\nFound\\n- The wash is amber. [2]\\n- A paper measured violet. [3]\\nInferred\\n- A cooler mix would read as night.\\nUnknown\\n- The hex is not in the note.\\n[2] wash-note.txt\\n[3] Invented Journal 2024";
+        let payload = format!("{{\"choices\":[{{\"message\":{{\"content\":\"{content}\"}}}}]}}");
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        let seen = Arc::new(Mutex::new(String::new()));
+        let seen_w = seen.clone();
+        std::thread::spawn(move || {
+            let Ok((mut sock, _)) = listener.accept() else { return };
+            let _ = sock.set_read_timeout(Some(Duration::from_millis(800)));
+            let mut buf = [0u8; 8192];
+            let mut got = Vec::new();
+            let mut header_end = None;
+            loop {
+                match sock.read(&mut buf) {
+                    Ok(0) | Err(_) => break,
+                    Ok(n) => {
+                        got.extend_from_slice(&buf[..n]);
+                        if header_end.is_none() {
+                            header_end = got.windows(4).position(|w| w == b"\r\n\r\n").map(|p| p + 4);
+                        }
+                        if let Some(end) = header_end {
+                            let head = String::from_utf8_lossy(&got[..end]);
+                            let len = head.lines().find_map(|l| {
+                                let (k, v) = l.split_once(':')?;
+                                if !k.trim().eq_ignore_ascii_case("content-length") {
+                                    return None;
+                                }
+                                v.trim().parse::<usize>().ok()
+                            }).unwrap_or(0);
+                            if got.len() >= end + len {
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            if let Ok(s) = String::from_utf8(got) {
+                *seen_w.lock().unwrap() = s;
+            }
+            let resp = format!(
+                "HTTP/1.0 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{payload}",
+                payload.len()
+            );
+            let _ = sock.write_all(resp.as_bytes());
+        });
+        let mut w = WebSurface::serve("127.0.0.1:0".parse().unwrap()).with_page("<!doctype html><canvas></canvas>");
+        w.set_research_hermes(galion_cascade::HermesLlm::new(
+            &format!("http://{addr}/v1/chat/completions"),
+            "hermes-agent",
+            key,
+            Duration::from_millis(1000),
+        ));
+        w.open().unwrap();
+        let a = w.local_addr().unwrap();
+        let empty = get(a, "/research/sources");
+        assert!(empty.contains("\"sources\":[]"), "{empty}");
+        let unnamed = post_json(a, "/research/sources", r#"{"text":"no name"}"#);
+        assert!(unnamed.starts_with("HTTP/1.1 400"), "{unnamed}");
+        let image = post_json(a, "/research/sources", r#"{"name":"../shot.png","kind":"image","text":"pixels"}"#);
+        assert!(image.contains("HTTP/1.1 200") && image.contains("shot.png") && image.contains("\"kind\":\"image\"") && image.contains("\"chars\":0"), "{image}");
+        assert!(!image.contains("../"), "{image}");
+        let file = post_json(
+            a,
+            "/research/sources",
+            r#"{"name":"notes/wash-note.txt","kind":"file","text":"The wash is amber."}"#,
+        );
+        assert!(file.contains("wash-note.txt") && file.contains("\"kind\":\"file\"") && file.contains("\"chars\":18") && file.contains("\"id\":2"), "{file}");
+        assert!(!file.contains("notes/"), "{file}");
+        let asked = post_json(a, "/research/ask", r#"{"question":"What colour is the wash?"}"#);
+        assert!(asked.contains("HTTP/1.1 200") && asked.contains("\"status\":\"Found\""), "{asked}");
+        assert!(asked.contains("wash-note.txt") && asked.contains("\"n\":2"), "{asked}");
+        assert!(asked.contains("amber"), "{asked}");
+        assert!(asked.contains("cooler") || asked.contains("night"), "{asked}");
+        assert!(!asked.contains("Invented Journal"), "a source that was not attached must not be cited: {asked}");
+        assert!(!asked.contains("\"n\":3"), "{asked}");
+        assert!(!asked.contains("NotFound"), "{asked}");
+        assert!(!asked.contains(key) && !asked.contains("Bearer"), "{asked}");
+        let upstream = seen.lock().unwrap().clone();
+        assert!(upstream.contains("wash-note.txt"), "{upstream}");
+        assert!(upstream.contains("The wash is amber."), "{upstream}");
+        assert!(!upstream.contains("Invented Journal"), "{upstream}");
+        assert!(upstream.contains("Authorization: Bearer "), "{upstream}");
+        let hist = get(a, "/research/history");
+        assert!(hist.contains("\"status\":\"Found\"") && !hist.contains("Invented Journal"), "{hist}");
+        w.close().unwrap();
+    }
+
+    #[test]
+    fn research_desk_keeps_the_latest_eight_sources() {
+        let desk = Arc::new(Mutex::new(ResearchDesk::new()));
+        for i in 1..=9 {
+            let body = format!(r#"{{"name":"n{i}.txt","text":"t{i}"}}"#);
+            research_add_source(&desk, &body).unwrap();
+        }
+        let d = desk.lock().unwrap();
+        assert_eq!(d.sources.len(), 8);
+        assert_eq!(d.sources[0].name, "n2.txt");
+        assert_eq!(d.sources[7].id, 9);
+        assert_eq!(d.sources[7].name, "n9.txt");
     }
 
     #[test]
