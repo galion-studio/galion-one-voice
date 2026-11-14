@@ -71,7 +71,21 @@ textarea::placeholder{color:color-mix(in srgb, var(--ink) 36%, transparent)}
 #voice-dot{width:120px;height:120px;display:block;background:transparent}
 .tools svg{width:22px;height:22px;display:block}
 .price{margin:22px 0 0;text-align:center;font:13px/1.4 system-ui,sans-serif;letter-spacing:.08em;color:color-mix(in srgb, var(--ink) 42%, transparent)}
-.work{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-top:18px}
+.app{display:grid;grid-template-columns:248px minmax(0,1fr);min-height:100vh}
+#rail{padding:28px 18px 40px;border-right:1px solid color-mix(in srgb, var(--ink) 12%, transparent)}
+#rail .brand{margin:0;font:13px/1.3 system-ui,sans-serif;letter-spacing:.16em;text-transform:uppercase}
+#rail .where,#rail .price{margin:10px 0 0;font:12px/1.4 system-ui,sans-serif;letter-spacing:.04em;color:color-mix(in srgb, var(--ink) 48%, transparent)}
+#rail h2{margin:22px 0 10px;font:12px/1 system-ui,sans-serif;font-weight:560;letter-spacing:.16em;text-transform:uppercase;color:color-mix(in srgb, var(--ink) 52%, transparent)}
+#history-list{margin:0;padding-left:1.1em}
+#history-list li{margin:0 0 8px;font:14px/1.4 system-ui,sans-serif}
+.stage{width:min(880px,calc(100% - 72px));margin:0 auto;padding:40px 0 80px}
+.piles,.book{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+.pile h3,.book h3{margin:0 0 8px;font:12px/1 system-ui,sans-serif;font-weight:560;letter-spacing:.14em;text-transform:uppercase;color:color-mix(in srgb, var(--ink) 52%, transparent)}
+.pile p,.pile li,.book p,.book li{margin:0 0 6px;font:15px/1.45 system-ui,sans-serif}
+.card{border:1px solid color-mix(in srgb, var(--amber) 45%, transparent);border-radius:16px;padding:16px 18px}
+.card button{appearance:none;margin-top:12px;border:1px solid color-mix(in srgb, var(--amber) 70%, transparent);background:transparent;color:var(--ink);border-radius:999px;padding:8px 14px;font:inherit;cursor:pointer}
+.card button[aria-pressed="true"]{background:var(--amber);color:var(--ground);border-color:var(--amber)}
+.work{display:grid;gap:16px;margin-top:28px}
 #hermes-status{margin:0 0 18px;font:13px/1.4 system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:color-mix(in srgb, var(--amber) 75%, var(--ink))}
 #history-list{margin:0;padding-left:1.2em}
 #history-list li{margin:0 0 8px;font:15px/1.45 system-ui,sans-serif}
@@ -97,19 +111,30 @@ textarea::placeholder{color:color-mix(in srgb, var(--ink) 36%, transparent)}
   .ask{flex-direction:column;align-items:stretch}
   textarea{font-size:22px;min-height:112px}
   .voice{align-self:center}
+  .app{grid-template-columns:1fr}
+  #rail{border-right:0;border-bottom:1px solid color-mix(in srgb, var(--ink) 12%, transparent)}
+  .piles,.book{grid-template-columns:1fr}
   .work{grid-template-columns:1fr}
 }
 </style>
 </head>
-<body data-product="research" data-voice="galion-research" data-standard="432">
-<div class="desk">
-  <header class="top">
-    <a id="to-one" href="/one">Galion One</a>
-    <p class="voice-name" id="voice-name">Research · Hermes</p>
-  </header>
-  <p class="sr" id="product-line">Galion Research is the Hermes research app, a voice of Galion One.</p>
+<body data-product="research" data-voice="galion-research" data-voice-to-voice="on" data-standard="432">
+<div class="app">
+<aside id="rail">
+  <p class="brand">Galion Research</p>
+  <a id="to-one" href="/one">Galion One</a>
+  <p class="where">galion.app/research</p>
+  <p class="price">Ultra $220/€220 per month</p>
   <p id="hermes-status" data-app="hermes">Hermes</p>
-  <p id="handoff" hidden>From Galion One.</p>
+  <section id="history" aria-labelledby="history-label">
+    <h2 id="history-label">Queue</h2>
+    <ol id="history-list"></ol>
+    <p id="history-empty">No request yet.</p>
+  </section>
+</aside>
+<main class="stage">
+  <p class="sr" id="product-line">Galion Research is the Hermes research app, a voice of Galion One. Voice to voice is on.</p>
+  <p class="sr" id="voice-name">Research · Hermes</p>
   <form class="ask" id="ask" action="#" method="post">
     <div class="field">
       <label class="sr" for="prompt">Ask</label>
@@ -122,49 +147,52 @@ textarea::placeholder{color:color-mix(in srgb, var(--ink) 36%, transparent)}
           <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="14" rx="2.2" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="8.5" cy="9.5" r="1.3" fill="currentColor"/><path d="M4 16.2 8.8 12l3.2 2.6 3.1-3.4L20 16.4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/></svg>
         </button>
         <input id="files" type="file" multiple hidden tabindex="-1" aria-hidden="true">
-        <span class="hint" id="commit-hint">Control Return sets the question</span>
+        <span class="hint" id="commit-hint">Return enqueues the question</span>
       </div>
     </div>
     <button type="button" class="voice" id="voice" aria-label="Voice" aria-pressed="false">
       <canvas id="voice-dot" width="240" height="240" aria-hidden="true"></canvas>
     </button>
   </form>
-  <p class="price">Ultra $220/€220 one-time</p>
   <div class="work">
-    <section class="panel" id="history" aria-labelledby="history-label">
-      <h2 id="history-label">History</h2>
-      <ol id="history-list"></ol>
-      <p id="history-empty">No request yet.</p>
-    </section>
     <section class="panel" id="sources" aria-labelledby="sources-label">
       <h2 id="sources-label">Sources</h2>
-      <ol id="source-list"></ol>
-      <p id="source-empty">No source yet.</p>
+      <div class="piles">
+        <div class="pile" id="sources-local"><h3>Local</h3><ol id="local-list"></ol><p id="source-empty">No source yet.</p></div>
+        <div class="pile" id="sources-reading"><h3>Reading</h3><ol id="reading-list"></ol><p id="reading-empty">No source yet.</p></div>
+        <div class="pile" id="sources-arriving"><h3>Arriving</h3><ol id="arriving-list"></ol><p id="arriving-empty">No source yet.</p></div>
+      </div>
     </section>
-    <section class="panel" id="plan" aria-labelledby="plan-label">
-      <h2 id="plan-label">Plan</h2>
-      <ol id="plan-list">
-        <li id="live-question" hidden></li>
-        <li>State the question.</li>
-        <li>Separate found, inferred, and unknown.</li>
-        <li>Cite only a source that was handed over.</li>
-        <li>Stop at the limit.</li>
-      </ol>
+    <section class="panel" id="citations" aria-labelledby="citations-label">
+      <h2 id="citations-label">Citations</h2>
+      <p id="citation-empty">None in hand.</p>
+      <ol id="citation-list"></ol>
+    </section>
+    <section class="panel" id="notebook" aria-labelledby="notebook-label">
+      <h2 id="notebook-label">Notebook</h2>
+      <div class="book">
+        <div id="found"><h3>Found</h3><ul id="found-list"></ul><p id="found-empty">Empty.</p></div>
+        <div id="inferred"><h3>Inferred</h3><ul id="inferred-list"></ul><p id="inferred-empty">Empty.</p></div>
+        <div id="unknown"><h3>Unknown</h3><ul id="unknown-list"></ul><p id="unknown-empty">Empty.</p></div>
+      </div>
     </section>
     <section class="panel" id="answer" aria-labelledby="answer-label">
-      <h2 id="answer-label">Answer</h2>
+      <h2 id="answer-label">Open job</h2>
       <article id="reading">
         <p id="reading-question" hidden></p>
         <p id="reading-body">The answer sits here, with the limit beside it.</p>
-        <p id="reading-local" hidden>Local. Found, inferred, and unknown stay separate until a source is handed over.</p>
       </article>
-      <div class="citations" id="citations">
-        <h3>Citations</h3>
-        <p id="citation-empty">None in hand.</p>
-        <ol id="citation-list"></ol>
-      </div>
+    </section>
+    <section class="panel" id="experiments" aria-labelledby="experiments-label">
+      <h2 id="experiments-label">Experiments</h2>
+      <article class="card" id="experiment">
+        <p>Ask first. Nothing runs until you allow it.</p>
+        <button type="button" id="allow-experiment" aria-pressed="false">Allow this experiment</button>
+        <p id="experiment-state">Waiting for permission.</p>
+      </article>
     </section>
   </div>
+</main>
 </div>
 <script>
 "use strict";
@@ -259,36 +287,37 @@ function tone(id){
     lead.textContent=q;
     lead.hidden=!q;
     document.getElementById("reading-body").textContent=j.reply||"I don't have a source for that.";
-    document.getElementById("reading-local").hidden=false;
     document.getElementById("answer").dataset.set="1";
     var cites=Array.isArray(j.citations)?j.citations:[];
-    var citeList=document.getElementById("citation-list");
-    var sourceList=document.getElementById("source-list");
-    fillList(citeList, cites.map(function(c){ return "["+c.n+"] "+(c.text||""); }));
-    fillList(sourceList, cites.map(function(c){ return c.text||""; }));
+    fillList(document.getElementById("citation-list"), cites.map(function(c){ return "["+c.n+"] "+(c.text||""); }));
+    fillList(document.getElementById("reading-list"), cites.map(function(c){ return c.text||""; }));
+    fillList(document.getElementById("arriving-list"), []);
     document.getElementById("citation-empty").hidden=cites.length>0;
-    document.getElementById("source-empty").hidden=cites.length>0;
-    if(!cites.length){
-      document.getElementById("citation-empty").textContent="None in hand.";
-      document.getElementById("source-empty").textContent="No source yet.";
-    }
-    hermesStatus("Hermes · "+(j.status||"answered"));
+    document.getElementById("reading-empty").hidden=cites.length>0;
+    document.getElementById("arriving-empty").hidden=false;
+    fillPile("found", j.found);
+    fillPile("inferred", j.inferred);
+    fillPile("unknown", j.unknown);
+    hermesStatus("Hermes · "+(j.status||"Returned"));
+  }
+  function fillPile(id, rows){
+    var list=document.getElementById(id+"-list");
+    var empty=document.getElementById(id+"-empty");
+    fillList(list, rows||[]);
+    if(empty) empty.hidden=(rows||[]).length>0;
   }
   function paintHistory(items){
     var list=document.getElementById("history-list");
     fillList(list, (items||[]).map(function(item){
-      return (item.status||"")+"  "+(item.question||"");
+      var age=(typeof item.age_s==="number")?item.age_s+"s · ":"";
+      return (item.status||"")+" · "+age+(item.question||"");
     }));
     document.getElementById("history-empty").hidden=(items||[]).length>0;
   }
-  if(/[?&]from=one(?:&|$)/.test(location.search)){
-    document.getElementById("handoff").hidden=false;
-    document.body.dataset.handoff="one";
-  }
   fetch("/research/hermes",{cache:"no-store"}).then(function(r){ return r.ok?r.json():null; }).then(function(j){
-    if(!j){ hermesStatus("Hermes · unreachable"); return; }
-    hermesStatus("Hermes · "+(j.status||"idle"));
-  }).catch(function(){ hermesStatus("Hermes · unreachable"); });
+    if(!j){ hermesStatus("Hermes · Unreachable"); return; }
+    hermesStatus("Hermes · "+(j.status||"Idle"));
+  }).catch(function(){ hermesStatus("Hermes · Unreachable"); });
   fetch("/research/history",{cache:"no-store"}).then(function(r){ return r.ok?r.json():null; }).then(function(j){
     if(j&&Array.isArray(j.items)) paintHistory(j.items);
   }).catch(function(){});
@@ -310,17 +339,20 @@ function tone(id){
   function commitQuestion(){
     var q=prompt.value.replace(/\s+/g," ").trim();
     if(!q) return;
-    hermesStatus("Hermes · asking");
+    hermesStatus("Hermes · Running");
+    fillList(document.getElementById("arriving-list"), [q]);
+    document.getElementById("arriving-empty").hidden=true;
     tone("think");
     fetch("/research/ask",{method:"POST",cache:"no-store",headers:{"Content-Type":"application/json"},body:JSON.stringify({question:q})})
       .then(function(r){ return r.ok?r.json():null; })
       .then(function(j){
         if(!j){
-          hermesStatus("Hermes · unreachable");
+          hermesStatus("Hermes · Unreachable");
           document.getElementById("reading-question").textContent=q;
           document.getElementById("reading-question").hidden=false;
           document.getElementById("reading-body").textContent="The research path is not reachable from here.";
-          paintHistory([{status:"unreachable", question:q}]);
+          fillPile("unknown", ["The research path is not reachable from here."]);
+          paintHistory([{status:"Unreachable", question:q}]);
           return;
         }
         showTurn(j);
@@ -328,18 +360,25 @@ function tone(id){
       })
       .then(function(h){ if(h&&Array.isArray(h.items)) paintHistory(h.items); tone("speak"); })
       .catch(function(){
-        hermesStatus("Hermes · unreachable");
+        hermesStatus("Hermes · Unreachable");
         document.getElementById("reading-question").textContent=q;
         document.getElementById("reading-question").hidden=false;
         document.getElementById("reading-body").textContent="The research path is not reachable from here.";
-        paintHistory([{status:"unreachable", question:q}]);
+        fillPile("unknown", ["The research path is not reachable from here."]);
+        paintHistory([{status:"Unreachable", question:q}]);
       });
   }
   prompt.addEventListener("keydown", function(ev){
-    if(ev.key==="Enter"&&(ev.ctrlKey||ev.metaKey)){
+    if(ev.key==="Enter"&&!ev.shiftKey){
       ev.preventDefault();
       commitQuestion();
     }
+  });
+  document.getElementById("allow-experiment").addEventListener("click", function(ev){
+    var btn=ev.currentTarget;
+    var on=btn.getAttribute("aria-pressed")==="true";
+    btn.setAttribute("aria-pressed", on?"false":"true");
+    document.getElementById("experiment-state").textContent=on?"Waiting for permission.":"Allowed. Nothing is trained and nothing is sent.";
   });
   document.getElementById("ask").addEventListener("submit", function(ev){
     ev.preventDefault();

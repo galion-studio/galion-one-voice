@@ -669,9 +669,6 @@ impl WebSurface {
     pub fn set_research_hermes(&self, client: galion_cascade::HermesLlm) {
         if let Ok(mut desk) = self.sh.research.lock() {
             desk.client = Some(client);
-            if desk.status == "idle" {
-                desk.status = "ready";
-            }
         }
     }
 }
@@ -688,6 +685,10 @@ struct ResearchNote {
     status: &'static str,
     reply: String,
     citations: Vec<(u32, String)>,
+    found: Vec<String>,
+    inferred: Vec<String>,
+    unknown: Vec<String>,
+    at: Instant,
 }
 
 struct ResearchDesk {
@@ -707,18 +708,63 @@ impl ResearchDesk {
         }
     }
     fn gateway_status(&self) -> &'static str {
-        if self.status == "asking" {
-            return "asking";
+        if self.status == "Running" {
+            return "Running";
         }
         if self.client.is_none() {
-            return "unreachable";
+            return "Unreachable";
         }
         if self.status == "idle" {
-            "ready"
+            "Idle"
         } else {
             self.status
         }
     }
+}
+
+fn research_state(text: &str) -> &'static str {
+    let low = text.to_ascii_lowercase();
+    if text == galion_cascade::UNREACHABLE || low.contains("not reachable") {
+        "Unreachable"
+    } else if text == galion_cascade::REFUSED || low.contains("not allowed") {
+        "Denied"
+    } else if low.contains("don't have a source") || low.contains("do not have a source") || low.contains("not found") {
+        "NotFound"
+    } else {
+        "Returned"
+    }
+}
+
+fn notebook_piles(reply: &str) -> (Vec<String>, Vec<String>, Vec<String>) {
+    let mut found = Vec::new();
+    let mut inferred = Vec::new();
+    let mut unknown = Vec::new();
+    let mut which = 0u8;
+    for line in reply.lines() {
+        let t = line.trim();
+        if t.is_empty() {
+            continue;
+        }
+        match t.trim_end_matches(':').to_ascii_lowercase().as_str() {
+            "found" => which = 1,
+            "inferred" => which = 2,
+            "unknown" => which = 3,
+            _ => {
+                let item = t.trim_start_matches(['-', ' ']).to_string();
+                match which {
+                    1 => found.push(item),
+                    2 => inferred.push(item),
+                    3 => unknown.push(item),
+                    _ => {}
+                }
+            }
+        }
+    }
+    (found, inferred, unknown)
+}
+
+fn json_list(items: &[String]) -> String {
+    items.iter().map(|s| galion_cascade::hermes::json_string(s)).collect::<Vec<_>>().join(",")
 }
 
 fn research_status_json(desk: &ResearchDesk) -> String {
@@ -737,12 +783,16 @@ fn research_note_json(note: &ResearchNote) -> String {
         format!("{{\"n\":{n},\"text\":{}}}", galion_cascade::hermes::json_string(text))
     }).collect();
     format!(
-        "{{\"id\":{},\"status\":\"{}\",\"question\":{},\"reply\":{},\"citations\":[{}]}}",
+        "{{\"id\":{},\"status\":\"{}\",\"age_s\":{},\"question\":{},\"reply\":{},\"citations\":[{}],\"found\":[{}],\"inferred\":[{}],\"unknown\":[{}]}}",
         note.id,
         note.status,
+        note.at.elapsed().as_secs(),
         galion_cascade::hermes::json_string(&note.question),
         galion_cascade::hermes::json_string(&note.reply),
-        cites.join(",")
+        cites.join(","),
+        json_list(&note.found),
+        json_list(&note.inferred),
+        json_list(&note.unknown)
     )
 }
 
@@ -754,9 +804,9 @@ fn research_history_json(desk: &ResearchDesk) -> String {
 fn research_ask(desk: &Arc<Mutex<ResearchDesk>>, question: &str) -> String {
     let (id, client, model_fallback) = {
         let Ok(mut d) = desk.lock() else {
-            return "{\"schema\":\"galion-research/1\",\"app\":\"hermes\",\"status\":\"unreachable\",\"reply\":\"The research path is not reachable from here.\",\"citations\":[]}".into();
+            return "{\"schema\":\"galion-research/1\",\"app\":\"hermes\",\"status\":\"Unreachable\",\"reply\":\"The research path is not reachable from here.\",\"citations\":[]}".into();
         };
-        d.status = "asking";
+        d.status = "Running";
         d.next_id = d.next_id.saturating_add(1);
         let model = d.client.as_ref().map(|c| c.label().to_string()).unwrap_or_else(|| galion_cascade::LLM_NAME.into());
         (d.next_id, d.client.clone(), model)
@@ -767,9 +817,26 @@ fn research_ask(desk: &Arc<Mutex<ResearchDesk>>, question: &str) -> String {
     };
     let unreachable = turn.text == galion_cascade::UNREACHABLE;
     let reply = if unreachable { "The research path is not reachable from here.".to_string() } else { turn.text };
-    let status = if unreachable { "unreachable" } else { "answered" };
+    let status = research_state(&reply);
     let citations = if unreachable { Vec::new() } else { turn.citations };
-    let note = ResearchNote { id, question: question.to_string(), status, reply, citations };
+    let (mut found, inferred, mut unknown) = notebook_piles(&reply);
+    if (status == "NotFound" || status == "Unreachable") && unknown.is_empty() {
+        unknown.push(reply.clone());
+    }
+    if status != "Returned" {
+        found.clear();
+    }
+    let note = ResearchNote {
+        id,
+        question: question.to_string(),
+        status,
+        reply,
+        citations,
+        found,
+        inferred,
+        unknown,
+        at: Instant::now(),
+    };
     let body = format!(
         "{{\"schema\":\"galion-research/1\",\"app\":\"hermes\",\"model\":{},{}}}",
         galion_cascade::hermes::json_string(&model_fallback),
@@ -1306,20 +1373,28 @@ mod tests {
                 "id=\"add-image\"",
                 "TODO: uploads are stubbed",
                 "id=\"sources\"",
-                "id=\"plan\"",
                 "id=\"answer\"",
                 "id=\"citations\"",
                 "id=\"to-one\"",
                 "href=\"/one\"",
-                "from=one",
                 "No source yet.",
                 "None in hand.",
-                "From Galion One.",
+                "galion.app/research",
+                "Ultra $220/€220 per month",
+                "id=\"sources-local\"",
+                "id=\"sources-reading\"",
+                "id=\"sources-arriving\"",
+                "id=\"notebook\"",
+                "id=\"found\"",
+                "id=\"inferred\"",
+                "id=\"unknown\"",
+                "id=\"experiment\"",
+                "Ask first",
+                "data-voice-to-voice=\"on\"",
                 "hz:432",
                 "hz:216",
                 "hz:540",
                 "hz:648",
-                "Ultra $220/€220 one-time",
                 "G.A.L.I.O.N. — General Autonomous Local Intelligence Open Network",
                 "Developed and distributed by Galion Labs",
                 "Perpetual Open MIT License",
@@ -1362,13 +1437,13 @@ mod tests {
         w.open().unwrap();
         let a = w.local_addr().unwrap();
         let off = get(a, "/research/hermes");
-        assert!(off.contains("\"app\":\"hermes\"") && off.contains("\"key\":\"none\"") && off.contains("\"status\":\"unreachable\""), "{off}");
+        assert!(off.contains("\"app\":\"hermes\"") && off.contains("\"key\":\"none\"") && off.contains("\"status\":\"Unreachable\""), "{off}");
         assert!(!off.contains(key) && !off.contains("Bearer") && !off.contains("GALION_LLM_KEY"), "{off}");
         let denied = post_json(a, "/research/ask", r#"{"question":"Where is the source?"}"#);
         assert!(denied.contains("HTTP/1.1 200") && denied.contains("The research path is not reachable from here."), "{denied}");
         assert!(!denied.contains(key), "{denied}");
         let hist = get(a, "/research/history");
-        assert!(hist.contains("Where is the source?") && hist.contains("\"status\":\"unreachable\""), "{hist}");
+        assert!(hist.contains("Where is the source?") && hist.contains("\"status\":\"Unreachable\""), "{hist}");
         let empty = post_json(a, "/research/ask", r#"{"question":"  "}"#);
         assert!(empty.starts_with("HTTP/1.1 400"), "{empty}");
         w.close().unwrap();
@@ -1406,15 +1481,15 @@ mod tests {
         w.open().unwrap();
         let a = w.local_addr().unwrap();
         let ready = get(a, "/research/hermes");
-        assert!(ready.contains("\"key\":\"set\"") && ready.contains("\"status\":\"ready\"") && ready.contains("hermes-agent"), "{ready}");
+        assert!(ready.contains("\"key\":\"set\"") && ready.contains("\"status\":\"Idle\"") && ready.contains("hermes-agent"), "{ready}");
         assert!(!ready.contains(key), "{ready}");
         let asked = post_json(a, "/research/ask", r#"{"question":"What colour is the wash?"}"#);
-        assert!(asked.contains("HTTP/1.1 200") && asked.contains("\"status\":\"answered\""), "{asked}");
+        assert!(asked.contains("HTTP/1.1 200") && asked.contains("\"status\":\"Returned\""), "{asked}");
         assert!(asked.contains("Galion brand note") && asked.contains("\"n\":1"), "{asked}");
         assert!(asked.contains("\"app\":\"hermes\""), "{asked}");
         assert!(!asked.contains(key) && !asked.contains("Bearer"), "{asked}");
         let hist = get(a, "/research/history");
-        assert!(hist.contains("What colour is the wash?") && hist.contains("\"status\":\"answered\""), "{hist}");
+        assert!(hist.contains("What colour is the wash?") && hist.contains("\"status\":\"Returned\""), "{hist}");
         assert!(!hist.contains(key), "{hist}");
         w.close().unwrap();
     }
