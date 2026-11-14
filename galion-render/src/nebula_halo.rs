@@ -398,6 +398,13 @@ mod tests {
         ] {
             assert!(page.contains(q), "{q}");
         }
+        assert!(page.contains("galion-nebula/1"));
+        assert!(page.contains("function pictureLine"));
+        assert!(page.contains("function isPicture"));
+        assert!(page.contains("cv.dataset.mode=shown"));
+        assert!(page.contains("paintHalo(now-t0,W,H,rad)"));
+        assert!(!page.contains("rad/side"));
+        assert!(page.contains("NII-575.5"));
         assert!(page.contains("present!==true"));
         assert!(page.contains("estimate===\"none\""));
         assert!(page.contains("#F5F5F7"));
