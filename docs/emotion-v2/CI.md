@@ -65,6 +65,38 @@ PYTHONPATH=tools/emotion-v2 python -m harness score \
 
 Exit status: `0` when every scored emotion passes, `1` when a score fails, `2` when the thresholds file is unusable or a requested recogniser has no local weights.
 
+## Emotion-sweep listening set
+
+`harness sweep` scores the frozen synthetic clips in
+`docs/galion-voice-v2/evals/listening-set/emotion-sweep` against the rollout
+gate. The manifest is `docs/galion-voice-v2/evals/emotion-sweep/sweep.csv`.
+The reply line is the sentence in `SWEEP.md`. The command reads those files.
+It does not synthesize, clone, or download.
+
+Candidates are Samantha, Jarvis, and each persona's V1 baseline. ECAPA and
+`emotion_match` use that persona's `*-reference-rest.wav` in the same
+directory. User-cue wavs are inventoried and are not candidates.
+`emotion_match` is `0.70*category_blend+0.30*emb_sim` against the resting
+reference. The CPU stub is not that score.
+
+WER and ECAPA run only when `galion-wer` and `galion-ecapa` are already on
+the machine (`GALION_WER`, `GALION_ECAPA`, or the usual build paths).
+`emotion_match` runs only when a local `superb/wav2vec2-base-superb-er`
+weight directory is complete. Otherwise the three values stay null and the
+gate is `unmeasured`. Null is not a pass and not a fail. `--require-scorers`
+exits 1 in that case without inventing a number.
+
+```bash
+PYTHONPATH=tools/emotion-v2 python -m harness sweep --out-dir /tmp/emotion-sweep-eval
+```
+
+Exit 0 when the report is written and every candidate is unmeasured, or
+measured and inside the gate. Exit 1 when a measured candidate misses the
+gate, or when `--require-scorers` is set and a scorer is absent. Exit 2 when
+a clip is missing or `thresholds.toml` disagrees with the locked gate
+(WER ≤ 0.018, ECAPA > 0.7057, emotion_match ≥ 0.83). `rollout_claimed` stays
+false. The command does not merge or deploy.
+
 ## Stub backend
 
 `StubBackend` returns a deterministic posterior over the twelve emotion names. A pure tone at the frequency in `STUB_FREQ_HZ` peaks on that emotion. Amused is **432 Hz**, the tuning standard, so a 432 Hz sine is the fixture for Amused. The same samples always yield the same posterior and the same embedding. The stub is not a model of affect.
