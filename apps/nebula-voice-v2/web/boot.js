@@ -118,6 +118,48 @@ function spriteView(mod, app, count) {
   return new Float32Array(mem.buffer, app.sprites_ptr(), count * 8);
 }
 
+// The bridge writes one JSON object per line on loopback TCP.
+// The page speaks that same object as a WebSocket text frame.
+// Backoff matches `nebula listen`: 80, 160, 320, 640, then 1280 ms.
+// A drop clears the emotion. It does not keep the last simplex.
+function attachFeed(app) {
+  const backoff = [80, 160, 320, 640, 1280];
+  let attempt = 0;
+  const raw = params.get("feed") || "127.0.0.1:8766";
+  const url = raw.startsWith("ws://") || raw.startsWith("wss://") ? raw : "ws://" + raw;
+  function fail() {
+    app.clear_emotion();
+    canvas.dataset.schema = "galion-voice-v2-emotion-feed/1";
+    canvas.dataset.estimate = "none";
+    const wait = backoff[Math.min(attempt, backoff.length - 1)];
+    attempt += 1;
+    setTimeout(connect, wait);
+  }
+  function connect() {
+    let ws;
+    try { ws = new WebSocket(url); }
+    catch (e) { fail(); return; }
+    ws.onopen = () => { attempt = 0; };
+    ws.onmessage = (ev) => {
+      const text = String(ev.data || "").replace(/\n$/, "").trim();
+      if (!text) return;
+      let msg = null;
+      try { msg = JSON.parse(text); }
+      catch (e) { app.clear_emotion(); return; }
+      if (!msg || typeof msg !== "object") { app.clear_emotion(); return; }
+      // No schema is galion-nebula/1. parse_frame still accepts it.
+      // An empty mass on that older shape is Neutral. Do not strip a schema that is present.
+      const schema = typeof msg.schema === "string" && msg.schema ? msg.schema : "galion-nebula/1";
+      canvas.dataset.schema = schema;
+      canvas.dataset.estimate = typeof msg.estimate === "string" ? msg.estimate : "";
+      app.apply_line(text);
+    };
+    ws.onerror = () => { try { ws.close(); } catch (e) {} };
+    ws.onclose = () => fail();
+  }
+  connect();
+}
+
 export async function start(mod) {
   const hz = await refreshHz();
   const probe = rendererOverride === "cpu"
@@ -145,6 +187,8 @@ export async function start(mod) {
     hz,
     !!probe.discrete,
   );
+  if (params.get("demo") === "1") app.set_demo(true);
+  else attachFeed(app);
   const floor = JSON.parse(app.floor_rgb());
   const clear = [floor.r, floor.g, floor.b];
   let rendererName = usingGpu ? gpu.api : "cpu";

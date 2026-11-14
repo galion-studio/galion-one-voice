@@ -47,6 +47,8 @@ pub mod png;
 pub mod wav;
 /// Instruction-layer floor for the one circle page. `GET /v2` redirects to `/`.
 pub mod v2_persona;
+/// Faint emotion arcs in the amber–violet wash, outside the one dot.
+pub mod nebula_halo;
 
 pub use frame::{Band, BandState, Emotion, VizFrame};
 pub use surface::{Fanout, NullSurface, RenderError, RenderSurface, SurfaceCaps, SurfaceKind};

@@ -532,6 +532,7 @@ struct Shared {
     replies: ReplyBox,
     page: Option<&'static str>,
     v2_page: Option<&'static str>,
+    nebula_vocabulary: Option<&'static str>,
     floor: Arc<Mutex<crate::v2_persona::Floor>>,
     edge: EdgeCfg,
     sessions: Arc<SessionStore>,
@@ -572,6 +573,7 @@ impl WebSurface {
             replies: ReplyBox::default(),
             page: None,
             v2_page: None,
+            nebula_vocabulary: None,
             floor: Arc::new(Mutex::new(crate::v2_persona::Floor::new())),
             sessions: Arc::new(SessionStore::new(edge.session_ttl)),
             disclosure_sent: Arc::new(AtomicBool::new(false)),
@@ -595,6 +597,11 @@ impl WebSurface {
     /// Serve `html` at `/` and `/screen` (set before `open()`).
     pub fn with_page(mut self, html: &'static str) -> Self {
         self.sh.page = Some(html);
+        self
+    }
+    /// `GET /nebula/vocabulary.mjs`. The one-dot page imports `drawNebula` from here.
+    pub fn with_nebula_vocabulary(mut self, js: &'static str) -> Self {
+        self.sh.nebula_vocabulary = Some(js);
         self
     }
     /// Body of `GET /v2`, which redirects to `/`. Set before `open()`.
@@ -875,6 +882,10 @@ fn route(req: &mut Request, sh: &Shared) -> (&'static str, &'static str, Vec<u8>
                     _ => ("404 Not Found", "text/plain", txt("not found")),
                 }
             } else { match p {
+                "/nebula/vocabulary.mjs" => match sh.nebula_vocabulary {
+                    Some(js) => ("200 OK", "text/javascript; charset=utf-8", js.as_bytes().to_vec()),
+                    None => ("404 Not Found", "text/plain", txt("not found")),
+                },
                 "/" | "/screen" if sh.page.is_some() => {
                     let html = sh.page.unwrap_or_default();
                     let page = if sh.edge.disclosure { html.to_string() } else { strip_ai_disclosure(html) };

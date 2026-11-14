@@ -28,6 +28,7 @@ pub struct Nebula {
     distance: f32,
     blend: f32,
     overlay: bool,
+    demo: bool,
     smoothed_ms: f32,
     cool: u32,
     hot: u32,
@@ -57,7 +58,8 @@ impl Nebula {
         Nebula {
             voice,
             sim: Sim::create(11, particles),
-            frame: frame_at(voice, 1.2),
+            frame: absent(voice),
+            demo: false,
             budget,
             refresh_hz: if refresh_hz.is_finite() && refresh_hz > 1.0 { refresh_hz } else { 60.0 },
             gpu,
@@ -78,8 +80,7 @@ impl Nebula {
         let dt = (dt_ms / 1000.0).clamp(1.0 / 240.0, 0.05);
         self.smoothed_ms = self.smoothed_ms * 0.9 + dt_ms.max(0.1) * 0.1;
         self.adapt();
-        self.blend += dt;
-        self.frame = frame_at(self.voice, self.blend);
+        self.advance(dt);
         let drive = crate::frame::drive_from(&self.frame, self.budget.particles, self.budget.octaves);
         self.sim.step(&drive, 1.0 / self.budget.fps_target.max(1.0));
         let css_w = canvas.client_width().max(2) as u32;
@@ -111,8 +112,7 @@ impl Nebula {
         let dt = (dt_ms / 1000.0).clamp(1.0 / 240.0, 0.05);
         self.smoothed_ms = self.smoothed_ms * 0.9 + dt_ms.max(0.1) * 0.1;
         self.adapt();
-        self.blend += dt;
-        self.frame = frame_at(self.voice, self.blend);
+        self.advance(dt);
         let drive = crate::frame::drive_from(&self.frame, self.budget.particles, self.budget.octaves);
         self.sim.step(&drive, 1.0 / self.budget.fps_target.max(1.0));
     }
@@ -143,6 +143,36 @@ impl Nebula {
 
     pub fn sprites_count(&self) -> u32 {
         self.sprite_count
+    }
+
+    /// Explicit demo blend. The feed path does not call this.
+    pub fn set_demo(&mut self, on: bool) {
+        self.demo = on;
+        if on {
+            self.frame = frame_at(self.voice, self.blend);
+        }
+    }
+
+    /// One `galion-voice-v2-emotion-feed/1` line. A bad line clears the cloud.
+    pub fn apply_line(&mut self, line: &str) -> bool {
+        match crate::frame::parse_frame(line, self.voice) {
+            Ok(frame) => {
+                self.voice = frame.voice;
+                self.frame = frame;
+                self.demo = false;
+                true
+            }
+            Err(_) => {
+                self.clear_emotion();
+                false
+            }
+        }
+    }
+
+    /// Disconnect, rejection, or `estimate: none`. Weights stay 0. Not Neutral.
+    pub fn clear_emotion(&mut self) {
+        self.demo = false;
+        self.frame = absent(self.voice);
     }
 
     pub fn apply_quality(&mut self, quality: &str) {
@@ -201,7 +231,24 @@ pub fn wasm_memory() -> JsValue {
 }
 
 
+fn absent(voice: Voice) -> NebulaFrame {
+    let mut frame = NebulaFrame::neutral(voice);
+    frame.weights = [0.0; 13];
+    frame.elements = [""; 13];
+    frame.no_estimate = true;
+    frame.vad = 0.0;
+    frame.energy = 0.0;
+    frame
+}
+
 impl Nebula {
+    fn advance(&mut self, dt: f32) {
+        if self.demo {
+            self.blend += dt;
+            self.frame = frame_at(self.voice, self.blend);
+        }
+    }
+
     fn adapt(&mut self) {
         let budget_ms = 1000.0 / self.budget.fps_target.max(1.0);
         match self.budget.pacing {

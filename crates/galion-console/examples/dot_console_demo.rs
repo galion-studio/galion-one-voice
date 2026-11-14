@@ -104,7 +104,8 @@ fn run<T: TimingFeed, A: AffectFeed>(args: &[String], mut pump: DemoPump<T, A>, 
             Ok(a) => {
                 let web = galion_render::WebSurface::serve(a)
                     .with_page(galion_console::dotviz::SCREEN_HTML)
-                    .with_v2_page(galion_console::dotviz::V2_SCREEN_HTML);
+                    .with_v2_page(galion_console::dotviz::V2_SCREEN_HTML)
+                    .with_nebula_vocabulary(galion_console::dotviz::NEBULA_VOCABULARY_JS);
                 #[cfg(feature = "phone-turn")]
                 {
                     phone = Some(galion_console::phone_host::PhoneHost::from_surface(&web));
