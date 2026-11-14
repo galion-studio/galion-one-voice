@@ -114,7 +114,17 @@ fn run<T: TimingFeed, A: AffectFeed>(args: &[String], mut pump: DemoPump<T, A>, 
                 // Unset leaves the desk on the local Offline answer. The key is never printed.
                 match galion_cascade::HermesLlm::research_from_env() {
                     Some(client) => {
-                        notes.push(format!("research → hermes model {} (key {})", client.label(), client.key_state()));
+                        let b = *client.research_budget();
+                        let label = client.label().to_string();
+                        let key = client.key_state();
+                        notes.push(format!(
+                            "research → hermes model {label} (key {key}) · helpers {}/{} · concurrency {} · budget {}ms · calls {}",
+                            b.helpers,
+                            galion_cascade::hermes::MAX_RESEARCH_HELPERS,
+                            b.concurrency,
+                            b.budget.as_millis(),
+                            b.calls
+                        ));
                         web.set_research_hermes(client);
                     }
                     None => notes.push("research → hermes not configured (GALION_RESEARCH_URL unset)".to_string()),

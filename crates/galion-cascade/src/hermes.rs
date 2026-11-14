@@ -12,9 +12,13 @@
 //! A timeout, a refused connect, a non-loopback URL, or a bad response is the
 //! plain line [`UNREACHABLE`]. This client does not call [`crate::CannedLlm`].
 
+use std::collections::VecDeque;
 use std::io::{Read, Write};
 use std::net::{IpAddr, SocketAddr, TcpStream};
-use std::time::Duration;
+use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::Mutex;
+use std::thread;
+use std::time::{Duration, Instant};
 
 use crate::{CascadeError, Emotion, Llm, Transcript};
 
@@ -37,6 +41,19 @@ Do not write that you have no source. English only.";
 pub const MAX_RESEARCH_SOURCES: usize = 8;
 /// Characters of each file kept in the prompt and on the desk.
 pub const MAX_RESEARCH_SOURCE_CHARS: usize = 2_000;
+/// Helper sub-questions one hard ask may run. `GALION_RESEARCH_HELPERS`, default 3.
+pub const DEFAULT_RESEARCH_HELPERS: usize = 3;
+/// Hard cap. A larger env value is clamped here.
+pub const MAX_RESEARCH_HELPERS: usize = 5;
+/// Helper calls in flight at once. `GALION_RESEARCH_HELPER_CONCURRENCY`, default 2.
+pub const DEFAULT_RESEARCH_CONCURRENCY: usize = 2;
+/// Wall clock for one ask, including the plan and the synthesis.
+/// `GALION_RESEARCH_BUDGET_MS`, default 180000, clamped 1000..=300000 from the env.
+pub const DEFAULT_RESEARCH_BUDGET_MS: u64 = 180_000;
+pub const MAX_RESEARCH_BUDGET_MS: u64 = 300_000;
+/// Planner + hard-capped helpers + synthesis. `GALION_RESEARCH_CALLS` cannot exceed this.
+pub const MAX_RESEARCH_CALLS: u32 = 7;
+
 /// Spoken when the model returns a forbidden empathy script.
 pub const REFUSED: &str = "I'll stay on what you said.";
 /// Stable client id when no model name is configured.
@@ -208,6 +225,128 @@ pub struct ResearchAnswer {
     pub standing: &'static str,
 }
 
+/// How many helper lookups one ask may spend. Read from `GALION_RESEARCH_*`.
+/// `helpers` is at most [`MAX_RESEARCH_HELPERS`]. `calls` is at most [`MAX_RESEARCH_CALLS`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ResearchBudget {
+    pub helpers: usize,
+    pub concurrency: usize,
+    /// Wall clock for the whole ask. A helper does not start when this is spent.
+    pub budget: Duration,
+    /// Hermes calls this ask may make, including the plan and the synthesis.
+    pub calls: u32,
+}
+
+impl Default for ResearchBudget {
+    fn default() -> Self {
+        Self {
+            helpers: DEFAULT_RESEARCH_HELPERS,
+            concurrency: DEFAULT_RESEARCH_CONCURRENCY,
+            budget: Duration::from_millis(DEFAULT_RESEARCH_BUDGET_MS),
+            calls: default_call_budget(DEFAULT_RESEARCH_HELPERS),
+        }
+    }
+}
+
+impl ResearchBudget {
+    /// Env values, clamped. Missing keys keep the defaults. `0` helpers disables the split.
+    pub fn from_vars(var: impl Fn(&str) -> Option<String>) -> Self {
+        let get = |k: &str| {
+            var(k)
+                .map(|v| v.trim().to_string())
+                .filter(|v| !v.is_empty())
+        };
+        let helpers = get("GALION_RESEARCH_HELPERS")
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(DEFAULT_RESEARCH_HELPERS)
+            .min(MAX_RESEARCH_HELPERS);
+        let concurrency = get("GALION_RESEARCH_HELPER_CONCURRENCY")
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(DEFAULT_RESEARCH_CONCURRENCY);
+        let budget_ms = get("GALION_RESEARCH_BUDGET_MS")
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(DEFAULT_RESEARCH_BUDGET_MS)
+            .clamp(1_000, MAX_RESEARCH_BUDGET_MS);
+        let auto = default_call_budget(helpers);
+        let calls = match get("GALION_RESEARCH_CALLS") {
+            Some(s) => s.parse::<u32>().ok().unwrap_or(auto),
+            None => auto,
+        };
+        Self {
+            helpers,
+            concurrency,
+            budget: Duration::from_millis(budget_ms),
+            calls,
+        }
+        .clamped()
+    }
+
+    /// Hard caps. A test may set a short budget; the env parser's floor is 1000 ms.
+    pub fn clamped(self) -> Self {
+        let helpers = self.helpers.min(MAX_RESEARCH_HELPERS);
+        let concurrency = self.concurrency.clamp(1, MAX_RESEARCH_HELPERS);
+        let ms = self
+            .budget
+            .as_millis()
+            .clamp(50, MAX_RESEARCH_BUDGET_MS as u128) as u64;
+        let calls = self.calls.clamp(1, MAX_RESEARCH_CALLS);
+        Self {
+            helpers,
+            concurrency,
+            budget: Duration::from_millis(ms),
+            calls,
+        }
+    }
+}
+
+fn default_call_budget(helpers: usize) -> u32 {
+    if helpers == 0 {
+        1
+    } else {
+        (1 + helpers as u32 + 1).min(MAX_RESEARCH_CALLS)
+    }
+}
+
+/// One helper the planner queued. `status` is `queued`, `running`, `skipped`,
+/// or a research standing (`Found`, `Inferred`, `Unknown`, `Unreachable`, `Denied`).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ResearchHelper {
+    pub question: String,
+    pub status: &'static str,
+}
+
+/// One desk ask. `calls` is how many Hermes completions this ask spent.
+/// `helpers` is empty when the question was not split.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ResearchReport {
+    pub answer: ResearchAnswer,
+    pub calls: u32,
+    pub call_budget: u32,
+    pub split: bool,
+    pub helpers: Vec<ResearchHelper>,
+}
+
+/// Progress the desk paints while an ask is in flight. The list stays collapsed.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ResearchEvent {
+    Phase(&'static str),
+    Calls(u32),
+    Budget(u32),
+    Helper(usize, ResearchHelper),
+}
+
+/// Sink for [`ResearchEvent`]. The desk lock is taken only inside the impl, never across a call.
+pub trait ResearchWatch: Send + Sync {
+    fn on_research(&self, event: &ResearchEvent);
+}
+
+/// Watch that drops events. Tests and the single-call path use it.
+pub struct ResearchQuiet;
+
+impl ResearchWatch for ResearchQuiet {
+    fn on_research(&self, _event: &ResearchEvent) {}
+}
+
 /// OpenAI-compatible chat client. `Send`. Connects only when [`HermesLlm::complete_as`] runs.
 #[derive(Clone)]
 pub struct HermesLlm {
@@ -216,6 +355,7 @@ pub struct HermesLlm {
     key: String,
     timeout: Duration,
     persona: String,
+    budget: ResearchBudget,
 }
 
 impl std::fmt::Debug for HermesLlm {
@@ -226,6 +366,8 @@ impl std::fmt::Debug for HermesLlm {
             .field("key", &if self.key.is_empty() { "none" } else { "set" })
             .field("timeout", &self.timeout)
             .field("persona", &self.persona)
+            .field("helpers", &self.budget.helpers)
+            .field("calls", &self.budget.calls)
             .finish()
     }
 }
@@ -253,6 +395,7 @@ impl HermesLlm {
             key: key.trim().to_string(),
             timeout,
             persona: "samantha".into(),
+            budget: ResearchBudget::default(),
         }
     }
 
@@ -307,9 +450,20 @@ impl HermesLlm {
     /// `hermes-agent`), `GALION_RESEARCH_TIMEOUT_MS` (default 60000, clamped 1000..=90000).
     /// Key: `GALION_RESEARCH_KEY`, or one `NAME=value` line named by `GALION_RESEARCH_KEY_NAME`
     /// in the dotenv file `GALION_RESEARCH_KEY_FILE`. The key is never logged or returned.
+    ///
+    /// A hard question is split into at most `GALION_RESEARCH_HELPERS` sub-questions
+    /// (default [`DEFAULT_RESEARCH_HELPERS`], hard cap [`MAX_RESEARCH_HELPERS`]).
+    /// `GALION_RESEARCH_HELPER_CONCURRENCY` bounds how many run at once.
+    /// `GALION_RESEARCH_BUDGET_MS` is the wall clock for the whole ask.
+    /// `GALION_RESEARCH_CALLS` caps completions (default one plan, the helpers, and one synthesis,
+    /// hard cap [`MAX_RESEARCH_CALLS`]). A simple question does not spend the plan.
     pub fn research_from_env() -> Option<Self> {
-        Self::research_from_vars(|k| std::env::var(k).ok(), |p| std::fs::read_to_string(p).ok())
+        Self::research_from_vars(
+            |k| std::env::var(k).ok(),
+            |p| std::fs::read_to_string(p).ok(),
+        )
     }
+
 
     /// [`HermesLlm::research_from_env`] with injected lookups (tests).
     pub fn research_from_vars(
@@ -331,8 +485,21 @@ impl HermesLlm {
             .and_then(|s| s.parse().ok())
             .unwrap_or(60_000)
             .clamp(1_000, 90_000);
-        Some(Self::new(&url, &model, &key, Duration::from_millis(timeout_ms)))
+        let mut llm = Self::new(&url, &model, &key, Duration::from_millis(timeout_ms));
+        llm.budget = ResearchBudget::from_vars(&var);
+        Some(llm)
     }
+
+    /// Helper cap, concurrency, and the time and call budgets for one research ask.
+    pub fn research_budget(&self) -> &ResearchBudget {
+        &self.budget
+    }
+
+    /// Replace the helper budget. Values above the hard caps are clamped.
+    pub fn set_research_budget(&mut self, budget: ResearchBudget) {
+        self.budget = budget.clamped();
+    }
+
 
     /// `hermes-agent`, or `GALION_LLM_MODEL` when that name is set.
     pub fn label(&self) -> &str {
@@ -363,8 +530,216 @@ impl HermesLlm {
     /// Research turn for the Galion Research desk. `sources` are the files the
     /// user attached. The gateway key stays on this client. It is not copied
     /// into the reply. A citation whose id or title was not in `sources` is
-    /// dropped before the answer is returned.
+    /// dropped before the answer is returned. One completion. No helper split.
     pub fn research_turn(&self, user: &str, sources: &[ResearchSource]) -> ResearchAnswer {
+        self.research_turn_within(user, sources, self.timeout)
+    }
+
+    /// One desk ask. A simple question is one completion. A hard question spends
+    /// one plan call, then up to [`ResearchBudget::helpers`] helper calls, then
+    /// one synthesis call. Each completion counts toward [`ResearchReport::calls`].
+    /// The gateway key stays on this client.
+    pub fn research_ask(&self, user: &str, sources: &[ResearchSource]) -> ResearchReport {
+        self.research_ask_watched(user, sources, &ResearchQuiet)
+    }
+
+    /// [`HermesLlm::research_ask`] with a progress sink. Events fire on the caller
+    /// thread and on the helper threads. The sink must not call back into this client.
+    pub fn research_ask_watched(
+        &self,
+        user: &str,
+        sources: &[ResearchSource],
+        watch: &dyn ResearchWatch,
+    ) -> ResearchReport {
+        let budget = self.budget.clamped();
+        let calls = AtomicU32::new(0);
+        watch.on_research(&ResearchEvent::Budget(budget.calls));
+        watch.on_research(&ResearchEvent::Calls(0));
+        let started = Instant::now();
+        let question = clip_chars(user.trim(), 2_000);
+        if question.is_empty()
+            || self.target.is_none()
+            || (!self.key.is_empty() && !key_ok(&self.key))
+        {
+            return finish(
+                blank_research(UNREACHABLE, "Unreachable"),
+                &calls,
+                budget.calls,
+                false,
+                Vec::new(),
+                watch,
+            );
+        }
+        // Three calls is the smallest split: plan, one helper, synthesis.
+        // Fewer than that, or an obvious one-lookup question, stays a single call.
+        if budget.helpers == 0 || budget.calls < 3 || !question_needs_helpers(&question) {
+            return self.direct_report(
+                &question,
+                sources,
+                &calls,
+                budget,
+                started,
+                false,
+                Vec::new(),
+                watch,
+            );
+        }
+
+        watch.on_research(&ResearchEvent::Phase("planning"));
+        let Some(timeout) = self.begin_call(&calls, budget.calls, budget, started, watch) else {
+            return finish(
+                blank_research("Unknown.", "Unknown"),
+                &calls,
+                budget.calls,
+                false,
+                Vec::new(),
+                watch,
+            );
+        };
+        let planned = match post_chat(
+            self.target.as_ref().unwrap(),
+            &self.model,
+            &self.key,
+            &research_plan_prompt(budget.helpers),
+            &plan_user(&question, budget.helpers),
+            timeout,
+        ) {
+            Err(()) => {
+                return finish(
+                    blank_research(UNREACHABLE, "Unreachable"),
+                    &calls,
+                    budget.calls,
+                    false,
+                    Vec::new(),
+                    watch,
+                );
+            }
+            Ok(text) => parse_subquestions(&text, budget.helpers, &question),
+        };
+        if planned.is_empty() {
+            return self.direct_report(
+                &question,
+                sources,
+                &calls,
+                budget,
+                started,
+                false,
+                Vec::new(),
+                watch,
+            );
+        }
+
+        let helpers = Mutex::new(
+            planned
+                .iter()
+                .map(|q| ResearchHelper {
+                    question: q.clone(),
+                    status: "queued",
+                })
+                .collect::<Vec<_>>(),
+        );
+        {
+            let queued = helpers.lock().unwrap_or_else(|e| e.into_inner());
+            for (i, item) in queued.iter().enumerate() {
+                watch.on_research(&ResearchEvent::Helper(i, item.clone()));
+            }
+        }
+        watch.on_research(&ResearchEvent::Phase("helpers"));
+        let answers: Mutex<Vec<Option<ResearchAnswer>>> =
+            Mutex::new((0..planned.len()).map(|_| None).collect());
+        // The last call is kept for synthesis. Helpers stop when they would spend it.
+        let helper_limit = budget.calls.saturating_sub(1);
+        let queue = Mutex::new((0..planned.len()).collect::<VecDeque<_>>());
+        let workers = budget.concurrency.min(planned.len()).max(1);
+        thread::scope(|scope| {
+            for _ in 0..workers {
+                scope.spawn(|| loop {
+                    let Some(idx) = queue.lock().unwrap_or_else(|e| e.into_inner()).pop_front()
+                    else {
+                        break;
+                    };
+                    let q = planned[idx].clone();
+                    let Some(timeout) =
+                        self.begin_call(&calls, helper_limit, budget, started, watch)
+                    else {
+                        set_helper(&helpers, idx, "skipped", watch);
+                        continue;
+                    };
+                    set_helper(&helpers, idx, "running", watch);
+                    let answer = self.research_turn_within(&q, sources, timeout);
+                    let standing = answer.standing;
+                    answers.lock().unwrap_or_else(|e| e.into_inner())[idx] = Some(answer);
+                    set_helper(&helpers, idx, standing, watch);
+                });
+            }
+        });
+
+        let helpers = helpers.into_inner().unwrap_or_else(|e| e.into_inner());
+        let stored = answers.into_inner().unwrap_or_else(|e| e.into_inner());
+        let mut notes: Vec<(String, ResearchAnswer)> = Vec::new();
+        for (i, answer) in stored.into_iter().enumerate() {
+            if let Some(answer) = answer {
+                if answer_is_usable(&answer) {
+                    notes.push((planned[i].clone(), answer));
+                }
+            }
+        }
+        if notes.is_empty() {
+            if call_window(started, budget.budget, self.timeout).is_some()
+                && calls.load(Ordering::SeqCst) < budget.calls
+            {
+                return self.direct_report(
+                    &question, sources, &calls, budget, started, true, helpers, watch,
+                );
+            }
+            let standing = if helpers.iter().any(|h| h.status == "Unreachable") {
+                "Unreachable"
+            } else {
+                "Unknown"
+            };
+            let text = if standing == "Unreachable" {
+                UNREACHABLE
+            } else {
+                "Unknown."
+            };
+            return finish(
+                blank_research(text, standing),
+                &calls,
+                budget.calls,
+                true,
+                helpers,
+                watch,
+            );
+        }
+
+        watch.on_research(&ResearchEvent::Phase("synthesis"));
+        let lead =
+            if let Some(timeout) = self.begin_call(&calls, budget.calls, budget, started, watch) {
+                match post_chat(
+                    self.target.as_ref().unwrap(),
+                    &self.model,
+                    &self.key,
+                    RESEARCH_SYNTH_PROMPT,
+                    &synthesis_user(&question, &notes, sources),
+                    timeout,
+                ) {
+                    Ok(text) => text,
+                    Err(()) => String::new(),
+                }
+            } else {
+                String::new()
+            };
+        let parts: Vec<ResearchAnswer> = notes.into_iter().map(|(_, answer)| answer).collect();
+        let merged = merge_helpers(&parts, &lead, sources, &question);
+        finish(merged, &calls, budget.calls, true, helpers, watch)
+    }
+
+    fn research_turn_within(
+        &self,
+        user: &str,
+        sources: &[ResearchSource],
+        timeout: Duration,
+    ) -> ResearchAnswer {
         let empty = || blank_research(UNREACHABLE, "Unreachable");
         let Some(target) = self.target.clone() else {
             return empty();
@@ -377,11 +752,63 @@ impl HermesLlm {
             return empty();
         }
         let user_msg = format!("{question}\n\n{}", research_source_block(sources));
-        match post_chat(&target, &self.model, &self.key, RESEARCH_PROMPT, &user_msg, self.timeout) {
+        match post_chat(
+            &target,
+            &self.model,
+            &self.key,
+            RESEARCH_PROMPT,
+            &user_msg,
+            timeout,
+        ) {
             Ok(text) => classify_research(&text, sources),
             Err(()) => empty(),
         }
     }
+
+    fn direct_report(
+        &self,
+        question: &str,
+        sources: &[ResearchSource],
+        calls: &AtomicU32,
+        budget: ResearchBudget,
+        started: Instant,
+        split: bool,
+        helpers: Vec<ResearchHelper>,
+        watch: &dyn ResearchWatch,
+    ) -> ResearchReport {
+        watch.on_research(&ResearchEvent::Phase("direct"));
+        let Some(timeout) = self.begin_call(calls, budget.calls, budget, started, watch) else {
+            return finish(
+                blank_research("Unknown.", "Unknown"),
+                calls,
+                budget.calls,
+                split,
+                helpers,
+                watch,
+            );
+        };
+        let answer = self.research_turn_within(question, sources, timeout);
+        finish(answer, calls, budget.calls, split, helpers, watch)
+    }
+
+    /// Spend one call and return the timeout that still fits in the wall clock.
+    /// `None` means this call must not start. The counter moves only when a call starts.
+    fn begin_call(
+        &self,
+        calls: &AtomicU32,
+        limit: u32,
+        budget: ResearchBudget,
+        started: Instant,
+        watch: &dyn ResearchWatch,
+    ) -> Option<Duration> {
+        let timeout = call_window(started, budget.budget, self.timeout)?;
+        if !spend_call(calls, limit) {
+            return None;
+        }
+        watch.on_research(&ResearchEvent::Calls(calls.load(Ordering::SeqCst)));
+        Some(timeout)
+    }
+
 
     /// `set` or `none`. Never the key bytes.
     pub fn key_state(&self) -> &'static str {
@@ -843,6 +1270,393 @@ pub fn classify_research(raw: &str, sources: &[ResearchSource]) -> ResearchAnswe
         standing,
     }
 }
+
+fn finish(
+    answer: ResearchAnswer,
+    calls: &AtomicU32,
+    call_budget: u32,
+    split: bool,
+    helpers: Vec<ResearchHelper>,
+    watch: &dyn ResearchWatch,
+) -> ResearchReport {
+    let calls = calls.load(Ordering::SeqCst);
+    watch.on_research(&ResearchEvent::Calls(calls));
+    watch.on_research(&ResearchEvent::Phase("done"));
+    ResearchReport {
+        answer,
+        calls,
+        call_budget,
+        split,
+        helpers,
+    }
+}
+
+fn set_helper(
+    helpers: &Mutex<Vec<ResearchHelper>>,
+    idx: usize,
+    status: &'static str,
+    watch: &dyn ResearchWatch,
+) {
+    let item = {
+        let mut h = helpers.lock().unwrap_or_else(|e| e.into_inner());
+        if idx >= h.len() {
+            return;
+        }
+        h[idx].status = status;
+        h[idx].clone()
+    };
+    watch.on_research(&ResearchEvent::Helper(idx, item));
+}
+
+fn spend_call(calls: &AtomicU32, limit: u32) -> bool {
+    loop {
+        let n = calls.load(Ordering::SeqCst);
+        if n >= limit {
+            return false;
+        }
+        if calls
+            .compare_exchange(n, n + 1, Ordering::SeqCst, Ordering::SeqCst)
+            .is_ok()
+        {
+            return true;
+        }
+    }
+}
+
+/// Timeout that still fits in the ask. `None` when the wall clock is already spent.
+fn call_window(started: Instant, budget: Duration, per_call: Duration) -> Option<Duration> {
+    let elapsed = started.elapsed();
+    if elapsed >= budget {
+        return None;
+    }
+    let remain = budget.saturating_sub(elapsed);
+    if remain < Duration::from_millis(50) {
+        return None;
+    }
+    let timeout = if per_call < remain { per_call } else { remain };
+    if timeout < Duration::from_millis(50) {
+        None
+    } else {
+        Some(timeout)
+    }
+}
+
+fn answer_is_usable(answer: &ResearchAnswer) -> bool {
+    if answer.standing == "Unreachable" || answer.standing == "Denied" {
+        return !answer.found.is_empty()
+            || !answer.inferred.is_empty()
+            || !answer.unknown.is_empty();
+    }
+    true
+}
+
+/// A short single lookup stays one call. A comparison, two questions, or a long
+/// compound ask is handed to the planner, which may still reply `simple`.
+pub fn question_needs_helpers(question: &str) -> bool {
+    let q = question.trim();
+    if q.is_empty() {
+        return false;
+    }
+    let marks = q.chars().filter(|c| *c == '?').count();
+    if marks >= 2 {
+        return true;
+    }
+    let low = q.to_ascii_lowercase();
+    const PHRASES: &[&str] = &[
+        "difference between",
+        "as well as",
+        "step by step",
+        "break down",
+        "pros and cons",
+        "on the one hand",
+    ];
+    if PHRASES.iter().any(|p| low.contains(p)) {
+        return true;
+    }
+    let words = words_of(&low);
+    if words
+        .iter()
+        .any(|w| matches!(w.as_str(), "compare" | "contrast" | "versus" | "vs"))
+    {
+        return true;
+    }
+    if words.len() > 32 {
+        return true;
+    }
+    let has_and = words.iter().any(|w| w == "and") || low.contains(';');
+    let asks = words
+        .iter()
+        .filter(|w| {
+            matches!(
+                w.as_str(),
+                "why" | "how" | "what" | "which" | "where" | "when" | "who"
+            )
+        })
+        .count();
+    if has_and && asks >= 2 {
+        return true;
+    }
+    if has_and && words.len() > 16 {
+        return true;
+    }
+    if asks >= 2 && (marks >= 2 || words.len() > 18) {
+        return true;
+    }
+    false
+}
+
+fn words_of(q: &str) -> Vec<String> {
+    q.split_whitespace()
+        .map(|w| {
+            w.trim_matches(|c: char| !c.is_ascii_alphanumeric())
+                .to_ascii_lowercase()
+        })
+        .filter(|w| !w.is_empty())
+        .collect()
+}
+
+fn research_plan_prompt(n: usize) -> String {
+    format!(
+        "You plan research for Galion Research, a voice of Galion One. \
+If one lookup can answer the question, reply with the single word simple. \
+Otherwise write at most {n} smaller questions, one per line, each one a question. \
+Do not answer them. Do not cite. Do not invent a paper, a URL, a date, or a source. English only."
+    )
+}
+
+fn plan_user(question: &str, n: usize) -> String {
+    format!(
+        "{question}\n\nIf one lookup can answer this, reply with the single word simple. \
+Otherwise write at most {n} smaller questions, one per line."
+    )
+}
+
+const RESEARCH_SYNTH_PROMPT: &str =
+    "You are Galion Research, the research app on Hermes, a voice of Galion One. \
+Write the answer first, in one or two sentences, using only the helper notes. \
+Do not add a claim the notes do not contain. Do not cite. \
+Do not invent a paper, a URL, a date, or a source. English only.";
+
+/// Sub-questions from a planner reply. Empty means the question stays one lookup.
+/// A forbidden script is dropped, so it cannot become a helper question.
+fn parse_subquestions(raw: &str, n: usize, original: &str) -> Vec<String> {
+    if n == 0 || raw.trim().is_empty() || contains_forbidden(raw) {
+        return Vec::new();
+    }
+    let mut questions = Vec::new();
+    for line in raw.lines() {
+        let t = line.trim();
+        if t.is_empty() {
+            continue;
+        }
+        let t = t.trim_start_matches(['-', '*', '•']).trim();
+        let t = strip_list_number(t);
+        if t.is_empty() || is_pile_heading(t).is_some() || is_citation_line(t) {
+            continue;
+        }
+        let bare = t.trim_end_matches('.').trim();
+        if bare.eq_ignore_ascii_case("simple") {
+            continue;
+        }
+        let q = clip_chars(t, 240);
+        if q.chars().count() < 8 {
+            continue;
+        }
+        if norm_claim(&q) == norm_claim(original) {
+            continue;
+        }
+        if questions
+            .iter()
+            .any(|e: &String| norm_claim(e) == norm_claim(&q))
+        {
+            continue;
+        }
+        questions.push(q);
+        if questions.len() >= n {
+            break;
+        }
+    }
+    questions
+}
+
+fn strip_list_number(t: &str) -> &str {
+    let bytes = t.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() && bytes[i].is_ascii_digit() {
+        i += 1;
+    }
+    if i > 0 && i < bytes.len() && (bytes[i] == b'.' || bytes[i] == b')') {
+        t[i + 1..].trim()
+    } else {
+        t
+    }
+}
+
+fn norm_claim(s: &str) -> String {
+    norm_cite(&clean_claim(s))
+}
+
+fn synthesis_user(
+    question: &str,
+    notes: &[(String, ResearchAnswer)],
+    sources: &[ResearchSource],
+) -> String {
+    let mut s = format!(
+        "Question: {question}\n\n{}\nHelper notes:\n",
+        research_source_block(sources)
+    );
+    for (q, answer) in notes {
+        s.push_str("Sub-question: ");
+        s.push_str(q);
+        s.push('\n');
+        push_note_pile(&mut s, "Found", &answer.found);
+        push_note_pile(&mut s, "Inferred", &answer.inferred);
+        push_note_pile(&mut s, "Unknown", &answer.unknown);
+    }
+    s.push_str("\nWrite the answer in one or two sentences. Do not cite.\n");
+    clip_chars(&s, 12_000)
+}
+
+fn push_note_pile(into: &mut String, label: &str, lines: &[String]) {
+    into.push_str(label);
+    into.push('\n');
+    if lines.is_empty() {
+        into.push_str("- none\n");
+        return;
+    }
+    for line in lines {
+        into.push_str("- ");
+        into.push_str(line);
+        into.push('\n');
+    }
+}
+
+/// Union of helper piles. Labels stay as the helpers marked them.
+/// A citation is kept only when a helper already kept it, so a synthesis
+/// sentence cannot introduce a source. The lead sentence is used only when
+/// every long word already appears in the question, the files, or the notes.
+fn merge_helpers(
+    parts: &[ResearchAnswer],
+    lead: &str,
+    sources: &[ResearchSource],
+    question: &str,
+) -> ResearchAnswer {
+    let mut found = Vec::new();
+    let mut inferred = Vec::new();
+    let mut unknown = Vec::new();
+    let mut citations = Vec::new();
+    for part in parts {
+        for (id, name) in &part.citations {
+            push_unique(&mut citations, *id, name);
+        }
+        for line in &part.found {
+            push_claim(&mut found, line);
+        }
+        for line in &part.inferred {
+            push_claim(&mut inferred, line);
+        }
+        for line in &part.unknown {
+            push_claim(&mut unknown, line);
+        }
+    }
+    inferred.retain(|line| !contains_claim(&found, line));
+    unknown.retain(|line| !contains_claim(&found, line) && !contains_claim(&inferred, line));
+
+    let standing = if !found.is_empty() {
+        "Found"
+    } else if !inferred.is_empty() {
+        "Inferred"
+    } else if !unknown.is_empty() {
+        "Unknown"
+    } else if parts.iter().any(|p| p.standing == "Unreachable") {
+        "Unreachable"
+    } else if parts.iter().any(|p| p.standing == "Denied") {
+        "Denied"
+    } else {
+        "Unknown"
+    };
+
+    let mut corpus = question.to_string();
+    for source in sources {
+        corpus.push(' ');
+        corpus.push_str(&source.name);
+        corpus.push(' ');
+        corpus.push_str(&source.text);
+    }
+    for part in parts {
+        corpus.push(' ');
+        corpus.push_str(&part.text);
+        for line in part
+            .found
+            .iter()
+            .chain(part.inferred.iter())
+            .chain(part.unknown.iter())
+        {
+            corpus.push(' ');
+            corpus.push_str(line);
+        }
+    }
+    let guarded = if lead.trim().is_empty() {
+        String::new()
+    } else {
+        guard_model_text_cap(lead, 480)
+    };
+    let text = if !guarded.is_empty()
+        && guarded != UNREACHABLE
+        && guarded != REFUSED
+        && prose_stays_inside(&guarded, &corpus)
+    {
+        guarded
+    } else if let Some(line) = found.first().or(inferred.first()).or(unknown.first()) {
+        line.clone()
+    } else if standing == "Unreachable" {
+        UNREACHABLE.to_string()
+    } else if standing == "Denied" {
+        REFUSED.to_string()
+    } else {
+        "Unknown.".to_string()
+    };
+
+    ResearchAnswer {
+        text,
+        citations,
+        found,
+        inferred,
+        unknown,
+        standing,
+    }
+}
+
+fn push_claim(into: &mut Vec<String>, line: &str) {
+    let claim = clean_claim(line);
+    if claim.is_empty() || contains_claim(into, &claim) {
+        return;
+    }
+    into.push(claim);
+}
+
+fn contains_claim(into: &[String], line: &str) -> bool {
+    let n = norm_claim(line);
+    !n.is_empty() && into.iter().any(|e| norm_claim(e) == n)
+}
+
+/// Every word of five letters or more must already be in the notes. A title
+/// the helpers did not write, including an invented journal, fails the check.
+fn prose_stays_inside(lead: &str, corpus: &str) -> bool {
+    let corpus = corpus.to_ascii_lowercase();
+    let mut long = 0usize;
+    for word in lead.split(|c: char| !c.is_ascii_alphanumeric()) {
+        if word.len() < 5 {
+            continue;
+        }
+        long += 1;
+        if !corpus.contains(&word.to_ascii_lowercase()) {
+            return false;
+        }
+    }
+    long > 0
+}
+
 
 fn guard_model_text(raw: &str) -> String {
     guard_model_text_cap(raw, 480)
@@ -1600,4 +2414,543 @@ Found
             Err(CascadeError::Empty)
         ));
     }
+
+    fn chat_json(content: &str) -> String {
+        format!(
+            "{{\"choices\":[{{\"message\":{{\"content\":{}}}}}]}}",
+            json_string(content)
+        )
+    }
+
+    fn read_http_req(sock: &mut TcpStream) -> Option<String> {
+        let _ = sock.set_read_timeout(Some(Duration::from_secs(2)));
+        let mut buf = [0u8; 8192];
+        let mut got = Vec::new();
+        let mut header_end = None;
+        loop {
+            match sock.read(&mut buf) {
+                Ok(0) | Err(_) => break,
+                Ok(n) => {
+                    got.extend_from_slice(&buf[..n]);
+                    if header_end.is_none() {
+                        header_end = got.windows(4).position(|w| w == b"\r\n\r\n").map(|p| p + 4);
+                    }
+                    if let Some(end) = header_end {
+                        let head = String::from_utf8_lossy(&got[..end]);
+                        if got.len() >= end + content_length(&head) {
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        String::from_utf8(got).ok()
+    }
+
+    /// Loopback Hermes. `on_req` sees the raw HTTP request and returns the assistant text.
+    /// No paid call: the stub never leaves 127.0.0.1.
+    fn serve_calls(
+        on_req: impl Fn(&str) -> String + Send + Sync + 'static,
+    ) -> (
+        SocketAddr,
+        Arc<Mutex<Vec<String>>>,
+        Arc<std::sync::atomic::AtomicBool>,
+    ) {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        listener.set_nonblocking(true).unwrap();
+        let seen = Arc::new(Mutex::new(Vec::new()));
+        let stop = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let seen_w = seen.clone();
+        let stop_w = stop.clone();
+        let on_req = Arc::new(on_req);
+        thread::spawn(move || {
+            let mut handled = 0usize;
+            while !stop_w.load(Ordering::SeqCst) && handled < 32 {
+                match listener.accept() {
+                    Ok((mut sock, _)) => {
+                        handled += 1;
+                        let _ = sock.set_nonblocking(false);
+                        let on = on_req.clone();
+                        let seen_c = seen_w.clone();
+                        thread::spawn(move || {
+                            let Some(body) = read_http_req(&mut sock) else {
+                                return;
+                            };
+                            seen_c.lock().unwrap().push(body.clone());
+                            let payload = chat_json(&on(&body));
+                            let resp = format!(
+                                "HTTP/1.0 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{payload}",
+                                payload.len()
+                            );
+                            let _ = sock.write_all(resp.as_bytes());
+                        });
+                    }
+                    Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                        thread::sleep(Duration::from_millis(5));
+                    }
+                    Err(_) => break,
+                }
+            }
+        });
+        (addr, seen, stop)
+    }
+
+    fn wash_source() -> ResearchSource {
+        ResearchSource {
+            id: 1,
+            name: "wash-note.txt".into(),
+            text: "The wash is amber.".into(),
+        }
+    }
+
+    const HARD_QUESTION: &str =
+        "Compare the daylight wash with the tungsten wash and say which hex is still unknown?";
+
+    fn budgeted(addr: SocketAddr, timeout_ms: u64, budget: ResearchBudget) -> HermesLlm {
+        let mut llm = client(addr, timeout_ms);
+        llm.set_research_budget(budget);
+        llm
+    }
+
+    fn helper_requests(seen: &[String]) -> usize {
+        seen.iter()
+            .filter(|s| !s.contains("You plan research") && !s.contains("Helper notes:"))
+            .count()
+    }
+
+    #[test]
+    fn helper_budget_clamps_to_the_hard_cap() {
+        let nine = |k: &str| match k {
+            "GALION_RESEARCH_HELPERS" => Some("9".into()),
+            "GALION_RESEARCH_HELPER_CONCURRENCY" => Some("0".into()),
+            "GALION_RESEARCH_CALLS" => Some("99".into()),
+            "GALION_RESEARCH_BUDGET_MS" => Some("50".into()),
+            _ => None,
+        };
+        let b = ResearchBudget::from_vars(nine);
+        assert_eq!(b.helpers, MAX_RESEARCH_HELPERS);
+        assert_eq!(b.concurrency, 1);
+        assert_eq!(b.calls, MAX_RESEARCH_CALLS);
+        assert_eq!(b.budget.as_millis(), 1_000);
+        let defaults = ResearchBudget::from_vars(|_| None);
+        assert_eq!(defaults.helpers, 3);
+        assert_eq!(defaults.concurrency, 2);
+        assert_eq!(defaults.calls, 5);
+        assert_eq!(defaults.budget.as_millis(), 180_000);
+        let zero = |k: &str| (k == "GALION_RESEARCH_HELPERS").then(|| "0".into());
+        let z = ResearchBudget::from_vars(zero);
+        assert_eq!(z.helpers, 0);
+        assert_eq!(z.calls, 1);
+        let llm = HermesLlm::research_from_vars(
+            |k| match k {
+                "GALION_RESEARCH_URL" => Some("http://127.0.0.1:8642/v1/chat/completions".into()),
+                "GALION_RESEARCH_HELPERS" => Some("4".into()),
+                _ => None,
+            },
+            |_| None,
+        )
+        .expect("loopback");
+        assert_eq!(llm.research_budget().helpers, 4);
+        assert_eq!(llm.research_budget().calls, 6);
+        let mut llm = HermesLlm::new(DEFAULT_URL, LLM_NAME, "", Duration::from_millis(1000));
+        llm.set_research_budget(ResearchBudget {
+            helpers: 9,
+            concurrency: 8,
+            budget: Duration::from_millis(10),
+            calls: 40,
+        });
+        assert_eq!(llm.research_budget().helpers, 5);
+        assert_eq!(llm.research_budget().concurrency, 5);
+        assert_eq!(llm.research_budget().calls, 7);
+        assert!(llm.research_budget().budget.as_millis() >= 50);
+    }
+
+    #[test]
+    fn simple_questions_skip_the_planner() {
+        assert!(!question_needs_helpers("What colour is the wash?"));
+        assert!(!question_needs_helpers("Why is the sky blue?"));
+        assert!(question_needs_helpers(HARD_QUESTION));
+        assert!(question_needs_helpers(
+            "Why does the wash read amber in daylight and how does that change under tungsten?"
+        ));
+        assert!(parse_subquestions("simple", 3, "q").is_empty());
+        assert!(parse_subquestions("Simple.", 3, "q").is_empty());
+        assert!(
+            parse_subquestions("I'm sorry, I cannot split this question for you.", 3, "q")
+                .is_empty()
+        );
+        let raw = "\
+- What colour does the note give the wash?
+- How would a cooler mix read at night?
+1. Which hex is still missing from the note?
+- Which hex is still missing from the note?
+- An extra helper question that is still specific?
+- A sixth line that the cap must drop from the plan?
+";
+        let qs = parse_subquestions(raw, 4, "original question here");
+        assert_eq!(qs.len(), 4, "{qs:?}");
+        assert!(qs[2].contains("hex"), "{qs:?}");
+        assert!(qs.iter().all(|q| !q.contains("sixth")), "{qs:?}");
+        assert_eq!(parse_subquestions(raw, 2, "original").len(), 2);
+
+        let (addr, seen, stop) =
+            serve_calls(|_body| "Inferred\n- The wash is often amber.\n".to_string());
+        let llm = client(addr, 1000);
+        let report = llm.research_ask("What colour is the wash?", &[wash_source()]);
+        stop.store(true, Ordering::SeqCst);
+        assert_eq!(report.calls, 1, "{report:?}");
+        assert!(!report.split);
+        assert!(report.helpers.is_empty());
+        assert_eq!(report.answer.standing, "Inferred");
+        let seen = seen.lock().unwrap().clone();
+        assert_eq!(seen.len(), 1, "{seen:?}");
+        assert!(
+            seen.iter().all(|s| !s.contains("You plan research")),
+            "{seen:?}"
+        );
+    }
+
+    #[test]
+    fn a_tight_call_budget_does_not_plan() {
+        let (addr, seen, stop) =
+            serve_calls(|_body| "Inferred\n- The wash is often amber.\n".to_string());
+        let llm = budgeted(
+            addr,
+            1000,
+            ResearchBudget {
+                helpers: 3,
+                concurrency: 2,
+                budget: Duration::from_secs(5),
+                calls: 2,
+            },
+        );
+        let report = llm.research_ask(HARD_QUESTION, &[wash_source()]);
+        stop.store(true, Ordering::SeqCst);
+        assert_eq!(report.calls, 1, "{report:?}");
+        assert!(!report.split);
+        let seen = seen.lock().unwrap().clone();
+        assert!(
+            seen.iter().all(|s| !s.contains("You plan research")),
+            "{seen:?}"
+        );
+    }
+
+    #[test]
+    fn planner_simple_stops_after_one_more_lookup() {
+        let (addr, seen, stop) = serve_calls(|body| {
+            if body.contains("You plan research") {
+                "simple".to_string()
+            } else {
+                "Inferred\n- The wash is often amber.\n".to_string()
+            }
+        });
+        let llm = budgeted(
+            addr,
+            1000,
+            ResearchBudget {
+                helpers: 3,
+                concurrency: 2,
+                budget: Duration::from_secs(5),
+                calls: 5,
+            },
+        );
+        let report = llm.research_ask(HARD_QUESTION, &[wash_source()]);
+        stop.store(true, Ordering::SeqCst);
+        assert_eq!(report.calls, 2, "{report:?}");
+        assert!(!report.split);
+        assert!(report.helpers.is_empty(), "{report:?}");
+        assert_eq!(report.answer.standing, "Inferred");
+        let seen = seen.lock().unwrap().clone();
+        assert_eq!(seen.len(), 2, "{seen:?}");
+        assert_eq!(helper_requests(&seen), 1);
+    }
+
+    #[test]
+    fn hard_question_runs_helpers_within_concurrency_and_keeps_real_citations() {
+        let inflight = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let max_in = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let entered = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let inflight_w = inflight.clone();
+        let max_w = max_in.clone();
+        let entered_w = entered.clone();
+        let (addr, seen, stop) = serve_calls(move |body| {
+            if body.contains("You plan research") {
+                return "\
+- What colour does the note give the wash?
+- How would a cooler mix read at night?
+- Which hex is still missing from the note?
+"
+                .to_string();
+            }
+            if body.contains("Helper notes:") {
+                return "Invented Journal 2024 says the wash is amber and the hex is unknown."
+                    .to_string();
+            }
+            let now = inflight_w.fetch_add(1, Ordering::SeqCst) + 1;
+            max_w.fetch_max(now, Ordering::SeqCst);
+            let n = entered_w.fetch_add(1, Ordering::SeqCst) + 1;
+            if n <= 2 {
+                let deadline = Instant::now() + Duration::from_secs(2);
+                while entered_w.load(Ordering::SeqCst) < 2 && Instant::now() < deadline {
+                    thread::sleep(Duration::from_millis(5));
+                }
+                thread::sleep(Duration::from_millis(40));
+            }
+            inflight_w.fetch_sub(1, Ordering::SeqCst);
+            if body.contains("What colour does the note") {
+                "\
+The wash is amber.
+Found
+- The wash is amber. [1]
+Inferred
+- Daylight is the assumed light.
+Unknown
+- The hex is not in the note.
+[1] wash-note.txt
+[9] Invented Journal 2024
+"
+                .to_string()
+            } else if body.contains("cooler mix") {
+                "\
+Inferred
+- A cooler mix would read as night.
+Unknown
+- Tungsten is not in the note.
+"
+                .to_string()
+            } else {
+                "\
+Unknown
+- The hex code is not written down.
+"
+                .to_string()
+            }
+        });
+        let llm = budgeted(
+            addr,
+            4000,
+            ResearchBudget {
+                helpers: 3,
+                concurrency: 2,
+                budget: Duration::from_secs(15),
+                calls: 5,
+            },
+        );
+        struct Rec(Mutex<Vec<String>>);
+        impl ResearchWatch for Rec {
+            fn on_research(&self, event: &ResearchEvent) {
+                let label = match event {
+                    ResearchEvent::Phase(p) => format!("phase:{p}"),
+                    ResearchEvent::Calls(n) => format!("calls:{n}"),
+                    ResearchEvent::Budget(n) => format!("budget:{n}"),
+                    ResearchEvent::Helper(i, h) => format!("helper:{i}:{}", h.status),
+                };
+                self.0.lock().unwrap().push(label);
+            }
+        }
+        let watch = Rec(Mutex::new(Vec::new()));
+        let report = llm.research_ask_watched(HARD_QUESTION, &[wash_source()], &watch);
+        stop.store(true, Ordering::SeqCst);
+        assert_eq!(report.calls, 5, "{report:?}");
+        assert!(report.split);
+        assert_eq!(report.helpers.len(), 3, "{report:?}");
+        assert!(
+            report.helpers.iter().all(|h| h.status != "skipped"),
+            "{report:?}"
+        );
+        assert_eq!(report.answer.standing, "Found", "{report:?}");
+        assert_eq!(report.answer.citations, vec![(1, "wash-note.txt".into())]);
+        assert!(
+            report.answer.found.iter().any(|s| s.contains("amber")),
+            "{report:?}"
+        );
+        assert!(
+            report
+                .answer
+                .inferred
+                .iter()
+                .any(|s| s.contains("cooler") || s.contains("Daylight")),
+            "{report:?}"
+        );
+        assert!(
+            report.answer.unknown.iter().any(|s| s.contains("hex")),
+            "{report:?}"
+        );
+        assert!(
+            !report.answer.text.contains("Invented"),
+            "{}",
+            report.answer.text
+        );
+        assert!(report
+            .answer
+            .citations
+            .iter()
+            .all(|(_, t)| !t.contains("Invented")));
+        assert!(
+            !format!("{report:?}").contains("Invented Journal"),
+            "{report:?}"
+        );
+        assert_eq!(max_in.load(Ordering::SeqCst), 2, "concurrency is 2");
+        let seen = seen.lock().unwrap().clone();
+        assert_eq!(helper_requests(&seen), 3, "{seen:?}");
+        assert!(seen.iter().any(|s| s.contains("You plan research")));
+        assert!(seen.iter().any(|s| s.contains("Helper notes:")));
+        let log = watch.0.lock().unwrap().clone();
+        assert!(log.iter().any(|e| e == "phase:planning"), "{log:?}");
+        assert!(log.iter().any(|e| e == "phase:helpers"), "{log:?}");
+        assert!(log.iter().any(|e| e == "phase:synthesis"), "{log:?}");
+        assert!(log.iter().any(|e| e == "calls:5"), "{log:?}");
+    }
+
+    #[test]
+    fn call_budget_skips_helpers_past_the_reserve() {
+        let (addr, seen, stop) = serve_calls(|body| {
+            if body.contains("You plan research") {
+                return "\
+- What colour does the note give the wash?
+- How would a cooler mix read at night?
+- Which hex is still missing from the note?
+"
+                .to_string();
+            }
+            if body.contains("Helper notes:") {
+                return "The wash is amber and the hex is not in the note.".to_string();
+            }
+            if body.contains("What colour does the note") {
+                "Found\n- The wash is amber. [1]\n[1] wash-note.txt\n".to_string()
+            } else if body.contains("cooler mix") {
+                "Inferred\n- A cooler mix would read as night.\n".to_string()
+            } else {
+                "Unknown\n- The hex code is not written down.\n".to_string()
+            }
+        });
+        let llm = budgeted(
+            addr,
+            1000,
+            ResearchBudget {
+                helpers: 5,
+                concurrency: 2,
+                budget: Duration::from_secs(5),
+                calls: 4,
+            },
+        );
+        let report = llm.research_ask(HARD_QUESTION, &[wash_source()]);
+        stop.store(true, Ordering::SeqCst);
+        assert_eq!(report.calls, 4, "{report:?}");
+        assert!(report.split);
+        assert_eq!(
+            report
+                .helpers
+                .iter()
+                .filter(|h| h.status == "skipped")
+                .count(),
+            1,
+            "{report:?}"
+        );
+        assert!(
+            report
+                .helpers
+                .iter()
+                .any(|h| h.question.contains("still missing") && h.status == "skipped"),
+            "{report:?}"
+        );
+        assert_eq!(report.answer.citations, vec![(1, "wash-note.txt".into())]);
+        assert!(!format!("{report:?}").contains("Invented"));
+        let seen = seen.lock().unwrap().clone();
+        assert_eq!(helper_requests(&seen), 2, "{seen:?}");
+        assert!(
+            seen.iter().all(|s| !s.contains("still missing")),
+            "{seen:?}"
+        );
+        assert!(
+            report.answer.text.contains("amber")
+                || report.answer.found.iter().any(|s| s.contains("amber"))
+        );
+    }
+
+    #[test]
+    fn time_budget_does_not_start_the_next_helper() {
+        let helpers_n = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let helpers_w = helpers_n.clone();
+        let (addr, seen, stop) = serve_calls(move |body| {
+            if body.contains("You plan research") {
+                return "\
+- What colour does the note give the wash?
+- How would a cooler mix read at night?
+- Which hex is still missing from the note?
+"
+                .to_string();
+            }
+            helpers_w.fetch_add(1, Ordering::SeqCst);
+            thread::sleep(Duration::from_secs(2));
+            "Found\n- The wash is amber. [1]\n[1] wash-note.txt\n".to_string()
+        });
+        let llm = budgeted(
+            addr,
+            5_000,
+            ResearchBudget {
+                helpers: 3,
+                concurrency: 1,
+                budget: Duration::from_millis(900),
+                calls: 7,
+            },
+        );
+        let report = llm.research_ask(HARD_QUESTION, &[wash_source()]);
+        stop.store(true, Ordering::SeqCst);
+        assert!(report.calls <= 2, "calls {}", report.calls);
+        assert!(
+            helpers_n.load(Ordering::SeqCst) <= 1,
+            "helpers {}",
+            helpers_n.load(Ordering::SeqCst)
+        );
+        let seen = seen.lock().unwrap().clone();
+        assert!(helper_requests(&seen) <= 1, "{seen:?}");
+        if report.calls == 2 {
+            assert!(report.split, "{report:?}");
+            assert!(
+                report.helpers.iter().any(|h| h.status == "skipped"),
+                "{report:?}"
+            );
+            assert_eq!(report.answer.standing, "Unreachable", "{report:?}");
+        }
+    }
+
+    #[test]
+    fn merge_keeps_helper_labels_and_drops_an_invented_lead() {
+        let part = ResearchAnswer {
+            text: "The wash is amber.".into(),
+            citations: vec![(1, "wash-note.txt".into())],
+            found: vec!["The wash is amber.".into()],
+            inferred: vec!["Daylight is the assumed light.".into()],
+            unknown: vec!["The hex is not in the note.".into()],
+            standing: "Found",
+        };
+        let dirty = merge_helpers(
+            &[part.clone()],
+            "Invented Journal 2024 says the wash is amber.",
+            &[wash_source()],
+            HARD_QUESTION,
+        );
+        assert_eq!(dirty.citations, vec![(1, "wash-note.txt".into())]);
+        assert_eq!(dirty.standing, "Found");
+        assert!(dirty.found.iter().any(|s| s.contains("amber")), "{dirty:?}");
+        assert!(
+            dirty.inferred.iter().any(|s| s.contains("Daylight")),
+            "{dirty:?}"
+        );
+        assert!(dirty.unknown.iter().any(|s| s.contains("hex")), "{dirty:?}");
+        assert!(!dirty.text.contains("Invented"), "{}", dirty.text);
+        assert_eq!(dirty.text, "The wash is amber.");
+        let clean = merge_helpers(
+            &[part],
+            "The wash is amber and daylight is the assumed light.",
+            &[wash_source()],
+            HARD_QUESTION,
+        );
+        assert!(clean.text.contains("amber"), "{}", clean.text);
+        assert!(clean.text.contains("daylight"), "{}", clean.text);
+        assert!(!clean.text.contains("Invented"));
+    }
+
 }
