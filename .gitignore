@@ -109,3 +109,13 @@ tools/laptop-runbooks/**/*.ogg
 
 # Emotion V2 capture originals (owner recordings + session manifests). Never commit.
 /originals/
+
+# G.A.L.I.O.N. hygiene: secrets, audio, models, build output, OS junk
+*.ogg
+*.m4a
+*.gguf
+dist/
+build/
+*.log
+.DS_Store
+Thumbs.db
