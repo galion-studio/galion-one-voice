@@ -1565,13 +1565,20 @@ mod tests {
                 "Ask first",
                 "data-voice-to-voice=\"on\"",
                 "id=\"ui-toggle\"",
+                "id=\"silence\"",
                 "id=\"helpers\"",
-                "ratio:\"5:4\"",
+                "galion-research-silence",
+                "prefers-reduced-motion",
+                "id:\"ask\",notes:[432,648,540]",
+                "id:\"answer\",notes:[648,540,432]",
+                "id:\"attached\",notes:[288,432]",
+                "id:\"show\",notes:[216,540,864]",
+                "id:\"hide\",notes:[864,540,216]",
+                "id:\"error\",notes:[648,432,288]",
+                "HUM=[108,216]",
+                "DECAY=2.8",
+                "o.type=\"sine\"",
                 "Local. What is already known stays marked local.",
-                "hz:432",
-                "hz:216",
-                "hz:540",
-                "hz:648",
                 "G.A.L.I.O.N. — General Autonomous Local Intelligence Open Network",
                 "Developed and distributed by Galion Labs",
                 "Perpetual Open MIT License",
@@ -1589,8 +1596,40 @@ mod tests {
             assert!(body.contains("<canvas id=\"voice-dot\""), "the restyled Voice V2 dot is the entry");
             assert!(!body.contains("id=\"s\""), "research is not the full-screen one-dot page");
             assert!(!body.contains("data-mark=\"orb\""), "the full-screen orb stays on /one");
+            assert!(!body.contains("galion-one-silence"), "research silence is its own key");
+            assert!(!body.contains("id:\"boot\""), "research does not play the Galion One boot cue");
+            assert!(!body.contains("createPeriodicWave"), "research cues are sines, not bells");
         }
         w.close().unwrap();
+    }
+
+    #[test]
+    fn research_cues_match_the_sound_guide() {
+        let page = include_str!("../../../crates/galion-console/assets/research.html");
+        let guide = include_str!("../../../docs/07-sound-guide/SOUND-LANGUAGE.md");
+        let cues = [
+            ("ask", "notes:[432,648,540]", "432, 648, 540"),
+            ("answer", "notes:[648,540,432]", "648, 540, 432"),
+            ("attached", "notes:[288,432]", "288, 432"),
+            ("show", "notes:[216,540,864]", "216, 540, 864"),
+            ("hide", "notes:[864,540,216]", "864, 540, 216"),
+            ("error", "notes:[648,432,288]", "648, 432, 288"),
+            ("listen", "notes:[432,864]", "432, 864"),
+            ("leave", "notes:[864,432]", "864, 432"),
+        ];
+        for (id, notes, hz) in cues {
+            let needle = format!("id:\"{id}\",{notes}");
+            assert!(page.contains(&needle), "page missing {needle}");
+            assert!(guide.contains(&format!("| {id} |")), "guide missing {id}");
+            assert!(guide.contains(hz), "guide missing {hz}");
+        }
+        assert!(page.contains("HUM=[108,216]") && guide.contains("108 Hz") && guide.contains("216 Hz"));
+        assert!(page.contains("DECAY=2.8") && guide.contains("2.8"));
+        assert!(page.contains("prefers-reduced-motion") && guide.contains("prefers-reduced-motion"));
+        assert!(page.contains("galion-research-silence") && guide.contains("galion-research-silence"));
+        assert!(page.contains("bell:false") && guide.contains("window open") && guide.contains("minimise"));
+        assert!(guide.contains("432, 216, 108"), "Galion One shutdown Hz");
+        assert!(!guide.contains("440"), "the guide stays on 432 Hz");
     }
 
     fn post_json(addr: SocketAddr, path: &str, body: &str) -> String {
