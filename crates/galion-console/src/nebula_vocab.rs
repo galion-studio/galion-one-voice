@@ -3,7 +3,8 @@
 //! The import the halo uses is
 //! `crates/galion-console/assets/nebula/vocabulary.mjs`.
 //! This module reads that file so the same table can be checked from
-//! `cargo test`. It does not serve a page and it does not touch the one-dot screen.
+//! `cargo test`. It does not serve a page. The one-dot screen imports the
+//! module; that wiring is checked in the tests below.
 //!
 //! A missing reading, `sense: false`, the label `neutral`, and confidence
 //! below [`CONFIDENCE_FLOOR`] resolve to an empty look. Nothing is invented
@@ -599,12 +600,19 @@ mod tests {
         near(quiet.density, 0.07 * 0.82);
     }
 
+    /// #121 left the one-dot page unwired so the vocabulary could land on its
+    /// own. This branch is that wiring: the one-dot page is the halo surface.
+    /// `drawNebula` paints the wash only. A missing reading, neutral, low
+    /// confidence, and `sense: false` still draw nothing, and the preview
+    /// sheet stays free of audio.
     #[test]
-    fn the_one_dot_page_does_not_import_the_halo() {
+    fn the_one_dot_page_imports_the_halo() {
         let page = include_str!("../assets/v1-screen.html");
         let preview = include_str!("../assets/nebula/preview.html");
-        assert!(!page.contains("vocabulary.mjs"));
-        assert!(!page.contains("drawNebula"));
+        assert!(page.contains("import { drawNebula } from \"/nebula/vocabulary.mjs\""));
+        assert!(page.contains("drawNebula(cx,input,tms/1000,"));
+        assert!(page.contains("estimate===\"none\""));
+        assert!(!page.contains("return {neutral:1}"));
         assert!(preview.contains("from \"./vocabulary.mjs\""));
         assert!(preview.contains("galion.app"));
         assert!(preview.contains("no cloud"));
