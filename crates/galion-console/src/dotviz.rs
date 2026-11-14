@@ -35,6 +35,8 @@ use crate::live::{AffectFeed, AffectReading, LiveSnapshot, Stage, StageLatencies
 /// `/screen` by `galion_render::WebSurface::with_page` (feature `dot-viz-web`); polls
 /// `/dot` every 80 ms. See docs/agent-v1-demo/V1-01-STATUS.md.
 pub const SCREEN_HTML: &str = include_str!("../assets/v1-screen.html");
+/// Emotion halo module. Served at `/nebula/vocabulary.mjs` for the one-dot page.
+pub const NEBULA_VOCABULARY_JS: &str = include_str!("../assets/nebula/vocabulary.mjs");
 
 /// `/v2` redirect. The circle lives on [`SCREEN_HTML`].
 pub const V2_SCREEN_HTML: &str = include_str!("../assets/v2-screen.html");

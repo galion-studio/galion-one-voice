@@ -39,7 +39,8 @@ impl DotSink {
         self.dc.attach(Box::new(
             galion_render::WebSurface::serve(addr)
                 .with_page(galion_console::dotviz::SCREEN_HTML)
-                .with_v2_page(galion_console::dotviz::V2_SCREEN_HTML),
+                .with_v2_page(galion_console::dotviz::V2_SCREEN_HTML)
+                .with_nebula_vocabulary(galion_console::dotviz::NEBULA_VOCABULARY_JS),
         ))
     }
 }

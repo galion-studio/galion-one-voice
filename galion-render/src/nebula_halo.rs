@@ -377,17 +377,19 @@ mod tests {
     #[test]
     fn page_shares_the_lattice_and_the_hold() {
         let page = include_str!("../../crates/galion-console/assets/v1-screen.html");
-        assert!(page.contains("fund:4320"));
-        assert!(page.contains("octave:2160"));
-        assert!(page.contains("fifth:2880"));
-        assert!(page.contains("third:3456"));
+        assert!(page.contains("drawNebula"));
+        assert!(page.contains("/nebula/vocabulary.mjs"));
         assert!(page.contains("present!==true"));
         assert!(page.contains("estimate===\"none\""));
-        assert!(page.contains("id:\"H-beta\""));
-        assert!(page.contains("id:\"NII-575.5\""));
-        assert!(page.contains("id:\"H-alpha\""));
-        assert!(page.contains("happy:{m:0.72,w:0.82,id:\"NII-575.5\"}"));
-        assert!(page.contains("sad:{m:0.24,w:0.22,id:\"HeII-468.6\"}"));
         assert!(page.contains("#F5F5F7"));
+        assert!(!page.contains("return {neutral:1}"));
+        let vocab = include_str!("../../crates/galion-console/assets/nebula/vocabulary.mjs");
+        assert!(vocab.contains("export function drawNebula"));
+        assert!(vocab.contains("\"referenceHz\": 432"));
+        assert!(vocab.contains("\"2:1\""));
+        assert!(vocab.contains("\"3:2\""));
+        assert!(vocab.contains("\"5:4\""));
+        assert!(vocab.contains("#F5A524"));
+        assert!(vocab.contains("#7C3AED"));
     }
 }
