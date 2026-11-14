@@ -1566,12 +1566,26 @@ mod tests {
                 "data-voice-to-voice=\"on\"",
                 "id=\"ui-toggle\"",
                 "id=\"helpers\"",
-                "ratio:\"5:4\"",
+                "id=\"silence\"",
+                "id:\"question-sent\"",
+                "id:\"thinking\"",
+                "id:\"answer-ready\"",
+                "id:\"source-attached\"",
+                "id:\"source-cited\"",
+                "id:\"error\"",
+                "id:\"window-open\"",
+                "id:\"window-close\"",
+                "id:\"window-minimise\"",
+                "id:\"window-settle\"",
+                "var FUND=432",
+                "FUND*(5/4)",
+                "FUND*(3/2)",
+                "FUND*2",
+                "FUND/4",
+                "galion-one-silence",
+                "o.type=\"sine\"",
+                "docs/07-sound-guide/SOUND-LANGUAGE.md",
                 "Local. What is already known stays marked local.",
-                "hz:432",
-                "hz:216",
-                "hz:540",
-                "hz:648",
                 "G.A.L.I.O.N. — General Autonomous Local Intelligence Open Network",
                 "Developed and distributed by Galion Labs",
                 "Perpetual Open MIT License",
@@ -1589,6 +1603,11 @@ mod tests {
             assert!(body.contains("<canvas id=\"voice-dot\""), "the restyled Voice V2 dot is the entry");
             assert!(!body.contains("id=\"s\""), "research is not the full-screen one-dot page");
             assert!(!body.contains("data-mark=\"orb\""), "the full-screen orb stays on /one");
+            assert!(!body.contains("hz:288"), "research cues stay on 2:1, 3:2, and 5:4");
+            assert!(!body.contains("id:\"ask\"") && !body.contains("id:\"local\""), "the old single-tone set is gone");
+            assert!(!body.contains(".wav") && !body.contains(".mp3") && !body.contains(".ogg"));
+            assert!(!body.contains("type=\"square\"") && !body.contains("type=\"sawtooth\"") && !body.contains("type=\"triangle\""));
+            assert!(!body.contains("howler") && !body.contains("tone.js"));
         }
         w.close().unwrap();
     }

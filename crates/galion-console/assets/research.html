@@ -125,6 +125,9 @@ body[data-ui="minimal"] #helpers{margin:0}
   .piles,.book{grid-template-columns:1fr}
   .work{grid-template-columns:1fr}
 }
+#silence{position:fixed;left:0;bottom:0;z-index:3;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;
+  clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;border:0;
+  background:#0A0A0C;color:#F5F5F7;font:16px/1.2 system-ui,sans-serif}
 </style>
 </head>
 <body data-product="research" data-voice="galion-research" data-voice-to-voice="on" data-standard="432" data-ui="minimal">
@@ -205,20 +208,118 @@ body[data-ui="minimal"] #helpers{margin:0}
   </div>
 </main>
 </div>
+<button id="silence" type="button" aria-pressed="false">Silence</button>
+<!-- /silence -->
 <script>
 "use strict";
-// Research cues. 432 Hz just intonation. Definitions only. No voice audio and no wav files.
+// Galion Research cues. Pure sine resonance on 432 Hz just intonation
+// (2:1, 3:2, 5:4), soft hum at 216 and 108. WebAudio only. No audio files.
+// Bell strikes are only window open, close, minimise, and settle.
+// Exact hertz: docs/07-sound-guide/SOUND-LANGUAGE.md
+var FUND=432;
+var HUM=[FUND/4, FUND/2];
+var NOTE_PEAK=0.03;
+var HUM_PEAK=0.01;
+var BELL_PEAK=0.03;
+var BELL_PARTIAL=0.01;
 var RESEARCH_CUES=[
-  {id:"ask",ratio:"1:1",hz:432},
-  {id:"listen",ratio:"1:1",hz:432},
-  {id:"helper",ratio:"5:4",hz:540},
-  {id:"local",ratio:"2:3",hz:288},
-  {id:"returned",ratio:"3:2",hz:648},
-  {id:"hide",ratio:"1:2",hz:216},
-  {id:"show",ratio:"2:1",hz:864},
-  {id:"leave",ratio:"1:4",hz:108}
+  {id:"question-sent", kind:"resonance", notes:[FUND, FUND*(3/2), FUND*2], peak:NOTE_PEAK, humPeak:HUM_PEAK},
+  {id:"thinking", kind:"resonance", notes:[FUND*(5/4)], peak:NOTE_PEAK, humPeak:HUM_PEAK},
+  {id:"answer-ready", kind:"resonance", notes:[FUND, FUND*(5/4), FUND*(3/2)], peak:NOTE_PEAK, humPeak:HUM_PEAK},
+  {id:"source-attached", kind:"resonance", notes:[FUND/2, FUND], peak:NOTE_PEAK, humPeak:HUM_PEAK},
+  {id:"source-cited", kind:"resonance", notes:[FUND*(3/2), FUND*(5/4)], peak:NOTE_PEAK, humPeak:HUM_PEAK},
+  {id:"error", kind:"resonance", notes:[FUND/2, FUND/4], peak:NOTE_PEAK, humPeak:HUM_PEAK}
 ];
-var SOUND_SET=RESEARCH_CUES;
+var WINDOW_BELLS=[
+  {id:"window-open", kind:"bell", notes:[FUND*2, FUND], peak:BELL_PEAK, partial:BELL_PARTIAL, humPeak:HUM_PEAK},
+  {id:"window-close", kind:"bell", notes:[FUND, FUND/2], peak:BELL_PEAK, partial:BELL_PARTIAL, humPeak:HUM_PEAK},
+  {id:"window-minimise", kind:"bell", notes:[FUND*(5/4), FUND/2], peak:BELL_PEAK, partial:BELL_PARTIAL, humPeak:HUM_PEAK},
+  {id:"window-settle", kind:"bell", notes:[FUND*(3/2), FUND], peak:BELL_PEAK, partial:BELL_PARTIAL, humPeak:HUM_PEAK}
+];
+function publishCue(row){
+  return {id:row.id, kind:row.kind, notes:row.notes.slice(), hum:HUM.slice(), peak:row.peak, humPeak:row.humPeak, partial:row.partial||0};
+}
+window.GALION_RESEARCH=RESEARCH_CUES.map(publishCue);
+window.GALION_BELLS=WINDOW_BELLS.map(publishCue);
+var audio=null, silence=false, thinkTimer=null, citeToken=0, closing=false, minimised=false, opened=false;
+function silenceRequested(){
+  try{ if(localStorage.getItem("galion-one-silence")==="1") return true; }catch(e){}
+  return new URLSearchParams(location.search).get("silence")==="1";
+}
+function setSilence(on){
+  silence=!!on;
+  document.body.dataset.silence=silence?"on":"off";
+  document.body.dataset.resonance=silence?"off":"on";
+  var btn=document.getElementById("silence");
+  if(btn) btn.setAttribute("aria-pressed", silence?"true":"false");
+  try{ localStorage.setItem("galion-one-silence", silence?"1":"0"); }catch(e){}
+}
+function toneContext(){
+  try{
+    var Ctx=window.AudioContext||window.webkitAudioContext;
+    if(!Ctx) return null;
+    if(!audio) audio=new Ctx();
+    if(audio.state==="suspended") audio.resume();
+    return audio;
+  }catch(e){ return null; }
+}
+function scheduleSine(ctx,hz,start,dur,peak,attack){
+  var o=ctx.createOscillator(), g=ctx.createGain();
+  o.type="sine";
+  o.frequency.value=hz;
+  g.gain.setValueAtTime(0.0001, start);
+  g.gain.exponentialRampToValueAtTime(peak, start+attack);
+  g.gain.exponentialRampToValueAtTime(0.0001, start+Math.max(attack+0.05, dur));
+  o.connect(g); g.connect(ctx.destination);
+  o.start(start); o.stop(start+dur+0.03);
+}
+function findCue(id){
+  var i;
+  for(i=0;i<RESEARCH_CUES.length;i++) if(RESEARCH_CUES[i].id===id) return RESEARCH_CUES[i];
+  for(i=0;i<WINDOW_BELLS.length;i++) if(WINDOW_BELLS[i].id===id) return WINDOW_BELLS[i];
+  return null;
+}
+function playCue(id){
+  if(silence) return;
+  var row=findCue(id);
+  if(!row) return;
+  var ctx=toneContext();
+  if(ctx){
+    try{
+      var t=ctx.currentTime;
+      if(row.kind==="bell"){
+        row.notes.forEach(function(hz,i){ scheduleSine(ctx, hz, t, 0.42, i?row.partial:row.peak, 0.005); });
+        HUM.forEach(function(hz){ scheduleSine(ctx, hz, t, 0.48, row.humPeak, 0.03); });
+      }else{
+        var step=0.14;
+        row.notes.forEach(function(hz,i){ scheduleSine(ctx, hz, t+i*step, 0.2, row.peak, 0.02); });
+        var dur=row.notes.length*step+0.24;
+        HUM.forEach(function(hz){ scheduleSine(ctx, hz, t, dur, row.humPeak, 0.03); });
+      }
+    }catch(e){}
+  }
+  var log=(document.body.dataset.cues||"").split(",").filter(Boolean);
+  log.push(id);
+  document.body.dataset.cues=log.slice(-24).join(",");
+  document.body.dataset.cue=id;
+}
+function cue(id){ playCue(id); }
+function bell(id){ playCue(id); }
+function stopPending(){
+  citeToken++;
+  if(thinkTimer){ clearTimeout(thinkTimer); thinkTimer=null; }
+}
+function armThinking(){
+  if(thinkTimer) clearTimeout(thinkTimer);
+  thinkTimer=setTimeout(function(){ thinkTimer=null; cue("thinking"); }, 500);
+}
+function scheduleCited(){
+  var token=++citeToken;
+  setTimeout(function(){ if(token===citeToken) cue("source-cited"); }, 520);
+}
+function failedStatus(status){
+  return status==="Unreachable"||status==="Denied"||status==="Timeout"||status==="NotFound";
+}
 // Voice V2 disc, restyled as the research entry. Same pigment as the one-dot page. Not the full-screen orb.
 var MARK={core:"#F5F5F7",edge:"#E8E8ED",stroke:"rgba(255,255,255,0.55)",strokePx:1};
 function markInner(warm){
@@ -257,25 +358,6 @@ function paintVoice(){
   requestAnimationFrame(paintVoice);
 }
 requestAnimationFrame(paintVoice);
-var audio=null;
-function tone(id){
-  var row=null;
-  for(var i=0;i<SOUND_SET.length;i++) if(SOUND_SET[i].id===id) row=SOUND_SET[i];
-  if(!row) return;
-  var Ctx=window.AudioContext||window.webkitAudioContext;
-  if(!Ctx) return;
-  if(!audio) audio=new Ctx();
-  if(audio.state==="suspended") audio.resume();
-  try{
-    var o=audio.createOscillator(), g=audio.createGain(), t=audio.currentTime;
-    o.type="sine"; o.frequency.value=row.hz;
-    g.gain.setValueAtTime(0.0001,t);
-    g.gain.exponentialRampToValueAtTime(0.045,t+0.02);
-    g.gain.exponentialRampToValueAtTime(0.0001,t+0.16);
-    o.connect(g); g.connect(audio.destination);
-    o.start(t); o.stop(t+0.18);
-  }catch(e){}
-}
 // Attached files are Sources. The desk cites only those ids.
 (function(){
   var files=document.getElementById("files");
@@ -318,7 +400,6 @@ function tone(id){
     }
     fillPile("unknown", [LOCAL]);
     paintHistory([{status:"Unreachable", question:q}]);
-    tone("local");
   }
   function showTurn(j){
     var q=j.question||"";
@@ -342,7 +423,6 @@ function tone(id){
     hermesStatus("Hermes · "+standing);
     helpers.hidden=false;
     helpers.textContent=standing==="Unreachable"?"Helpers are quiet. Local knowledge carries the question.":standing;
-    tone(j.status==="Unreachable"?"local":"returned");
   }
   function fillPile(id, rows){
     var list=document.getElementById(id+"-list");
@@ -373,11 +453,15 @@ function tone(id){
     fetch("/research/sources",{method:"POST",cache:"no-store",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:file.name,text:text,kind:kind})})
       .then(function(r){ return r.ok?r.json():null; })
       .then(function(j){
-        if(j&&Array.isArray(j.sources)) paintSources(j.sources);
-        else if(!attached.length) document.getElementById("source-empty").textContent="The file was not attached.";
+        if(j&&Array.isArray(j.sources)){ paintSources(j.sources); cue("source-attached"); }
+        else {
+          if(!attached.length) document.getElementById("source-empty").textContent="The file was not attached.";
+          cue("error");
+        }
       })
       .catch(function(){
         if(!attached.length) document.getElementById("source-empty").textContent="The file was not attached.";
+        cue("error");
       })
       .then(function(){
         pending=Math.max(0,pending-1);
@@ -408,6 +492,7 @@ function tone(id){
       };
       reader.onerror=function(){
         if(!attached.length) document.getElementById("source-empty").textContent="The file was not attached.";
+        cue("error");
       };
       reader.readAsText(file);
     });
@@ -416,28 +501,34 @@ function tone(id){
     var btn=ev.currentTarget;
     var on=btn.getAttribute("aria-pressed")==="true";
     btn.setAttribute("aria-pressed", on?"false":"true");
-    tone(on?"leave":"listen");
   });
   function commitQuestion(){
     var q=prompt.value.replace(/\s+/g," ").trim();
     if(!q) return;
     if(pending>0){ waiting=true; return; }
+    stopPending();
     hermesStatus("Hermes · Running");
     helpers.hidden=false;
     helpers.textContent="Helpers: reading, sources, notebook.";
     fillList(document.getElementById("arriving-list"), [q]);
     document.getElementById("arriving-empty").hidden=true;
-    tone("ask");
-    setTimeout(function(){ tone("helper"); }, 180);
+    cue("question-sent");
+    armThinking();
     fetch("/research/ask",{method:"POST",cache:"no-store",headers:{"Content-Type":"application/json"},body:JSON.stringify({question:q})})
       .then(function(r){ return r.ok?r.json():null; })
       .then(function(j){
-        if(!j){ carryLocal(q); return; }
+        stopPending();
+        if(!j){ carryLocal(q); cue("error"); return null; }
         showTurn(j);
-        return fetch("/research/history",{cache:"no-store"}).then(function(r){ return r.ok?r.json():null; });
+        if(failedStatus(j.status)) cue("error");
+        else {
+          cue("answer-ready");
+          if(Array.isArray(j.citations)&&j.citations.length) scheduleCited();
+        }
+        return fetch("/research/history",{cache:"no-store"}).then(function(r){ return r.ok?r.json():null; }).catch(function(){ return null; });
       })
       .then(function(h){ if(h&&Array.isArray(h.items)) paintHistory(h.items); })
-      .catch(function(){ carryLocal(q); });
+      .catch(function(){ stopPending(); carryLocal(q); cue("error"); });
   }
   prompt.addEventListener("keydown", function(ev){
     if(ev.key==="Enter"&&!ev.shiftKey){
@@ -450,7 +541,6 @@ function tone(id){
     document.body.setAttribute("data-ui", minimal?"":"minimal");
     ev.currentTarget.textContent=minimal?"Hide interface":"Show interface";
     ev.currentTarget.setAttribute("aria-pressed", minimal?"false":"true");
-    tone(minimal?"show":"hide");
   });
   document.getElementById("allow-experiment").addEventListener("click", function(ev){
     var btn=ev.currentTarget;
@@ -463,6 +553,40 @@ function tone(id){
     commitQuestion();
   });
 })();
+setSilence(silenceRequested());
+var quiet=document.getElementById("silence");
+if(quiet) quiet.addEventListener("click", function(ev){
+  ev.preventDefault();
+  ev.stopPropagation();
+  setSilence(!silence);
+});
+addEventListener("keydown", function(ev){
+  if(ev.key!=="s"&&ev.key!=="S") return;
+  if(ev.metaKey||ev.ctrlKey||ev.altKey) return;
+  var tag=ev.target&&ev.target.tagName;
+  if(tag==="TEXTAREA"||tag==="INPUT"||tag==="SELECT") return;
+  ev.preventDefault();
+  setSilence(!silence);
+});
+addEventListener("pageshow", function(){
+  if(opened) return;
+  opened=true;
+  bell("window-open");
+});
+addEventListener("pagehide", function(){
+  closing=true;
+  bell("window-close");
+});
+document.addEventListener("visibilitychange", function(){
+  if(document.visibilityState==="hidden"){
+    if(closing) return;
+    minimised=true;
+    bell("window-minimise");
+  }else if(minimised){
+    minimised=false;
+    bell("window-settle");
+  }
+});
 </script>
 </body>
 </html>

@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "../..");
 const html = readFileSync(join(root, "crates/galion-console/assets/v1-screen.html"));
+const researchHtml = readFileSync(join(root, "crates/galion-console/assets/research.html"));
 const vocab = readFileSync(join(root, "crates/galion-console/assets/nebula/vocabulary.mjs"));
 
 const neutral = {
@@ -30,6 +31,31 @@ const state = {
 };
 let tMs = 1000;
 let holdDot = false;
+const research = {
+  delayMs: 0,
+  fail: false,
+  status: "Found",
+  reply: "The wash is amber to violet.",
+  citations: [{ n: 1, text: "wash-note.txt" }],
+  found: ["The wash is amber to violet."],
+  sources: [],
+  nextId: 1,
+  notes: [],
+};
+
+function readBody(req) {
+  return new Promise((resolve) => {
+    const chunks = [];
+    req.on("data", (chunk) => chunks.push(chunk));
+    req.on("end", () => resolve(Buffer.concat(chunks).toString()));
+  });
+}
+
+function sendJson(res, code, body) {
+  const raw = typeof body === "string" ? body : JSON.stringify(body);
+  res.writeHead(code, { "content-type": "application/json", "cache-control": "no-store" });
+  res.end(raw);
+}
 
 function dotBody() {
   tMs += 80;
@@ -98,6 +124,95 @@ const server = createServer((req, res) => {
   if (req.method === "POST" && url.pathname === "/session") {
     res.writeHead(200, { "content-type": "application/json" });
     res.end('{"token":"desktop-e2e"}');
+    return;
+  }
+  if (req.method === "GET" && (url.pathname === "/research" || url.pathname === "/research/")) {
+    res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
+    res.end(researchHtml);
+    return;
+  }
+  if (req.method === "GET" && url.pathname === "/research/hermes") {
+    sendJson(res, 200, { schema: "galion-research/1", app: "hermes", status: "Idle" });
+    return;
+  }
+  if (req.method === "GET" && url.pathname === "/research/history") {
+    sendJson(res, 200, { schema: "galion-research/1", app: "hermes", items: research.notes.slice().reverse() });
+    return;
+  }
+  if (req.method === "GET" && url.pathname === "/research/sources") {
+    sendJson(res, 200, { sources: research.sources });
+    return;
+  }
+  if (req.method === "POST" && url.pathname === "/__research") {
+    readBody(req).then((raw) => {
+      const patch = JSON.parse(raw || "{}");
+      if (patch.reset) {
+        research.sources = [];
+        research.nextId = 1;
+        research.delayMs = 0;
+        research.fail = false;
+        research.status = "Found";
+        research.reply = "The wash is amber to violet.";
+        research.citations = [{ n: 1, text: "wash-note.txt" }];
+        research.found = ["The wash is amber to violet."];
+        research.notes = [];
+      }
+      if ("delayMs" in patch) research.delayMs = Number(patch.delayMs) || 0;
+      if ("fail" in patch) research.fail = Boolean(patch.fail);
+      if ("status" in patch) research.status = patch.status;
+      if ("reply" in patch) research.reply = patch.reply;
+      if ("citations" in patch) research.citations = patch.citations;
+      if ("found" in patch) research.found = patch.found;
+      res.writeHead(204);
+      res.end();
+    });
+    return;
+  }
+  if (req.method === "POST" && url.pathname === "/research/sources") {
+    readBody(req).then((raw) => {
+      const body = JSON.parse(raw || "{}");
+      const name = typeof body.name === "string" ? body.name.split("/").pop() : "";
+      if (!name) {
+        sendJson(res, 400, { error: "name" });
+        return;
+      }
+      research.sources.push({
+        id: research.nextId,
+        name,
+        kind: body.kind === "image" ? "image" : "file",
+        chars: typeof body.text === "string" ? body.text.length : 0,
+      });
+      research.nextId += 1;
+      sendJson(res, 200, { sources: research.sources });
+    });
+    return;
+  }
+  if (req.method === "POST" && url.pathname === "/research/ask") {
+    readBody(req).then((raw) => {
+      const body = JSON.parse(raw || "{}");
+      const question = typeof body.question === "string" ? body.question : "";
+      const delay = research.delayMs;
+      const fail = research.fail;
+      const payload = {
+        schema: "galion-research/1",
+        app: "hermes",
+        question,
+        status: research.status,
+        reply: research.reply,
+        citations: research.citations,
+        found: research.found,
+        inferred: [],
+        unknown: [],
+      };
+      setTimeout(() => {
+        if (fail) {
+          sendJson(res, 500, { ok: false });
+          return;
+        }
+        research.notes.push({ status: payload.status, question });
+        sendJson(res, 200, payload);
+      }, delay);
+    });
     return;
   }
   res.writeHead(204);
