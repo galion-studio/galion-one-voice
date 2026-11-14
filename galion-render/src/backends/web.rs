@@ -1148,7 +1148,13 @@ mod tests {
                 "data-product=\"research\"",
                 "id=\"prompt\"",
                 "id=\"voice\"",
+                "id=\"voice-dot\"",
+                "id=\"voice-name\"",
                 "aria-label=\"Voice\"",
+                "function markInner",
+                "edge:\"#E8E8ED\"",
+                "Galion Research is a voice of Galion One",
+                "data-voice=\"galion-research\"",
                 "id=\"add-file\"",
                 "id=\"add-image\"",
                 "TODO: uploads are stubbed",
@@ -1180,7 +1186,9 @@ mod tests {
             ] {
                 assert!(body.contains(needle), "{p} missing {needle}");
             }
-            assert!(!body.contains("<canvas"), "research is not the one-dot page");
+            assert!(body.contains("<canvas id=\"voice-dot\""), "the restyled Voice V2 dot is the entry");
+            assert!(!body.contains("id=\"s\""), "research is not the full-screen one-dot page");
+            assert!(!body.contains("data-mark=\"orb\""), "the full-screen orb stays on /one");
         }
         w.close().unwrap();
     }

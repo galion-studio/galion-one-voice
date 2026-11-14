@@ -45,9 +45,10 @@ body{min-height:100vh;min-height:100dvh;
   font-family:system-ui,sans-serif}
 .desk{width:min(1080px,calc(100vw - 96px));margin:0 auto;padding:32px 0 72px}
 .top{display:flex;align-items:center;justify-content:space-between;margin:0 0 36px}
-.brand{font:13px/1 system-ui,sans-serif;letter-spacing:.16em;text-transform:uppercase;color:color-mix(in srgb, var(--ink) 78%, transparent)}
-#to-one{color:color-mix(in srgb, var(--ink) 48%, transparent);font:13px/1 system-ui,sans-serif;letter-spacing:.14em;text-transform:uppercase;text-decoration:none}
+#to-one,.voice-name{font:13px/1 system-ui,sans-serif;letter-spacing:.16em;text-transform:uppercase;text-decoration:none}
+#to-one{color:color-mix(in srgb, var(--ink) 72%, transparent)}
 #to-one:hover,#to-one:focus-visible{color:var(--ink);outline:none}
+.voice-name{margin:0;color:color-mix(in srgb, var(--ink) 88%, transparent)}
 #handoff{margin:-18px 0 22px;font:14px/1.4 system-ui,sans-serif;color:color-mix(in srgb, var(--amber) 80%, var(--ink))}
 .ask{display:flex;align-items:center;gap:22px}
 .field{position:relative;flex:1;min-width:0;border-radius:32px;border:1px solid transparent;padding:26px 26px 14px;
@@ -64,22 +65,22 @@ textarea::placeholder{color:color-mix(in srgb, var(--ink) 36%, transparent)}
 .tools button{width:40px;height:40px;border-radius:999px;border:1px solid color-mix(in srgb, var(--ink) 16%, transparent);background:transparent;color:color-mix(in srgb, var(--ink) 72%, transparent)}
 .tools button:hover,.tools button:focus-visible{border-color:color-mix(in srgb, var(--amber) 70%, transparent);color:var(--ink);outline:none}
 .hint{margin-left:auto;font:12px/1 system-ui,sans-serif;letter-spacing:.04em;color:color-mix(in srgb, var(--ink) 38%, transparent)}
-.voice{width:84px;height:84px;flex:none;border:0;border-radius:999px;background:
-  radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--amber) 28%, transparent), color-mix(in srgb, var(--violet) 22%, transparent) 42%, transparent 68%)}
+.voice{width:120px;height:120px;flex:none;border:0;border-radius:999px;background:
+  radial-gradient(circle at 50% 46%, color-mix(in srgb, var(--amber) 24%, transparent), color-mix(in srgb, var(--violet) 28%, transparent) 48%, transparent 72%)}
 .voice:focus-visible{outline:1px solid color-mix(in srgb, var(--amber) 70%, transparent);outline-offset:4px}
-.dot{width:22px;height:22px;border-radius:999px;background:#F5F5F7;box-shadow:0 0 18px color-mix(in srgb, var(--ink) 55%, transparent)}
-.voice[aria-pressed="true"] .dot{width:30px;height:30px;box-shadow:0 0 28px color-mix(in srgb, var(--amber) 55%, transparent), 0 0 42px color-mix(in srgb, var(--violet) 45%, transparent)}
+#voice-dot{width:120px;height:120px;display:block;background:transparent}
 .tools svg{width:22px;height:22px;display:block}
 .price{margin:22px 0 0;text-align:center;font:13px/1.4 system-ui,sans-serif;letter-spacing:.08em;color:color-mix(in srgb, var(--ink) 42%, transparent)}
 .work{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:28px}
 .panel{border:1px solid color-mix(in srgb, var(--ink) 12%, transparent);border-radius:18px;padding:16px 18px 18px;background:color-mix(in srgb, var(--ground) 40%, transparent);min-width:0}
 .panel h2,.citations h3{margin:0 0 12px;font:12px/1 system-ui,sans-serif;font-weight:560;letter-spacing:.16em;text-transform:uppercase;color:color-mix(in srgb, var(--ink) 52%, transparent)}
 #answer{grid-column:1 / -1}
+#sources,#plan{min-height:168px}
 #plan-list,#source-list,#citation-list{margin:0;padding-left:1.2em}
 #plan-list li,#source-list li{margin:0 0 8px;font:15px/1.45 system-ui,sans-serif;color:color-mix(in srgb, var(--ink) 88%, transparent)}
 #live-question{color:var(--ink)}
 #source-empty,#citation-empty{margin:0;font:15px/1.45 system-ui,sans-serif;color:color-mix(in srgb, var(--ink) 62%, transparent)}
-#reading{max-width:68ch;min-height:7.5em}
+#reading{max-width:68ch;min-height:11em}
 #reading p{margin:0 0 12px;font:18px/1.6 system-ui,sans-serif}
 #reading-question{color:var(--ink)}
 #reading-local{color:color-mix(in srgb, var(--ink) 72%, transparent)}
@@ -96,12 +97,13 @@ textarea::placeholder{color:color-mix(in srgb, var(--ink) 36%, transparent)}
 }
 </style>
 </head>
-<body data-product="research" data-standard="432">
+<body data-product="research" data-voice="galion-research" data-standard="432">
 <div class="desk">
   <header class="top">
-    <div class="brand">Galion Research</div>
     <a id="to-one" href="/one">Galion One</a>
+    <p class="voice-name" id="voice-name">Research</p>
   </header>
+  <p class="sr" id="product-line">Galion Research is a voice of Galion One. This desk is where that voice works.</p>
   <p id="handoff" hidden>From Galion One.</p>
   <form class="ask" id="ask" action="#" method="post">
     <div class="field">
@@ -119,7 +121,7 @@ textarea::placeholder{color:color-mix(in srgb, var(--ink) 36%, transparent)}
       </div>
     </div>
     <button type="button" class="voice" id="voice" aria-label="Voice" aria-pressed="false">
-      <span class="dot" aria-hidden="true"></span>
+      <canvas id="voice-dot" width="240" height="240" aria-hidden="true"></canvas>
     </button>
   </form>
   <p class="price">Ultra $220/€220 one-time</p>
@@ -166,6 +168,44 @@ var SOUND_SET=[
   {id:"no",hz:288},
   {id:"leave",hz:108}
 ];
+// Voice V2 disc, restyled as the research entry. Same pigment as the one-dot page. Not the full-screen orb.
+var MARK={core:"#F5F5F7",edge:"#E8E8ED",stroke:"rgba(255,255,255,0.55)",strokePx:1};
+function markInner(warm){
+  var w=Math.max(0,Math.min(1,warm));
+  return [Math.round(246+9*w), Math.round(246+6*w), Math.round(252-12*w)];
+}
+var voiceCv=document.getElementById("voice-dot"), voiceCx=voiceCv.getContext("2d"), voiceT0=performance.now(), voiceRad=0.34;
+function paintVoice(){
+  var now=performance.now();
+  var dpr=Math.min(window.devicePixelRatio||1, 2);
+  var css=voiceCv.clientWidth||120;
+  var W=Math.max(2, Math.round(css*dpr));
+  if(voiceCv.width!==W||voiceCv.height!==W){ voiceCv.width=W; voiceCv.height=W; }
+  var listening=document.getElementById("voice").getAttribute("aria-pressed")==="true";
+  var breath=Math.sin(((now-voiceT0)%1600)/1600*2*Math.PI);
+  var aim=(listening?0.46:0.34)+(listening?0.01:0.012)*breath;
+  voiceRad+=(aim-voiceRad)*0.08;
+  var rad=voiceRad*(W/2);
+  var k=listening?0.72:0.48+0.08*breath;
+  voiceCx.clearRect(0,0,W,W);
+  voiceCx.save(); voiceCx.translate(W/2,W/2);
+  var reach=rad*(1.18+0.06*k);
+  var halo=voiceCx.createRadialGradient(0,0,rad*0.92,0,0,reach);
+  halo.addColorStop(0,"rgba(245,245,247,"+(0.05+0.10*Math.max(0,k)).toFixed(3)+")");
+  halo.addColorStop(1,"rgba(245,245,247,0)");
+  voiceCx.fillStyle=halo; voiceCx.beginPath(); voiceCx.arc(0,0,reach,0,2*Math.PI); voiceCx.fill();
+  var inner=markInner(0.30);
+  var g=voiceCx.createRadialGradient(-rad*0.08,-rad*0.10,Math.max(1,rad*0.04),0,0,rad);
+  g.addColorStop(0,"rgb("+inner[0]+","+inner[1]+","+inner[2]+")");
+  g.addColorStop(0.48,MARK.core);
+  g.addColorStop(0.90,MARK.core);
+  g.addColorStop(1,MARK.edge);
+  voiceCx.fillStyle=g; voiceCx.beginPath(); voiceCx.arc(0,0,rad,0,2*Math.PI); voiceCx.fill();
+  voiceCx.strokeStyle=MARK.stroke; voiceCx.lineWidth=MARK.strokePx; voiceCx.stroke();
+  voiceCx.restore();
+  requestAnimationFrame(paintVoice);
+}
+requestAnimationFrame(paintVoice);
 var audio=null;
 function tone(id){
   var row=null;
