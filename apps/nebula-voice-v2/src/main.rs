@@ -115,7 +115,12 @@ fn run_stdin() -> Result<(), String> {
         voice = frame.voice;
         let top = nebula_voice_v2::frame::dominant(&frame, 3);
         let names: Vec<&str> = top.iter().map(|l| l.emotion).collect();
-        println!("{{\"voice\":\"{:?}\",\"dominant\":{}}}", voice, serde_json::to_string(&names).unwrap_or_else(|_| "[]".into()));
+        let estimate = if frame.no_estimate { "none" } else { "present" };
+        println!(
+            "{{\"voice\":\"{:?}\",\"estimate\":\"{estimate}\",\"dominant\":{}}}",
+            voice,
+            serde_json::to_string(&names).unwrap_or_else(|_| "[]".into())
+        );
     }
     Ok(())
 }

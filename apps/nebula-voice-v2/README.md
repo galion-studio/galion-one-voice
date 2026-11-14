@@ -86,6 +86,14 @@ Samantha-only.
 Arousal scales turbulence, valence scales hue warmth, dominance scales
 clumping, and speech `energy` gated by `vad` scales the pulse.
 
+A line whose `schema` is `galion-nebula-live-feed/1` or
+`galion-voice-v2-emotion-feed/1` is the live contract in
+`docs/galion-voice-v2/EMOTION-NEBULA-FEED.md`. `estimate: none` (and
+`present: false`) leaves every weight at 0. It does not fill Neutral.
+`drive_from` then keeps turbulence, clump, and pulse at 0. Bind particles
+with `element_id` (`H-beta`, `H-alpha`). The feed's `gas_line`
+(`Hbeta-486.1`, `Halpha-656.3`) is a different string.
+
 ## Browser
 
 `apps/nebula-voice-v2/build-web.sh` writes a static `dist/` (gitignored).

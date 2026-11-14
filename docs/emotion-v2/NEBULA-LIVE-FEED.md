@@ -116,3 +116,7 @@ python -m unittest discover -s tools/emotion-v2/nebula/tests -v
 ```
 
 Exit status is `0` on success and `2` when the file, the voice, or a posterior is unusable.
+
+## UI reading
+
+The picture does not read this wire directly. `docs/galion-voice-v2/EMOTION-NEBULA-FEED.md` is the contract in front of it: an explicit `estimate` of `none`, `distribution`, or `partial`, a check before each send, and a reconnect backoff. `estimate: none` is this file's absence (`present: false`, null weights). It is not a Neutral weight of 1. The live voice server is not part of that bridge.
