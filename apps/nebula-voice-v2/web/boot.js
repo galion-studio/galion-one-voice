@@ -146,11 +146,11 @@ function attachFeed(app) {
       let msg = null;
       try { msg = JSON.parse(text); }
       catch (e) { app.clear_emotion(); return; }
-      if (!msg || typeof msg.schema !== "string" || !msg.schema) {
-        app.clear_emotion();
-        return;
-      }
-      canvas.dataset.schema = msg.schema;
+      if (!msg || typeof msg !== "object") { app.clear_emotion(); return; }
+      // No schema is galion-nebula/1. parse_frame still accepts it.
+      // An empty mass on that older shape is Neutral. Do not strip a schema that is present.
+      const schema = typeof msg.schema === "string" && msg.schema ? msg.schema : "galion-nebula/1";
+      canvas.dataset.schema = schema;
       canvas.dataset.estimate = typeof msg.estimate === "string" ? msg.estimate : "";
       app.apply_line(text);
     };

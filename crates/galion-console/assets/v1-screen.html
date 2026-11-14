@@ -148,13 +148,39 @@ const GAS={
   seductive:{m:0.28,w:0.78,id:"H-alpha"}
 };
 // estimate none, a dropped feed, or sense denied: paint nothing. Not Neutral.
+// A nebula object with no schema is galion-nebula/1 and is still accepted.
 function nebulaDrive(latest){
   const n=latest&&latest.nebula;
-  if(!n||typeof n.schema!=="string"||!n.schema) return null;
+  if(!n) return null;
+  if(typeof n.schema!=="string"||!n.schema) return n;
   if(n.estimate==="none"||n.present!==true||n.reason==="disconnected"||n.reason==="rejected") return null;
   if(n.estimate!=="distribution"&&n.estimate!=="partial") return null;
   if(latest.emotion&&latest.emotion.sense===false) return null;
   return n;
+}
+function legacyWeights(raw){
+  const out={};
+  if(Array.isArray(raw)){
+    for(const item of raw){
+      if(!item||typeof item.emotion!=="string") continue;
+      const w=+item.weight;
+      if(isFinite(w)&&w>0) out[item.emotion]=(out[item.emotion]||0)+w;
+    }
+  }else if(raw&&typeof raw==="object"){
+    for(const name in raw){
+      if(!Object.prototype.hasOwnProperty.call(raw,name)) continue;
+      const entry=raw[name];
+      const w=typeof entry==="number"?entry:(entry&&typeof entry.weight==="number"?entry.weight:null);
+      if(w==null||!isFinite(w)||w<=0) continue;
+      out[name]=(out[name]||0)+w;
+    }
+  }
+  let sum=0;
+  for(const name in out) sum+=out[name];
+  if(sum<1e-4) return {neutral:1};
+  const norm={};
+  for(const name in out) norm[name]=out[name]/sum;
+  return norm;
 }
 function feedWeight(weights,name,id){
   if(!weights) return null;
@@ -173,7 +199,8 @@ function paintHalo(tms,W,H,mark){
   const drive=nebulaDrive(latest);
   cv.dataset.nebula=drive?"gas":"hold";
   if(!drive) return;
-  const weights=drive.weights||{};
+  const legacy=typeof drive.schema!=="string"||!drive.schema;
+  const weights=legacy?legacyWeights(drive.weights):(drive.weights||{});
   const val=clamp(+drive.valence||0,-1,1);
   const ar=clamp(+drive.arousal||0,0,1);
   const dom=clamp(drive.dominance==null?0.5:+drive.dominance,0,1);
@@ -187,7 +214,7 @@ function paintHalo(tms,W,H,mark){
   for(const name in GAS){
     if(!Object.prototype.hasOwnProperty.call(GAS,name)) continue;
     if(name==="seductive"&&!samantha) continue;
-    const w=feedWeight(weights,name,g.id);
+    const w=legacy?weights[name]:feedWeight(weights,name,g.id);
     if(w==null||w<0.02) continue;
     const g=GAS[name];
     const n=Math.max(1,Math.round(w*18));
