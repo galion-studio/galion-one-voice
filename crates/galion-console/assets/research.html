@@ -1,0 +1,413 @@
+<!doctype html>
+<!--
+G.A.L.I.O.N. — General Autonomous Local Intelligence Open Network
+Developed and distributed by Galion Labs
+Perpetual Open MIT License
+Copyright © 2026 Galion Labs. All rights reserved.
+
+MIT License
+
+Copyright (c) 2026 Maciej Grajczyk
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0B0F14">
+<meta name="color-scheme" content="dark">
+<title>Galion Research</title>
+<style>
+:root{--ground:#0B0F14;--ink:#E6EDF3;--sky:#58C4FF;--ice:#B8E8FF;--ocean:#0B5FA5;--amber:var(--sky);--violet:var(--ocean)}
+html,body{margin:0;min-height:100%;background:var(--ground);color:var(--ink)}
+body{min-height:100vh;min-height:100dvh;
+  background:
+    radial-gradient(90% 48% at 50% -14%, color-mix(in srgb, var(--ice) 38%, transparent), transparent 62%),
+    radial-gradient(ellipse 70% 50% at 80% 110%, color-mix(in srgb, var(--ocean) 42%, transparent), transparent 58%),
+    var(--ground);
+  font-family:system-ui,sans-serif}
+.desk{width:min(1080px,calc(100vw - 96px));margin:0 auto;padding:32px 0 72px}
+.top{display:flex;align-items:center;justify-content:space-between;margin:0 0 36px}
+#to-one,.voice-name{font:13px/1 system-ui,sans-serif;letter-spacing:.16em;text-transform:uppercase;text-decoration:none}
+#to-one{color:color-mix(in srgb, var(--ink) 72%, transparent)}
+#to-one:hover,#to-one:focus-visible{color:var(--ink);outline:none}
+.voice-name{margin:0;color:color-mix(in srgb, var(--ink) 88%, transparent)}
+#handoff{margin:-18px 0 22px;font:14px/1.4 system-ui,sans-serif;color:color-mix(in srgb, var(--amber) 80%, var(--ink))}
+.ask{display:flex;align-items:center;gap:22px}
+.field{position:relative;flex:1;min-width:0;border-radius:32px;border:1px solid transparent;padding:26px 26px 14px;
+  background:
+    linear-gradient(color-mix(in srgb, var(--ground) 82%, transparent), color-mix(in srgb, var(--ground) 82%, transparent)) padding-box,
+    linear-gradient(135deg, color-mix(in srgb, var(--ice) 80%, transparent), color-mix(in srgb, var(--sky) 70%, transparent) 55%, color-mix(in srgb, var(--ocean) 85%, transparent)) border-box;
+  box-shadow:0 28px 80px rgba(0,0,0,.35)}
+.field:focus-within{box-shadow:0 28px 80px rgba(0,0,0,.35), 0 0 0 1px color-mix(in srgb, var(--amber) 28%, transparent)}
+textarea{display:block;width:100%;box-sizing:border-box;min-height:132px;margin:0;padding:0 2px;border:0;resize:none;
+  background:transparent;color:var(--ink);font:28px/1.35 system-ui,sans-serif;letter-spacing:-.02em;outline:none}
+textarea::placeholder{color:color-mix(in srgb, var(--ink) 36%, transparent)}
+.tools{display:flex;align-items:center;gap:8px;margin-top:8px}
+.tools button,.voice{appearance:none;display:grid;place-items:center;padding:0;cursor:pointer;color:var(--ink)}
+.tools button{width:40px;height:40px;border-radius:999px;border:1px solid color-mix(in srgb, var(--ink) 16%, transparent);background:transparent;color:color-mix(in srgb, var(--ink) 72%, transparent)}
+.tools button:hover,.tools button:focus-visible{border-color:color-mix(in srgb, var(--amber) 70%, transparent);color:var(--ink);outline:none}
+.hint{margin-left:auto;font:12px/1 system-ui,sans-serif;letter-spacing:.04em;color:color-mix(in srgb, var(--ink) 38%, transparent)}
+.voice{width:120px;height:120px;flex:none;border:0;border-radius:999px;background:
+  radial-gradient(circle at 50% 46%, color-mix(in srgb, var(--ice) 50%, transparent), color-mix(in srgb, var(--sky) 36%, transparent) 48%, transparent 72%)}
+.voice:focus-visible{outline:1px solid color-mix(in srgb, var(--amber) 70%, transparent);outline-offset:4px}
+#voice-dot{width:120px;height:120px;display:block;background:transparent}
+.tools svg{width:22px;height:22px;display:block}
+.price{margin:22px 0 0;text-align:center;font:13px/1.4 system-ui,sans-serif;letter-spacing:.08em;color:color-mix(in srgb, var(--ink) 42%, transparent)}
+.app{display:grid;grid-template-columns:248px minmax(0,1fr);min-height:100vh}
+#rail{padding:28px 18px 40px;border-right:1px solid color-mix(in srgb, var(--ink) 12%, transparent)}
+#rail .brand{margin:0;font:13px/1.3 system-ui,sans-serif;letter-spacing:.16em;text-transform:uppercase}
+#rail .where,#rail .price{margin:10px 0 0;font:12px/1.4 system-ui,sans-serif;letter-spacing:.04em;color:color-mix(in srgb, var(--ink) 48%, transparent)}
+#rail h2{margin:22px 0 10px;font:12px/1 system-ui,sans-serif;font-weight:560;letter-spacing:.16em;text-transform:uppercase;color:color-mix(in srgb, var(--ink) 52%, transparent)}
+#history-list{margin:0;padding-left:1.1em}
+#history-list li{margin:0 0 8px;font:14px/1.4 system-ui,sans-serif}
+.stage{width:min(880px,calc(100% - 72px));margin:0 auto;padding:40px 0 80px}
+.piles,.book{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+.pile h3,.book h3{margin:0 0 8px;font:12px/1 system-ui,sans-serif;font-weight:560;letter-spacing:.14em;text-transform:uppercase;color:color-mix(in srgb, var(--ink) 52%, transparent)}
+.pile p,.pile li,.book p,.book li{margin:0 0 6px;font:15px/1.45 system-ui,sans-serif}
+.card{border:1px solid color-mix(in srgb, var(--amber) 45%, transparent);border-radius:16px;padding:16px 18px}
+.card button{appearance:none;margin-top:12px;border:1px solid color-mix(in srgb, var(--amber) 70%, transparent);background:transparent;color:var(--ink);border-radius:999px;padding:8px 14px;font:inherit;cursor:pointer}
+.card button[aria-pressed="true"]{background:var(--amber);color:var(--ground);border-color:var(--amber)}
+.work{display:grid;gap:16px;margin-top:28px}
+#hermes-status{margin:0 0 18px;font:13px/1.4 system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:color-mix(in srgb, var(--amber) 75%, var(--ink))}
+#history-list{margin:0;padding-left:1.2em}
+#history-list li{margin:0 0 8px;font:15px/1.45 system-ui,sans-serif}
+#history-empty{margin:0;font:15px/1.45 system-ui,sans-serif;color:color-mix(in srgb, var(--ink) 62%, transparent)}
+.panel{border:1px solid color-mix(in srgb, var(--ink) 12%, transparent);border-radius:18px;padding:16px 18px 18px;background:color-mix(in srgb, var(--ground) 40%, transparent);min-width:0}
+.panel h2,.citations h3{margin:0 0 12px;font:12px/1 system-ui,sans-serif;font-weight:560;letter-spacing:.16em;text-transform:uppercase;color:color-mix(in srgb, var(--ink) 52%, transparent)}
+#answer{grid-column:1 / -1}
+#sources,#plan{min-height:168px}
+#plan-list,#source-list,#citation-list{margin:0;padding-left:1.2em}
+#plan-list li,#source-list li{margin:0 0 8px;font:15px/1.45 system-ui,sans-serif;color:color-mix(in srgb, var(--ink) 88%, transparent)}
+#live-question{color:var(--ink)}
+#source-empty,#citation-empty{margin:0;font:15px/1.45 system-ui,sans-serif;color:color-mix(in srgb, var(--ink) 62%, transparent)}
+#reading{max-width:68ch;min-height:11em}
+#reading p{margin:0 0 12px;font:18px/1.6 system-ui,sans-serif}
+#reading-question{color:var(--ink)}
+#reading-local{color:color-mix(in srgb, var(--ink) 72%, transparent)}
+.citations{margin-top:8px;padding-top:12px;border-top:1px solid color-mix(in srgb, var(--ink) 10%, transparent)}
+#citation-list{color:color-mix(in srgb, var(--ink) 78%, transparent);font:14px/1.45 system-ui,sans-serif}
+#citation-list .mark{color:var(--amber);margin-right:.4em}
+#helpers{margin:18px 0 0;text-align:center;font:13px/1.4 system-ui,sans-serif;letter-spacing:.04em;color:color-mix(in srgb, var(--ink) 46%, transparent)}
+#ui-toggle{width:auto;height:40px;padding:0 14px;border-radius:999px;font:12px/1 system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase}
+body[data-ui="minimal"] #rail,
+body[data-ui="minimal"] .work,
+body[data-ui="minimal"] #add-image{display:none}
+body[data-ui="minimal"] .app{display:block}
+body[data-ui="minimal"] .stage{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;width:min(880px,calc(100vw - 80px));margin:0 auto;padding:0;gap:18px}
+body[data-ui="minimal"] .ask{width:100%}
+body[data-ui="minimal"] #helpers{margin:0}
+.sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0}
+@media (max-width:800px){
+  .desk{width:min(1080px,calc(100vw - 32px))}
+  .ask{flex-direction:column;align-items:stretch}
+  textarea{font-size:22px;min-height:112px}
+  .voice{align-self:center}
+  .app{grid-template-columns:1fr}
+  #rail{border-right:0;border-bottom:1px solid color-mix(in srgb, var(--ink) 12%, transparent)}
+  .piles,.book{grid-template-columns:1fr}
+  .work{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body data-product="research" data-voice="galion-research" data-voice-to-voice="on" data-standard="432" data-ui="minimal">
+<div class="app">
+<aside id="rail">
+  <p class="brand">Galion Research</p>
+  <a id="to-one" href="/one">Galion One</a>
+  <p class="where">galion.app/research</p>
+  <p class="price">Ultra $220/€220 per month</p>
+  <p id="hermes-status" data-app="hermes">Hermes</p>
+  <section id="history" aria-labelledby="history-label">
+    <h2 id="history-label">Queue</h2>
+    <ol id="history-list"></ol>
+    <p id="history-empty">No request yet.</p>
+  </section>
+</aside>
+<main class="stage">
+  <p class="sr" id="product-line">Galion Research is the Hermes research app, a voice of Galion One. Voice to voice is on.</p>
+  <p class="sr" id="voice-name">Research · Hermes</p>
+  <form class="ask" id="ask" action="#" method="post">
+    <div class="field">
+      <label class="sr" for="prompt">Ask</label>
+      <textarea id="prompt" name="prompt" rows="4" placeholder="Ask a big question" autocomplete="off"></textarea>
+      <div class="tools">
+        <button type="button" id="add-file" aria-label="Add files">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        </button>
+        <button type="button" id="add-image" aria-label="Add an image">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="14" rx="2.2" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="8.5" cy="9.5" r="1.3" fill="currentColor"/><path d="M4 16.2 8.8 12l3.2 2.6 3.1-3.4L20 16.4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/></svg>
+        </button>
+        <input id="files" type="file" multiple hidden tabindex="-1" aria-hidden="true">
+        <button type="button" id="ui-toggle" aria-pressed="true">Show interface</button>
+        <span class="hint" id="commit-hint">Return enqueues the question</span>
+      </div>
+    </div>
+    <button type="button" class="voice" id="voice" aria-label="Voice" aria-pressed="false">
+      <canvas id="voice-dot" width="240" height="240" aria-hidden="true"></canvas>
+    </button>
+  </form>
+  <p id="helpers" hidden>Helpers are quiet.</p>
+  <div class="work">
+    <section class="panel" id="sources" aria-labelledby="sources-label">
+      <h2 id="sources-label">Sources</h2>
+      <div class="piles">
+        <div class="pile" id="sources-local"><h3>Local</h3><ol id="local-list"></ol><p id="source-empty">No source yet.</p></div>
+        <div class="pile" id="sources-reading"><h3>Reading</h3><ol id="reading-list"></ol><p id="reading-empty">No source yet.</p></div>
+        <div class="pile" id="sources-arriving"><h3>Arriving</h3><ol id="arriving-list"></ol><p id="arriving-empty">No source yet.</p></div>
+      </div>
+    </section>
+    <section class="panel" id="citations" aria-labelledby="citations-label">
+      <h2 id="citations-label">Citations</h2>
+      <p id="citation-empty">None in hand.</p>
+      <ol id="citation-list"></ol>
+    </section>
+    <section class="panel" id="notebook" aria-labelledby="notebook-label">
+      <h2 id="notebook-label">Notebook</h2>
+      <div class="book">
+        <div id="found"><h3>Found</h3><ul id="found-list"></ul><p id="found-empty">Empty.</p></div>
+        <div id="inferred"><h3>Inferred</h3><ul id="inferred-list"></ul><p id="inferred-empty">Empty.</p></div>
+        <div id="unknown"><h3>Unknown</h3><ul id="unknown-list"></ul><p id="unknown-empty">Empty.</p></div>
+      </div>
+    </section>
+    <section class="panel" id="answer" aria-labelledby="answer-label">
+      <h2 id="answer-label">Open job</h2>
+      <article id="reading">
+        <p id="reading-question" hidden></p>
+        <p id="reading-body">The answer sits here, with the limit beside it.</p>
+      </article>
+    </section>
+    <section class="panel" id="experiments" aria-labelledby="experiments-label">
+      <h2 id="experiments-label">Experiments</h2>
+      <article class="card" id="experiment">
+        <p>Ask first. Nothing runs until you allow it.</p>
+        <button type="button" id="allow-experiment" aria-pressed="false">Allow this experiment</button>
+        <p id="experiment-state">Waiting for permission.</p>
+      </article>
+    </section>
+  </div>
+</main>
+</div>
+<script>
+"use strict";
+// Research cues. 432 Hz just intonation. Definitions only. No voice audio and no wav files.
+var RESEARCH_CUES=[
+  {id:"ask",ratio:"1:1",hz:432},
+  {id:"listen",ratio:"1:1",hz:432},
+  {id:"helper",ratio:"5:4",hz:540},
+  {id:"local",ratio:"2:3",hz:288},
+  {id:"returned",ratio:"3:2",hz:648},
+  {id:"hide",ratio:"1:2",hz:216},
+  {id:"show",ratio:"2:1",hz:864},
+  {id:"leave",ratio:"1:4",hz:108}
+];
+var SOUND_SET=RESEARCH_CUES;
+// Voice V2 disc, restyled as the research entry. Same pigment as the one-dot page. Not the full-screen orb.
+var MARK={core:"#F5F5F7",edge:"#E8E8ED",stroke:"rgba(255,255,255,0.55)",strokePx:1};
+function markInner(warm){
+  var w=Math.max(0,Math.min(1,warm));
+  return [Math.round(246+9*w), Math.round(246+6*w), Math.round(252-12*w)];
+}
+var voiceCv=document.getElementById("voice-dot"), voiceCx=voiceCv.getContext("2d"), voiceT0=performance.now(), voiceRad=0.34;
+function paintVoice(){
+  var now=performance.now();
+  var dpr=Math.min(window.devicePixelRatio||1, 2);
+  var css=voiceCv.clientWidth||120;
+  var W=Math.max(2, Math.round(css*dpr));
+  if(voiceCv.width!==W||voiceCv.height!==W){ voiceCv.width=W; voiceCv.height=W; }
+  var listening=document.getElementById("voice").getAttribute("aria-pressed")==="true";
+  var breath=Math.sin(((now-voiceT0)%1600)/1600*2*Math.PI);
+  var aim=(listening?0.46:0.34)+(listening?0.01:0.012)*breath;
+  voiceRad+=(aim-voiceRad)*0.08;
+  var rad=voiceRad*(W/2);
+  var k=listening?0.72:0.48+0.08*breath;
+  voiceCx.clearRect(0,0,W,W);
+  voiceCx.save(); voiceCx.translate(W/2,W/2);
+  var reach=rad*(1.18+0.06*k);
+  var halo=voiceCx.createRadialGradient(0,0,rad*0.92,0,0,reach);
+  halo.addColorStop(0,"rgba(245,245,247,"+(0.05+0.10*Math.max(0,k)).toFixed(3)+")");
+  halo.addColorStop(1,"rgba(245,245,247,0)");
+  voiceCx.fillStyle=halo; voiceCx.beginPath(); voiceCx.arc(0,0,reach,0,2*Math.PI); voiceCx.fill();
+  var inner=markInner(0.30);
+  var g=voiceCx.createRadialGradient(-rad*0.08,-rad*0.10,Math.max(1,rad*0.04),0,0,rad);
+  g.addColorStop(0,"rgb("+inner[0]+","+inner[1]+","+inner[2]+")");
+  g.addColorStop(0.48,MARK.core);
+  g.addColorStop(0.90,MARK.core);
+  g.addColorStop(1,MARK.edge);
+  voiceCx.fillStyle=g; voiceCx.beginPath(); voiceCx.arc(0,0,rad,0,2*Math.PI); voiceCx.fill();
+  voiceCx.strokeStyle=MARK.stroke; voiceCx.lineWidth=MARK.strokePx; voiceCx.stroke();
+  voiceCx.restore();
+  requestAnimationFrame(paintVoice);
+}
+requestAnimationFrame(paintVoice);
+var audio=null;
+function tone(id){
+  var row=null;
+  for(var i=0;i<SOUND_SET.length;i++) if(SOUND_SET[i].id===id) row=SOUND_SET[i];
+  if(!row) return;
+  var Ctx=window.AudioContext||window.webkitAudioContext;
+  if(!Ctx) return;
+  if(!audio) audio=new Ctx();
+  if(audio.state==="suspended") audio.resume();
+  try{
+    var o=audio.createOscillator(), g=audio.createGain(), t=audio.currentTime;
+    o.type="sine"; o.frequency.value=row.hz;
+    g.gain.setValueAtTime(0.0001,t);
+    g.gain.exponentialRampToValueAtTime(0.045,t+0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001,t+0.16);
+    o.connect(g); g.connect(audio.destination);
+    o.start(t); o.stop(t+0.18);
+  }catch(e){}
+}
+// TODO: uploads are stubbed. The add-file and add-image icons are UI only.
+// Do not read, store, or send the chosen files. Wire them to the research turn later.
+(function(){
+  var files=document.getElementById("files");
+  var prompt=document.getElementById("prompt");
+  var statusEl=document.getElementById("hermes-status");
+  function hermesStatus(text){ statusEl.textContent=text; }
+  function fillList(ol, rows){
+    while(ol.firstChild) ol.removeChild(ol.firstChild);
+    rows.forEach(function(row){
+      var li=document.createElement("li");
+      li.textContent=row;
+      ol.appendChild(li);
+    });
+  }
+  var LOCAL="The research path is not reachable from here. Local. What is already known stays marked local.";
+  var helpers=document.getElementById("helpers");
+  function carryLocal(q){
+    hermesStatus("Hermes · Unreachable");
+    helpers.hidden=false;
+    helpers.textContent="Helpers are quiet. Local knowledge carries the question.";
+    document.getElementById("reading-question").textContent=q;
+    document.getElementById("reading-question").hidden=false;
+    document.getElementById("reading-body").textContent=LOCAL;
+    fillList(document.getElementById("local-list"), ["Local. What is already known stays marked local."]);
+    document.getElementById("source-empty").hidden=true;
+    fillPile("unknown", [LOCAL]);
+    paintHistory([{status:"Unreachable", question:q}]);
+    tone("local");
+  }
+  function showTurn(j){
+    var q=j.question||"";
+    var lead=document.getElementById("reading-question");
+    lead.textContent=q;
+    lead.hidden=!q;
+    document.getElementById("reading-body").textContent=j.reply||"I don't have a source for that.";
+    document.getElementById("answer").dataset.set="1";
+    var cites=Array.isArray(j.citations)?j.citations:[];
+    fillList(document.getElementById("citation-list"), cites.map(function(c){ return "["+c.n+"] "+(c.text||""); }));
+    fillList(document.getElementById("reading-list"), cites.map(function(c){ return c.text||""; }));
+    fillList(document.getElementById("arriving-list"), []);
+    document.getElementById("citation-empty").hidden=cites.length>0;
+    document.getElementById("reading-empty").hidden=cites.length>0;
+    document.getElementById("arriving-empty").hidden=false;
+    fillPile("found", j.found);
+    fillPile("inferred", j.inferred);
+    fillPile("unknown", j.unknown);
+    hermesStatus("Hermes · "+(j.status||"Returned"));
+    helpers.hidden=false;
+    helpers.textContent=j.status==="Unreachable"?"Helpers are quiet. Local knowledge carries the question.":"Helpers are quiet.";
+    tone(j.status==="Unreachable"?"local":"returned");
+  }
+  function fillPile(id, rows){
+    var list=document.getElementById(id+"-list");
+    var empty=document.getElementById(id+"-empty");
+    fillList(list, rows||[]);
+    if(empty) empty.hidden=(rows||[]).length>0;
+  }
+  function paintHistory(items){
+    var list=document.getElementById("history-list");
+    fillList(list, (items||[]).map(function(item){
+      var age=(typeof item.age_s==="number")?item.age_s+"s · ":"";
+      return (item.status||"")+" · "+age+(item.question||"");
+    }));
+    document.getElementById("history-empty").hidden=(items||[]).length>0;
+  }
+  fetch("/research/hermes",{cache:"no-store"}).then(function(r){ return r.ok?r.json():null; }).then(function(j){
+    if(!j){ hermesStatus("Hermes · Unreachable"); return; }
+    hermesStatus("Hermes · "+(j.status||"Idle"));
+  }).catch(function(){ hermesStatus("Hermes · Unreachable"); });
+  fetch("/research/history",{cache:"no-store"}).then(function(r){ return r.ok?r.json():null; }).then(function(j){
+    if(j&&Array.isArray(j.items)) paintHistory(j.items);
+  }).catch(function(){});
+  function openPicker(ev){ ev.preventDefault(); files.click(); }
+  document.getElementById("add-file").addEventListener("click", openPicker);
+  document.getElementById("add-image").addEventListener("click", openPicker);
+  files.addEventListener("change", function(){
+    // TODO: accept files here. Nothing is uploaded.
+    var chosen=files.files?files.files.length:0;
+    files.value="";
+    if(chosen>0) document.getElementById("source-empty").textContent="No source yet. The file was not attached.";
+  });
+  document.getElementById("voice").addEventListener("click", function(ev){
+    var btn=ev.currentTarget;
+    var on=btn.getAttribute("aria-pressed")==="true";
+    btn.setAttribute("aria-pressed", on?"false":"true");
+    tone(on?"leave":"listen");
+  });
+  function commitQuestion(){
+    var q=prompt.value.replace(/\s+/g," ").trim();
+    if(!q) return;
+    hermesStatus("Hermes · Running");
+    helpers.hidden=false;
+    helpers.textContent="Helpers: reading, sources, notebook.";
+    fillList(document.getElementById("arriving-list"), [q]);
+    document.getElementById("arriving-empty").hidden=true;
+    tone("ask");
+    setTimeout(function(){ tone("helper"); }, 180);
+    fetch("/research/ask",{method:"POST",cache:"no-store",headers:{"Content-Type":"application/json"},body:JSON.stringify({question:q})})
+      .then(function(r){ return r.ok?r.json():null; })
+      .then(function(j){
+        if(!j){ carryLocal(q); return; }
+        showTurn(j);
+        return fetch("/research/history",{cache:"no-store"}).then(function(r){ return r.ok?r.json():null; });
+      })
+      .then(function(h){ if(h&&Array.isArray(h.items)) paintHistory(h.items); })
+      .catch(function(){ carryLocal(q); });
+  }
+  prompt.addEventListener("keydown", function(ev){
+    if(ev.key==="Enter"&&!ev.shiftKey){
+      ev.preventDefault();
+      commitQuestion();
+    }
+  });
+  document.getElementById("ui-toggle").addEventListener("click", function(ev){
+    var minimal=document.body.getAttribute("data-ui")==="minimal";
+    document.body.setAttribute("data-ui", minimal?"":"minimal");
+    ev.currentTarget.textContent=minimal?"Hide interface":"Show interface";
+    ev.currentTarget.setAttribute("aria-pressed", minimal?"false":"true");
+    tone(minimal?"show":"hide");
+  });
+  document.getElementById("allow-experiment").addEventListener("click", function(ev){
+    var btn=ev.currentTarget;
+    var on=btn.getAttribute("aria-pressed")==="true";
+    btn.setAttribute("aria-pressed", on?"false":"true");
+    document.getElementById("experiment-state").textContent=on?"Waiting for permission.":"Allowed. Nothing is trained and nothing is sent.";
+  });
+  document.getElementById("ask").addEventListener("submit", function(ev){
+    ev.preventDefault();
+    commitQuestion();
+  });
+})();
+</script>
+</body>
+</html>

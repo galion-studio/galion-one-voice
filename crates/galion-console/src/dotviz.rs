@@ -473,6 +473,8 @@ mod tests {
         assert!(SCREEN_HTML.contains("data-persona=\"samantha\""));
         // Owner t653u: the voice surface is one dot. Slavik's desktop session
         // widget lives only inside #decide and stays display:none below 1100px.
+        assert!(!SCREEN_HTML.contains("to-research"), "the dot draws no research handoff");
+        assert!(!SCREEN_HTML.contains("/research"), "the dot draws no research route");
         assert!(SCREEN_HTML.contains("id=\"decide\""));
         assert!(SCREEN_HTML.contains("#decide{display:none}"));
         assert!(SCREEN_HTML.contains("@media (min-width:1100px)"));
