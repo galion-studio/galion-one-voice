@@ -1,0 +1,160 @@
+<!doctype html>
+<!-- Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+     Design sheet for the emotion halo. Not the one-dot page.
+     The product surface stays crates/galion-console/assets/v1-screen.html.
+     Nothing here is served by that host. Open this file, or import vocabulary.mjs. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0A0A0C">
+<meta name="robots" content="noindex">
+<title>Galion nebula vocabulary</title>
+<style>
+  :root {
+    --ground: #0A0A0C;
+    --dot: #F5F5F7;
+    --amber: #F5A524;
+    --violet: #7C3AED;
+  }
+  html, body { margin: 0; background: var(--ground); color: var(--dot); }
+  body {
+    min-height: 100dvh;
+    font: 400 13px/1.45 ui-sans-serif, system-ui, sans-serif;
+  }
+  .wash {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(ellipse at 50% 38%, rgba(245, 165, 36, 0.09), transparent 42%),
+      linear-gradient(168deg, rgba(245, 165, 36, 0.05), rgba(124, 58, 237, 0.08) 76%);
+  }
+  main {
+    position: relative;
+    max-width: 1120px;
+    margin: 0 auto;
+    padding: 52px 28px 80px;
+  }
+  .word {
+    margin: 0;
+    font-size: 15px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    opacity: 0.9;
+  }
+  .site { margin: 8px 0 0; letter-spacing: 0.04em; opacity: 0.42; }
+  .note {
+    max-width: 38em;
+    margin: 28px 0 40px;
+    opacity: 0.5;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+    gap: 36px 18px;
+  }
+  figure { margin: 0; background: var(--ground); }
+  canvas {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1;
+    background: var(--ground);
+  }
+  figcaption {
+    margin-top: 10px;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: lowercase;
+    opacity: 0.66;
+  }
+  figcaption span {
+    display: block;
+    margin-top: 3px;
+    letter-spacing: 0.02em;
+    text-transform: none;
+    opacity: 0.72;
+  }
+  @media (max-width: 640px) {
+    main { padding: 36px 18px 64px; }
+    .grid { gap: 28px 12px; }
+  }
+</style>
+</head>
+<body>
+<div class="wash" aria-hidden="true"></div>
+<main>
+  <p class="word">Galion</p>
+  <p class="site">galion.app</p>
+  <p class="note">Halo only, outside the dot. Amber to violet, timed from 432 Hz. A missing reading, sense off, and neutral draw nothing.</p>
+  <div class="grid" id="grid"></div>
+</main>
+<script type="module">
+import { BRAND, VOCABULARY, drawNebula, lookup } from "./vocabulary.mjs";
+
+const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const grid = document.getElementById("grid");
+const cells = VOCABULARY.map((row) => ({
+  title: row.id,
+  input: row.present
+    ? { sense: true, label: row.id, confidence: 1 }
+    : { sense: true, label: "neutral", confidence: 1 },
+}));
+cells.push({
+  title: "sense off",
+  input: { sense: false, label: "joy", valence: 0.8, arousal: 0.8, confidence: 1 },
+});
+
+const views = cells.map((cell) => {
+  const fig = document.createElement("figure");
+  const canvas = document.createElement("canvas");
+  const cap = document.createElement("figcaption");
+  const look = lookup(cell.input);
+  const detail = document.createElement("span");
+  cap.textContent = cell.title;
+  detail.textContent = look.present
+    ? `${look.ratio} · ${look.driftHz.toFixed(3)} Hz`
+    : "no cloud";
+  cap.appendChild(detail);
+  fig.append(canvas, cap);
+  grid.appendChild(fig);
+  return { canvas, input: cell.input };
+});
+
+function frame(now) {
+  const t = reduce ? 0 : now / 1000;
+  for (const view of views) {
+    const css = view.canvas.clientWidth || 168;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const px = Math.max(1, Math.round(css * dpr));
+    if (view.canvas.width !== px) {
+      view.canvas.width = px;
+      view.canvas.height = px;
+    }
+    const ctx = view.canvas.getContext("2d");
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, css, css);
+    const dot = css * 0.11;
+    drawNebula(ctx, view.input, t, {
+      cx: css / 2,
+      cy: css / 2,
+      inner: dot,
+      outer: css * 0.46,
+    });
+    ctx.beginPath();
+    ctx.arc(css / 2, css / 2, dot, 0, Math.PI * 2);
+    ctx.fillStyle = BRAND.dot;
+    ctx.fill();
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = "rgba(255,255,255,0.55)";
+    ctx.stroke();
+  }
+  if (!reduce && !document.hidden) requestAnimationFrame(frame);
+}
+
+requestAnimationFrame(frame);
+window.addEventListener("resize", () => requestAnimationFrame(frame));
+</script>
+</body>
+</html>
