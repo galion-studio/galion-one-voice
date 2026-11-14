@@ -1565,6 +1565,7 @@ mod tests {
                 "Ask first",
                 "data-voice-to-voice=\"on\"",
                 "id=\"ui-toggle\"",
+                "id=\"silence\"",
                 "id=\"helpers\"",
                 "ratio:\"5:4\"",
                 "Local. What is already known stays marked local.",
@@ -1572,6 +1573,16 @@ mod tests {
                 "hz:216",
                 "hz:540",
                 "hz:648",
+                "hz:864",
+                "hz:108",
+                "id:\"ask-sent\"",
+                "id:\"thinking\"",
+                "id:\"answer-ready\"",
+                "id:\"source-attached\"",
+                "id:\"error\"",
+                "galion-one-silence",
+                "data-silence",
+                "docs/07-sound-guide/SOUND-LANGUAGE.md",
                 "G.A.L.I.O.N. — General Autonomous Local Intelligence Open Network",
                 "Developed and distributed by Galion Labs",
                 "Perpetual Open MIT License",
@@ -1589,6 +1600,13 @@ mod tests {
             assert!(body.contains("<canvas id=\"voice-dot\""), "the restyled Voice V2 dot is the entry");
             assert!(!body.contains("id=\"s\""), "research is not the full-screen one-dot page");
             assert!(!body.contains("data-mark=\"orb\""), "the full-screen orb stays on /one");
+            assert!(!body.contains("hz:288"), "research stays on 2:1, 3:2, 5:4 and the 216/108 hum");
+            assert!(!body.contains("speechSynthesis"), "research cues are not voice audio");
+            assert!(!body.contains(".wav"), "research cues are not audio files");
+            assert!(body.contains("playCues([\"ask-sent\",\"thinking\"])"), "ask sent then thinking");
+            assert!(body.contains("tone(\"source-attached\")"), "a landed file cues source attached");
+            assert!(body.contains("tone(failed?\"error\":\"answer-ready\")"), "a reply cues answer ready, a bad standing cues error");
+            assert!(body.contains("tone(\"error\")"), "a failed ask or file cues error");
         }
         w.close().unwrap();
     }

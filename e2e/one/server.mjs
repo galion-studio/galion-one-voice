@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "../..");
 const html = readFileSync(join(root, "crates/galion-console/assets/v1-screen.html"));
+const researchHtml = readFileSync(join(root, "crates/galion-console/assets/research.html"));
 const vocab = readFileSync(join(root, "crates/galion-console/assets/nebula/vocabulary.mjs"));
 
 const neutral = {
@@ -30,6 +31,38 @@ const state = {
 };
 let tMs = 1000;
 let holdDot = false;
+
+const research = {
+  failAsk: false,
+  failSource: false,
+  status: "Found",
+  reply: "The wash is amber to violet.",
+  sources: [],
+  nextId: 1,
+};
+
+function resetResearch() {
+  research.failAsk = false;
+  research.failSource = false;
+  research.status = "Found";
+  research.reply = "The wash is amber to violet.";
+  research.sources = [];
+  research.nextId = 1;
+}
+
+function sendJson(res, code, obj) {
+  const body = JSON.stringify(obj);
+  res.writeHead(code, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
+  res.end(body);
+}
+
+function readBody(req) {
+  return new Promise((resolve) => {
+    const chunks = [];
+    req.on("data", (chunk) => chunks.push(chunk));
+    req.on("end", () => resolve(Buffer.concat(chunks).toString()));
+  });
+}
 
 function dotBody() {
   tMs += 80;
@@ -98,6 +131,86 @@ const server = createServer((req, res) => {
   if (req.method === "POST" && url.pathname === "/session") {
     res.writeHead(200, { "content-type": "application/json" });
     res.end('{"token":"desktop-e2e"}');
+    return;
+  }
+  if (req.method === "GET" && (url.pathname === "/research" || url.pathname === "/research/")) {
+    res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
+    res.end(researchHtml);
+    return;
+  }
+  if (req.method === "GET" && url.pathname === "/research/hermes") {
+    sendJson(res, 200, { app: "hermes", status: "Idle", key: "none" });
+    return;
+  }
+  if (req.method === "GET" && url.pathname === "/research/history") {
+    sendJson(res, 200, { items: [] });
+    return;
+  }
+  if (req.method === "GET" && url.pathname === "/research/sources") {
+    sendJson(res, 200, { sources: research.sources });
+    return;
+  }
+  if (req.method === "POST" && url.pathname === "/__research") {
+    readBody(req).then((raw) => {
+      const patch = JSON.parse(raw || "{}");
+      if (patch.reset) resetResearch();
+      if ("failAsk" in patch) research.failAsk = Boolean(patch.failAsk);
+      if ("failSource" in patch) research.failSource = Boolean(patch.failSource);
+      if (typeof patch.status === "string") research.status = patch.status;
+      if (typeof patch.reply === "string") research.reply = patch.reply;
+      sendJson(res, 200, { ok: true });
+    });
+    return;
+  }
+  if (req.method === "POST" && url.pathname === "/research/sources") {
+    readBody(req).then((raw) => {
+      if (research.failSource) {
+        sendJson(res, 500, { error: "not attached" });
+        return;
+      }
+      let body = {};
+      try {
+        body = JSON.parse(raw || "{}");
+      } catch {
+        body = {};
+      }
+      const name = typeof body.name === "string" && body.name ? body.name : "file";
+      const kind = body.kind === "image" ? "image" : "file";
+      const text = typeof body.text === "string" ? body.text : "";
+      research.sources.push({
+        id: "s" + research.nextId,
+        name,
+        kind,
+        chars: kind === "image" ? 0 : text.length,
+      });
+      research.nextId += 1;
+      sendJson(res, 200, { sources: research.sources });
+    });
+    return;
+  }
+  if (req.method === "POST" && url.pathname === "/research/ask") {
+    readBody(req).then((raw) => {
+      if (research.failAsk) {
+        sendJson(res, 500, { error: "unreachable" });
+        return;
+      }
+      let question = "";
+      try {
+        const body = JSON.parse(raw || "{}");
+        question = typeof body.question === "string" ? body.question : "";
+      } catch {
+        question = "";
+      }
+      sendJson(res, 200, {
+        question,
+        reply: research.reply,
+        status: research.status,
+        citations: [],
+        found: [research.reply],
+        inferred: [],
+        unknown: [],
+      });
+    });
     return;
   }
   res.writeHead(204);

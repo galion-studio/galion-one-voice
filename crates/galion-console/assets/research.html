@@ -60,7 +60,7 @@ body{min-height:100vh;min-height:100dvh;
 textarea{display:block;width:100%;box-sizing:border-box;min-height:132px;margin:0;padding:0 2px;border:0;resize:none;
   background:transparent;color:var(--ink);font:28px/1.35 system-ui,sans-serif;letter-spacing:-.02em;outline:none}
 textarea::placeholder{color:color-mix(in srgb, var(--ink) 36%, transparent)}
-.tools{display:flex;align-items:center;gap:8px;margin-top:8px}
+.tools{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-top:8px;min-width:0}
 .tools button,.voice{appearance:none;display:grid;place-items:center;padding:0;cursor:pointer;color:var(--ink)}
 .tools button{width:40px;height:40px;border-radius:999px;border:1px solid color-mix(in srgb, var(--ink) 16%, transparent);background:transparent;color:color-mix(in srgb, var(--ink) 72%, transparent)}
 .tools button:hover,.tools button:focus-visible{border-color:color-mix(in srgb, var(--amber) 70%, transparent);color:var(--ink);outline:none}
@@ -106,7 +106,8 @@ textarea::placeholder{color:color-mix(in srgb, var(--ink) 36%, transparent)}
 #citation-list{color:color-mix(in srgb, var(--ink) 78%, transparent);font:14px/1.45 system-ui,sans-serif}
 #citation-list .mark{color:var(--amber);margin-right:.4em}
 #helpers{margin:18px 0 0;text-align:center;font:13px/1.4 system-ui,sans-serif;letter-spacing:.04em;color:color-mix(in srgb, var(--ink) 46%, transparent)}
-#ui-toggle{width:auto;height:40px;padding:0 14px;border-radius:999px;font:12px/1 system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase}
+#ui-toggle,#silence{width:auto;height:40px;padding:0 14px;border-radius:999px;font:12px/1 system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase}
+#silence[aria-pressed="true"]{background:var(--sky);color:var(--ground);border-color:var(--sky)}
 body[data-ui="minimal"] #rail,
 body[data-ui="minimal"] .work,
 body[data-ui="minimal"] #add-image{display:none}
@@ -120,14 +121,15 @@ body[data-ui="minimal"] #helpers{margin:0}
   .ask{flex-direction:column;align-items:stretch}
   textarea{font-size:22px;min-height:112px}
   .voice{align-self:center}
-  .app{grid-template-columns:1fr}
+  .app{grid-template-columns:minmax(0,1fr)}
+  #rail,.stage,.ask,.field{min-width:0}
   #rail{border-right:0;border-bottom:1px solid color-mix(in srgb, var(--ink) 12%, transparent)}
   .piles,.book{grid-template-columns:1fr}
   .work{grid-template-columns:1fr}
 }
 </style>
 </head>
-<body data-product="research" data-voice="galion-research" data-voice-to-voice="on" data-standard="432" data-ui="minimal">
+<body data-product="research" data-voice="galion-research" data-voice-to-voice="on" data-standard="432" data-ui="minimal" data-silence="off" data-resonance="on" data-cues="">
 <div class="app">
 <aside id="rail">
   <p class="brand">Galion Research</p>
@@ -157,6 +159,7 @@ body[data-ui="minimal"] #helpers{margin:0}
         </button>
         <input id="files" type="file" multiple hidden tabindex="-1" aria-hidden="true">
         <button type="button" id="ui-toggle" aria-pressed="true">Show interface</button>
+        <button type="button" id="silence" aria-pressed="false">Silence</button>
         <span class="hint" id="commit-hint">Return enqueues the question</span>
       </div>
     </div>
@@ -207,18 +210,21 @@ body[data-ui="minimal"] #helpers{margin:0}
 </div>
 <script>
 "use strict";
-// Research cues. 432 Hz just intonation. Definitions only. No voice audio and no wav files.
+// Research cues. Exact Hz: docs/07-sound-guide/SOUND-LANGUAGE.md
+// 432 Hz just intonation (1:1, 5:4, 3:2, 2:1; hum 216/108). Synthesized sines only.
 var RESEARCH_CUES=[
-  {id:"ask",ratio:"1:1",hz:432},
+  {id:"ask-sent",ratio:"1:1",hz:432},
+  {id:"thinking",ratio:"5:4",hz:540},
+  {id:"answer-ready",ratio:"3:2",hz:648},
+  {id:"source-attached",ratio:"2:1",hz:864},
+  {id:"error",ratio:"1:2",hz:216},
   {id:"listen",ratio:"1:1",hz:432},
-  {id:"helper",ratio:"5:4",hz:540},
-  {id:"local",ratio:"2:3",hz:288},
-  {id:"returned",ratio:"3:2",hz:648},
   {id:"hide",ratio:"1:2",hz:216},
   {id:"show",ratio:"2:1",hz:864},
   {id:"leave",ratio:"1:4",hz:108}
 ];
 var SOUND_SET=RESEARCH_CUES;
+window.GALION_RESEARCH=SOUND_SET.map(function(row){ return {id:row.id, ratio:row.ratio, hz:row.hz}; });
 // Voice V2 disc, restyled as the research entry. Same pigment as the one-dot page. Not the full-screen orb.
 var MARK={core:"#F5F5F7",edge:"#E8E8ED",stroke:"rgba(255,255,255,0.55)",strokePx:1};
 function markInner(warm){
@@ -258,24 +264,70 @@ function paintVoice(){
 }
 requestAnimationFrame(paintVoice);
 var audio=null;
-function tone(id){
-  var row=null;
-  for(var i=0;i<SOUND_SET.length;i++) if(SOUND_SET[i].id===id) row=SOUND_SET[i];
-  if(!row) return;
-  var Ctx=window.AudioContext||window.webkitAudioContext;
-  if(!Ctx) return;
-  if(!audio) audio=new Ctx();
-  if(audio.state==="suspended") audio.resume();
+var silence=false;
+function silenceRequested(){
+  try{ if(localStorage.getItem("galion-one-silence")==="1") return true; }catch(e){}
+  return new URLSearchParams(location.search).get("silence")==="1";
+}
+function setSilence(on){
+  silence=!!on;
+  document.body.setAttribute("data-silence", silence?"on":"off");
+  document.body.setAttribute("data-resonance", silence?"off":"on");
+  var btn=document.getElementById("silence");
+  if(btn) btn.setAttribute("aria-pressed", silence?"true":"false");
+  try{ localStorage.setItem("galion-one-silence", silence?"1":"0"); }catch(e){}
+}
+function cueRow(id){
+  for(var i=0;i<SOUND_SET.length;i++) if(SOUND_SET[i].id===id) return SOUND_SET[i];
+  return null;
+}
+function rememberCue(id){
+  var log=(document.body.getAttribute("data-cues")||"").split(",").filter(Boolean);
+  log.push(id);
+  document.body.setAttribute("data-cues", log.slice(-16).join(","));
+  document.body.setAttribute("data-cue", id);
+}
+function scheduleCue(id, when){
+  var row=cueRow(id);
+  if(!row||silence) return;
+  rememberCue(id);
+  if(!audio) return;
   try{
-    var o=audio.createOscillator(), g=audio.createGain(), t=audio.currentTime;
+    var o=audio.createOscillator(), g=audio.createGain();
     o.type="sine"; o.frequency.value=row.hz;
-    g.gain.setValueAtTime(0.0001,t);
-    g.gain.exponentialRampToValueAtTime(0.045,t+0.02);
-    g.gain.exponentialRampToValueAtTime(0.0001,t+0.16);
+    g.gain.setValueAtTime(0.0001, when);
+    g.gain.exponentialRampToValueAtTime(0.045, when+0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, when+0.16);
     o.connect(g); g.connect(audio.destination);
-    o.start(t); o.stop(t+0.18);
+    o.start(when); o.stop(when+0.18);
   }catch(e){}
 }
+function playCues(ids){
+  if(silence) return;
+  var Ctx=window.AudioContext||window.webkitAudioContext;
+  if(!audio&&Ctx){
+    try{ audio=new Ctx(); }catch(e){ audio=null; }
+  }
+  if(audio&&audio.state==="suspended"){
+    try{ audio.resume(); }catch(e){}
+  }
+  var t=audio?audio.currentTime:0;
+  for(var i=0;i<ids.length;i++) scheduleCue(ids[i], t+i*0.2);
+}
+function tone(id){ playCues([id]); }
+setSilence(silenceRequested());
+document.getElementById("silence").addEventListener("click", function(ev){
+  ev.preventDefault();
+  setSilence(!silence);
+});
+document.addEventListener("keydown", function(ev){
+  if(ev.key!=="s"&&ev.key!=="S") return;
+  if(ev.metaKey||ev.ctrlKey||ev.altKey) return;
+  var tag=(ev.target&&ev.target.tagName)||"";
+  if(tag==="TEXTAREA"||tag==="INPUT") return;
+  ev.preventDefault();
+  setSilence(!silence);
+});
 // Attached files are Sources. The desk cites only those ids.
 (function(){
   var files=document.getElementById("files");
@@ -318,7 +370,7 @@ function tone(id){
     }
     fillPile("unknown", [LOCAL]);
     paintHistory([{status:"Unreachable", question:q}]);
-    tone("local");
+    tone("error");
   }
   function showTurn(j){
     var q=j.question||"";
@@ -342,7 +394,8 @@ function tone(id){
     hermesStatus("Hermes · "+standing);
     helpers.hidden=false;
     helpers.textContent=standing==="Unreachable"?"Helpers are quiet. Local knowledge carries the question.":standing;
-    tone(j.status==="Unreachable"?"local":"returned");
+    var failed=standing==="Unreachable"||standing==="Denied"||j.status==="Timeout"||j.status==="NotFound";
+    tone(failed?"error":"answer-ready");
   }
   function fillPile(id, rows){
     var list=document.getElementById(id+"-list");
@@ -373,11 +426,17 @@ function tone(id){
     fetch("/research/sources",{method:"POST",cache:"no-store",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:file.name,text:text,kind:kind})})
       .then(function(r){ return r.ok?r.json():null; })
       .then(function(j){
-        if(j&&Array.isArray(j.sources)) paintSources(j.sources);
-        else if(!attached.length) document.getElementById("source-empty").textContent="The file was not attached.";
+        if(j&&Array.isArray(j.sources)){
+          paintSources(j.sources);
+          tone("source-attached");
+        }else{
+          if(!attached.length) document.getElementById("source-empty").textContent="The file was not attached.";
+          tone("error");
+        }
       })
       .catch(function(){
         if(!attached.length) document.getElementById("source-empty").textContent="The file was not attached.";
+        tone("error");
       })
       .then(function(){
         pending=Math.max(0,pending-1);
@@ -408,6 +467,7 @@ function tone(id){
       };
       reader.onerror=function(){
         if(!attached.length) document.getElementById("source-empty").textContent="The file was not attached.";
+        tone("error");
       };
       reader.readAsText(file);
     });
@@ -427,8 +487,7 @@ function tone(id){
     helpers.textContent="Helpers: reading, sources, notebook.";
     fillList(document.getElementById("arriving-list"), [q]);
     document.getElementById("arriving-empty").hidden=true;
-    tone("ask");
-    setTimeout(function(){ tone("helper"); }, 180);
+    playCues(["ask-sent","thinking"]);
     fetch("/research/ask",{method:"POST",cache:"no-store",headers:{"Content-Type":"application/json"},body:JSON.stringify({question:q})})
       .then(function(r){ return r.ok?r.json():null; })
       .then(function(j){
