@@ -1,0 +1,12 @@
+# Galion Voice — Perpetual Open MIT License
+# Copyright (c) 2026 Maciej Grajczyk.
+# G.A.L.I.O.N. — General Autonomous Local Intelligence Open Network
+# Developed and distributed by Galion Labs
+# Perpetual Open MIT License
+# Copyright © 2026 Galion Labs. All rights reserved.
+#
+# Operator override for the stage unit. Copy this file, set SHA to the
+# release directory name under /opt/galion/voice/release/, then render.
+# The unit template Description stays free of a commit hash.
+# scripts/deploy/render-stage-unit.sh reads SHA= and writes the drop-in.
+SHA=
