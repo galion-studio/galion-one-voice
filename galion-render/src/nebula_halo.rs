@@ -379,13 +379,21 @@ mod tests {
         let page = include_str!("../../crates/galion-console/assets/v1-screen.html");
         assert!(page.contains("drawNebula"));
         assert!(page.contains("/nebula/vocabulary.mjs"));
-        assert!(page.contains("id:\"arrive\",hz:216"));
-        assert!(page.contains("id:\"listen\",hz:432"));
-        assert!(page.contains("id:\"think\",hz:540"));
-        assert!(page.contains("id:\"speak\",hz:648"));
-        assert!(page.contains("id:\"yes\",hz:864"));
-        assert!(page.contains("id:\"no\",hz:288"));
-        assert!(page.contains("id:\"leave\",hz:108"));
+        assert!(page.contains("const FUND=432"));
+        assert!(page.contains("const HUM=[FUND/4, FUND/2]"));
+        for id in ["boot", "shutdown", "notification", "wake", "done", "approval", "error"] {
+            assert!(page.contains(&format!("id:\"{id}\"")), "{id}");
+        }
+        assert!(page.contains("FUND*(5/4)"));
+        assert!(page.contains("FUND*(3/2)"));
+        assert!(page.contains("FUND*2"));
+        assert!(page.contains("id=\"silence\""));
+        assert!(page.contains("function setSilence"));
+        assert!(page.contains("dataset.resonance"));
+        assert!(page.contains("createOscillator"));
+        assert!(!page.contains("id:\"arrive\""));
+        assert!(!page.contains("hz:288"));
+        assert!(!page.contains("howler") && !page.contains("tone.js"));
         assert!(page.contains("id=\"decide\""));
         assert!(page.contains("#decide{display:none}"));
         assert!(page.contains("function productIsOne"));

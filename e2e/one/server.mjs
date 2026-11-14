@@ -29,6 +29,7 @@ const state = {
   approval: false,
 };
 let tMs = 1000;
+let holdDot = false;
 
 function dotBody() {
   tMs += 80;
@@ -53,6 +54,12 @@ function dotBody() {
 const port = Number(process.env.PORT || 4173);
 const server = createServer((req, res) => {
   const url = new URL(req.url || "/", "http://127.0.0.1");
+  if (req.method === "POST" && (url.pathname === "/__hold" || url.pathname === "/__release")) {
+    holdDot = url.pathname === "/__hold";
+    res.writeHead(204);
+    res.end();
+    return;
+  }
   if (req.method === "POST" && url.pathname === "/__state") {
     const chunks = [];
     req.on("data", (chunk) => chunks.push(chunk));
@@ -79,6 +86,11 @@ const server = createServer((req, res) => {
     return;
   }
   if (req.method === "GET" && url.pathname === "/dot") {
+    if (holdDot) {
+      res.writeHead(204);
+      res.end();
+      return;
+    }
     res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
     res.end(dotBody());
     return;

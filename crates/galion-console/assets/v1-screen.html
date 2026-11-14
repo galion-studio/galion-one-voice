@@ -55,6 +55,9 @@ canvas{display:block;position:fixed;inset:0;width:100%;height:100%;width:100dvw;
     border-radius:999px;padding:6px 14px;font:inherit;cursor:pointer}
   #decide button[aria-pressed="true"]{background:#F5A524;color:#0A0A0C;border-color:#F5A524}
 }
+#silence{position:fixed;left:0;bottom:0;z-index:3;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;
+  clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;border:0;
+  background:#0A0A0C;color:#F5F5F7;font:16px/1.2 system-ui,sans-serif}
 </style>
 <script type="module">
 import { drawNebula } from "/nebula/vocabulary.mjs";
@@ -69,6 +72,8 @@ window.drawNebula = drawNebula;
   <div class="row" data-id="english"><span class="q">Keep replies in English</span><button type="button" data-yes="yes">Yes</button><button type="button" data-yes="no">No</button></div>
 </div>
 <!-- /decide -->
+<button id="silence" type="button" aria-pressed="false">Silence</button>
+<!-- /silence -->
 <script>
 "use strict";
 const TOK={dot:"#F5F5F7",base:"#0A0A0C",from:"#F5A524",to:"#7C3AED"};
@@ -95,7 +100,7 @@ const AI_DISCLOSURE={hr:"Razgovarate s umjetnom inteligencijom. Galion je AI asi
 let aiDisclosed=false;
 const t0=performance.now();
 let latest=null, lastOk=0, lastT=-1, inflight=0, everOk=false;
-let shown="idle", cand="idle", candSince=0, soundMode="";          // displayed mode + hysteresis
+let shown="idle", cand="idle", candSince=0;          // displayed mode + hysteresis
 let lastFrame=performance.now();
 let micState="off"; // off | pending | on | denied
 let micStream=null, micCtx=null, micAnalyser=null, micData=null, micRms=0, micFloor=0.004, micPosting=false;
@@ -216,34 +221,71 @@ function clearFeed(){
   latest.nebula={schema:FEED_SCHEMA,estimate:"none",present:false,distribution:false,reason:"disconnected",origin:"client",weights:null};
 }
 function productIsOne(){ const p=location.pathname; return p==="/one"||p==="/one/"; }
-const SOUND_SET=[
-  {id:"arrive",hz:216},
-  {id:"listen",hz:432},
-  {id:"think",hz:540},
-  {id:"speak",hz:648},
-  {id:"yes",hz:864},
-  {id:"no",hz:288},
-  {id:"leave",hz:108}
+// Galion OS tones. 432 Hz just intonation: 2:1, 3:2, 5:4. Warm hum at 216 and 108.
+// boot, shutdown, notification, wake (Galion One wake), done (task done),
+// approval (approval needed), error. Oscillators only. No audio files.
+
+const FUND=432;
+const HUM=[FUND/4, FUND/2];
+const OS_SOUNDS=[
+  {id:"boot", notes:[FUND/4, FUND/2, FUND]},
+  {id:"shutdown", notes:[FUND, FUND/2, FUND/4]},
+  {id:"notification", notes:[FUND, FUND*(5/4)]},
+  {id:"wake", notes:[FUND/2, FUND, FUND*(3/2)]},
+  {id:"done", notes:[FUND*(5/4), FUND*(3/2), FUND*2]},
+  {id:"approval", notes:[FUND, FUND*(3/2)]},
+  {id:"error", notes:[FUND/2, FUND/4]}
 ];
-function playSound(id){
-  const one=productIsOne();
-  if(!one&&id!=="yes"&&id!=="no") return;
-  const tone=SOUND_SET.find(s=>s.id===id);
-  if(!tone||!micCtx) return;
-  try{
-    const o=micCtx.createOscillator(), g=micCtx.createGain(), t=micCtx.currentTime;
-    o.type="sine"; o.frequency.value=tone.hz;
-    g.gain.setValueAtTime(0.0001,t);
-    g.gain.exponentialRampToValueAtTime(0.045,t+0.02);
-    g.gain.exponentialRampToValueAtTime(0.0001,t+0.16);
-    o.connect(g); g.connect(micCtx.destination);
-    o.start(t); o.stop(t+0.18);
-  }catch(e){}
+window.GALION_OS=OS_SOUNDS.map(s=>({id:s.id, notes:s.notes.slice(), hum:HUM.slice()}));
+let silence=false, booted=false, approvalOn=false, haloHeard="", prevShown="";
+function silenceRequested(){
+  try{ if(localStorage.getItem("galion-one-silence")==="1") return true; }catch(e){}
+  return new URLSearchParams(location.search).get("silence")==="1";
 }
-function cueSound(mode){
-  if(!productIsOne()||mode===soundMode) return;
-  soundMode=mode;
-  playSound(mode==="listening"?"listen":mode==="thinking"?"think":mode==="speaking"?"speak":mode==="offline"?"leave":"arrive");
+function setSilence(on){
+  silence=!!on;
+  document.body.dataset.silence=silence?"on":"off";
+  document.body.dataset.resonance=silence?"off":"on";
+  const btn=document.getElementById("silence");
+  if(btn) btn.setAttribute("aria-pressed", silence?"true":"false");
+  try{ localStorage.setItem("galion-one-silence", silence?"1":"0"); }catch(e){}
+}
+function toneContext(){
+  try{
+    const AC=window.AudioContext||window.webkitAudioContext;
+    if(!AC) return null;
+    if(!micCtx) micCtx=new AC({latencyHint:"interactive"});
+    if(micCtx.state==="suspended") micCtx.resume().catch(()=>{});
+    return micCtx;
+  }catch(e){ return null; }
+}
+function scheduleSine(ctx,hz,start,dur,peak){
+  const o=ctx.createOscillator(), g=ctx.createGain();
+  o.type="sine"; o.frequency.value=hz;
+  g.gain.setValueAtTime(0.0001, start);
+  g.gain.exponentialRampToValueAtTime(peak, start+0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001, start+Math.max(0.05,dur));
+  o.connect(g); g.connect(ctx.destination);
+  o.start(start); o.stop(start+dur+0.02);
+}
+function playSound(id){
+  if(!productIsOne()||silence) return;
+  const tone=OS_SOUNDS.find(s=>s.id===id);
+  if(!tone) return;
+  const ctx=toneContext();
+  if(ctx){
+    try{
+      const t=ctx.currentTime, step=0.12;
+      tone.notes.forEach((hz,i)=>scheduleSine(ctx,hz,t+i*step,step+0.04,0.05));
+      const dur=tone.notes.length*step+0.36;
+      for(const hz of HUM) scheduleSine(ctx,hz,t,dur,0.016);
+    }catch(e){}
+  }
+  const log=(cv.dataset.cues||"").split(",").filter(Boolean);
+  log.push(id);
+  cv.dataset.cues=log.slice(-16).join(",");
+  cv.dataset.cue=id;
+  cv.dataset.resonance="on";
 }
 function paintHalo(tms,W,H,mark){
   const input=haloInput();
@@ -251,8 +293,11 @@ function paintHalo(tms,W,H,mark){
   if(typeof drawNebula==="function"){
     drew=drawNebula(cx,input,tms/1000,{cx:W/2,cy:H/2,inner:mark,outer:mark*2.6})===true;
   }
-  cv.dataset.nebula=drew?"gas":"hold";
+  const state=drew?"gas":"hold";
+  cv.dataset.nebula=state;
   cv.dataset.halo=input&&typeof input.label==="string"&&input.label?input.label:"hold";
+  if(productIsOne()&&state==="gas"&&haloHeard!=="gas") playSound("notification");
+  haloHeard=state;
 }
 function paintBg(tms,b){
   const base=hex(b.base),A=hex(b.from),V=hex(b.to);
@@ -387,7 +432,11 @@ function draw(){
   const side=Math.min(W,H);
   const rad=Math.max(1, clamp(rP,0,0.5)*(0.97+0.03*k)*side);
   if(shown==="offline") clearFeed();
-  cueSound(shown);
+  if(productIsOne()){
+    if(prevShown&&prevShown!=="offline"&&shown==="offline") playSound("shutdown");
+    if(prevShown==="speaking"&&shown!=="speaking"&&shown!=="offline") playSound("done");
+  }
+  prevShown=shown;
   paintHalo(now-t0,W,H,rad);
   const presence=shown==="offline"?0.5:1;
   cx.save(); cx.translate(W/2,H/2); cx.globalAlpha=presence;
@@ -430,6 +479,12 @@ function pollOnce(){
       lastT=t; latest=j; lastOk=performance.now();
       if(j.persona) cv.dataset.persona=j.persona;
       if(!everOk){everOk=true;}
+      if(productIsOne()&&!booted){ booted=true; playSound("boot"); }
+      if(productIsOne()){
+        const want=j.approval===true;
+        if(want&&!approvalOn) playSound("approval");
+        approvalOn=want;
+      }
       onReply(j.reply);
     })
     .catch(()=>{})
@@ -438,7 +493,11 @@ function pollOnce(){
 setInterval(pollOnce,POLL_MS);
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible") pollOnce();});
 
-function showErr(msg){ if(msg) try{console.warn("[galion]",msg);}catch(e){} }
+function showErr(msg){
+  if(!msg) return;
+  try{console.warn("[galion]",msg);}catch(e){}
+  if(productIsOne()) playSound("error");
+}
 function hideHint(){}
 
 function tickMic(){
@@ -474,7 +533,7 @@ async function enableMic(){
   // Create + unlock the AudioContext synchronously inside the tap (before any await) so that
   // mobile Safari/Chrome let us play reply audio later. Reused for capture and playback.
   ensureAudio();
-  if(productIsOne()) playSound("arrive");
+  if(productIsOne()) playSound("wake");
   try{
     micStream=await navigator.mediaDevices.getUserMedia({
       audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true,channelCount:1},
@@ -512,6 +571,9 @@ function onActivate(e){
 document.addEventListener("touchend",onActivate,{passive:false});
 document.addEventListener("click",onActivate);
 addEventListener("keydown",e=>{
+  if((e.key==="s"||e.key==="S")&&productIsOne()&&!e.metaKey&&!e.ctrlKey&&!e.altKey){
+    e.preventDefault(); setSilence(!silence); return;
+  }
   if(e.key==="Enter"||e.key===" "){e.preventDefault();enableMic();}
 });
 async function sendText(text){
@@ -705,10 +767,15 @@ document.addEventListener("visibilitychange",()=>{
   if(document.visibilityState==="visible"&&micCtx&&micCtx.state==="suspended") micCtx.resume().catch(()=>{});
 });
 
+addEventListener("pagehide",()=>{ if(productIsOne()) playSound("shutdown"); });
+
 (function mountSession(){
   const one=productIsOne();
   document.body.dataset.product=one?"one":"samantha";
   document.body.dataset.session=one?"one":"samantha";
+  setSilence(silenceRequested());
+  const quiet=document.getElementById("silence");
+  if(quiet) quiet.addEventListener("click",e=>{ e.preventDefault(); e.stopPropagation(); setSilence(!silence); });
   if(one){ document.title="Galion One"; cv.dataset.persona="galion"; return; }
   const box=document.getElementById("decide");
   if(!box) return;
@@ -728,7 +795,6 @@ document.addEventListener("visibilitychange",()=>{
     const row=btn.closest(".row");
     if(!row) return;
     picks[row.dataset.id]=btn.dataset.yes;
-    playSound(btn.dataset.yes==="yes"?"yes":"no");
     row.querySelectorAll("button").forEach(b=>b.setAttribute("aria-pressed", b===btn?"true":"false"));
     postIfComplete();
   });

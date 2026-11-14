@@ -477,9 +477,14 @@ mod tests {
         assert!(SCREEN_HTML.contains("#decide{display:none}"));
         assert!(SCREEN_HTML.contains("@media (min-width:1100px)"));
         assert!(SCREEN_HTML.contains("<!-- /decide -->"));
+        assert!(SCREEN_HTML.contains("id=\"silence\""));
+        assert!(SCREEN_HTML.contains("<!-- /silence -->"));
         let (head, tail) = SCREEN_HTML.split_once("<div id=\"decide\">").expect("decide");
         let (_, after) = tail.split_once("<!-- /decide -->").expect("decide end");
         let voice = format!("{head}{after}");
+        let (pre, post) = voice.split_once("<button id=\"silence\"").expect("silence");
+        let (_, rest) = post.split_once("<!-- /silence -->").expect("silence end");
+        let voice = format!("{pre}{rest}");
         for tag in ["<div", "<form", "<input", "<button", "<label", "<span", "<p>", "<a "] {
             assert!(!voice.contains(tag), "{tag} is on the voice screen");
         }
