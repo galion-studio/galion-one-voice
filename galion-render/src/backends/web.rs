@@ -12,6 +12,10 @@
 //!                  [`TurnInbox`]; the host polls it with [`TurnInbox::take`] (never blocks).
 //!                  Answers `202 {"id":N,"bytes":B,"format":"wav"|"pcm16"}`.
 //!                  `X-Galion-Proceed: auto` is allowed. It is not a second route.
+//!                  `Host: voice.galion.app` marks the turn as the voice stack. A research
+//!                  cue on that turn is handed to `POST /research/ask` and spoken back.
+//!                  `Host: galion.app` (the One page) is not marked, and this route does
+//!                  not add a talk path for `/one`.
 //!   GET /reply/<id>.wav -> reply audio the host published with [`ReplyBox::set_reply`];
 //!                  `audio/wav`, 404 when unknown/evicted.
 //!   GET / , /screen, /one, /one/ -> the caller's single-screen HTML page, only when one was set with
@@ -153,6 +157,9 @@ pub struct Turn {
     /// Exact request body bytes.
     pub bytes: Vec<u8>,
     pub received_at: Instant,
+    /// `true` when the request `Host` is the voice stack (`voice.galion.app`).
+    /// The One page on `galion.app` stays `false`.
+    pub voice_stack: bool,
 }
 
 impl Turn {
@@ -188,14 +195,19 @@ pub struct TurnInbox { st: Arc<Mutex<InboxState>>, next_id: Arc<AtomicU64> }
 impl TurnInbox {
     /// Enqueue bytes as a new turn and return its id (also used by tests / embedding).
     /// When [`MAX_PENDING_TURNS`] are already pending the oldest is dropped.
-    pub fn push(&self, format: TurnFormat, mut bytes: Vec<u8>) -> u64 {
+    /// The turn is not the voice stack.
+    pub fn push(&self, format: TurnFormat, bytes: Vec<u8>) -> u64 {
+        self.push_from(format, bytes, false)
+    }
+    /// As [`Self::push`], with the voice-stack flag from the request host.
+    pub fn push_from(&self, format: TurnFormat, mut bytes: Vec<u8>, voice_stack: bool) -> u64 {
         let id = self.next_id.fetch_add(1, Ordering::SeqCst) + 1;
         if let Ok(mut g) = self.st.lock() {
             while g.q.len() >= MAX_PENDING_TURNS {
                 g.q.pop_front();
                 g.dropped += 1;
             }
-            g.q.push_back(Turn { id, format, bytes, received_at: Instant::now() });
+            g.q.push_back(Turn { id, format, bytes, received_at: Instant::now(), voice_stack });
         } else {
             zeroise_bytes(&mut bytes);
         }
@@ -673,6 +685,12 @@ impl WebSurface {
             desk.client = Some(client);
         }
     }
+    /// The same reply `POST /research/ask` speaks. The voice stack calls this
+    /// after a research cue. The key stays inside the desk.
+    pub fn research_ask_fn(&self) -> std::sync::Arc<dyn Fn(&str) -> String + Send + Sync> {
+        let desk = std::sync::Arc::clone(&self.sh.research);
+        std::sync::Arc::new(move |question| research_reply(&desk, question))
+    }
 }
 
 const V2_REDIRECT_HTML: &str = "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta http-equiv=\"refresh\" content=\"0; url=/\"><title>Galion Voice</title><script>location.replace(\"/\");</script></head><body><p><a href=\"/\">Galion Voice</a></p></body></html>";
@@ -681,6 +699,7 @@ const V2_REDIRECT_HTML: &str = "<!doctype html><html lang=\"en\"><head><meta cha
 /// the same gate as `/one`.
 const RESEARCH_HTML: &str = include_str!("../../../crates/galion-console/assets/research.html");
 
+#[derive(Clone)]
 struct ResearchNote {
     id: u64,
     question: String,
@@ -908,10 +927,16 @@ fn research_history_json(desk: &ResearchDesk) -> String {
     format!("{{\"schema\":\"galion-research/1\",\"app\":\"hermes\",\"items\":[{}]}}", items.join(","))
 }
 
-fn research_ask(desk: &Arc<Mutex<ResearchDesk>>, question: &str) -> String {
+fn research_reply(desk: &Arc<Mutex<ResearchDesk>>, question: &str) -> String {
+    research_commit(desk, question)
+        .map(|(_, note)| note.reply)
+        .unwrap_or_else(|_| "The research path is not reachable from here.".into())
+}
+
+fn research_commit(desk: &Arc<Mutex<ResearchDesk>>, question: &str) -> Result<(String, ResearchNote), ()> {
     let (id, client, model_fallback, sources) = {
         let Ok(mut d) = desk.lock() else {
-            return "{\"schema\":\"galion-research/1\",\"app\":\"hermes\",\"status\":\"Unreachable\",\"reply\":\"The research path is not reachable from here.\",\"citations\":[]}".into();
+            return Err(());
         };
         d.status = "Running";
         d.next_id = d.next_id.saturating_add(1);
@@ -934,7 +959,7 @@ fn research_ask(desk: &Arc<Mutex<ResearchDesk>>, question: &str) -> String {
     };
     let status = turn.standing;
     let reply = if status == "Unreachable" {
-        "The research path is not reachable from here. Local. What is already known stays marked local.".to_string()
+        galion_cascade::research_handoff::RESEARCH_LOCAL.to_string()
     } else {
         turn.text
     };
@@ -968,11 +993,7 @@ fn research_ask(desk: &Arc<Mutex<ResearchDesk>>, question: &str) -> String {
         unknown,
         at: Instant::now(),
     };
-    let body = format!(
-        "{{\"schema\":\"galion-research/1\",\"app\":\"hermes\",\"model\":{},{}",
-        galion_cascade::hermes::json_string(&model_fallback),
-        research_note_json(&note).trim_start_matches('{')
-    );
+    let stored = note.clone();
     if let Ok(mut d) = desk.lock() {
         d.status = status;
         d.notes.push_back(note);
@@ -980,7 +1001,18 @@ fn research_ask(desk: &Arc<Mutex<ResearchDesk>>, question: &str) -> String {
             d.notes.pop_front();
         }
     }
-    body
+    Ok((model_fallback, stored))
+}
+
+fn research_ask(desk: &Arc<Mutex<ResearchDesk>>, question: &str) -> String {
+    let Ok((model, note)) = research_commit(desk, question) else {
+        return "{\"schema\":\"galion-research/1\",\"app\":\"hermes\",\"status\":\"Unreachable\",\"reply\":\"The research path is not reachable from here.\",\"citations\":[]}".into();
+    };
+    format!(
+        "{{\"schema\":\"galion-research/1\",\"app\":\"hermes\",\"model\":{},{}",
+        galion_cascade::hermes::json_string(&model),
+        research_note_json(&note).trim_start_matches('{')
+    )
 }
 
 const SECURITY_HEADERS: &str = concat!(
@@ -1219,7 +1251,8 @@ fn route(req: &mut Request, sh: &Shared) -> (&'static str, &'static str, Vec<u8>
             let fmt = classify_turn(req);
             let n = req.body.len();
             let bytes = std::mem::take(&mut req.body);
-            let id = sh.turns.push(fmt, bytes);
+            let voice_stack = req.header("host").is_some_and(galion_cascade::research_handoff::voice_stack_host);
+            let id = sh.turns.push_from(fmt, bytes, voice_stack);
             let f = match fmt { TurnFormat::Wav => "wav", TurnFormat::Pcm16 { .. } => "pcm16" };
             let json = if sh.edge.disclosure && !sh.disclosure_sent.swap(true, Ordering::SeqCst) {
                 format!(
@@ -1695,6 +1728,48 @@ mod tests {
     }
 
     #[test]
+    fn research_reply_speaks_the_stub_hermes_answer() {
+        let key = "test-gateway-key-not-for-git";
+        let payload = "{\"choices\":[{\"message\":{\"content\":\"The wash stays near-white.\\nUnknown\\n- The wash stays near-white.\"}}]}";
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        std::thread::spawn(move || {
+            let Ok((mut sock, _)) = listener.accept() else { return };
+            let _ = sock.set_read_timeout(Some(Duration::from_millis(500)));
+            let mut buf = [0u8; 8192];
+            loop {
+                match sock.read(&mut buf) {
+                    Ok(0) | Err(_) => break,
+                    Ok(n) => {
+                        if buf[..n].windows(4).any(|w| w == b"\r\n\r\n") { break; }
+                    }
+                }
+            }
+            let resp = format!(
+                "HTTP/1.0 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{payload}",
+                payload.len()
+            );
+            let _ = sock.write_all(resp.as_bytes());
+        });
+        let w = WebSurface::mailbox().with_page("<!doctype html><canvas></canvas>");
+        w.set_research_hermes(galion_cascade::HermesLlm::new(
+            &format!("http://{addr}/v1/chat/completions"),
+            "hermes-agent",
+            key,
+            Duration::from_millis(1000),
+        ));
+        let spoken = (w.research_ask_fn())("what colour is the wash");
+        assert!(spoken.contains("near-white"), "{spoken}");
+        assert!(!spoken.contains(key) && !spoken.contains("Bearer"), "{spoken}");
+        let hist = {
+            let desk = w.sh.research.lock().unwrap();
+            research_history_json(&desk)
+        };
+        assert!(hist.contains("what colour is the wash") && hist.contains("near-white"), "{hist}");
+        assert!(!hist.contains(key), "{hist}");
+    }
+
+    #[test]
     fn research_sources_are_the_only_citations() {
         let key = "test-gateway-key-not-for-git";
         let content = "The wash is amber.\\nFound\\n- The wash is amber. [2]\\n- A paper measured violet. [3]\\nInferred\\n- A cooler mix would read as night.\\nUnknown\\n- The hex is not in the note.\\n[2] wash-note.txt\\n[3] Invented Journal 2024";
@@ -2089,6 +2164,40 @@ mod tests {
         assert_eq!((rate, ch), (16_000, 1));
         assert_eq!(pcm, samples);
         assert!(inbox.take().is_none(), "take is non-blocking and empties the inbox");
+        assert!(!t.voice_stack, "Host x is not the voice stack");
+        w.close().unwrap();
+    }
+
+    #[test]
+    fn voice_stack_host_marks_the_turn_and_the_one_host_does_not() {
+        let mut w = WebSurface::serve("127.0.0.1:0".parse().unwrap());
+        let inbox = w.turn_inbox();
+        w.open().unwrap();
+        let a = w.local_addr().unwrap();
+        let wav = encode_wav_pcm16(16_000, 1, &[0, 1, 0]);
+        let post = |host: &str| {
+            let mut s = std::net::TcpStream::connect(a).unwrap();
+            s.write_all(
+                format!(
+                    "POST /turn HTTP/1.1\r\nHost: {host}\r\nContent-Type: audio/wav\r\nContent-Length: {}\r\n\r\n",
+                    wav.len()
+                )
+                .as_bytes(),
+            )
+            .unwrap();
+            s.write_all(&wav).unwrap();
+            let mut out = String::new();
+            s.read_to_string(&mut out).unwrap();
+            assert!(out.starts_with("HTTP/1.1 202"), "{host} {out}");
+        };
+        post("voice.galion.app");
+        let voice = inbox.take_latest().unwrap();
+        assert!(voice.voice_stack, "voice.galion.app is the voice stack");
+        post("galion.app");
+        let one = inbox.take_latest().unwrap();
+        assert!(!one.voice_stack, "galion.app/one is not handed to research");
+        post("galion.app:443");
+        assert!(!inbox.take_latest().unwrap().voice_stack);
         w.close().unwrap();
     }
 
@@ -2374,6 +2483,7 @@ mod tests {
             format: TurnFormat::Pcm16 { rate: 16_000, channels: 1 },
             bytes: b"RIFFPCM_SECRET_0123456789".to_vec(),
             received_at: Instant::now(),
+            voice_stack: false,
         };
         t.wipe();
         assert!(t.bytes.iter().all(|&b| b == 0));
