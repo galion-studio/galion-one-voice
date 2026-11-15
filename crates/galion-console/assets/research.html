@@ -243,7 +243,7 @@ window.GALION_RESEARCH=RESEARCH_CUES.map(publishCue);
 window.GALION_BELLS=WINDOW_BELLS.map(publishCue);
 var audio=null, silence=false, thinkTimer=null, citeToken=0, closing=false, minimised=false, opened=false;
 function silenceRequested(){
-  try{ if(localStorage.getItem("galion-one-silence")==="1") return true; }catch(e){}
+  try{ if(localStorage.getItem("galion-research-silence")==="1") return true; }catch(e){}
   return new URLSearchParams(location.search).get("silence")==="1";
 }
 function setSilence(on){
@@ -252,7 +252,13 @@ function setSilence(on){
   document.body.dataset.resonance=silence?"off":"on";
   var btn=document.getElementById("silence");
   if(btn) btn.setAttribute("aria-pressed", silence?"true":"false");
-  try{ localStorage.setItem("galion-one-silence", silence?"1":"0"); }catch(e){}
+  try{ localStorage.setItem("galion-research-silence", silence?"1":"0"); }catch(e){}
+}
+function motionReduced(){
+  return !!(window.matchMedia&&window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+}
+function paintMotion(){
+  document.body.setAttribute("data-motion", motionReduced()?"reduced":"full");
 }
 function toneContext(){
   try{
@@ -280,7 +286,7 @@ function findCue(id){
   return null;
 }
 function playCue(id){
-  if(silence) return;
+  if(silence||motionReduced()) return;
   var row=findCue(id);
   if(!row) return;
   var ctx=toneContext();
@@ -334,9 +340,10 @@ function paintVoice(){
   var W=Math.max(2, Math.round(css*dpr));
   if(voiceCv.width!==W||voiceCv.height!==W){ voiceCv.width=W; voiceCv.height=W; }
   var listening=document.getElementById("voice").getAttribute("aria-pressed")==="true";
-  var breath=Math.sin(((now-voiceT0)%1600)/1600*2*Math.PI);
-  var aim=(listening?0.46:0.34)+(listening?0.01:0.012)*breath;
-  voiceRad+=(aim-voiceRad)*0.08;
+  var reduce=motionReduced();
+  var breath=reduce?0:Math.sin(((now-voiceT0)%1600)/1600*2*Math.PI);
+  var aim=(listening?0.46:0.34)+(reduce?0:(listening?0.01:0.012)*breath);
+  if(reduce) voiceRad=aim; else voiceRad+=(aim-voiceRad)*0.08;
   var rad=voiceRad*(W/2);
   var k=listening?0.72:0.48+0.08*breath;
   voiceCx.clearRect(0,0,W,W);
@@ -554,6 +561,11 @@ requestAnimationFrame(paintVoice);
   });
 })();
 setSilence(silenceRequested());
+paintMotion();
+if(window.matchMedia){
+  var motionQuery=window.matchMedia("(prefers-reduced-motion: reduce)");
+  if(motionQuery.addEventListener) motionQuery.addEventListener("change", paintMotion);
+}
 var quiet=document.getElementById("silence");
 if(quiet) quiet.addEventListener("click", function(ev){
   ev.preventDefault();
