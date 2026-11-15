@@ -21,6 +21,15 @@ This file is the Lane C plan. It is the only file on the plan pull request. Work
 
 `/workspace/voice-next/NEXT-ITERATION.md` (2026-11-15 21:56 +01:00, same tip, host `grok-bot-vm-511777615`) was read and is cited below. Do not commit that file.
 
+## Opened (2026-11-15 22:08 +01:00)
+
+| PR | What | Merge? |
+|---|---|---|
+| [#150](https://github.com/galion-studio/galion-one-voice/pull/150) | This plan. Branch `cursor/persona-v2v-plan-6a84`. | When its own checks are green. Docs only. |
+| [#156](https://github.com/galion-studio/galion-one-voice/pull/156) | Candidate: `/one` keeps `data-persona="samantha"` and the Piper mouth. Branch `cursor/persona-v2v-one-samantha-6a84`. | **No.** Flagged for Maciej. Not in the C2–C4 order. |
+
+If you edit `v1-screen.html`, do not put `dataset.persona="galion"` back. #156 is still based on `8980e1a` and is not on `main`. Rebase your branch onto `main` only. A conflict with #156 is his to resolve if he merges the candidate.
+
 Branch from current `origin/main`. Do not use a dirty checkout on `cursor/piper-stream-live-t301`. Do not edit open pull requests #145, #149, #97, #86, #87, #78, or #83.
 
 ## Workers
@@ -131,7 +140,7 @@ return
 
 The canvas markup default is `data-persona="samantha"` and `data-mouth="piper"`. `e2e/one/one.spec.js` posts `persona: "galion"` through `/__state` and expects `#s` `data-persona="galion"`. The Rust `/dot` floor still annotates `"persona":"samantha"` unless a turn asked for Jarvis (`galion-render` `v2_persona`).
 
-Owner instruction for this lane: Voice V2 live default is **Piper + the Samantha persona** until a clone mouth is actually live. The orchestrator will open a **separate** pull request that stops the `/one` path from forcing `data-persona="galion"`, keeps the HTML default `samantha` and `data-mouth="piper"`, and updates the Playwright expectation that currently locks the flip. Title will start with `Swarm 10 persona-v2v`. It is a **candidate for Maciej**. It will not be merged by this lane as if the product-voice question were settled.
+Owner instruction for this lane: Voice V2 live default is **Piper + the Samantha persona** until a clone mouth is actually live. That candidate is [#156](https://github.com/galion-studio/galion-one-voice/pull/156). It stops the `/one` path from forcing `data-persona="galion"`, keeps `samantha` and `data-mouth="piper"`, and updates the Playwright expectation that locked the flip. It is **not** merged by this lane.
 
 Why it stays flagged: `docs/galion-voice-v2/symphony/PERSONA.md` says Galion One is the product voice, Samantha is test/internal, and presenting a test voice as the product is FAIL. Backlog §7 item 4 still asks when, if ever, `/one` leaves Piper + Samantha for the Nano clone. Those two sentences are for Maciej. This lane does not edit `LOCKS.toml`, does not rename the page title away from Galion One, and does not claim the Piper pack is the original performer.
 
