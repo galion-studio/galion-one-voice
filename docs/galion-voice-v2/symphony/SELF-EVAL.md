@@ -452,7 +452,7 @@ scripts/symphony/gates/a.sh
 ## Matrix
 
 <!-- SYMPHONY-MATRIX-START -->
-Recorded 2026-11-06 17:18 CET. A row closes only when this run says PASS.
+Recorded 2026-11-15 22:08 CET. A row closes only when this run says PASS.
 
 | ID | Section | Status | Evidence |
 |---|---|---|---|
@@ -461,16 +461,16 @@ Recorded 2026-11-06 17:18 CET. A row closes only when this run says PASS.
 | C | Jarvis texture toggle | OPEN | checker self-test passed on a synthetic tone; jarvis.toml has no [texture] preserve toggle |
 | D | Persona and emotion | PASS | persona docs, e0/e1 prosody and wash, voice_color, feeling band at 80 ms; canned replies have no scripted empathy lines |
 | E | One-dot | PASS | one / surface, mic records on that page, workflow hook in crates/galion-console/src/auto_workflow.rs |
-| F | Runbooks | PASS | bash -n ok for 8 README scripts: scripts/asr/fetch-vosk.sh, scripts/a21/fetch-a21.sh, scripts/run-v1-screen.sh, scripts/run-v1-demo.sh, scripts/eval/virtual-user.sh, scripts/check-phone-pipeline.sh, scripts/check-locks.sh, scripts/check-no-forbidden.sh |
+| F | Runbooks | OPEN | README has no run-the-demo section |
 | G | 80 ms frame | PASS | frame_ms=80, 24 kHz, p95 budget <= 60 ms, late frame pauses; streaming doc names 80 ms; flash-ttfa stub-measures and prints no ttfa_ms |
 
-Closed: A, D, E, F, G. Open: B, C.
+Closed: A, D, E, G. Open: B, C, F.
 <!-- SYMPHONY-MATRIX-END -->
 
 ## Last run
 
 <!-- SYMPHONY-RUN-START -->
-stamp: 2026-11-06 17:18 CET
+stamp: 2026-11-15 22:08 CET
 locks_sha256: b97fa057f6136d724f1283bdeb77d9d175a08a0245177ad85ae8e94ca3040f59
 command: scripts/symphony/self-eval.sh
 A PASS — compiler witness crates/galion-ml-voice/src/artifact.rs round-trips a Galion clip and refuses Chatterbox as primary
@@ -478,12 +478,24 @@ B OPEN — protocol stub emitted 402 B PCM (not a ref speak); worker refused a r
 C OPEN — checker self-test passed on a synthetic tone; jarvis.toml has no [texture] preserve toggle
 D PASS — persona docs, e0/e1 prosody and wash, voice_color, feeling band at 80 ms; canned replies have no scripted empathy lines
 E PASS — one / surface, mic records on that page, workflow hook in crates/galion-console/src/auto_workflow.rs
-F PASS — bash -n ok for 8 README scripts: scripts/asr/fetch-vosk.sh, scripts/a21/fetch-a21.sh, scripts/run-v1-screen.sh, scripts/run-v1-demo.sh, scripts/eval/virtual-user.sh, scripts/check-phone-pipeline.sh, scripts/check-locks.sh, scripts/check-no-forbidden.sh
+F OPEN — README has no run-the-demo section
 G PASS — frame_ms=80, 24 kHz, p95 budget <= 60 ms, late frame pauses; streaming doc names 80 ms; flash-ttfa stub-measures and prints no ttfa_ms
 exit: 1
 <!-- SYMPHONY-RUN-END -->
 
+## Swarm 10 D3 note
 
+2026-11-15 22:09 +01:00 (Europe/Zagreb). Host `cursor`. Tip `8980e1a9b4214806dd62cfccf6e2aaf093ed86b0`. Command `bash scripts/symphony/self-eval.sh` at 22:08 +01:00. Exit 1. `LOCKS.toml` sha256 stayed `b97fa057f6136d724f1283bdeb77d9d175a08a0245177ad85ae8e94ca3040f59`. The matrix and the last-run block above are the script's text. This note does not change a verdict.
+
+B is OPEN and stays OPEN/BLOCKED on A0. The script line is the B line above. `docs/galion-voice-v2/personas/refs/` has placeholders only, so `samantha.wav` and `jarvis.wav` were not hashed on this host. The 402 B PCM is the protocol stub (`GALION_CLONE_STUB_PCM=1`), not a smoke speak of the originals. `scripts/symphony/eval.py` still compares those paths to the t623u pins `e4bc60c33f697108cf5585dead213da1065979010f5be1d513574893584a4641` and `60ad5457dac31af915a9679760705296f9aad17e15ee84885385509b58b8f6b6`. The "What closes a row" table names the t273 digests `bdcb0c2903bb91c7b0fda0cf79a42406fdaa662fd8d31f6eaed3895d9c7a8693` and `c2200b59fa78b3c98d13ac5dc7db3a6c14e802310dca73033d7770bd4b532c60`. Those constants were not edited. A t623u match, a skip, or the stub is not a committed PASS.
+
+C is OPEN and stays OPEN/BLOCKED on A0. The script line is the C line above. The synthetic tone is not the original Jarvis clip. `jarvis.wav` is absent, so no spectral compare ran. `jarvis.toml` was not edited. Texture keys stay under `[reference]`.
+
+F is OPEN on this run. README's heading is `## Build and run` (commit `1f2e196`, 2026-11-06 17:39 +01:00). The gate looks for `## Run the demo`. The 17:18 matrix PASS was before that heading change. This record does not retitle the README to close F. The gate returned before `bash -n`.
+
+A, D, E, and G PASS are this script's source and docs checks. They are not a live clone, a spoken turn, or a measured product TTFA. `cargo test --workspace` was not run.
+
+Worker notes: `docs/swarm-10/2026-11-15/brain-eureka/self-eval.md`.
 
 A section is complete when its gate passes and the result is written here.
 A skip of a missing gitignored wav is a pass of that gate. A missing model
