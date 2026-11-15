@@ -1050,18 +1050,51 @@ mod tests {
 
     #[test]
     fn landed_clone_is_compiled_before_the_stack_plays_it() {
+        match std::process::Command::new("python3").arg("-c").arg("pass").status() {
+            Ok(status) if status.success() => {}
+            Ok(status) => panic!(
+                "compile-then-play BLOCKED: python3 exited {status}. The packet compiler is in-process Rust, not a gqvoice executable on PATH."
+            ),
+            Err(err) => panic!(
+                "compile-then-play BLOCKED: python3 is not on PATH ({err}). The packet compiler is in-process Rust, not a gqvoice executable on PATH."
+            ),
+        }
         let dir = std::env::temp_dir().join(format!("galion-gqvoice-stack-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
+        // Empty root: no wav, no voice TOML. Lookup is the CI absent path.
+        // An unallowlisted file at the repo pin must not fall through to Flite
+        // and then fail as "gqvoice: No such file or directory".
+        let ref_root = dir.join("ref-root");
+        std::fs::create_dir_all(&ref_root).unwrap();
+        let voices = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../voices/gq");
+        let voices_before = std::fs::read_dir(&voices).map(|rd| rd.count()).unwrap_or(0);
         let script = dir.join("fake-clone.py");
         std::fs::write(&script, FAKE_CLONE).unwrap();
-        let worker =
-            clone_worker::CloneWorker::spawn_for_test(&script, clone_worker::CloneModel::Nano, "samantha");
+        let worker = clone_worker::CloneWorker::spawn_for_test(
+            &script,
+            clone_worker::CloneModel::Nano,
+            "samantha",
+        )
+        .with_ref_root(ref_root.clone());
         let mut stack =
             SpeechStack::from_clone(clone_worker::CloneTts::for_test(worker, dir.clone()));
-        let both = stack.speak("Hello! Go.").unwrap();
+        let both = stack.speak("Hello! Go.").unwrap_or_else(|err| {
+            panic!(
+                "compile-then-play BLOCKED: clone utterance did not compile ({err}). The packet compiler is in-process Rust, not a gqvoice executable on PATH."
+            )
+        });
+        assert!(
+            matches!(stack.backend, SpeechBackend::Clone { .. }),
+            "compile-then-play BLOCKED: clone slot fell back to {} ({}); no packet was compiled",
+            stack.reported().0,
+            stack.reported().1
+        );
         let path = dir.join("samantha.gqvoice");
-        let packet = gqvoice::GqVoice::open(&path).unwrap();
+        let packet = gqvoice::GqVoice::open(&path).unwrap_or_else(|err| {
+            panic!("compile-then-play BLOCKED: {err}")
+        });
+        assert_eq!(path.parent(), Some(dir.as_path()));
         assert_eq!(packet.persona_name(), "samantha");
         assert_eq!(packet.model_name(), "nano");
         assert!(packet.as_bytes().starts_with(&gqvoice::MAGIC));
@@ -1090,17 +1123,38 @@ mod tests {
 
         let jdir = dir.join("jarvis");
         std::fs::create_dir_all(&jdir).unwrap();
-        let jworker =
-            clone_worker::CloneWorker::spawn_for_test(&script, clone_worker::CloneModel::Turbo, "jarvis");
+        let jworker = clone_worker::CloneWorker::spawn_for_test(
+            &script,
+            clone_worker::CloneModel::Turbo,
+            "jarvis",
+        )
+        .with_ref_root(ref_root);
         let mut jarvis =
             SpeechStack::from_clone(clone_worker::CloneTts::for_test(jworker, jdir.clone()));
-        let tone = jarvis.speak("Systems ready.").unwrap();
+        let tone = jarvis.speak("Systems ready.").unwrap_or_else(|err| {
+            panic!(
+                "compile-then-play BLOCKED: jarvis utterance did not compile ({err}). The packet compiler is in-process Rust, not a gqvoice executable on PATH."
+            )
+        });
+        assert!(
+            matches!(jarvis.backend, SpeechBackend::Clone { .. }),
+            "compile-then-play BLOCKED: jarvis slot fell back to {} ({})",
+            jarvis.reported().0,
+            jarvis.reported().1
+        );
         let jpath = jdir.join("jarvis.gqvoice");
-        let jpacket = gqvoice::GqVoice::open(&jpath).unwrap();
+        let jpacket = gqvoice::GqVoice::open(&jpath).unwrap_or_else(|err| {
+            panic!("compile-then-play BLOCKED: {err}")
+        });
         assert_eq!(jpacket.persona_name(), "jarvis");
         assert_eq!(jpacket.model_name(), "turbo");
         assert_eq!(tone.samples, jpacket.to_audio().samples);
         assert!(!jdir.join("samantha.gqvoice").exists());
+        let voices_after = std::fs::read_dir(&voices).map(|rd| rd.count()).unwrap_or(0);
+        assert_eq!(
+            voices_before, voices_after,
+            "compile-then-play wrote a packet under voices/gq"
+        );
         drop(stack);
         drop(jarvis);
         let _ = std::fs::remove_dir_all(&dir);
