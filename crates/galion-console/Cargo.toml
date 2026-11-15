@@ -57,3 +57,7 @@ galion-consent = { path = "../galion-consent" }
 [[example]]
 name = "dot_console_demo"
 required-features = ["dot-viz"]
+
+[[example]]
+name = "v2v_session"
+required-features = ["phone-turn"]
