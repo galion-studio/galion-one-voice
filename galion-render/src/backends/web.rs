@@ -241,6 +241,17 @@ impl TurnInbox {
     pub fn id_clock(&self) -> Arc<AtomicU64> { self.next_id.clone() }
 }
 
+/// Persona-column numbers for the mouth that speaks this line.
+/// Set only when the turn had `sense` on. Pitch, loudness, and pause are
+/// applied to the PCM. `rate` is carried and is not a Piper respawn.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct MouthProsody {
+    pub pitch_st: f32,
+    pub rate: f32,
+    pub loudness: f32,
+    pub pre_pause_ms: u32,
+}
+
 /// One persona reply waiting to be spoken (Piper / flite), not a second page.
 #[derive(Clone, Debug)]
 pub struct SpokenLine {
@@ -248,6 +259,8 @@ pub struct SpokenLine {
     pub reply: String,
     pub silence: bool,
     pub barge: bool,
+    /// `None` when sense was off, or the line is silence.
+    pub mouth: Option<MouthProsody>,
 }
 
 impl Drop for SpokenLine {
@@ -269,11 +282,11 @@ impl SayInbox {
         Self { st: Arc::new(Mutex::new(SayState::default())), next_id }
     }
     /// Queue a line. Empty / silence still gets an id so barge-in can cancel playback.
-    pub fn push(&self, reply: String, silence: bool, barge: bool) -> u64 {
+    pub fn push(&self, reply: String, silence: bool, barge: bool, mouth: Option<MouthProsody>) -> u64 {
         let id = self.next_id.fetch_add(1, Ordering::SeqCst) + 1;
         if let Ok(mut g) = self.st.lock() {
             while g.q.len() >= MAX_PENDING_TURNS { g.q.pop_front(); }
-            g.q.push_back(SpokenLine { id, reply, silence, barge });
+            g.q.push_back(SpokenLine { id, reply, silence, barge, mouth });
         }
         id
     }
@@ -1684,15 +1697,33 @@ fn route(req: &mut Request, sh: &Shared, set_cookie: &mut Option<String>) -> (&'
                 );
             };
             let model = prepared.model_reply();
-            let json = match sh.floor.lock() {
-                Ok(mut floor) => floor.finish_say_json(prepared, model),
-                Err(_) => "{\"persona\":\"samantha\",\"reply\":\"\",\"silence\":true,\"film_voice\":false}".to_string(),
+            let said = match sh.floor.lock() {
+                Ok(mut floor) => Some(floor.finish_say(prepared, model)),
+                Err(_) => None,
             };
-            let silence = crate::v2_persona::json_field_bool(&json, "silence");
-            let reply = crate::v2_persona::json_field_string(&json, "reply").unwrap_or_default();
-            let barge_out = crate::v2_persona::json_field_bool(&json, "barge");
+            let Some(said) = said else {
+                return (
+                    "200 OK",
+                    "application/json",
+                    txt("{\"persona\":\"samantha\",\"reply\":\"\",\"silence\":true,\"film_voice\":false}"),
+                );
+            };
+            let json = crate::v2_persona::say_to_json(&said);
+            let silence = said.silence;
+            let reply = said.reply.clone();
+            let barge_out = said.barge;
             let quiet = silence || reply.trim().is_empty();
-            sh.says.push(if quiet { String::new() } else { reply }, quiet, barge_out);
+            let mouth = if said.sense_applied && !quiet {
+                Some(MouthProsody {
+                    pitch_st: said.prosody.pitch_st,
+                    rate: said.prosody.rate,
+                    loudness: said.prosody.loudness,
+                    pre_pause_ms: said.prosody.pre_pause_ms,
+                })
+            } else {
+                None
+            };
+            sh.says.push(if quiet { String::new() } else { reply }, quiet, barge_out, mouth);
             zeroise_bytes(&mut req.body);
             ("200 OK", "application/json", json.into_bytes())
         }
@@ -1860,11 +1891,14 @@ fn route(req: &mut Request, sh: &Shared, set_cookie: &mut Option<String>) -> (&'
                 }
                 "/dot" => {
                     let d = sh.latest_dot.lock().map(|g| g.clone()).unwrap_or_default();
-                    let (persona, mood, from_turn) = sh.floor.lock().map(|g| (g.id().to_string(), g.mood().to_string(), g.mood_from_turn())).unwrap_or_else(|_| ("samantha".into(), "calm".into(), false));
+                    let (persona, mood, from_turn, felt) = sh.floor.lock().map(|g| (g.id().to_string(), g.mood().to_string(), g.mood_from_turn(), g.last_felt())).unwrap_or_else(|_| ("samantha".into(), "calm".into(), false, None));
                     // Mood is attached only after a turn, and then emotion.label matches it.
+                    // A sensed turn also publishes feeling_e, wash_amber, and the OKLCH decision.
                     // `reply` stays the last field.
                     let mood_field = if from_turn { Some(mood.as_str()) } else { None };
-                    let body = dot_with_reply(&crate::v2_persona::annotate_dot(&d, &persona, mood_field), sh.replies.latest_json().as_deref());
+                    let dotted = crate::v2_persona::annotate_dot(&d, &persona, mood_field);
+                    let dotted = crate::v2_persona::annotate_feeling(&dotted, felt);
+                    let body = dot_with_reply(&dotted, sh.replies.latest_json().as_deref());
                     ("200 OK", "application/json", body.into_bytes())
                 }
                 "/v2" | "/v2/" => {
@@ -3018,6 +3052,71 @@ mod tests {
         let line = w.say_inbox().take_latest().expect("reply queued for Piper");
         assert_eq!(line.reply, "model can't be reached");
         assert!(!line.silence);
+        assert!(line.mouth.is_none(), "sense off does not steer the mouth");
+        assert!(!dot.contains("\"wash_amber\""), "sense off does not publish the feeling wash: {dot}");
+        w.close().unwrap();
+    }
+
+    #[test]
+    fn sensed_say_moves_wash_and_queues_mouth_prosody() {
+        let mut w = WebSurface::serve("127.0.0.1:0".parse().unwrap());
+        w.open().unwrap();
+        let a = w.local_addr().unwrap();
+        let post = |body: &str| {
+            let mut s = std::net::TcpStream::connect(a).unwrap();
+            s.write_all(format!(
+                "POST /v2/say HTTP/1.1\r\nHost: x\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{body}",
+                body.len()
+            ).as_bytes()).unwrap();
+            let mut out = String::new();
+            s.read_to_string(&mut out).unwrap();
+            out
+        };
+        let sam = post("{\"text\":\"My mother died this morning.\",\"e\":1,\"sense\":true}");
+        assert!(sam.contains("HTTP/1.1 200"), "{sam}");
+        assert!(sam.contains("\"persona\":\"samantha\""), "{sam}");
+        assert!(sam.contains("\"sense\":true"), "{sam}");
+        assert!(sam.contains("\"feeling_e\":1"), "{sam}");
+        assert!(sam.contains("\"wash_amber\":0.5"), "{sam}");
+        assert!(sam.contains("\"pre_pause_ms\":250"), "{sam}");
+        assert!(sam.contains("\"loudness\":0.8"), "{sam}");
+        assert!(sam.contains("\"pitch_st\":-0.5"), "{sam}");
+        assert!(sam.contains("\"l\":0.72") && sam.contains("\"h\":310"), "{sam}");
+        assert!(sam.contains("\"mouth\":\"piper\""), "{sam}");
+        assert!(!sam.to_ascii_lowercase().contains("i hear you"), "{sam}");
+        assert!(!sam.contains("Your mother died this morning."), "{sam}");
+        let line = w.say_inbox().take_latest().expect("samantha line");
+        let mouth = line.mouth.expect("sense on queues mouth prosody");
+        assert!((mouth.pitch_st - -0.5).abs() < 1e-3);
+        assert!((mouth.loudness - 0.8).abs() < 1e-3);
+        assert_eq!(mouth.pre_pause_ms, 250);
+        assert!((mouth.rate - 0.92).abs() < 1e-3);
+        let dot = get(a, "/dot");
+        assert!(dot.contains("\"wash_amber\":0.5"), "{dot}");
+        assert!(dot.contains("\"feeling_e\":1"), "{dot}");
+        assert!(dot.contains("\"oklch\""), "{dot}");
+        let jar = post("{\"text\":\"be Jarvis\",\"e\":0,\"sense\":true}");
+        assert!(jar.contains("\"persona\":\"jarvis\""), "{jar}");
+        let _ = w.say_inbox().take_latest();
+        let high = post("{\"text\":\"My mother died this morning.\",\"e\":1,\"sense\":true}");
+        assert!(high.contains("\"persona\":\"jarvis\""), "{high}");
+        assert!(high.contains("\"wash_amber\":0.5"), "{high}");
+        assert!(high.contains("\"pre_pause_ms\":120"), "{high}");
+        assert!(high.contains("\"loudness\":0.88"), "{high}");
+        assert!(high.contains("\"pitch_st\":-0.4"), "{high}");
+        let rest = post("{\"text\":\"My mother died this morning.\",\"e\":0,\"sense\":true}");
+        assert!(rest.contains("\"persona\":\"jarvis\""), "{rest}");
+        assert!(rest.contains("\"wash_amber\":0.28"), "{rest}");
+        assert!(rest.contains("\"pre_pause_ms\":80"), "{rest}");
+        assert!(rest.contains("\"loudness\":0.92"), "{rest}");
+        assert!(rest.contains("\"pitch_st\":-0.3"), "{rest}");
+        assert!(rest.contains("\"l\":0.971"), "{rest}");
+        let denied = post("{\"text\":\"My mother died this morning.\",\"e\":1,\"sense\":false}");
+        assert!(denied.contains("\"sense\":false"), "{denied}");
+        let denied_line = w.say_inbox().take_latest().expect("denied still speaks");
+        assert!(denied_line.mouth.is_none(), "sense off does not move the mouth");
+        let dot_denied = get(a, "/dot");
+        assert!(!dot_denied.contains("\"wash_amber\""), "{dot_denied}");
         w.close().unwrap();
     }
 

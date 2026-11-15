@@ -163,6 +163,15 @@ pub struct SpeakPlan {
     pub slot: MouthSlot,
     pub blocked: Option<&'static str>,
     pub hub: TextureToggle,
+    /// Floor label (`hermes-agent` or `galion-reflect`). Not proof a model ran.
+    pub llm: String,
+    /// A Hermes client was attached when this plan was built.
+    pub hermes_attached: bool,
+    /// Content turns used the in-house rule floor.
+    pub inhouse: bool,
+    pub mood: String,
+    pub film_voice: bool,
+    pub clone_live: bool,
 }
 
 impl SpeakPlan {
@@ -294,6 +303,12 @@ fn plan_from(outline: &DuplexOutline, color: VoiceColor, prosody: Prosody) -> Sp
         slot: outline.slot,
         blocked,
         hub: outline.hub,
+        llm: outline.floor.llm_label().to_string(),
+        hermes_attached: outline.floor.hermes_attached(),
+        inhouse: outline.floor.inhouse_reply(),
+        mood: outline.floor.mood().to_string(),
+        film_voice: outline.floor.film_voice(),
+        clone_live: outline.floor.clone_live(),
     }
 }
 
@@ -482,6 +497,12 @@ mod tests {
         // #23: matter content goes to Hermes; with no GALION_LLM_URL the
         // honest unreachable line is spoken, never a canned echo.
         assert_eq!(plan.text, "model can't be reached");
+        assert_eq!(plan.llm, "hermes-agent");
+        assert!(!plan.hermes_attached);
+        assert!(!plan.inhouse);
+        assert_eq!(plan.mood, "grief");
+        assert!(!plan.film_voice);
+        assert!(!plan.clone_live);
         assert!(!v2_persona::is_canned_empathy(&plan.text));
         let line = path.nano_request_line();
         assert!(line.contains("\"model\":\"nano\""));

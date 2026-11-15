@@ -25,7 +25,7 @@ printf '%s\n' '{"text":"Hello.","reference":"/tmp/galion-not-a-clip.wav"}' \
   | GALION_CLONE_STUB_PCM=1 python3 scripts/clone/chatterbox_worker.py
 ```
 
-Without `GALION_CLONE_STUB_PCM=1`, and without the pinned safetensors on disk, the process exits 2 (`galion-clone-absent`). With the files present and the stub flag off, a request is `galion-clone-unwired` and no samples are written. Weights are fetched only when you set `GALION_CLONE_FETCH=1` on `scripts/clone/fetch-clone-weights.sh`. CI does not set that flag. This runbook does not run the fetch.
+Without `GALION_CLONE_STUB_PCM=1`, and without the pinned safetensors on disk, the process exits 2 (`galion-clone-absent`). With the files present, the stub flag off, and `GALION_CLONE_LOCAL_REFS` unset, a request is `galion-clone-unwired` and no samples are written. With `GALION_CLONE_LOCAL_REFS=1` and a sha256 that matches an uncommented `scripts/clone/REFS.sha256` row, the child calls Nano `generate` when torch and the pinned tokenizer are present (engine `chatterbox-nano`). A commented t273 original is not that row: the child exits 3 (`galion-clone-refuse`) and does not delete the file. Weights are fetched only when you set `GALION_CLONE_FETCH=1` on `scripts/clone/fetch-clone-weights.sh`. CI does not set that flag. This runbook does not run the fetch.
 
 ## What is not landed
 

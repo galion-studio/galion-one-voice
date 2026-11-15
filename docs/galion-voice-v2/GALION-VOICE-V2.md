@@ -366,6 +366,12 @@ answers that before the table. `PhoneLane` passes `Emotion::Neutral` always,
 because reading affect from the caller's voice is the `sense` bit and the
 default is deny. `ProsodyEmotion` is tested and unwired. `ReplyLlm` still
 defaults to echo outside the phone lane so old fixtures keep their strings.
+The phone default stays that table. `GALION_LLM=student` is the S0 probe and
+is not the default. On the persona floor, `GALION_LLM=canned|inhouse|student|reflect`
+no longer speaks `galion-reflect`. It probes `weights/student/s0.gq` (or
+`GALION_STUDENT_GQ`) with `galion-tensor` `GqFile`. A missing file, a file
+that does not open, and a file this build cannot speak all say the student
+brain is unavailable. `"llm"` on that turn is `galion-student-blocked`.
 
 **Acceptance.**
 
