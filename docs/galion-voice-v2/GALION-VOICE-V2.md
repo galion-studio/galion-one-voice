@@ -538,9 +538,15 @@ against `weights_vendored = false`.
 between code and weights.
 
 **Owner decision (2026-11-03, YES).** S0 is the first student size. Canned
-replies stay the fallback until readiness tests pass. Training go-ahead and
-the teacher checkpoint are still not given. Configs stay stubs. The Open Mind
+replies stay the fallback until readiness tests pass. Training go-ahead is
+still not given. Configs stay stubs. The Open Mind
 slot file may still say S1; that string is not a licence to skip S0.
+
+**Owner decision (2026-11-15).** The S0 teacher is local Hermes on CPU
+(`galion-student/configs/distill.toml`, `s0.toml`, `s1.toml`). Loopback
+`http://127.0.0.1:8642/v1/chat/completions` only. `paid = false` and
+`remote = false`. No paid API and no remote model call. The configs do not
+dial. PersonaPlex and Kyutai Moshi are not the teacher.
 
 The voice-side nerve and cortex seam is
 [OPENMIND-NERVE-CORTEX.md](OPENMIND-NERVE-CORTEX.md) and

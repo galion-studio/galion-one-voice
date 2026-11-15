@@ -1,7 +1,14 @@
-# Distillation stages (stub)
+# Distillation stages (stub).
+# Owner decision 2026-11-15: the teacher is local Hermes on CPU.
+# No paid API. No remote model call. Config only; this file does not dial.
 [teacher]
-id = "nvidia/personaplex-7b"       # verify exact id + license (risk R1)
-fallback = "kyutai/moshi"          # CC-BY fallback teacher
+id = "local-hermes"
+runtime = "cpu"
+endpoint = "http://127.0.0.1:8642/v1/chat/completions"
+transport = "loopback-http"
+paid = false
+remote = false
+fallback = "none"
 ships = false
 
 [stage0_profile]

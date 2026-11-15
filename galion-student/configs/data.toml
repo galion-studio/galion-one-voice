@@ -6,7 +6,7 @@ deny_sources = ["meta-seamless-interaction", "emilia-original-nc"]
 
 [[shard]]
 name = "teacher_selfplay"
-license = "self-generated"   # subject to teacher license R1
+license = "self-generated"   # local Hermes on CPU; no remote call
 [[shard]]
 name = "librispeech"
 license = "CC-BY-4.0"

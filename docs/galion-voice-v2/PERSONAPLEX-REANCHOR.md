@@ -5,7 +5,7 @@ Status: **plan only** (owner item 9, 2026-11-04 16:01 CET). No code, no weights,
 > **Owner ruling, 2026-11-04 20:45 CET.** No Qwen anywhere in the architecture, and no fallback to it.
 > Qwen, Groq and any cloud LLM are third party. The reasoning sector is fully local and in-house: the S0
 > student (~0.5B, `.gq`, W8A8) on `galion-tensor`, with `CannedLlm` until trained weights exist. This doc
-> assumes **no third-party teacher**. The S0 teacher / training source is an open owner decision (D2).
+> assumes **no third-party teacher**. The S0 teacher is local Hermes on CPU (owner decision 2026-11-15, D2).
 > PersonaPlex and Moshi below are architecture references only.
 Every number below is either measured on the sprint box (the source is named) or published by
 NVIDIA or Kyutai (cited). Anything else is marked as **arithmetic**: an estimate derived from those
@@ -36,7 +36,7 @@ Galion already has the shape this needs:
   - `galion-mimi`: real kernels, no weights, `IS_STUB = true`;
   - `galion-tensor`: own CPU runtime, `.gq` later;
   - `galion-student-backend`: slot only, `LoadError::NotPlaced`;
-  - `galion-student/`: the distillation plan, owner pick S0 first. Its teacher / training source is open (D2).
+  - `galion-student/`: the distillation plan, owner pick S0 first. Its teacher is local Hermes on CPU (D2, 2026-11-15).
 
 "Dual-band" in this doc means the model consumes the **you** band (user audio) and produces the
 **me** band (agent text plus agent audio tokens) in the same step. **feeling** stays Galion's own 8-byte
@@ -80,7 +80,7 @@ which Mimi decodes. That conflicts with "Piper stays the TTS engine" unless we s
 Training order (extends `galion-student/configs/distill.toml`):
 
 1. **Train S0** (stages 0–5 as planned): base training from the source Mate picks, then duplex, then persona, then Q8 QAT.
-   - Teacher / training source: **open owner decision (D2)**. No third-party model is assumed. If Mate picks KD, the teacher has to be cleared by him first.
+   - Teacher / training source: **local Hermes on CPU** (owner decision 2026-11-15, D2 closed). Loopback `http://127.0.0.1:8642/v1/chat/completions`, `paid = false`, `remote = false`. No paid API and no remote model call. The config does not dial.
    - This stage is supervised and RL-free.
 2. **Offline preference stage (DPO-style).** For each simulated dialogue context, sample several student
    continuations and rank them with the programmatic rewards below. Train on chosen/rejected pairs.
@@ -155,7 +155,7 @@ turn-taking TOR 0.908 / latency 0.170 s; user interruption TOR 0.950 / latency 0
 | M0 | This plan, plus owner decisions D1–D4 | Mate signs off |
 | M1 | Turn-event harness: Full-Duplex-Bench-style scenarios (pause, backchannel, smooth turn, interruption) on the loopback virtual user, scored for **today's cascade** as the baseline | Baseline TOR and latency numbers recorded for the cascade, on the box |
 | M2 | `galion-mimi` + `galion-tensor` run a weight-loaded (licence-cleared) Mimi encode, and a random-init S0 temporal + depth step in Rust, timed | Measured S0 step time on 8 cores with Piper running: ≥ 25 steps/s, or S0 is cut |
-| M3 | Trained S0 (stages 0–5) off-box, exported as safetensors / `.gq` | Beats nothing yet. Must reproduce the reference turn events on M1 within a set tolerance (reference = the training source Mate picks, D2) |
+| M3 | Trained S0 (stages 0–5) off-box, exported as safetensors / `.gq` | Beats nothing yet. Must reproduce the reference turn events on M1 within a set tolerance (reference = local Hermes on CPU, D2, 2026-11-15). Not trained in this tree. |
 | M4 | DPO stage, then GRPO stage, with the reward table above | Better than M3 and the cascade on M1, `barge_in_max_ms` holds, presence bans hold, outer human anchor agrees |
 | M5 | D1 = A in the live loop: S0 drives text and timing, Piper speaks, cascade as fallback lane | Live HARD-LOOP: eos→first content audio and barge-in no worse than the cascade's measured numbers |
 | M6 | (only if D1 = B) model audio plays, Piper is the fallback | Voice match on approved refs only, consent gate holds |
@@ -163,7 +163,7 @@ turn-taking TOR 0.908 / latency 0.170 s; user interruption TOR 0.950 / latency 0
 ## 6. Decisions for Mate
 
 - **D1:** Who makes the sound (A: Piper, keeps the ruling; B: model audio, Piper fallback).
-- **D2: S0 teacher / training source (open, owner decision).** No third-party model is assumed. Options to rule on: train from Galion-owned data only, or name a teacher he clears. Fisher data needs counsel.
+- **D2: S0 teacher / training source (closed, 2026-11-15).** Local Hermes on CPU. Loopback only. No paid API and no remote model call. Fisher data is not the teacher.
   Mimi weights need A21 clearance.
 - **D3: GPU training budget.** The box cannot train. No figure is given here because none was measured or quoted.
 - **D4: Lock conflict: closed by the ruling.** `[formats]` forbids `llama`/`ggml` runtimes and GGML containers. The local
