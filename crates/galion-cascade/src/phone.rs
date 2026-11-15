@@ -24,7 +24,9 @@
 //!
 //! # S5 LLM
 //! Phone turns default to [`CannedLlm`] when `GALION_LLM` is unset or `canned`
-//! (explicit test opt-in). `GALION_LLM=echo` selects the old `MockLlm` echo.
+//! (the intent table, not the product brain). `GALION_LLM=echo` selects the
+//! old `MockLlm` echo. `GALION_LLM=student` selects [`crate::student::StudentLlm`],
+//! which says the S0 `.gq` is unavailable until a file can be spoken.
 //! `GALION_LLM=hermes` selects [`crate::HermesLlm`]: a loopback OpenAI chat
 //! completion (`GALION_LLM_URL`, default `http://127.0.0.1:8642/v1/chat/completions`).
 //! Any other value is [`PhoneError::UnknownLlm`]. It is not canned.
@@ -47,6 +49,7 @@
 use crate::canned::CannedLlm;
 use crate::en_lane::{spoken_text, to_f32, to_pcm16, wav_bytes, LANE_RATE_HZ};
 use crate::hermes::HermesLlm;
+use crate::student::StudentLlm;
 use crate::{CascadeError, Emotion, Lang, Llm, MockLlm, Transcript};
 use galion_ml_voice::speech::{resample, SpeechStack};
 
@@ -83,22 +86,25 @@ impl AsrMode {
 }
 
 /// S5 LLM mode (`GALION_LLM`). Unset and `canned` are the rule table.
-/// `hermes` is the loopback gateway. Anything else is an error.
+/// `student` is the blocked S0 probe. `hermes` is the loopback gateway.
+/// Anything else is an error.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum LlmMode { Canned, Echo, Hermes }
+pub enum LlmMode { Canned, Echo, Hermes, Student }
 
 impl LlmMode {
     pub fn from_env() -> Result<Self, PhoneError> {
         Self::from_choice(std::env::var("GALION_LLM").ok().as_deref())
     }
     /// `None`, `""`, and `canned` → [`LlmMode::Canned`]. `echo` / `mock` → echo.
-    /// `hermes` → [`LlmMode::Hermes`]. Every other value is [`PhoneError::UnknownLlm`].
+    /// `student` → [`LlmMode::Student`]. `hermes` → [`LlmMode::Hermes`].
+    /// Every other value, including `reflect`, is [`PhoneError::UnknownLlm`].
     pub fn from_choice(v: Option<&str>) -> Result<Self, PhoneError> {
         let raw = v.unwrap_or("").trim();
         match raw.to_ascii_lowercase().as_str() {
             "" | "canned" => Ok(LlmMode::Canned),
             "echo" | "mock" => Ok(LlmMode::Echo),
             "hermes" => Ok(LlmMode::Hermes),
+            "student" => Ok(LlmMode::Student),
             _ => Err(PhoneError::UnknownLlm(raw.to_string())),
         }
     }
@@ -365,6 +371,7 @@ impl PhoneLane {
             LlmMode::Canned => Box::new(CannedLlm::new()),
             LlmMode::Echo => Box::new(MockLlm),
             LlmMode::Hermes => Box::new(HermesLlm::from_env()),
+            LlmMode::Student => Box::new(StudentLlm),
         };
         speech.prewarm();
         Self { cfg, asr: PhoneTurnAsr::new(cfg.asr), llm, speech }
@@ -536,6 +543,8 @@ mod tests {
         assert_eq!(LlmMode::from_choice(Some("canned")).unwrap(), LlmMode::Canned);
         assert_eq!(LlmMode::from_choice(Some("echo")).unwrap(), LlmMode::Echo);
         assert_eq!(LlmMode::from_choice(Some(" Hermes ")).unwrap(), LlmMode::Hermes);
+        assert_eq!(LlmMode::from_choice(Some("student")).unwrap(), LlmMode::Student);
+        assert!(matches!(LlmMode::from_choice(Some("reflect")), Err(PhoneError::UnknownLlm(_))));
         assert!(matches!(LlmMode::from_choice(Some("gpt")), Err(PhoneError::UnknownLlm(m)) if m == "gpt"));
         assert!(matches!(LlmMode::from_choice(Some("openai")), Err(PhoneError::UnknownLlm(_))));
         assert!(matches!(LlmMode::from_choice(Some("hermes-agent")), Err(PhoneError::UnknownLlm(_))));
@@ -633,6 +642,13 @@ mod tests {
         assert_eq!(i.reply_text(&voice(0.5)).unwrap().2, "Hi. I'm here — go ahead.");
         let mut e = PhoneLane::new(PhoneConfig { asr: AsrMode::Stub, llm: LlmMode::Echo });
         assert_eq!(e.reply_text(&fx("hi")).unwrap().2, "you said: hi");
+        let mut s = PhoneLane::new(PhoneConfig { asr: AsrMode::Stub, llm: LlmMode::Student });
+        let (t, _, r) = s.reply_text(&fx("hello how are you")).unwrap();
+        assert_eq!(t, "hello how are you");
+        assert!(r.starts_with("Student brain unavailable."), "{r}");
+        assert!(!r.contains("you said"), "{r}");
+        assert!(!r.contains("doing well"), "{r}");
+        assert_eq!(s.llm.name(), crate::student::LABEL_BLOCKED);
     }
     #[test] fn lane_is_send() { fn s<T: Send>() {} s::<PhoneLane>(); s::<PhoneTurn>(); s::<PhoneError>(); }
     /// Full S4→S5→S6 turn with real speech. Skips only if no speech backend exists.
