@@ -170,4 +170,63 @@ mod tests {
         assert!(!b.is_loaded() && !b.supports_rika());
         assert_eq!(b.name(), "student-stub");
     }
+
+    /// Owner decision 2026-11-15. The teacher block is local Hermes on CPU.
+    /// This test reads the config. It does not open a socket.
+    #[test]
+    fn teacher_is_local_hermes_on_cpu() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../galion-student/configs");
+        for name in ["distill.toml", "s0.toml", "s1.toml"] {
+            let text = std::fs::read_to_string(root.join(name))
+                .unwrap_or_else(|e| panic!("read {name}: {e}"));
+            let block = teacher_block(&text);
+            assert!(
+                block.contains("id = \"local-hermes\""),
+                "{name} teacher id:\n{block}"
+            );
+            assert!(block.contains("runtime = \"cpu\""), "{name}");
+            assert!(
+                block.contains("endpoint = \"http://127.0.0.1:8642/v1/chat/completions\""),
+                "{name}"
+            );
+            assert!(block.contains("paid = false"), "{name}");
+            assert!(block.contains("remote = false"), "{name}");
+            let low = block.to_ascii_lowercase();
+            for banned in [
+                "openrouter",
+                "api.openai",
+                "nvidia/",
+                "kyutai/",
+                "https://",
+                "groq",
+                "anthropic",
+            ] {
+                assert!(!low.contains(banned), "{name} teacher names {banned}:\n{block}");
+            }
+        }
+    }
+}
+
+fn teacher_block(text: &str) -> String {
+    let mut out = String::new();
+    let mut inside = false;
+    for line in text.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with('[') && trimmed.ends_with(']') {
+            if inside {
+                break;
+            }
+            inside = trimmed == "[teacher]";
+            if inside {
+                out.push_str(line);
+                out.push('\n');
+            }
+            continue;
+        }
+        if inside {
+            out.push_str(line);
+            out.push('\n');
+        }
+    }
+    out
 }

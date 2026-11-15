@@ -29,9 +29,15 @@ fallback = "depth_shared_4x768"
 tokens = ["LISTEN","SPEAK","BACKCHANNEL","YIELD","INTERRUPTED","HOLD"]
 feed_back = true
 
+# Owner decision 2026-11-15. Logits come from loopback Hermes on CPU.
+# This block does not name a paid or remote model, and it does not dial.
 [teacher]
-logit_teacher = "kyutai/moshiko (CC-BY-4.0)"
-personaplex = "outputs_only"   # pending legal review (A21)
+id = "local-hermes"
+runtime = "cpu"
+endpoint = "http://127.0.0.1:8642/v1/chat/completions"
+paid = false
+remote = false
+logit_teacher = "local-hermes"
 
 [distill]
 recipe = "pocket_tts_shrink"
