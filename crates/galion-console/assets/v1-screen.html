@@ -777,7 +777,9 @@ addEventListener("pagehide",()=>{ if(productIsOne()) playSound("shutdown"); });
   setSilence(silenceRequested());
   const quiet=document.getElementById("silence");
   if(quiet) quiet.addEventListener("click",e=>{ e.preventDefault(); e.stopPropagation(); setSilence(!silence); });
-  if(one){ document.title="Galion One"; cv.dataset.persona="galion"; return; }
+  // /one keeps Samantha as the persona and the markup mouth (Piper) until a clone mouth is live.
+  // The page title stays Galion One. productIsOne() still owns the tones and skips the decide box.
+  if(one){ document.title="Galion One"; cv.dataset.persona="samantha"; return; }
   const box=document.getElementById("decide");
   if(!box) return;
   const picks={};
