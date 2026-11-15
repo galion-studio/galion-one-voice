@@ -476,6 +476,9 @@ impl PhoneHost {
             // The page does not send a skill token. Live path is the auto program.
             self.last_proceed = proceed(ProceedSource::Mic, None);
             self.proceeded = self.proceeded.saturating_add(1);
+            // One line per accepted take. The loopback check greps it.
+            // No transcript, no PCM, no second panel.
+            eprintln!("workflow proceed source=mic program=phone-turn");
             let _ = self
                 .bus
                 .try_send(BusMsg::barge_in(self.bus.alloc_id(), turn_id, self.t_ms));
