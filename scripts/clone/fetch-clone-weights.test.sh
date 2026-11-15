@@ -218,19 +218,49 @@ grep -q 'CLONE=ABSENT' "$tmp/err" || fail "absent line"
 expect_rc 2 env -u GALION_CLONE_PUBLISH "$PUB"
 grep -q 'GALION_CLONE_PUBLISH' "$tmp/err" || fail "publish env gate"
 
-expect_rc 2 env \
-  -u GALION_CLONE_PINS -u GALION_CLONE_WEIGHTS -u GALION_CLONE_RELEASE_BASE \
-  -u GALION_CLONE_WEIGHTS_SOURCE -u GALION_CLONE_HF_BASE \
-  GALION_CLONE_PUBLISH=1 \
-  "$PUB"
-grep -q 'BLOCKED' "$tmp/err" || fail "publish blocked on a clean tree"
-
 cat > "$tmp/bin/gh" <<'EOF'
 #!/bin/sh
 echo "gh should not run" >&2
 exit 99
 EOF
 chmod +x "$tmp/bin/gh"
+
+# The checkout's own weights/clone is not deleted and not overridden.
+# Exit 0: pinned safetensors are present and verify (print only, no upload).
+# Exit 2: the tree is absent, incomplete, or a symlink the script refuses.
+# Exit 1 is a pin mismatch and stays a failure. gh is not called.
+set +e
+env \
+  -u GALION_CLONE_PINS -u GALION_CLONE_WEIGHTS -u GALION_CLONE_RELEASE_BASE \
+  -u GALION_CLONE_WEIGHTS_SOURCE -u GALION_CLONE_HF_BASE \
+  PATH="$tmp/bin:$PATH" \
+  GALION_CLONE_PUBLISH=1 \
+  "$PUB" >"$tmp/out" 2>"$tmp/err"
+rc=$?
+set -e
+grep -q 'gh should not run' "$tmp/err" && fail "checkout publish called gh" || true
+case "$rc" in
+  0)
+    grep -q 'verified' "$tmp/out" || fail "checkout weights exit 0 without verified"
+    grep -q 'published ' "$tmp/out" && fail "checkout publish uploaded" || true
+    ;;
+  2)
+    grep -Eq 'BLOCKED|refusing symlink' "$tmp/err" || fail "checkout publish exit 2 was not BLOCKED or a symlink refuse: $(cat "$tmp/err")"
+    ;;
+  *)
+    fail "checkout publish: want 0 (pins verified, no upload) or 2 (BLOCKED or symlink refuse), got $rc"
+    ;;
+esac
+
+# An absent directory is BLOCKED even when the checkout already holds weights.
+expect_rc 2 env \
+  -u GALION_CLONE_PINS \
+  PATH="$tmp/bin:$PATH" \
+  GALION_CLONE_PUBLISH=1 \
+  GALION_CLONE_WEIGHTS="$tmp/weights-not-on-this-host" \
+  "$PUB"
+grep -q 'BLOCKED' "$tmp/err" || fail "absent weights directory was not BLOCKED"
+grep -q 'gh should not run' "$tmp/err" && fail "absent publish called gh" || true
 expect_rc 2 env \
   PATH="$tmp/bin:$PATH" \
   GALION_CLONE_PUBLISH=1 \

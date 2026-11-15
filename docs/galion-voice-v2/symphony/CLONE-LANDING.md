@@ -19,7 +19,7 @@ It does not edit `LOCKS.toml`.
 | Piece | Value |
 |---|---|
 | Model | `chatterbox-nano` (TOML `model = "nano"`). Not swapped. |
-| Process | `scripts/clone/chatterbox_worker.py`, one child, PyTorch only if a later generate is wired inside that process. This landing does not import torch. |
+| Process | `scripts/clone/chatterbox_worker.py`, one child. Torch is imported inside the Nano generate functions, not at module level. This landing harness does not call generate. |
 | Device | CPU only. `GALION_CLONE_DEVICE=cpu`. `CUDA_VISIBLE_DEVICES` empty. A `cuda` / `gpu` / `mps` request exits 3 and writes no PCM. |
 | Session size | **1 vCPU** for this child (`threads=1`). `GALION_CLONE_THREADS` above 1 is clamped to 1. |
 | Voice budget | Planning band from the CPU foundation: ~1.0 vCPU average per voice session (ASR 0.4, TTS 0.3, VAD/SER 0.15, plus reserve), burst ~4 vCPU across that cascade, ~0.65–1.15 GB RAM pooled. The burst is not given to this process. RAM is not a measured RSS and is not an enforced ulimit. |
@@ -37,6 +37,8 @@ not fetch them, does not commit them, and does not add an audio file.
 |---|---|---|---|---|---|
 | Samantha | `docs/galion-voice-v2/personas/refs/samantha.wav` | `$GALION_CLIP_STORE/samantha/reference.wav` | `bdcb0c2903bb91c7b0fda0cf79a42406fdaa662fd8d31f6eaed3895d9c7a8693` | 17.41 s, 44100 Hz, stereo, 16-bit | `preserve` |
 | Jarvis | `docs/galion-voice-v2/personas/refs/jarvis.wav` | `$GALION_CLIP_STORE/jarvis/reference.wav` | `c2200b59fa78b3c98d13ac5dc7db3a6c14e802310dca73033d7770bd4b532c60` | 15.95 s, 48000 Hz, stereo, 16-bit | `preserve-hub` |
+
+The two sha256 values in that table are the t273 originals. On this main they are commented in `scripts/clone/REFS.sha256` with "do not re-enable them." The live allowlist is the uncommented t623u rows (Samantha `e4bc60c33f697108cf5585dead213da1065979010f5be1d513574893584a4641`, Jarvis `60ad5457dac31af915a9679760705296f9aad17e15ee84885385509b58b8f6b6`). `LOCKS.toml` `ref_clip_decision = "t623u"`. A t273 file at the gitignored path is not an uncommented pin, so the child exits 3 and the Rust request path does not attach it. This page does not delete it and does not edit the pin. `scripts/clone/clone-landing-smoke.sh` checks the uncommented rows.
 
 On the owner machine the store is:
 
@@ -119,12 +121,12 @@ scripts/clone/clone-landing-smoke.sh
 Pass means:
 
 - `frame_ms` is 80 and `reference_clips` is still false
-- the worker source does not import torch, GGUF, or a denoise tool
+- torch is not imported at module level (it is imported inside the generate functions). The source does not import GGUF or a denoise tool. This harness does not call generate
 - a stub utterance returns PCM and logs `threads=1 device=cpu model=nano gguf=false`
 - denoise, GPU, MP3, and a bad sha256 produce no PCM
 - each pinned wav that exists matches its sha256 and is accepted
 - each pinned wav that does not exist prints `status=skip reason=ref-absent`
-- the last lines say `generate=blocked reason=weights-not-fetched` until the safetensors are on disk, then `generate=unwired` because this process still does not call Chatterbox `generate`
+- the last lines say `generate=blocked reason=weights-not-fetched` when `weights/clone/nano/t3_nano_v1.safetensors` is absent, and `generate=unwired reason=chatterbox-generate-not-called` when that file is present, because this harness does not call `generate`. The child can call it when `GALION_CLONE_LOCAL_REFS=1` and the uncommented pin matches. That run is not this harness
 
 Weights, when an owner wants them later, are a separate decision:
 

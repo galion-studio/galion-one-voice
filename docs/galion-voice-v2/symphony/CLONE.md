@@ -19,7 +19,20 @@ Clone landing uses the current Samantha and Jarvis models. References are the WA
 
 ## What the tree runs today
 
-`scripts/clone/chatterbox_worker.py` does not import torch and does not call generate. With the pinned safetensors absent it exits 2 (`galion-clone-absent`). With the files present and the stub flag off, a request is `galion-clone-unwired` and no samples are written. A line that carries `reference`, `audio_prompt`, `audio_prompt_path`, or `clip` exits 3 and writes no PCM. The reference stays in the clip store. The compiler ([COMPILER.md](COMPILER.md)) is what attaches it to the Galion voice file.
+Updated 2026-11-15. `scripts/clone/chatterbox_worker.py` is the out-of-process child. Torch is not imported at module level. It is imported inside the Nano `generate` path, and only then.
+
+| Condition | What the child does |
+|---|---|
+| Pinned safetensors absent | Exit 2, `galion-clone-absent`, no PCM. |
+| `GALION_CLONE_STUB_PCM=1` | A supplied wav whose sha256 is not the uncommented pin exits 3 (`reference sha256 mismatch`) and writes no PCM. Otherwise protocol PCM, engine `protocol-stub`. Not a voice and not a product claim. |
+| Weights present, `GALION_CLONE_LOCAL_REFS` unset, stream unset | Same pin check. A non-pin digest exits 3 (`reference sha256 mismatch`). With no reference, or with the pinned wav, `galion-clone-unwired` and no samples. `generate` is not called. |
+| `GALION_CLONE_LOCAL_REFS=1` and the wav sha256 is an uncommented row in `scripts/clone/REFS.sha256` | Nano `generate` when torch, chatterbox, and the pinned tokenizer are on that machine. Engine `chatterbox-nano`. |
+| Wav present, sha256 is not an uncommented pin (a commented t273 original, or any other digest) | Exit 3, `galion-clone-refuse`. The generate path says `reference sha256 is not allowlisted`. The stub and unwired pin check says `reference sha256 mismatch`. The Rust request path names a t273 file inside `reference sha256 mismatch` and does not attach it. The file is not deleted. |
+| `model` `turbo` on the Nano generate path | `galion-clone-unwired`. Turbo is not this generate path. |
+
+A reference the allowlist rejects is not attached and writes no PCM. Piper remains the fallback. Piper is not the original clone. The compiler ([COMPILER.md](COMPILER.md)) turns accepted worker PCM into the Galion voice file.
+
+The live allowlist on this main is the uncommented t623u rows in `scripts/clone/REFS.sha256` (CC0 donors). `LOCKS.toml` `ref_clip_decision = "t623u"`. The commented t273 hashes are the recorded originals, not the pin. This page does not edit `LOCKS.toml` or `REFS.sha256`. Re-opening t273 is an owner decision.
 
 Weights, when a human opts in:
 
@@ -33,11 +46,11 @@ Pins: `scripts/clone/PINS.sha256`. Nano is `t3_nano_v1.safetensors` plus shared 
 
 ## Gate
 
-**PASS** when the worker writes PCM for both personas, the reference sha256 values match [CLIP-STORE.md](CLIP-STORE.md), and a smoke speak is logged (command, machine, engine label).
+**PASS** when the worker writes PCM for both personas from the active allowlist, the reference sha256 values are the uncommented `REFS.sha256` rows, and a smoke speak is logged (command, machine, engine label). Engine `chatterbox-nano` or `nano`. Protocol-stub PCM is not this pass.
 
-**FAIL** when PCM is silent, the hash mismatches, or the Jarvis take has had the hub texture removed. See [JARVIS-TEXTURE.md](JARVIS-TEXTURE.md).
+**FAIL** when PCM is silent, the hash is not the active pin, or the Jarvis take has had the hub texture removed. See [JARVIS-TEXTURE.md](JARVIS-TEXTURE.md). A t273 file at the gitignored path is a named refuse, not a pass.
 
-**BLOCKED** while generate is unwired or the WAV refs are not on the machine. This landing has not logged a smoke speak. WER, ECAPA, MOS, and timings are not measured here. Each of those gates stays **BLOCKED**. An unlogged smoke speak does not become a timing.
+**BLOCKED** on this page until that smoke speak is logged. Generate is wired behind the gates in the table above. This landing has not logged a smoke speak. WER, ECAPA, MOS, and timings are not measured here. Each of those gates stays **BLOCKED**. An unlogged smoke speak does not become a timing. A protocol stub does not close the gate.
 
 Fetch and the flash clock: [TTFA.md](TTFA.md). Record the gate in [SELF-EVAL.md](SELF-EVAL.md).
 
