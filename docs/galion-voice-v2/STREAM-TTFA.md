@@ -78,6 +78,25 @@ CC0 clips and their sources are in `scripts/eval/sample-voices/`
 (`SAMPLE-VOICES.md`). Piper does not condition on them. They are not
 Samantha or Jarvis.
 
+## Original-ref Nano first-PCM
+
+`scripts/eval/clone-stream-ttfa.sh` still rejects a protocol-stub clock
+and can then accept the Piper script. That Piper number is not a clone
+of the original refs.
+
+`scripts/eval/nano-original-ref-ttfa.sh` is the original-ref Nano clock.
+It measures first PCM and the 80 ms first-playable frame only when the
+in-tree worker can emit real Chatterbox Nano PCM from the t273 Samantha
+and Jarvis refs. It does not set `GALION_CLONE_REF_SHA`, it does not edit
+`REFS.sha256` or `LOCKS.toml`, and it does not run Piper. A protocol-stub
+clock is `FAIL` and the JSON has no `ttfa_ms`. Whole-utterance only at or
+above 1500 ms is `HARD-FAIL`. `claim_80ms` is true only when the measured
+first playable frame is at most 80 ms. Otherwise the real `ttfa_ms` is
+reported and 80 ms is not claimed. No real PCM is `BLOCKED` (exit 2).
+
+Onset, barge-in, and e-to-a are not invented, so this harness does not
+write a `galion-ttfa-measured/v1` file.
+
 ## Why Nano has no real clock on this box
 
 A Nano HARD-PASS needs torch, the pinned safetensors, and a CPU call that

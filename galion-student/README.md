@@ -5,6 +5,8 @@ This directory holds the plan scaffolding for the Galion Voice distilled student
 **Status:** config stubs only. Nothing has been trained and no weights are included.
 Owner decision 2026-11-03: **S0** is the first size to attempt. S1 and S2 stay later. Canned replies remain the phone fallback until readiness tests pass.
 
+The live probe is `galion_cascade::student` (`weights/student/s0.gq`, or `GALION_STUDENT_GQ`). It opens a file with `galion-tensor` `GqFile` and does not speak one. Until a generator exists the persona floor says the student brain is unavailable. This directory does not hold that file.
+
 - **License:** the code and configs here are Perpetual Open MIT. Weights ship separately, with their own `LICENSE-WEIGHTS`.
 - **Weights:** exported as safetensors with a quant metadata table (primary path only; no foreign pack formats).
 - **Quantization:** Q8 per-channel FFN and attention. int4 is allowed only for embeddings and the LM head.

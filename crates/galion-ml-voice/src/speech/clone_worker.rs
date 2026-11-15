@@ -25,11 +25,13 @@
 //! `sched_setaffinity` in the child before exec, not a taskset wrapper.
 //! No GPU. No GGUF. PyTorch stays in that process and is not linked here.
 //!
-//! A reference is attached only for the owner-cleared Samantha and Jarvis
-//! wavs (t273) when the file is present and its sha256 matches
-//! `scripts/clone/REFS.sha256`. Missing files are omitted (CI skip). A
-//! mismatch, an MP3, or a denoise request is an error. Jarvis hub texture
-//! is character and is not cleaned.
+//! A reference is attached only when the file is present and its sha256 is an
+//! uncommented row in `scripts/clone/REFS.sha256` (t623u CC0 donors on this
+//! main). A missing file is omitted (CI skip). A file whose digest is a
+//! commented t273 original is a named refuse (`not allowlisted`); it is not
+//! attached and it is not deleted. Any other digest is a sha256 mismatch.
+//! An MP3 or a denoise request is an error. Jarvis hub texture is character
+//! and is not cleaned.
 //!
 //! `GALION_CLONE_STUB_PCM=1` is protocol PCM, not a Flash result.
 //! The child calls Chatterbox Nano `generate` only when
@@ -304,6 +306,60 @@ fn ref_pins() -> Vec<RefPin> {
     out
 }
 
+/// Commented t273 rows in `REFS.sha256`. Record only. Not an allowlist.
+fn superseded_original(persona: &str, digest: &str) -> bool {
+    let digest = digest.to_ascii_lowercase();
+    let persona = persona_name(persona);
+    REFS_TEXT.lines().any(|line| {
+        let Some(rest) = line.trim().strip_prefix('#') else {
+            return false;
+        };
+        let mut parts = rest.trim().split_whitespace();
+        let Some(row_persona) = parts.next() else {
+            return false;
+        };
+        let Some(sha) = parts.next() else {
+            return false;
+        };
+        row_persona == persona
+            && sha.len() == 64
+            && sha.chars().all(|c| c.is_ascii_hexdigit())
+            && sha.eq_ignore_ascii_case(&digest)
+    })
+}
+
+/// Present file, wrong digest. The compare does not change: the file is not
+/// attached and is not deleted. A commented t273 original is named inside the
+/// same `reference sha256 mismatch` refuse. Any other digest stays the short
+/// mismatch. Neither path rewrites `REFS.sha256`.
+fn refuse_unpinned_ref(persona: &str, got: &str) -> VoiceError {
+    if superseded_original(persona, got) {
+        VoiceError::Backend(format!(
+            "reference sha256 mismatch for {persona}: on-disk file is the superseded t273 original and is not allowlisted; active pin remains t623u"
+        ))
+    } else {
+        VoiceError::Backend(format!("reference sha256 mismatch for {persona}"))
+    }
+}
+
+fn is_named_ref_refuse(err: &VoiceError) -> bool {
+    err.to_string().contains("reference sha256 mismatch")
+}
+
+/// Protocol children (stub PCM, fake scripts) do not attach an unallowlisted
+/// wav. That is the same as a temp root with no clip: the request omits the
+/// path. The repo worker still returns the mismatch. t273 is not allowlisted.
+fn reference_attach(
+    resolved: Result<Option<ResolvedRef>, VoiceError>,
+    protocol_child: bool,
+) -> Result<Option<ResolvedRef>, VoiceError> {
+    match resolved {
+        Ok(found) => Ok(found),
+        Err(e) if protocol_child && is_named_ref_refuse(&e) => Ok(None),
+        Err(e) => Err(e),
+    }
+}
+
 fn repo_root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
 }
@@ -397,9 +453,7 @@ fn resolve_reference_at(
         let got = sha256::file_hex(&path)
             .map_err(|e| VoiceError::Backend(format!("reference hash: {e}")))?;
         if got != pin.sha {
-            return Err(VoiceError::Backend(format!(
-                "reference sha256 mismatch for {persona}"
-            )));
+            return Err(refuse_unpinned_ref(persona, &got));
         }
         return Ok(Some(ResolvedRef {
             persona: persona.to_string(),
@@ -783,6 +837,13 @@ pub struct CloneWorker {
     cond: Option<CondCtx>,
     cond_ticket: Option<SaveTicket>,
     cond_note: String,
+    /// When set, reference lookup uses this directory instead of the repo.
+    /// Protocol compile tests pass an empty root so an unallowlisted operator
+    /// wav does not block the in-process compiler. `None` is the live path.
+    ref_root: Option<PathBuf>,
+    /// Stub PCM and fake scripts must not hash the operator's gitignored wav.
+    /// The repo worker, with the stub off, still refuses an unallowlisted original.
+    protocol_child: bool,
 }
 
 impl CloneWorker {
@@ -902,6 +963,9 @@ impl CloneWorker {
             let _ = child.wait();
             return Err(VoiceError::Backend(format!("clone worker nonblock: {e}")));
         }
+        let protocol_child = protocol_stub_armed()
+            || extra.iter().any(|(k, v)| *k == "GALION_CLONE_STUB_PCM" && *v == "1")
+            || script.file_name().and_then(|n| n.to_str()) != Some("chatterbox_worker.py");
         Ok(Self {
             child: Some(child),
             stdin: Some(stdin),
@@ -930,7 +994,21 @@ impl CloneWorker {
             cond: None,
             cond_ticket: None,
             cond_note: String::new(),
+            ref_root: None,
+            protocol_child,
         })
+    }
+
+    /// Look up the reference under `root` instead of the repo.
+    ///
+    /// The compile-then-play test uses an empty directory. A present
+    /// unallowlisted wav at the pinned repo path stays a named refuse on the
+    /// live path (`reference sha256 mismatch`). This does not edit
+    /// `REFS.sha256` and does not treat that wav as allowlisted.
+    #[doc(hidden)]
+    pub fn with_ref_root(mut self, root: PathBuf) -> Self {
+        self.ref_root = Some(root);
+        self
     }
 
     /// Item 10: reuse saved conditioning from `$GALION_CLIP_STORE/<persona>/cond/`.
@@ -1151,7 +1229,11 @@ impl CloneWorker {
     /// One clause in, one PCM buffer out. Same process on every call.
     pub fn synthesize(&mut self, text: &str) -> Result<Vec<i16>, VoiceError> {
         let t0 = Instant::now();
-        let resolved = resolve_reference(self.persona)?;
+        let looked_up = match &self.ref_root {
+            Some(root) => resolve_reference_at(self.persona, None, root),
+            None => resolve_reference(self.persona),
+        };
+        let resolved = reference_attach(looked_up, self.protocol_child)?;
         let plan = self.cond_plan(resolved.as_ref());
         let mut line = with_prosody(
             request_line(
@@ -2179,14 +2261,56 @@ mod tests {
     }
 
     #[test]
+    fn superseded_t273_original_is_a_named_refuse_and_unknown_bytes_stay_a_mismatch() {
+        let samantha = "bdcb0c2903bb91c7b0fda0cf79a42406fdaa662fd8d31f6eaed3895d9c7a8693";
+        let jarvis = "c2200b59fa78b3c98d13ac5dc7db3a6c14e802310dca73033d7770bd4b532c60";
+        let pin_s = "e4bc60c33f697108cf5585dead213da1065979010f5be1d513574893584a4641";
+        let pin_j = "60ad5457dac31af915a9679760705296f9aad17e15ee84885385509b58b8f6b6";
+        assert!(superseded_original("samantha", samantha));
+        assert!(superseded_original("jarvis", jarvis));
+        assert!(!superseded_original("samantha", pin_s));
+        assert!(!superseded_original("jarvis", pin_j));
+        assert!(!superseded_original("samantha", &"ab".repeat(32)));
+        let named = refuse_unpinned_ref("samantha", samantha);
+        let msg = named.to_string();
+        assert!(msg.contains("reference sha256 mismatch"), "{msg}");
+        assert!(msg.contains("t273"), "{msg}");
+        assert!(msg.contains("t623u"), "{msg}");
+        assert!(msg.contains("not allowlisted"), "{msg}");
+        assert!(reference_attach(Err(named), true).unwrap().is_none());
+        let named = refuse_unpinned_ref("jarvis", jarvis);
+        let kept = reference_attach(Err(named), false).unwrap_err();
+        assert!(kept.to_string().contains("reference sha256 mismatch"));
+        let unknown = refuse_unpinned_ref("samantha", &"cd".repeat(32));
+        let unknown_msg = unknown.to_string();
+        assert!(unknown_msg.contains("reference sha256 mismatch"), "{unknown_msg}");
+        assert!(!unknown_msg.contains("t273"), "{unknown_msg}");
+        assert!(reference_attach(Err(unknown), true).unwrap().is_none());
+        assert!(reference_attach(Err(refuse_unpinned_ref("samantha", &"cd".repeat(32))), false).is_err());
+        assert!(reference_attach(Ok(None), true).unwrap().is_none());
+    }
+
+    #[test]
     fn absent_reference_is_skipped_and_a_bad_file_is_refused() {
         let root = repo_root();
         let store = clip_store_from(None);
-        let got = resolve_reference_at("samantha", store.as_deref(), &root).unwrap();
-        if let Some(found) = got {
-            assert_eq!(found.sha256, "e4bc60c33f697108cf5585dead213da1065979010f5be1d513574893584a4641");
-            assert_eq!(found.texture, "preserve");
-            assert!(found.path.ends_with("samantha.wav"));
+        match resolve_reference_at("samantha", store.as_deref(), &root) {
+            Ok(Some(found)) => {
+                assert_eq!(
+                    found.sha256,
+                    "e4bc60c33f697108cf5585dead213da1065979010f5be1d513574893584a4641"
+                );
+                assert_eq!(found.texture, "preserve");
+                assert!(found.path.ends_with("samantha.wav"));
+            }
+            Ok(None) => {}
+            Err(e) => {
+                let msg = e.to_string();
+                assert!(
+                    msg.contains("reference sha256 mismatch"),
+                    "a present unallowlisted file is a named refuse, not a crash: {msg}"
+                );
+            }
         }
         let dir = std::env::temp_dir().join(format!("galion-clone-ref-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
@@ -2487,8 +2611,8 @@ mod tests {
         // t623u: opened for the CC0 / public-domain donors only.
         assert!(section.contains("reference_clips = true"), "{section}");
         assert!(section.contains("ref_clip_decision = \"t623u\""), "{section}");
-        // Main pins the full t273 digests (symphony B). The worker allowlist
-        // reads those rows, so prefix/suffix rows are no longer the file.
+        // Uncommented rows are the t623u CC0 pins. The t273 digests stay
+        // commented in REFS.sha256 and are not the allowlist.
         let refs = include_str!("../../../../scripts/clone/REFS.sha256");
         let rows: Vec<&str> = refs.lines().filter(|l| !l.trim_start().starts_with('#') && !l.trim().is_empty()).collect();
         assert_eq!(rows.len(), 2, "{refs}");

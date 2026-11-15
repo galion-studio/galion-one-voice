@@ -49,9 +49,55 @@ A product number is copied into [SELF-EVAL.md](SELF-EVAL.md) when `engine` is `m
 
 ## This session
 
-galion-laptop. 2026-11-06. Europe/Zagreb. No model engine ran. Product TTFA is **BLOCKED**. The harness line is `measured: false` and has no `ttfa_ms`.
+2026-11-15, Europe/Zagreb (+01:00). Swarm 10 lane B, worker ttfa. Notes: [ttfa.md](../../swarm-10/2026-11-15/latency-harness/ttfa.md). The lane plan is draft PR #151 (`docs/swarm-10/2026-11-15/latency-harness/PLAN.md` on `cursor/latency-harness-plan-68d6`). This change does not edit that file.
 
-Exact line, stdout of `scripts/eval/flash-ttfa.sh` (exit 2; the example did not link, `cc` is missing):
+The original-ref Nano product clock stays **BLOCKED** on A0 and A1. That measurement belongs to worker B3. Nothing in this session is `chatterbox-nano`, a clone of the original Samantha or Jarvis references, Flite, or an 80 ms first-playable-frame pass. `product_claim: true` below is Piper `en_US-ljspeech-medium` only. These clocks are not copied into `SELF-EVAL.md`. No `galion-ttfa-measured/v1` file is added. No WAV is committed.
+
+### Cited Piper receipt
+
+Host `grok-bot-vm-511777615`. Commit `8980e1a9b4214806dd62cfccf6e2aaf093ed86b0`. Source: the local untracked baseline `NEXT-ITERATION.md` §4.3–§4.5 (written 2026-11-15 21:56 +01:00 on that host). That file is not in git. This worker did not re-run the commands on that host.
+
+`scripts/eval/piper-stream-ttfa.sh`, 21:53 +01:00, exit 0, wall 8.579 s. The drain WAV stayed at `/tmp/voice-next-baseline/piper-ttfa.wav` (161324 bytes) and is not in the repo.
+
+```text
+engine=piper voice=en_US-ljspeech-medium pack=present sha256=pinned
+runtime=weights/runtime/piper/piper cpu_only=true measured=true stub=false product_claim=true
+SpeechStack cold_first_pcm_ms=398 warm_first_pcm_ms=20 worker_reused=true piper_spawns=1
+raw_spawn cold_spawn_first_pcm_byte_ms=363.8 warm_line_first_pcm_byte_ms=23.8
+drain in_rate=22050 out_rate=24000 frame_samples=1920 tick_ms=80 frames=42 late_ticks=0 late_policy=pause audio_ms=3343.7
+```
+
+`scripts/eval/virtual-user.sh`, 21:55 +01:00. Verdict green, 15/15. Report `galion-gates/results/presence-eval/20261115T205505Z.json` (gitignored). `asr_mode=interim` (not recognition). `llm=canned`. `speech_backend=a21-weights` (Piper `en_US-ljspeech-medium`). `ttfa_ms=78`, `ttfa_status=measured`, `ttfa_kind=loopback-full-utterance`. That is the wall from the end of inject until the reply WAV, plus leading silence. It is not a streaming first frame and not a clone clock. PSTN was not run. This worker did not re-run the loopback. On host `cursor` the loopback is **not measured**.
+
+Default `scripts/eval/flash-ttfa.sh` on that host: exit 0 in 0.465 s.
+
+```text
+{"measured":false,"product_claim":false,"engine":null,"note":"GALION_FLASH_EVAL is not 1; no TTFA number"}
+```
+
+### This worker, host `cursor`
+
+Same commit `8980e1a`. 2026-11-15 22:06 +01:00. rustc 1.85.0 (the image default was 1.83.0; the 1.85 toolchain was installed before the harness result below). 4 CPUs. The A21 pack was absent, then `scripts/a21/fetch-a21.sh` (exit 0) wrote it under gitignored `weights/`. Nothing from that fetch is in git.
+
+`scripts/eval/piper-stream-ttfa.sh --wav /tmp/swarm10-b1-piper-ttfa.wav` at 22:06:10 +0100. Exit 0. Wall 5.290 s. Stdout, one JSON object, engine `piper`, `stub` false, `product_claim` true for this Piper voice only:
+
+```text
+{"engine": "piper", "voice": "en_US-ljspeech-medium", "pack": "present", "sha256": "pinned", "runtime": "weights/runtime/piper/piper", "cpu_only": true, "measured": true, "stub": false, "product_claim": true, "speechstack": {"pack": "present", "measured": true, "voice": "en_US-ljspeech-medium", "cold_first_pcm_ms": 339, "warm_first_pcm_ms": 21, "piper_pid": 4282, "piper_spawns": 1, "worker_reused": true, "pcm_cache": "none", "phrase": "Hi! This clause is the warm path check.", "clock": "speak entry until first clause PCM"}, "cold_first_pcm_ms": 339, "warm_first_pcm_ms": 21, "raw_spawn": {"cold_spawn_first_pcm_byte_ms": 350.4, "warm_line_first_pcm_byte_ms": 18.5, "cold_pcm_bytes": 147968, "warm_pcm_bytes": 119296, "clock": "spawn (cold) / stdin write (warm) until first stdout byte"}, "cold_spawn_first_pcm_byte_ms": 350.4, "warm_source": "speechstack", "drain": {"in_rate": 22050, "out_rate": 24000, "frame_samples": 1920, "tick_ms": 80, "frames": 42, "late_ticks": 0, "late_policy": "pause", "audio_ms": 3355.2, "ticks": "pppppppppppppppppppppppppppppppppppppppppp"}, "phrase_cold": "Streaming check. Galion Voice on Piper CPU.", "phrase_warm": "Hi! This clause is the warm path check.", "wav": "/tmp/swarm10-b1-piper-ttfa.wav"}
+```
+
+SpeechStack cold 339 ms / warm 21 ms. Raw spawn first PCM byte 350.4 ms / warm line 18.5 ms. Drain 42 frames, 0 late ticks, late=pause, audio 3355.2 ms. The `/tmp` WAV was 161324 bytes and was not committed. These figures sit beside the cited 398 / 20 / 0 late ticks. They do not replace them. They are still Piper.
+
+Default `scripts/eval/flash-ttfa.sh` on rustc 1.85.0: exit 0.
+
+```text
+{"measured":false,"product_claim":false,"engine":null,"note":"GALION_FLASH_EVAL is not 1; no TTFA number"}
+```
+
+No `ttfa_ms`. A protocol-stub clock was not armed.
+
+### Earlier session (galion-laptop, 2026-11-06)
+
+Kept. Not re-run. No model engine ran. Product TTFA on that laptop was **BLOCKED**. `scripts/eval/flash-ttfa.sh` exited 2 (`cc` missing) and printed:
 
 ```text
 {"measured":false,"product_claim":false,"engine":null,"note":"flash example did not run; no model engine ran; no TTFA number"}
@@ -127,7 +173,7 @@ The gate fails when a spec target is looser than the lock. A tighter target stil
 
 The zeros are the shape. A real file carries the clocks from a run on `host`. The gate accepts the file when `frame_ms` is 80, `kind` is `measured`, `host` is set, `engine` names a live engine, `ttfa_ms` is at most 80, and the three presence clocks sit inside the lock caps. Engines named `mock`, `stub`, `protocol-stub`, or `unwired` are refused. The stub replay still runs beside the file, so a measured file cannot hide a red mock.
 
-No measured file is shipped in this tree. Until one is passed in, the receipt says the wall-clock is absent.
+No `galion-ttfa-measured/v1` file is shipped in this tree. Until one is passed in, the receipt says the wall-clock is absent. The 2026-11-15 Piper clocks in the session above are not that file. They do not set `ttfa_ms` to 80, and they do not close the first-playable-frame bar. That bar waits on a measured Nano file.
 
 
 docs/galion-voice-v2/symphony/scripts/ttfa-gate.sh

@@ -69,11 +69,13 @@ These hex strings are the owner's published pins. This repository did not hash t
 | samantha | `bdcb0c2903bb91c7b0fda0cf79a42406fdaa662fd8d31f6eaed3895d9c7a8693` | 17.41 s, 44100 Hz stereo 16-bit, not re-measured here |
 | jarvis | `c2200b59fa78b3c98d13ac5dc7db3a6c14e802310dca73033d7770bd4b532c60` | 15.95 s, 48000 Hz stereo 16-bit, not re-measured here |
 
-On a mismatch the ingest outline says to delete the wav. The self-eval check fails the section and does not delete anything.
+Those two digests are the t273 originals. On this main they are commented in `scripts/clone/REFS.sha256`. The live worker allowlist is the uncommented t623u rows (Samantha `e4bc60c33f697108cf5585dead213da1065979010f5be1d513574893584a4641`, Jarvis `60ad5457dac31af915a9679760705296f9aad17e15ee84885385509b58b8f6b6`). A file with a t273 digest at the gitignored path is not an uncommented pin. The child exits 3 (`galion-clone-refuse`) and the Rust request path does not attach it. This page does not delete that file and does not edit the pin.
+
+On a mismatch the ingest outline says to delete the wav. The self-eval check fails the section and does not delete anything. Swarm 10 does not delete the wav either.
 
 A clean-speech baseline for the texture check is optional and separate: `GALION_TEXTURE_BASELINE`, or `$GALION_CLIP_STORE/jarvis/clean-speech.wav`. Without both files the spectral compare is `not measured`. No ratio is filled in.
 
-`LOCKS.toml` still has `reference_clips = false` for the Chatterbox exception. This page does not change that.
+`LOCKS.toml` `[formats.exceptions.v2s14_chatterbox]` has `reference_clips = true` and `ref_clip_decision = "t623u"` (CC0 / public-domain LibriVox donors only). This page does not change that.
 # V2-S14 · Clip store (owner clearance t273)
 
 Europe/Zagreb. 2026-11-03. The worker gate for one reference WAV per
@@ -168,8 +170,11 @@ child is not given a path.
 gate. Piper is still not a film voice.
 
 The child accepts that one `reference` path when the same checks pass.
-It still does not import torch and does not call `generate`. A protocol
-stub may emit its pipe PCM. The WAV bytes are not the reply.
+Torch is not imported at module level. `generate` runs only when
+`GALION_CLONE_LOCAL_REFS=1`, the sha256 is an uncommented `REFS.sha256`
+row, and torch plus the pinned tokenizer are present. Otherwise the child
+is `galion-clone-unwired` or a named refuse. A protocol stub may emit its
+pipe PCM. The WAV bytes are not the reply. Protocol-stub PCM is not generate.
 
 These keys still exit 3 with no PCM: `audio_prompt`, `audio_prompt_path`,
 `clip`. A `reference` that fails the table exits 3 with no PCM. The
@@ -183,7 +188,7 @@ not the outside store, and `sha256` when the sidecar is missing or wrong.
 - It does not name counsel, a grantor, or a rightsholder.
 - It does not open a public demo, a tunnel, or a login gate.
 - It does not set `GALION_CLONE_FETCH`.
-- It does not flip `reference_clips`. That boolean is still false. An owner flip of `LOCKS.toml` is still required. Until that commit, `scripts/check-locks.sh` keeps requiring false. The worker gate is the ledger, not the lock file.
+- It does not flip `reference_clips`. The chatterbox exception is already `reference_clips = true` with `ref_clip_decision = "t623u"`. This page does not edit `LOCKS.toml`. The t273 originals are not that allowlist.
 - It does not put a WAV, an mp3, or a hash of a missing file into git.
 - It does not claim the page is speaking either performer.
 
@@ -217,11 +222,11 @@ error, because the WAV is not part of the clone.
 | Owner t273 recorded as LEDGER `PRIVATE CLEARED` for Samantha and Jarvis, counsel name not invented | PASS |
 | Worker `send_reference` when that ledger line, the record, and an outside WAV all pass | PASS, covered by the crate tests. No path is sent when the store is unset. |
 | Jarvis texture is its own toggle and does not rewrite the WAV | PASS, covered by the worker test (`hub` default, `off` leaves the bytes). |
-| `LOCKS.toml` `reference_clips` flipped to true | BLOCKED. The value is still false. This change does not edit the lock. The owner flips it in a later commit. |
+| `LOCKS.toml` chatterbox `reference_clips` | Already `true`, decision `t623u`. This page does not edit the lock. The t273 originals stay commented in `REFS.sha256`. |
 | Repeat the Nano smoke from `personas/refs/*.wav` here | BLOCKED. Those WAVs are not in this checkout. Clone weights are not in git. t287 reports a local smoke already generated Nano clones from those files. This tree does not re-measure that run and does not invent a duration or a sha256. |
 | WER, ECAPA, MOS, timings | BLOCKED. Not measured in this tree. |
 | Public demo | Not opened. |
-| `generate()` inside this process | Not wired. The stub still does not import torch. |
+| `generate()` inside the child | Wired behind `GALION_CLONE_LOCAL_REFS=1` and the uncommented pin. Torch is imported only on that path, not at module level. This page has not logged a smoke speak. The stub does not call `generate`. |
 
 — Maciej Grajczyk
 
