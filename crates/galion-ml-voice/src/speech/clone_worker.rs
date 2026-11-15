@@ -837,6 +837,10 @@ pub struct CloneWorker {
     cond: Option<CondCtx>,
     cond_ticket: Option<SaveTicket>,
     cond_note: String,
+    /// When set, reference lookup uses this directory instead of the repo.
+    /// Protocol compile tests pass an empty root so an unallowlisted operator
+    /// wav does not block the in-process compiler. `None` is the live path.
+    ref_root: Option<PathBuf>,
     /// Stub PCM and fake scripts must not hash the operator's gitignored wav.
     /// The repo worker, with the stub off, still refuses an unallowlisted original.
     protocol_child: bool,
@@ -990,8 +994,21 @@ impl CloneWorker {
             cond: None,
             cond_ticket: None,
             cond_note: String::new(),
+            ref_root: None,
             protocol_child,
         })
+    }
+
+    /// Look up the reference under `root` instead of the repo.
+    ///
+    /// The compile-then-play test uses an empty directory. A present
+    /// unallowlisted wav at the pinned repo path stays a named refuse on the
+    /// live path (`reference sha256 mismatch`). This does not edit
+    /// `REFS.sha256` and does not treat that wav as allowlisted.
+    #[doc(hidden)]
+    pub fn with_ref_root(mut self, root: PathBuf) -> Self {
+        self.ref_root = Some(root);
+        self
     }
 
     /// Item 10: reuse saved conditioning from `$GALION_CLIP_STORE/<persona>/cond/`.
@@ -1212,7 +1229,11 @@ impl CloneWorker {
     /// One clause in, one PCM buffer out. Same process on every call.
     pub fn synthesize(&mut self, text: &str) -> Result<Vec<i16>, VoiceError> {
         let t0 = Instant::now();
-        let resolved = reference_attach(resolve_reference(self.persona), self.protocol_child)?;
+        let looked_up = match &self.ref_root {
+            Some(root) => resolve_reference_at(self.persona, None, root),
+            None => resolve_reference(self.persona),
+        };
+        let resolved = reference_attach(looked_up, self.protocol_child)?;
         let plan = self.cond_plan(resolved.as_ref());
         let mut line = with_prosody(
             request_line(
