@@ -50,12 +50,12 @@ Read 2026-11-15 22:06 +01:00 from the cloud-agent list. All four were `RUNNING` 
 
 Base every branch on current `origin/main`. One concern per PR. Draft until the worker's own local tests have been re-run and the notes file quotes what those commands printed.
 
-| Order | Role | Branch | Status at 22:53 +01:00 |
+| Order | Role | Branch | Status at 22:57 +01:00 |
 |---|---|---|---|
 | 1 | ttfa | `cursor/latency-harness-ttfa-d251` | Merged. [#157](https://github.com/galion-studio/galion-one-voice/pull/157) head `46087e9`, merge commit `2ecca8645adb1bf069af912cb7066334f97d1b3c`. Piper only: cited cold 398 ms / warm 20 ms, this host cold 339 ms / warm 21 ms. |
 | 2 | heartbeat | `cursor/latency-harness-heartbeat-05c6` | Merged. [#154](https://github.com/galion-studio/galion-one-voice/pull/154) head `ada0a92`, merge commit `c33dd4a681fc1d0e2eeff2dc7116cd9439a4ded2`. Harness `verdict=FAIL reason=stub-frames-are-not-a-voice`. Separate unit line `frame_ms=80 allocs=0 late=pause`. |
-| 3 | one-percent | `cursor/latency-harness-one-percent-b942` | Ready [#155](https://github.com/galion-studio/galion-one-voice/pull/155). Checks on `8d10334` were green, then main moved to `0fc5dc9`. Updated onto `d450bb3`. Notes quote `p99=1438ns`, `product_claim=false`. Merge waits for checks on `d450bb3`. |
-| 4 | stream-clone | `cursor/latency-harness-stream-clone-533b` | Draft [#164](https://github.com/galion-studio/galion-one-voice/pull/164), head `2fd84fa`. Harness exits 2, `gate` `BLOCKED`, no `ttfa_ms`. Held until #155 merges, then updated from main. A1 [#170](https://github.com/galion-studio/galion-one-voice/pull/170) is BLOCKED with no Nano PCM. Texture [#161](https://github.com/galion-studio/galion-one-voice/pull/161) is on main as BLOCKED without the original clip. A0 remains BLOCKED-OWNER. |
+| 3 | one-percent | `cursor/latency-harness-one-percent-b942` | Merged. [#155](https://github.com/galion-studio/galion-one-voice/pull/155) head `d450bb3`, merge commit `8a629a328447332dd597c3dd055b6f97b798997c`. Notes quote `p99=1438ns`, `product_claim=false`. Not an EPYC, CX23, or CX43 claim. |
+| 4 | stream-clone | `cursor/latency-harness-stream-clone-533b` | Draft [#164](https://github.com/galion-studio/galion-one-voice/pull/164). Updated from main onto `c4c35dd`. Re-run exit 2, `gate` `BLOCKED`, no `ttfa_ms`. Merge waits for checks on `c4c35dd`. A1 [#170](https://github.com/galion-studio/galion-one-voice/pull/170) is BLOCKED with no Nano PCM. Texture [#161](https://github.com/galion-studio/galion-one-voice/pull/161) is BLOCKED without the original clip. A0 remains BLOCKED-OWNER. |
 
 Stay on that branch. Do not push to the plan branch. Do not push to `main`.
 
