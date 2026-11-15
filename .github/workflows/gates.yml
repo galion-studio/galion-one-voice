@@ -50,6 +50,18 @@ jobs:
             exit 0
           fi
           exit "$code"
+      - name: Original-ref Nano TTFA (stub is FAIL; no PCM is BLOCKED)
+        run: |
+          python3 scripts/eval/test_nano_original_ref_ttfa.py
+          set +e
+          scripts/eval/nano-original-ref-ttfa.sh
+          code=$?
+          set -e
+          if [ "$code" = 2 ]; then
+            echo "BLOCKED. Original-ref Nano PCM was not measured. Not a product TTFA. 80 ms is not claimed."
+            exit 0
+          fi
+          exit "$code"
       - name: Phone HTTP surface
         run: cargo test -p galion-render --features web --lib
       - name: Phone lane
