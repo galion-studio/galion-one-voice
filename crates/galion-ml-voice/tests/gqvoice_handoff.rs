@@ -48,7 +48,17 @@ fn chatterbox_worker_bytes_compile_before_playback() {
 }
 
 fn land(script: &std::path::Path, dir: &PathBuf, persona: &str, model: CloneModel, text: &str) {
-    let mut worker = CloneWorker::spawn(script, model, persona).unwrap();
+    // Outside `dir`: the test counts landed packet names in that directory.
+    let ref_root = std::env::temp_dir().join(format!(
+        "galion-gqvoice-refroot-{}-{}",
+        persona,
+        std::process::id()
+    ));
+    let _ = std::fs::remove_dir_all(&ref_root);
+    std::fs::create_dir_all(&ref_root).unwrap();
+    let mut worker = CloneWorker::spawn(script, model, persona)
+        .unwrap()
+        .with_ref_root(ref_root.clone());
     let pcm = worker.synthesize(text).unwrap();
     assert!(!pcm.is_empty());
     let mut raw = Vec::new();
@@ -67,4 +77,5 @@ fn land(script: &std::path::Path, dir: &PathBuf, persona: &str, model: CloneMode
     assert_eq!(audio.sample_rate, 24_000);
     assert_eq!(packet.sector(0).unwrap().len(), 1920);
     drop(worker);
+    let _ = std::fs::remove_dir_all(&ref_root);
 }

@@ -414,7 +414,8 @@ function draw(){
   const moodT=MOOD[moodName];
   const mk=1-Math.exp(-dt/EM_TAU);
   moodWash+=(moodT.wash-moodWash)*mk;
-  moodAmber+=(moodT.amber-moodAmber)*mk;
+  const amberTarget=(latest&&typeof latest.wash_amber==="number"&&isFinite(+latest.wash_amber))?clamp(+latest.wash_amber,0,1):moodT.amber;
+  moodAmber+=(amberTarget-moodAmber)*mk;
   if(latest&&latest.mood){ feel.v=moodT.warm; feel.a=Math.min(1,moodT.wash); }
   cv.dataset.mood=moodName;
   const leanNow=clamp(+((latest&&latest.emotion&&latest.emotion.lean)!=null?latest.emotion.lean:(latest&&latest.lean)||0),0,1);
