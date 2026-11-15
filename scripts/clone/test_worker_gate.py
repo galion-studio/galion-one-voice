@@ -62,13 +62,16 @@ def run_worker(payload: dict, env: dict[str, str]) -> subprocess.CompletedProces
 class AllowlistTests(unittest.TestCase):
     def test_documented_prefixes_are_the_file(self) -> None:
         allow = MOD.load_allowlist(str(HERE / "REFS.sha256"))
-        # REFS.sha256 now carries main's full t273 pin rows; the allowlist
-        # reads the full digest as the prefix with an empty suffix.
+        # Uncommented rows are the t623u CC0 pins. The allowlist reads the
+        # full digest as the prefix with an empty suffix. Commented t273
+        # originals are not in this map.
         self.assertTrue(allow["samantha"][0].startswith("e4bc60c3"))
         self.assertTrue((allow["samantha"][0] + allow["samantha"][1]).endswith("84a4641"))
         self.assertTrue(allow["jarvis"][0].startswith("60ad5457"))
         self.assertTrue((allow["jarvis"][0] + allow["jarvis"][1]).endswith("58b8f6b6"))
         self.assertEqual(set(allow), {"samantha", "jarvis"})
+        self.assertNotIn("bdcb0c29", allow["samantha"][0])
+        self.assertNotIn("c2200b59", allow["jarvis"][0])
 
     def test_persona_binding(self) -> None:
         # Synthetic digests against a prefix/suffix allowlist (the 3-column form
