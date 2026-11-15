@@ -34,6 +34,8 @@ jobs:
         run: cargo test -p galion-ml-voice --features speech
       - name: Clone prep staging (no download, no generate)
         run: scripts/clone/stage-clone-prep.test.sh
+      - name: Speaking rate changes the PCM
+        run: python3 scripts/clone/test_speaking_rate.py
       - name: Flash TTFA harness (no number without a run)
         run: scripts/eval/flash-ttfa.sh
       - name: Hard loop classifiers (no product verdict)

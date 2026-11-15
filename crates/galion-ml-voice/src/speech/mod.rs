@@ -80,9 +80,10 @@ pub const SPEECH_RATE: u32 = crate::stub::SAMPLE_RATE;
 /// sensed `/v2/say` persona column.
 ///
 /// There is no emotion name on this struct. Identity leaves the PCM alone.
-/// [`apply_frame_prosody`] uses `energy`, `pitch_st`, and `pre_pause_ms`.
-/// `rate` is stored and is not a time-stretch: Piper reads `length_scale`
-/// once at spawn, and this function does not respawn the worker.
+/// [`apply_frame_prosody`] uses `energy`, `pitch_st`, `rate`, and `pre_pause_ms`.
+/// `rate` is a pitch-preserving time stretch of this buffer. Piper still reads
+/// `length_scale` once at spawn; this stretch is what a later rate change does
+/// to the samples.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct FrameProsody {
     pub pitch_st: f32,
@@ -129,11 +130,12 @@ fn finite(x: f32, fallback: f32) -> f32 {
     if x.is_finite() { x } else { fallback }
 }
 
-/// Scale loudness, resample pitch, then prepend silence.
+/// Scale loudness, resample pitch, time-stretch `rate`, then prepend silence.
 ///
 /// Pitch is a linear resample by `2^(st/12)`, the same ratio as
 /// [`crate::emotive::EmotiveShaper`]. Formants move with the pitch. A lower
-/// pitch lengthens the buffer. `rate` is not applied here.
+/// pitch lengthens the buffer. Speaking `rate` then changes duration and
+/// keeps that pitch: `rate` above 1 shortens the buffer.
 pub fn apply_frame_prosody(samples: &mut Vec<f32>, rate: u32, prosody: FrameProsody) {
     let prosody = prosody.clamped();
     let energy = prosody.energy;
@@ -148,6 +150,9 @@ pub fn apply_frame_prosody(samples: &mut Vec<f32>, rate: u32, prosody: FramePros
             *samples = pitch_resample(samples, ratio);
         }
     }
+    if samples.len() > 1 && rate > 0 && (prosody.rate - 1.0).abs() > 1.0e-4 {
+        *samples = stretch_speaking_rate(samples, rate, prosody.rate);
+    }
     if prosody.pre_pause_ms == 0 || rate == 0 {
         return;
     }
@@ -158,6 +163,110 @@ pub fn apply_frame_prosody(samples: &mut Vec<f32>, rate: u32, prosody: FramePros
     let mut out = vec![0.0; n];
     out.append(samples);
     *samples = out;
+}
+
+/// Pitch-preserving speaking-rate stretch.
+///
+/// `speaking_rate` above 1 shortens the buffer. Grains are one estimated
+/// period apart in the output, so a steady tone keeps its period. The search
+/// picks the source offset that best matches the previous grain.
+fn stretch_speaking_rate(input: &[f32], sample_rate: u32, speaking_rate: f32) -> Vec<f32> {
+    let rate = if speaking_rate.is_finite() { speaking_rate } else { 1.0 }.clamp(0.8, 1.2);
+    if (rate - 1.0).abs() < 1.0e-4 || input.len() < 64 || sample_rate == 0 {
+        return input.to_vec();
+    }
+    let period = estimate_period(input, sample_rate).unwrap_or((sample_rate as usize / 160).clamp(40, 400));
+    let win = (period.saturating_mul(2)).clamp(16, input.len());
+    let target = ((input.len() as f32) / rate).round().max(win as f32) as usize;
+    let mut window = vec![0.0f32; win];
+    for (i, w) in window.iter_mut().enumerate() {
+        let x = std::f32::consts::PI * i as f32 / win as f32;
+        *w = x.sin() * x.sin();
+    }
+    let mut out = vec![0.0f32; target];
+    let mut norm = vec![0.0f32; target];
+    let mut prev: Vec<f32> = Vec::new();
+    let mut syn = 0usize;
+    let radius = (period / 2).max(1);
+    while syn + win <= target {
+        let ideal = ((syn as f32) * rate) as usize;
+        let ideal = ideal.min(input.len().saturating_sub(win));
+        let ana = if prev.is_empty() {
+            ideal
+        } else {
+            best_grain_start(input, &prev, ideal, radius, win)
+        };
+        for i in 0..win {
+            let s = input[ana + i] * window[i];
+            out[syn + i] += s;
+            norm[syn + i] += window[i];
+        }
+        prev.clear();
+        prev.extend_from_slice(&input[ana..ana + win]);
+        syn += period.max(1);
+    }
+    for i in 0..out.len() {
+        if norm[i] > 1.0e-6 {
+            out[i] /= norm[i];
+        }
+    }
+    out
+}
+
+fn estimate_period(input: &[f32], sample_rate: u32) -> Option<usize> {
+    let min_lag = (sample_rate as usize / 400).max(8);
+    let max_lag = (sample_rate as usize / 70).min(input.len() / 2);
+    if max_lag <= min_lag || input.len() < max_lag * 2 {
+        return None;
+    }
+    let start = input.len() / 4;
+    let end = (start + max_lag * 2).min(input.len());
+    let frame = &input[start..end];
+    let mut best_lag = 0usize;
+    let mut best = 0.0f32;
+    for lag in min_lag..=max_lag {
+        if lag >= frame.len() {
+            break;
+        }
+        let mut corr = 0.0f32;
+        let mut e0 = 0.0f32;
+        let mut e1 = 0.0f32;
+        let n = frame.len() - lag;
+        for i in 0..n {
+            let a = frame[i];
+            let b = frame[i + lag];
+            corr += a * b;
+            e0 += a * a;
+            e1 += b * b;
+        }
+        let denom = (e0 * e1).sqrt();
+        let norm = if denom > 1.0e-8 { corr / denom } else { 0.0 };
+        if norm > best {
+            best = norm;
+            best_lag = lag;
+        }
+    }
+    if best > 0.3 && best_lag > 0 { Some(best_lag) } else { None }
+}
+
+fn best_grain_start(input: &[f32], prev: &[f32], ideal: usize, radius: usize, win: usize) -> usize {
+    let last = input.len().saturating_sub(win);
+    let lo = ideal.saturating_sub(radius).min(last);
+    let hi = ideal.saturating_add(radius).min(last);
+    let mut best = lo;
+    let mut best_score = f32::NEG_INFINITY;
+    let n = win.min(prev.len());
+    for start in lo..=hi {
+        let mut score = 0.0f32;
+        for i in 0..n {
+            score += input[start + i] * prev[i];
+        }
+        if score > best_score {
+            best_score = score;
+            best = start;
+        }
+    }
+    best
 }
 
 /// Read `input` at `i * ratio`. `ratio > 1` raises pitch and shortens the buffer.
@@ -604,10 +713,10 @@ impl SpeechStack {
         self.finish_audio(result, clone_engine)
     }
 
-    /// Merge #56 + gqvoice: frame prosody (pause, loudness) is applied to
+    /// Frame prosody (pause, loudness, pitch, speaking rate) is applied to
     /// Piper and flite PCM here. Clone PCM is not rewritten after the child:
-    /// the landed `.gqvoice` packet must equal the playback buffer, and the
-    /// clone child already receives the prosody numbers (`set_prosody`).
+    /// the landed `.gqvoice` packet must equal the playback buffer. The clone
+    /// worker applies `rate` to the PCM it writes.
     fn finish_audio(
         &mut self,
         result: Result<Audio, VoiceError>,
@@ -883,6 +992,68 @@ mod tests {
         let rms = (speech.iter().map(|s| s * s).sum::<f32>() / speech.len() as f32).sqrt();
         assert!(rms < 0.75, "energy 0.8 should sit under a full sine, rms {rms}");
         assert!(rms > 0.4, "energy 0.8 should still be audible, rms {rms}");
+    }
+
+    #[test]
+    fn speaking_rate_changes_the_waveform_and_keeps_the_period() {
+        let sr = 24_000u32;
+        let n = sr as usize;
+        let freq = 200.0f32;
+        let tone: Vec<f32> = (0..n)
+            .map(|i| (2.0 * std::f32::consts::PI * freq * i as f32 / sr as f32).sin())
+            .collect();
+        let source_period = measured_period(&tone);
+        let mut same = tone.clone();
+        apply_frame_prosody(&mut same, sr, FrameProsody::identity());
+        assert_eq!(same, tone, "rate 1 must leave the samples alone");
+        let mut fast = tone.clone();
+        apply_frame_prosody(&mut fast, sr, FrameProsody { rate: 1.2, ..FrameProsody::identity() });
+        let mut slow = tone.clone();
+        apply_frame_prosody(&mut slow, sr, FrameProsody { rate: 0.8, ..FrameProsody::identity() });
+        assert!(fast.len() < n, "rate 1.2 shortened nothing: {}", fast.len());
+        assert!(slow.len() > n, "rate 0.8 lengthened nothing: {}", slow.len());
+        let fast_ratio = fast.len() as f32 / n as f32;
+        let slow_ratio = slow.len() as f32 / n as f32;
+        assert!(
+            (fast_ratio - (1.0 / 1.2)).abs() < 0.08,
+            "measured fast length ratio {fast_ratio} (len {})",
+            fast.len()
+        );
+        assert!(
+            (slow_ratio - (1.0 / 0.8)).abs() < 0.08,
+            "measured slow length ratio {slow_ratio} (len {})",
+            slow.len()
+        );
+        let fast_period = measured_period(&fast);
+        let slow_period = measured_period(&slow);
+        assert!(
+            (fast_period - source_period).abs() < 6.0,
+            "fast period {fast_period} source {source_period}"
+        );
+        assert!(
+            (slow_period - source_period).abs() < 6.0,
+            "slow period {slow_period} source {source_period}"
+        );
+        let mut clamped = tone.clone();
+        apply_frame_prosody(&mut clamped, sr, FrameProsody { rate: 4.0, ..FrameProsody::identity() });
+        assert_eq!(clamped.len(), fast.len(), "rate is clamped to 1.2");
+    }
+
+    /// Median samples between rising zero crossings, measured on the middle half.
+    fn measured_period(samples: &[f32]) -> f32 {
+        let start = samples.len() / 4;
+        let end = samples.len() * 3 / 4;
+        let mut marks = Vec::new();
+        for i in start + 1..end {
+            if samples[i - 1] <= 0.0 && samples[i] > 0.0 {
+                marks.push(i);
+            }
+        }
+        assert!(marks.len() >= 4, "not enough zero crossings in {} samples", samples.len());
+        let gaps: Vec<f32> = marks.windows(2).map(|w| (w[1] - w[0]) as f32).collect();
+        let mut sorted = gaps.clone();
+        sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        sorted[sorted.len() / 2]
     }
 
     #[test] fn resample_len_and_identity() {

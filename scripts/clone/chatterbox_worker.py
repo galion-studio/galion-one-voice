@@ -858,7 +858,129 @@ def read_request() -> dict | None:
     return msg
 
 
-# #56: numeric 80 ms prosody is logged only; Nano generate does not take it.
+# Pitch, energy, warmth, and pause are logged. `rate` is applied to the PCM
+# before it is written (owner decision 2026-11-15). Nano generate itself
+# does not take the number; this process stretches the samples.
+def speaking_rate_of(msg: dict) -> float:
+    raw = msg.get("prosody") if isinstance(msg, dict) else None
+    if not isinstance(raw, dict):
+        return 1.0
+    try:
+        value = float(raw.get("rate", 1.0))
+    except (TypeError, ValueError):
+        return 1.0
+    if value != value or value in (float("inf"), float("-inf")):
+        return 1.0
+    if value < 0.8:
+        return 0.8
+    if value > 1.2:
+        return 1.2
+    return value
+
+
+def apply_speaking_rate(pcm: bytes, rate: float) -> bytes:
+    """Pitch-preserving time stretch of little-endian s16le mono.
+
+    `rate` above 1 shortens the buffer. `rate` of 1 returns the same bytes.
+    Buffers shorter than 64 samples are left alone (the one-sample stream
+    clock stays one sample). This does not call a model.
+    """
+    if rate != rate or rate in (float("inf"), float("-inf")):
+        rate = 1.0
+    if rate < 0.8:
+        rate = 0.8
+    elif rate > 1.2:
+        rate = 1.2
+    if abs(rate - 1.0) < 1e-4 or len(pcm) < 128 or len(pcm) % 2:
+        return pcm
+    samples = list(struct.unpack("<" + "h" * (len(pcm) // 2), pcm))
+    if len(samples) < 64:
+        return pcm
+    floats = [s / 32768.0 for s in samples]
+    stretched = _stretch_rate(floats, 24000, rate)
+    out = bytearray()
+    for x in stretched:
+        if x > 1.0:
+            x = 1.0
+        elif x < -1.0:
+            x = -1.0
+        out += struct.pack("<h", int(round(x * 32767.0)))
+    return bytes(out)
+
+
+def _stretch_rate(samples: list, sample_rate: int, rate: float) -> list:
+    import math
+    period = _estimate_period(samples, sample_rate) or max(40, min(400, sample_rate // 160))
+    win = max(16, min(len(samples), period * 2))
+    target = max(win, int(round(len(samples) / rate)))
+    window = [math.sin(math.pi * i / win) ** 2 for i in range(win)]
+    out = [0.0] * target
+    norm = [0.0] * target
+    prev = None
+    syn = 0
+    radius = max(1, period // 2)
+    while syn + win <= target:
+        ideal = min(int(syn * rate), len(samples) - win)
+        ana = ideal if prev is None else _best_start(samples, prev, ideal, radius, win)
+        for i in range(win):
+            s = samples[ana + i] * window[i]
+            out[syn + i] += s
+            norm[syn + i] += window[i]
+        prev = samples[ana:ana + win]
+        syn += max(1, period)
+    for i in range(target):
+        if norm[i] > 1e-6:
+            out[i] /= norm[i]
+    return out
+
+
+def _estimate_period(samples: list, sample_rate: int):
+    min_lag = max(8, sample_rate // 400)
+    max_lag = min(len(samples) // 2, sample_rate // 70)
+    if max_lag <= min_lag or len(samples) < max_lag * 2:
+        return None
+    start = len(samples) // 4
+    frame = samples[start:start + max_lag * 2]
+    best_lag = 0
+    best = 0.0
+    for lag in range(min_lag, max_lag + 1):
+        if lag >= len(frame):
+            break
+        corr = e0 = e1 = 0.0
+        n = len(frame) - lag
+        for i in range(n):
+            a = frame[i]
+            b = frame[i + lag]
+            corr += a * b
+            e0 += a * a
+            e1 += b * b
+        denom = (e0 * e1) ** 0.5
+        score = corr / denom if denom > 1e-8 else 0.0
+        if score > best:
+            best = score
+            best_lag = lag
+    if best > 0.3 and best_lag:
+        return best_lag
+    return None
+
+
+def _best_start(samples: list, prev: list, ideal: int, radius: int, win: int) -> int:
+    last = len(samples) - win
+    lo = min(max(0, ideal - radius), last)
+    hi = min(ideal + radius, last)
+    best = lo
+    best_score = float("-inf")
+    n = min(win, len(prev))
+    for start in range(lo, hi + 1):
+        score = 0.0
+        for i in range(n):
+            score += samples[start + i] * prev[i]
+        if score > best_score:
+            best_score = score
+            best = start
+    return best
+
+
 def log_prosody(msg: dict) -> None:
     raw = msg.get("prosody")
     if not isinstance(raw, dict):
@@ -918,12 +1040,13 @@ def run_stub(pcm_fd: int) -> None:
         if persona == "jarvis":
             text = TAG.sub("", text)
         text = " ".join(text.split())
+        rate = speaking_rate_of(msg)
         n = max(1, min(len(text), 32767))
         tone = 1000 + (n % 50)
         frames = stub_frame_count()
         sys.stderr.write("galion-clone-emit: galion-vc\n")
         if frames:
-            one = struct.pack("<h", tone) * FRAME
+            one = apply_speaking_rate(struct.pack("<h", tone) * FRAME, rate)
             frame_utterance(pcm_fd, b"", "protocol-stub", persona, announce=len(one) * frames)
             for i in range(frames):
                 sys.stderr.write(f"galion-clone-progress: {i}\n")
@@ -940,7 +1063,7 @@ def run_stub(pcm_fd: int) -> None:
             for index, chunk in enumerate(nano_stream.protocol_chunks(text)):
                 if index:
                     time.sleep(0.05)
-                yield chunk
+                yield apply_speaking_rate(chunk, rate)
 
         nano_stream.write_chunks(
             stub_pcm_file(pcm_fd),
@@ -1001,7 +1124,7 @@ def run_nano(pcm_fd: int, allow: dict[str, tuple[str, str]]) -> None:
                     cache["path"] = path
             except Exception as exc:
                 refuse(f"chatterbox nano conditioning failed ({type(exc).__name__}: {one_line(exc)})")
-        pcm = render(model, text, path, cache)
+        pcm = apply_speaking_rate(render(model, text, path, cache), speaking_rate_of(msg))
         sys.stderr.write("galion-clone-emit: galion-vc\n")
         frame_utterance(pcm_fd, pcm, "chatterbox-nano", persona)
 
@@ -1060,10 +1183,11 @@ def run_stream(pcm_fd: int, allow: dict[str, tuple[str, str]]) -> None:
                 nano_stream.write_unwired(sys.stderr, f"conditioning failed ({type(exc).__name__})")
                 continue
         sys.stderr.write("galion-clone-emit: galion-vc\n")
+        rate = speaking_rate_of(msg)
         try:
             nano_stream.write_chunks(
                 pcm,
-                nano_stream.iter_pcm(model, text, stream_ref),
+                (apply_speaking_rate(chunk, rate) for chunk in nano_stream.iter_pcm(model, text, stream_ref)),
                 engine="nano",
                 persona=persona,
                 path="stream",
