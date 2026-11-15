@@ -27,7 +27,7 @@ Europe/Zagreb. The spelling is **Galion**. The product is Galion Voice.
 - Nerve record: `docs/galion-voice-v2/OPENMIND-NERVE-CORTEX.md` §4, and `crates/galion-console/assets/v1-screen.html` (read, not edited). No second pane was added.
 - `docs/galion-voice-v3/VERIFICATION.md` Part A1–A2. Both clone boxes are still unchecked. That file was not edited. No V3 code.
 
-Lane C siblings C1, C2, and C3 had no open pull request at 2026-11-15 22:07 +01:00. The open Swarm 10 pull requests then were #150 (this lane's plan), #151, #152, #153, #154, and #155. Their results are not invented here.
+At 2026-11-15 22:07 +01:00, C1, C2, and C3 had no open pull request. At 22:12 +01:00 a second search found draft [#162](https://github.com/galion-studio/galion-one-voice/pull/162) (C2 one-dot) and draft [#156](https://github.com/galion-studio/galion-one-voice/pull/156) (orchestrator `/one` candidate). C1 and C3 were not in that result. #162 is cited below from its pull-request body. It was not re-run here.
 
 ## Hard-loop report
 
@@ -133,7 +133,7 @@ On this host the optional probe above produced 0 PCM and `galion-clone-absent: p
 
 The original-ref generate in NEXT-ITERATION (2026-11-15, host `grok-bot-vm-511777615`, commit `8980e1a`) was **not re-run here**. The t273 wavs and the pinned safetensors are not on this machine. That write-up, cited and not recycled as a result of this VM, says both personas exited 3 in 0.032–0.033 s with 0 PCM and stderr `galion-clone-refuse: reference sha256 is not allowlisted for <persona>`, because `REFS.sha256` allowlists the t623u donors. A0 stays **BLOCKED-OWNER**. This lane did not flip `LOCKS.toml` or `REFS.sha256`.
 
-C1, C2, and C3 had not opened pull requests when this note was written, so their session logs are not folded in. C5 stays BLOCKED on A0 even if those notes arrive later, until a clone backend actually speaks from the refs Maciej allows.
+Draft [#162](https://github.com/galion-studio/galion-one-voice/pull/162) (C2, body read 2026-11-15 22:12 +01:00, not re-run on this seat) says its loopback mouth line was `backend=system-flite`, and that the Piper pack was absent on that VM. Flite labelled as Flite is a negative for A1 and A2. That pull request also says C5 stays BLOCKED on A0. It does not supply a clone-backend listen log. C1 and C3 were not in the 22:12 search, so their session logs are not quoted. C5 stays BLOCKED until a clone backend speaks from the refs Maciej allows.
 
 The speech stack's documented fallback, and the owner deploy default until a clone mouth is live, is Piper `en_US-ljspeech-medium`. This hard loop did not speak it: `piper-pcm` is `failed` because the pack is not on this box.
 
@@ -159,7 +159,15 @@ The one-dot page does not draw an LLM thought pane, a menu, or a transcript. The
 
 ## CI
 
-Not yet recorded for this commit. The pull request checks are filled in after they finish. Workflows expected on a docs-only pull request: `gates`, `emotion-v2`, `one-desktop`. `nebula-voice-v2` stays absent unless nebula paths change; this commit does not touch them.
+Recorded 2026-11-15 22:12 +01:00 from the Checks API for commit `d35e964854da123e7693ba1a7f6ab5ded2c77c94`. Three check runs, all `completed` / `success`. The legacy combined status for that SHA had `total_count` 0 and `state` `pending`; there were no status contexts. `nebula-voice-v2` did not appear in the check list (path filter; this commit does not touch nebula paths).
+
+| Check | Workflow run | Conclusion | UTC window |
+|---|---|---|---|
+| `test` (`gates`) | [43762087913](https://github.com/galion-studio/galion-one-voice/actions/runs/43762087913) | success | 21:09:27–21:11:04 |
+| `playwright` (`one-desktop`) | [43762087904](https://github.com/galion-studio/galion-one-voice/actions/runs/43762087904) | success | 21:09:49–21:11:02 |
+| `emotion-v2 harness (CPU stub)` | [43762087915](https://github.com/galion-studio/galion-one-voice/actions/runs/43762087915) | success | 21:09:37–21:09:47 |
+
+Those three are the checks on `d35e964`, the commit that added this file. A later commit that only fills this section is a different head. Its checks are not these rows.
 
 On the base, the lane plan records `gates`, `emotion-v2`, and `one-desktop` success on `8980e1a` (runs 43660665688, 43660665722, 43660665724). That is the base, not this head.
 
@@ -173,7 +181,7 @@ On the base, the lane plan records `gates`, `emotion-v2`, and `one-desktop` succ
 
 ## Open questions
 
-- C1, C2, and C3 notes were not available at 22:07 +01:00. If they land with measurements, this C5 sentence still stays BLOCKED unless those notes include a clone backend speaking. They did not exist to quote.
+- C2 draft #162 was read at 22:12 +01:00. Its mouth line is Flite, and it does not close C5. C1 and C3 were still absent from that search.
 - `HARD-LOOP.md` still describes an overall word `STUB-PASS`. The script that ran printed `HARD-FAIL`. Left for a docs pass outside this brief.
 
 ---
