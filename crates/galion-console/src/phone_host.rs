@@ -328,13 +328,11 @@ fn nerve_from_env() -> Option<NerveEmitter> {
     }
 }
 
-/// `GALION_STUDENT_GQ` names an existing student checkpoint.
+/// `GALION_STUDENT_GQ` names an existing non-empty `.gq` file.
+/// An empty file, a missing path, or a non-`.gq` file is absent.
+/// Presence is not speech: the turn seam does not load the file.
 fn student_present() -> bool {
-    std::env::var("GALION_STUDENT_GQ")
-        .ok()
-        .map(|p| p.trim().to_string())
-        .filter(|p| !p.is_empty())
-        .is_some_and(|p| std::path::Path::new(&p).is_file())
+    galion_openmind::TurnSeam::weights_from_env()
 }
 
 /// `GALION_JARVIS_HUB=0|off|false` mutes the hub bed on playback. Default is on.
