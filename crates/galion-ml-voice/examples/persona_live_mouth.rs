@@ -5,8 +5,8 @@
 //! is whatever `SpeechStack::detect` can open (Flite when the library is
 //! present). Protocol-stub PCM is not used. WAVs are not written.
 //!
-//! `rate` is printed and is not a time-stretch. Pitch, loudness, and the
-//! leading pause are the moves in the PCM.
+//! `rate` is a pitch-preserving time stretch of the PCM. Pitch, loudness, and
+//! the leading pause are applied in the same pass.
 //!
 //! ```text
 //! GALION_SPEECH=flite cargo run -p galion-ml-voice --features speech --example persona_live_mouth
