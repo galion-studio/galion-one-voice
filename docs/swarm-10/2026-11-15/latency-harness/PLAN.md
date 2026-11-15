@@ -50,12 +50,12 @@ Read 2026-11-15 22:06 +01:00 from the cloud-agent list. All four were `RUNNING` 
 
 Base every branch on current `origin/main`. One concern per PR. Draft until the worker's own local tests have been re-run and the notes file quotes what those commands printed.
 
-| Order | Role | Branch | Status at 22:09 +01:00 |
+| Order | Role | Branch | Status at 22:13 +01:00 |
 |---|---|---|---|
-| 1 | ttfa | not pushed yet (`bc-38462fe4-ceba-5f61-bcd3-ef42058ad251` still running) | not open. Merge waits on this PR. |
-| 2 | heartbeat | `cursor/latency-harness-heartbeat-05c6` | Draft [#154](https://github.com/galion-studio/galion-one-voice/pull/154), head `998bcd8`. Notes quote `verdict=FAIL reason=stub-frames-are-not-a-voice` because the A21 pack is absent, and a separate unit line `frame_ms=80 allocs=0 late=pause`. Held for B1, then for a green `test` check. |
-| 3 | one-percent | `cursor/latency-harness-one-percent-b942` | Draft [#155](https://github.com/galion-studio/galion-one-voice/pull/155), head `dc34921`. Notes quote `p99=1438ns`, `product_claim=false`, host not EPYC/CX23/CX43. Held until B1 and B2 have merged. |
-| 4 | stream-clone | not pushed yet | not open. Lane A plan is draft [#153](https://github.com/galion-studio/galion-one-voice/pull/153). A0 remains BLOCKED-OWNER. A1 has no PR. |
+| 1 | ttfa | `cursor/latency-harness-ttfa-d251` | Merged. [#157](https://github.com/galion-studio/galion-one-voice/pull/157) head `46087e9`, merge commit `2ecca8645adb1bf069af912cb7066334f97d1b3c`. Piper only: cited cold 398 ms / warm 20 ms, this host cold 339 ms / warm 21 ms. |
+| 2 | heartbeat | `cursor/latency-harness-heartbeat-05c6` | Ready [#154](https://github.com/galion-studio/galion-one-voice/pull/154). Updated from main onto `ada0a92`. Notes still quote `verdict=FAIL reason=stub-frames-are-not-a-voice` and a separate unit line `frame_ms=80 allocs=0 late=pause`. Merge waits for checks on `ada0a92`. |
+| 3 | one-percent | `cursor/latency-harness-one-percent-b942` | Ready [#155](https://github.com/galion-studio/galion-one-voice/pull/155), head `dc34921`, checks were green before main moved. Notes quote `p99=1438ns`, `product_claim=false`. Held until #154 merges, then updated from main. |
+| 4 | stream-clone | not pushed yet | not open. Lane A plan is draft [#153](https://github.com/galion-studio/galion-one-voice/pull/153). A0 remains BLOCKED-OWNER. A1 has no PR. Texture draft [#161](https://github.com/galion-studio/galion-one-voice/pull/161) records the original Jarvis hub as BLOCKED. |
 
 Stay on that branch. Do not push to the plan branch. Do not push to `main`.
 
