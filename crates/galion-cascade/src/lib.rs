@@ -18,6 +18,8 @@ pub mod canned;
 pub mod hermes;
 /// In-house persona reply floor (rules, no model). `GALION_LLM=canned|inhouse`.
 pub mod reflect;
+/// Voice-stack cue that hands a spoken question to Galion Research.
+pub mod research_handoff;
 /// Phone turn: 16 kHz utterance → transcript → reply text → 24 kHz WAV (feature `cascade`).
 #[cfg(feature = "cascade")]
 pub mod phone;

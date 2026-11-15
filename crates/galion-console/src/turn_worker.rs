@@ -16,6 +16,7 @@
 //! ASR and again before the reply is handed back. The same token drops Piper clauses
 //! that have not started. The thread and the Piper process are not killed.
 
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::mpsc::{sync_channel, Receiver, RecvTimeoutError, SyncSender, TryRecvError, TrySendError};
 use std::time::Instant;
 
@@ -57,7 +58,13 @@ pub struct TurnJob {
     pub id: u64,
     pub rate: u32,
     pub pcm: Vec<i16>,
+    /// Set only for a turn whose HTTP host was `voice.galion.app`.
+    /// `galion.app` (the One page) stays false, so a research cue is not spoken from there.
+    pub voice_stack: bool,
 }
+
+/// Spoken research reply. The closure is the desk behind `POST /research/ask`.
+pub type ResearchAsk = std::sync::Arc<dyn Fn(&str) -> String + Send + Sync>;
 
 impl TurnJob {
     /// Overwrite the utterance. Also run from [`Drop`].
@@ -148,6 +155,9 @@ pub struct TurnWorker {
     bus: ProcessBus,
     reply_rx: Receiver<TurnReply>,
     speak_tx: SyncSender<SpeakJob>,
+    /// Turn id whose job is a voice-stack handoff. 0 when the lane holds none.
+    voice_turn: Arc<AtomicU64>,
+    ask: Arc<Mutex<Option<ResearchAsk>>>,
 }
 
 impl TurnWorker {
@@ -184,6 +194,10 @@ impl TurnWorker {
         let (rtx, reply_rx) = sync_channel::<TurnReply>(WORKER_REPLY_DEPTH);
         let (speak_tx, speak_rx) = sync_channel::<SpeakJob>(1);
         let (ready_tx, ready_rx) = std::sync::mpsc::channel::<()>();
+        let voice_turn = Arc::new(AtomicU64::new(0));
+        let voice_for_thread = Arc::clone(&voice_turn);
+        let ask = Arc::new(Mutex::new(None));
+        let ask_for_thread = Arc::clone(&ask);
         std::thread::Builder::new()
             .name("galion-turn-worker".into())
             .spawn(move || {
@@ -217,8 +231,12 @@ impl TurnWorker {
                             if !gate.admit_asr(turn_id) {
                                 continue; // superseded (barge-in) before ASR
                             }
-                            let job = turn_job_from(msg);
-                            let Some(reply) = respond(&mut lane, job, &gate, &prosody) else {
+                            let mut job = turn_job_from(msg);
+                            if voice_for_thread.load(Ordering::SeqCst) == job.id {
+                                let _ = voice_for_thread.compare_exchange(job.id, 0, Ordering::SeqCst, Ordering::SeqCst);
+                                job.voice_stack = true;
+                            }
+                            let Some(reply) = respond(&mut lane, job, &gate, &prosody, &ask_for_thread) else {
                                 let _ = gate.admit_publish(turn_id);
                                 continue; // superseded while synthesizing, before publish
                             };
@@ -237,7 +255,15 @@ impl TurnWorker {
             })
             .expect("spawn turn worker");
         ready_rx.recv().expect("turn worker stopped during lane start");
-        Self { bus, reply_rx, speak_tx }
+        Self { bus, reply_rx, speak_tx, voice_turn, ask }
+    }
+
+    /// Desk behind `POST /research/ask`. The voice stack calls it for a research cue.
+    /// A missing asker speaks the local line. This does not run on the 80 ms tick.
+    pub fn set_research_ask(&self, ask: ResearchAsk) {
+        if let Ok(mut slot) = self.ask.lock() {
+            *slot = Some(ask);
+        }
     }
 
     pub fn bus(&self) -> &ProcessBus {
@@ -266,6 +292,13 @@ impl TurnWorker {
     /// An older id does not rewind the cancel token.
     pub fn try_submit(&self, job: TurnJob) -> Result<(), TurnJob> {
         self.supersede(job.id);
+        let voice_stack = job.voice_stack;
+        let id = job.id;
+        if voice_stack {
+            self.voice_turn.store(id, Ordering::SeqCst);
+        } else if self.voice_turn.load(Ordering::SeqCst) == id {
+            self.voice_turn.store(0, Ordering::SeqCst);
+        }
         let msg = BusMsg::utterance(
             self.bus.alloc_id(),
             job.id,
@@ -276,7 +309,14 @@ impl TurnWorker {
         );
         match self.bus.try_send_job(msg) {
             Ok(()) => Ok(()),
-            Err(msg) => Err(turn_job_from(msg)),
+            Err(msg) => {
+                if voice_stack && self.voice_turn.load(Ordering::SeqCst) == id {
+                    self.voice_turn.store(0, Ordering::SeqCst);
+                }
+                let mut back = turn_job_from(msg);
+                back.voice_stack = voice_stack;
+                Err(back)
+            }
         }
     }
 
@@ -305,6 +345,7 @@ fn turn_job_from(msg: BusMsg) -> TurnJob {
         id: msg.turn_id,
         rate,
         pcm,
+        voice_stack: false,
     }
 }
 
@@ -364,13 +405,206 @@ fn respond_speak(lane: &mut PhoneLane, mut job: SpeakJob, gate: &BusGate, prosod
     }
 }
 
-fn respond(lane: &mut PhoneLane, mut job: TurnJob, gate: &BusGate, prosody: &ProsodySlot) -> Option<TurnReply> {
+fn ask_research(slot: &Mutex<Option<ResearchAsk>>, question: &str) -> String {
+    let f = slot.lock().ok().and_then(|g| g.clone());
+    let spoken = match f {
+        Some(f) => f(question),
+        None => galion_cascade::research_handoff::RESEARCH_LOCAL.to_string(),
+    };
+    if spoken.trim().is_empty() {
+        galion_cascade::research_handoff::RESEARCH_LOCAL.to_string()
+    } else {
+        spoken
+    }
+}
+
+/// Voice-stack turn. A research cue is handed to `/research/ask` and spoken
+/// back as [`galion_cascade::research_handoff::RESEARCH_VOICE`]. The mouth is
+/// the lane already running: no new voice model. Any other transcript stays
+/// on the ordinary reply, still only because the host was the voice stack.
+fn respond_voice_stack(
+    lane: &mut PhoneLane,
+    job: &TurnJob,
+    persona: &'static str,
+    in_ms: u32,
+    t0: Instant,
+    wav_in: &[u8],
+    ask: &Mutex<Option<ResearchAsk>>,
+) -> Option<TurnReply> {
+    use galion_cascade::research_handoff::{research_cue, RESEARCH_GREETING, RESEARCH_VOICE};
+    let (transcript, asr) = match lane.hear_wav(wav_in) {
+        Ok(heard) => heard,
+        Err(PhoneError::Superseded) => return None,
+        Err(e) => {
+            return Some(lane_error(
+                job.id,
+                persona,
+                in_ms,
+                t0,
+                e,
+                String::new(),
+                "none",
+                "none",
+            ))
+        }
+    };
+    let Some(cue) = research_cue(&transcript) else {
+        return pack_phone(
+            job.id,
+            persona,
+            in_ms,
+            t0,
+            lane.speak_heard(transcript, asr),
+        );
+    };
+    let llm = if cue.question.is_empty() {
+        "research"
+    } else {
+        "hermes"
+    };
+    let mut spoken = if cue.question.is_empty() {
+        RESEARCH_GREETING.to_string()
+    } else {
+        ask_research(ask, &cue.question)
+    };
+    if galion_cascade::contains_forbidden(&spoken) {
+        spoken = galion_cascade::REFUSED.to_string();
+    }
+    let mut result = lane.speak_fixed(&spoken);
+    if let Ok(turn) = result.as_mut() {
+        turn.transcript = transcript.clone();
+        turn.asr = asr;
+        turn.llm = llm;
+        turn.reply_text = spoken.clone();
+    }
+    let mut reply = match result {
+        Ok(turn) => pack_ok(job.id, RESEARCH_VOICE, in_ms, t0, turn),
+        Err(PhoneError::Superseded) => return None,
+        Err(e) => lane_error(job.id, RESEARCH_VOICE, in_ms, t0, e, spoken, asr.id(), llm),
+    };
+    if reply.error.is_none() {
+        reply.stages = format!("research=handoff {}", reply.stages);
+    } else {
+        reply.transcript = transcript;
+        reply.llm = llm;
+        reply.stages = "research=handoff".into();
+    }
+    Some(reply)
+}
+
+fn pack_phone(
+    id: u64,
+    persona: &'static str,
+    in_ms: u32,
+    t0: Instant,
+    result: Result<galion_cascade::PhoneTurn, PhoneError>,
+) -> Option<TurnReply> {
+    match result {
+        Ok(turn) => Some(pack_ok(id, persona, in_ms, t0, turn)),
+        Err(PhoneError::Superseded) => None,
+        Err(e) => Some(lane_error(
+            id,
+            persona,
+            in_ms,
+            t0,
+            e,
+            String::new(),
+            "none",
+            "none",
+        )),
+    }
+}
+
+fn pack_ok(
+    id: u64,
+    persona: &'static str,
+    in_ms: u32,
+    t0: Instant,
+    t: galion_cascade::PhoneTurn,
+) -> TurnReply {
+    let pcm = reply_pcm(&t.wav_bytes);
+    let ms = (pcm.len() as u64 * 1000 / LANE_RATE_HZ as u64) as u32;
+    TurnReply {
+        id,
+        transcript: t.transcript,
+        text: t.reply_text,
+        pcm,
+        wav: t.wav_bytes,
+        ms,
+        backend: t.speech_backend,
+        asr: t.asr.id(),
+        llm: t.llm,
+        stages: format!(
+            "asr={} llm={} tts={} tts_first={}",
+            t.stage_ms.asr, t.stage_ms.llm, t.stage_ms.tts, t.stage_ms.tts_first_pcm
+        ),
+        error: None,
+        in_ms,
+        took_ms: t0.elapsed().as_millis() as u32,
+        persona,
+    }
+}
+
+fn lane_error(
+    id: u64,
+    persona: &'static str,
+    in_ms: u32,
+    t0: Instant,
+    e: PhoneError,
+    text: String,
+    asr: &'static str,
+    llm: &'static str,
+) -> TurnReply {
+    let kind = match &e {
+        PhoneError::AsrUnratified(_) => "AsrUnratified (set GALION_ASR=vosk and place the small-en model; docs/asr/VOSK.md)",
+        PhoneError::AsrUnavailable(_) => "AsrUnavailable (Vosk model or worker missing; typed text still works; no transcript invented)",
+        PhoneError::NoSpeech(_) => "NoSpeech (GALION_SPEECH / Piper weights)",
+        PhoneError::BadWav(_) => "BadWav",
+        PhoneError::Empty => "Empty",
+        _ => "Cascade",
+    };
+    let pcm = tone();
+    let ms = (pcm.len() as u64 * 1000 / LANE_RATE_HZ as u64) as u32;
+    TurnReply {
+        id,
+        transcript: String::new(),
+        text,
+        wav: wav_bytes(&pcm, LANE_RATE_HZ),
+        pcm,
+        ms,
+        backend: "tone",
+        asr,
+        llm,
+        stages: String::new(),
+        error: Some(format!("{kind}: {e}")),
+        in_ms,
+        took_ms: t0.elapsed().as_millis() as u32,
+        persona,
+    }
+}
+
+fn respond(
+    lane: &mut PhoneLane,
+    mut job: TurnJob,
+    gate: &BusGate,
+    prosody: &ProsodySlot,
+    ask: &Mutex<Option<ResearchAsk>>,
+) -> Option<TurnReply> {
     let persona = gate.persona_id().as_str();
     lane.set_delivery(persona, prosody.load());
     lane.arm_cancel(gate.cancel_token(), job.id);
     let t0 = Instant::now();
     let in_ms = (job.pcm.len() as u64 * 1000 / job.rate.max(1) as u64) as u32;
     let mut wav_in = wav_bytes(&job.pcm, job.rate);
+    if job.voice_stack {
+        let voice = respond_voice_stack(lane, &job, persona, in_ms, t0, &wav_in, ask);
+        for b in &mut wav_in {
+            *b = 0;
+        }
+        std::hint::black_box(wav_in.as_slice());
+        job.wipe();
+        return voice;
+    }
     let result = lane.turn_wav(&wav_in);
     for b in &mut wav_in {
         *b = 0;
@@ -470,7 +704,7 @@ pub fn tone() -> Vec<i16> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::{Mutex, MutexGuard};
+    use std::sync::{Arc, Mutex, MutexGuard};
 
     fn env_lock() -> MutexGuard<'static, ()> {
         static LOCK: Mutex<()> = Mutex::new(());
@@ -511,7 +745,8 @@ mod tests {
             .try_submit(TurnJob {
                 id: 1,
                 rate: 16_000,
-                pcm: vec![0; 160]
+                pcm: vec![0; 160],
+                voice_stack: false,
             })
             .is_ok());
         let t0 = Instant::now();
@@ -541,7 +776,7 @@ mod tests {
         w.bus()
             .try_send(crate::bus::BusMsg::persona_explicit(w.bus().alloc_id(), 0, crate::bus::PersonaId::Jarvis))
             .unwrap();
-        assert!(w.try_submit(TurnJob { id: 1, rate: 16_000, pcm: vec![0; 160] }).is_ok());
+        assert!(w.try_submit(TurnJob { id: 1, rate: 16_000, pcm: vec![0; 160], voice_stack: false }).is_ok());
         let t0 = Instant::now();
         let mut got = None;
         while got.is_none() && t0.elapsed().as_secs() < 5 {
@@ -563,7 +798,8 @@ mod tests {
             .try_submit(TurnJob {
                 id: 3,
                 rate: 16_000,
-                pcm: vec![1, 0]
+                pcm: vec![1, 0],
+                voice_stack: false,
             })
             .is_ok());
         assert_eq!(
@@ -584,7 +820,7 @@ mod tests {
 
     #[test]
     fn reply_and_job_pcm_are_zeroised() {
-        let mut job = TurnJob { id: 1, rate: 16_000, pcm: vec![9, -9, 12345] };
+        let mut job = TurnJob { id: 1, rate: 16_000, pcm: vec![9, -9, 12345], voice_stack: false };
         job.wipe();
         assert!(job.pcm.iter().all(|&s| s == 0));
         let mut reply = TurnReply {
@@ -614,7 +850,7 @@ mod tests {
         let _lock = env_lock();
         let _env = EnvGuard::set(&[("GALION_SPEECH", "off"), ("GALION_ASR", "stub")]);
         let w = TurnWorker::spawn();
-        assert!(w.try_submit(TurnJob { id: 3, rate: 16_000, pcm: galion_cascade::stub_fixture_pcm16("hello") }).is_ok());
+        assert!(w.try_submit(TurnJob { id: 3, rate: 16_000, pcm: galion_cascade::stub_fixture_pcm16("hello"), voice_stack: false }).is_ok());
         let t0 = Instant::now();
         let mut got = None;
         while got.is_none() && t0.elapsed().as_secs() < 8 {
@@ -628,5 +864,79 @@ mod tests {
         assert!(err.contains("GALION_SPEECH=off"), "{err}");
         assert!(r.wav.starts_with(b"RIFF"));
         assert!(r.pcm.iter().any(|&s| s.unsigned_abs() > 1000));
+    }
+
+    fn wait_reply(w: &TurnWorker) -> TurnReply {
+        let t0 = Instant::now();
+        loop {
+            if let Some(r) = w.try_recv() {
+                return r;
+            }
+            assert!(t0.elapsed().as_secs() < 8, "reply did not arrive");
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+    }
+
+    #[test]
+    fn voice_stack_hands_the_spoken_question_to_a_stub_hermes() {
+        let _lock = env_lock();
+        let _env = EnvGuard::set(&[("GALION_SPEECH", "off"), ("GALION_ASR", "stub")]);
+        let seen = Arc::new(Mutex::new(String::new()));
+        let seen_w = Arc::clone(&seen);
+        let w = TurnWorker::spawn();
+        w.set_research_ask(Arc::new(move |q| {
+            *seen_w.lock().unwrap() = q.to_string();
+            "The wash stays near-white.".into()
+        }));
+        let pcm = galion_cascade::stub_fixture_pcm16("go deep what colour is the wash");
+        assert!(w.try_submit(TurnJob { id: 4, rate: 16_000, pcm, voice_stack: true }).is_ok());
+        let r = wait_reply(&w);
+        assert_eq!(seen.lock().unwrap().as_str(), "what colour is the wash");
+        assert_eq!(r.persona, galion_cascade::research_handoff::RESEARCH_VOICE);
+        assert_eq!(r.text, "The wash stays near-white.");
+        assert_eq!(r.transcript, "go deep what colour is the wash");
+        assert_eq!(r.llm, "hermes");
+        assert!(r.stages.contains("research=handoff"), "{}", r.stages);
+        assert!(!r.text.contains("Bearer"));
+    }
+
+    #[test]
+    fn voice_stack_cue_without_a_question_greets_and_does_not_ask() {
+        let _lock = env_lock();
+        let _env = EnvGuard::set(&[("GALION_SPEECH", "off"), ("GALION_ASR", "stub")]);
+        let asked = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let asked_w = Arc::clone(&asked);
+        let w = TurnWorker::spawn();
+        w.set_research_ask(Arc::new(move |_| {
+            asked_w.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            "should not be spoken".into()
+        }));
+        let pcm = galion_cascade::stub_fixture_pcm16("please go deep");
+        assert!(w.try_submit(TurnJob { id: 5, rate: 16_000, pcm, voice_stack: true }).is_ok());
+        let r = wait_reply(&w);
+        assert_eq!(asked.load(std::sync::atomic::Ordering::SeqCst), 0);
+        assert_eq!(r.text, galion_cascade::research_handoff::RESEARCH_GREETING);
+        assert_eq!(r.persona, galion_cascade::research_handoff::RESEARCH_VOICE);
+        assert_eq!(r.llm, "research");
+    }
+
+    #[test]
+    fn one_page_host_does_not_hand_the_same_words_to_hermes() {
+        let _lock = env_lock();
+        let _env = EnvGuard::set(&[("GALION_SPEECH", "off"), ("GALION_ASR", "stub")]);
+        let asked = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let asked_w = Arc::clone(&asked);
+        let w = TurnWorker::spawn();
+        w.set_research_ask(Arc::new(move |_| {
+            asked_w.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            "The wash stays near-white.".into()
+        }));
+        let pcm = galion_cascade::stub_fixture_pcm16("research this why the fill is locked");
+        assert!(w.try_submit(TurnJob { id: 6, rate: 16_000, pcm, voice_stack: false }).is_ok());
+        let r = wait_reply(&w);
+        assert_eq!(asked.load(std::sync::atomic::Ordering::SeqCst), 0);
+        assert_eq!(r.persona, "samantha");
+        assert_ne!(r.text, "The wash stays near-white.");
+        assert!(r.text.is_empty(), "speech is off, so the ordinary turn keeps the tone and no research line");
     }
 }

@@ -73,13 +73,15 @@ impl PhoneHost {
     pub fn from_surface(web: &WebSurface) -> Self {
         let bus = ProcessBus::new();
         let prosody = ProsodySlot::identity();
+        let worker = TurnWorker::spawn_linked(bus.clone(), prosody.clone());
+        worker.set_research_ask(web.research_ask_fn());
         Self {
             mic: web.mic_tap(),
             turns: web.turn_inbox(),
             says: web.say_inbox(),
             replies: web.reply_box(),
             floor: web.persona_floor(),
-            worker: TurnWorker::spawn_linked(bus.clone(), prosody.clone()),
+            worker,
             prosody,
             bus,
             play: VecDeque::new(),
@@ -491,6 +493,7 @@ impl PhoneHost {
                 id: turn_id,
                 rate,
                 pcm,
+                voice_stack: t.voice_stack,
             });
             self.note_recorded(turn_id);
         }

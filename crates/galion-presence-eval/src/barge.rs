@@ -33,6 +33,7 @@ pub fn probe_supersede() -> BargeProbe {
         id: 1,
         rate: 16_000,
         pcm: vec![0; 1_600],
+        voice_stack: false,
     };
     if worker.try_submit(job).is_err() {
         return BargeProbe {
@@ -79,6 +80,7 @@ pub fn probe_supersede() -> BargeProbe {
         id: 100,
         rate: 16_000,
         pcm: vec![0; 1_600],
+        voice_stack: false,
     };
     if worker.try_submit(follow).is_err() {
         return BargeProbe {

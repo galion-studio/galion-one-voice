@@ -476,6 +476,27 @@ impl PhoneLane {
 
     /// As [`turn`](Self::turn) from WAV bytes (PCM16, any rate; resampled to 16 kHz).
     pub fn turn_wav(&mut self, wav: &[u8]) -> Result<PhoneTurn, PhoneError> { self.turn(&wav_to_pcm16k(wav)?) }
+
+    /// Transcript only. The voice-stack worker calls this once, then either
+    /// hands the question to research or continues with [`Self::speak_heard`].
+    pub fn hear(&mut self, pcm16k: &[i16]) -> Result<(String, AsrSource), PhoneError> {
+        self.asr.transcribe(pcm16k)
+    }
+
+    /// [`hear`](Self::hear) from WAV bytes.
+    pub fn hear_wav(&mut self, wav: &[u8]) -> Result<(String, AsrSource), PhoneError> {
+        self.hear(&wav_to_pcm16k(wav)?)
+    }
+
+    /// LLM and TTS for a transcript [`Self::hear`] already produced. Does not transcribe again.
+    pub fn speak_heard(&mut self, transcript: String, asr: AsrSource) -> Result<PhoneTurn, PhoneError> {
+        let t0 = Instant::now();
+        let t1 = Instant::now();
+        let raw = self.llm.reply(&Transcript { text: transcript.clone(), lang: Lang::En }, Emotion::Neutral)?;
+        let reply_text = spoken_text(&raw);
+        let llm_ms = ms_since(t1);
+        self.emit(t0, 0, llm_ms, transcript, asr, reply_text)
+    }
 }
 
 /// One-shot phone turn from 16 kHz mono PCM16 (env-configured).
@@ -519,6 +540,15 @@ mod tests {
         assert!(matches!(LlmMode::from_choice(Some("openai")), Err(PhoneError::UnknownLlm(_))));
         assert!(matches!(LlmMode::from_choice(Some("hermes-agent")), Err(PhoneError::UnknownLlm(_))));
     }
+    #[test]
+    fn hear_reads_a_stub_fixture_without_inventing_words() {
+        let mut l = PhoneLane::new(cfg(AsrMode::Stub));
+        let (text, src) = l.hear(&fx("go deep")).unwrap();
+        assert_eq!((text.as_str(), src), ("go deep", AsrSource::StubFixture));
+        let (again, _) = l.hear(&fx("research this")).unwrap();
+        assert_eq!(again, "research this");
+    }
+
     #[test] fn stub_decodes_fixture_in_every_mode_but_off() {
         for m in [AsrMode::Stub, AsrMode::Interim, AsrMode::Vosk] {
             assert_eq!(PhoneTurnAsr::new(m).transcribe(&fx("how are you")).unwrap(), ("how are you".into(), AsrSource::StubFixture));
