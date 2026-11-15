@@ -18,9 +18,11 @@
 //! Content turns go to the Hermes client (`GALION_LLM=hermes`). Safety lines
 //! (harm, secrets, clips, silence, identity) stay local. A dead gateway says
 //! "model can't be reached" and does not invent a reply.
-//! With no Hermes client and `GALION_LLM=canned|inhouse`, content turns go to
-//! the in-house rule floor [`galion_cascade::reflect`] (no model, owner
-//! ruling 2026-11-04: in-house only). `"llm"` then reads `galion-reflect`.
+//! With no Hermes client and `GALION_LLM=canned|inhouse|student|reflect`,
+//! content turns go to the S0 student probe [`galion_cascade::student`].
+//! Missing or unreadable weights, and a `.gq` this build cannot speak, say
+//! the student brain is unavailable. `"llm"` then reads `galion-student-blocked`.
+//! That path does not call `galion_cascade::reflect::reply`.
 //!
 //! `e` in a request is a harness knob for prosody. It is not a reading of the
 //! caller. Emotion-driven id changes stay off unless `sense` is set, and one
@@ -29,7 +31,7 @@
 use std::time::{Duration, Instant};
 
 use galion_cascade::hermes::{self, HermesLlm, REFUSED, UNREACHABLE};
-use galion_cascade::reflect;
+use galion_cascade::student;
 
 const SAMANTHA_TOML: &str = include_str!("../../docs/galion-voice-v2/personas/voice/samantha.toml");
 const JARVIS_TOML: &str = include_str!("../../docs/galion-voice-v2/personas/voice/jarvis.toml");
@@ -154,7 +156,7 @@ pub struct Floor {
     samantha_gate: Option<PersonaGate>,
     jarvis_gate: Option<PersonaGate>,
     hermes: Option<HermesLlm>,
-    /// In-house rule floor for content turns when no Hermes client is attached.
+    /// S0 student probe for content turns when no Hermes client is attached.
     inhouse: bool,
     llm_label: String,
 }
@@ -168,10 +170,10 @@ impl Default for Floor {
 impl Floor {
     pub fn new() -> Self {
         let hermes = load_hermes();
-        let inhouse = hermes.is_none() && !cfg!(test) && reflect::selected_from_env();
+        let inhouse = hermes.is_none() && !cfg!(test) && student::selected_from_env();
         let llm_label = match (&hermes, inhouse) {
             (Some(h), _) => h.label().to_string(),
-            (None, true) => reflect::LLM_NAME.to_string(),
+            (None, true) => student::LABEL_BLOCKED.to_string(),
             (None, false) => hermes::LLM_NAME.to_string(),
         };
         Self {
@@ -228,16 +230,17 @@ impl Floor {
         self.inhouse = false;
     }
 
-    /// Answer content turns with the in-house rule floor ([`reflect`]) when no
-    /// Hermes client is attached. No model is called.
+    /// Answer content turns with the S0 student probe when no Hermes client
+    /// is attached. The spoken line is the blocked line until a `.gq` can be
+    /// spoken. This does not select `galion-reflect`.
     pub fn set_inhouse_reply(&mut self, on: bool) {
         self.inhouse = on && self.hermes.is_none();
         if self.hermes.is_none() {
-            self.llm_label = if self.inhouse { reflect::LLM_NAME } else { hermes::LLM_NAME }.to_string();
+            self.llm_label = if self.inhouse { student::LABEL_BLOCKED } else { hermes::LLM_NAME }.to_string();
         }
     }
 
-    /// True when content turns use the in-house rule floor.
+    /// True when content turns use the S0 student probe.
     pub fn inhouse_reply(&self) -> bool {
         self.inhouse
     }
@@ -960,7 +963,7 @@ pub struct SayWork {
     pub persona: &'static str,
     pub user: String,
     pub client: Option<HermesLlm>,
-    /// No client: answer with the in-house rule floor instead of the unreachable line.
+    /// No client: answer with the S0 student probe instead of the unreachable line.
     pub inhouse: bool,
     barge: bool,
     e: f32,
@@ -979,7 +982,7 @@ impl SayWork {
         }
         Some(match &self.client {
             Some(h) => h.complete_as(self.persona, &self.user),
-            None if self.inhouse => reflect::reply(self.persona, &self.user),
+            None if self.inhouse => student::answer(&self.user).1,
             None => UNREACHABLE.to_string(),
         })
     }
@@ -1272,34 +1275,44 @@ mod tests {
         no_script(&moved);
     }
 
-    /// In-house floor (no model): persona-http probes get a real, guarded reply
-    /// that names the caller's fact. `"llm"` says it is the rule floor.
+    /// S0 probe, no weights required: a content turn does not restate the
+    /// caller and is not labelled `galion-reflect` or `student-gq`.
     #[test]
-    fn inhouse_floor_answers_the_probes_without_a_model() {
+    fn inhouse_floor_says_the_student_is_blocked() {
         let mut f = Floor::new();
         f.set_inhouse_reply(true);
         assert!(f.inhouse_reply());
-        let grief = f.say_turn("My mother died this morning.", false, 0.0, false);
+        let user = "My mother died this morning.";
+        let reflected = galion_cascade::reflect::reply("samantha", user);
+        let grief = f.say_turn(user, false, 0.0, false);
         assert_eq!(grief.persona, "samantha");
         assert_eq!(grief.mood, "grief");
-        assert_eq!(grief.llm, "galion-reflect");
-        assert!(grief.reply.contains("mother"), "{}", grief.reply);
+        assert_eq!(grief.llm, student::LABEL_BLOCKED);
+        assert_ne!(grief.llm, "galion-reflect");
+        assert_ne!(grief.llm, "student-gq");
+        assert!(grief.reply.starts_with("Student brain unavailable."), "{}", grief.reply);
+        assert!(!grief.reply.contains("mother"), "{}", grief.reply);
+        assert_ne!(grief.reply, reflected);
         assert_ne!(grief.reply, REFUSED);
         no_script(&grief);
         let joy = f.say_turn("I got the job. I can't stop smiling.", false, 0.0, false);
         assert_eq!(joy.mood, "joy");
+        assert_eq!(joy.reply, grief.reply);
         no_script(&joy);
         let vuln = f.say_turn("I don't think anyone actually likes me.", false, 0.0, false);
         assert_eq!(vuln.mood, "vulnerability");
+        assert_eq!(vuln.reply, grief.reply);
         no_script(&vuln);
         let quiet = f.say_turn("You don't have to say anything. Just stay.", false, 0.0, false);
         assert!(quiet.silence && quiet.reply.is_empty());
         let sw = f.say_turn("be Jarvis", false, 0.0, false);
         assert_eq!(sw.persona, "jarvis");
-        let jg = f.say_turn("My mother died this morning.", false, 0.0, false);
+        let jg = f.say_turn(user, false, 0.0, false);
         assert_eq!(jg.persona, "jarvis");
-        assert!(jg.reply.contains("mother") && !jg.reply.contains('?'), "{}", jg.reply);
-        assert!(jg.reply.len() < grief.reply.len() + 8);
+        assert_eq!(jg.llm, student::LABEL_BLOCKED);
+        assert_eq!(jg.reply, grief.reply);
+        assert!(!jg.reply.contains('?'), "{}", jg.reply);
+        assert_ne!(jg.reply, galion_cascade::reflect::reply("jarvis", user));
         no_script(&jg);
         f.set_inhouse_reply(false);
         assert_eq!(f.say_turn("I got the job.", false, 0.0, false).reply, UNREACHABLE);
