@@ -6,7 +6,7 @@
 #
 #   scripts/run-v1-screen.sh                  # serve for 1 h (Ctrl-C to stop)
 #   scripts/run-v1-screen.sh --open           # + open it once, fullscreen kiosk (first browser found)
-#   scripts/run-v1-screen.sh --check          # ~15 s self-test: page, /dot modes, /mic, /turn
+#   scripts/run-v1-screen.sh --check          # loopback self-test: page, /v2, /dot speak-wins, /mic, /turn
 #   ngrok http 127.0.0.1:7878                 # local only. Staging must add OAuth or basic auth
 #                                         # and set GALION_CORS_ORIGINS. No secrets in this file.
 #                                         # docs/galion-voice-v2/SECURITY-EDGE.md
@@ -36,7 +36,7 @@ OPEN=0; CHECK=0; ARGS=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --open) OPEN=1 ;;
-    --check) CHECK=1; SECS=16 ;;
+    --check) CHECK=1; SECS=48 ;;
     --seconds) SECS="$2"; shift ;;
     *) ARGS+=("$1") ;;
   esac
@@ -80,6 +80,21 @@ else
   echo "mic ASR: $GALION_ASR"
 fi
 
+# The idle room never speaks. The self-test adds the existing synthetic
+# room → you → me script so one poll can see speaking and not-speaking.
+# The hour-long serve (no --check) stays idle until a mic or typed turn.
+if [[ "$CHECK" == "1" ]]; then
+  syn=0
+  if [[ ${#ARGS[@]} -gt 0 ]]; then
+    for a in "${ARGS[@]}"; do
+      [[ "$a" == "--synthetic" ]] && syn=1
+    done
+  fi
+  if [[ "$syn" == "0" ]]; then
+    ARGS+=("--synthetic")
+  fi
+fi
+
 "$BIN" --headless --realtime --no-png --web "$ADDR" --seconds "$SECS" ${ARGS[@]+"${ARGS[@]}"} > "$OUT/heartbeat.log" 2>&1 &
 PID=$!
 trap 'kill $PID 2>/dev/null || true' EXIT INT TERM
@@ -93,6 +108,9 @@ if [[ "$CHECK" == "1" ]]; then
   page=$(curl -fsS "$URL")
   grep -q '<canvas id="s"' <<<"$page" && echo "  / : one canvas page OK ($(wc -c <<<"$page") bytes)" || { echo "  / : FAIL"; exit 1; }
   grep -q 'data-persona="samantha"' <<<"$page" && grep -q 'data-mark="orb"' <<<"$page" && grep -q 'data-mouth="piper"' <<<"$page" && echo "  / : persona, mic page, orb OK" || { echo "  / : persona/text FAIL"; exit 1; }
+  one=$(curl -fsS "${URL}one")
+  if grep -q 'dataset.persona="galion"' <<<"$one"; then echo "  /one : persona galion FAIL"; exit 1; fi
+  grep -q 'function shownPersona' <<<"$one" && grep -q 'data-persona="samantha"' <<<"$one" && grep -q 'data-mouth="piper"' <<<"$one" && echo "  /one : default persona samantha, mouth piper (not a clone)" || { echo "  /one : persona FAIL"; exit 1; }
   v2hdr=$(curl -sI "${URL}v2")
   grep -q '302' <<<"$v2hdr" && grep -qi 'location: /' <<<"$v2hdr" && echo "  /v2 : redirect OK" || { echo "  /v2 : FAIL ($v2hdr)"; exit 1; }
   state=$(curl -fsS "${URL}v2/state")
@@ -106,9 +124,37 @@ if [[ "$CHECK" == "1" ]]; then
   else
     echo "  POST /v2/say : hermes path, no canned empathy"
   fi
-  seen=""
-  for _ in $(seq 1 150); do seen+=" $(curl -fsS "${URL}dot" 2>/dev/null | sed -n 's/.*"mode":"\([a-z]*\)".*/\1/p')"; sleep 0.07; done
-  echo "  /dot modes over ~12 s:$(tr ' ' '\n' <<<"$seen" | sort -u | tr '\n' ' ')"
+  : >"$OUT/dot-samples.jsonl"
+  for _ in $(seq 1 150); do
+    curl -fsS "${URL}dot" >>"$OUT/dot-samples.jsonl" 2>/dev/null || true
+    echo >>"$OUT/dot-samples.jsonl"
+    sleep 0.07
+  done
+  python3 - "$OUT/dot-samples.jsonl" <<'PY'
+import json, sys
+rows = []
+for line in open(sys.argv[1], encoding="utf-8"):
+    line = line.strip()
+    if not line:
+        continue
+    try:
+        rows.append(json.loads(line))
+    except json.JSONDecodeError:
+        pass
+times = [r.get("t_ms") for r in rows if isinstance(r.get("t_ms"), (int, float))]
+modes = [r.get("mode") for r in rows if isinstance(r.get("mode"), str)]
+spoke = [r for r in rows if r.get("mode") == "speaking"]
+other = [m for m in modes if m != "speaking"]
+print("  /dot samples:", len(rows), "modes:", " ".join(sorted(set(modes))))
+if len(times) < 2 or max(times) <= min(times):
+    print("  /dot : t_ms did not advance")
+    sys.exit(1)
+print("  /dot : t_ms %s -> %s" % (min(times), max(times)))
+if not spoke or not other or any(r.get("state") != "speaking" for r in spoke):
+    print("  /dot : speak-wins FAIL (need speaking state and a non-speaking sample)")
+    sys.exit(1)
+print("  /dot : speak wins (state speaking, and a non-speaking sample)")
+PY
   code=$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' --data '{"rms":0.02,"t":1}' "${URL}mic")
   [[ "$code" == "204" ]] && echo "  POST /mic 204 OK" || { echo "  POST /mic FAIL ($code)"; exit 1; }
   code=$(curl -s -o /dev/null -w '%{http_code}' -X OPTIONS -H 'Origin: http://127.0.0.1:7878' -H 'Access-Control-Request-Method: POST' "${URL}turn")
@@ -119,8 +165,24 @@ import struct,sys
 n=1600
 sys.stdout.buffer.write(b"RIFF"+struct.pack("<I",36+n*2)+b"WAVEfmt "+struct.pack("<IHHIIHH",16,1,1,16000,32000,2,16)+b"data"+struct.pack("<I",n*2)+b"\x00"*(n*2))
 PY
-  code=$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: audio/wav' -H 'X-Sample-Rate: 16000' --data-binary @"$OUT/silence.wav" "${URL}turn")
+  code=$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: audio/wav' -H 'X-Sample-Rate: 16000' -H 'X-Galion-Proceed: auto' --data-binary @"$OUT/silence.wav" "${URL}turn")
   [[ "$code" == "202" ]] && echo "  POST /turn 202 OK" || { echo "  POST /turn FAIL ($code)"; exit 1; }
+  hook=0
+  for _ in $(seq 1 80); do
+    if grep -q 'workflow proceed source=mic program=phone-turn' "$OUT/heartbeat.log"; then hook=1; break; fi
+    sleep 0.1
+  done
+  if [[ "$hook" != "1" ]]; then
+    echo "  workflow hook: proceed line absent"
+    exit 1
+  fi
+  echo "  workflow hook: proceed source=mic program=phone-turn"
+  reply_line=$(grep 'phone reply ' "$OUT/heartbeat.log" | head -1 || true)
+  if [[ -n "$reply_line" ]]; then
+    echo "  mouth log: $reply_line"
+  else
+    echo "  mouth log: no phone reply line in this run"
+  fi
   grep -q 'X-Content-Type-Options' <<<"$(curl -sI "${URL}health")" && echo "  security headers OK" || { echo "  security headers FAIL"; exit 1; }
   exit 0
 fi

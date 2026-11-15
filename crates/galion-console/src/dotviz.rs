@@ -471,6 +471,12 @@ mod tests {
         assert!(V2_SCREEN_HTML.contains("location.replace"));
         assert!(!V2_SCREEN_HTML.contains("createRadialGradient"), "the second circle page is gone");
         assert!(SCREEN_HTML.contains("data-persona=\"samantha\""));
+        assert!(SCREEN_HTML.contains("function shownPersona"));
+        assert!(SCREEN_HTML.contains("return id===\"jarvis\"?\"jarvis\":\"samantha\""));
+        assert!(SCREEN_HTML.contains("cv.dataset.persona=shownPersona(\"samantha\")"));
+        assert!(SCREEN_HTML.contains("cv.dataset.persona=shownPersona(j.persona)"));
+        assert!(!SCREEN_HTML.contains("dataset.persona=\"galion\""));
+        assert!(SCREEN_HTML.contains("cv.dataset.mouth=\"piper\""));
         // Owner t653u: the voice surface is one dot. Slavik's desktop session
         // widget lives only inside #decide and stays display:none below 1100px.
         assert!(!SCREEN_HTML.contains("to-research"), "the dot draws no research handoff");
