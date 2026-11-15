@@ -50,12 +50,12 @@ Read 2026-11-15 22:06 +01:00 from the cloud-agent list. All four were `RUNNING` 
 
 Base every branch on current `origin/main`. One concern per PR. Draft until the worker's own local tests have been re-run and the notes file quotes what those commands printed.
 
-| Order | Role | Branch | Status at 22:57 +01:00 |
+| Order | Role | Branch | Status at 23:00 +01:00 |
 |---|---|---|---|
 | 1 | ttfa | `cursor/latency-harness-ttfa-d251` | Merged. [#157](https://github.com/galion-studio/galion-one-voice/pull/157) head `46087e9`, merge commit `2ecca8645adb1bf069af912cb7066334f97d1b3c`. Piper only: cited cold 398 ms / warm 20 ms, this host cold 339 ms / warm 21 ms. |
 | 2 | heartbeat | `cursor/latency-harness-heartbeat-05c6` | Merged. [#154](https://github.com/galion-studio/galion-one-voice/pull/154) head `ada0a92`, merge commit `c33dd4a681fc1d0e2eeff2dc7116cd9439a4ded2`. Harness `verdict=FAIL reason=stub-frames-are-not-a-voice`. Separate unit line `frame_ms=80 allocs=0 late=pause`. |
 | 3 | one-percent | `cursor/latency-harness-one-percent-b942` | Merged. [#155](https://github.com/galion-studio/galion-one-voice/pull/155) head `d450bb3`, merge commit `8a629a328447332dd597c3dd055b6f97b798997c`. Notes quote `p99=1438ns`, `product_claim=false`. Not an EPYC, CX23, or CX43 claim. |
-| 4 | stream-clone | `cursor/latency-harness-stream-clone-533b` | Draft [#164](https://github.com/galion-studio/galion-one-voice/pull/164). Updated from main onto `c4c35dd`. Re-run exit 2, `gate` `BLOCKED`, no `ttfa_ms`. Merge waits for checks on `c4c35dd`. A1 [#170](https://github.com/galion-studio/galion-one-voice/pull/170) is BLOCKED with no Nano PCM. Texture [#161](https://github.com/galion-studio/galion-one-voice/pull/161) is BLOCKED without the original clip. A0 remains BLOCKED-OWNER. |
+| 4 | stream-clone | `cursor/latency-harness-stream-clone-533b` | Merged. [#164](https://github.com/galion-studio/galion-one-voice/pull/164) head `c4c35dd`, merge commit `dec55d572a65f0f98b5d9460152d4ccd724ffc9c`. Re-run exit 2, `gate` `BLOCKED`, `claim_80ms` false, no `ttfa_ms`. A1 [#170](https://github.com/galion-studio/galion-one-voice/pull/170) is BLOCKED with no Nano PCM. Texture [#161](https://github.com/galion-studio/galion-one-voice/pull/161) is BLOCKED without the original clip. A0 remains BLOCKED-OWNER. |
 
 Stay on that branch. Do not push to the plan branch. Do not push to `main`.
 
@@ -174,7 +174,7 @@ An older ledger line, not re-run here and not this plan host, is quoted only so 
 | Id | State at plan time | Effect on this lane |
 |---|---|---|
 | A0 t273 vs t623u | BLOCKED-OWNER. Agents do not flip the lock or `REFS.sha256`. | B3 cannot measure original-ref Nano. |
-| A1 Nano PCM from the originals | open, blocked on A0. Venv and tokenizer were absent on the baseline host. | B3 has no PCM to time. |
+| A1 Nano PCM from the originals | On main as [#170](https://github.com/galion-studio/galion-one-voice/pull/170). Verdict BLOCKED. No Nano PCM. Wavs, pins, and tokenizer absent. A CPU venv was staged on that host only and was not committed. | B3 has no PCM to time. The harness on main exits 2. |
 | Piper pack on the plan host | absent. `weights/` contains only `.gitignore`. | Orchestrator did not re-measure TTFA or the Piper half of the heartbeat script. Workers measure on their own host. |
 | rustc on the plan host | 1.83.0. CI pin is 1.85.0. | Orchestrator did not run `cargo test` for this plan. |
 | EPYC / CX23 / CX43 tick | not this class of machine | B4 must not call a local p99 a capacity-class product claim. |
@@ -184,9 +184,20 @@ An older ledger line, not re-run here and not this plan host, is quoted only so 
 
 Record only. This lane does not settle them.
 
-1. **A0.** Re-open the t273 originals on the live clone path (a lock-and-ledger edit Maciej makes), or state that `main` stays on t623u and the symphony B/C landing bar must be re-stated. Until that, B3 is BLOCKED and no Swarm 10 PR will label Piper as the clone.
+1. **A0.** Re-open the t273 originals on the live clone path (a lock-and-ledger edit Maciej makes), or state that `main` stays on t623u and the symphony B/C landing bar must be re-stated. The B3 harness is on main as BLOCKED. It does not label Piper as the clone.
 2. Live `/one` stays Piper plus the Samantha persona until a clone mouth is actually live. B1's `product_claim` does not change that.
 3. The 80 ms first-playable frame is not claimed from the Piper clocks (cold 398 ms, warm 20 ms, loopback 78 ms).
+
+## Lane record
+
+2026-11-15 23:00 +01:00. All four worker pull requests are on main. This plan file is the remaining draft.
+
+| Item | Merge | What the notes actually say |
+|---|---|---|
+| B1 | `2ecca8645adb1bf069af912cb7066334f97d1b3c` | Piper only. Cited cold 398 ms / warm 20 ms. This host cold 339 ms / warm 21 ms. Loopback `ttfa_ms=78` is loopback, not Nano. |
+| B2 | `c33dd4a681fc1d0e2eeff2dc7116cd9439a4ded2` | Harness `verdict=FAIL reason=stub-frames-are-not-a-voice` because the A21 pack was absent. Separate unit line `frame_ms=80 allocs=0 late=pause`. |
+| B4 | `8a629a328447332dd597c3dd055b6f97b798997c` | `p99=1438ns`, `product_claim=false`. Not an EPYC, CX23, or CX43 claim. |
+| B3 | `dec55d572a65f0f98b5d9460152d4ccd724ffc9c` | Exit 2, `gate` `BLOCKED`, no `ttfa_ms`, `claim_80ms` false. 80 ms is not claimed. |
 
 ## Plan host (not a measurement)
 
