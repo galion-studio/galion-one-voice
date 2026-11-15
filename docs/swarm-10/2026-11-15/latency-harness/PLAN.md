@@ -15,7 +15,7 @@ Lane slug: `latency-harness` (Lane B). Owner: Maciej Grajczyk. Repo: `galion-stu
 | Sources | `docs/swarm-10` briefs and backlog as given at launch; local untracked `NEXT-ITERATION.md` (2026-11-15 21:56 +01:00, host `grok-bot-vm-511777615`). That file is cited. It is not committed. |
 | This file | The only file on the plan PR. Workers do not edit it. |
 
-This plan was written before any worker PR existed. Worker branch names below are the contract. The orchestrator fills the actual ref and PR number on this file when each PR opens.
+Worker branch names below are the contract. The orchestrator fills the actual ref and PR number on this file when each PR opens. At 22:06 +01:00 no Lane B worker PR was open.
 
 ## What this lane owns
 
@@ -41,10 +41,10 @@ First reading: [TTFA.md](../../../galion-voice-v2/symphony/TTFA.md), [PIPER-STRE
 ## Roster
 
 ```
-latency-harness: O bc-60b588a5-5c71-5db6-8a3b-ac7e5afc68d6 | ttfa (launched separately) | heartbeat (launched separately) | stream-clone (launched separately) | one-percent (launched separately)
+latency-harness: O bc-60b588a5-5c71-5db6-8a3b-ac7e5afc68d6 | ttfa bc-38462fe4-ceba-5f61-bcd3-ef42058ad251 | heartbeat bc-73380dfd-7f66-5df8-93b3-6043631005c6 | stream-clone bc-821103fb-65d5-5676-a3f3-0d5bb951533b | one-percent bc-917d0c77-dac6-5a91-896f-3cdc1103b942
 ```
 
-Worker run ids were not in the launch brief. Identity is the PR title.
+Read 2026-11-15 22:06 +01:00 from the cloud-agent list. All four were `RUNNING` with no branch yet. Lane A orchestrator is `bc-e03b289a-1b1e-5e90-a8d6-722adad494c0`. Lane A plan PR was not open at that read (open Swarm 10 plans: #150 persona-v2v, #151 this file). Identity for review stays the PR title.
 
 ## Worker branches
 
