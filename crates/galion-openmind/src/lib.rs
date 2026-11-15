@@ -13,6 +13,9 @@
 //! * [`handoff`] is the cortex. It submits [`galion_sideband::ToHermes`]
 //!   `Turn` / `Intent` / `Affect` through the existing side-band client.
 //!   Hermes thinks off the audio tick. The 3 s retrieval cap still applies.
+//! * [`seam`] is the local store / student-file check a voice turn may call
+//!   at a turn boundary. A missing store or a missing `.gq` is
+//!   [`seam::PathState::Blocked`]. No memory is invented. Hermes is not called.
 //!
 //! Obsidian Open Mind itself is not vendored. It lives at
 //! <https://github.com/galion-studio/obsidian-open-mind> and, when a human
@@ -25,6 +28,7 @@
 pub mod handoff;
 pub mod nerve;
 pub mod observe;
+pub mod seam;
 
 pub use handoff::{CortexHandoff, HandoffReceipt, IntentDisposition, TakeoverOffer};
 pub use nerve::{
@@ -33,3 +37,7 @@ pub use nerve::{
     NERVE_SCHEMA_VERSION, SOURCE, VOICE_KINDS,
 };
 pub use observe::note_from_frame;
+pub use seam::{
+    seam_enabled_from_env, weights_file_ok, Fallback, MemoryWitness, MissingPiece, PathState,
+    ReplyFrom, SeamBlock, SeamDecision, TurnSeam, REMEMBER_ENV, SEAM_ENV, STORE_ENV, WEIGHTS_ENV,
+};
