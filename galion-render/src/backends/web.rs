@@ -22,10 +22,16 @@
 //!                      [`WebSurface::with_page`] (V1-01; the page itself is owned by
 //!                      galion-console, this crate only serves the bytes); 404 otherwise
 //!   GET /research, /research/ -> the Galion Research desk, same gate as /one.
+//!                      Sets `galion_research`, an HttpOnly SameSite=Strict cookie.
+//!                      `X-Galion-Research` carries the same id when there is no cookie jar.
 //!   GET /research/hermes, GET /research/history, POST /research/ask -> Hermes
 //!                      research app. The gateway key stays on the server.
-//!   POST /research/sources, GET /research/sources -> files the user attached.
-//!                      A citation may name only those files.
+//!                      History and the ask see only this session's files.
+//!   POST /research/sources, GET /research/sources -> files this session attached.
+//!                      A citation may name only those files. Eight per session.
+//!                      A file, and an idle session, are dropped after 30 minutes.
+//!   DELETE /research/sources/{id} removes one of this session's files.
+//!   DELETE /research/sources clears this session's files.
 //! `/dot` also carries `"mode"` (idle|listening|speaking|rika), `"lean"` (Rika lean-in 0..1),
 //! `"level"` (0..1, the band driving the state), `"e"` (empathy weight 0..1),
 //! `"engine"` (one Luti step), and `"emotion"` (sense, label, valence, arousal, lean)
@@ -96,13 +102,13 @@ pub const MAX_PENDING_TURNS: usize = 8;
 pub const MAX_STORED_REPLIES: usize = 8;
 /// CORS `Access-Control-Allow-Headers` sent on every response (incl. OPTIONS preflight).
 pub const CORS_ALLOW_HEADERS: &str =
-    "Content-Type, X-Turn-Id, X-Sample-Rate, X-Barge-In, X-Galion-Proceed, X-Galion-Session, ngrok-skip-browser-warning";
+    "Content-Type, X-Turn-Id, X-Sample-Rate, X-Barge-In, X-Galion-Proceed, X-Galion-Session, X-Galion-Research, ngrok-skip-browser-warning";
 
 pub use super::edge::{
     bind_decision, cors_allow_origin, parse_json_string_field, AI_DISCLOSURE_EN, AI_DISCLOSURE_HR,
 };
 use super::edge::{
-    check_origin, presented_session, query_carries_token, route_is_sensitive, route_needs_session,
+    check_origin, mint_token, presented_session, query_carries_token, route_is_sensitive, route_needs_session,
     strip_ai_disclosure, wipe_string, zeroise_bytes, EdgeCfg, OriginCheck, SessionStore,
 };
 /// Whole-request read deadline (head + body).
@@ -712,21 +718,68 @@ struct ResearchNote {
     at: Instant,
 }
 
-/// A file the user attached. `kind` is `file` or `image`. Image pixels are not read.
+impl Drop for ResearchNote {
+    fn drop(&mut self) {
+        wipe_string(&mut self.question);
+        wipe_string(&mut self.reply);
+        for (_, text) in &mut self.citations {
+            wipe_string(text);
+        }
+        for text in &mut self.found {
+            wipe_string(text);
+        }
+        for text in &mut self.inferred {
+            wipe_string(text);
+        }
+        for text in &mut self.unknown {
+            wipe_string(text);
+        }
+    }
+}
+
+/// A file one browser attached. `kind` is `file` or `image`. Image pixels are not read.
 struct DeskSource {
     id: u32,
     name: String,
     text: String,
     kind: &'static str,
+    at: Instant,
 }
+
+impl Drop for DeskSource {
+    fn drop(&mut self) {
+        wipe_string(&mut self.name);
+        wipe_string(&mut self.text);
+    }
+}
+
+/// Files and notes for one browser. The id is the cookie value, not a label.
+struct ResearchSession {
+    id: String,
+    next_source: u32,
+    sources: Vec<DeskSource>,
+    notes: VecDeque<ResearchNote>,
+    touched: Instant,
+}
+
+impl Drop for ResearchSession {
+    fn drop(&mut self) {
+        wipe_string(&mut self.id);
+    }
+}
+
+/// How long an attached file, a note, and an idle session stay in memory.
+const RESEARCH_SESSION_TTL: Duration = Duration::from_secs(30 * 60);
+/// Quiet browsers dropped when a new one arrives. The least recently used goes first.
+const RESEARCH_SESSION_CAP: usize = 64;
+const RESEARCH_COOKIE: &str = "galion_research";
 
 struct ResearchDesk {
     client: Option<galion_cascade::HermesLlm>,
     next_id: u64,
-    next_source: u32,
-    sources: Vec<DeskSource>,
-    notes: VecDeque<ResearchNote>,
+    sessions: VecDeque<ResearchSession>,
     status: &'static str,
+    ttl: Duration,
 }
 
 impl ResearchDesk {
@@ -734,10 +787,9 @@ impl ResearchDesk {
         Self {
             client: if cfg!(test) { None } else { galion_cascade::HermesLlm::attached_from_env() },
             next_id: 0,
-            next_source: 0,
-            sources: Vec::new(),
-            notes: VecDeque::new(),
+            sessions: VecDeque::new(),
             status: "idle",
+            ttl: RESEARCH_SESSION_TTL,
         }
     }
     fn gateway_status(&self) -> &'static str {
@@ -753,10 +805,99 @@ impl ResearchDesk {
             self.status
         }
     }
+    fn cookie_line(&self, id: &str) -> String {
+        let max_age = self.ttl.as_secs().max(1);
+        format!("{RESEARCH_COOKIE}={id}; HttpOnly; SameSite=Strict; Path=/research; Max-Age={max_age}")
+    }
+    /// Drop files and notes older than the TTL, then drop sessions nobody has touched.
+    fn evict(&mut self, now: Instant) {
+        let ttl = self.ttl;
+        for session in &mut self.sessions {
+            session.sources.retain(|src| now.saturating_duration_since(src.at) < ttl);
+            session.notes.retain(|note| now.saturating_duration_since(note.at) < ttl);
+        }
+        self.sessions.retain(|session| now.saturating_duration_since(session.touched) < ttl);
+    }
+    fn touch(&mut self, id: &str, now: Instant) -> bool {
+        let Some(i) = self.sessions.iter().position(|s| id_eq(&s.id, id)) else { return false };
+        self.sessions[i].touched = now;
+        if let Some(session) = self.sessions.remove(i) {
+            self.sessions.push_back(session);
+        }
+        true
+    }
+    fn mint(&mut self, now: Instant) -> String {
+        while self.sessions.len() >= RESEARCH_SESSION_CAP {
+            self.sessions.pop_front();
+        }
+        let id = mint_token();
+        self.sessions.push_back(ResearchSession {
+            id: id.clone(),
+            next_source: 0,
+            sources: Vec::new(),
+            notes: VecDeque::new(),
+            touched: now,
+        });
+        id
+    }
+    /// Cookie first, then the header, and only when that id is still live.
+    /// An unknown id is not adopted. A new id is minted instead.
+    fn ensure(&mut self, cookie_id: Option<&str>, header_id: Option<&str>) -> String {
+        let now = Instant::now();
+        self.evict(now);
+        for id in [cookie_id, header_id].into_iter().flatten() {
+            if research_id_ok(id) && self.touch(id, now) {
+                return id.to_string();
+            }
+        }
+        self.mint(now)
+    }
+    fn session_mut(&mut self, id: &str) -> Option<&mut ResearchSession> {
+        self.sessions.iter_mut().find(|s| id_eq(&s.id, id))
+    }
 }
 
-fn research_sources_json(desk: &ResearchDesk) -> String {
-    let items: Vec<String> = desk.sources.iter().map(|s| {
+fn id_eq(a: &str, b: &str) -> bool {
+    if a.len() != b.len() {
+        return false;
+    }
+    let mut diff = 0u8;
+    for (x, y) in a.bytes().zip(b.bytes()) {
+        diff |= x ^ y;
+    }
+    diff == 0
+}
+
+fn research_id_ok(id: &str) -> bool {
+    id.len() == 64 && id.bytes().all(|b| b.is_ascii_hexdigit())
+}
+
+fn research_cookie_id(req: &Request) -> Option<String> {
+    let header = req.header("cookie")?;
+    for part in header.split(';') {
+        let Some((k, v)) = part.trim().split_once('=') else { continue };
+        if k.trim() != RESEARCH_COOKIE {
+            continue;
+        }
+        let v = v.trim();
+        return research_id_ok(v).then(|| v.to_string());
+    }
+    None
+}
+
+fn research_header_id(req: &Request) -> Option<String> {
+    let v = req.header("x-galion-research")?.trim();
+    research_id_ok(v).then(|| v.to_string())
+}
+
+fn wipe_opt(slot: &mut Option<String>) {
+    if let Some(ref mut s) = slot {
+        wipe_string(s);
+    }
+}
+
+fn research_sources_json(sources: &[DeskSource]) -> String {
+    let items: Vec<String> = sources.iter().map(|s| {
         format!(
             "{{\"id\":{},\"name\":{},\"kind\":\"{}\",\"chars\":{}}}",
             s.id,
@@ -869,7 +1010,13 @@ fn parse_json_string_capped(s: &str, cap: usize) -> Option<String> {
     None
 }
 
-fn research_add_source(desk: &Arc<Mutex<ResearchDesk>>, raw: &str) -> Result<String, &'static str> {
+struct NewSource {
+    name: String,
+    text: String,
+    kind: &'static str,
+}
+
+fn parse_new_source(raw: &str) -> Result<NewSource, &'static str> {
     let name = json_object_string(raw, "name", 160).ok_or("name")?;
     let name = clean_source_name(&name).ok_or("name")?;
     let kind_raw = json_object_string(raw, "kind", 16).unwrap_or_default();
@@ -879,29 +1026,146 @@ fn research_add_source(desk: &Arc<Mutex<ResearchDesk>>, raw: &str) -> Result<Str
     } else {
         json_object_string(raw, "text", galion_cascade::hermes::MAX_RESEARCH_SOURCE_CHARS).unwrap_or_default()
     };
+    Ok(NewSource { name, text, kind })
+}
+
+/// `(json, set-cookie)`. A bad name does not open a session.
+fn research_attach(
+    desk: &Arc<Mutex<ResearchDesk>>,
+    cookie_id: Option<&str>,
+    header_id: Option<&str>,
+    raw: &str,
+) -> Result<(String, String), &'static str> {
+    let src = parse_new_source(raw)?;
     let Ok(mut d) = desk.lock() else { return Err("research") };
-    if d.sources.len() >= galion_cascade::hermes::MAX_RESEARCH_SOURCES {
-        d.sources.remove(0);
+    let mut id = d.ensure(cookie_id, header_id);
+    let cookie = d.cookie_line(&id);
+    let Some(session) = d.session_mut(&id) else {
+        wipe_string(&mut id);
+        return Err("research");
+    };
+    if session.sources.len() >= galion_cascade::hermes::MAX_RESEARCH_SOURCES {
+        session.sources.remove(0);
     }
-    d.next_source = d.next_source.saturating_add(1);
-    let id = d.next_source.max(1);
-    d.sources.push(DeskSource { id, name, text, kind });
-    Ok(research_sources_json(&d))
+    session.next_source = session.next_source.saturating_add(1);
+    let source_id = session.next_source.max(1);
+    session.sources.push(DeskSource {
+        id: source_id,
+        name: src.name,
+        text: src.text,
+        kind: src.kind,
+        at: Instant::now(),
+    });
+    let json = research_sources_json(&session.sources);
+    wipe_string(&mut id);
+    Ok((json, cookie))
+}
+
+#[derive(Clone, Copy)]
+enum SourceDelete {
+    All,
+    One(u32),
+}
+
+/// `None` is not this route. `Err` is a source id this route refuses.
+fn parse_source_delete(path: &str) -> Option<Result<SourceDelete, ()>> {
+    if path == "/research/sources" || path == "/research/sources/" {
+        return Some(Ok(SourceDelete::All));
+    }
+    let id = path.strip_prefix("/research/sources/")?;
+    if id.is_empty() || id.contains('/') {
+        return None;
+    }
+    if id.len() > 10 || !id.bytes().all(|b| b.is_ascii_digit()) {
+        return Some(Err(()));
+    }
+    let Ok(n) = id.parse::<u32>() else { return Some(Err(())) };
+    if n == 0 || n.to_string() != id {
+        return Some(Err(()));
+    }
+    Some(Ok(SourceDelete::One(n)))
+}
+
+fn research_remove(
+    desk: &Arc<Mutex<ResearchDesk>>,
+    cookie_id: Option<&str>,
+    header_id: Option<&str>,
+    target: SourceDelete,
+) -> Result<(String, String), &'static str> {
+    let Ok(mut d) = desk.lock() else { return Err("research") };
+    let mut id = d.ensure(cookie_id, header_id);
+    let cookie = d.cookie_line(&id);
+    let Some(session) = d.session_mut(&id) else {
+        wipe_string(&mut id);
+        return Err("research");
+    };
+    match target {
+        SourceDelete::All => session.sources.clear(),
+        SourceDelete::One(source_id) => {
+            let before = session.sources.len();
+            session.sources.retain(|src| src.id != source_id);
+            if session.sources.len() == before {
+                wipe_string(&mut id);
+                return Err("missing");
+            }
+        }
+    }
+    let json = research_sources_json(&session.sources);
+    wipe_string(&mut id);
+    Ok((json, cookie))
+}
+
+fn research_list(
+    desk: &Arc<Mutex<ResearchDesk>>,
+    cookie_id: Option<&str>,
+    header_id: Option<&str>,
+) -> Result<(String, String), ()> {
+    let Ok(mut d) = desk.lock() else { return Err(()) };
+    let mut id = d.ensure(cookie_id, header_id);
+    let cookie = d.cookie_line(&id);
+    let json = d.session_mut(&id).map(|s| research_sources_json(&s.sources)).unwrap_or_else(|| research_sources_json(&[]));
+    wipe_string(&mut id);
+    Ok((json, cookie))
+}
+
+fn research_touch(
+    desk: &Arc<Mutex<ResearchDesk>>,
+    cookie_id: Option<&str>,
+    header_id: Option<&str>,
+) -> Result<String, ()> {
+    let Ok(mut d) = desk.lock() else { return Err(()) };
+    let mut id = d.ensure(cookie_id, header_id);
+    let cookie = d.cookie_line(&id);
+    wipe_string(&mut id);
+    Ok(cookie)
 }
 
 fn json_list(items: &[String]) -> String {
     items.iter().map(|s| galion_cascade::hermes::json_string(s)).collect::<Vec<_>>().join(",")
 }
 
-fn research_status_json(desk: &ResearchDesk) -> String {
+fn research_status_json(desk: &ResearchDesk, history: usize) -> String {
     let key = desk.client.as_ref().map(|c| c.key_state()).unwrap_or("none");
     let model = desk.client.as_ref().map(|c| c.label().to_string()).unwrap_or_else(|| galion_cascade::LLM_NAME.into());
     format!(
-        "{{\"schema\":\"galion-research/1\",\"app\":\"hermes\",\"voice\":\"galion-research\",\"product\":\"galion-one\",\"model\":{},\"key\":\"{key}\",\"status\":\"{}\",\"history\":{}}}",
+        "{{\"schema\":\"galion-research/1\",\"app\":\"hermes\",\"voice\":\"galion-research\",\"product\":\"galion-one\",\"model\":{},\"key\":\"{key}\",\"status\":\"{}\",\"history\":{history}}}",
         galion_cascade::hermes::json_string(&model),
         desk.gateway_status(),
-        desk.notes.len()
     )
+}
+
+fn research_status_request(
+    desk: &Arc<Mutex<ResearchDesk>>,
+    cookie_id: Option<&str>,
+    header_id: Option<&str>,
+) -> Result<(String, String), ()> {
+    let Ok(mut d) = desk.lock() else { return Err(()) };
+    let mut id = d.ensure(cookie_id, header_id);
+    let cookie = d.cookie_line(&id);
+    let history = d.session_mut(&id).map(|s| s.notes.len()).unwrap_or(0);
+    let json = research_status_json(&d, history);
+    wipe_string(&mut id);
+    Ok((json, cookie))
 }
 
 fn research_note_json(note: &ResearchNote) -> String {
@@ -922,29 +1186,57 @@ fn research_note_json(note: &ResearchNote) -> String {
     )
 }
 
-fn research_history_json(desk: &ResearchDesk) -> String {
-    let items: Vec<String> = desk.notes.iter().rev().map(research_note_json).collect();
+fn research_history_json(notes: &VecDeque<ResearchNote>) -> String {
+    let items: Vec<String> = notes.iter().rev().map(research_note_json).collect();
     format!("{{\"schema\":\"galion-research/1\",\"app\":\"hermes\",\"items\":[{}]}}", items.join(","))
 }
 
+fn research_history_request(
+    desk: &Arc<Mutex<ResearchDesk>>,
+    cookie_id: Option<&str>,
+    header_id: Option<&str>,
+) -> Result<(String, String), ()> {
+    let Ok(mut d) = desk.lock() else { return Err(()) };
+    let mut id = d.ensure(cookie_id, header_id);
+    let cookie = d.cookie_line(&id);
+    let json = d.session_mut(&id).map(|s| research_history_json(&s.notes)).unwrap_or_else(|| research_history_json(&VecDeque::new()));
+    wipe_string(&mut id);
+    Ok((json, cookie))
+}
+
+/// Spoken reply for the voice-stack handoff. No browser cookie: the note stays
+/// on its own session and is not mixed into another visitor's files.
 fn research_reply(desk: &Arc<Mutex<ResearchDesk>>, question: &str) -> String {
-    research_commit(desk, question)
-        .map(|(_, note)| note.reply)
+    research_commit(desk, None, None, question)
+        .map(|(_, note, mut cookie)| {
+            wipe_string(&mut cookie);
+            note.reply.clone()
+        })
         .unwrap_or_else(|_| "The research path is not reachable from here.".into())
 }
 
-fn research_commit(desk: &Arc<Mutex<ResearchDesk>>, question: &str) -> Result<(String, ResearchNote), ()> {
-    let (id, client, model_fallback, sources) = {
-        let Ok(mut d) = desk.lock() else {
-            return Err(());
-        };
+/// `(model, note, set-cookie)`. Sources and the stored note belong to one session.
+fn research_commit(
+    desk: &Arc<Mutex<ResearchDesk>>,
+    cookie_id: Option<&str>,
+    header_id: Option<&str>,
+    question: &str,
+) -> Result<(String, ResearchNote, String), ()> {
+    let (note_id, client, model_fallback, mut sources, mut session_id, cookie) = {
+        let Ok(mut d) = desk.lock() else { return Err(()) };
+        let session_id = d.ensure(cookie_id, header_id);
+        let cookie = d.cookie_line(&session_id);
         d.status = "Running";
         d.next_id = d.next_id.saturating_add(1);
         let model = d.client.as_ref().map(|c| c.label().to_string()).unwrap_or_else(|| galion_cascade::LLM_NAME.into());
-        let sources: Vec<galion_cascade::hermes::ResearchSource> = d.sources.iter().map(|s| {
-            galion_cascade::hermes::ResearchSource { id: s.id, name: s.name.clone(), text: s.text.clone() }
-        }).collect();
-        (d.next_id, d.client.clone(), model, sources)
+        let sources: Vec<galion_cascade::hermes::ResearchSource> = d.session_mut(&session_id).map(|s| {
+            s.sources.iter().map(|src| galion_cascade::hermes::ResearchSource {
+                id: src.id,
+                name: src.name.clone(),
+                text: src.text.clone(),
+            }).collect()
+        }).unwrap_or_default();
+        (d.next_id, d.client.clone(), model, sources, session_id, cookie)
     };
     let turn = match client {
         Some(c) => c.research_turn(question, &sources),
@@ -957,6 +1249,10 @@ fn research_commit(desk: &Arc<Mutex<ResearchDesk>>, question: &str) -> Result<(S
             standing: "Unreachable",
         },
     };
+    for src in &mut sources {
+        wipe_string(&mut src.name);
+        wipe_string(&mut src.text);
+    }
     let status = turn.standing;
     let reply = if status == "Unreachable" {
         galion_cascade::research_handoff::RESEARCH_LOCAL.to_string()
@@ -983,7 +1279,7 @@ fn research_commit(desk: &Arc<Mutex<ResearchDesk>>, question: &str) -> Result<(S
         unknown.push(reply.clone());
     }
     let note = ResearchNote {
-        id,
+        id: note_id,
         question: question.to_string(),
         status,
         reply,
@@ -996,23 +1292,33 @@ fn research_commit(desk: &Arc<Mutex<ResearchDesk>>, question: &str) -> Result<(S
     let stored = note.clone();
     if let Ok(mut d) = desk.lock() {
         d.status = status;
-        d.notes.push_back(note);
-        while d.notes.len() > 32 {
-            d.notes.pop_front();
+        if let Some(session) = d.session_mut(&session_id) {
+            session.notes.push_back(note);
+            while session.notes.len() > 32 {
+                session.notes.pop_front();
+            }
         }
     }
-    Ok((model_fallback, stored))
+    wipe_string(&mut session_id);
+    Ok((model_fallback, stored, cookie))
 }
 
-fn research_ask(desk: &Arc<Mutex<ResearchDesk>>, question: &str) -> String {
-    let Ok((model, note)) = research_commit(desk, question) else {
-        return "{\"schema\":\"galion-research/1\",\"app\":\"hermes\",\"status\":\"Unreachable\",\"reply\":\"The research path is not reachable from here.\",\"citations\":[]}".into();
+/// `(body, set-cookie)`. The cookie is absent only when the desk lock is gone.
+fn research_ask_request(
+    desk: &Arc<Mutex<ResearchDesk>>,
+    cookie_id: Option<&str>,
+    header_id: Option<&str>,
+    question: &str,
+) -> (String, Option<String>) {
+    let Ok((model, note, cookie)) = research_commit(desk, cookie_id, header_id, question) else {
+        return ("{\"schema\":\"galion-research/1\",\"app\":\"hermes\",\"status\":\"Unreachable\",\"reply\":\"The research path is not reachable from here.\",\"citations\":[]}".into(), None);
     };
-    format!(
+    let body = format!(
         "{{\"schema\":\"galion-research/1\",\"app\":\"hermes\",\"model\":{},{}",
         galion_cascade::hermes::json_string(&model),
         research_note_json(&note).trim_start_matches('{')
-    )
+    );
+    (body, Some(cookie))
 }
 
 const SECURITY_HEADERS: &str = concat!(
@@ -1040,8 +1346,8 @@ fn format_acao(origin: Option<String>) -> String {
 
 fn handle(mut stream: std::net::TcpStream, sh: &Shared) {
     let _ = stream.set_read_timeout(Some(Duration::from_millis(2000)));
-    let (status, ctype, mut body, acao) = match read_request(&mut stream, MAX_BODY_BYTES) {
-        Err((st, msg)) => (st, "text/plain", msg.as_bytes().to_vec(), Acao::Unscoped),
+    let (status, ctype, mut body, acao, mut set_cookie) = match read_request(&mut stream, MAX_BODY_BYTES) {
+        Err((st, msg)) => (st, "text/plain", msg.as_bytes().to_vec(), Acao::Unscoped, None),
         Ok(mut req) => dispatch(&mut req, sh),
     };
     let cors = match acao {
@@ -1052,28 +1358,35 @@ fn handle(mut stream: std::net::TcpStream, sh: &Shared) {
         }
     };
     let location = if status.starts_with("302") { "Location: /\r\n" } else { "" };
-    let head = format!(
-        "HTTP/1.1 {status}\r\nContent-Type: {ctype}\r\nContent-Length: {}\r\nCache-Control: no-store\r\n{location}{cors}Access-Control-Allow-Methods: GET, POST, OPTIONS\r\nAccess-Control-Allow-Headers: {CORS_ALLOW_HEADERS}\r\n{SECURITY_HEADERS}Connection: close\r\n\r\n",
+    let mut cookie_line = match set_cookie.as_deref() {
+        Some(c) if !c.is_empty() => format!("Set-Cookie: {c}\r\n"),
+        _ => String::new(),
+    };
+    wipe_opt(&mut set_cookie);
+    let mut head = format!(
+        "HTTP/1.1 {status}\r\nContent-Type: {ctype}\r\nContent-Length: {}\r\nCache-Control: no-store\r\n{location}{cors}{cookie_line}Access-Control-Allow-Methods: GET, POST, DELETE, OPTIONS\r\nAccess-Control-Allow-Headers: {CORS_ALLOW_HEADERS}\r\n{SECURITY_HEADERS}Connection: close\r\n\r\n",
         body.len()
     );
     let _ = stream.write_all(head.as_bytes());
     let _ = stream.write_all(&body);
     let _ = stream.flush();
     // The socket has the bytes. Do not leave a token or a WAV sitting in this buffer.
+    wipe_string(&mut head);
+    wipe_string(&mut cookie_line);
     zeroise_bytes(&mut body);
 }
 
-fn dispatch(req: &mut Request, sh: &Shared) -> (&'static str, &'static str, Vec<u8>, Acao) {
+fn dispatch(req: &mut Request, sh: &Shared) -> (&'static str, &'static str, Vec<u8>, Acao, Option<String>) {
     if query_carries_token(&req.query) {
         zeroise_bytes(&mut req.body);
-        return ("400 Bad Request", "text/plain", b"session token must not be in the URL".to_vec(), Acao::Omit);
+        return ("400 Bad Request", "text/plain", b"session token must not be in the URL".to_vec(), Acao::Omit, None);
     }
     let origin = req.header("origin").map(str::to_string);
     let sensitive = route_is_sensitive(&req.method, &req.path);
     match check_origin(origin.as_deref(), &sh.edge.cors_origins, sensitive) {
         OriginCheck::Reject => {
             zeroise_bytes(&mut req.body);
-            ("403 Forbidden", "text/plain", b"origin rejected".to_vec(), Acao::Omit)
+            ("403 Forbidden", "text/plain", b"origin rejected".to_vec(), Acao::Omit, None)
         }
         OriginCheck::Allow { acao } => {
             if route_needs_session(&req.method, &req.path) && sh.edge.session_required() {
@@ -1088,11 +1401,12 @@ fn dispatch(req: &mut Request, sh: &Shared) -> (&'static str, &'static str, Vec<
                 }
                 if !ok {
                     zeroise_bytes(&mut req.body);
-                    return ("401 Unauthorized", "text/plain", b"session required".to_vec(), Acao::Keep(acao));
+                    return ("401 Unauthorized", "text/plain", b"session required".to_vec(), Acao::Keep(acao), None);
                 }
             }
-            let (st, ct, body) = route(req, sh);
-            (st, ct, body, Acao::Keep(acao))
+            let mut set_cookie = None;
+            let (st, ct, body) = route(req, sh, &mut set_cookie);
+            (st, ct, body, Acao::Keep(acao), set_cookie)
         }
     }
 }
@@ -1117,7 +1431,7 @@ fn cc0_json(accepted: bool) -> String {
     )
 }
 
-fn route(req: &mut Request, sh: &Shared) -> (&'static str, &'static str, Vec<u8>) {
+fn route(req: &mut Request, sh: &Shared, set_cookie: &mut Option<String>) -> (&'static str, &'static str, Vec<u8>) {
     let head = req.method == "HEAD";
     let method = if head { "GET" } else { req.method.as_str() };
     let txt = |s: &str| s.as_bytes().to_vec();
@@ -1230,16 +1544,53 @@ fn route(req: &mut Request, sh: &Shared) -> (&'static str, &'static str, Vec<u8>
             if question.is_empty() {
                 return ("400 Bad Request", "text/plain", txt("question"));
             }
-            let json = research_ask(&sh.research, &question);
+            let mut cookie_id = research_cookie_id(req);
+            let mut header_id = research_header_id(req);
+            let (json, cookie) = research_ask_request(&sh.research, cookie_id.as_deref(), header_id.as_deref(), &question);
+            wipe_opt(&mut cookie_id);
+            wipe_opt(&mut header_id);
+            if let Some(c) = cookie {
+                *set_cookie = Some(c);
+            }
             ("200 OK", "application/json", json.into_bytes())
         }
         ("POST", "/research/sources") if sh.page.is_some() => {
             let raw = String::from_utf8_lossy(&req.body).into_owned();
             zeroise_bytes(&mut req.body);
-            match research_add_source(&sh.research, &raw) {
-                Ok(json) => ("200 OK", "application/json", json.into_bytes()),
+            let mut cookie_id = research_cookie_id(req);
+            let mut header_id = research_header_id(req);
+            let answered = research_attach(&sh.research, cookie_id.as_deref(), header_id.as_deref(), &raw);
+            wipe_opt(&mut cookie_id);
+            wipe_opt(&mut header_id);
+            match answered {
+                Ok((json, cookie)) => {
+                    *set_cookie = Some(cookie);
+                    ("200 OK", "application/json", json.into_bytes())
+                }
                 Err("name") => ("400 Bad Request", "text/plain", txt("name")),
                 Err(_) => ("500 Internal Server Error", "text/plain", txt("research")),
+            }
+        }
+        ("DELETE", path) if sh.page.is_some() => {
+            zeroise_bytes(&mut req.body);
+            match parse_source_delete(path) {
+                None => ("404 Not Found", "text/plain", txt("not found")),
+                Some(Err(())) => ("400 Bad Request", "text/plain", txt("id")),
+                Some(Ok(target)) => {
+                    let mut cookie_id = research_cookie_id(req);
+                    let mut header_id = research_header_id(req);
+                    let answered = research_remove(&sh.research, cookie_id.as_deref(), header_id.as_deref(), target);
+                    wipe_opt(&mut cookie_id);
+                    wipe_opt(&mut header_id);
+                    match answered {
+                        Ok((json, cookie)) => {
+                            *set_cookie = Some(cookie);
+                            ("200 OK", "application/json", json.into_bytes())
+                        }
+                        Err("missing") => ("404 Not Found", "text/plain", txt("not found")),
+                        Err(_) => ("500 Internal Server Error", "text/plain", txt("research")),
+                    }
+                }
             }
         }
         ("POST", "/turn") => {
@@ -1280,24 +1631,55 @@ fn route(req: &mut Request, sh: &Shared) -> (&'static str, &'static str, Vec<u8>
                     ("200 OK", "text/html; charset=utf-8", page.into_bytes())
                 }
                 "/research/hermes" if sh.page.is_some() => {
-                    let Ok(desk) = sh.research.lock() else {
-                        return ("500 Internal Server Error", "text/plain", txt("research"));
-                    };
-                    ("200 OK", "application/json", research_status_json(&desk).into_bytes())
+                    let mut cookie_id = research_cookie_id(req);
+                    let mut header_id = research_header_id(req);
+                    let answered = research_status_request(&sh.research, cookie_id.as_deref(), header_id.as_deref());
+                    wipe_opt(&mut cookie_id);
+                    wipe_opt(&mut header_id);
+                    match answered {
+                        Ok((json, cookie)) => {
+                            *set_cookie = Some(cookie);
+                            ("200 OK", "application/json", json.into_bytes())
+                        }
+                        Err(()) => ("500 Internal Server Error", "text/plain", txt("research")),
+                    }
                 }
                 "/research/history" if sh.page.is_some() => {
-                    let Ok(desk) = sh.research.lock() else {
-                        return ("500 Internal Server Error", "text/plain", txt("research"));
-                    };
-                    ("200 OK", "application/json", research_history_json(&desk).into_bytes())
+                    let mut cookie_id = research_cookie_id(req);
+                    let mut header_id = research_header_id(req);
+                    let answered = research_history_request(&sh.research, cookie_id.as_deref(), header_id.as_deref());
+                    wipe_opt(&mut cookie_id);
+                    wipe_opt(&mut header_id);
+                    match answered {
+                        Ok((json, cookie)) => {
+                            *set_cookie = Some(cookie);
+                            ("200 OK", "application/json", json.into_bytes())
+                        }
+                        Err(()) => ("500 Internal Server Error", "text/plain", txt("research")),
+                    }
                 }
                 "/research/sources" if sh.page.is_some() => {
-                    let Ok(desk) = sh.research.lock() else {
-                        return ("500 Internal Server Error", "text/plain", txt("research"));
-                    };
-                    ("200 OK", "application/json", research_sources_json(&desk).into_bytes())
+                    let mut cookie_id = research_cookie_id(req);
+                    let mut header_id = research_header_id(req);
+                    let answered = research_list(&sh.research, cookie_id.as_deref(), header_id.as_deref());
+                    wipe_opt(&mut cookie_id);
+                    wipe_opt(&mut header_id);
+                    match answered {
+                        Ok((json, cookie)) => {
+                            *set_cookie = Some(cookie);
+                            ("200 OK", "application/json", json.into_bytes())
+                        }
+                        Err(()) => ("500 Internal Server Error", "text/plain", txt("research")),
+                    }
                 }
                 "/research" | "/research/" if sh.page.is_some() => {
+                    let mut cookie_id = research_cookie_id(req);
+                    let mut header_id = research_header_id(req);
+                    if let Ok(cookie) = research_touch(&sh.research, cookie_id.as_deref(), header_id.as_deref()) {
+                        *set_cookie = Some(cookie);
+                    }
+                    wipe_opt(&mut cookie_id);
+                    wipe_opt(&mut header_id);
                     ("200 OK", "text/html; charset=utf-8", RESEARCH_HTML.as_bytes().to_vec())
                 }
                 "/dot" => {
@@ -1420,7 +1802,8 @@ mod tests {
     #[test]
     fn research_ask_reply_is_one_json_object() {
         let desk = Arc::new(Mutex::new(ResearchDesk::new()));
-        let body = research_ask(&desk, "Is the reply one object?");
+        let (body, cookie) = research_ask_request(&desk, None, None, "Is the reply one object?");
+        assert!(cookie.unwrap_or_default().contains("HttpOnly"), "ask sets the research cookie");
         assert!(body.starts_with('{') && body.ends_with("]}") && !body.ends_with("]}}"), "{body}");
         let (mut depth, mut in_str, mut esc, mut closed_at) = (0i32, false, false, None);
         for (i, c) in body.char_indices() {
@@ -1555,6 +1938,7 @@ mod tests {
         for p in ["/research", "/research/", "/research?kiosk=1"] {
             let r = get(a, p);
             assert!(r.starts_with("HTTP/1.1 200") && r.contains("text/html"), "{p} {r}");
+            assert_research_cookie(&r);
             let body = r.split_once("\r\n\r\n").map(|(_, b)| b).unwrap_or("");
             for needle in [
                 "<title>Galion Research</title>",
@@ -1619,6 +2003,10 @@ mod tests {
                 "o.type=\"sine\"",
                 "docs/07-sound-guide/SOUND-LANGUAGE.md",
                 "Local. What is already known stays marked local.",
+                "data-ui=\"minimal\"",
+                "data-standard=\"432\"",
+                "--ink:#E6EDF3",
+                "--sky:#58C4FF",
                 "G.A.L.I.O.N. — General Autonomous Local Intelligence Open Network",
                 "Developed and distributed by Galion Labs",
                 "Perpetual Open MIT License",
@@ -1646,18 +2034,55 @@ mod tests {
     }
 
     fn post_json(addr: SocketAddr, path: &str, body: &str) -> String {
+        call(addr, "POST", path, "", Some(body))
+    }
+
+    fn call(addr: SocketAddr, method: &str, path: &str, headers: &str, body: Option<&str>) -> String {
         let mut s = std::net::TcpStream::connect(addr).unwrap();
-        s.write_all(
-            format!(
-                "POST {path} HTTP/1.1\r\nHost: x\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{body}",
-                body.len()
-            )
-            .as_bytes(),
-        )
-        .unwrap();
+        let payload = body.unwrap_or("");
+        let length = if body.is_some() {
+            format!("Content-Type: application/json\r\nContent-Length: {}\r\n", payload.len())
+        } else {
+            String::new()
+        };
+        let req = format!("{method} {path} HTTP/1.1\r\nHost: x\r\n{headers}{length}\r\n{payload}");
+        s.write_all(req.as_bytes()).unwrap();
         let mut out = String::new();
         s.read_to_string(&mut out).unwrap();
         out
+    }
+
+    fn research_cookie_of(resp: &str) -> String {
+        resp.lines().find_map(|line| {
+            let (name, value) = line.split_once(':')?;
+            if !name.eq_ignore_ascii_case("set-cookie") {
+                return None;
+            }
+            let pair = value.trim().split(';').next()?.trim();
+            let (k, v) = pair.split_once('=')?;
+            (k == "galion_research").then(|| v.to_string())
+        }).unwrap_or_default()
+    }
+
+    fn session_id_from_cookie(cookie: &str) -> String {
+        cookie.split(';').next().unwrap_or("").trim().strip_prefix("galion_research=").unwrap_or("").to_string()
+    }
+
+    fn cookie_header(id: &str) -> String {
+        format!("Cookie: galion_research={id}\r\n")
+    }
+
+    fn assert_research_cookie(resp: &str) {
+        let line = resp.lines().find(|l| l.to_ascii_lowercase().starts_with("set-cookie:")).unwrap_or("");
+        assert!(line.contains("galion_research="), "{line}");
+        assert!(line.contains("HttpOnly"), "{line}");
+        assert!(line.contains("SameSite=Strict"), "{line}");
+        assert!(line.contains("Path=/research"), "{line}");
+        let id = research_cookie_of(resp);
+        assert_eq!(id.len(), 64, "{id}");
+        assert!(id.bytes().all(|b| b.is_ascii_hexdigit()), "{id}");
+        let body = resp.split_once("\r\n\r\n").map(|(_, b)| b).unwrap_or("");
+        assert!(!id.is_empty() && !body.contains(&id), "session id stays out of the body");
     }
 
     #[test]
@@ -1672,8 +2097,12 @@ mod tests {
         let denied = post_json(a, "/research/ask", r#"{"question":"Where is the source?"}"#);
         assert!(denied.contains("HTTP/1.1 200") && denied.contains("The research path is not reachable from here."), "{denied}");
         assert!(!denied.contains(key), "{denied}");
-        let hist = get(a, "/research/history");
+        assert_research_cookie(&denied);
+        let sid = research_cookie_of(&denied);
+        let hist = call(a, "GET", "/research/history", &cookie_header(&sid), None);
         assert!(hist.contains("Where is the source?") && hist.contains("\"status\":\"Unreachable\""), "{hist}");
+        let other = get(a, "/research/history");
+        assert!(!other.contains("Where is the source?"), "another browser does not see this question: {other}");
         let empty = post_json(a, "/research/ask", r#"{"question":"  "}"#);
         assert!(empty.starts_with("HTTP/1.1 400"), "{empty}");
         w.close().unwrap();
@@ -1721,9 +2150,12 @@ mod tests {
         assert!(!asked.contains("NotFound") && !asked.contains("\"status\":\"Returned\""), "{asked}");
         assert!(asked.contains("\"app\":\"hermes\""), "{asked}");
         assert!(!asked.contains(key) && !asked.contains("Bearer"), "{asked}");
-        let hist = get(a, "/research/history");
+        let wash_sid = research_cookie_of(&asked);
+        let hist = call(a, "GET", "/research/history", &cookie_header(&wash_sid), None);
         assert!(hist.contains("What colour is the wash?") && hist.contains("\"status\":\"Unknown\""), "{hist}");
         assert!(!hist.contains(key) && !hist.contains("Galion brand note"), "{hist}");
+        let other = get(a, "/research/history");
+        assert!(!other.contains("What colour is the wash?"), "{other}");
         w.close().unwrap();
     }
 
@@ -1763,7 +2195,13 @@ mod tests {
         assert!(!spoken.contains(key) && !spoken.contains("Bearer"), "{spoken}");
         let hist = {
             let desk = w.sh.research.lock().unwrap();
-            research_history_json(&desk)
+            let mut notes = VecDeque::new();
+            for session in &desk.sessions {
+                for note in &session.notes {
+                    notes.push_back(note.clone());
+                }
+            }
+            research_history_json(&notes)
         };
         assert!(hist.contains("what colour is the wash") && hist.contains("near-white"), "{hist}");
         assert!(!hist.contains(key), "{hist}");
@@ -1833,14 +2271,18 @@ mod tests {
         let image = post_json(a, "/research/sources", r#"{"name":"../shot.png","kind":"image","text":"pixels"}"#);
         assert!(image.contains("HTTP/1.1 200") && image.contains("shot.png") && image.contains("\"kind\":\"image\"") && image.contains("\"chars\":0"), "{image}");
         assert!(!image.contains("../"), "{image}");
-        let file = post_json(
+        assert_research_cookie(&image);
+        let sid = research_cookie_of(&image);
+        let file = call(
             a,
+            "POST",
             "/research/sources",
-            r#"{"name":"notes/wash-note.txt","kind":"file","text":"The wash is amber."}"#,
+            &cookie_header(&sid),
+            Some(r#"{"name":"notes/wash-note.txt","kind":"file","text":"The wash is amber."}"#),
         );
         assert!(file.contains("wash-note.txt") && file.contains("\"kind\":\"file\"") && file.contains("\"chars\":18") && file.contains("\"id\":2"), "{file}");
         assert!(!file.contains("notes/"), "{file}");
-        let asked = post_json(a, "/research/ask", r#"{"question":"What colour is the wash?"}"#);
+        let asked = call(a, "POST", "/research/ask", &cookie_header(&sid), Some(r#"{"question":"What colour is the wash?"}"#));
         assert!(asked.contains("HTTP/1.1 200") && asked.contains("\"status\":\"Found\""), "{asked}");
         assert!(asked.contains("wash-note.txt") && asked.contains("\"n\":2"), "{asked}");
         assert!(asked.contains("amber"), "{asked}");
@@ -1854,7 +2296,7 @@ mod tests {
         assert!(upstream.contains("The wash is amber."), "{upstream}");
         assert!(!upstream.contains("Invented Journal"), "{upstream}");
         assert!(upstream.contains("Authorization: Bearer "), "{upstream}");
-        let hist = get(a, "/research/history");
+        let hist = call(a, "GET", "/research/history", &cookie_header(&sid), None);
         assert!(hist.contains("\"status\":\"Found\"") && !hist.contains("Invented Journal"), "{hist}");
         w.close().unwrap();
     }
@@ -1862,15 +2304,208 @@ mod tests {
     #[test]
     fn research_desk_keeps_the_latest_eight_sources() {
         let desk = Arc::new(Mutex::new(ResearchDesk::new()));
+        let (other_json, other_cookie) = research_attach(&desk, None, None, r#"{"name":"kept.txt","text":"stay"}"#).unwrap();
+        let other = session_id_from_cookie(&other_cookie);
+        assert!(other_json.contains("kept.txt") && !other_json.contains("n1.txt"), "{other_json}");
+        let mut sid: Option<String> = None;
         for i in 1..=9 {
             let body = format!(r#"{{"name":"n{i}.txt","text":"t{i}"}}"#);
-            research_add_source(&desk, &body).unwrap();
+            let (json, cookie) = research_attach(&desk, sid.as_deref(), None, &body).unwrap();
+            if sid.is_none() {
+                sid = Some(session_id_from_cookie(&cookie));
+            }
+            if i == 9 {
+                assert!(json.contains("n9.txt") && json.contains("n2.txt") && !json.contains("n1.txt"), "{json}");
+                assert!(!json.contains("kept.txt"), "{json}");
+            }
         }
+        let id = sid.unwrap();
+        let (kept, _) = research_list(&desk, Some(&other), None).unwrap();
+        assert!(kept.contains("kept.txt") && !kept.contains("n9.txt") && !kept.contains("n2.txt"), "{kept}");
         let d = desk.lock().unwrap();
-        assert_eq!(d.sources.len(), 8);
-        assert_eq!(d.sources[0].name, "n2.txt");
-        assert_eq!(d.sources[7].id, 9);
-        assert_eq!(d.sources[7].name, "n9.txt");
+        let s = d.sessions.iter().find(|s| s.id == id).unwrap();
+        assert_eq!(s.sources.len(), 8);
+        assert_eq!(s.sources[0].name, "n2.txt");
+        assert_eq!(s.sources[7].id, 9);
+        assert_eq!(s.sources[7].name, "n9.txt");
+    }
+
+    #[test]
+    fn research_cookie_wins_over_the_header_and_a_forged_id_is_not_adopted() {
+        let desk = Arc::new(Mutex::new(ResearchDesk::new()));
+        let (_, cookie_a) = research_attach(&desk, None, None, r#"{"name":"alpha.txt","text":"alpha-secret"}"#).unwrap();
+        let id_a = session_id_from_cookie(&cookie_a);
+        let (_, cookie_b) = research_attach(&desk, None, None, r#"{"name":"beta.txt","text":"beta-secret"}"#).unwrap();
+        let id_b = session_id_from_cookie(&cookie_b);
+        assert_ne!(id_a, id_b);
+        let (listed, _) = research_list(&desk, Some(&id_b), Some(&id_a)).unwrap();
+        assert!(listed.contains("beta.txt") && !listed.contains("alpha.txt"), "{listed}");
+        let (listed, _) = research_list(&desk, None, Some(&id_a)).unwrap();
+        assert!(listed.contains("alpha.txt") && !listed.contains("beta-secret"), "{listed}");
+        let forged = "ab".repeat(32);
+        let (listed, cookie) = research_list(&desk, Some(&forged), None).unwrap();
+        assert!(listed.contains("\"sources\":[]") && !listed.contains("alpha.txt"), "{listed}");
+        assert_ne!(session_id_from_cookie(&cookie), forged);
+        let removed = research_remove(&desk, Some(&id_b), None, SourceDelete::One(1));
+        assert!(removed.is_ok(), "beta's own id 1 is removed");
+        let (alpha, _) = research_list(&desk, Some(&id_a), None).unwrap();
+        assert!(alpha.contains("alpha.txt"), "deleting beta's id leaves alpha: {alpha}");
+    }
+
+    #[test]
+    fn research_files_and_idle_sessions_expire() {
+        let desk = Arc::new(Mutex::new(ResearchDesk::new()));
+        desk.lock().unwrap().ttl = Duration::from_millis(30);
+        let (_, cookie) = research_attach(&desk, None, None, r#"{"name":"fade.txt","text":"fades"}"#).unwrap();
+        let id = session_id_from_cookie(&cookie);
+        std::thread::sleep(Duration::from_millis(70));
+        desk.lock().unwrap().sessions[0].touched = Instant::now();
+        let (listed, cookie2) = research_list(&desk, Some(&id), None).unwrap();
+        assert!(listed.contains("\"sources\":[]") && !listed.contains("fade.txt") && !listed.contains("fades"), "{listed}");
+        assert_eq!(session_id_from_cookie(&cookie2), id, "a live session keeps its id when only the file expired");
+
+        let (_, cookie) = research_attach(&desk, None, None, r#"{"name":"idle.txt","text":"goes"}"#).unwrap();
+        let idle = session_id_from_cookie(&cookie);
+        std::thread::sleep(Duration::from_millis(70));
+        let (listed, cookie3) = research_list(&desk, Some(&idle), None).unwrap();
+        assert!(listed.contains("\"sources\":[]") && !listed.contains("idle.txt"), "{listed}");
+        assert_ne!(session_id_from_cookie(&cookie3), idle, "an idle session is not resumed");
+    }
+
+    #[test]
+    fn research_session_cap_drops_the_quiet_browser() {
+        let desk = Arc::new(Mutex::new(ResearchDesk::new()));
+        let (json, cookie) = research_attach(&desk, None, None, r#"{"name":"first.txt","text":"quiet-browser"}"#).unwrap();
+        let first = session_id_from_cookie(&cookie);
+        assert!(json.contains("first.txt"), "{json}");
+        for _ in 1..RESEARCH_SESSION_CAP {
+            research_touch(&desk, None, None).unwrap();
+        }
+        assert_eq!(desk.lock().unwrap().sessions.len(), RESEARCH_SESSION_CAP);
+        research_touch(&desk, None, None).unwrap();
+        let d = desk.lock().unwrap();
+        assert!(d.sessions.len() <= RESEARCH_SESSION_CAP);
+        assert!(d.sessions.iter().all(|s| s.id != first));
+        assert!(d.sessions.iter().all(|s| s.sources.iter().all(|src| src.name != "first.txt")));
+    }
+
+    #[test]
+    fn two_browsers_cannot_see_each_others_research_files() {
+        let key = "test-gateway-key-not-for-git";
+        let payload = "{\"choices\":[{\"message\":{\"content\":\"Unknown\\n- The file is the limit.\\n\"}}]}";
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        let seen = Arc::new(Mutex::new(Vec::<String>::new()));
+        let seen_w = seen.clone();
+        std::thread::spawn(move || {
+            for _ in 0..2 {
+                let Ok((mut sock, _)) = listener.accept() else { return };
+                let _ = sock.set_read_timeout(Some(Duration::from_millis(800)));
+                let mut buf = [0u8; 8192];
+                let mut got = Vec::new();
+                let mut header_end = None;
+                loop {
+                    match sock.read(&mut buf) {
+                        Ok(0) | Err(_) => break,
+                        Ok(n) => {
+                            got.extend_from_slice(&buf[..n]);
+                            if header_end.is_none() {
+                                header_end = got.windows(4).position(|w| w == b"\r\n\r\n").map(|p| p + 4);
+                            }
+                            if let Some(end) = header_end {
+                                let head = String::from_utf8_lossy(&got[..end]);
+                                let len = head.lines().find_map(|l| {
+                                    let (k, v) = l.split_once(':')?;
+                                    if !k.trim().eq_ignore_ascii_case("content-length") {
+                                        return None;
+                                    }
+                                    v.trim().parse::<usize>().ok()
+                                }).unwrap_or(0);
+                                if got.len() >= end + len {
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+                if let Ok(s) = String::from_utf8(got) {
+                    seen_w.lock().unwrap().push(s);
+                }
+                let resp = format!(
+                    "HTTP/1.0 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{payload}",
+                    payload.len()
+                );
+                let _ = sock.write_all(resp.as_bytes());
+            }
+        });
+        let mut w = WebSurface::serve("127.0.0.1:0".parse().unwrap()).with_page("<!doctype html><canvas></canvas>");
+        w.set_research_hermes(galion_cascade::HermesLlm::new(
+            &format!("http://{addr}/v1/chat/completions"),
+            "hermes-agent",
+            key,
+            Duration::from_millis(1000),
+        ));
+        w.open().unwrap();
+        let a = w.local_addr().unwrap();
+        let page = get(a, "/research");
+        assert_research_cookie(&page);
+        assert!(page.contains("data-ui=\"minimal\"") && page.contains("--ink:#E6EDF3") && page.contains("--sky:#58C4FF"), "{page}");
+        let blocked = get(a, "/research/sources?galion_research=not-a-cookie");
+        assert!(blocked.starts_with("HTTP/1.1 400"), "{blocked}");
+
+        let alpha = call(a, "POST", "/research/sources", "", Some(r#"{"name":"alpha.txt","text":"alpha-secret-ink"}"#));
+        assert_research_cookie(&alpha);
+        let sid_a = research_cookie_of(&alpha);
+        assert!(alpha.contains("alpha.txt") && !alpha.contains("beta.txt"), "{alpha}");
+        let beta = call(a, "POST", "/research/sources", "", Some(r#"{"name":"beta.txt","text":"beta-secret-sky"}"#));
+        let sid_b = research_cookie_of(&beta);
+        assert_ne!(sid_a, sid_b);
+        assert!(beta.contains("beta.txt") && !beta.contains("alpha.txt") && !beta.contains("alpha-secret-ink"), "{beta}");
+        let second = call(a, "POST", "/research/sources", &cookie_header(&sid_a), Some(r#"{"name":"alpha-2.txt","text":"alpha-second"}"#));
+        assert!(second.contains("alpha.txt") && second.contains("alpha-2.txt") && !second.contains("beta.txt"), "{second}");
+        assert_eq!(research_cookie_of(&second), sid_a);
+
+        let via_header = call(a, "GET", "/research/sources", &format!("X-Galion-Research: {sid_a}\r\n"), None);
+        assert!(via_header.contains("alpha.txt") && via_header.contains("alpha-2.txt") && !via_header.contains("beta"), "{via_header}");
+        let forged = "ab".repeat(32);
+        let forged_list = call(a, "GET", "/research/sources", &format!("X-Galion-Research: {forged}\r\n"), None);
+        assert!(forged_list.contains("\"sources\":[]"), "{forged_list}");
+        assert_ne!(research_cookie_of(&forged_list), forged);
+        assert!(!forged_list.contains("alpha") && !forged_list.contains("beta"), "{forged_list}");
+        let list_b = call(a, "GET", "/research/sources", &cookie_header(&sid_b), None);
+        assert!(list_b.contains("beta.txt") && !list_b.contains("alpha"), "{list_b}");
+
+        let ask_a = call(a, "POST", "/research/ask", &cookie_header(&sid_a), Some(r#"{"question":"What is in alpha?"}"#));
+        let ask_b = call(a, "POST", "/research/ask", &cookie_header(&sid_b), Some(r#"{"question":"What is in beta?"}"#));
+        assert!(!ask_a.contains("beta-secret-sky") && !ask_a.contains("beta.txt"), "{ask_a}");
+        assert!(!ask_b.contains("alpha-secret-ink") && !ask_b.contains("alpha.txt"), "{ask_b}");
+        let upstream = seen.lock().unwrap().clone();
+        assert_eq!(upstream.len(), 2, "{upstream:?}");
+        assert!(upstream[0].contains("alpha-secret-ink") && upstream[0].contains("alpha-second") && !upstream[0].contains("beta-secret-sky"), "{}", upstream[0]);
+        assert!(upstream[1].contains("beta-secret-sky") && !upstream[1].contains("alpha-secret-ink") && !upstream[1].contains("alpha-second"), "{}", upstream[1]);
+
+        let hist_a = call(a, "GET", "/research/history", &cookie_header(&sid_a), None);
+        let hist_b = call(a, "GET", "/research/history", &cookie_header(&sid_b), None);
+        assert!(hist_a.contains("What is in alpha?") && !hist_a.contains("What is in beta?"), "{hist_a}");
+        assert!(hist_b.contains("What is in beta?") && !hist_b.contains("What is in alpha?"), "{hist_b}");
+
+        let cross = call(a, "DELETE", "/research/sources/2", &cookie_header(&sid_b), None);
+        assert!(cross.starts_with("HTTP/1.1 404"), "{cross}");
+        let still_a = call(a, "GET", "/research/sources", &cookie_header(&sid_a), None);
+        assert!(still_a.contains("alpha-2.txt") && still_a.contains("alpha.txt"), "{still_a}");
+        let removed = call(a, "DELETE", "/research/sources/1", &cookie_header(&sid_a), None);
+        assert!(removed.starts_with("HTTP/1.1 200") && removed.contains("alpha-2.txt") && !removed.contains("alpha.txt"), "{removed}");
+        let still_b = call(a, "GET", "/research/sources", &cookie_header(&sid_b), None);
+        assert!(still_b.contains("beta.txt"), "{still_b}");
+        let cleared = call(a, "DELETE", "/research/sources", &cookie_header(&sid_a), None);
+        assert!(cleared.starts_with("HTTP/1.1 200") && cleared.contains("\"sources\":[]"), "{cleared}");
+        let still_b = call(a, "GET", "/research/sources", &cookie_header(&sid_b), None);
+        assert!(still_b.contains("beta.txt") && !still_b.contains("alpha"), "{still_b}");
+        let clear_b = call(a, "DELETE", "/research/sources", &cookie_header(&sid_b), None);
+        assert!(clear_b.contains("\"sources\":[]") && !clear_b.contains("beta.txt"), "{clear_b}");
+        let bad = call(a, "DELETE", "/research/sources/nope", &cookie_header(&sid_b), None);
+        assert!(bad.starts_with("HTTP/1.1 400"), "{bad}");
+        w.close().unwrap();
     }
 
     #[test]
