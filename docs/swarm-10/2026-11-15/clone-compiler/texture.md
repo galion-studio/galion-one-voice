@@ -117,7 +117,15 @@ Text used: `Here. What do you need?`. Device `cpu`. Persona `jarvis`.
 
 ## CI
 
-Recorded after the checks on this head finish. At the time this section was first written, CI had not been recorded.
+Head `3b139efd8b30207bacb5f4c91f7a4fd2770c5152`. All three registered checks completed `success` (GitHub Actions, 2026-11-15, Europe/Zagreb +01:00):
+
+| Check | Conclusion | Run |
+|---|---|---|
+| `test` | success | [43762200767](https://github.com/galion-studio/galion-one-voice/actions/runs/43762200767) (22:10:36–22:12:42 +01:00) |
+| `emotion-v2 harness (CPU stub)` | success | [43762200762](https://github.com/galion-studio/galion-one-voice/actions/runs/43762200762) (22:10:36–22:10:50 +01:00) |
+| `playwright` | success | [43762200778](https://github.com/galion-studio/galion-one-voice/actions/runs/43762200778) (22:10:35–22:11:21 +01:00) |
+
+`nebula-voice-v2` did not register a check on this head. The plan treats that path filter as not a failure. No check was skipped, cancelled, or failed. This notes edit is a later commit, so its own CI is a separate head.
 
 ## Open questions
 
