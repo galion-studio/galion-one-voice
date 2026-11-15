@@ -21,6 +21,18 @@ User=galion
 # Hermes gateway. Unset also selects Hermes in the phone lane; this line
 # states it on the unit. GALION_LLM=canned is the rule table, not this unit.
 Environment=GALION_LLM=hermes
+# Gateway key. Not stored in this unit. The process reads one NAME=value
+# line from GALION_LLM_KEY_FILE. The line name is GALION_LLM_KEY_NAME.
+# That is the same shape as GALION_RESEARCH_KEY_FILE / GALION_RESEARCH_KEY_NAME.
+# On the Hermes gateway file the line is API_SERVER_KEY.
+# GALION_LLM_KEY is the fallback when the file is unset, unreadable, or has
+# no matching line. The key is never logged.
+# ProtectSystem=strict hides paths outside ReadWritePaths. Add the file to
+# ReadOnlyPaths in a drop-in before uncommenting. A missing path is not listed
+# here, so this template still starts without the file.
+# Environment=GALION_LLM_KEY_FILE=/etc/galion/voice-hermes.env
+# Environment=GALION_LLM_KEY_NAME=API_SERVER_KEY
+# ReadOnlyPaths=/etc/galion/voice-hermes.env
 ExecStart=/opt/galion/voice/release/current/dot_console_demo --headless --realtime --no-png --web 127.0.0.1:7878 --seconds 3600
 WorkingDirectory=/opt/galion/voice/release/current
 Restart=always

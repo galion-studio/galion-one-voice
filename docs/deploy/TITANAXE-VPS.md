@@ -35,6 +35,17 @@ operator ──ssh:22 (key only, user galion)──▶ VPS
 | `scripts/deploy/package-release.sh [ver]` | builds `target/release-pkg/galion-voice-<ver>-<arch>.tar.gz` + `.sha256` locally |
 | `scripts/deploy/release-dryrun.sh [ver] [host]` | gate + scp/verify/symlink/restart/rollback plan. `--execute` is refused |
 
+## Hermes gateway key
+
+The voice brain (`HermesLlm::from_env` in `crates/galion-cascade`) reads the gateway bearer from a dotenv file when both of these are set:
+
+- `GALION_LLM_KEY_FILE` — path of the file
+- `GALION_LLM_KEY_NAME` — the `NAME=value` line. Same shape as Research `GALION_RESEARCH_KEY_FILE` / `GALION_RESEARCH_KEY_NAME`. On the Hermes gateway file that name is `API_SERVER_KEY`.
+
+`GALION_LLM_KEY` is the fallback when the file is unset, unreadable, or has no matching line. The key is sent as `Authorization` and is never logged. `Debug` prints `set` or `none`.
+
+`deploy/systemd/templates/galion-voice-stage.service` leaves those lines commented. The key is not written in the unit, the override, or this note. A human sets the path in a drop-in and adds that path to `ReadOnlyPaths`, because `ProtectSystem=strict` otherwise hides it. Mode `0600`, owner `galion`. This note does not install the unit and does not read a key.
+
 ## Dry-run results (2026-11-02, CET)
 - `harden-dryrun.sh --preflight`: all files present; Caddy upstream is loopback 7878; the unit binds loopback. `caddy validate` was skipped because caddy is not installed on the box. `systemd-analyze verify` cannot run unprivileged here.
 - `package-release.sh v1-20261102`: built `galion-voice-v1-20261102-x86_64.tar.gz`, sha256 `d128efcd2b12df18ac25c345f301c4cfd12598e5792c77c6311395ed3a9a3196`.

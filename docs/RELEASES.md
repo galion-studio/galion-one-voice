@@ -67,6 +67,8 @@ scripts/deploy/render-stage-unit.sh \
 
 The template `ExecStart` is the screen command from `scripts/run-v1-screen.sh`: `dot_console_demo` on `127.0.0.1:7878` for 3600 seconds, from `/opt/galion/voice/release/current`. `MemoryMax=256M` is the cap named in `docs/deploy/TITANAXE-VPS.md`. `docs/galion-voice-v2/symphony/STAGING-CPU.md` says the human raises that cap at install. The template keeps 256M.
 
+The template does not set the Hermes gateway key. `GALION_LLM_KEY_FILE` and `GALION_LLM_KEY_NAME` are commented, the same shape as Research `GALION_RESEARCH_KEY_FILE` / `GALION_RESEARCH_KEY_NAME`. `GALION_LLM_KEY` remains the fallback. The key is not written in the unit. See `docs/deploy/TITANAXE-VPS.md`.
+
 — Maciej Grajczyk
 
 ---
