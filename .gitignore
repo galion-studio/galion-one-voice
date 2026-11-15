@@ -77,6 +77,8 @@ link.env
 clip-store*/
 venv/
 .venv/
+# Documented Chatterbox CPU venv (scripts/clone/requirements.txt). Never commit.
+.venv-clone/
 __pycache__/
 node_modules/
 target/

@@ -24,7 +24,8 @@ use std::sync::{Arc, Mutex};
 
 use galion_cascade::en_lane::{wav_bytes, LANE_RATE_HZ};
 use galion_cascade::phone::FrameProsody;
-use galion_cascade::{PhoneConfig, PhoneError, PhoneLane};
+use galion_cascade::{LlmMode, PhoneConfig, PhoneError, PhoneLane};
+use galion_openmind::{seam_enabled_from_env, ReplyFrom, TurnSeam};
 
 use crate::bus::{
     bytes_to_pcm16, pcm16_to_bytes, BusBody, BusGate, BusMsg, ProcessBus, WORKER_REPLY_DEPTH,
@@ -141,6 +142,8 @@ fn wipe_string(s: &mut String) {
 pub struct SpeakJob {
     pub id: u64,
     pub text: String,
+    /// Sensed `/v2/say` column. `None` keeps the latest 80 ms slot.
+    pub prosody: Option<FrameProsody>,
 }
 
 impl Drop for SpeakJob {
@@ -278,9 +281,9 @@ impl TurnWorker {
 
     /// Speak `text` as the persona already wrote it. `Err(text)` when the slot is full.
     /// An older id does not rewind the cancel token.
-    pub fn try_speak(&self, id: u64, text: String) -> Result<(), String> {
+    pub fn try_speak(&self, id: u64, text: String, prosody: Option<FrameProsody>) -> Result<(), String> {
         self.supersede(id);
-        match self.speak_tx.try_send(SpeakJob { id, text }) {
+        match self.speak_tx.try_send(SpeakJob { id, text, prosody }) {
             Ok(()) => Ok(()),
             Err(TrySendError::Full(mut job) | TrySendError::Disconnected(mut job)) => {
                 Err(std::mem::take(&mut job.text))
@@ -352,7 +355,8 @@ fn turn_job_from(msg: BusMsg) -> TurnJob {
 fn respond_speak(lane: &mut PhoneLane, mut job: SpeakJob, gate: &BusGate, prosody: &ProsodySlot) -> Option<TurnReply> {
     let persona = gate.persona_id().as_str();
     let id = job.id;
-    lane.set_delivery(persona, prosody.load());
+    let delivery = job.prosody.unwrap_or_else(|| prosody.load());
+    lane.set_delivery(persona, delivery);
     lane.arm_cancel(gate.cancel_token(), id);
     let t0 = Instant::now();
     let mut text = std::mem::take(&mut job.text);
@@ -583,6 +587,64 @@ fn lane_error(
     }
 }
 
+/// Turn boundary, not the 80 ms tick. Runs only when `GALION_OPENMIND_SEAM`
+/// is on. A missing store or weights file keeps the lane reply. A memory
+/// hit speaks the exact stored line. Hermes is not called from here.
+fn respond_seamed(
+    lane: &mut PhoneLane,
+    mut job: TurnJob,
+    persona: &'static str,
+    in_ms: u32,
+    t0: Instant,
+    wav_in: &mut Vec<u8>,
+) -> Option<TurnReply> {
+    let id = job.id;
+    let heard = lane.hear_wav(wav_in);
+    for b in wav_in.iter_mut() {
+        *b = 0;
+    }
+    std::hint::black_box(wav_in.as_slice());
+    job.wipe();
+    let (transcript, asr) = match heard {
+        Ok(v) => v,
+        Err(PhoneError::Superseded) => return None,
+        Err(e) => {
+            return Some(lane_error(id, persona, in_ms, t0, e, String::new(), "none", "none"))
+        }
+    };
+    let asr_label = asr.id();
+    let seam = TurnSeam::from_env();
+    let _ = seam.note_turn(id, "user", &transcript);
+    let decision = seam.consult(id, matches!(lane.cfg.llm, LlmMode::Hermes));
+    let token = decision.stage_token();
+    let result = match decision.reply_from {
+        ReplyFrom::Stored { text, .. } => {
+            let mut result = lane.speak_fixed(&text);
+            if let Ok(turn) = result.as_mut() {
+                turn.transcript = transcript;
+                turn.asr = asr;
+                turn.llm = "local-store";
+                turn.reply_text = text;
+            }
+            result
+        }
+        ReplyFrom::Lane => lane.speak_heard(transcript, asr),
+    };
+    match result {
+        Ok(turn) => {
+            let mut reply = pack_ok(id, persona, in_ms, t0, turn);
+            reply.stages = format!("{} {}", reply.stages, token);
+            Some(reply)
+        }
+        Err(PhoneError::Superseded) => None,
+        Err(e) => {
+            let mut reply = lane_error(id, persona, in_ms, t0, e, String::new(), asr_label, "none");
+            reply.stages = token;
+            Some(reply)
+        }
+    }
+}
+
 fn respond(
     lane: &mut PhoneLane,
     mut job: TurnJob,
@@ -604,6 +666,9 @@ fn respond(
         std::hint::black_box(wav_in.as_slice());
         job.wipe();
         return voice;
+    }
+    if seam_enabled_from_env() {
+        return respond_seamed(lane, job, persona, in_ms, t0, &mut wav_in);
     }
     let result = lane.turn_wav(&wav_in);
     for b in &mut wav_in {
@@ -938,5 +1003,78 @@ mod tests {
         assert_eq!(r.persona, "samantha");
         assert_ne!(r.text, "The wash stays near-white.");
         assert!(r.text.is_empty(), "speech is off, so the ordinary turn keeps the tone and no research line");
+    }
+
+    #[test]
+    fn openmind_seam_blocks_when_the_store_is_missing_and_witnesses_when_it_exists() {
+        let _lock = env_lock();
+        let dir = std::env::temp_dir().join(format!(
+            "galion-seam-worker-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_nanos()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let _env = EnvGuard::set(&[
+            ("GALION_SPEECH", "off"),
+            ("GALION_ASR", "stub"),
+            ("GALION_LLM", "canned"),
+            ("GALION_OPENMIND_SEAM", "1"),
+            ("GALION_OPENMIND_REMEMBER", "yes"),
+            ("GALION_STUDENT_GQ", ""),
+            ("GALION_OPENMIND_STORE", ""),
+        ]);
+        let w = TurnWorker::spawn();
+        assert!(w.try_submit(TurnJob {
+            id: 21,
+            rate: 16_000,
+            pcm: galion_cascade::stub_fixture_pcm16("hello"),
+            voice_stack: false,
+        }).is_ok());
+        let blocked = wait_reply(&w);
+        assert!(blocked.stages.contains("seam=blocked:store+weights"), "{}", blocked.stages);
+        assert!(blocked.stages.contains("memory=blocked:store"), "{}", blocked.stages);
+        assert!(blocked.stages.contains("fallback=canned"), "{}", blocked.stages);
+        assert_ne!(blocked.llm, "local-store");
+        assert!(blocked.text.is_empty(), "no store, so no memory line was spoken");
+        assert!(!blocked.stages.contains("hello"));
+        drop(w);
+        drop(_env);
+
+        let _env = EnvGuard::set(&[
+            ("GALION_SPEECH", "off"),
+            ("GALION_ASR", "stub"),
+            ("GALION_LLM", "canned"),
+            ("GALION_OPENMIND_SEAM", "1"),
+            ("GALION_OPENMIND_REMEMBER", "yes"),
+            ("GALION_STUDENT_GQ", ""),
+            ("GALION_OPENMIND_STORE", dir.to_str().unwrap()),
+        ]);
+        let w = TurnWorker::spawn();
+        assert!(w.try_submit(TurnJob {
+            id: 1,
+            rate: 16_000,
+            pcm: galion_cascade::stub_fixture_pcm16("the lamp is on"),
+            voice_stack: false,
+        }).is_ok());
+        let first = wait_reply(&w);
+        assert!(first.stages.contains("seam=blocked:weights"), "{}", first.stages);
+        assert!(first.stages.contains("memory=empty"), "{}", first.stages);
+        assert!(first.text.is_empty());
+        assert!(w.try_submit(TurnJob {
+            id: 2,
+            rate: 16_000,
+            pcm: galion_cascade::stub_fixture_pcm16("hello"),
+            voice_stack: false,
+        }).is_ok());
+        let later = wait_reply(&w);
+        assert!(later.stages.contains("memory=hit:1"), "{}", later.stages);
+        assert!(later.stages.contains("seam=blocked:weights"), "{}", later.stages);
+        assert!(!later.stages.contains("the lamp is on"));
+        assert_ne!(later.llm, "local-store");
+        let stored = std::fs::read_to_string(dir.join("turns.jsonl")).unwrap();
+        assert_eq!(stored, "v1\t1\tuser\tthe lamp is on\nv1\t2\tuser\thello\n");
+        assert!(later.error.as_deref().is_some_and(|e| e.contains("NoSpeech")));
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

@@ -19,9 +19,9 @@ One-shot: `galion_cascade::phone_turn(&pcm)` / `phone_turn_wav(&bytes)`.
 | Env | Values |
 |---|---|
 | `GALION_ASR` | unset/`stub` (fixtures only; real speech → `AsrUnratified`) · `vosk` (worker; missing model → `AsrUnavailable`) · `off` · `interim` is ignored (treated as stub) |
-| `GALION_LLM` | unset/`canned` (CannedLlm, phone default) · `echo` |
+| `GALION_LLM` | unset/`canned` (CannedLlm, phone default) · `echo` · `student` (S0 probe; blocked until a `.gq` can be spoken) |
 | `GALION_ASR` | unset/`stub` (fixtures only; real speech → `AsrUnratified`) · `interim` (placeholder) · `off` |
-| `GALION_LLM` | unset/`canned` (CannedLlm, explicit test opt-in) · `echo` · `hermes` (loopback OpenAI chat). Any other value is an error, not a canned fallback. |
+| `GALION_LLM` | unset/`canned` (CannedLlm, explicit test opt-in) · `echo` · `student` · `hermes` (loopback OpenAI chat). `reflect` is an error on the phone. Any other value is an error, not a canned fallback. |
 | `GALION_LLM_URL` | `http://127.0.0.1:8642/v1/chat/completions` (default when mode is `hermes`). Numeric loopback `http://` only. No TLS. |
 | `GALION_LLM_MODEL` | model name sent to the gateway. Default `hermes-agent`. Shown on `/v2/say` and `/v2/state` as `llm`. |
 | `GALION_LLM_KEY` | optional bearer token. Not logged. |

@@ -32,6 +32,8 @@ jobs:
         run: galion-gates/op-one-percent.sh
       - name: Clone worker scaffold (no weight download)
         run: cargo test -p galion-ml-voice --features speech
+      - name: Clone prep staging (no download, no generate)
+        run: scripts/clone/stage-clone-prep.test.sh
       - name: Flash TTFA harness (no number without a run)
         run: scripts/eval/flash-ttfa.sh
       - name: Hard loop classifiers (no product verdict)

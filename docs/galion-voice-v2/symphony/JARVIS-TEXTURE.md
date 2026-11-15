@@ -234,6 +234,21 @@ The program brief names a gitignored `jarvis.wav` (48 kHz, stereo,
 film reference stay on the hold. Piper and flite remain the speaking
 path. The synthetic check is the gate that can run here.
 
+## Swarm 10 record
+
+2026-11-15, Europe/Zagreb (+01:00). Lane clone-compiler, worker texture.
+The original clip `docs/galion-voice-v2/personas/refs/jarvis.wav`
+(sha256 `c2200b59fa78b3c98d13ac5dc7db3a6c14e802310dca73033d7770bd4b532c60`)
+was not on this machine. The git slot is `jarvis.placeholder`. No
+`GALION_CLIP_STORE` was set. Piper listening-set files were not opened.
+The spectral compare against a clean-speech baseline of that take was
+not measured. Section C stays BLOCKED. `scripts/eval/jarvis-texture.sh`
+is the synthetic toggle quoted in
+`docs/swarm-10/2026-11-15/clone-compiler/texture.md`. That line is not
+a PASS of the original clip and not a Nano clone-output measurement.
+No wav was committed. `LOCKS.toml` and `scripts/clone/REFS.sha256` were
+not edited.
+
 — Maciej Grajczyk
 
 ---

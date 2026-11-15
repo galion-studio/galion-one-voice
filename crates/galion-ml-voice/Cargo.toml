@@ -53,3 +53,7 @@ path = "src/bin/galion-voice-compile.rs"
 [[example]]
 name = "emotion_sweep"
 required-features = ["speech"]
+
+[[example]]
+name = "persona_live_mouth"
+required-features = ["speech"]
