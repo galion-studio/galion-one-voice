@@ -26,7 +26,7 @@ const state = {
   mode: "idle",
   emotion: { sense: true, label: "neutral", valence: 0, arousal: 0.1, lean: 0, confidence: 1 },
   nebula: neutral,
-  persona: "galion",
+  persona: "samantha",
   approval: false,
 };
 let tMs = 1000;

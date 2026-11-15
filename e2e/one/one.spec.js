@@ -52,7 +52,7 @@ async function idleState(page) {
     data: {
       mode: "idle",
       approval: false,
-      persona: "galion",
+      persona: "samantha",
       emotion: { sense: true, label: "neutral", valence: 0, arousal: 0.1, lean: 0, confidence: 1 },
       nebula: neutralLine(),
     },
@@ -171,7 +171,7 @@ test("desktop /one is one dot in idle and listening", async ({ page }) => {
   await expect(page).toHaveTitle("Galion One");
   await expect(page.locator("canvas")).toHaveCount(1);
   await expect(page.locator("#s")).toHaveAttribute("data-mark", "orb");
-  await expect(page.locator("#s")).toHaveAttribute("data-persona", "galion");
+  await expect(page.locator("#s")).toHaveAttribute("data-persona", "samantha");
   await expect(page.locator("#decide")).toBeHidden();
   const bg = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
   expect(bg).toBe("rgb(10, 10, 12)");
