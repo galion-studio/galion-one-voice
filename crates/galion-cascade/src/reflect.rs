@@ -1,28 +1,27 @@
 // Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
-//! In-house persona reply floor. No model, no weights, no network.
+//! Instruction-floor rule engine. No model, no weights, no network.
 //!
 //! Owner ruling 2026-11-04: the reply path is in-house only (no Qwen, no
-//! Groq, no cloud LLM). Until the S0 student `.gq` exists on galion-tensor,
-//! content turns on the persona floor can be answered by this rule engine
-//! when the host opts in with `GALION_LLM=canned` (or `inhouse`).
+//! Groq, no cloud LLM). This module restates the caller's fact in second
+//! person and adds one short persona line. It is not a language model and
+//! it is not the product brain.
 //!
-//! It does what the Hermes system prompt asks of a model, by rule: say the
-//! fact the caller named back in second person, then one short persona line
-//! that stays on that fact. It never speaks an empathy script; every reply
-//! still goes through [`crate::hermes::contains_forbidden`].
-//!
-//! This is not a language model. The hard harness reports it as the
-//! instruction floor (`real-llm: stub`), never as Hermes or a student.
+//! The live persona floor does not call [`reply`]. Content turns go to
+//! [`crate::student`], which says the S0 `.gq` is unavailable until a file
+//! can be spoken. [`reply`] stays for these unit tests. Do not relabel it
+//! as a student or as Hermes. The hard harness scores this text as
+//! `real-llm: stub`.
 
 use crate::hermes::{contains_forbidden, REFUSED};
 
-/// Label on `/v2/say` `"llm"` when this engine wrote the reply.
+/// Historical label. The live persona floor does not write this on `"llm"`.
 pub const LLM_NAME: &str = "galion-reflect";
 
 /// Longest reflected fact, in characters, before the persona line.
 pub const MAX_FACT_CHARS: usize = 180;
 
-/// `GALION_LLM=canned|inhouse|reflect` selects this engine for the persona floor.
+/// Env values that used to select this engine. The persona floor now uses
+/// [`crate::student::selected_from_env`] and does not call [`reply`].
 pub fn selected_from_env() -> bool {
     matches!(
         std::env::var("GALION_LLM")
