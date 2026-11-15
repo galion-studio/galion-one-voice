@@ -141,6 +141,8 @@ fn wipe_string(s: &mut String) {
 pub struct SpeakJob {
     pub id: u64,
     pub text: String,
+    /// Sensed `/v2/say` column. `None` keeps the latest 80 ms slot.
+    pub prosody: Option<FrameProsody>,
 }
 
 impl Drop for SpeakJob {
@@ -278,9 +280,9 @@ impl TurnWorker {
 
     /// Speak `text` as the persona already wrote it. `Err(text)` when the slot is full.
     /// An older id does not rewind the cancel token.
-    pub fn try_speak(&self, id: u64, text: String) -> Result<(), String> {
+    pub fn try_speak(&self, id: u64, text: String, prosody: Option<FrameProsody>) -> Result<(), String> {
         self.supersede(id);
-        match self.speak_tx.try_send(SpeakJob { id, text }) {
+        match self.speak_tx.try_send(SpeakJob { id, text, prosody }) {
             Ok(()) => Ok(()),
             Err(TrySendError::Full(mut job) | TrySendError::Disconnected(mut job)) => {
                 Err(std::mem::take(&mut job.text))
@@ -352,7 +354,8 @@ fn turn_job_from(msg: BusMsg) -> TurnJob {
 fn respond_speak(lane: &mut PhoneLane, mut job: SpeakJob, gate: &BusGate, prosody: &ProsodySlot) -> Option<TurnReply> {
     let persona = gate.persona_id().as_str();
     let id = job.id;
-    lane.set_delivery(persona, prosody.load());
+    let delivery = job.prosody.unwrap_or_else(|| prosody.load());
+    lane.set_delivery(persona, delivery);
     lane.arm_cancel(gate.cancel_token(), id);
     let t0 = Instant::now();
     let mut text = std::mem::take(&mut job.text);

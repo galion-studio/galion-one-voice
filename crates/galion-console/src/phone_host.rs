@@ -14,7 +14,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use galion_heartbeat::{FRAME_MS, FRAME_SAMPLES, SAMPLE_RATE};
-use galion_render::backends::web::{MicTap, ReplyBox, SayInbox, SpokenLine, Turn, TurnInbox, WebSurface};
+use galion_render::backends::web::{MicTap, MouthProsody, ReplyBox, SayInbox, SpokenLine, Turn, TurnInbox, WebSurface};
 use galion_render::v2_persona::Floor;
 
 use crate::auto_workflow::{proceed, Proceed, ProceedSource};
@@ -345,6 +345,20 @@ fn hub_playback_on() -> bool {
     )
 }
 
+/// Sensed say column → the frame the mouth applies. `rate` is stored.
+/// Pitch, energy, and pause are written into the PCM. Warmth is not.
+fn mouth_frame(m: MouthProsody) -> galion_cascade::phone::FrameProsody {
+    galion_cascade::phone::FrameProsody {
+        pitch_st: m.pitch_st,
+        pitch_range: 1.0,
+        rate: m.rate,
+        energy: m.loudness,
+        warmth: 0.5,
+        pre_pause_ms: u16::try_from(m.pre_pause_ms).unwrap_or(u16::MAX).min(400),
+    }
+    .clamped()
+}
+
 /// The Jarvis reply WAV with the galion-emotion hub bed (clicks, alarm, room tone)
 /// added per 80 ms frame through [`crate::v2v::mix_hub_playback`]. `pcm` is
 /// 24 kHz mono. `None` if the mix refuses (rate or length), so the caller keeps
@@ -462,7 +476,8 @@ impl PhoneHost {
         }
         let id = line.id;
         let text = std::mem::take(&mut line.reply);
-        if let Err(text) = self.worker.try_speak(id, text) {
+        let prosody = line.mouth.map(mouth_frame);
+        if let Err(text) = self.worker.try_speak(id, text, prosody) {
             line.reply = text;
             self.pending_line = Some(line);
         }
@@ -683,7 +698,7 @@ mod tests {
             assert_eq!(said.mood, "grief");
         }
         web.say_inbox()
-            .push("Your mother died this morning.".into(), false, false);
+            .push("Your mother died this morning.".into(), false, false, None);
         let mut host = PhoneHost::from_surface(&web);
         match prev_speech {
             Some(v) => std::env::set_var("GALION_SPEECH", v),
@@ -770,7 +785,7 @@ mod tests {
         let mut host = PhoneHost::from_surface(&web);
         assert_eq!(host.bus.persona_id(), crate::bus::PersonaId::Samantha);
         let _ = web.persona_floor().lock().unwrap().say("be Jarvis", false, 0.0, false);
-        host.submit_say(SpokenLine { id: 3, reply: String::new(), silence: true, barge: false });
+        host.submit_say(SpokenLine { id: 3, reply: String::new(), silence: true, barge: false, mouth: None });
         assert_eq!(host.bus.persona_id(), crate::bus::PersonaId::Jarvis);
     }
 

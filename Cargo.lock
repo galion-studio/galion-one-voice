@@ -283,6 +283,7 @@ version = "0.0.1"
 dependencies = [
  "galion-cascade",
  "galion-consent",
+ "galion-emotion",
 ]
 
 [[package]]
