@@ -17,6 +17,10 @@ After=network.target
 [Service]
 Type=simple
 User=galion
+# Owner decision 2026-11-15 (t493s3301). The live unit calls the loopback
+# Hermes gateway. Unset also selects Hermes in the phone lane; this line
+# states it on the unit. GALION_LLM=canned is the rule table, not this unit.
+Environment=GALION_LLM=hermes
 ExecStart=/opt/galion/voice/release/current/dot_console_demo --headless --realtime --no-png --web 127.0.0.1:7878 --seconds 3600
 WorkingDirectory=/opt/galion/voice/release/current
 Restart=always

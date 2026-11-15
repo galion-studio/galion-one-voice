@@ -6,7 +6,7 @@
 //! GALION_LLM_URL=http://127.0.0.1:8642/v1/chat/completions
 //! GALION_LLM_MODEL=hermes-agent
 //! GALION_LLM_KEY=...            # optional; sent as Authorization, never logged
-//! GALION_LLM_TIMEOUT_MS=3000
+//! GALION_LLM_TIMEOUT_MS=15000
 //! ```
 //!
 //! A timeout, a refused connect, a non-loopback URL, or a bad response is the
@@ -60,7 +60,33 @@ pub const REFUSED: &str = "I'll stay on what you said.";
 pub const LLM_NAME: &str = "hermes-agent";
 /// Approved gateway when `GALION_LLM_URL` is unset and the mode is hermes.
 pub const DEFAULT_URL: &str = "http://127.0.0.1:8642/v1/chat/completions";
-pub const DEFAULT_TIMEOUT_MS: u64 = 3_000;
+/// Failure ceiling for one live voice completion. Not a measured reply time.
+/// A local CPU generation does not fit in the old 3 s ceiling.
+/// `GALION_LLM_TIMEOUT_MS` overrides this (clamped 50..=30000).
+pub const DEFAULT_TIMEOUT_MS: u64 = 15_000;
+const MIN_TIMEOUT_MS: u64 = 50;
+const MAX_TIMEOUT_MS: u64 = 30_000;
+
+/// `GALION_LLM_TIMEOUT_MS`. Unset, blank, and non-numeric values use
+/// [`DEFAULT_TIMEOUT_MS`]. Values outside 50..=30000 are clamped.
+fn timeout_ms_from_choice(raw: Option<&str>) -> u64 {
+    let parsed = raw
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .and_then(|s| s.parse::<u64>().ok());
+    parsed.unwrap_or(DEFAULT_TIMEOUT_MS).clamp(MIN_TIMEOUT_MS, MAX_TIMEOUT_MS)
+}
+
+/// Whether [`HermesLlm::attached_from_env`] builds a client.
+/// Unset and `hermes` attach. `canned`, `echo`, and `mock` do not.
+fn should_attach(mode: Option<&str>) -> bool {
+    let owned = mode.map(|s| s.trim().to_ascii_lowercase());
+    match owned.as_deref().filter(|s| !s.is_empty()) {
+        Some("canned") | Some("echo") | Some("mock") => false,
+        Some("hermes") | None => true,
+        Some(_) => false,
+    }
+}
 
 /// Empathy scripts the model must not speak. Same list the `/v2` floor uses.
 /// This is the one list: `scripts/eval/v2_hard_loop.py` parses it from this
@@ -400,16 +426,12 @@ impl HermesLlm {
     }
 
     /// `GALION_LLM_URL` (default [`DEFAULT_URL`]), `GALION_LLM_MODEL`, `GALION_LLM_KEY`,
-    /// `GALION_LLM_TIMEOUT_MS` (default 3000, clamped 50..=30000).
+    /// `GALION_LLM_TIMEOUT_MS` (default [`DEFAULT_TIMEOUT_MS`], clamped 50..=30000).
     pub fn from_env() -> Self {
         let url = std::env::var("GALION_LLM_URL").unwrap_or_else(|_| DEFAULT_URL.to_string());
         let model = std::env::var("GALION_LLM_MODEL").unwrap_or_else(|_| LLM_NAME.to_string());
         let key = std::env::var("GALION_LLM_KEY").unwrap_or_default();
-        let timeout_ms: u64 = std::env::var("GALION_LLM_TIMEOUT_MS")
-            .ok()
-            .and_then(|s| s.trim().parse().ok())
-            .unwrap_or(DEFAULT_TIMEOUT_MS);
-        let timeout_ms = timeout_ms.clamp(50, 30_000);
+        let timeout_ms = timeout_ms_from_choice(std::env::var("GALION_LLM_TIMEOUT_MS").ok().as_deref());
         Self::new(
             url.trim(),
             model.trim(),
@@ -420,22 +442,14 @@ impl HermesLlm {
 
     /// Attach only when the process asked for Hermes.
     ///
-    /// `GALION_LLM=hermes`, or a set `GALION_LLM_URL` with no explicit mode.
-    /// `canned`, `echo`, and `mock` stay off this client. An unknown mode does
+    /// `GALION_LLM=hermes`, or no explicit mode at all (owner card t493s3301:
+    /// Hermes is the default phone brain). `canned`, `echo`, and `mock` stay off this client. An unknown mode does
     /// not attach and does not select canned; the phone lane reports that as an error.
     pub fn attached_from_env() -> Option<Self> {
         let mode = std::env::var("GALION_LLM")
             .ok()
             .map(|s| s.trim().to_ascii_lowercase());
-        let url_set = std::env::var("GALION_LLM_URL")
-            .ok()
-            .is_some_and(|s| !s.trim().is_empty());
-        let attach = match mode.as_deref() {
-            Some("canned") | Some("echo") | Some("mock") => false,
-            Some("hermes") => true,
-            None => url_set,
-            Some(_) => false,
-        };
+        let attach = should_attach(mode.as_deref());
         if attach {
             Some(Self::from_env())
         } else {
@@ -2028,6 +2042,31 @@ mod tests {
             "",
             Duration::from_millis(timeout_ms),
         )
+    }
+
+    #[test]
+    fn voice_timeout_default_is_fifteen_seconds_and_clamped() {
+        assert_eq!(timeout_ms_from_choice(None), DEFAULT_TIMEOUT_MS);
+        assert_eq!(DEFAULT_TIMEOUT_MS, 15_000);
+        assert_eq!(timeout_ms_from_choice(Some("")), DEFAULT_TIMEOUT_MS);
+        assert_eq!(timeout_ms_from_choice(Some("nope")), DEFAULT_TIMEOUT_MS);
+        assert_eq!(timeout_ms_from_choice(Some("15000")), 15_000);
+        assert_eq!(timeout_ms_from_choice(Some(" 8000 ")), 8_000);
+        assert_eq!(timeout_ms_from_choice(Some("10")), MIN_TIMEOUT_MS);
+        assert_eq!(timeout_ms_from_choice(Some("999999")), MAX_TIMEOUT_MS);
+    }
+
+    #[test]
+    fn unset_mode_attaches_hermes_and_canned_does_not() {
+        assert!(should_attach(None));
+        assert!(should_attach(Some("")));
+        assert!(should_attach(Some(" hermes ")));
+        assert!(!should_attach(Some("canned")));
+        assert!(!should_attach(Some("echo")));
+        assert!(!should_attach(Some("mock")));
+        assert!(!should_attach(Some("student")));
+        assert!(!should_attach(Some("reflect")));
+        assert!(!should_attach(Some("openrouter")));
     }
 
     #[test]
