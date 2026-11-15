@@ -76,10 +76,13 @@ pub use weights::A21RingFeed;
 /// Output rate of every speech backend (Mimi-class 24 kHz lane bus).
 pub const SPEECH_RATE: u32 = crate::stub::SAMPLE_RATE;
 
-/// Numeric prosody from one 80 ms `galion-emotion` decision.
+/// Numeric prosody from one 80 ms `galion-emotion` decision, or from a
+/// sensed `/v2/say` persona column.
 ///
 /// There is no emotion name on this struct. Identity leaves the PCM alone.
-/// [`apply_frame_prosody`] uses `pre_pause_ms` and `energy` only.
+/// [`apply_frame_prosody`] uses `energy`, `pitch_st`, and `pre_pause_ms`.
+/// `rate` is stored and is not a time-stretch: Piper reads `length_scale`
+/// once at spawn, and this function does not respawn the worker.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct FrameProsody {
     pub pitch_st: f32,
@@ -126,13 +129,23 @@ fn finite(x: f32, fallback: f32) -> f32 {
     if x.is_finite() { x } else { fallback }
 }
 
-/// Prepend silence and scale loudness. Pitch and rate are not rewritten here.
+/// Scale loudness, resample pitch, then prepend silence.
+///
+/// Pitch is a linear resample by `2^(st/12)`, the same ratio as
+/// [`crate::emotive::EmotiveShaper`]. Formants move with the pitch. A lower
+/// pitch lengthens the buffer. `rate` is not applied here.
 pub fn apply_frame_prosody(samples: &mut Vec<f32>, rate: u32, prosody: FrameProsody) {
     let prosody = prosody.clamped();
     let energy = prosody.energy;
     if (energy - 1.0).abs() > 1.0e-4 {
         for s in samples.iter_mut() {
             *s = (*s * energy).clamp(-1.0, 1.0);
+        }
+    }
+    if samples.len() > 1 && prosody.pitch_st.abs() > 1.0e-4 {
+        let ratio = (prosody.pitch_st / 12.0).exp2();
+        if ratio.is_finite() && (ratio - 1.0).abs() > 1.0e-4 {
+            *samples = pitch_resample(samples, ratio);
         }
     }
     if prosody.pre_pause_ms == 0 || rate == 0 {
@@ -145,6 +158,22 @@ pub fn apply_frame_prosody(samples: &mut Vec<f32>, rate: u32, prosody: FramePros
     let mut out = vec![0.0; n];
     out.append(samples);
     *samples = out;
+}
+
+/// Read `input` at `i * ratio`. `ratio > 1` raises pitch and shortens the buffer.
+fn pitch_resample(input: &[f32], ratio: f32) -> Vec<f32> {
+    let n = ((input.len() as f32) / ratio).floor() as usize;
+    let n = n.max(1);
+    let mut out = Vec::with_capacity(n);
+    for i in 0..n {
+        let pos = i as f32 * ratio;
+        let i0 = pos.floor() as usize;
+        let frac = pos - i0 as f32;
+        let a = input.get(i0).copied().unwrap_or(0.0);
+        let b = input.get(i0.saturating_add(1)).copied().unwrap_or(a);
+        out.push(a + (b - a) * frac);
+    }
+    out
 }
 
 /// Which backend produced (or would produce) speech.
@@ -824,6 +853,38 @@ mod tests {
         assert!((quiet[1920] - 0.8).abs() < 1.0e-5);
     }
 
+    #[test]
+    fn pitch_shift_changes_length_without_touching_a_zero_shift() {
+        let rate = 24_000u32;
+        let n = rate as usize;
+        let tone = | | -> Vec<f32> {
+            (0..n)
+                .map(|i| (2.0 * std::f32::consts::PI * 200.0 * i as f32 / rate as f32).sin())
+                .collect()
+        };
+        let mut same = tone();
+        apply_frame_prosody(&mut same, rate, FrameProsody { pitch_st: 0.0, ..FrameProsody::identity() });
+        assert_eq!(same.len(), n);
+        // Pitch is clamped to ±4 st, so +12 st is the same resample as +4 st.
+        let mut up = tone();
+        apply_frame_prosody(&mut up, rate, FrameProsody { pitch_st: 4.0, ..FrameProsody::identity() });
+        let expect = ((n as f32) / (4.0f32 / 12.0).exp2()).floor() as i32;
+        assert!((up.len() as i32 - expect).abs() <= 2, "len {} expect {expect}", up.len());
+        assert!(up.len() < n);
+        let mut clamped = tone();
+        apply_frame_prosody(&mut clamped, rate, FrameProsody { pitch_st: 12.0, ..FrameProsody::identity() });
+        assert_eq!(clamped.len(), up.len());
+        let mut down = tone();
+        apply_frame_prosody(&mut down, rate, FrameProsody { pitch_st: -0.5, energy: 0.8, pre_pause_ms: 250, ..FrameProsody::identity() });
+        let lead = 24_000 * 250 / 1000;
+        assert!(down.len() > n, "lower pitch plus pause should lengthen, len {}", down.len());
+        assert!(down[..lead].iter().all(|s| s.abs() < 1.0e-6));
+        let speech = &down[lead..];
+        let rms = (speech.iter().map(|s| s * s).sum::<f32>() / speech.len() as f32).sqrt();
+        assert!(rms < 0.75, "energy 0.8 should sit under a full sine, rms {rms}");
+        assert!(rms > 0.4, "energy 0.8 should still be audible, rms {rms}");
+    }
+
     #[test] fn resample_len_and_identity() {
         let x: Vec<f32> = (0..1600).map(|i| (i as f32 * 0.01).sin()).collect();
         assert_eq!(resample(&x, 16_000, 24_000).len(), 2400);
@@ -1050,18 +1111,51 @@ mod tests {
 
     #[test]
     fn landed_clone_is_compiled_before_the_stack_plays_it() {
+        match std::process::Command::new("python3").arg("-c").arg("pass").status() {
+            Ok(status) if status.success() => {}
+            Ok(status) => panic!(
+                "compile-then-play BLOCKED: python3 exited {status}. The packet compiler is in-process Rust, not a gqvoice executable on PATH."
+            ),
+            Err(err) => panic!(
+                "compile-then-play BLOCKED: python3 is not on PATH ({err}). The packet compiler is in-process Rust, not a gqvoice executable on PATH."
+            ),
+        }
         let dir = std::env::temp_dir().join(format!("galion-gqvoice-stack-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
+        // Empty root: no wav, no voice TOML. Lookup is the CI absent path.
+        // An unallowlisted file at the repo pin must not fall through to Flite
+        // and then fail as "gqvoice: No such file or directory".
+        let ref_root = dir.join("ref-root");
+        std::fs::create_dir_all(&ref_root).unwrap();
+        let voices = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../voices/gq");
+        let voices_before = std::fs::read_dir(&voices).map(|rd| rd.count()).unwrap_or(0);
         let script = dir.join("fake-clone.py");
         std::fs::write(&script, FAKE_CLONE).unwrap();
-        let worker =
-            clone_worker::CloneWorker::spawn_for_test(&script, clone_worker::CloneModel::Nano, "samantha");
+        let worker = clone_worker::CloneWorker::spawn_for_test(
+            &script,
+            clone_worker::CloneModel::Nano,
+            "samantha",
+        )
+        .with_ref_root(ref_root.clone());
         let mut stack =
             SpeechStack::from_clone(clone_worker::CloneTts::for_test(worker, dir.clone()));
-        let both = stack.speak("Hello! Go.").unwrap();
+        let both = stack.speak("Hello! Go.").unwrap_or_else(|err| {
+            panic!(
+                "compile-then-play BLOCKED: clone utterance did not compile ({err}). The packet compiler is in-process Rust, not a gqvoice executable on PATH."
+            )
+        });
+        assert!(
+            matches!(stack.backend, SpeechBackend::Clone { .. }),
+            "compile-then-play BLOCKED: clone slot fell back to {} ({}); no packet was compiled",
+            stack.reported().0,
+            stack.reported().1
+        );
         let path = dir.join("samantha.gqvoice");
-        let packet = gqvoice::GqVoice::open(&path).unwrap();
+        let packet = gqvoice::GqVoice::open(&path).unwrap_or_else(|err| {
+            panic!("compile-then-play BLOCKED: {err}")
+        });
+        assert_eq!(path.parent(), Some(dir.as_path()));
         assert_eq!(packet.persona_name(), "samantha");
         assert_eq!(packet.model_name(), "nano");
         assert!(packet.as_bytes().starts_with(&gqvoice::MAGIC));
@@ -1090,17 +1184,38 @@ mod tests {
 
         let jdir = dir.join("jarvis");
         std::fs::create_dir_all(&jdir).unwrap();
-        let jworker =
-            clone_worker::CloneWorker::spawn_for_test(&script, clone_worker::CloneModel::Turbo, "jarvis");
+        let jworker = clone_worker::CloneWorker::spawn_for_test(
+            &script,
+            clone_worker::CloneModel::Turbo,
+            "jarvis",
+        )
+        .with_ref_root(ref_root);
         let mut jarvis =
             SpeechStack::from_clone(clone_worker::CloneTts::for_test(jworker, jdir.clone()));
-        let tone = jarvis.speak("Systems ready.").unwrap();
+        let tone = jarvis.speak("Systems ready.").unwrap_or_else(|err| {
+            panic!(
+                "compile-then-play BLOCKED: jarvis utterance did not compile ({err}). The packet compiler is in-process Rust, not a gqvoice executable on PATH."
+            )
+        });
+        assert!(
+            matches!(jarvis.backend, SpeechBackend::Clone { .. }),
+            "compile-then-play BLOCKED: jarvis slot fell back to {} ({})",
+            jarvis.reported().0,
+            jarvis.reported().1
+        );
         let jpath = jdir.join("jarvis.gqvoice");
-        let jpacket = gqvoice::GqVoice::open(&jpath).unwrap();
+        let jpacket = gqvoice::GqVoice::open(&jpath).unwrap_or_else(|err| {
+            panic!("compile-then-play BLOCKED: {err}")
+        });
         assert_eq!(jpacket.persona_name(), "jarvis");
         assert_eq!(jpacket.model_name(), "turbo");
         assert_eq!(tone.samples, jpacket.to_audio().samples);
         assert!(!jdir.join("samantha.gqvoice").exists());
+        let voices_after = std::fs::read_dir(&voices).map(|rd| rd.count()).unwrap_or(0);
+        assert_eq!(
+            voices_before, voices_after,
+            "compile-then-play wrote a packet under voices/gq"
+        );
         drop(stack);
         drop(jarvis);
         let _ = std::fs::remove_dir_all(&dir);

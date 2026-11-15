@@ -165,7 +165,7 @@ scripts/check-phone-pipeline.sh
 
 ### Clone worker and TTFA
 
-The worker is a long-lived child: one JSON line in, 24 kHz s16le out. The script in tree does not import torch and does not call generate until a later wiring lands. Fetch of the pinned weights is explicit:
+The worker is a long-lived child: one JSON line in, 24 kHz s16le out. Torch is not imported at module level. Nano `generate` runs only when `GALION_CLONE_LOCAL_REFS=1`, the wav sha256 is an uncommented row in `scripts/clone/REFS.sha256`, and torch, chatterbox, and the pinned tokenizer are on that machine. Otherwise the child is `galion-clone-absent` (no weights) or `galion-clone-unwired` (weights present, local-refs gate closed). A commented t273 original at the gitignored path is not an uncommented pin, so the child exits 3 (`galion-clone-refuse`) and the file stays on disk. Fetch of the pinned weights is explicit:
 
 ```bash
 GALION_CLONE_FETCH=1 scripts/clone/fetch-clone-weights.sh

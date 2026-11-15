@@ -26,6 +26,8 @@ full = ["terminal", "window", "web"]
 galion-cascade = { path = "../crates/galion-cascade", default-features = false }
 # Std-only, zero deps. Clone-time consent verdicts; the floor reads them in memory.
 galion-consent = { path = "../crates/galion-consent" }
+# Std-only, zero deps. Feeling-band OKLCH for a sensed /v2/say turn.
+galion-emotion = { path = "../galion-emotion" }
 
 [[example]]
 name = "demo"

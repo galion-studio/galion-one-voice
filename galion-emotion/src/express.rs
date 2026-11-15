@@ -164,6 +164,13 @@ impl Oklch {
         Self { l: lab[0], c, h }
     }
 
+    /// Decision colour at empathy weight `e`. `0` is [`NEUTRAL_OKLCH`]. `1` is [`EMPATHY_OKLCH`].
+    /// This is the feeling-band wash decision. It is not paint on the locked circle.
+    pub fn empathy_at(e: f32) -> Self {
+        let e = if e.is_finite() { e.clamp(0.0, 1.0) } else { 0.0 };
+        NEUTRAL_OKLCH.lerp_lab(EMPATHY_OKLCH, e)
+    }
+
     fn lerp_lab(self, other: Self, t: f32) -> Self {
         let t = if t.is_finite() { t.clamp(0.0, 1.0) } else { 0.0 };
         if t == 0.0 {
@@ -295,6 +302,21 @@ mod tests {
         assert!(tgt.valence >= 0.7 && tgt.arousal >= 0.6);
         let ctrl = p.plan(&tgt);
         assert!(ctrl.pitch_shift_st > 0.0 && ctrl.rate > 1.0);
+    }
+
+    #[test]
+    fn empathy_colour_is_neutral_at_rest_and_heather_at_full() {
+        let rest = Oklch::empathy_at(0.0);
+        assert!((rest.l - NEUTRAL_OKLCH.l).abs() < 1e-6);
+        assert!((rest.c - NEUTRAL_OKLCH.c).abs() < 1e-6);
+        assert!((rest.h - NEUTRAL_OKLCH.h).abs() < 1e-4);
+        let full = Oklch::empathy_at(1.0);
+        assert!((full.l - EMPATHY_OKLCH.l).abs() < 1e-6);
+        assert!((full.c - EMPATHY_OKLCH.c).abs() < 1e-6);
+        assert!((full.h - EMPATHY_OKLCH.h).abs() < 1e-4);
+        let mid = Oklch::empathy_at(0.5);
+        assert!(mid.l < rest.l && mid.l > full.l);
+        assert!((Oklch::empathy_at(f32::NAN).l - rest.l).abs() < 1e-6);
     }
 
     #[test]

@@ -55,11 +55,26 @@ impl PiperProsody {
     }
 
     /// V2-S6 prosody hook. `Neutral` (phone default, consent deny) returns `self`.
-    /// Non-neutral is not applied: a later consent-gated caller can change
-    /// `length_scale` here without swapping the voice pack.
+    ///
+    /// Empathy labels use the Samantha high-`e` column already in
+    /// `samantha.toml`: rate `0.92` becomes Piper `length_scale` `1.09`
+    /// (`1/0.92`, two decimals) and `pre_pause_ms` `250` becomes
+    /// `sentence_silence` `0.25`. Noise scales stay. The voice pack is not
+    /// selected here. Joy and other non-empathy labels stay on `self`,
+    /// matching `empathy_weight` (those labels do not raise `e`).
+    ///
+    /// This does not respawn a warm worker. Piper reads the scales at spawn.
+    /// A sensed `/v2/say` applies pitch, loudness, and pause on the PCM of
+    /// the mouth already running.
     pub fn with_emotion(&self, emotion: &str) -> Self {
-        match emotion.trim() {
-            "Neutral" | "neutral" | "" => self.clone(),
+        match emotion.trim().to_ascii_lowercase().as_str() {
+            "neutral" | "" => self.clone(),
+            "sad" | "tired" | "anxious" | "angry" | "grief" | "vulnerability" => {
+                let mut out = self.clone();
+                out.length_scale = "1.09".into();
+                out.sentence_silence = "0.25".into();
+                out
+            }
             _ => self.clone(),
         }
     }
@@ -495,8 +510,16 @@ mod tests {
         assert_eq!(p.with_emotion("Neutral"), p);
         assert_eq!(p.with_emotion("neutral"), p);
         assert_eq!(p.with_emotion(""), p);
+        assert_eq!(p.with_emotion("joy"), p);
         // Voice identity is not a prosody field.
         assert!(p.length_scale == "1.0" || p.length_scale == "1");
+        let grief = p.with_emotion("grief");
+        assert_eq!(grief.length_scale, "1.09");
+        assert_eq!(grief.sentence_silence, "0.25");
+        assert_eq!(grief.noise_scale, p.noise_scale);
+        assert_eq!(grief.noise_w, p.noise_w);
+        assert_ne!(grief.length_scale, p.with_emotion("Neutral").length_scale);
+        assert_eq!(p.with_emotion("Sad").length_scale, "1.09");
     }
 
     #[test]
