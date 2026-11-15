@@ -171,13 +171,7 @@ test("desktop /one is one dot in idle and listening", async ({ page }) => {
   await expect(page).toHaveTitle("Galion One");
   await expect(page.locator("canvas")).toHaveCount(1);
   await expect(page.locator("#s")).toHaveAttribute("data-mark", "orb");
-  await expect(page.locator("#s")).toHaveAttribute("data-persona", "samantha");
-  await expect(page.locator("#s")).toHaveAttribute("data-mouth", "piper");
-  await page.request.post("/__state", { data: { persona: "jarvis" } });
-  await expect(page.locator("#s")).toHaveAttribute("data-persona", "jarvis");
-  await expect(page.locator("#s")).toHaveAttribute("data-mouth", "piper");
-  await page.request.post("/__state", { data: { persona: "galion" } });
-  await expect(page.locator("#s")).toHaveAttribute("data-persona", "samantha");
+  await expect(page.locator("#s")).toHaveAttribute("data-persona", "galion");
   await expect(page.locator("#decide")).toBeHidden();
   const bg = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
   expect(bg).toBe("rgb(10, 10, 12)");

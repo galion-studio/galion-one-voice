@@ -1,32 +1,24 @@
 # Swarm 10 — persona-v2v one-dot (C2)
 
 Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
-Written 2026-11-15 22:10 +01:00 (Europe/Zagreb).
+Written 2026-11-15 22:10 +01:00 (Europe/Zagreb). Persona edit removed 2026-11-15 22:12 +01:00.
 
 The spelling is **Galion**. The product is Galion Voice. Owner: Maciej Grajczyk.
 
 Role: one-dot. Item C2. Lane plan: pull request [#150](https://github.com/galion-studio/galion-one-voice/pull/150) (`cursor/persona-v2v-plan-6a84`). This seat did not edit that plan, `LOCKS.toml`, `SOUL.md`, `config.yaml`, or any other open draft.
 
-Base: `origin/main` `8980e1a9b4214806dd62cfccf6e2aaf093ed86b0`.
+Base after the plan merge: `origin/main` `107a11f3a5af7e9adb4b3213e458e1c68cc6b2aa` (pull request #150). The first commit on this branch was `8980e1a`.
 Host of the commands below: this cloud VM, Linux 6.12.113+, 4 CPUs, `rustc 1.85.0 (4d91de4e4 2025-02-17)`. RAM was not measured. This is not the NEXT-ITERATION host named in the backlog. Loopback only (`127.0.0.1`). No deploy.
 
 ## What changed
 
-`/one` used to set `data-persona` to the product page name inside `productIsOne()`. The canvas markup was already `data-persona="samantha"` and `data-mouth="piper"`.
+`scripts/run-v1-screen.sh --check` runs the existing synthetic room script in that same process, checks that `/dot` `t_ms` moves, that a speaking sample has `state` speaking and that a non-speaking sample is in the same poll, and waits for `workflow proceed source=mic program=phone-turn` after `POST /turn` with `X-Galion-Proceed: auto`. It prints the first `phone reply` log line so the mouth backend is visible. The hour-long serve without `--check` stays idle until a mic or typed turn. `PhoneHost` prints that proceed line. No second panel.
 
-`shownPersona` keeps Jarvis when the floor says Jarvis, and keeps Samantha for every other label, including the product page name. On `/one` the title stays **Galion One**, the canvas persona is Samantha, and `data-mouth` stays `piper`. No new element was added. The 432 Hz tones and the decide box are unchanged. `productIsOne()` still gates those tones.
+## `/one` persona is not in this pull request
 
-`scripts/run-v1-screen.sh --check` now runs the existing synthetic room script in that same process, checks that `/dot` `t_ms` moves, that a speaking sample has `state` speaking and that a non-speaking sample is in the same poll, checks the served `/one` HTML, and waits for `workflow proceed source=mic program=phone-turn` after `POST /turn` with `X-Galion-Proceed: auto`. It prints the first `phone reply` log line so the mouth backend is visible. The hour-long serve without `--check` stays idle until a mic or typed turn.
+The first commit on this branch also changed `v1-screen.html`, `dotviz.rs`, and `e2e/one/one.spec.js` so `/one` kept `data-persona="samantha"`. The swarm lead said that change lives in one place only: [#156](https://github.com/galion-studio/galion-one-voice/pull/156). Those three files are restored to `main` here. The `--check` lines that failed on `dataset.persona="galion"` and required `shownPersona` are removed. [#156](https://github.com/galion-studio/galion-one-voice/pull/156) stays the owner-flagged candidate. It does not merge without Maciej's explicit yes, and neither does any other copy of that edit.
 
-## Flag for Maciej — not a settled product-voice ruling
-
-[#150](https://github.com/galion-studio/galion-one-voice/pull/150) says this persona edit is a candidate and that workers do not own it. The launch instruction for this seat said to include the small tested change and to flag it. It is in this pull request for that reason.
-
-`docs/galion-voice-v2/symphony/PERSONA.md` says Galion One is the product voice, Samantha is test/internal, and presenting a test voice as the product is FAIL. This change does not rename the page title. It does set the canvas persona attribute on `/one` to Samantha, with the mouth attribute `piper`, because the owner instruction for Voice V2 is Piper plus the Samantha persona until a clone mouth is actually live.
-
-Merging that attribute is Maciej's decision. This seat does not merge.
-
-On this VM the Piper pack is **absent** (`weights/tts/en_US-ljspeech-medium.onnx` absent, `weights/runtime/piper/piper` absent). The one `phone reply` line in the self-test was Flite. That is not Piper, and it is not a clone of the original Samantha. The canvas attribute `data-mouth="piper"` is the labelled default. It is not a claim that this run's audio was Piper.
+On the 22:10 +01:00 host the Piper pack was **absent**. The `phone reply` line in that run was Flite (`backend=system-flite`). That is not Piper, and it is not a clone. The markup `data-mouth="piper"` on `/` is the page default. It is not a claim that the self-test audio was Piper.
 
 ## Checks on this host
 
@@ -39,9 +31,9 @@ On this VM the Piper pack is **absent** (`weights/tts/en_US-ljspeech-medium.onnx
 
 `cargo test -p galion-render --features web --lib page_shares_the_lattice_and_the_hold`: **1 passed**, exit 0.
 
-`npx playwright test` in `e2e/one` (Chromium, Playwright 1.56.1): **12 passed**, exit 0. The desktop `/one` test expects `data-persona="samantha"` and `data-mouth="piper"`, then Jarvis from `/__state`, then the product-page label falls back to Samantha.
+`npx playwright test` in `e2e/one` (Chromium, Playwright 1.56.1): **12 passed**, exit 0, on the head that still expected `data-persona="samantha"` after the persona edit. That assertion is no longer in this pull request. The re-run of `one.spec.js` against the restored page is quoted with the second `--check` below.
 
-`scripts/run-v1-screen.sh --check` (2026-11-15 22:10 +01:00), exit 0. Vosk model absent at `weights/asr/vosk-model-small-en-us-0.15`. Quoted output:
+`scripts/run-v1-screen.sh --check` (2026-11-15 22:10 +01:00), exit 0, on the head that still contained the `/one` persona check. Vosk model absent at `weights/asr/vosk-model-small-en-us-0.15`. Quoted output from that earlier head:
 
 ```text
 mic ASR: Vosk model missing at weights/asr/vosk-model-small-en-us-0.15
@@ -66,6 +58,32 @@ Galion Voice · one dot → http://127.0.0.1:7878/
 
 The absolute model path in the real stdout was the repo `weights/asr/...` path. No server address other than loopback was printed.
 
+After those three files were restored to `main`, the same script was run again on this VM (host `cursor`, rustc 1.85.0, started 2026-11-15 22:12 +01:00, wall 16 s), exit 0:
+
+```text
+mic ASR: Vosk model missing at /agent/repos/galion-one-voice/weights/asr/vosk-model-small-en-us-0.15
+  typed text still works. Mic turns return an error and do not invent a transcript.
+Galion Voice · one dot → http://127.0.0.1:7878/
+  / : one canvas page OK (38661 bytes)
+  / : persona, mic page, orb OK
+  /v2 : redirect OK
+  /v2/state : rights hold OK
+  POST /v2/say : no gateway, plain unreachable, no canned empathy
+  /dot samples: 150 modes: idle listening rika speaking
+  /dot : t_ms 2080 -> 13760
+  /dot : speak wins (state speaking, and a non-speaking sample)
+  POST /mic 204 OK
+  OPTIONS /turn 204 OK
+  POST /turn 202 OK
+  workflow hook: proceed source=mic program=phone-turn
+  mouth log: phone reply id=1 asr=text-inject backend=system-flite audio_ms=1680 in_ms=0 took_ms=38 err=-
+  security headers OK
+```
+
+There is no `/one` persona line in that output. The page still flips `data-persona` to `galion` on `/one`. That flip is only in [#156](https://github.com/galion-studio/galion-one-voice/pull/156).
+
+Same command, `cargo +1.85.0 test -p galion-console --features phone-turn --lib screen_page_is_phone_path_and_v2_orb`: 1 passed, exit 0. `npx playwright test one.spec.js` in `e2e/one`: 3 passed, exit 0, including idle `/one` with the restored `data-persona="galion"` expectation. The other nine Playwright specs were not re-run in this pass.
+
 Same run, from `target/v1-screen/dot-samples.jsonl` (not committed): 150 samples, `t_ms` 2160 to 13760, `engine.frames` 28 to 173, every `persona` was `samantha`, modes `idle` `listening` `rika` `speaking`, every speaking sample had `state` `speaking`. One speaking sample: `t_ms` 2320, mode speaking, state speaking, persona samantha, `engine.frames` 30. One other sample: `t_ms` 2160, mode listening, state listening, persona samantha, `engine.frames` 28.
 
 The heartbeat log for that process also contained `synthetic room/you/me script on` and `workflow proceed source=mic program=phone-turn`.
@@ -80,8 +98,8 @@ At the time this note was written, checks on the pull-request head had not been 
 
 ## Open questions for Maciej
 
-1. Keep `data-persona="samantha"` and `data-mouth="piper"` on `/one`, or put the product-page name back on the canvas. PERSONA.md still calls Samantha a test voice.
-2. This VM had no Piper pack, so the spoken reply in the self-test was Flite. The Titan default (Piper plus Samantha) was not re-measured here.
+1. [#156](https://github.com/galion-studio/galion-one-voice/pull/156) is the only open copy of the `/one` Samantha default. PERSONA.md still calls Samantha a test voice. It does not merge without an explicit yes.
+2. The 22:10 self-test reply was Flite because the Piper pack was absent on that VM. The Titan default (Piper plus Samantha) was not re-measured here.
 3. A0 (t273 versus t623u) is unchanged. This seat did not edit locks or `REFS.sha256`.
 
 — Maciej Grajczyk
