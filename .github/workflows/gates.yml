@@ -17,6 +17,13 @@ jobs:
         run: scripts/check-locks.sh
       - name: Forbidden formats and runtimes
         run: scripts/check-no-forbidden.sh
+      - name: Release manifest and stage unit label
+        run: |
+          if ! command -v jq >/dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y jq
+          fi
+          scripts/deploy/write-release-manifest.test.sh
       - name: Workspace tests
         run: cargo test --workspace
       - name: Emotion V2 reference checker

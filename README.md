@@ -150,6 +150,7 @@ Pins are `scripts/clone/PINS.sha256`. Public-demo gates in `docs/galion-voice-v2
 - [Persona](docs/galion-voice-v2/symphony/PERSONA.md)
 - [Presence eval](docs/eval/PRESENCE-EVAL.md)
 - [LEDGER](LEDGER.md)
+- [Releases](docs/RELEASES.md)
 
 ## Licence
 

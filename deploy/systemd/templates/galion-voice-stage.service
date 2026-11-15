@@ -1,0 +1,33 @@
+# Galion Voice — Perpetual Open MIT License
+# Copyright (c) 2026 Maciej Grajczyk.
+# G.A.L.I.O.N. — General Autonomous Local Intelligence Open Network
+# Developed and distributed by Galion Labs
+# Perpetual Open MIT License
+# Copyright © 2026 Galion Labs. All rights reserved.
+#
+# Stage unit template. Not installed. Nothing in this file is a commit hash.
+# The drop-in override sets Description and GALION_RELEASE_SHA.
+# Render it with scripts/deploy/render-stage-unit.sh.
+# ExecStart matches scripts/run-v1-screen.sh (dot_console_demo, loopback, 3600 s).
+# MemoryMax is the Titanaxe draft cap. STAGING-CPU says the human raises it at install.
+[Unit]
+Description=Galion Voice stage
+After=network.target
+
+[Service]
+Type=simple
+User=galion
+ExecStart=/opt/galion/voice/release/current/dot_console_demo --headless --realtime --no-png --web 127.0.0.1:7878 --seconds 3600
+WorkingDirectory=/opt/galion/voice/release/current
+Restart=always
+MemoryMax=256M
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/opt/galion/voice
+IPAddressDeny=any
+IPAddressAllow=localhost
+
+[Install]
+WantedBy=multi-user.target
