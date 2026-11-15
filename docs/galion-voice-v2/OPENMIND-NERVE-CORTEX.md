@@ -231,7 +231,9 @@ A fallback from relay to student stores code 772 (relay in the high
 byte, student in the low byte). The JSON also names `from` and `to`, so a
 reader does not have to decode the number. The student in this repository is still the silent stub in
 `galion-student-backend`. This seam does not load weights and does not
-replace `CannedLlm`.
+replace `CannedLlm`. A later turn can repeat an exact line from a local
+store the operator already placed (section 11). That line is the stored
+text. It is not a student generation and it is not a thought trace.
 
 ## 8. Dependency and consume path
 
@@ -267,11 +269,17 @@ crates). No new lock value. `LOCKS.toml` was not edited.
 * It does not ask `gaia-cortex` to restart a unit.
 * It does not synthesize filler audio. Timeout and unreachable are
   `NoKnowledge`. The local reply path is the filler.
+* It does not invent a memory or a thought trace when the store or the
+  student `.gq` is absent. The turn seam names the missing piece and the
+  phone lane keeps its own reply.
+* It does not create `/opt/galion/openmind` and it does not write under
+  that prefix.
 
 ## 10. Check
 
 ```bash
 cargo test -p galion-openmind
+cargo test -p galion-console --features phone-turn --lib turn_worker::tests::openmind_seam_blocks_when_the_store_is_missing_and_witnesses_when_it_exists
 scripts/check-locks.sh
 scripts/check-no-forbidden.sh
 ```
@@ -279,6 +287,39 @@ scripts/check-no-forbidden.sh
 `note` under a stuck worker returns in well under one 80 ms frame.
 `offer` does the same. A URL of `http://10.1.2.3:8670` is refused and
 still leaves `voice.frame_miss` in the local ring.
+
+## 11. Turn seam: local store and student file
+
+`crates/galion-openmind/src/seam.rs` (`TurnSeam`) is the check a voice
+turn may run at a turn boundary. The phone worker calls it only when
+`GALION_OPENMIND_SEAM` is `1`, `true`, `on`, or `yes`. The 80 ms loop
+does not call it. Hermes is not called from it. `CortexHandoff` stays
+the only side-band offer.
+
+| Env | Meaning |
+|---|---|
+| `GALION_OPENMIND_STORE` | An existing file, or an existing directory. Missing paths are not created. A directory uses `turns.jsonl` inside it. |
+| `GALION_STUDENT_GQ` | An existing non-empty file whose name ends in `.gq`. The bytes are not loaded. |
+| `GALION_OPENMIND_REMEMBER` | `1` / `true` / `on` / `yes` grants `remember` for this file. Unset is deny. Deny does not write and does not return stored text. |
+
+A line is `v1`, a turn id, the role `user` or `voice`, and the text,
+separated by tabs. A later `consult` returns that text unchanged when
+the turn id is earlier and `remember` is granted. A malformed line is
+skipped. It is not repaired into a memory.
+
+The path is `present` only when both the store and the `.gq` file are
+on disk. Otherwise it is `blocked` and the missing piece is `store`,
+`weights`, or `store+weights`. The spoken fallback label is `canned`,
+or `unreachable` when the phone lane was already set to Hermes. This
+crate does not synthesize either sentence. The Open Mind memory server
+(C6, port 8420) is still not this file.
+
+`/opt/galion/openmind` is not created. A write whose path is that
+prefix is refused. A read of a file a human already placed there is
+allowed and does not add a file.
+
+On a machine with no store and no `.gq`, the decision is blocked.
+That is the result. It is not a pass, and it is not a made-up recall.
 
 — Maciej Grajczyk
 

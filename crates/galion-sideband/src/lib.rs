@@ -2,8 +2,10 @@
 //!
 //! Types-only contract between the duplex student (owns turns + speech) and
 //! Hermes (owns knowledge + actions), per V3 §C.3 and the MoshiRAG side-stream
-//! pattern. No I/O, no transport. Gateway choice is open decision C5;
-//! memory surface is open decision C6.
+//! pattern. No I/O, no transport. Gateway choice is open decision C5.
+//! The Open Mind memory server (C6) is still open. A voice turn may read a
+//! local store file through `galion-openmind`'s turn seam when that file
+//! already exists. A missing store is blocked there, and it is not a memory.
 //!
 //! The voice engine offers `Turn`, `Intent`, and `Affect` through
 //! `galion-openmind::CortexHandoff`, which only `try_send`s onto

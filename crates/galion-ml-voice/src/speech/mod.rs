@@ -76,10 +76,13 @@ pub use weights::A21RingFeed;
 /// Output rate of every speech backend (Mimi-class 24 kHz lane bus).
 pub const SPEECH_RATE: u32 = crate::stub::SAMPLE_RATE;
 
-/// Numeric prosody from one 80 ms `galion-emotion` decision.
+/// Numeric prosody from one 80 ms `galion-emotion` decision, or from a
+/// sensed `/v2/say` persona column.
 ///
 /// There is no emotion name on this struct. Identity leaves the PCM alone.
-/// [`apply_frame_prosody`] uses `pre_pause_ms` and `energy` only.
+/// [`apply_frame_prosody`] uses `energy`, `pitch_st`, and `pre_pause_ms`.
+/// `rate` is stored and is not a time-stretch: Piper reads `length_scale`
+/// once at spawn, and this function does not respawn the worker.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct FrameProsody {
     pub pitch_st: f32,
@@ -126,13 +129,23 @@ fn finite(x: f32, fallback: f32) -> f32 {
     if x.is_finite() { x } else { fallback }
 }
 
-/// Prepend silence and scale loudness. Pitch and rate are not rewritten here.
+/// Scale loudness, resample pitch, then prepend silence.
+///
+/// Pitch is a linear resample by `2^(st/12)`, the same ratio as
+/// [`crate::emotive::EmotiveShaper`]. Formants move with the pitch. A lower
+/// pitch lengthens the buffer. `rate` is not applied here.
 pub fn apply_frame_prosody(samples: &mut Vec<f32>, rate: u32, prosody: FrameProsody) {
     let prosody = prosody.clamped();
     let energy = prosody.energy;
     if (energy - 1.0).abs() > 1.0e-4 {
         for s in samples.iter_mut() {
             *s = (*s * energy).clamp(-1.0, 1.0);
+        }
+    }
+    if samples.len() > 1 && prosody.pitch_st.abs() > 1.0e-4 {
+        let ratio = (prosody.pitch_st / 12.0).exp2();
+        if ratio.is_finite() && (ratio - 1.0).abs() > 1.0e-4 {
+            *samples = pitch_resample(samples, ratio);
         }
     }
     if prosody.pre_pause_ms == 0 || rate == 0 {
@@ -145,6 +158,22 @@ pub fn apply_frame_prosody(samples: &mut Vec<f32>, rate: u32, prosody: FramePros
     let mut out = vec![0.0; n];
     out.append(samples);
     *samples = out;
+}
+
+/// Read `input` at `i * ratio`. `ratio > 1` raises pitch and shortens the buffer.
+fn pitch_resample(input: &[f32], ratio: f32) -> Vec<f32> {
+    let n = ((input.len() as f32) / ratio).floor() as usize;
+    let n = n.max(1);
+    let mut out = Vec::with_capacity(n);
+    for i in 0..n {
+        let pos = i as f32 * ratio;
+        let i0 = pos.floor() as usize;
+        let frac = pos - i0 as f32;
+        let a = input.get(i0).copied().unwrap_or(0.0);
+        let b = input.get(i0.saturating_add(1)).copied().unwrap_or(a);
+        out.push(a + (b - a) * frac);
+    }
+    out
 }
 
 /// Which backend produced (or would produce) speech.
@@ -822,6 +851,38 @@ mod tests {
         assert_eq!(quiet.len(), 1 + 24_000 * 80 / 1000);
         assert!(quiet[..1920].iter().all(|s| *s == 0.0));
         assert!((quiet[1920] - 0.8).abs() < 1.0e-5);
+    }
+
+    #[test]
+    fn pitch_shift_changes_length_without_touching_a_zero_shift() {
+        let rate = 24_000u32;
+        let n = rate as usize;
+        let tone = | | -> Vec<f32> {
+            (0..n)
+                .map(|i| (2.0 * std::f32::consts::PI * 200.0 * i as f32 / rate as f32).sin())
+                .collect()
+        };
+        let mut same = tone();
+        apply_frame_prosody(&mut same, rate, FrameProsody { pitch_st: 0.0, ..FrameProsody::identity() });
+        assert_eq!(same.len(), n);
+        // Pitch is clamped to ±4 st, so +12 st is the same resample as +4 st.
+        let mut up = tone();
+        apply_frame_prosody(&mut up, rate, FrameProsody { pitch_st: 4.0, ..FrameProsody::identity() });
+        let expect = ((n as f32) / (4.0f32 / 12.0).exp2()).floor() as i32;
+        assert!((up.len() as i32 - expect).abs() <= 2, "len {} expect {expect}", up.len());
+        assert!(up.len() < n);
+        let mut clamped = tone();
+        apply_frame_prosody(&mut clamped, rate, FrameProsody { pitch_st: 12.0, ..FrameProsody::identity() });
+        assert_eq!(clamped.len(), up.len());
+        let mut down = tone();
+        apply_frame_prosody(&mut down, rate, FrameProsody { pitch_st: -0.5, energy: 0.8, pre_pause_ms: 250, ..FrameProsody::identity() });
+        let lead = 24_000 * 250 / 1000;
+        assert!(down.len() > n, "lower pitch plus pause should lengthen, len {}", down.len());
+        assert!(down[..lead].iter().all(|s| s.abs() < 1.0e-6));
+        let speech = &down[lead..];
+        let rms = (speech.iter().map(|s| s * s).sum::<f32>() / speech.len() as f32).sqrt();
+        assert!(rms < 0.75, "energy 0.8 should sit under a full sine, rms {rms}");
+        assert!(rms > 0.4, "energy 0.8 should still be audible, rms {rms}");
     }
 
     #[test] fn resample_len_and_identity() {
