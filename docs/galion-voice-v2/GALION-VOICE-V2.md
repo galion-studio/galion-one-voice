@@ -95,16 +95,18 @@ phonemizer) is waiting on counsel. Flite is the fallback. Tones are not a reply.
 transcript, reply text, 24 kHz WAV out. `GALION_ASR` unset means stub
 (fixtures decode, real speech returns `AsrUnratified`). `GALION_ASR=vosk`
 runs the out-of-process worker (`docs/asr/VOSK.md`). `GALION_ASR=interim`
-does not select the length-bucket placeholder. `GALION_LLM` defaults to
-`CannedLlm` on this lane. `TurnWorker` in `galion-console` (feature
+does not select the length-bucket placeholder. `GALION_LLM` unset or
+`hermes` is the loopback Hermes gateway on this lane. `canned` is the rule
+table. `TurnWorker` in `galion-console` (feature
 `phone-turn`) runs that lane on its own thread. `PhoneHost` polls it from
 the screen demo.
 (fixtures decode, real speech returns `AsrUnratified`). `interim` is a
 **placeholder**: canned English chosen by utterance length, labelled
-`interim-placeholder`, not recognition. `GALION_LLM` unset or `canned` is
-`CannedLlm` (explicit test opt-in). `hermes` is the loopback gateway
+`interim-placeholder`, not recognition. `GALION_LLM` unset or `hermes` is
+the loopback gateway
 (`GALION_LLM_URL`, default `http://127.0.0.1:8642/v1/chat/completions`,
-3 s cap). Unknown values error. A dead gateway says `model can't be reached`
+15 s failure ceiling, `GALION_LLM_TIMEOUT_MS`). `canned` is the rule table.
+Unknown values error. A dead gateway says `model can't be reached`
 and does not fall back to canned. `TurnWorker` in `galion-console` (feature `phone-turn`) runs
 that lane on its own thread. `PhoneHost` polls it from the screen demo.
 `WebSurface` serves `POST /mic`, `POST /turn`, `GET /reply/<id>.wav`, and
@@ -366,7 +368,8 @@ answers that before the table. `PhoneLane` passes `Emotion::Neutral` always,
 because reading affect from the caller's voice is the `sense` bit and the
 default is deny. `ProsodyEmotion` is tested and unwired. `ReplyLlm` still
 defaults to echo outside the phone lane so old fixtures keep their strings.
-The phone default stays that table. `GALION_LLM=student` is the S0 probe and
+The phone default is the loopback Hermes gateway (owner card t493s3301,
+2026-11-15). `GALION_LLM=canned` is the rule table. `GALION_LLM=student` is the S0 probe and
 is not the default. On the persona floor, `GALION_LLM=canned|inhouse|student|reflect`
 no longer speaks `galion-reflect`. It probes `weights/student/s0.gq` (or
 `GALION_STUDENT_GQ`) with `galion-tensor` `GqFile`. A missing file, a file
@@ -375,8 +378,9 @@ brain is unavailable. `"llm"` on that turn is `galion-student-blocked`.
 
 **Acceptance.**
 
-1. Phone tests: "hello how are you" → the canned well-being line, not
-   `you said: …`, unless `GALION_LLM=echo`.
+1. Phone tests with `GALION_LLM=canned`: "hello how are you" → the canned
+   well-being line, not `you said: …`. `GALION_LLM=echo` is the echo.
+   Unset is Hermes, not this table.
 2. With `sense` deny, a loud utterance does not change the reply emotion.
 3. With `sense` granted in a test only, a future wire may pass `ProsodyEmotion`
    into the lane. That test must not be the default demo.
@@ -745,7 +749,10 @@ gateway beside local models. A t197u note that named OpenRouter was replaced
 by this decision before any OpenRouter approval was kept. No secrets in the
 repo. The voice reply path calls Hermes off the 80 ms tick: std HTTP to a
 numeric loopback OpenAI chat endpoint (`crates/galion-cascade/src/hermes.rs`,
-`GALION_LLM=hermes`, 3 s cap). The side-band trait in `galion-sideband` is
+`GALION_LLM` unset or `hermes`, 15 s failure ceiling via `GALION_LLM_TIMEOUT_MS`).
+The live unit sets `Environment=GALION_LLM=hermes`
+(`deploy/systemd/templates/galion-voice-stage.service`).
+The side-band trait in `galion-sideband` is
 unchanged. Do not put a key in the tree.
 
 The hook that offers `Turn`, `Intent`, and `Affect` is

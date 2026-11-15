@@ -15,17 +15,19 @@
 #      GALION_ASR=vosk when weights/asr/vosk-model-small-en-us-0.15 is on disk,
 #      otherwise stub (typed text works; mic does not invent a transcript).
 #      GALION_ASR=interim is refused here (test-only placeholder).
-#      GALION_LLM=canned|echo|hermes · GALION_SPEECH=auto · RELEASE=1
+#      GALION_LLM=hermes|canned|echo · GALION_SPEECH=auto · RELEASE=1
 #      Model: docs/asr/VOSK.md · scripts/asr/fetch-vosk.sh
 #
 # Hermes (approved gateway, OpenAI-compatible, numeric loopback, no TLS):
+#   GALION_LLM=hermes \
 #   GALION_LLM_URL=http://127.0.0.1:8642/v1/chat/completions \
 #   GALION_LLM_MODEL=hermes-agent \
 #   GALION_LLM_KEY=... \
-#   GALION_LLM_TIMEOUT_MS=3000 \
+#   GALION_LLM_TIMEOUT_MS=15000 \
 #   scripts/run-v1-screen.sh
-# GALION_LLM defaults to hermes when GALION_LLM_URL is set and GALION_LLM is unset.
-# GALION_LLM=canned is an explicit opt-in for tests. It is not the demo default.
+# The live unit sets Environment=GALION_LLM=hermes
+# (deploy/systemd/templates/galion-voice-stage.service).
+# Unset selects the same loopback gateway. GALION_LLM=canned is the rule table.
 # If the gateway is down the spoken line is "model can't be reached".
 # That failure does not fall back to a canned reply.
 set -euo pipefail
@@ -44,8 +46,9 @@ while [[ $# -gt 0 ]]; do
 done
 URL="http://$ADDR/"
 PROFILE=(); [[ "${RELEASE:-0}" == "1" ]] && PROFILE=(--release)
-# Canned is opt-in (`GALION_LLM=canned`). A gateway URL with no mode selects Hermes.
-if [[ -z "${GALION_LLM:-}" && -n "${GALION_LLM_URL:-}" ]]; then
+# Unset selects the loopback Hermes gateway. The stage unit sets the same
+# Environment=GALION_LLM=hermes. GALION_LLM=canned is the rule table.
+if [[ -z "${GALION_LLM:-}" ]]; then
   export GALION_LLM=hermes
 fi
 

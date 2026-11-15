@@ -51,8 +51,8 @@ pub fn weight_path_from_env() -> PathBuf {
 }
 
 /// Persona-floor opt-in. Same env values that used to select `galion-reflect`,
-/// plus `student`. The phone lane does not use this function. Its default
-/// stays [`crate::CannedLlm`].
+/// plus `student`. The phone lane does not use this function. Its env default
+/// is the loopback Hermes gateway; `GALION_LLM=canned` is the rule table.
 pub fn selected_from_env() -> bool {
     matches!(
         std::env::var("GALION_LLM")

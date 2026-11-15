@@ -494,11 +494,12 @@ mod tests {
         path.on_heartbeat_frame(Some(&frame(-0.6, 0.2, 0.4, 1.0)));
         let plan = path.on_asr_final("My mother died this morning.");
         assert_eq!(plan.persona, "samantha");
-        // #23: matter content goes to Hermes; with no GALION_LLM_URL the
-        // honest unreachable line is spoken, never a canned echo.
+        // Unset GALION_LLM attaches the loopback Hermes client. This host
+        // has nothing on :8642, so the connect is refused and the spoken
+        // line is the unreachable line, never a canned echo.
         assert_eq!(plan.text, "model can't be reached");
         assert_eq!(plan.llm, "hermes-agent");
-        assert!(!plan.hermes_attached);
+        assert!(plan.hermes_attached);
         assert!(!plan.inhouse);
         assert_eq!(plan.mood, "grief");
         assert!(!plan.film_voice);

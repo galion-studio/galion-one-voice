@@ -124,7 +124,15 @@ fn pronoun_for(low: &str) -> &'static str {
 pub fn second_person(text: &str) -> String {
     let mut out: Vec<String> = Vec::new();
     let mut prev = String::new();
-    for raw in text.split_whitespace() {
+    let words: Vec<&str> = text.split_whitespace().collect();
+    for (idx, raw) in words.iter().copied().enumerate() {
+        let next_low = words
+            .get(idx + 1)
+            .map(|w| {
+                w.trim_matches(|c: char| !c.is_alphanumeric())
+                    .to_ascii_lowercase()
+            })
+            .unwrap_or_default();
         let start = raw.find(|c: char| c.is_alphanumeric()).unwrap_or(raw.len());
         let end = raw
             .rfind(|c: char| c.is_alphanumeric())
@@ -153,7 +161,10 @@ pub fn second_person(text: &str) -> String {
             "myself" => Some("yourself"),
             "am" if prev == "i" => Some("are"),
             "was" if prev == "i" => Some("were"),
-            "you" if subj_slot => Some("I"),
+            // Question inversion: "are you there" -> "am I there", not "are me there".
+            "are" if next_low == "you" => Some("am"),
+            "were" if next_low == "you" => Some("was"),
+            "you" if subj_slot || matches!(prev.as_str(), "are" | "were" | "do" | "did" | "can" | "could" | "will" | "would" | "have") => Some("I"),
             "you" => Some("me"),
             "your" => Some("my"),
             "yours" => Some("mine"),
@@ -321,6 +332,15 @@ mod tests {
         let r = reply("samantha", "I'm sorry I was late.");
         assert_eq!(r, "You're sorry you were late. Go on.");
         assert!(!contains_forbidden(&r));
+    }
+
+    #[test]
+    fn question_inversion_swaps_to_am_i() {
+        assert_eq!(
+            second_person("Hi Samantha, are you there?"),
+            "Hi Samantha, am I there?"
+        );
+        assert_eq!(second_person("Can you hear me?"), "Can I hear you?");
     }
 
     #[test]
