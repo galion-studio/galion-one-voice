@@ -24,9 +24,10 @@
 //!   GET /research, /research/ -> the Galion Research desk, same gate as /one.
 //!                      Sets `galion_research`, an HttpOnly SameSite=Strict cookie.
 //!                      `X-Galion-Research` carries the same id when there is no cookie jar.
-//!   GET /research/hermes, GET /research/history, POST /research/ask -> Hermes
-//!                      research app. The gateway key stays on the server.
-//!                      History and the ask see only this session's files.
+//!   GET /research/hermes, GET /research/history, GET /research/progress,
+//!   POST /research/ask -> Hermes research app. The gateway key stays on the server.
+//!                      History, progress, and the ask see only this session's files.
+//!                      Helper progress stays on the asking browser. `calls` is that ask's spend.
 //!                      When Hermes does not answer, `/research/ask` answers Offline
 //!                      from this session's files and notes.
 //!   POST /research/sources, GET /research/sources -> files this session attached.
@@ -717,6 +718,10 @@ struct ResearchNote {
     found: Vec<String>,
     inferred: Vec<String>,
     unknown: Vec<String>,
+    calls: u32,
+    call_budget: u32,
+    split: bool,
+    helpers: Vec<galion_cascade::hermes::ResearchHelper>,
     at: Instant,
 }
 
@@ -735,6 +740,70 @@ impl Drop for ResearchNote {
         }
         for text in &mut self.unknown {
             wipe_string(text);
+        }
+        for helper in &mut self.helpers {
+            wipe_string(&mut helper.question);
+        }
+    }
+}
+
+/// In-flight helper list for one browser. Another session cannot read it.
+struct ResearchLive {
+    phase: &'static str,
+    calls: u32,
+    call_budget: u32,
+    helpers: Vec<galion_cascade::hermes::ResearchHelper>,
+}
+
+impl ResearchLive {
+    fn idle() -> Self {
+        Self { phase: "idle", calls: 0, call_budget: 0, helpers: Vec::new() }
+    }
+}
+
+impl Drop for ResearchLive {
+    fn drop(&mut self) {
+        for helper in &mut self.helpers {
+            wipe_string(&mut helper.question);
+        }
+    }
+}
+
+/// Writes helper progress onto one session. The desk lock is not held across a Hermes call.
+struct SessionWatch {
+    desk: Arc<Mutex<ResearchDesk>>,
+    session: String,
+}
+
+impl Drop for SessionWatch {
+    fn drop(&mut self) {
+        wipe_string(&mut self.session);
+    }
+}
+
+impl galion_cascade::hermes::ResearchWatch for SessionWatch {
+    fn on_research(&self, event: &galion_cascade::hermes::ResearchEvent) {
+        let Ok(mut d) = self.desk.lock() else { return };
+        let Some(session) = d.session_mut(&self.session) else { return };
+        use galion_cascade::hermes::ResearchEvent;
+        match event {
+            ResearchEvent::Phase(p) => {
+                if *p == "planning" {
+                    session.live.helpers.clear();
+                }
+                session.live.phase = p;
+            }
+            ResearchEvent::Calls(n) => session.live.calls = *n,
+            ResearchEvent::Budget(n) => session.live.call_budget = *n,
+            ResearchEvent::Helper(i, h) => {
+                if *i >= session.live.helpers.len() {
+                    session.live.helpers.resize(
+                        *i + 1,
+                        galion_cascade::hermes::ResearchHelper { question: String::new(), status: "queued" },
+                    );
+                }
+                session.live.helpers[*i] = h.clone();
+            }
         }
     }
 }
@@ -761,6 +830,7 @@ struct ResearchSession {
     next_source: u32,
     sources: Vec<DeskSource>,
     notes: VecDeque<ResearchNote>,
+    live: ResearchLive,
     touched: Instant,
 }
 
@@ -838,6 +908,7 @@ impl ResearchDesk {
             next_source: 0,
             sources: Vec::new(),
             notes: VecDeque::new(),
+            live: ResearchLive::idle(),
             touched: now,
         });
         id
@@ -1146,11 +1217,11 @@ fn json_list(items: &[String]) -> String {
     items.iter().map(|s| galion_cascade::hermes::json_string(s)).collect::<Vec<_>>().join(",")
 }
 
-fn research_status_json(desk: &ResearchDesk, history: usize) -> String {
+fn research_status_json(desk: &ResearchDesk, history: usize, calls: u32) -> String {
     let key = desk.client.as_ref().map(|c| c.key_state()).unwrap_or("none");
     let model = desk.client.as_ref().map(|c| c.label().to_string()).unwrap_or_else(|| galion_cascade::LLM_NAME.into());
     format!(
-        "{{\"schema\":\"galion-research/1\",\"app\":\"hermes\",\"voice\":\"galion-research\",\"product\":\"galion-one\",\"model\":{},\"key\":\"{key}\",\"status\":\"{}\",\"history\":{history}}}",
+        "{{\"schema\":\"galion-research/1\",\"app\":\"hermes\",\"voice\":\"galion-research\",\"product\":\"galion-one\",\"model\":{},\"key\":\"{key}\",\"status\":\"{}\",\"calls\":{calls},\"history\":{history}}}",
         galion_cascade::hermes::json_string(&model),
         desk.gateway_status(),
     )
@@ -1164,8 +1235,41 @@ fn research_status_request(
     let Ok(mut d) = desk.lock() else { return Err(()) };
     let mut id = d.ensure(cookie_id, header_id);
     let cookie = d.cookie_line(&id);
-    let history = d.session_mut(&id).map(|s| s.notes.len()).unwrap_or(0);
-    let json = research_status_json(&d, history);
+    let (history, calls) = d.session_mut(&id).map(|s| (s.notes.len(), s.live.calls)).unwrap_or((0, 0));
+    let json = research_status_json(&d, history, calls);
+    wipe_string(&mut id);
+    Ok((json, cookie))
+}
+
+fn research_helpers_json(helpers: &[galion_cascade::hermes::ResearchHelper]) -> String {
+    helpers.iter().map(|h| {
+        format!(
+            "{{\"question\":{},\"status\":\"{}\"}}",
+            galion_cascade::hermes::json_string(&h.question),
+            h.status
+        )
+    }).collect::<Vec<_>>().join(",")
+}
+
+fn research_progress_json(live: &ResearchLive) -> String {
+    format!(
+        "{{\"schema\":\"galion-research/1\",\"app\":\"hermes\",\"phase\":\"{}\",\"calls\":{},\"call_budget\":{},\"helpers\":[{}]}}",
+        live.phase,
+        live.calls,
+        live.call_budget,
+        research_helpers_json(&live.helpers)
+    )
+}
+
+fn research_progress_request(
+    desk: &Arc<Mutex<ResearchDesk>>,
+    cookie_id: Option<&str>,
+    header_id: Option<&str>,
+) -> Result<(String, String), ()> {
+    let Ok(mut d) = desk.lock() else { return Err(()) };
+    let mut id = d.ensure(cookie_id, header_id);
+    let cookie = d.cookie_line(&id);
+    let json = d.session_mut(&id).map(|s| research_progress_json(&s.live)).unwrap_or_else(|| research_progress_json(&ResearchLive::idle()));
     wipe_string(&mut id);
     Ok((json, cookie))
 }
@@ -1175,7 +1279,7 @@ fn research_note_json(note: &ResearchNote) -> String {
         format!("{{\"n\":{n},\"text\":{}}}", galion_cascade::hermes::json_string(text))
     }).collect();
     format!(
-        "{{\"id\":{},\"status\":\"{}\",\"age_s\":{},\"question\":{},\"reply\":{},\"citations\":[{}],\"found\":[{}],\"inferred\":[{}],\"unknown\":[{}]}}",
+        "{{\"id\":{},\"status\":\"{}\",\"age_s\":{},\"question\":{},\"reply\":{},\"citations\":[{}],\"found\":[{}],\"inferred\":[{}],\"unknown\":[{}],\"calls\":{},\"call_budget\":{},\"split\":{},\"helpers\":[{}]}}",
         note.id,
         note.status,
         note.at.elapsed().as_secs(),
@@ -1184,7 +1288,11 @@ fn research_note_json(note: &ResearchNote) -> String {
         cites.join(","),
         json_list(&note.found),
         json_list(&note.inferred),
-        json_list(&note.unknown)
+        json_list(&note.unknown),
+        note.calls,
+        note.call_budget,
+        if note.split { "true" } else { "false" },
+        research_helpers_json(&note.helpers)
     )
 }
 
@@ -1230,8 +1338,10 @@ fn research_commit(
         let cookie = d.cookie_line(&session_id);
         d.status = "Running";
         d.next_id = d.next_id.saturating_add(1);
+        let call_budget = d.client.as_ref().map(|c| c.research_budget().calls).unwrap_or(0);
         let model = d.client.as_ref().map(|c| c.label().to_string()).unwrap_or_else(|| galion_cascade::LLM_NAME.into());
         let (sources, history) = d.session_mut(&session_id).map(|s| {
+            s.live = ResearchLive { phase: "planning", calls: 0, call_budget, helpers: Vec::new() };
             let sources: Vec<galion_cascade::hermes::ResearchSource> = s.sources.iter().map(|src| {
                 galion_cascade::hermes::ResearchSource {
                     id: src.id,
@@ -1250,17 +1360,31 @@ fn research_commit(
         }).unwrap_or_default();
         (d.next_id, d.client.clone(), model, sources, history, session_id, cookie)
     };
-    let turn = match client {
-        Some(c) => c.research_turn(question, &sources),
-        None => galion_cascade::hermes::ResearchAnswer {
-            text: galion_cascade::UNREACHABLE.into(),
-            citations: Vec::new(),
-            found: Vec::new(),
-            inferred: Vec::new(),
-            unknown: Vec::new(),
-            standing: "Unreachable",
+    let report = match client {
+        Some(c) => {
+            let watch = SessionWatch { desk: Arc::clone(desk), session: session_id.clone() };
+            c.research_ask_watched(question, &sources, &watch)
+        }
+        None => galion_cascade::hermes::ResearchReport {
+            answer: galion_cascade::hermes::ResearchAnswer {
+                text: galion_cascade::UNREACHABLE.into(),
+                citations: Vec::new(),
+                found: Vec::new(),
+                inferred: Vec::new(),
+                unknown: Vec::new(),
+                standing: "Unreachable",
+            },
+            calls: 0,
+            call_budget: 0,
+            split: false,
+            helpers: Vec::new(),
         },
     };
+    let calls = report.calls;
+    let call_budget = report.call_budget;
+    let split = report.split;
+    let helpers = report.helpers;
+    let turn = report.answer;
     // Hermes did not answer. Search only this session's files and notes.
     let (model_name, note) = if turn.standing == "Unreachable" {
         let local = galion_cascade::offline::offline_research(question, &sources, &history);
@@ -1273,6 +1397,10 @@ fn research_commit(
             found: local.found,
             inferred: local.inferred,
             unknown: local.unknown,
+            calls,
+            call_budget,
+            split,
+            helpers,
             at: Instant::now(),
         };
         ("local".to_string(), note)
@@ -1301,6 +1429,10 @@ fn research_commit(
             found,
             inferred,
             unknown,
+            calls,
+            call_budget,
+            split,
+            helpers,
             at: Instant::now(),
         };
         (model_fallback, note)
@@ -1319,6 +1451,10 @@ fn research_commit(
     if let Ok(mut d) = desk.lock() {
         d.status = status;
         if let Some(session) = d.session_mut(&session_id) {
+            session.live.phase = "done";
+            session.live.calls = note.calls;
+            session.live.call_budget = note.call_budget;
+            session.live.helpers = note.helpers.clone();
             session.notes.push_back(note);
             while session.notes.len() > 32 {
                 session.notes.pop_front();
@@ -1670,6 +1806,20 @@ fn route(req: &mut Request, sh: &Shared, set_cookie: &mut Option<String>) -> (&'
                         Err(()) => ("500 Internal Server Error", "text/plain", txt("research")),
                     }
                 }
+                "/research/progress" if sh.page.is_some() => {
+                    let mut cookie_id = research_cookie_id(req);
+                    let mut header_id = research_header_id(req);
+                    let answered = research_progress_request(&sh.research, cookie_id.as_deref(), header_id.as_deref());
+                    wipe_opt(&mut cookie_id);
+                    wipe_opt(&mut header_id);
+                    match answered {
+                        Ok((json, cookie)) => {
+                            *set_cookie = Some(cookie);
+                            ("200 OK", "application/json", json.into_bytes())
+                        }
+                        Err(()) => ("500 Internal Server Error", "text/plain", txt("research")),
+                    }
+                }
                 "/research/history" if sh.page.is_some() => {
                     let mut cookie_id = research_cookie_id(req);
                     let mut header_id = research_header_id(req);
@@ -2009,6 +2159,10 @@ mod tests {
                 "data-voice-to-voice=\"on\"",
                 "id=\"ui-toggle\"",
                 "id=\"helpers\"",
+                "<details id=\"helpers\">",
+                "id=\"helpers-summary\"",
+                "Helpers are quiet.",
+                "/research/progress",
                 "id=\"silence\"",
                 "id:\"question-sent\"",
                 "id:\"thinking\"",
@@ -2050,6 +2204,8 @@ mod tests {
             ] {
                 assert!(body.contains(needle), "{p} missing {needle}");
             }
+            assert!(body.contains("<details id=\"helpers\">"), "helper progress is a disclosure");
+            assert!(!body.contains("<details id=\"helpers\" open"), "helpers stay collapsed until opened");
             assert!(body.contains("<canvas id=\"voice-dot\""), "the restyled Voice V2 dot is the entry");
             assert!(!body.contains("id=\"s\""), "research is not the full-screen one-dot page");
             assert!(!body.contains("data-mark=\"orb\""), "the full-screen orb stays on /one");
@@ -2177,6 +2333,7 @@ mod tests {
         assert!(!ready.contains(key), "{ready}");
         let asked = post_json(a, "/research/ask", r#"{"question":"What colour is the wash?"}"#);
         assert!(asked.contains("HTTP/1.1 200") && asked.contains("\"status\":\"Unknown\""), "{asked}");
+        assert!(asked.contains("\"calls\":1") && asked.contains("\"split\":false"), "{asked}");
         assert!(asked.contains("amber to violet"), "{asked}");
         assert!(!asked.contains("Galion brand note"), "an unprovided source must not be cited: {asked}");
         assert!(asked.contains("\"citations\":[]"), "{asked}");
@@ -2189,6 +2346,147 @@ mod tests {
         assert!(!hist.contains(key) && !hist.contains("Galion brand note"), "{hist}");
         let other = get(a, "/research/history");
         assert!(!other.contains("What colour is the wash?"), "{other}");
+        w.close().unwrap();
+    }
+
+    #[test]
+    fn research_helpers_stay_in_the_asking_session() {
+        let key = "test-gateway-key-not-for-git";
+        let release = Arc::new(AtomicBool::new(false));
+        let release_w = release.clone();
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        listener.set_nonblocking(true).unwrap();
+        std::thread::spawn(move || {
+            let mut handled = 0usize;
+            while handled < 16 {
+                match listener.accept() {
+                    Ok((mut sock, _)) => {
+                        handled += 1;
+                        let _ = sock.set_nonblocking(false);
+                        let release_c = release_w.clone();
+                        std::thread::spawn(move || {
+                            let _ = sock.set_read_timeout(Some(Duration::from_secs(2)));
+                            let mut buf = [0u8; 8192];
+                            let mut got = Vec::new();
+                            let mut header_end = None;
+                            loop {
+                                match sock.read(&mut buf) {
+                                    Ok(0) | Err(_) => break,
+                                    Ok(n) => {
+                                        got.extend_from_slice(&buf[..n]);
+                                        if header_end.is_none() {
+                                            header_end = got.windows(4).position(|w| w == b"\r\n\r\n").map(|p| p + 4);
+                                        }
+                                        if let Some(end) = header_end {
+                                            let head = String::from_utf8_lossy(&got[..end]);
+                                            let len = head.lines().find_map(|l| {
+                                                let (k, v) = l.split_once(':')?;
+                                                if !k.trim().eq_ignore_ascii_case("content-length") { return None; }
+                                                v.trim().parse::<usize>().ok()
+                                            }).unwrap_or(0);
+                                            if got.len() >= end + len { break; }
+                                        }
+                                    }
+                                }
+                            }
+                            let body = String::from_utf8_lossy(&got);
+                            let content = if body.contains("You plan research") {
+                                "- What colour does the note give the wash?\n- How would a cooler mix read at night?\n- Which hex is still missing from the note?\n"
+                            } else if body.contains("Helper notes:") {
+                                "The wash is amber and daylight is the assumed light."
+                            } else {
+                                let deadline = Instant::now() + Duration::from_secs(5);
+                                while !release_c.load(Ordering::SeqCst) && Instant::now() < deadline {
+                                    std::thread::sleep(Duration::from_millis(10));
+                                }
+                                if body.contains("cooler mix") {
+                                    "Inferred\n- A cooler mix would read as night.\n"
+                                } else if body.contains("still missing") {
+                                    "Unknown\n- The hex is not in the note.\n"
+                                } else {
+                                    "Found\n- The wash is amber. [1]\n[1] wash-note.txt\n[9] Invented Journal 2024\n"
+                                }
+                            };
+                            let payload = format!(
+                                "{{\"choices\":[{{\"message\":{{\"content\":{}}}}}]}}",
+                                galion_cascade::hermes::json_string(content)
+                            );
+                            let resp = format!(
+                                "HTTP/1.0 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{payload}",
+                                payload.len()
+                            );
+                            let _ = sock.write_all(resp.as_bytes());
+                        });
+                    }
+                    Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => std::thread::sleep(Duration::from_millis(5)),
+                    Err(_) => break,
+                }
+            }
+        });
+        let mut llm = galion_cascade::HermesLlm::new(
+            &format!("http://{addr}/v1/chat/completions"),
+            "hermes-agent",
+            key,
+            Duration::from_millis(4000),
+        );
+        llm.set_research_budget(galion_cascade::hermes::ResearchBudget {
+            helpers: 3,
+            concurrency: 2,
+            budget: Duration::from_secs(12),
+            calls: 5,
+        });
+        let mut w = WebSurface::serve("127.0.0.1:0".parse().unwrap()).with_page("<!doctype html><canvas></canvas>");
+        w.set_research_hermes(llm);
+        w.open().unwrap();
+        let a = w.local_addr().unwrap();
+        let file = post_json(a, "/research/sources", r#"{"name":"wash-note.txt","kind":"file","text":"The wash is amber."}"#);
+        assert!(file.contains("wash-note.txt") && file.contains("\"id\":1"), "{file}");
+        let sid_a = research_cookie_of(&file);
+        let other = get(a, "/research/hermes");
+        let sid_b = research_cookie_of(&other);
+        assert_ne!(sid_a, sid_b, "two browsers are two sessions");
+        let ask_a = a;
+        let cookie_a = cookie_header(&sid_a);
+        let ask = std::thread::spawn(move || {
+            call(
+                ask_a,
+                "POST",
+                "/research/ask",
+                &cookie_a,
+                Some(r#"{"question":"Compare the daylight wash with the tungsten wash and say which hex is still unknown?"}"#),
+            )
+        });
+        let deadline = Instant::now() + Duration::from_secs(4);
+        let mut saw = String::new();
+        while Instant::now() < deadline {
+            let prog = call(a, "GET", "/research/progress", &cookie_header(&sid_a), None);
+            if prog.contains("\"running\"") {
+                saw = prog;
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(30));
+        }
+        let other_prog = call(a, "GET", "/research/progress", &cookie_header(&sid_b), None);
+        release.store(true, Ordering::SeqCst);
+        assert!(saw.contains("\"phase\":\"helpers\"") && saw.contains("\"running\""), "{saw}");
+        assert!(saw.contains("What colour does the note"), "{saw}");
+        assert!(!saw.contains(key), "{saw}");
+        assert!(!other_prog.contains("What colour does the note"), "another browser does not see these helpers: {other_prog}");
+        assert!(!other_prog.contains("still missing"), "{other_prog}");
+        let asked = ask.join().unwrap();
+        assert!(asked.contains("HTTP/1.1 200") && asked.contains("\"split\":true"), "{asked}");
+        assert!(asked.contains("\"calls\":5"), "{asked}");
+        assert!(asked.contains("wash-note.txt") && asked.contains("\"n\":1"), "{asked}");
+        assert!(asked.contains("amber"), "{asked}");
+        assert!(!asked.contains("Invented Journal"), "{asked}");
+        assert!(!asked.contains(key) && !asked.contains("Bearer"), "{asked}");
+        let hist_b = call(a, "GET", "/research/history", &cookie_header(&sid_b), None);
+        assert!(!hist_b.contains("What colour does the note"), "{hist_b}");
+        assert!(!hist_b.contains("Compare the daylight wash"), "{hist_b}");
+        let hist_a = call(a, "GET", "/research/history", &cookie_header(&sid_a), None);
+        assert!(hist_a.contains("\"calls\":5") && hist_a.contains("\"split\":true"), "{hist_a}");
+        assert!(!hist_a.contains("Invented Journal") && !hist_a.contains(key), "{hist_a}");
         w.close().unwrap();
     }
 
