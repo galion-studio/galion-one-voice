@@ -247,6 +247,22 @@ impl Floor {
         &self.llm_label
     }
 
+    /// True when a Hermes client is attached. The label can still read
+    /// `hermes-agent` when this is false: that is the unreachable-line default.
+    pub fn hermes_attached(&self) -> bool {
+        self.hermes.is_some()
+    }
+
+    /// Clone-time film flag. A session log reads this; it does not grant it.
+    pub fn film_voice(&self) -> bool {
+        self.gate().film
+    }
+
+    /// Clone-time live flag. False while the clip store or the rights hold is closed.
+    pub fn clone_live(&self) -> bool {
+        self.gate().live
+    }
+
     /// Name the mouth that will actually speak. Never a film checkpoint.
     pub fn set_mouth(&mut self, mouth: &'static str, checkpoint: &'static str) {
         self.mouth = mouth;
