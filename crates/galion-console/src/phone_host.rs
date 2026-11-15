@@ -14,7 +14,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use galion_heartbeat::{FRAME_MS, FRAME_SAMPLES, SAMPLE_RATE};
-use galion_render::backends::web::{MicTap, ReplyBox, SayInbox, SpokenLine, Turn, TurnInbox, WebSurface};
+use galion_render::backends::web::{MicTap, MouthProsody, ReplyBox, SayInbox, SpokenLine, Turn, TurnInbox, WebSurface};
 use galion_render::v2_persona::Floor;
 
 use crate::auto_workflow::{proceed, Proceed, ProceedSource};
@@ -328,13 +328,11 @@ fn nerve_from_env() -> Option<NerveEmitter> {
     }
 }
 
-/// `GALION_STUDENT_GQ` names an existing student checkpoint.
+/// `GALION_STUDENT_GQ` names an existing non-empty `.gq` file.
+/// An empty file, a missing path, or a non-`.gq` file is absent.
+/// Presence is not speech: the turn seam does not load the file.
 fn student_present() -> bool {
-    std::env::var("GALION_STUDENT_GQ")
-        .ok()
-        .map(|p| p.trim().to_string())
-        .filter(|p| !p.is_empty())
-        .is_some_and(|p| std::path::Path::new(&p).is_file())
+    galion_openmind::TurnSeam::weights_from_env()
 }
 
 /// `GALION_JARVIS_HUB=0|off|false` mutes the hub bed on playback. Default is on.
@@ -343,6 +341,20 @@ fn hub_playback_on() -> bool {
         std::env::var("GALION_JARVIS_HUB").ok().map(|v| v.trim().to_ascii_lowercase()).as_deref(),
         Some("0") | Some("off") | Some("false") | Some("no")
     )
+}
+
+/// Sensed say column → the frame the mouth applies. `rate` is stored.
+/// Pitch, energy, and pause are written into the PCM. Warmth is not.
+fn mouth_frame(m: MouthProsody) -> galion_cascade::phone::FrameProsody {
+    galion_cascade::phone::FrameProsody {
+        pitch_st: m.pitch_st,
+        pitch_range: 1.0,
+        rate: m.rate,
+        energy: m.loudness,
+        warmth: 0.5,
+        pre_pause_ms: u16::try_from(m.pre_pause_ms).unwrap_or(u16::MAX).min(400),
+    }
+    .clamped()
 }
 
 /// The Jarvis reply WAV with the galion-emotion hub bed (clicks, alarm, room tone)
@@ -462,7 +474,8 @@ impl PhoneHost {
         }
         let id = line.id;
         let text = std::mem::take(&mut line.reply);
-        if let Err(text) = self.worker.try_speak(id, text) {
+        let prosody = line.mouth.map(mouth_frame);
+        if let Err(text) = self.worker.try_speak(id, text, prosody) {
             line.reply = text;
             self.pending_line = Some(line);
         }
@@ -478,6 +491,9 @@ impl PhoneHost {
             // The page does not send a skill token. Live path is the auto program.
             self.last_proceed = proceed(ProceedSource::Mic, None);
             self.proceeded = self.proceeded.saturating_add(1);
+            // One line per accepted take. The loopback check greps it.
+            // No transcript, no PCM, no second panel.
+            eprintln!("workflow proceed source=mic program=phone-turn");
             let _ = self
                 .bus
                 .try_send(BusMsg::barge_in(self.bus.alloc_id(), turn_id, self.t_ms));
@@ -683,7 +699,7 @@ mod tests {
             assert_eq!(said.mood, "grief");
         }
         web.say_inbox()
-            .push("Your mother died this morning.".into(), false, false);
+            .push("Your mother died this morning.".into(), false, false, None);
         let mut host = PhoneHost::from_surface(&web);
         match prev_speech {
             Some(v) => std::env::set_var("GALION_SPEECH", v),
@@ -770,7 +786,7 @@ mod tests {
         let mut host = PhoneHost::from_surface(&web);
         assert_eq!(host.bus.persona_id(), crate::bus::PersonaId::Samantha);
         let _ = web.persona_floor().lock().unwrap().say("be Jarvis", false, 0.0, false);
-        host.submit_say(SpokenLine { id: 3, reply: String::new(), silence: true, barge: false });
+        host.submit_say(SpokenLine { id: 3, reply: String::new(), silence: true, barge: false, mouth: None });
         assert_eq!(host.bus.persona_id(), crate::bus::PersonaId::Jarvis);
     }
 

@@ -18,8 +18,10 @@ pub mod canned;
 pub mod hermes;
 /// Local BM25 answers for the research desk when Hermes does not answer.
 pub mod offline;
-/// In-house persona reply floor (rules, no model). `GALION_LLM=canned|inhouse`.
+/// Instruction-floor rule engine. Not the product brain. Unit tests only on the live path.
 pub mod reflect;
+/// S0 student `.gq` probe on galion-tensor. Blocked until a file can be spoken.
+pub mod student;
 /// Voice-stack cue that hands a spoken question to Galion Research.
 pub mod research_handoff;
 /// Phone turn: 16 kHz utterance → transcript → reply text → 24 kHz WAV (feature `cascade`).

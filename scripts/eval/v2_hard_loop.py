@@ -166,6 +166,10 @@ def reply_of(payload: str) -> str:
     return value if isinstance(value, str) else ""
 
 
+# Spoken prefix from galion_cascade::student. A file on disk is not a brain.
+BLOCKED_MARK = "student brain unavailable."
+
+
 def llm_source(content: list[str], url: str, gq: str) -> str:
     """Who wrote the content-turn replies. Local policy lines (switch, quiet) are not content."""
     texts = [c.strip() for c in content if c.strip()]
@@ -173,6 +177,8 @@ def llm_source(content: list[str], url: str, gq: str) -> str:
         return ""
     if any(t.lower() == UNREACHABLE_LINE for t in texts):
         return "unreachable"
+    if all(t.lower().startswith(BLOCKED_MARK) for t in texts):
+        return "student-blocked"
     if all(t.lower() in FLOOR_LINES for t in texts):
         return "floor"
     if is_loopback_url(url):
@@ -588,6 +594,12 @@ def classify_llm(text: str, source: str) -> Gate:
         return Gate("real-llm", "met", "Hermes produced the Samantha/Jarvis turn. No canned empathy line.")
     if source == "student-gq":
         return Gate("real-llm", "met", "Open Mind student .gq produced the Samantha/Jarvis turn. No canned empathy line.")
+    if source == "student-blocked":
+        return Gate(
+            "real-llm",
+            "stub",
+            "S0 student .gq did not speak. The reply says the brain is unavailable. Not galion-reflect and not student-gq. Not HARD-PASS.",
+        )
     if source == "unreachable":
         return Gate("real-llm", "absent", "The model can't be reached from the persona floor. Not HARD-PASS.")
     if text.strip():
@@ -1657,6 +1669,11 @@ def logic_self_check() -> None:
     assert classify_llm("I hear you now.", "floor").status == "failed"
     assert classify_llm("The room stayed quiet.", "hermes").status == "met"
     assert classify_llm("The room stayed quiet.", "student-gq").status == "met"
+    blocked = "Student brain unavailable. The S0 student .gq is not on this host."
+    opened = "Student brain unavailable. The S0 .gq opened and cannot speak."
+    assert classify_llm(blocked, "student-blocked").status == "stub"
+    assert classify_llm(opened, "student-blocked").status == "stub"
+    assert "Not HARD-PASS" in classify_llm(opened, "student-blocked").detail
     assert classify_llm(UNREACHABLE_LINE, "unreachable").status == "absent"
     assert classify_llm("I'm sorry to hear about your mother.", "hermes").status == "failed"
     assert FORBIDDEN == FORBIDDEN_MIRROR, "hard harness FORBIDDEN_MIRROR drifted from hermes.rs FORBIDDEN"
@@ -1670,6 +1687,13 @@ def logic_self_check() -> None:
     assert llm_source(["Your mother died this morning."], "http://[::1]:1/v1", "") == "floor"
     assert llm_source(["The job is yours now."], "http://[::1]:1/v1", "") == "hermes"
     assert llm_source(["x"], "https://api.example.invalid/v1", "") == "floor"
+    assert llm_source([blocked], "", "") == "student-blocked"
+    assert llm_source([opened], "", "") == "student-blocked"
+    with tempfile.TemporaryDirectory() as tmp:
+        present = Path(tmp) / "s0.gq"
+        present.write_bytes(b"")
+        assert llm_source([opened], "", str(present)) == "student-blocked"
+        assert llm_source(["The room stayed quiet."], "", str(present)) == "student-gq"
     alias = demo_env({"GALION_HERMES_URL": "http://127.0.0.1:1/v1/chat/completions", "GALION_LLM": "hermes"})
     assert alias["GALION_LLM_URL"] == "http://127.0.0.1:1/v1/chat/completions"
     assert alias["GALION_LLM"] == "hermes"
