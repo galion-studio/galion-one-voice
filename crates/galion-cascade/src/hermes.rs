@@ -5,7 +5,9 @@
 //! GALION_LLM=hermes
 //! GALION_LLM_URL=http://127.0.0.1:8642/v1/chat/completions
 //! GALION_LLM_MODEL=hermes-agent
-//! GALION_LLM_KEY=...            # optional; sent as Authorization, never logged
+//! GALION_LLM_KEY_FILE=...       # optional dotenv path (same shape as GALION_RESEARCH_KEY_FILE)
+//! GALION_LLM_KEY_NAME=API_SERVER_KEY
+//! GALION_LLM_KEY=...            # fallback when the file has no key; never logged
 //! GALION_LLM_TIMEOUT_MS=15000
 //! ```
 //!
@@ -425,19 +427,29 @@ impl HermesLlm {
         }
     }
 
-    /// `GALION_LLM_URL` (default [`DEFAULT_URL`]), `GALION_LLM_MODEL`, `GALION_LLM_KEY`,
+    /// `GALION_LLM_URL` (default [`DEFAULT_URL`]), `GALION_LLM_MODEL`,
     /// `GALION_LLM_TIMEOUT_MS` (default [`DEFAULT_TIMEOUT_MS`], clamped 50..=30000).
+    ///
+    /// Key: one `NAME=value` line named by `GALION_LLM_KEY_NAME` in the dotenv
+    /// file `GALION_LLM_KEY_FILE`, the same shape as [`HermesLlm::research_from_env`]
+    /// (`GALION_RESEARCH_KEY_FILE` / `GALION_RESEARCH_KEY_NAME`). `GALION_LLM_KEY`
+    /// is the fallback when that file is unset, unreadable, or has no matching
+    /// line. The key is never logged.
     pub fn from_env() -> Self {
-        let url = std::env::var("GALION_LLM_URL").unwrap_or_else(|_| DEFAULT_URL.to_string());
-        let model = std::env::var("GALION_LLM_MODEL").unwrap_or_else(|_| LLM_NAME.to_string());
-        let key = std::env::var("GALION_LLM_KEY").unwrap_or_default();
-        let timeout_ms = timeout_ms_from_choice(std::env::var("GALION_LLM_TIMEOUT_MS").ok().as_deref());
-        Self::new(
-            url.trim(),
-            model.trim(),
-            key.trim(),
-            Duration::from_millis(timeout_ms),
-        )
+        Self::from_vars(|k| std::env::var(k).ok(), |p| std::fs::read_to_string(p).ok())
+    }
+
+    /// [`HermesLlm::from_env`] with injected lookups (tests).
+    pub fn from_vars(
+        var: impl Fn(&str) -> Option<String>,
+        read: impl Fn(&str) -> Option<String>,
+    ) -> Self {
+        let get = |k: &str| var(k).map(|v| v.trim().to_string()).filter(|v| !v.is_empty());
+        let url = var("GALION_LLM_URL").unwrap_or_else(|| DEFAULT_URL.to_string());
+        let model = var("GALION_LLM_MODEL").unwrap_or_else(|| LLM_NAME.to_string());
+        let key = llm_gateway_key(&get, &read);
+        let timeout_ms = timeout_ms_from_choice(var("GALION_LLM_TIMEOUT_MS").as_deref());
+        Self::new(url.trim(), model.trim(), &key, Duration::from_millis(timeout_ms))
     }
 
     /// Attach only when the process asked for Hermes.
@@ -871,6 +883,24 @@ fn key_ok(key: &str) -> bool {
 
 fn clip_chars(s: &str, max: usize) -> String {
     s.chars().take(max).collect()
+}
+
+/// Bearer token for the voice gateway.
+///
+/// A non-empty line from `GALION_LLM_KEY_FILE` named by `GALION_LLM_KEY_NAME`
+/// wins. `GALION_LLM_KEY` is the fallback. Nothing here is written to a log.
+fn llm_gateway_key(
+    get: &impl Fn(&str) -> Option<String>,
+    read: &impl Fn(&str) -> Option<String>,
+) -> String {
+    if let (Some(file), Some(name)) = (get("GALION_LLM_KEY_FILE"), get("GALION_LLM_KEY_NAME")) {
+        if let Some(key) = read(&file).and_then(|text| dotenv_value(&text, &name)) {
+            if !key.is_empty() {
+                return key;
+            }
+        }
+    }
+    get("GALION_LLM_KEY").unwrap_or_default()
 }
 
 /// `NAME=value` from dotenv text. `export`, quotes, and `#` comment lines are handled.
@@ -2388,6 +2418,142 @@ Found
         assert!(!format!("{llm:?}").contains("test-key-not-for-git"));
         assert_eq!(dotenv_value(file, "API_SERVER_KEY").as_deref(), Some("test-key-not-for-git"));
         assert_eq!(dotenv_value(file, "MISSING"), None);
+    }
+
+    #[test]
+    fn from_vars_reads_the_gateway_key_file() {
+        use std::collections::HashMap;
+        let env: HashMap<&str, &str> = [
+            ("GALION_LLM_URL", "http://127.0.0.1:8642/v1/chat/completions"),
+            ("GALION_LLM_MODEL", "river-flash"),
+            ("GALION_LLM_KEY_FILE", "/x/.env"),
+            ("GALION_LLM_KEY_NAME", "API_SERVER_KEY"),
+            ("GALION_LLM_TIMEOUT_MS", "8000"),
+        ]
+        .into_iter()
+        .collect();
+        let file = "# c\nOTHER=1\nexport API_SERVER_KEY=\"test-key-not-for-git\"\n";
+        let reads = std::sync::atomic::AtomicU32::new(0);
+        let llm = HermesLlm::from_vars(
+            |k| env.get(k).map(|v| (*v).to_string()),
+            |p| {
+                reads.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                (p == "/x/.env").then(|| file.to_string())
+            },
+        );
+        assert_eq!(reads.load(std::sync::atomic::Ordering::SeqCst), 1);
+        assert_eq!(llm.label(), "river-flash");
+        assert_eq!(llm.timeout, Duration::from_millis(8000));
+        assert_eq!(llm.key, "test-key-not-for-git");
+        assert_eq!(llm.key_state(), "set");
+        let shown = format!("{llm:?}");
+        assert!(!shown.contains("test-key-not-for-git"), "{shown}");
+        assert!(shown.contains("set"), "{shown}");
+    }
+
+    #[test]
+    fn from_vars_prefers_the_file_and_falls_back_to_the_env_key() {
+        use std::collections::HashMap;
+        let file = "API_SERVER_KEY=test-key-not-for-git\n";
+        let env_key = "env-key-not-for-git";
+        let both: HashMap<&str, &str> = [
+            ("GALION_LLM_KEY_FILE", "/x/.env"),
+            ("GALION_LLM_KEY_NAME", "API_SERVER_KEY"),
+            ("GALION_LLM_KEY", env_key),
+        ]
+        .into_iter()
+        .collect();
+        let from_file = HermesLlm::from_vars(
+            |k| both.get(k).map(|v| (*v).to_string()),
+            |p| (p == "/x/.env").then(|| file.to_string()),
+        );
+        assert_eq!(from_file.key, "test-key-not-for-git");
+        assert!(!format!("{from_file:?}").contains("test-key-not-for-git"));
+        assert!(!format!("{from_file:?}").contains(env_key));
+
+        let unread = |_: &str| -> Option<String> {
+            panic!("file is not read when the path is unset");
+        };
+        let env_only = |k: &str| (k == "GALION_LLM_KEY").then(|| format!("  {env_key}  "));
+        let from_env = HermesLlm::from_vars(env_only, unread);
+        assert_eq!(from_env.key, env_key);
+        assert_eq!(from_env.key_state(), "set");
+        assert!(!format!("{from_env:?}").contains(env_key));
+
+        let missing_name: HashMap<&str, &str> = [
+            ("GALION_LLM_KEY_FILE", "/x/.env"),
+            ("GALION_LLM_KEY", env_key),
+        ]
+        .into_iter()
+        .collect();
+        let no_name = HermesLlm::from_vars(
+            |k| missing_name.get(k).map(|v| (*v).to_string()),
+            unread,
+        );
+        assert_eq!(no_name.key, env_key);
+
+        let unreadable: HashMap<&str, &str> = [
+            ("GALION_LLM_KEY_FILE", "/x/.env"),
+            ("GALION_LLM_KEY_NAME", "API_SERVER_KEY"),
+            ("GALION_LLM_KEY", env_key),
+        ]
+        .into_iter()
+        .collect();
+        let missed = HermesLlm::from_vars(
+            |k| unreadable.get(k).map(|v| (*v).to_string()),
+            |_: &str| None,
+        );
+        assert_eq!(missed.key, env_key);
+
+        let blank = "API_SERVER_KEY=\nOTHER=1\n";
+        let empty_line = HermesLlm::from_vars(
+            |k| unreadable.get(k).map(|v| (*v).to_string()),
+            |p| (p == "/x/.env").then(|| blank.to_string()),
+        );
+        assert_eq!(empty_line.key, env_key);
+
+        let wrong_name: HashMap<&str, &str> = [
+            ("GALION_LLM_KEY_FILE", "/x/.env"),
+            ("GALION_LLM_KEY_NAME", "OTHER_KEY"),
+            ("GALION_LLM_KEY", env_key),
+        ]
+        .into_iter()
+        .collect();
+        let other = HermesLlm::from_vars(
+            |k| wrong_name.get(k).map(|v| (*v).to_string()),
+            |p| (p == "/x/.env").then(|| file.to_string()),
+        );
+        assert_eq!(other.key, env_key);
+
+        let none = HermesLlm::from_vars(|_: &str| None, unread);
+        assert_eq!(none.key_state(), "none");
+        assert!(none.key.is_empty());
+        assert!(!format!("{none:?}").contains(env_key));
+    }
+
+    #[test]
+    fn file_key_is_sent_as_bearer_and_stays_out_of_the_reply() {
+        let secret = "test-key-not-for-git";
+        let payload = "{\"choices\":[{\"message\":{\"content\":\"She died this morning.\"}}]}";
+        let srv = serve_body("200 OK", payload, None);
+        let url = format!("http://{}/v1/chat/completions", srv.addr);
+        let file = format!("export API_SERVER_KEY=\"{secret}\"\n");
+        let llm = HermesLlm::from_vars(
+            |k| match k {
+                "GALION_LLM_URL" => Some(url.clone()),
+                "GALION_LLM_KEY_FILE" => Some("/x/.env".to_string()),
+                "GALION_LLM_KEY_NAME" => Some("API_SERVER_KEY".to_string()),
+                _ => None,
+            },
+            |p| (p == "/x/.env").then(|| file.clone()),
+        );
+        let reply = llm.complete("hello");
+        assert_eq!(reply, "She died this morning.");
+        assert!(!reply.contains(secret));
+        assert!(!format!("{llm:?}").contains(secret));
+        let seen = srv.seen.lock().unwrap().clone();
+        assert!(seen.contains(&format!("Authorization: Bearer {secret}")));
+        assert!(!reply.contains("Bearer"));
     }
 
     #[test]

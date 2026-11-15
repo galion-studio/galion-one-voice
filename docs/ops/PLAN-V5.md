@@ -202,6 +202,8 @@ were fetched on that machine. No raw-audio path in the unit. `NoNewPrivileges`
 and a read-only root are preferred; the unit's own draft wins if it already
 says so — do not fork a second unit file in this plan.
 
+The gateway key is not an `Environment=` value in the unit. `GALION_LLM_KEY_FILE` and `GALION_LLM_KEY_NAME` name a dotenv file and one line in it, the same shape as Research `GALION_RESEARCH_KEY_FILE` and `GALION_RESEARCH_KEY_NAME`. The gateway line is `API_SERVER_KEY`. `GALION_LLM_KEY` is the fallback when that file does not supply a key. The commented lines are in `deploy/systemd/templates/galion-voice-stage.service`. The key stays off the unit and out of git. `ProtectSystem=strict` needs a `ReadOnlyPaths` entry for that file before the process can read it. The key is never logged.
+
 Caddy terminates TLS, sets HSTS, forwards the routes in section 3, and sends
 the same security headers the app already sends (duplicating `nosniff` and
 `Referrer-Policy` at the edge is fine). Microphone permission stays

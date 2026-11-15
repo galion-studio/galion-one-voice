@@ -22,11 +22,13 @@ One-shot: `galion_cascade::phone_turn(&pcm)` / `phone_turn_wav(&bytes)`.
 | `GALION_LLM` | unset/`hermes` (loopback Hermes gateway, phone default) · `canned` (rule table) · `echo` · `student` (S0 probe; blocked until a `.gq` can be spoken). `reflect` is an error on the phone. Any other value is an error, not a canned fallback. |
 | `GALION_LLM_URL` | `http://127.0.0.1:8642/v1/chat/completions` (default when mode is `hermes` or unset). Numeric loopback `http://` only. No TLS. |
 | `GALION_LLM_MODEL` | model name sent to the gateway. Default `hermes-agent`. Shown on `/v2/say` and `/v2/state` as `llm`. |
-| `GALION_LLM_KEY` | optional bearer token. Not logged. |
+| `GALION_LLM_KEY_FILE` | optional dotenv path. One `NAME=value` line, named by `GALION_LLM_KEY_NAME`. Same shape as Research (`GALION_RESEARCH_KEY_FILE` / `GALION_RESEARCH_KEY_NAME`). Not logged. |
+| `GALION_LLM_KEY_NAME` | line name inside that file. The Hermes gateway file uses `API_SERVER_KEY`. |
+| `GALION_LLM_KEY` | fallback bearer when the file is unset, unreadable, or has no matching line. Not logged. |
 | `GALION_LLM_TIMEOUT_MS` | default `15000` (failure ceiling for one live completion, clamped 50..=30000). Not a measured reply time. Timeout or a refused connect speaks `model can't be reached`. No canned fallback. |
 | `GALION_SPEECH` | `auto` (A21 Piper, else flite) · `a21` · `flite` · `off` → `NoSpeech` |
 
-The live unit is `deploy/systemd/templates/galion-voice-stage.service`. It sets `Environment=GALION_LLM=hermes`. Unset selects the same gateway; the unit states it so a drop-in does not leave the process on the rule table.
+The live unit is `deploy/systemd/templates/galion-voice-stage.service`. It sets `Environment=GALION_LLM=hermes`. Unset selects the same gateway; the unit states it so a drop-in does not leave the process on the rule table. The gateway key lines stay commented. A human sets `GALION_LLM_KEY_FILE` and `GALION_LLM_KEY_NAME` in a drop-in and adds that file to `ReadOnlyPaths`. `GALION_LLM_KEY` remains the fallback. The key is not written in the unit.
 
 A21 keeps one Piper process for the lane (`--json-input --output_raw`).
 `PhoneLane::new` pre-warms it. Two turns reuse that process (`piper_worker()`

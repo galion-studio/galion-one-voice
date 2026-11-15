@@ -9,4 +9,7 @@
 # release directory name under /opt/galion/voice/release/, then render.
 # The unit template Description stays free of a commit hash.
 # scripts/deploy/render-stage-unit.sh reads SHA= and writes the drop-in.
+# The gateway key is not set in this drop-in. The unit template comments
+# GALION_LLM_KEY_FILE and GALION_LLM_KEY_NAME. GALION_LLM_KEY is the fallback.
+# Do not write the key here.
 SHA=

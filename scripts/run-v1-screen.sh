@@ -22,11 +22,16 @@
 #   GALION_LLM=hermes \
 #   GALION_LLM_URL=http://127.0.0.1:8642/v1/chat/completions \
 #   GALION_LLM_MODEL=hermes-agent \
+#   GALION_LLM_KEY_FILE=/path/to/hermes.env \
+#   GALION_LLM_KEY_NAME=API_SERVER_KEY \
 #   GALION_LLM_KEY=... \
 #   GALION_LLM_TIMEOUT_MS=15000 \
 #   scripts/run-v1-screen.sh
 # The live unit sets Environment=GALION_LLM=hermes
 # (deploy/systemd/templates/galion-voice-stage.service).
+# GALION_LLM_KEY_FILE plus GALION_LLM_KEY_NAME is the gateway dotenv line
+# (same shape as GALION_RESEARCH_KEY_FILE / GALION_RESEARCH_KEY_NAME).
+# GALION_LLM_KEY is the fallback. The key is never logged.
 # Unset selects the same loopback gateway. GALION_LLM=canned is the rule table.
 # If the gateway is down the spoken line is "model can't be reached".
 # That failure does not fall back to a canned reply.
