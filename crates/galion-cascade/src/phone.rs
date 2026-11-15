@@ -23,12 +23,13 @@
 //! Every [`PhoneTurn`] carries `asr` so a UI can tell a Vosk transcript from a fixture.
 //!
 //! # S5 LLM
-//! Phone turns default to [`CannedLlm`] when `GALION_LLM` is unset or `canned`
-//! (the intent table, not the product brain). `GALION_LLM=echo` selects the
-//! old `MockLlm` echo. `GALION_LLM=student` selects [`crate::student::StudentLlm`],
-//! which says the S0 `.gq` is unavailable until a file can be spoken.
-//! `GALION_LLM=hermes` selects [`crate::HermesLlm`]: a loopback OpenAI chat
-//! completion (`GALION_LLM_URL`, default `http://127.0.0.1:8642/v1/chat/completions`).
+//! Phone turns use the loopback Hermes gateway when `GALION_LLM` is unset or
+//! `hermes` (owner card t493s3301). `GALION_LLM=canned` is the rule table.
+//! `GALION_LLM=echo` selects the old `MockLlm` echo. `GALION_LLM=student`
+//! selects [`crate::student::StudentLlm`], which says the S0 `.gq` is
+//! unavailable until a file can be spoken. Hermes is a loopback OpenAI chat
+//! completion (`GALION_LLM_URL`, default `http://127.0.0.1:8642/v1/chat/completions`,
+//! `GALION_LLM_TIMEOUT_MS` default 15000).
 //! Any other value is [`PhoneError::UnknownLlm`]. It is not canned.
 //! A timeout or a dead gateway speaks `model can't be reached` and does not
 //! fall back to the rule table. Emotion is fixed `Neutral`: inferring affect
@@ -85,8 +86,9 @@ impl AsrMode {
     }
 }
 
-/// S5 LLM mode (`GALION_LLM`). Unset and `canned` are the rule table.
-/// `student` is the blocked S0 probe. `hermes` is the loopback gateway.
+/// S5 LLM mode (`GALION_LLM`). Unset and `hermes` are the loopback Hermes gateway
+/// (owner card t493s3301: the phone brain defaults to Hermes, not the rule table).
+/// `canned` is the rule table. `student` is the blocked S0 probe.
 /// Anything else is an error.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LlmMode { Canned, Echo, Hermes, Student }
@@ -95,15 +97,15 @@ impl LlmMode {
     pub fn from_env() -> Result<Self, PhoneError> {
         Self::from_choice(std::env::var("GALION_LLM").ok().as_deref())
     }
-    /// `None`, `""`, and `canned` → [`LlmMode::Canned`]. `echo` / `mock` → echo.
-    /// `student` → [`LlmMode::Student`]. `hermes` → [`LlmMode::Hermes`].
+    /// `None`, `""`, and `hermes` → [`LlmMode::Hermes`]. `canned` → [`LlmMode::Canned`].
+    /// `echo` / `mock` → echo. `student` → [`LlmMode::Student`].
     /// Every other value, including `reflect`, is [`PhoneError::UnknownLlm`].
     pub fn from_choice(v: Option<&str>) -> Result<Self, PhoneError> {
         let raw = v.unwrap_or("").trim();
         match raw.to_ascii_lowercase().as_str() {
-            "" | "canned" => Ok(LlmMode::Canned),
+            "canned" => Ok(LlmMode::Canned),
             "echo" | "mock" => Ok(LlmMode::Echo),
-            "hermes" => Ok(LlmMode::Hermes),
+            "" | "hermes" => Ok(LlmMode::Hermes),
             "student" => Ok(LlmMode::Student),
             _ => Err(PhoneError::UnknownLlm(raw.to_string())),
         }
@@ -120,6 +122,9 @@ impl PhoneConfig {
         Ok(Self { asr: AsrMode::from_env(), llm: LlmMode::from_env()? })
     }
 }
+/// In-memory rule table for a lane built without reading the environment.
+/// The live process uses [`PhoneConfig::from_env`], which selects Hermes when
+/// `GALION_LLM` is unset.
 impl Default for PhoneConfig { fn default() -> Self { Self { asr: AsrMode::Stub, llm: LlmMode::Canned } } }
 
 /// Phone-turn failure.
@@ -539,7 +544,8 @@ mod tests {
         assert_eq!(AsrMode::from_choice(Some("whisper")), AsrMode::Stub);
         assert_ne!(AsrMode::from_choice(None), AsrMode::Interim);
         assert_ne!(AsrMode::from_choice(Some("interim")), AsrMode::Interim);
-        assert_eq!(LlmMode::from_choice(None).unwrap(), LlmMode::Canned);
+        assert_eq!(LlmMode::from_choice(None).unwrap(), LlmMode::Hermes);
+        assert_eq!(LlmMode::from_choice(Some("")).unwrap(), LlmMode::Hermes);
         assert_eq!(LlmMode::from_choice(Some("canned")).unwrap(), LlmMode::Canned);
         assert_eq!(LlmMode::from_choice(Some("echo")).unwrap(), LlmMode::Echo);
         assert_eq!(LlmMode::from_choice(Some(" Hermes ")).unwrap(), LlmMode::Hermes);

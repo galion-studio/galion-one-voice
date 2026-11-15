@@ -19,14 +19,14 @@ One-shot: `galion_cascade::phone_turn(&pcm)` / `phone_turn_wav(&bytes)`.
 | Env | Values |
 |---|---|
 | `GALION_ASR` | unset/`stub` (fixtures only; real speech → `AsrUnratified`) · `vosk` (worker; missing model → `AsrUnavailable`) · `off` · `interim` is ignored (treated as stub) |
-| `GALION_LLM` | unset/`canned` (CannedLlm, phone default) · `echo` · `student` (S0 probe; blocked until a `.gq` can be spoken) |
-| `GALION_ASR` | unset/`stub` (fixtures only; real speech → `AsrUnratified`) · `interim` (placeholder) · `off` |
-| `GALION_LLM` | unset/`canned` (CannedLlm, explicit test opt-in) · `echo` · `student` · `hermes` (loopback OpenAI chat). `reflect` is an error on the phone. Any other value is an error, not a canned fallback. |
-| `GALION_LLM_URL` | `http://127.0.0.1:8642/v1/chat/completions` (default when mode is `hermes`). Numeric loopback `http://` only. No TLS. |
+| `GALION_LLM` | unset/`hermes` (loopback Hermes gateway, phone default) · `canned` (rule table) · `echo` · `student` (S0 probe; blocked until a `.gq` can be spoken). `reflect` is an error on the phone. Any other value is an error, not a canned fallback. |
+| `GALION_LLM_URL` | `http://127.0.0.1:8642/v1/chat/completions` (default when mode is `hermes` or unset). Numeric loopback `http://` only. No TLS. |
 | `GALION_LLM_MODEL` | model name sent to the gateway. Default `hermes-agent`. Shown on `/v2/say` and `/v2/state` as `llm`. |
 | `GALION_LLM_KEY` | optional bearer token. Not logged. |
-| `GALION_LLM_TIMEOUT_MS` | default `3000`. Timeout or a refused connect speaks `model can't be reached`. No canned fallback. |
+| `GALION_LLM_TIMEOUT_MS` | default `15000` (failure ceiling for one live completion, clamped 50..=30000). Not a measured reply time. Timeout or a refused connect speaks `model can't be reached`. No canned fallback. |
 | `GALION_SPEECH` | `auto` (A21 Piper, else flite) · `a21` · `flite` · `off` → `NoSpeech` |
+
+The live unit is `deploy/systemd/templates/galion-voice-stage.service`. It sets `Environment=GALION_LLM=hermes`. Unset selects the same gateway; the unit states it so a drop-in does not leave the process on the rule table.
 
 A21 keeps one Piper process for the lane (`--json-input --output_raw`).
 `PhoneLane::new` pre-warms it. Two turns reuse that process (`piper_worker()`
