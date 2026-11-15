@@ -97,8 +97,7 @@ impl GqVoice {
     }
 
     pub fn open(path: &Path) -> Result<Self, VoiceError> {
-        let bytes =
-            std::fs::read(path).map_err(|e| VoiceError::Backend(format!("gqvoice: {e}")))?;
+        let bytes = std::fs::read(path).map_err(|e| packet_io(path, e))?;
         Self::open_bytes(&bytes)
     }
 
@@ -290,12 +289,11 @@ pub fn handoff_at(
 
 /// Atomic replace: `.<persona>.gqvoice.tmp` → `<persona>.gqvoice`.
 pub fn land(voice: &GqVoice, dir: &Path) -> Result<PathBuf, VoiceError> {
-    std::fs::create_dir_all(dir).map_err(|e| VoiceError::Backend(format!("gqvoice: {e}")))?;
+    std::fs::create_dir_all(dir).map_err(|e| packet_io(dir, e))?;
     let path = asset_path(dir, voice.persona_name());
     let tmp = dir.join(format!(".{}.gqvoice.tmp", voice.persona_name()));
     let write = (|| -> Result<(), VoiceError> {
-        let mut f = std::fs::File::create(&tmp)
-            .map_err(|e| VoiceError::Backend(format!("gqvoice: {e}")))?;
+        let mut f = std::fs::File::create(&tmp).map_err(|e| packet_io(&tmp, e))?;
         f.write_all(voice.as_bytes())
             .map_err(|e| VoiceError::Backend(format!("gqvoice: {e}")))?;
         f.sync_all()
@@ -308,9 +306,22 @@ pub fn land(voice: &GqVoice, dir: &Path) -> Result<PathBuf, VoiceError> {
     }
     if let Err(e) = std::fs::rename(&tmp, &path) {
         let _ = std::fs::remove_file(&tmp);
-        return Err(VoiceError::Backend(format!("gqvoice: {e}")));
+        return Err(packet_io(&path, e));
     }
     Ok(path)
+}
+
+/// A missing packet is BLOCKED. The compiler is linked into this crate.
+/// `os error 2` alone is not a missing `gqvoice` executable.
+fn packet_io(path: &Path, err: std::io::Error) -> VoiceError {
+    if err.kind() == std::io::ErrorKind::NotFound {
+        VoiceError::Backend(format!(
+            "gqvoice BLOCKED: packet was not written at {}. The compiler is in-process Rust, not a gqvoice executable on PATH.",
+            path.display()
+        ))
+    } else {
+        VoiceError::Backend(format!("gqvoice: {err}"))
+    }
 }
 
 fn guard_not_chatterbox(voice: &GqVoice, samples: &[i16]) -> Result<(), VoiceError> {
@@ -415,6 +426,21 @@ mod tests {
         s[42] = -18000;
         s.extend_from_slice(&[50i16; 1900]);
         s
+    }
+
+    #[test]
+    fn missing_packet_is_blocked_not_a_bare_os_error() {
+        let path = std::env::temp_dir().join(format!(
+            "galion-gqvoice-missing-{}-absent.gqvoice",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_file(&path);
+        let err = GqVoice::open(&path).unwrap_err().to_string();
+        assert!(err.contains("BLOCKED"), "{err}");
+        assert!(err.contains("in-process Rust"), "{err}");
+        assert!(err.contains("not a gqvoice executable"), "{err}");
+        assert!(!err.contains("os error 2"), "{err}");
+        assert!(!path.exists());
     }
 
     #[test]
