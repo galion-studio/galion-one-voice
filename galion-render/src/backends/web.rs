@@ -27,6 +27,8 @@
 //!   GET /research/hermes, GET /research/history, POST /research/ask -> Hermes
 //!                      research app. The gateway key stays on the server.
 //!                      History and the ask see only this session's files.
+//!                      When Hermes does not answer, `/research/ask` answers Offline
+//!                      from this session's files and notes.
 //!   POST /research/sources, GET /research/sources -> files this session attached.
 //!                      A citation may name only those files. Eight per session.
 //!                      A file, and an idle session, are dropped after 30 minutes.
@@ -1215,28 +1217,38 @@ fn research_reply(desk: &Arc<Mutex<ResearchDesk>>, question: &str) -> String {
         .unwrap_or_else(|_| "The research path is not reachable from here.".into())
 }
 
-/// `(model, note, set-cookie)`. Sources and the stored note belong to one session.
+/// `(model, note, set-cookie)`. Sources, notes, and the stored reply belong to one session.
 fn research_commit(
     desk: &Arc<Mutex<ResearchDesk>>,
     cookie_id: Option<&str>,
     header_id: Option<&str>,
     question: &str,
 ) -> Result<(String, ResearchNote, String), ()> {
-    let (note_id, client, model_fallback, mut sources, mut session_id, cookie) = {
+    let (note_id, client, model_fallback, mut sources, mut history, mut session_id, cookie) = {
         let Ok(mut d) = desk.lock() else { return Err(()) };
         let session_id = d.ensure(cookie_id, header_id);
         let cookie = d.cookie_line(&session_id);
         d.status = "Running";
         d.next_id = d.next_id.saturating_add(1);
         let model = d.client.as_ref().map(|c| c.label().to_string()).unwrap_or_else(|| galion_cascade::LLM_NAME.into());
-        let sources: Vec<galion_cascade::hermes::ResearchSource> = d.session_mut(&session_id).map(|s| {
-            s.sources.iter().map(|src| galion_cascade::hermes::ResearchSource {
-                id: src.id,
-                name: src.name.clone(),
-                text: src.text.clone(),
-            }).collect()
+        let (sources, history) = d.session_mut(&session_id).map(|s| {
+            let sources: Vec<galion_cascade::hermes::ResearchSource> = s.sources.iter().map(|src| {
+                galion_cascade::hermes::ResearchSource {
+                    id: src.id,
+                    name: src.name.clone(),
+                    text: src.text.clone(),
+                }
+            }).collect();
+            let history: Vec<galion_cascade::offline::LocalNote> = s.notes.iter().map(|n| {
+                galion_cascade::offline::LocalNote {
+                    found: n.found.clone(),
+                    inferred: n.inferred.clone(),
+                    unknown: n.unknown.clone(),
+                }
+            }).collect();
+            (sources, history)
         }).unwrap_or_default();
-        (d.next_id, d.client.clone(), model, sources, session_id, cookie)
+        (d.next_id, d.client.clone(), model, sources, history, session_id, cookie)
     };
     let turn = match client {
         Some(c) => c.research_turn(question, &sources),
@@ -1249,46 +1261,60 @@ fn research_commit(
             standing: "Unreachable",
         },
     };
+    // Hermes did not answer. Search only this session's files and notes.
+    let (model_name, note) = if turn.standing == "Unreachable" {
+        let local = galion_cascade::offline::offline_research(question, &sources, &history);
+        let note = ResearchNote {
+            id: note_id,
+            question: question.to_string(),
+            status: "Offline",
+            reply: local.text,
+            citations: local.citations,
+            found: local.found,
+            inferred: local.inferred,
+            unknown: local.unknown,
+            at: Instant::now(),
+        };
+        ("local".to_string(), note)
+    } else {
+        let status = turn.standing;
+        let reply = turn.text;
+        let citations = if status == "Denied" { Vec::new() } else { turn.citations };
+        let mut found = if status == "Found" { turn.found } else { Vec::new() };
+        let mut inferred = if status == "Found" || status == "Inferred" { turn.inferred } else { Vec::new() };
+        let mut unknown = if status == "Found" || status == "Inferred" || status == "Unknown" { turn.unknown } else { Vec::new() };
+        if status == "Found" && found.is_empty() && !reply.is_empty() {
+            found.push(reply.clone());
+        }
+        if status == "Inferred" && inferred.is_empty() && !reply.is_empty() {
+            inferred.push(reply.clone());
+        }
+        if status == "Unknown" && unknown.is_empty() && !reply.is_empty() {
+            unknown.push(reply.clone());
+        }
+        let note = ResearchNote {
+            id: note_id,
+            question: question.to_string(),
+            status,
+            reply,
+            citations,
+            found,
+            inferred,
+            unknown,
+            at: Instant::now(),
+        };
+        (model_fallback, note)
+    };
     for src in &mut sources {
         wipe_string(&mut src.name);
         wipe_string(&mut src.text);
     }
-    let status = turn.standing;
-    let reply = if status == "Unreachable" {
-        galion_cascade::research_handoff::RESEARCH_LOCAL.to_string()
-    } else {
-        turn.text
-    };
-    let citations = if status == "Unreachable" || status == "Denied" { Vec::new() } else { turn.citations };
-    let mut found = if status == "Found" { turn.found } else { Vec::new() };
-    let mut inferred = if status == "Found" || status == "Inferred" { turn.inferred } else { Vec::new() };
-    let mut unknown = if status == "Found" || status == "Inferred" || status == "Unknown" { turn.unknown } else { Vec::new() };
-    if status == "Unreachable" {
-        found.clear();
-        inferred.clear();
-        unknown.clear();
-        unknown.push(reply.clone());
+    for note in &mut history {
+        for text in note.found.iter_mut().chain(note.inferred.iter_mut()).chain(note.unknown.iter_mut()) {
+            wipe_string(text);
+        }
     }
-    if status == "Found" && found.is_empty() && !reply.is_empty() {
-        found.push(reply.clone());
-    }
-    if status == "Inferred" && inferred.is_empty() && !reply.is_empty() {
-        inferred.push(reply.clone());
-    }
-    if status == "Unknown" && unknown.is_empty() && !reply.is_empty() {
-        unknown.push(reply.clone());
-    }
-    let note = ResearchNote {
-        id: note_id,
-        question: question.to_string(),
-        status,
-        reply,
-        citations,
-        found,
-        inferred,
-        unknown,
-        at: Instant::now(),
-    };
+    let status = note.status;
     let stored = note.clone();
     if let Ok(mut d) = desk.lock() {
         d.status = status;
@@ -1300,7 +1326,7 @@ fn research_commit(
         }
     }
     wipe_string(&mut session_id);
-    Ok((model_fallback, stored, cookie))
+    Ok((model_name, stored, cookie))
 }
 
 /// `(body, set-cookie)`. The cookie is absent only when the desk lock is gone.
@@ -2007,6 +2033,9 @@ mod tests {
                 "data-standard=\"432\"",
                 "--ink:#E6EDF3",
                 "--sky:#58C4FF",
+                "id=\"offline-mark\"",
+                "aria-live=\"polite\"",
+                ">Offline<",
                 "G.A.L.I.O.N. — General Autonomous Local Intelligence Open Network",
                 "Developed and distributed by Galion Labs",
                 "Perpetual Open MIT License",
@@ -2095,12 +2124,16 @@ mod tests {
         assert!(off.contains("\"app\":\"hermes\"") && off.contains("\"key\":\"none\"") && off.contains("\"status\":\"Unreachable\""), "{off}");
         assert!(!off.contains(key) && !off.contains("Bearer") && !off.contains("GALION_LLM_KEY"), "{off}");
         let denied = post_json(a, "/research/ask", r#"{"question":"Where is the source?"}"#);
-        assert!(denied.contains("HTTP/1.1 200") && denied.contains("The research path is not reachable from here."), "{denied}");
-        assert!(!denied.contains(key), "{denied}");
+        assert!(denied.contains("HTTP/1.1 200") && denied.contains("\"status\":\"Offline\""), "{denied}");
+        assert!(denied.contains("Offline.") && denied.contains("The research path is not reachable from here."), "{denied}");
+        assert!(denied.contains("I don't have a source for that."), "{denied}");
+        assert!(denied.contains("\"citations\":[]") && denied.contains("\"found\":[]"), "{denied}");
+        assert!(denied.contains("\"model\":\"local\""), "{denied}");
+        assert!(!denied.contains(key) && !denied.contains("Paris"), "{denied}");
         assert_research_cookie(&denied);
         let sid = research_cookie_of(&denied);
         let hist = call(a, "GET", "/research/history", &cookie_header(&sid), None);
-        assert!(hist.contains("Where is the source?") && hist.contains("\"status\":\"Unreachable\""), "{hist}");
+        assert!(hist.contains("Where is the source?") && hist.contains("\"status\":\"Offline\""), "{hist}");
         let other = get(a, "/research/history");
         assert!(!other.contains("Where is the source?"), "another browser does not see this question: {other}");
         let empty = post_json(a, "/research/ask", r#"{"question":"  "}"#);
@@ -2205,6 +2238,115 @@ mod tests {
         };
         assert!(hist.contains("what colour is the wash") && hist.contains("near-white"), "{hist}");
         assert!(!hist.contains(key), "{hist}");
+    }
+
+    #[test]
+    fn research_ask_continues_offline_when_hermes_is_down() {
+        let mut w = WebSurface::serve("127.0.0.1:0".parse().unwrap()).with_page("<!doctype html><canvas></canvas>");
+        w.open().unwrap();
+        let a = w.local_addr().unwrap();
+        let file = post_json(
+            a,
+            "/research/sources",
+            r#"{"name":"notes/wash-note.txt","kind":"file","text":"The wash is amber. The hull is grey."}"#,
+        );
+        assert!(file.contains("wash-note.txt") && file.contains("\"id\":1"), "{file}");
+        assert_research_cookie(&file);
+        let sid = research_cookie_of(&file);
+        let asked = call(a, "POST", "/research/ask", &cookie_header(&sid), Some(r#"{"question":"What colour is the wash?"}"#));
+        assert!(asked.contains("HTTP/1.1 200") && asked.contains("\"status\":\"Offline\""), "{asked}");
+        assert!(asked.contains("\"model\":\"local\""), "{asked}");
+        assert!(asked.contains("Offline.") && asked.contains("The wash is amber."), "{asked}");
+        assert!(asked.contains("wash-note.txt") && asked.contains("\"n\":1"), "{asked}");
+        assert!(!asked.contains("grey"), "{asked}");
+        let miss = call(a, "POST", "/research/ask", &cookie_header(&sid), Some(r#"{"question":"What is the capital of France?"}"#));
+        assert!(miss.contains("\"status\":\"Offline\"") && miss.contains("I don't have a source for that."), "{miss}");
+        assert!(miss.contains("\"citations\":[]") && miss.contains("\"found\":[]"), "{miss}");
+        assert!(!miss.contains("Paris") && !miss.contains("amber") && !miss.contains("wash-note"), "{miss}");
+        let other = post_json(a, "/research/ask", r#"{"question":"What colour is the wash?"}"#);
+        assert!(other.contains("\"status\":\"Offline\"") && other.contains("I don't have a source for that."), "{other}");
+        assert!(!other.contains("The wash is amber.") && !other.contains("wash-note"), "another browser does not search this session: {other}");
+        let hist = call(a, "GET", "/research/history", &cookie_header(&sid), None);
+        assert!(hist.contains("The wash is amber.") && hist.contains("\"status\":\"Offline\""), "{hist}");
+        let cleared = call(a, "DELETE", "/research/sources", &cookie_header(&sid), None);
+        assert!(cleared.contains("\"sources\":[]"), "{cleared}");
+        let again = call(a, "POST", "/research/ask", &cookie_header(&sid), Some(r#"{"question":"What colour is the wash?"}"#));
+        assert!(again.contains("\"status\":\"Offline\"") && again.contains("The wash is amber."), "{again}");
+        assert!(again.contains("\"citations\":[]") && again.contains("\"found\":[]"), "a removed file is not cited: {again}");
+        assert!(again.contains("\"inferred\":[\"The wash is amber.\"]"), "{again}");
+        w.close().unwrap();
+
+        let key = "test-gateway-key-not-for-git";
+        let poison = "The wash is violet according to the Invented Journal.";
+        let payload = format!("{{\"choices\":[{{\"message\":{{\"content\":\"{poison}\"}}}}]}}");
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        let seen = Arc::new(Mutex::new(String::new()));
+        let seen_w = seen.clone();
+        std::thread::spawn(move || {
+            let Ok((mut sock, _)) = listener.accept() else { return };
+            let _ = sock.set_read_timeout(Some(Duration::from_millis(800)));
+            let mut buf = [0u8; 8192];
+            let mut got = Vec::new();
+            let mut header_end = None;
+            loop {
+                match sock.read(&mut buf) {
+                    Ok(0) | Err(_) => break,
+                    Ok(n) => {
+                        got.extend_from_slice(&buf[..n]);
+                        if header_end.is_none() {
+                            header_end = got.windows(4).position(|w| w == b"\r\n\r\n").map(|p| p + 4);
+                        }
+                        if let Some(end) = header_end {
+                            let head = String::from_utf8_lossy(&got[..end]);
+                            let len = head.lines().find_map(|l| {
+                                let (k, v) = l.split_once(':')?;
+                                if !k.trim().eq_ignore_ascii_case("content-length") {
+                                    return None;
+                                }
+                                v.trim().parse::<usize>().ok()
+                            }).unwrap_or(0);
+                            if got.len() >= end + len {
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            if let Ok(s) = String::from_utf8(got) {
+                *seen_w.lock().unwrap() = s;
+            }
+            let resp = format!(
+                "HTTP/1.0 500 Down\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{payload}",
+                payload.len()
+            );
+            let _ = sock.write_all(resp.as_bytes());
+        });
+        let mut w = WebSurface::serve("127.0.0.1:0".parse().unwrap()).with_page("<!doctype html><canvas></canvas>");
+        w.set_research_hermes(galion_cascade::HermesLlm::new(
+            &format!("http://{addr}/v1/chat/completions"),
+            "hermes-agent",
+            key,
+            Duration::from_millis(1000),
+        ));
+        w.open().unwrap();
+        let a = w.local_addr().unwrap();
+        let ready = get(a, "/research/hermes");
+        assert!(ready.contains("\"key\":\"set\"") && ready.contains("\"status\":\"Idle\""), "{ready}");
+        let attached = post_json(a, "/research/sources", r#"{"name":"wash-note.txt","text":"The wash is amber."}"#);
+        let sid = research_cookie_of(&attached);
+        let asked = call(a, "POST", "/research/ask", &cookie_header(&sid), Some(r#"{"question":"What colour is the wash?"}"#));
+        assert!(asked.contains("HTTP/1.1 200") && asked.contains("\"status\":\"Offline\""), "{asked}");
+        assert!(asked.contains("The wash is amber.") && asked.contains("wash-note.txt"), "{asked}");
+        assert!(!asked.contains("violet") && !asked.contains("Invented"), "{asked}");
+        assert!(!asked.contains(key) && !asked.contains("Bearer"), "{asked}");
+        let stranger = post_json(a, "/research/ask", r#"{"question":"What colour is the wash?"}"#);
+        assert!(!stranger.contains("The wash is amber.") && !stranger.contains("wash-note"), "{stranger}");
+        let upstream = seen.lock().unwrap().clone();
+        assert!(upstream.contains("What colour is the wash?"), "the stub was reached: {upstream}");
+        assert!(upstream.contains("Authorization: Bearer "), "{upstream}");
+        assert!(!upstream.contains("violet"), "{upstream}");
+        w.close().unwrap();
     }
 
     #[test]

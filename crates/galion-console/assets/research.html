@@ -106,6 +106,8 @@ textarea::placeholder{color:color-mix(in srgb, var(--ink) 36%, transparent)}
 #citation-list{color:color-mix(in srgb, var(--ink) 78%, transparent);font:14px/1.45 system-ui,sans-serif}
 #citation-list .mark{color:var(--amber);margin-right:.4em}
 #helpers{margin:18px 0 0;text-align:center;font:13px/1.4 system-ui,sans-serif;letter-spacing:.04em;color:color-mix(in srgb, var(--ink) 46%, transparent)}
+#offline-mark{margin:14px 0 0;text-align:center;font:12px/1.3 system-ui,sans-serif;letter-spacing:.08em;color:color-mix(in srgb, var(--ink) 42%, transparent)}
+body[data-ui="minimal"] #offline-mark{margin:0}
 #ui-toggle{width:auto;height:40px;padding:0 14px;border-radius:999px;font:12px/1 system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase}
 body[data-ui="minimal"] #rail,
 body[data-ui="minimal"] .work,
@@ -167,6 +169,7 @@ body[data-ui="minimal"] #helpers{margin:0}
       <canvas id="voice-dot" width="240" height="240" aria-hidden="true"></canvas>
     </button>
   </form>
+  <p id="offline-mark" hidden aria-live="polite">Offline</p>
   <p id="helpers" hidden>Helpers are quiet.</p>
   <div class="work">
     <section class="panel" id="sources" aria-labelledby="sources-label">
@@ -377,6 +380,10 @@ requestAnimationFrame(paintVoice);
     if(!attached.length) document.getElementById("source-empty").textContent="No source yet.";
   }
   function hermesStatus(text){ statusEl.textContent=text; }
+  function markOffline(on){
+    var el=document.getElementById("offline-mark");
+    if(el) el.hidden=!on;
+  }
   function fillList(ol, rows){
     while(ol.firstChild) ol.removeChild(ol.firstChild);
     rows.forEach(function(row){
@@ -388,7 +395,8 @@ requestAnimationFrame(paintVoice);
   var LOCAL="The research path is not reachable from here. Local. What is already known stays marked local.";
   var helpers=document.getElementById("helpers");
   function carryLocal(q){
-    hermesStatus("Hermes · Unreachable");
+    markOffline(true);
+    hermesStatus("Hermes");
     helpers.hidden=false;
     helpers.textContent="Helpers are quiet. Local knowledge carries the question.";
     document.getElementById("reading-question").textContent=q;
@@ -419,10 +427,12 @@ requestAnimationFrame(paintVoice);
     fillPile("inferred", j.inferred);
     fillPile("unknown", j.unknown);
     var standing=j.status||"Unknown";
-    if(standing!=="Found"&&standing!=="Inferred"&&standing!=="Unknown"&&standing!=="Unreachable"&&standing!=="Denied") standing="Unknown";
-    hermesStatus("Hermes · "+standing);
+    if(standing!=="Found"&&standing!=="Inferred"&&standing!=="Unknown"&&standing!=="Unreachable"&&standing!=="Denied"&&standing!=="Offline") standing="Unknown";
+    var down=standing==="Offline"||standing==="Unreachable";
+    markOffline(down);
+    hermesStatus(down?"Hermes":"Hermes · "+standing);
     helpers.hidden=false;
-    helpers.textContent=standing==="Unreachable"?"Helpers are quiet. Local knowledge carries the question.":standing;
+    helpers.textContent=down?"Helpers are quiet. Local knowledge carries the question.":standing;
   }
   function fillPile(id, rows){
     var list=document.getElementById(id+"-list");
@@ -439,9 +449,11 @@ requestAnimationFrame(paintVoice);
     document.getElementById("history-empty").hidden=(items||[]).length>0;
   }
   fetch("/research/hermes",{cache:"no-store"}).then(function(r){ return r.ok?r.json():null; }).then(function(j){
-    if(!j){ hermesStatus("Hermes · Unreachable"); return; }
-    hermesStatus("Hermes · "+(j.status||"Idle"));
-  }).catch(function(){ hermesStatus("Hermes · Unreachable"); });
+    if(!j){ hermesStatus("Hermes"); markOffline(true); return; }
+    var down=j.status==="Unreachable"||j.status==="Offline";
+    markOffline(down);
+    hermesStatus(down?"Hermes":"Hermes · "+(j.status||"Idle"));
+  }).catch(function(){ hermesStatus("Hermes"); markOffline(true); });
   fetch("/research/history",{cache:"no-store"}).then(function(r){ return r.ok?r.json():null; }).then(function(j){
     if(j&&Array.isArray(j.items)) paintHistory(j.items);
   }).catch(function(){});
