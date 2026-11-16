@@ -31,7 +31,9 @@
 //! completion (`GALION_LLM_URL`, default `http://127.0.0.1:8642/v1/chat/completions`,
 //! `GALION_LLM_TIMEOUT_MS` default 15000).
 //! Any other value is [`PhoneError::UnknownLlm`]. It is not canned.
-//! A timeout or a dead gateway speaks `model can't be reached` and does not
+//! A dead gateway speaks `model can't be reached`. A gateway that stays quiet
+//! until the failure ceiling speaks `That took too long. I don't have an answer yet.`
+//! Neither line is a canned fallback, and the lane does not
 //! fall back to the rule table. Emotion is fixed `Neutral`: inferring affect
 //! from the caller's voice is the LOCKS `[consent] sense` bit (default deny).
 //!

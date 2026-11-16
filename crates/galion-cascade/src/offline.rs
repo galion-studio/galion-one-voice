@@ -373,6 +373,7 @@ fn is_boilerplate(s: &str) -> bool {
         "the research path is not reachable from here",
         "the research path is not reachable from here local what is already known stays marked local",
         "model can't be reached",
+        "that took too long i don't have an answer yet",
         "i'll stay on what you said",
     ];
     let n = flat(s);
@@ -459,6 +460,12 @@ mod tests {
             name: name.into(),
             text: text.into(),
         }
+    }
+
+    #[test]
+    fn slow_reply_is_not_stored_as_knowledge() {
+        assert!(is_boilerplate(crate::hermes::PATIENT));
+        assert!(is_boilerplate(crate::hermes::UNREACHABLE));
     }
 
     fn assert_honest(turn: &ResearchAnswer, sources: &[ResearchSource], history: &[LocalNote]) {
