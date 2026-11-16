@@ -29,6 +29,9 @@ if p["measured"]:
     assert isinstance(p["warm_samples_ms"], list) and len(p["warm_samples_ms"]) >= 3
     r = d["reply"]
     assert r["stream_first_audio_ms"] < r["buffered_first_audio_ms"], r
+    phone = r.get("phone_first_audio_ms")
+    if phone is not None:
+        assert phone < r["buffered_first_audio_ms"], r
 else:
     assert d["reply"]["buffered_first_audio_ms"] is None
     assert d["reply"]["stream_first_audio_ms"] is None

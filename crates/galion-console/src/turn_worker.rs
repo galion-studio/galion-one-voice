@@ -377,7 +377,7 @@ fn respond_speak(lane: &mut PhoneLane, mut job: SpeakJob, gate: &BusGate, prosod
                 backend: t.speech_backend,
                 asr: t.asr.id(),
                 llm: "persona-floor",
-                stages: format!("tts={} tts_first={}", t.stage_ms.tts, t.stage_ms.tts_first_pcm),
+                stages: format!("tts={} tts_first={} first_audio={}", t.stage_ms.tts, t.stage_ms.tts_first_pcm, t.stage_ms.first_audio_ms),
                 error: None,
                 in_ms: 0,
                 took_ms: t0.elapsed().as_millis() as u32,
@@ -539,8 +539,8 @@ fn pack_ok(
         asr: t.asr.id(),
         llm: t.llm,
         stages: format!(
-            "asr={} llm={} tts={} tts_first={}",
-            t.stage_ms.asr, t.stage_ms.llm, t.stage_ms.tts, t.stage_ms.tts_first_pcm
+            "asr={} llm={} tts={} tts_first={} first_audio={}",
+            t.stage_ms.asr, t.stage_ms.llm, t.stage_ms.tts, t.stage_ms.tts_first_pcm, t.stage_ms.first_audio_ms
         ),
         error: None,
         in_ms,
@@ -691,8 +691,8 @@ fn respond(
                 asr: t.asr.id(),
                 llm: t.llm,
                 stages: format!(
-                    "asr={} llm={} tts={} tts_first={}",
-                    t.stage_ms.asr, t.stage_ms.llm, t.stage_ms.tts, t.stage_ms.tts_first_pcm
+                    "asr={} llm={} tts={} tts_first={} first_audio={}",
+                    t.stage_ms.asr, t.stage_ms.llm, t.stage_ms.tts, t.stage_ms.tts_first_pcm, t.stage_ms.first_audio_ms
                 ),
                 error: None,
                 in_ms,

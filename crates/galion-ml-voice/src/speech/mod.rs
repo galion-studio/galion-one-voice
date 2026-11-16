@@ -580,6 +580,21 @@ impl SpeechStack {
         self.prewarmed = ok;
     }
 
+    /// Keep the Piper process up. A dead worker is spawned and warmed again.
+    /// An already warm worker returns without another synthesis.
+    pub fn ensure_warm(&mut self) {
+        let dead = match self.engine.as_mut() {
+            Some(Engine::A21(t)) => !t.worker_alive(),
+            _ => false,
+        };
+        if dead {
+            self.prewarmed = false;
+        }
+        if !self.prewarmed {
+            self.prewarm();
+        }
+    }
+
     /// Supersede gate shared with the turn worker. A stale `turn_id` drops
     /// clauses that have not been sent yet. The Piper process stays up.
     pub fn arm_cancel(&mut self, current: Arc<AtomicU64>, turn_id: u64) {
