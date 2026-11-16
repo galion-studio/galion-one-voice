@@ -11,8 +11,10 @@
 //! GALION_LLM_TIMEOUT_MS=15000
 //! ```
 //!
-//! A timeout, a refused connect, a non-loopback URL, or a bad response is the
-//! plain line [`UNREACHABLE`]. This client does not call [`crate::CannedLlm`].
+//! A refused connect, a non-loopback URL, or a bad response is the plain line
+//! [`UNREACHABLE`]. A connect or read that waits out the failure ceiling is
+//! [`PATIENT`]: a short honest line, with no clock in it. This client does not
+//! call [`crate::CannedLlm`].
 
 use std::collections::VecDeque;
 use std::io::{Read, Write};
@@ -26,6 +28,9 @@ use crate::{CascadeError, Emotion, Llm, Transcript};
 
 /// Spoken when the gateway does not answer. Not a canned intent line.
 pub const UNREACHABLE: &str = "model can't be reached";
+/// Spoken when the gateway is quiet until the failure ceiling. Not a measured
+/// latency, and not a canned intent line.
+pub const PATIENT: &str = "That took too long. I don't have an answer yet.";
 /// Galion Research desk. A voice of Galion One, with Hermes as the agent behind it.
 /// Citations are ids from the Sources list on this turn. A missing source is
 /// Inferred or Unknown. The desk drops any id that was not provided.
@@ -544,7 +549,8 @@ impl HermesLlm {
         };
     }
 
-    /// One completion. Network failure is [`UNREACHABLE`], never a canned line.
+    /// One completion. A dead gateway is [`UNREACHABLE`]. A gateway that stays
+    /// quiet until the failure ceiling is [`PATIENT`]. Never a canned line.
     pub fn complete(&self, user: &str) -> String {
         self.complete_as(&self.persona, user)
     }
@@ -630,7 +636,17 @@ impl HermesLlm {
             &plan_user(&question, budget.helpers),
             timeout,
         ) {
-            Err(()) => {
+            Err(PostFail::Slow) => {
+                return finish(
+                    blank_research(PATIENT, "Timeout"),
+                    &calls,
+                    budget.calls,
+                    false,
+                    Vec::new(),
+                    watch,
+                );
+            }
+            Err(PostFail::Down) => {
                 return finish(
                     blank_research(UNREACHABLE, "Unreachable"),
                     &calls,
@@ -718,15 +734,14 @@ impl HermesLlm {
                     &question, sources, &calls, budget, started, true, helpers, watch,
                 );
             }
-            let standing = if helpers.iter().any(|h| h.status == "Unreachable") {
-                "Unreachable"
+            let timed = helpers.iter().any(|h| h.status == "Timeout");
+            let down = helpers.iter().any(|h| h.status == "Unreachable");
+            let (text, standing) = if timed && !down {
+                (PATIENT, "Timeout")
+            } else if down {
+                (UNREACHABLE, "Unreachable")
             } else {
-                "Unknown"
-            };
-            let text = if standing == "Unreachable" {
-                UNREACHABLE
-            } else {
-                "Unknown."
+                ("Unknown.", "Unknown")
             };
             return finish(
                 blank_research(text, standing),
@@ -750,7 +765,8 @@ impl HermesLlm {
                     timeout,
                 ) {
                     Ok(text) => text,
-                    Err(()) => String::new(),
+                    Err(PostFail::Slow) => PATIENT.to_string(),
+                    Err(PostFail::Down) => String::new(),
                 }
             } else {
                 String::new()
@@ -787,7 +803,8 @@ impl HermesLlm {
             timeout,
         ) {
             Ok(text) => classify_research(&text, sources),
-            Err(()) => empty(),
+            Err(PostFail::Slow) => blank_research(PATIENT, "Timeout"),
+            Err(PostFail::Down) => empty(),
         }
     }
 
@@ -855,7 +872,8 @@ impl HermesLlm {
         match post_chat(&target, &self.model, &self.key, system, &user, self.timeout) {
             Ok(text) if cap <= 480 => guard_model_text(&text),
             Ok(text) => guard_model_text_cap(&text, cap),
-            Err(()) => UNREACHABLE.to_string(),
+            Err(PostFail::Slow) => PATIENT.to_string(),
+            Err(PostFail::Down) => UNREACHABLE.to_string(),
         }
     }
 }
@@ -1386,7 +1404,10 @@ fn call_window(started: Instant, budget: Duration, per_call: Duration) -> Option
 }
 
 fn answer_is_usable(answer: &ResearchAnswer) -> bool {
-    if answer.standing == "Unreachable" || answer.standing == "Denied" {
+    if answer.standing == "Unreachable"
+        || answer.standing == "Denied"
+        || answer.standing == "Timeout"
+    {
         return !answer.found.is_empty()
             || !answer.inferred.is_empty()
             || !answer.unknown.is_empty();
@@ -1746,6 +1767,19 @@ fn strip_tags(s: &str) -> String {
     out.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
+#[derive(Clone, Copy)]
+enum PostFail {
+    Down,
+    Slow,
+}
+
+fn io_fail(err: &std::io::Error) -> PostFail {
+    match err.kind() {
+        std::io::ErrorKind::TimedOut | std::io::ErrorKind::WouldBlock => PostFail::Slow,
+        _ => PostFail::Down,
+    }
+}
+
 fn post_chat(
     target: &HermesTarget,
     model: &str,
@@ -1753,16 +1787,16 @@ fn post_chat(
     system: &str,
     user: &str,
     timeout: Duration,
-) -> Result<String, ()> {
+) -> Result<String, PostFail> {
     let body = format!(
         "{{\"model\":{model},\"messages\":[{{\"role\":\"system\",\"content\":{system}}},{{\"role\":\"user\",\"content\":{user}}}]}}",
         model = json_string(model),
         system = json_string(system),
         user = json_string(user),
     );
-    let mut sock = TcpStream::connect_timeout(&target.addr, timeout).map_err(|_| ())?;
-    sock.set_read_timeout(Some(timeout)).map_err(|_| ())?;
-    sock.set_write_timeout(Some(timeout)).map_err(|_| ())?;
+    let mut sock = TcpStream::connect_timeout(&target.addr, timeout).map_err(|e| io_fail(&e))?;
+    sock.set_read_timeout(Some(timeout)).map_err(|e| io_fail(&e))?;
+    sock.set_write_timeout(Some(timeout)).map_err(|e| io_fail(&e))?;
     let auth = if key.is_empty() {
         String::new()
     } else {
@@ -1776,30 +1810,31 @@ fn post_chat(
         auth = auth,
         body = body,
     );
-    sock.write_all(req.as_bytes()).map_err(|_| ())?;
+    sock.write_all(req.as_bytes()).map_err(|e| io_fail(&e))?;
     let raw = read_limited(&mut sock, 64 * 1024)?;
-    let (status, payload) = split_http(&raw)?;
+    let (status, payload) = split_http(&raw).map_err(|_| PostFail::Down)?;
     if !(200..300).contains(&status) {
-        return Err(());
+        return Err(PostFail::Down);
     }
-    let text = std::str::from_utf8(&payload).map_err(|_| ())?;
-    assistant_content(text).ok_or(())
+    let text = std::str::from_utf8(&payload).map_err(|_| PostFail::Down)?;
+    assistant_content(text).ok_or(PostFail::Down)
 }
 
-fn read_limited(sock: &mut TcpStream, cap: usize) -> Result<Vec<u8>, ()> {
+fn read_limited(sock: &mut TcpStream, cap: usize) -> Result<Vec<u8>, PostFail> {
     let mut buf = Vec::new();
     let mut tmp = [0u8; 4096];
     loop {
         if buf.len() >= cap {
-            return Err(());
+            return Err(PostFail::Down);
         }
         let n = match sock.read(&mut tmp) {
             Ok(0) => break,
             Ok(n) => n,
             Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
-            Err(_) => {
-                if buf.is_empty() {
-                    return Err(());
+            Err(e) => {
+                let fail = io_fail(&e);
+                if buf.is_empty() || matches!(fail, PostFail::Slow) {
+                    return Err(fail);
                 }
                 break;
             }
@@ -1821,7 +1856,7 @@ fn read_limited(sock: &mut TcpStream, cap: usize) -> Result<Vec<u8>, ()> {
         }
     }
     if buf.is_empty() {
-        Err(())
+        Err(PostFail::Down)
     } else {
         Ok(buf)
     }
@@ -2206,13 +2241,20 @@ mod tests {
         let stall = serve_body("200 OK", "{\"choices\":[]}", Some(Duration::from_secs(2)));
         let llm = client(stall.addr, 150);
         let t = Instant::now();
-        assert_eq!(llm.complete("hello"), UNREACHABLE);
+        let slow = llm.complete("hello");
+        assert_eq!(slow, PATIENT);
+        assert_ne!(slow, UNREACHABLE);
+        assert!(!slow.chars().any(|c| c.is_ascii_digit()), "{slow}");
+        assert!(!contains_forbidden(&slow));
         assert!(
             t.elapsed() < Duration::from_millis(1000),
             "{:?}",
             t.elapsed()
         );
-        assert!(!llm.complete("hi").contains("I'm here"));
+        let again = llm.complete("hi");
+        assert!(!again.contains("I'm here"));
+        assert!(!again.to_ascii_lowercase().contains("timed out"));
+        assert!(!again.contains("os error"));
 
         let bad = serve_body("500 Nope", "{\"error\":\"x\"}", None);
         let llm = client(bad.addr, 1000);
@@ -3117,7 +3159,9 @@ Unknown
                 report.helpers.iter().any(|h| h.status == "skipped"),
                 "{report:?}"
             );
-            assert_eq!(report.answer.standing, "Unreachable", "{report:?}");
+            assert_eq!(report.answer.standing, "Timeout", "{report:?}");
+            assert_eq!(report.answer.text, PATIENT);
+            assert!(!report.answer.text.chars().any(|c| c.is_ascii_digit()));
         }
     }
 
