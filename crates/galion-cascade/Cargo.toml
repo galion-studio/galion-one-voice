@@ -33,3 +33,7 @@ required-features = ["cascade"]
 [[example]]
 name = "phone_turn"
 required-features = ["cascade"]
+
+[[example]]
+name = "reply_latency"
+required-features = ["cascade"]

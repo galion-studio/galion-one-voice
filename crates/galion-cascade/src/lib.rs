@@ -16,6 +16,8 @@ pub mod en_lane;
 pub mod canned;
 /// Loopback Hermes chat client (OpenAI-compatible, std `TcpStream`, no TLS).
 pub mod hermes;
+/// First sentence of a streaming reply, for TTS before the rest of the text.
+mod early_reply;
 /// Local BM25 answers for the research desk when Hermes does not answer.
 pub mod offline;
 /// Instruction-floor rule engine. Not the product brain. Unit tests only on the live path.
@@ -61,6 +63,22 @@ pub trait Llm {
     fn reply(&mut self, t: &Transcript, e: Emotion) -> Result<String, CascadeError>;
     /// Active test register (`samantha` or `jarvis`). The default ignores it.
     fn set_persona(&mut self, _id: &str) {}
+    /// [`Self::reply`], delivering text as it arrives.
+    ///
+    /// The default waits for the whole reply and then calls `on_delta` once.
+    /// Hermes overrides this and calls `on_delta` on each streamed piece.
+    fn reply_deltas(
+        &mut self,
+        t: &Transcript,
+        e: Emotion,
+        on_delta: &mut dyn FnMut(&str),
+    ) -> Result<String, CascadeError> {
+        let text = self.reply(t, e)?;
+        if !text.is_empty() {
+            on_delta(&text);
+        }
+        Ok(text)
+    }
 }
 /// Outbound TTS (Piper / SpeechT5 / Pocket-TTS-class slot).
 pub trait Tts { fn name(&self) -> &'static str; fn synth(&mut self, text: &str, lang: Lang) -> Result<Vec<i16>, CascadeError>; }

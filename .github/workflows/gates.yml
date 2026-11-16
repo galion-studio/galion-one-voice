@@ -68,6 +68,8 @@ jobs:
         run: cargo test -p galion-render --features web --lib
       - name: Phone lane
         run: cargo test -p galion-cascade --features cascade --lib
+      - name: Reply latency harness (loopback stub, no paid model)
+        run: scripts/eval/reply-latency.sh
       - name: Turn worker
         run: cargo test -p galion-console --features phone-turn --lib
       - name: Presence-eval virtual user
