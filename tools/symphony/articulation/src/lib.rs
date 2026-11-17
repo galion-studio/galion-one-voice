@@ -10,11 +10,19 @@
 //! - Rhubarb Lip Sync (MIT, C++, out of process): mouth shapes A-H, X.
 //!
 //! Our own glue: everything is put on the 80 ms Symphony tick (LOCKS clock.frame_ms),
-//! summarised as quantiles, and compared with TractPrint (see [`score`]).
-//! Voice-agnostic: no voice name or voice-specific constant appears in this crate.
+//! summarised as quantiles, and compared with TractPrint v2 (see [`score`]): a speaker
+//! score and an expression score. [`decode`] writes the voice profile a cloner reads.
+//! [`state`] is the per-tick emotion trajectory. Voice-agnostic: no voice name appears.
 
 pub mod acoustic;
+pub mod breath;
+pub mod closed_loop;
+pub mod decode;
+pub mod environment;
+pub mod labels;
 pub mod score;
+pub mod select;
+pub mod state;
 pub mod workers;
 
 use serde::{Deserialize, Serialize};

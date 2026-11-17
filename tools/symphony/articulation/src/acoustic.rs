@@ -120,6 +120,20 @@ pub fn analyse(samples: &[f64], sr: f64) -> (Articulation, Settings) {
         .collect();
     a.add("vtl_cm", Section::Mouth, "cm", "glue: Fitch 1997 formant dispersion", vtl);
 
+    let hop = (crate::TICK_S * sr).round().max(1.0) as usize;
+    let rms: Vec<Option<f64>> = (0..n)
+        .map(|i| {
+            let a0 = i * hop;
+            let b0 = (a0 + hop).min(samples.len());
+            if b0 <= a0 {
+                return None;
+            }
+            let e = samples[a0..b0].iter().map(|v| v * v).sum::<f64>() / (b0 - a0) as f64;
+            Some(if e <= 1e-12 { -120.0 } else { 10.0 * e.log10() })
+        })
+        .collect();
+    a.add("rms_dbfs", Section::Throat, "dBFS", "glue: tick rms", rms);
+
     a.bricks.push(Brick {
         name: "praatfan_rust".into(),
         version: "0.1.16 (git tag v0.1.16, 5950fb6f)".into(),
