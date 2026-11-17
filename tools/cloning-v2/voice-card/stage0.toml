@@ -1,0 +1,46 @@
+# Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
+# Stage 0 voice card: which existing bricks to run and the plain-language bands
+# used for the delivery text. Same file for EVERY voice (universal, t1362u).
+# Paths are relative to the repo root; each can be overridden by the env var
+# named next to it. A missing brick never fails the run: its fields are written
+# as unmeasured with the reason.
+schema = "galion-voice-card-config/1"
+standard = "galion-voice-v2-432"
+tuning_a4_hz = 432.0
+
+[bricks]
+refcheck = "tools/emotion-v2/refcheck/target/release/refcheck"                       # GALION_REFCHECK_BIN
+refcheck_spec = "docs/emotion-v2/capture-spec.toml"                                 # GALION_REFCHECK_SPEC
+artic = "tools/cloning-v2/scorers/articulation/bin/galion-artic"                     # GALION_ARTIC_BIN
+hygiene = "tools/cloning-v2/scorers/quality/bin/galion-hygiene"                      # GALION_HYGIENE_BIN
+emotion12 = "tools/emotion-v2/emotion12/target/release/galion-emotion12"             # GALION_EMOTION12_BIN
+emotion12_emotions = "tools/emotion-v2/emotion12/gate-emotions.toml"                 # EMOTION_V2_GATE_EMOTIONS
+# emotion12 also needs ORT_DYLIB_PATH and EMOTION_V2_MODELS_DIR (it never downloads).
+refprep_config = "tools/cloning-v2/refprep/configs/default.toml"                    # GALION_REFPREP_CONFIG
+
+[emotion_windows]
+window_s = 3.0
+hop_s = 1.5
+
+[gate]  # reported as clone targets, never changed here
+wer_max = 0.018
+ecapa_min = 0.7057
+emotion_min = 0.83
+
+[bands]  # plain-language labels only; numbers in the card are always the raw measurement
+articulation_slow_below = 4.0      # syllables per second of phonation
+articulation_fast_above = 5.5
+pitch_flat_below_st = 2.0          # F0 SD in semitones
+pitch_lively_above_st = 3.5
+pause_ratio_high = 0.25
+lra_compressed_below_lu = 3.0
+hf_limited_f99_below_hz = 4000.0   # 99 % of energy below this = band-limited
+noise_floor_target_dbfs = -60.0
+dual_mono_corr_min = 0.999
+
+[targets]  # tolerance written next to each clone target (plain config, not learned)
+f0_tol_st = 0.5
+rate_tol_frac = 0.10
+formant_tol_frac = 0.08
+fricative_tol_hz = 500.0
+lufs_tol = 1.0

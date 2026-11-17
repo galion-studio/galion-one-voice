@@ -8,6 +8,7 @@
 - Engine stance: Rust first; cloning with cbx (Chatterbox Turbo ONNX, Rust), fp32 pinned.
 
 ## How she sounds (measured, 2026-11-05)
+- Full measured card (stage 0, 2026-11-17): `tools/cloning-v2/voice-card/examples/samantha.voice.md` / `.toml` — pitch, timbre, tempo, voicing, loudness, articulation, emotion, environment, prep and clone targets.
 - Reference pitch about 178 Hz; the clone runs higher (about 201 Hz) and about 20% faster (3.49 vs 2.82 words/s). Target is her natural pace and pitch.
 - Emotion: reference is gently neutral; clones were tagged "angry" on 8/12 lines by a speech-emotion model, likely detector noise on TTS, but the clone is brighter, faster and flatter in loudness than her. Target: calm, warm, unhurried.
 - Situation: scripted close-mic character read (Her-style monologue), not casual chat.
