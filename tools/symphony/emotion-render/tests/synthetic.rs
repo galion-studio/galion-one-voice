@@ -85,9 +85,12 @@ fn shipped_magnitudes_are_unknown_and_engine_literals_match_the_worker() {
     }
     let worker = fs::read_to_string(repo().join("scripts/clone/chatterbox_worker.py")).unwrap();
     let nano = fs::read_to_string(repo().join("scripts/clone/nano_stream.py")).unwrap();
-    assert!(worker.contains("exaggeration=0.0"));
-    assert!(nano.contains("temperature = 0.8"));
-    assert!(nano.contains("cfg_weight=0.0"));
+    // The worker default is still 0.0 / 0.0 / 0.8. The log line prints four
+    // decimals, so the source no longer contains the old `exaggeration=0.0` token.
+    assert!(worker.contains("msg.get(\"exaggeration\", 0.0)"));
+    assert!(worker.contains("msg.get(\"temperature\", 0.8)"));
+    assert!(nano.contains("temperature: float = 0.8"));
+    assert!(nano.contains("cfg_weight: float = 0.0"));
     approx(scales.engine.exaggeration, 0.0);
     approx(scales.engine.cfg_weight, 0.0);
     approx(scales.engine.temperature, 0.8);
