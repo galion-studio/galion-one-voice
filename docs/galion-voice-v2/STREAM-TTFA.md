@@ -1,6 +1,6 @@
 # V2-S14 · Chatterbox Nano stream (time to first audio)
 
-Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 Europe/Zagreb. Merge is held (admin t298 and t299).
 
 The spelling is **Galion**. The product is Galion Voice.

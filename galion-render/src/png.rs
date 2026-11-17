@@ -1,4 +1,4 @@
-// Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+// Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 //! Minimal std-only PNG writer (W21-04) for headless one-dot frames.
 //!
 //! RGB8, no interlace, zlib stream made of *stored* (uncompressed) deflate blocks,

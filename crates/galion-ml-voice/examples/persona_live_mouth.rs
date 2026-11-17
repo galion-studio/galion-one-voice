@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! Speak one matter line at the Samantha and Jarvis e0/e1 columns and print
 //! what the mouth actually did. This host has no Piper pack, so the engine
 //! is whatever `SpeechStack::detect` can open (Flite when the library is

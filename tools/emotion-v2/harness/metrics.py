@@ -1,5 +1,5 @@
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 """Comparisons used by the emotion gate. Pure functions, no audio I/O."""
 
 from __future__ import annotations

@@ -1,5 +1,5 @@
 # Galion Voice — Perpetual Open MIT License
-# (c) 2026 Maciej Grajczyk / G.A.L.I.O.N.
+# (c) 2026 Galion Labs / G.A.L.I.O.N.
 """Demo 13 v2 and the 62-row universal lookup.
 
 Label data only. Importing this module must not change pitch, pace,

@@ -1,6 +1,6 @@
 # V3 · Admin backlog
 
-Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Perpetual Open MIT License. (c) 2026 Galion Labs.
 Europe/Zagreb. 2026-11-03. Five items, written so they stay distinct.
 None of them is in force. None of them is an offer. None of them edits
 `LOCKS.toml`.

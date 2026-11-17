@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! W21-03 EN cascade demo lane (live-demo hook).
 //! ASR-stub -> route (pin > hint > LID) -> MockLlm reply -> TTS-stub -> WAV.
 //! FP-03: the reply WAV is SPOKEN ENGLISH WORDS from the A21 neural TTS (Piper VITS

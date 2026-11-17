@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 #
 # W21-03 · EN cascade demo lane (Sector 11 + EN ml-voice). LOCAL ONLY, offline,
 # no weights, English only.

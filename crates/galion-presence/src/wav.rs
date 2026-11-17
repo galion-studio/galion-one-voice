@@ -1,4 +1,4 @@
-// Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+// Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 //! Std-only RIFF/WAVE PCM loader for presence fixtures (A13, wave 2).
 //!
 //! Supported input (anything else is a clear error, never a guess):

@@ -4,7 +4,7 @@
 [![Rust 1.85](https://img.shields.io/badge/rust-1.85%2B-orange)](https://www.rust-lang.org)
 [![Clone landing: CPU](https://img.shields.io/badge/clone%20landing-CPU%20only-lightgrey)](docs/galion-voice-v2/symphony/CLONE-LANDING.md)
 
-Perpetual Open MIT License. © 2026 Maciej Grajczyk.
+Perpetual Open MIT License. © 2026 Galion Labs.
 
 Galion Voice is one voice on one mark. You speak on the **you** band. Galion answers on the **me** band. A **feeling** band carries a few bytes of emotion each frame, and only when consent allows it. Consent starts denied.
 
@@ -154,7 +154,7 @@ Pins are `scripts/clone/PINS.sha256`. Public-demo gates in `docs/galion-voice-v2
 
 ## Licence
 
-Code in this repository is Perpetual Open MIT, © 2026 Maciej Grajczyk. `LOCKS.toml` says free forever, and no paid tiers. Weights are separate and are not in git. The Piper voice pack keeps its own MIT grant and is downloaded by `scripts/a21/fetch-a21.sh`.
+Code in this repository is Perpetual Open MIT, © 2026 Galion Labs. `LOCKS.toml` says free forever, and no paid tiers. Weights are separate and are not in git. The Piper voice pack keeps its own MIT grant and is downloaded by `scripts/a21/fetch-a21.sh`.
 
 ---
 

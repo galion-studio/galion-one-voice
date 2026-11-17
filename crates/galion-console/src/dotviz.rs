@@ -1,4 +1,4 @@
-// Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+// Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 //! W21-04 · heartbeat → one dot + live console bars (feature `dot-viz`).
 //!
 //! The bridge W21-01 attaches to its live loop. Per 80 ms frame:

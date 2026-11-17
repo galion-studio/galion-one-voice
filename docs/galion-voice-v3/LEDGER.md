@@ -1,6 +1,6 @@
 # LEDGER — Galion Voice V3 (planning)
 
-Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Perpetual Open MIT License. (c) 2026 Galion Labs.
 Europe/Zagreb. Witness book for the V3 plan. It is not the wave ledger
 in the root `LEDGER.md`, and it is not a clearance of Samantha or Jarvis.
 

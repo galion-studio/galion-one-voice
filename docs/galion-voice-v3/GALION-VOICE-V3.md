@@ -1,6 +1,6 @@
 # Galion Voice V3
 
-Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Perpetual Open MIT License. (c) 2026 Galion Labs.
 Europe/Zagreb. 2026-11-03. This is the program plan. It is not a claim
 that V3 has started, and it is not permission to write V3 code.
 

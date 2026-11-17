@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 #
 # V2-S14 Flash eval harness. CPU time-to-first-audio, only when a worker
 # returns PCM. The default path prints measured:false and no ttfa_ms.

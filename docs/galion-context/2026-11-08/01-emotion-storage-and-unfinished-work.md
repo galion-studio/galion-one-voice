@@ -1,6 +1,6 @@
 # Emotion storage and unfinished work
 
-Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 2026-11-08. Docs only. Tip read: `origin/main` `3e1f5a12c53cd8e0dd47d111676d61d608540559`.
 
 This note records what the current tree executes, what is only a name, and

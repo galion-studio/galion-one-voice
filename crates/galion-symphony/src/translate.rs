@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! Read clone safetensors (interchange only) and write a symphony pack.
 
 use crate::clip::{self, WrapOpts};

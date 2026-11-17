@@ -5,7 +5,7 @@
 //! [`crate::StubExpressor::voice_color`]: weight `e`, prosody, and an OKLCH
 //! colour. There is no reply line on this clock.
 //!
-//! Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+//! Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 
 use crate::{EmotionFrame, StubExpressor, VoiceColor};
 

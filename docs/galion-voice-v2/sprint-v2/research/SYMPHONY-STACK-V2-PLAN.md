@@ -20,7 +20,7 @@
 
 Status: **PLAN, not an implementation.** Written 2026-11-03, about 18:50 Europe/Zagreb (CET), for owner request pt602u.
 Research was read-only. Nothing was committed, pushed, deployed, restarted, downloaded, built or installed. The only file written is this one.
-Licence line for the code this plan proposes: GOATSI Inc. "open perpetual MIT" (see open question Q9 about the copyright line already in the tree).
+Licence line for the code this plan proposes: GOATSI Inc. "Perpetual Open MIT" (see open question Q9 about the copyright line already in the tree).
 
 **How to read the numbers.** Each number carries one of four tags:
 
@@ -401,7 +401,7 @@ The latency agents are 01-streaming-tts, 02-core-pinning, 03-clone-efficiency, 0
 - **Q6** Are persona switches allowed only at turn boundaries (recommended)?
 - **Q7** Clone at rest: is training a Piper-class voice on Nano-generated audio acceptable under the CC0 donor terms and the a21/v2s14 exceptions?
 - **Q8** Is the V2.0 gate p95 ≤320 ms acceptable, with p95 ≤240 ms deferred to V2.1?
-- **Q9** Licence header: the tree says "Perpetual Open MIT License (c) 2026 Maciej Grajczyk" (e.g. `symphony/STAGING-CPU.md:3`); the brief says GOATSI Inc. "open perpetual MIT". Which copyright line goes on new files?
+- **Q9** Licence header: the tree says "Perpetual Open MIT License (c) 2026 Galion Labs" (e.g. `symphony/STAGING-CPU.md:3`); the brief says GOATSI Inc. "Perpetual Open MIT". Which copyright line goes on new files?
 - **Q10** Is the 64-turn RAM ring (nerve) the same as the memory L0 ring, or separate?
 
 ## 9. Not verified

@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! Listening set: persona × user emotion × persona mood history, on Piper.
 //!
 //! For each case the *user* line is synthesized (ljspeech-medium, loudness set

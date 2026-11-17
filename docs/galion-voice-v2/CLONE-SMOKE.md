@@ -1,6 +1,6 @@
 # V2-S14 · Clone smoke
 
-Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 Europe/Zagreb. How to check the Nano worker. Not a latency claim.
 
 The spelling is **Galion**. The product is Galion Voice.

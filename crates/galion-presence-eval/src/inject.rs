@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! Utterances the virtual user can hand to PhoneLane.
 //! Text is not audio. A fixture WAV is the stub codec (exact decode). A voice WAV is
 //! a synthetic tone with no words in it, used to check the interim placeholder.

@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! Loopback phone turn. Binds `127.0.0.1` only. The virtual user posts text or a WAV
 //! and reads the JSON reply. When Piper or flite can speak and the request asks for
 //! audio, the server writes the reply WAV before it answers.

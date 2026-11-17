@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! `galion-piper-rt`: drop-in, out-of-process replacement for the
 //! `piper --json-input --output_raw` child used by `PiperWorker`.
 //!

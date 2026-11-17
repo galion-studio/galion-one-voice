@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 """Consent gate for one Samantha or Jarvis reference clip.
 
 Stdlib only. This does not fetch audio, does not write a wav, does not invent

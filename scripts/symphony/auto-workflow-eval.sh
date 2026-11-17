@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+# Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 # Gate for the one-dot auto-record workflow. Exit 0 = PASS.
 # Does not edit LOCKS.toml. Does not start a second UI.
 set -euo pipefail

@@ -1,4 +1,4 @@
-# Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+# Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 """Synthetic tests for the Emotion V2 capture-kit format + sha256 writer.
 
 Fixtures are silence packed as 24-bit mono 48 kHz WAV. They are not a voice.

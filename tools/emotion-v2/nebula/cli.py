@@ -1,5 +1,5 @@
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 """Command line for the Nebula live feed.
 
 ``replay`` reads a JSON file of posteriors. ``feed`` reads the same objects

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 """Gate tests for the Chatterbox Nano worker. No weights, no torch, no audio."""
 
 from __future__ import annotations

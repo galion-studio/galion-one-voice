@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! CPU classes the symphony pack records. Voice stays CPU-only.
 //! Session budgets are the same on every class. The class is capacity.
 

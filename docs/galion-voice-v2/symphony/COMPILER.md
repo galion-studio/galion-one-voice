@@ -1,6 +1,6 @@
 # Compiler
 
-Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Perpetual Open MIT License. (c) 2026 Galion Labs.
 Europe/Zagreb. 2026-11-03. Synthesis note 2026-11-06. Symphony section. Index: [README.md](README.md).
 
 The spelling is **Galion**. The product is Galion Voice.
@@ -170,7 +170,7 @@ Puzzle pieces, named so the licence stays visible. Nothing below is linked excep
 
 | Piece | Licence | What this compiler does with it |
 |---|---|---|
-| `.gq` v1 reader, `crates/galion-tensor/src/gq.rs` | Perpetual Open MIT, (c) 2026 Maciej Grajczyk | The runtime reader. The clip writer in this crate follows that layout. `galion-tensor` grows no writer. |
+| `.gq` v1 reader, `crates/galion-tensor/src/gq.rs` | Perpetual Open MIT, (c) 2026 Galion Labs | The runtime reader. The clip writer in this crate follows that layout. `galion-tensor` grows no writer. |
 | SHA-256 in that same reader | FIPS 180-4, in-repo MIT | Tensor digests and the sidecar. No third-party hash crate. |
 | WAV PCM walk, same subset as `galion-render/src/wav.rs` | In-repo MIT | Reimplemented here so the voice crate does not depend on the render crate. Public RIFF/WAVE layout. |
 | Linear resample, same idea as `galion-render` `resample_linear` | In-repo MIT | Reimplemented. Samples stay as mixed. |

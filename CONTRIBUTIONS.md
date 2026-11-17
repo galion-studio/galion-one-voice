@@ -1,5 +1,5 @@
 # CONTRIBUTIONS · Galion Voice
-Galion Voice — Perpetual Open MIT License · © 2026 Maciej Grajczyk · 2026-11-02 (Europe/Zagreb, UTC+1)
+Galion Voice — Perpetual Open MIT License · © 2026 Galion Labs · 2026-11-02 (Europe/Zagreb, UTC+1)
 
 Based only on files in this tree (LEDGER.md, README.md, LICENSE, docs/agent-v1-demo/*, docs/agent-wave20/*, docs/agent-wave21/*). The tree is not a git repo, so there is no commit history to attribute from. Agent IDs are lane IDs from the docs, not people.
 
@@ -12,7 +12,7 @@ Based only on files in this tree (LEDGER.md, README.md, LICENSE, docs/agent-v1-d
 |---|---|---|
 | V1 one-dot demo, `http://127.0.0.1:7878/` | present | V1-01…V1-04, FP-01…FP-04 (docs/agent-v1-demo) |
 | README.md | present | needs review (author lane not recorded) |
-| LICENSE | present — MIT text, © 2026 Maciej Grajczyk; docs call it "Perpetual Open MIT License (draft)" | needs review (final licence wording) |
+| LICENSE | present — MIT text, © 2026 Galion Labs; docs call it "Perpetual Open MIT License (draft)" | needs review (final licence wording) |
 | CREDENTIALS.md | **not present** in this tree | planned/open — needs review |
 | CONTRIBUTIONS.md | present (this file) | — |
 | Speech path (A21 = Piper VITS, CPU) | present | FP-03 |

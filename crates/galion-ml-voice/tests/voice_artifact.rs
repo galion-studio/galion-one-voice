@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! Section A gate: the runtime path is a Galion clip, the tick does not allocate,
 //! and a late frame stays inside the one-percent budget.
 

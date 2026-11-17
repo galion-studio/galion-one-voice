@@ -1,5 +1,5 @@
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 """Emotion V2 training-data run.
 
 Order, for each line: render, quality filter, environment augmentation, manifest.

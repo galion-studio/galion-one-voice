@@ -1,5 +1,5 @@
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 """Load Emotion V2 thresholds and the fixed scenario texts."""
 
 from __future__ import annotations

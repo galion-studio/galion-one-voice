@@ -1,6 +1,6 @@
 # Ultra — symphony host plan
 
-Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Perpetual Open MIT License. (c) 2026 Galion Labs.
 Europe/Zagreb, 2026-11-03. Owner: Maciej Grajczyk. Source note: t284u.
 
 The spelling is **Galion**. The product is Galion Voice.

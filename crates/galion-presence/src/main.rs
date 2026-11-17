@@ -1,4 +1,4 @@
-// Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+// Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 //! `galion-presence [SPEC] [--out REPORT.json] [--json]`
 //!
 //! Exit codes: 0 green · 1 red (a `must` failed or budget exceeded) · 2 spec invalid / IO error.

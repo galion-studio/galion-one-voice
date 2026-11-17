@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! v2-latency: Gate 1. Real CPU Piper (A21) TTFA cold/warm, chunking and
 //! core-count effects, and the full loop on real CC0 speech:
 //! end of speech → VAD/endpoint → streaming Vosk final → real LLM stream

@@ -1,5 +1,5 @@
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 """Command line for the Emotion V2 harness.
 
 CPU runs pass ``--backend stub``. SUPERB is selected only when weights are

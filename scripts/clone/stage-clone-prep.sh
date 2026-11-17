@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 #
 # A1 prep on the machine that will speak. Stages a CPU venv and the five
 # pinned tokenizer text files. Does not fetch safetensors, does not edit

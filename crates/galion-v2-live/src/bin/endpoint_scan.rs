@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! v2-endpoint-scan: false-endpoint rate of the two-stage endpointer.
 //!
 //! Each WAV is one user turn (true end = last frame within 35 dB of peak,

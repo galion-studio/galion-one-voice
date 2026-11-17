@@ -1,6 +1,6 @@
 # Emotion V2 — prompt lines for Samantha and Jarvis
 
-Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 Europe/Zagreb. Lines the owner can speak during the controlled capture.
 They are original. They are not film lines. They are not a reply table.
 

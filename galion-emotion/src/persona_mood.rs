@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! Persona-conditioned voice (owner t641u / t644u): PersonaPlex-style
 //! conditioning on the Piper path. Design note: `docs/galion-voice-v2/PERSONA-MOOD.md`.
 //!

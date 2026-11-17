@@ -1,4 +1,4 @@
-// Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+// Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 //! W21-02 latency probe for the Mimi passthrough lane (SYNTHETIC: ZeroWeights, IS_STUB = true).
 //! `cargo run --release -p galion-student-backend --example mimi_passthrough [demo|no-kernels|full] [frames]`
 use galion_student_backend::mimi_lane::{tone_frame, IS_STUB};

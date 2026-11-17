@@ -1,5 +1,5 @@
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 """Per-sector emotion_match on synthetic tones. No weights, no network."""
 
 from __future__ import annotations

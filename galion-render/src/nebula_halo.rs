@@ -1,6 +1,6 @@
 //! Emotion halo around the one dot.
 //!
-//! Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+//! Perpetual Open MIT License. (c) 2026 Galion Labs.
 //!
 //! The mark stays `#F5F5F7`. This module only places faint arcs in the
 //! locked amber → violet wash. It does not recolour the dot, invent a

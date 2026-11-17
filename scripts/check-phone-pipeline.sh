@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+# Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 # Phone-path smoke: /health /dot /mic /turn (and the same through NGROK_URL when set).
 # Does not deploy. Does not open SSH. Loopback only unless you pass a URL.
 #

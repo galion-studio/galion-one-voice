@@ -1,4 +1,4 @@
-// Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+// Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 //! Stub-path timing for one heartbeat step.
 //!
 //! This measures `Heartbeat::step` with the RMS/ZCR stub and Rika v0.

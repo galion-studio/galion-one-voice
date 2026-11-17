@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 """Streaming variant of worker/nano_live_worker.py (LOCKS v2s14 exception:
 PyTorch CPU, out of process). Same JSON protocol plus chunked output.
 

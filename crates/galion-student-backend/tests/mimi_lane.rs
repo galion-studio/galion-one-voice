@@ -1,4 +1,4 @@
-// Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+// Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 //! W21-02: Mimi passthrough lane runs frames without panic, honest stub output, tone-safe.
 use galion_presence::backend::ReplayBackend;
 use galion_student_backend::mimi_lane::{tone_frame, IS_STUB};

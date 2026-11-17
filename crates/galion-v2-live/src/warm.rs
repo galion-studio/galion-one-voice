@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! Warm LLM requests (latency-240 lane 04).
 //!
 //! `llm::stream` pays, on every turn and inside the measured TTFT: JSON

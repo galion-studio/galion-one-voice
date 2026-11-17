@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 """Original-ref Nano first-PCM and 80 ms first-playable-frame harness.
 
 Measures only when the in-tree worker can emit real Chatterbox Nano PCM

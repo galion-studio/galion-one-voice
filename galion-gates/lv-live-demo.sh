@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Galion Voice — Perpetual Open MIT License. Copyright (c) 2026 Maciej Grajczyk.
+# Galion Voice — Perpetual Open MIT License. Copyright (c) 2026 Galion Labs.
 # LV — live-demo smoke (W21-05, soft gate). Runs scripts/run-live-demo.sh headless with a timeout.
 #   rc 0 = PASS, rc 3 = SKIP (script absent / no audio-display needed path unavailable), other = SOFTFAIL.
 # Never needs a display: DISPLAY/WAYLAND_DISPLAY are cleared and GALION_HEADLESS=1 is exported,

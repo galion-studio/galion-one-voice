@@ -1,6 +1,6 @@
 # Emotion V2 — consent template
 
-Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 Europe/Zagreb.
 
 This is a template. It is not a consent record. No signer, date, or

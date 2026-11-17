@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! Symphony voice clip. Chatterbox clone PCM goes in. A Galion `.gq` comes out.
 //!
 //! The runtime file is not a Chatterbox weight, not a WAV, and not raw s16le.

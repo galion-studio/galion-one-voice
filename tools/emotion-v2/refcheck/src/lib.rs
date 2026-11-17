@@ -1,4 +1,4 @@
-// Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+// Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 //! Controlled-reference checker for Emotion V2 capture (432 Hz standard).
 //!
 //! The procedure is `docs/emotion-v2/CAPTURE-PROTOCOL.md`. The numbers are

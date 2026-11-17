@@ -1,6 +1,6 @@
 # Adopted scorers (Cloning A2)
 
-Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 Europe/Zagreb. Symphony section. Index: [README.md](README.md).
 
 `tools/cloning-v2/score-wrap` (`galion-score-wrap` 0.1.0, MIT) is the CPU

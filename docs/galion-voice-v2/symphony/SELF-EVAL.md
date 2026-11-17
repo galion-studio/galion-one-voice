@@ -1,6 +1,6 @@
 # Self-eval
 
-Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 Europe/Zagreb · 2026-11-03.
 
 Ledger for [`EUREKA.md`](EUREKA.md). A symphony section is complete when its
@@ -53,7 +53,7 @@ command was not run. A green exit on a different machine does not fill a
 row that this file did not see.
 # Symphony self-eval — Ultra
 
-Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Perpetual Open MIT License. (c) 2026 Galion Labs.
 Europe/Zagreb, 2026-11-03.
 
 Subject: `docs/galion-voice-v2/symphony/PLAN-ULTRA.md`.

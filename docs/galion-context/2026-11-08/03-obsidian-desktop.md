@@ -1,6 +1,6 @@
 # Obsidian desktop — product context
 
-Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Perpetual Open MIT License. (c) 2026 Galion Labs.
 Europe/Zagreb. 2026-11-08T04:30:49+01:00. Pair 04, Open Mind. This file is
 the architecture note for the desktop question. It does not add code, a
 package, a boot image, a price in the lock file, or a deploy.

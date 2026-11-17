@@ -1,6 +1,6 @@
 # V2 · Error state
 
-Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 The spelling is **Galion**. This is an interface requirement for the user
 surface. It is not drawn on the phone page yet. It is not a lock edit, and
 it is not V3.

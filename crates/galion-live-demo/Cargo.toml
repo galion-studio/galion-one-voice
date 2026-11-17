@@ -1,4 +1,4 @@
-# Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+# Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 [package]
 name = "galion-live-demo"
 description = "Galion Voice live demo (W21-01): WAV -> 80 ms Heartbeat::step + RikaReplayBackend per frame -> stereo WAV (L=you, R=me) + console capture + SHA256SUMS. Std only, no weights, builds --offline."

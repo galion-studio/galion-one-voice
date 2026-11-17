@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+# Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 # Section E. One page at /. Mic VAD posts /turn. /v2 redirects. No second panel.
 # Live browser session is not started. The contract test is this script.
 set -euo pipefail

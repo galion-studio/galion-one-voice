@@ -1,6 +1,6 @@
 # Galion Voice V2 — Symphony index
 
-Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Perpetual Open MIT License. (c) 2026 Galion Labs.
 Europe/Zagreb. 2026-11-03. Program t282.
 
 The spelling is **Galion**. The product is Galion Voice.
@@ -226,7 +226,7 @@ Rust 1.85. This is the local check. It does not fetch weights and it does not op
 8. [RUNBOOKS.md](RUNBOOKS.md) when a command in this index needs a longer page.
 # Galion Voice V2 symphony
 
-Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 Europe/Zagreb.
 
 Champion: a conversation is one heartbeat, not a pipeline.

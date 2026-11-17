@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 # Lock gate (agent A1): validates LOCKS.toml is present and every Eureka lock holds.
 # Usage: scripts/check-locks.sh [path/to/LOCKS.toml]   exit 0 = OK, 1 = lock broken, 2 = missing/unparseable.
 set -euo pipefail

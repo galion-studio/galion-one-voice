@@ -1,5 +1,5 @@
 # First-principles pass (FP-01…04) · Summary
-Galion Voice — Perpetual Open MIT License · © 2026 Maciej Grajczyk · 2026-11-02, finished ≈16:20 (Europe/Zagreb, UTC+1)
+Galion Voice — Perpetual Open MIT License · © 2026 Galion Labs · 2026-11-02, finished ≈16:20 (Europe/Zagreb, UTC+1)
 **LOCAL ONLY.** I did not deploy, SSH or push. The interface is **one dot** at `http://127.0.0.1:7878/`.
 
 ## TL;DR

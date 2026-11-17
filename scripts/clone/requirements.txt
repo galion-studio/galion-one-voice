@@ -1,4 +1,4 @@
-# Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+# Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 # Owner machine only. CI does not install this file. Nothing here is vendored.
 # CPU PyTorch in the clone child. Do not install an in-tree runtime, a GGML
 # port, or an ONNX Runtime build for this lane.

@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! galion-v2-asr: streaming Vosk sidecar. dlopens libvosk (Apache-2.0),
 //! never links it. stdin frames: b'A' u16le n, n*i16le (16 kHz mono) |
 //! b'F' (force final + reset) | b'S' (sync ack) | b'Q'. stdout NDJSON, one line per event:

@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! The real clone worker's stdout is not the runtime format.
 //! Protocol-stub PCM is compiled into `.gqvoice` for Samantha and Jarvis.
 #![cfg(feature = "speech")]

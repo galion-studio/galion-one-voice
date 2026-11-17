@@ -1,4 +1,4 @@
-// Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+// Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 //! Minimal, dependency-free JSON reader/writer (enough for `presence.json`).
 //! Objects keep key order so output is deterministic.
 

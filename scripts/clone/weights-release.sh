@@ -1,5 +1,5 @@
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 #
 # Shared names for the Chatterbox clone-weight release.
 # Sourced by fetch-clone-weights.sh and publish-clone-weights.sh.

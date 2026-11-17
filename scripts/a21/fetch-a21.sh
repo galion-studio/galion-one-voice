@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 #
 # FP-03 · fetch the A21 neural TTS pack (CPU only, MIT) into <repo>/weights/ (NOT vendored:
 # weights/.gitignore ignores everything). The ONLY network step of the A21 path; the demo

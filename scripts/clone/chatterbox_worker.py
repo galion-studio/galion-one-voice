@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 """V2-S14 out-of-process Chatterbox Nano clone worker.
 
 One long-lived process. One JSON line on stdin. Raw 24 kHz s16le on a

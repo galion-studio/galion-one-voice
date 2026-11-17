@@ -1,6 +1,6 @@
 # Eureka
 
-Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 Europe/Zagreb · 2026-11-03.
 
 The spelling is **Galion**. The product is Galion Voice.
@@ -138,7 +138,7 @@ described in `docs/eval/PRESENCE-EVAL.md`. It does not measure PSTN.
 Copy the command, the exit, and the measured number into
 [`SELF-EVAL.md`](SELF-EVAL.md). A section with no row there is blocked.
 
-Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Perpetual Open MIT License. (c) 2026 Galion Labs.
 Europe/Zagreb. 2026-11-03. Symphony section. Index: [README.md](README.md).
 
 

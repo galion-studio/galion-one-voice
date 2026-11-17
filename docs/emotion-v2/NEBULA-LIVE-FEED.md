@@ -1,6 +1,6 @@
 # Nebula live feed
 
-Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 
 Schema `galion-nebula-live-feed/1`. This is the contract for the visualiser at `apps/nebula-voice-v2`. That program is not in this repository. It reads one JSON object per line from stdout, or one JSON object per datagram from a loopback UDP port.
 

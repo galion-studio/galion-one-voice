@@ -1,6 +1,6 @@
 # Personas and emotions
 
-Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 Europe/Zagreb. Symphony section D. CPU-only. The 80 ms heartbeat is the clock.
 
 The feeling band sits inside `Heartbeat::step`, with the you band and the me band. One step, three bands. The work is arithmetic on a `Copy` value. It does not allocate, block, read a clock, or call a model. A late frame holds the previous feeling. A missing SENSE bit clears it to rest on that same step.

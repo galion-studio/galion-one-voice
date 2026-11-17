@@ -1,4 +1,4 @@
-// Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+// Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 //! One JSON line: stub script plus a measured window on this process.
 //! `product_claim` is false. No weights, no network.
 

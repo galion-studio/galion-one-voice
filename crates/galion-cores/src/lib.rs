@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! V2 live-call core map, shared by every process launcher on the voice host.
 //!
 //! **v3** (owner ruling 2026-11-04 20:45 CET): the reasoning sector is fully

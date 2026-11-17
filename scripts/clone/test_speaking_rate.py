@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 """Speaking rate changes the PCM, not only the logged prosody number.
 
 Measures a 200 Hz tone at 24 kHz. Does not load a model and does not write a WAV.

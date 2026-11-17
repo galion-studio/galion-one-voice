@@ -1,6 +1,6 @@
 # Emotion V2 — filename scheme and manifests
 
-Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 Europe/Zagreb. Layout for capture originals and for the per-sector reference
 map that the scorer fix (branch `cursor/emotion-v2-per-sector-refs`) consumes.
 

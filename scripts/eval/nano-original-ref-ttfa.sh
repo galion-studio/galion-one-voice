@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 #
 # Original-ref Nano first-PCM and 80 ms first-playable-frame harness.
 # Stubs are FAIL. Piper is not this clock. No real clone PCM => BLOCKED.

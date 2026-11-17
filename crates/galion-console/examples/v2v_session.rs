@@ -1,4 +1,4 @@
-// Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+// Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 //! One voice-to-voice session per persona, using the showcase beats.
 //!
 //! The words are the script in `docs/galion-voice-v2/V2V-SHOWCASE.md`.

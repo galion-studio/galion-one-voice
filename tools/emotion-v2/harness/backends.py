@@ -1,5 +1,5 @@
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 """Pluggable categorical emotion backends.
 
 The default recogniser is ``superb/wav2vec2-base-superb-er``, and only when a

@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! v2-pipeline240: latency-240 lane 04 A/B of the full loop on the same
 //! clips, Vosk sidecar, warm Piper and LLM as v2-latency.
 //!

@@ -1,6 +1,6 @@
 # V2-S1 · Process bus — message shapes
 
-Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 Status: design for the bus. The code in this program still uses the V1 channels
 (`MicTap`, `TurnInbox`, `ReplyBox`, `TurnWorker`'s `sync_channel`). Do not build
 a second runtime beside those. The bus replaces them when V2-S1 is implemented.

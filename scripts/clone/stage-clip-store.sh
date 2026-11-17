@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 #
 # Copy gitignored persona WAVs into $GALION_CLIP_STORE, outside the work tree.
 # WAVs only. Writes reference.wav.sha256 from the bytes. Does not fetch.

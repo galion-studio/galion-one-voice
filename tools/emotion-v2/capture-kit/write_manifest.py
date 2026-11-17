@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+# Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 """Validate capture WAV format and write sha256 manifests.
 
 This tool reads audio; it does not rewrite it, and it does not write a

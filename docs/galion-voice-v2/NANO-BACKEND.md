@@ -1,6 +1,6 @@
 # Galion Voice V2 · Chatterbox Nano backend
 
-Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 Europe/Zagreb.
 
 The spelling is **Galion**. The product is Galion Voice.

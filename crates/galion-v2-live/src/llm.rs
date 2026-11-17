@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! Reply stream. Default: the local canned reply (no network). Opt-in only
 //! (GALION_LLM=openrouter): streaming chat completions via a `curl` child.
 //! The key is read from OPENROUTER_API_KEY and handed to curl on stdin as

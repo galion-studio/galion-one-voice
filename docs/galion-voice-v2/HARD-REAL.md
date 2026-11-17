@@ -1,6 +1,6 @@
 # Hard real gates
 
-Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 Europe/Zagreb. The spelling is **Galion**. The product is Galion Voice.
 
 `scripts/eval/v2-hard-loop.sh` runs on this CPU. It does not call a cloud

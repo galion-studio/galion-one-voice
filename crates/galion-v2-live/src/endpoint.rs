@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! Two-stage endpointer (latency-240 lane 04).
 //!
 //! The old loop waited a fixed 160 ms of silence before doing anything. Here

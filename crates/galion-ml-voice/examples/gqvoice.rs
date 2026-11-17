@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! Compile one clone utterance into `voices/gq/<persona>.gqvoice`.
 //!
 //! Worker stdout is raw s16le. This program writes a Galion packet and

@@ -1,4 +1,4 @@
-// Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+// Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 //! Cortex handoff: analytical takeover on the Hermes side band.
 //!
 //! The voice engine keeps speaking from local state (canned reply, filler,

@@ -1,5 +1,5 @@
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 """Manifest loading, sha256 pins, and closed failures. Sine fixtures only."""
 
 from __future__ import annotations

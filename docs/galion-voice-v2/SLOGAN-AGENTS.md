@@ -1,6 +1,6 @@
 # Slogan seats
 
-Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Perpetual Open MIT License. (c) 2026 Galion Labs.
 Europe/Zagreb. Record only. **0 launched.**
 
 Master slogan, exact words:

@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! Screen-demo glue for the phone path (feature `phone-turn`).
 //!
 //! The 80 ms loop calls [`PhoneHost::drive_you`] and [`PhoneHost::drive_me`]

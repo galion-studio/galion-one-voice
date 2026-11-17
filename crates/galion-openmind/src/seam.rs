@@ -1,4 +1,4 @@
-// Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+// Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 //! Local Open Mind / student turn seam.
 //!
 //! A voice turn may call [`TurnSeam::consult`] at a turn boundary. It must not

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 #
 # Letter A · fetch Vosk small-en and libvosk into <repo>/weights/ (NOT vendored:
 # weights/.gitignore ignores everything). CPU only. No GPU. The demo does not

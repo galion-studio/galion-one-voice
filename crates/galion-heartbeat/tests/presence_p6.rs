@@ -1,4 +1,4 @@
-// Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+// Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 //! presence.json through the real heartbeat: P6 measures lean_in_ms when Rika is ON.
 use galion_heartbeat::presence::RikaReplayBackend;
 use galion_heartbeat::HeartbeatConfig;

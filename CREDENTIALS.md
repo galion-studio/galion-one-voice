@@ -1,6 +1,6 @@
 # Galion Voice — CREDENTIALS (third-party & borrowed pieces)
 
-Perpetual Open MIT License · © 2026 Maciej Grajczyk · 2026-11-02 (Europe/Zagreb, UTC+1)
+Perpetual Open MIT License · © 2026 Galion Labs · 2026-11-02 (Europe/Zagreb, UTC+1)
 **LOCAL ONLY.** Code is MIT (this repo); weights and external tools keep their own licences. Only third-party / borrowed pieces are listed.
 
 Sources scanned: `Cargo.toml` + member manifests, `Cargo.lock`, `LOCKS.toml`, `README.md`, `docs/**` (V1-DEMO, A21-BLOCKERS, A21-COUNSEL-MEMO, cascade, wave20/21), `scripts/a21/fetch-a21.sh`, `weights/.gitignore`, `weights/runtime/piper/PIPER-LICENSE.md`, source comments. No MULTI-LAB docs found. `rmp` was searched for and is not referenced anywhere. No vendored third-party source or copy-attribution comments were found in `*.rs`.

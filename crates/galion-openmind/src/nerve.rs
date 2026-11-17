@@ -1,4 +1,4 @@
-// Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+// Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 //! Nerve notes from the voice engine.
 //!
 //! The wire shape matches `openmind_nerve::evt::NerveEvent` schema version 1

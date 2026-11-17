@@ -1,4 +1,4 @@
-// Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+// Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 //! W21-02: `MimiPassthrough::step_frame` / `StudentBackend::step_frame` do not allocate.
 use galion_student_backend::mimi_lane::tone_frame;
 use galion_student_backend::{KernelMode, MimiLaneConfig, MimiPassthrough, Monitor, StudentBackend, FRAME_SAMPLES};

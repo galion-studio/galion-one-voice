@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! Virtual-user presence eval for the phone path.
 //!
 //! The user is in-process. It injects text or a WAV, PhoneLane answers with

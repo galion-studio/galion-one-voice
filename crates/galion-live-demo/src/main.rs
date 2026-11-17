@@ -1,4 +1,4 @@
-// Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+// Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 //! `galion-live-demo [--in you.wav] [--reply words.wav] [--out DIR] [--consent none|sense,adapt]
 //!                   [--purpose personal|workplace|education|...] [--rika-opener] [--realtime] [--quiet]
 //!                   [--web 127.0.0.1:PORT] [--loops N] [--hold SECS]`

@@ -1,6 +1,6 @@
 # Voice V2 universal datasets — inventory and proposed indoor PersonaPlex join
 
-Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 
 Pair 11, PersonaPlex. Date of this inventory: 2026-11-08. This file is documentation only. It does not ingest audio, train a model, download weights, or change `LOCKS.toml`, pin files, or code.
 

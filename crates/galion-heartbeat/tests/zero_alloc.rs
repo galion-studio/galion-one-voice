@@ -1,4 +1,4 @@
-// Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+// Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 //! Counting allocator: `Heartbeat::step` must allocate nothing (Rika ON, full R1 moment).
 mod common;
 use common::*;
