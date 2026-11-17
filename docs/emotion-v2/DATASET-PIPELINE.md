@@ -19,7 +19,8 @@ datasets/emotion-v2/<voice_id>/<run_id>/
   manifest.jsonl          generic training manifest, one clip per line
   rejected.jsonl          lines the quality gate dropped (no audio)
   run.json                pitch standard, licences, plugin sources, counts
-  audio/<emotion>/*.wav   augmented clips (PCM 16-bit)
+  audio/<emotion>/*.wav   augmented clips (48 kHz PCM 24-bit mono, -20 LUFS;
+                          24 kHz 16-bit only in synthetic-test mode)
   personaplex/train.jsonl Moshi-format manifest (path, duration)
   personaplex/eval.jsonl  held-out split (empty unless --eval-fraction)
   personaplex/prompts.jsonl   side metadata, not the trainer manifest
@@ -38,10 +39,11 @@ datasets/emotion-v2/<voice_id>/<run_id>/
 | `environment` | Environment name from the matrix |
 | `snr_db` | Noise level in dB. `null` means dry, no noise added |
 | `voice_id` | Profile id |
-| `scores` | `wer`, `ecapa`, `emotion`. `null` when that scorer is absent |
+| `scores` | `wer`, `ecapa`, `emotion`. Always set in high-quality mode; `null` only in synthetic-test mode |
 | `sha256` | SHA-256 of the wav bytes |
 
-Further keys record the sample rate, duration, the 432 Hz pitch centre, the
+Further keys record the sample rate, `bit_depth`, `loudness_lufs`,
+`true_peak_dbtp`, `quality_mode`, duration, the 432 Hz pitch centre, the
 backend, whether the signal is synthetic, the scenario id, the
 impulse-response and noise source plus licence, and `telephony_hz` (`8000`
 for the phone environment, otherwise `null`). Scores are measured on the dry
@@ -66,12 +68,15 @@ accepted, and that is what the tests use.
 
 ## How to run the stub
 
-Requires Python 3.11+ and numpy. From the repo root, with
-`tools/emotion-v2/dataset` on `PYTHONPATH`:
+Requires Python 3.11+, numpy, and for the default high-quality mode the
+pinned bricks in `tools/emotion-v2/dataset/requirements-hq.txt`
+(`pip install -r tools/emotion-v2/dataset/requirements-hq.txt`). From the
+repo root, with `tools/emotion-v2/dataset` on `PYTHONPATH`:
 
 ```bash
 PYTHONPATH=tools/emotion-v2/dataset \
   python3 -m emotion_v2_dataset run \
+  --allow-unscored-synthetic-test \
   --run-id demo \
   --emotions "Neutral|Happy" \
   --environments "dry studio|small room" \
@@ -164,14 +169,54 @@ environments = 192 clips. Pass `--max-scenarios-per-emotion` and
 1. Load the profile, the scenario bank, and the environment list. Resolve
    optional plugins (below). Apply the pitch-standard gate.
 2. Render each selected line with the backend, dry, at 24 kHz.
-3. Quality filter. WER, ECAPA, and emotion scorers run only when a scorer
-   object is configured or the CI plugin provides one. A missing scorer
-   leaves that score `null` and does not reject the line, unless
-   `--require-scorers` is set. Default thresholds, applied only to scores
-   that exist: WER above 0.35, ECAPA below 0.50, emotion match below 0.40.
-   Rejected lines go to `rejected.jsonl` and are not augmented.
+3. Quality filter, **high-quality-only by default**. All three scorers
+   (WER, ECAPA, emotion) are required: a missing scorer rejects the line
+   (`--require-scorers` is now the default and kept only as a no-op flag).
+   Default thresholds are the rollout gate from
+   `tools/emotion-v2/thresholds.toml`: WER ≤ 0.018, ECAPA > 0.7057, and
+   emotion ≥ 0.83 checked **per emotion class** for all twelve classes
+   (`QualityThresholds.min_emotion_by_class`, or `--thresholds FILE` to read
+   per-class targets). High-quality mode refuses any threshold looser than
+   the gate. Rejected lines go to `rejected.jsonl` and are not augmented.
 4. Augment each accepted line across the environment matrix.
-5. Write wavs, `manifest.jsonl`, and the PersonaPlex export.
+5. Capture-spec gate on every augmented clip (`capture.py`, numbers from
+   `capture-spec.toml`): resample to 48 kHz, level to −20 LUFS, require
+   −20 ± 2 LUFS, true peak ≤ −1 dBTP, 0 clipped samples (also checked on the
+   dry render), write 24-bit PCM mono. A failing clip goes to
+   `rejected.jsonl` with a `capture:` reason. Telephony clips stay band-limited
+   inside the 48 kHz file; `telephony_hz` still says 8000.
+6. Write wavs, `manifest.jsonl`, and the PersonaPlex export.
+
+### Bricks (reused, not written)
+
+| Brick | Version | Licence | Used for |
+|---|---|---|---|
+| pyloudnorm | 0.2.0 | MIT | BS.1770-4 integrated loudness |
+| scipy (pyloudnorm dependency) | any | BSD-3-Clause | K-weighting filters inside pyloudnorm |
+| python-samplerate | 0.2.4 | MIT (libsamplerate BSD-2-Clause) | `sinc_best` resampling, 4× true-peak oversampling |
+
+The package code is glue only: thresholds, the clipped-sample count, and the
+24-bit wav write through the standard-library `wave` module.
+
+### Scorers and compute device
+
+Scorers are pluggable. `--scorer-module NAME` (repeatable) imports a module
+with `build_scorers(config) -> list`; without it the `emotion_v2_ci` plugin
+is tried. An emotion scorer may return one float or a mapping of all twelve
+class names to scores (a 12-class posterior); the clip's own class is used.
+A named module that does not import is an error, never a silent pass.
+
+`config` carries `device`, `num_threads`, and `device_reason`.
+`--scorer-device cpu` is the production default (no GPU probe, all CPU
+threads). `--scorer-device auto` picks CUDA when torch sees a GPU, otherwise
+all CPU threads. `--scorer-device cuda` fails if there is no GPU.
+
+### Synthetic-test opt-out
+
+`--allow-unscored-synthetic-test` (`RunConfig.allow_unscored_synthetic_test`)
+is the only way to keep unscored clips and skip the capture spec. It is
+refused for a real profile and for any backend except `stub`. Present scores
+are still held to the gate.
 
 ## Environments, sources, and licences
 

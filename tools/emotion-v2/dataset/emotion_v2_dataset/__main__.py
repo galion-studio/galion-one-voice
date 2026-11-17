@@ -7,7 +7,13 @@ From the repository root::
     python -m emotion_v2_dataset run --run-id demo
 
 ``PYTHONPATH`` must include ``tools/emotion-v2/dataset``. The default backend
-is the synthetic stub. ``--backend chatterbox`` still needs a consent file
+is the synthetic stub.
+
+High-quality-only is the default: every clip needs WER, ECAPA, and emotion
+scores (``--scorer-module`` or the ``emotion_v2_ci`` plugin), the rollout gate
+(WER <= 0.018, ECAPA > 0.7057, emotion >= 0.83 per class), and the capture
+spec (48 kHz / 24-bit, -20 LUFS, no clipping). Without scorers every clip is
+rejected. ``--allow-unscored-synthetic-test`` is for synthetic stub tests only. ``--backend chatterbox`` still needs a consent file
 and, in-process, an engine this CLI does not provide.
 """
 
@@ -15,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from dataclasses import replace
 from datetime import date
 from pathlib import Path
 
@@ -22,11 +29,17 @@ from emotion_v2_dataset.errors import (
     ConsentError,
     DatasetError,
     PitchPolicyError,
+    QualityError,
     RealVoiceRefused,
 )
 from emotion_v2_dataset.paths import DATA_DIR, default_output_root
 from emotion_v2_dataset.pipeline import RunConfig, run_pipeline
-from emotion_v2_dataset.quality import QualityThresholds
+from emotion_v2_dataset.quality import (
+    HIGH_QUALITY_THRESHOLDS,
+    SYNTHETIC_TEST_THRESHOLDS,
+    QualityThresholds,
+    thresholds_from_toml,
+)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -60,30 +73,53 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument("--absolute-paths", action="store_true")
     run.add_argument("--max-wer", type=float, default=None)
     run.add_argument("--min-ecapa", type=float, default=None)
-    run.add_argument("--min-emotion", type=float, default=None)
-    run.add_argument("--require-scorers", action="store_true")
+    run.add_argument("--min-emotion", type=float, default=None,
+                     help="Threshold for every emotion class. High-quality mode accepts only >= 0.83.")
+    run.add_argument("--thresholds", type=Path, default=None,
+                     help="thresholds.toml with [guards] and per-class [emotion.targets].")
+    run.add_argument("--scorer-module", action="append", default=None,
+                     help="Python module with build_scorers(config) -> list. Repeatable.")
+    run.add_argument(
+        "--require-scorers",
+        action="store_true",
+        help="Kept for old scripts. Scorers are always required unless "
+        "--allow-unscored-synthetic-test is given.",
+    )
+    run.add_argument(
+        "--allow-unscored-synthetic-test",
+        action="store_true",
+        help="SYNTHETIC STUB TESTS ONLY. Keep clips with missing scorers and skip "
+        "the capture spec. Refused for a real profile or the chatterbox backend.",
+    )
+    run.add_argument(
+        "--scorer-device",
+        choices=("cpu", "auto", "cuda"),
+        default="cpu",
+        help="cpu (production default, all threads); auto = CUDA if available else all CPU threads.",
+    )
+    run.add_argument("--scorer-threads", type=int, default=None)
     run.add_argument("--today", default=None, help="Override today's date (YYYY-MM-DD).")
     args = parser.parse_args(argv)
     if args.command != "run":
         parser.error("unknown command")
         return 2
-    thresholds = QualityThresholds(require_scorers=args.require_scorers)
+    if args.allow_unscored_synthetic_test and args.require_scorers:
+        parser.error("--require-scorers and --allow-unscored-synthetic-test conflict")
+    base = SYNTHETIC_TEST_THRESHOLDS if args.allow_unscored_synthetic_test else HIGH_QUALITY_THRESHOLDS
+    if args.thresholds is not None:
+        loaded = thresholds_from_toml(args.thresholds)
+        base = replace(loaded, require_scorers=base.require_scorers)
     if args.max_wer is not None:
-        thresholds = QualityThresholds(
-            max_wer=args.max_wer,
-            min_ecapa=thresholds.min_ecapa,
-            min_emotion=thresholds.min_emotion,
-            require_scorers=thresholds.require_scorers,
+        base = replace(base, max_wer=args.max_wer)
+    if args.min_ecapa is not None:
+        base = replace(base, min_ecapa=args.min_ecapa)
+    if args.min_emotion is not None:
+        base = replace(
+            base,
+            min_emotion=args.min_emotion,
+            min_emotion_by_class={name: args.min_emotion for name in base.min_emotion_by_class},
         )
-    if args.min_ecapa is not None or args.min_emotion is not None:
-        thresholds = QualityThresholds(
-            max_wer=args.max_wer if args.max_wer is not None else QualityThresholds().max_wer,
-            min_ecapa=args.min_ecapa if args.min_ecapa is not None else QualityThresholds().min_ecapa,
-            min_emotion=(
-                args.min_emotion if args.min_emotion is not None else QualityThresholds().min_emotion
-            ),
-            require_scorers=args.require_scorers,
-        )
+    thresholds: QualityThresholds = base
     today = date.fromisoformat(args.today) if args.today else None
     config = RunConfig(
         profile_path=args.profile,
@@ -101,10 +137,14 @@ def main(argv: list[str] | None = None) -> int:
         personaplex_adapter=args.personaplex_adapter,
         absolute_personaplex_paths=args.absolute_paths,
         today=today,
+        scorer_modules=tuple(args.scorer_module) if args.scorer_module else None,
+        allow_unscored_synthetic_test=args.allow_unscored_synthetic_test,
+        scorer_device=args.scorer_device,
+        scorer_threads=args.scorer_threads,
     )
     try:
         result = run_pipeline(config)
-    except (ConsentError, PitchPolicyError, RealVoiceRefused) as exc:
+    except (ConsentError, PitchPolicyError, RealVoiceRefused, QualityError) as exc:
         print(f"refused: {exc}", file=sys.stderr)
         return 2
     except DatasetError as exc:

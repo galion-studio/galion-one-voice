@@ -107,6 +107,7 @@ class EndToEndTests(unittest.TestCase):
                     environments=("dry studio",),
                     max_scenarios_per_emotion=1,
                     repo_root=REPO,
+                    allow_unscored_synthetic_test=True,
                 )
             )
             blob = b"".join(path.read_bytes() for path in result.run_dir.rglob("*") if path.is_file())
@@ -162,8 +163,13 @@ class EndToEndTests(unittest.TestCase):
                     max_scenarios_per_emotion=1,
                     today=TODAY,
                     repo_root=REPO,
+                    # A real profile always runs the high-quality gate.
+                    scorers=_passing_scorers(),
                 )
             )
+            self.assertEqual(result.record["quality_mode"], "high-quality")
+            self.assertEqual(result.rows[0].sample_rate_hz, 48000)
+            self.assertEqual(result.rows[0].bit_depth, 24)
             self.assertTrue(result.record["consent_checked"])
             self.assertTrue(result.rows[0].synthetic_signal)
             self.assertEqual(result.rows[0].render_backend, "stub")
@@ -188,8 +194,9 @@ class EndToEndTests(unittest.TestCase):
                     environments=("car", "street"),
                     max_scenarios_per_emotion=1,
                     scorers=[RejectWer()],
-                    thresholds=QualityThresholds(max_wer=0.35),
+                    thresholds=QualityThresholds(max_wer=0.35, require_scorers=False),
                     repo_root=REPO,
+                    allow_unscored_synthetic_test=True,
                 )
             )
             self.assertEqual(result.rows, [])
@@ -235,6 +242,7 @@ class EndToEndTests(unittest.TestCase):
                     "dry studio",
                     "--max-scenarios-per-emotion",
                     "1",
+                    "--allow-unscored-synthetic-test",
                 ],
                 cwd=str(PACKAGE),
                 env=env,
@@ -394,8 +402,20 @@ def _run(root: Path, run_id: str):
             environments=("dry studio", "cafe/babble", "phone/narrowband 8 kHz"),
             max_scenarios_per_emotion=1,
             repo_root=REPO,
+            # Legacy synthetic run: no scorers, no capture spec, 24 kHz / 16-bit.
+            allow_unscored_synthetic_test=True,
         )
     )
+
+
+def _passing_scorers() -> list:
+    from emotion_v2_dataset.quality import FunctionScorer
+
+    return [
+        FunctionScorer("wer", lambda _clip: 0.0),
+        FunctionScorer("ecapa", lambda _clip: 0.9),
+        FunctionScorer("emotion", lambda _clip: 0.95),
+    ]
 
 
 def _real_profile(root: Path) -> Path:

@@ -50,6 +50,10 @@ class ManifestRow:
     duration_s: float = 0.0
     # Label only. Audio synthesis does not read this field.
     element: str = ""
+    bit_depth: int = 16
+    loudness_lufs: float | None = None
+    true_peak_dbtp: float | None = None
+    quality_mode: str = "high-quality"
 
     def as_dict(self) -> dict[str, Any]:
         row: dict[str, Any] = {
@@ -80,6 +84,10 @@ class ManifestRow:
             "noise_licence": self.noise_licence,
             "telephony_hz": self.telephony_hz,
             "element": self.element or _element_label(self.emotion),
+            "bit_depth": self.bit_depth,
+            "loudness_lufs": self.loudness_lufs,
+            "true_peak_dbtp": self.true_peak_dbtp,
+            "quality_mode": self.quality_mode,
         }
         return row
 

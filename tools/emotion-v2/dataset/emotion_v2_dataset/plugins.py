@@ -77,9 +77,21 @@ def resolve_references(
 def load_scorer_plugins(
     importer: Callable[[str], Any] | None = None,
     config: dict[str, Any] | None = None,
+    module_names: tuple[str, ...] | None = None,
 ) -> tuple[list[Any], str]:
+    """Load scorers from ``emotion_v2_ci`` or from named modules.
+
+    ``module_names`` lets a run plug in another scorer module, for example a
+    12-class emotion scorer, without editing this package. Each module must
+    expose ``build_scorers(config) -> list``. Scorers from later modules
+    replace earlier ones with the same ``name``. A named module that does not
+    import, or does not match the interface, raises ``QualityError``: a
+    scorer the caller asked for is never silently dropped.
+    """
     if importer is None:
         importer = importlib.import_module
+    if module_names:
+        return _load_named_scorers(importer, config, module_names)
     try:
         module = importer(CI_MODULE)
     except ImportError:
@@ -94,3 +106,32 @@ def load_scorer_plugins(
     if not isinstance(built, list):
         return [], "local-mismatch"
     return list(built), CI_MODULE
+
+
+def _load_named_scorers(
+    importer: Callable[[str], Any],
+    config: dict[str, Any] | None,
+    module_names: tuple[str, ...],
+) -> tuple[list[Any], str]:
+    from emotion_v2_dataset.errors import QualityError
+
+    by_name: dict[str, Any] = {}
+    extra: list[Any] = []
+    for module_name in module_names:
+        try:
+            module = importer(module_name)
+        except ImportError as exc:
+            raise QualityError(f"scorer module {module_name} does not import") from exc
+        builder = getattr(module, "build_scorers", None)
+        if not callable(builder):
+            raise QualityError(f"scorer module {module_name} has no build_scorers()")
+        built = builder({} if config is None else config)
+        if not isinstance(built, list):
+            raise QualityError(f"scorer module {module_name} build_scorers() must return a list")
+        for scorer in built:
+            name = getattr(scorer, "name", None)
+            if isinstance(name, str):
+                by_name[name] = scorer
+            else:
+                extra.append(scorer)
+    return list(by_name.values()) + extra, "+".join(module_names)
