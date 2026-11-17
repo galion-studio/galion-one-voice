@@ -36,6 +36,8 @@ jobs:
         run: cargo test --manifest-path tools/symphony/lungs/Cargo.toml
       - name: Voice V2 pipeline (synthetic tones, no download)
         run: cargo test --manifest-path tools/symphony/voice-v2/Cargo.toml
+      - name: Mouth stack integrator (synthetic tone, no download)
+        run: cargo test --manifest-path tools/symphony/mne/Cargo.toml
       - name: One-percent symphony gate
         run: galion-gates/op-one-percent.sh
       - name: Clone worker scaffold (no weight download)

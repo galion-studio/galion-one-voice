@@ -1,0 +1,27 @@
+# Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
+[package]
+name = "galion-mne"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+publish = false
+description = "Swarm 13 integrator: one CLI over the stacked drafts. Does not own the layer crates."
+
+[[bin]]
+name = "galion-mne"
+path = "src/main.rs"
+
+[dependencies]
+galion-articulation = { path = "../articulation" }
+galion-emotion-render = { path = "../emotion-render" }
+galion-lungs = { path = "../lungs" }
+hound = "3.5"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+
+# Own workspace, same pattern as the stacked symphony tools.
+[workspace]
+
+[profile.release]
+opt-level = 3
