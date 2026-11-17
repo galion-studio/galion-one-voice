@@ -1,5 +1,5 @@
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 """Nebula live feed: EMA, gas-line ids, replay, UDP, and the 80 ms heartbeat.
 
 No audio is synthesized or read. Posteriors are numbers.

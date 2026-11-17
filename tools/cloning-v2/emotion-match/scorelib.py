@@ -1,5 +1,5 @@
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 # emotion_match = 0.70*category_blend+0.30*emb_sim
 #
 # Pure functions. No audio I/O, no weights, no network. The weights and the

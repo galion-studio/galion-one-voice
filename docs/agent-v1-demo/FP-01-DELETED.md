@@ -1,5 +1,5 @@
 # FP-01 · Deleted / disabled (one-dot only)
-Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 
 Rule: the interface is ONE solid dot on near-black at `http://127.0.0.1:7878/`. Anything else goes.
 Backups of the pre-FP-01 files are in `/workspace/fp01-backup/` (box scratch, outside the repo).

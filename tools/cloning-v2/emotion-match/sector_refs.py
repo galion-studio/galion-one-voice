@@ -1,5 +1,5 @@
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 """Per-sector reference manifest for emotion_match.
 
 A manifest maps each line's emotion to a reference clip path and its sha256.

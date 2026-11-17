@@ -13,7 +13,7 @@ Source drafts: `galion-voice-20/v4/agents/A21-licence-weights.md` (full A21 memo
 BACKLOG #9 (P1, BLOCKED) is waiting on this. It blocks #10 (A7 `gq-pack` + G5), #5 (real Mimi weights) and #13, and it gates every weight on disk for #11 (adapt, don't train) and #20.
 
 ## 2. Facts
-- **Code:** Perpetual Open MIT, © 2026 Maciej Grajczyk. This covers code only; weights are excluded.
+- **Code:** Perpetual Open MIT, © 2026 Galion Labs. This covers code only; weights are excluded.
 - **No weights in the repo** (S10). Weights are only linked, and each link needs a licence row (`docs/WEIGHTS.md` / `weights/LICENCES.toml`).
 - **Current plan: no training.** We load published Mimi + Moshiko as they are, apply int8 post-training quantisation to `.gq`, use SenseVoice-Small as an inbound SER reference (adapter only, no fine-tune), and use PersonaPlex outputs as eval data only. A knowledge-distillation (KD) student (A8) is a *later* option.
 - **The loader refuses real weights today** (`galion-mimi` `NotImplementedStub`). The format allowlist is `{safetensors, gq}`.

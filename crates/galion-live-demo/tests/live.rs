@@ -1,4 +1,4 @@
-// Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+// Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 //! W21-01 integration: the live demo frame loop on the real Heartbeat + RikaReplayBackend path.
 use galion_emotion::band::consent_bits;
 use galion_emotion::Purpose;

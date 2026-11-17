@@ -1,5 +1,5 @@
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 """Synthetic signals, wav I/O, and open band-limit / codec simulations.
 
 No recorded room, no downloaded noise, no voice clone. The stub voice is a

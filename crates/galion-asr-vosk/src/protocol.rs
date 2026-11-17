@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! NDJSON protocol between PhoneLane and `galion-asr-vosk`.
 //!
 //! One request line, then zero or more `partial` lines, then one `final`

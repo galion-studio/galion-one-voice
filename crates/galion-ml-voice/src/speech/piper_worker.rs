@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! Persistent Piper A21 worker (V2-S6). Out of process. No in-tree ONNX Runtime.
 //!
 //! One child per [`PiperWorker`]: `piper --json-input --output_raw`. Each request

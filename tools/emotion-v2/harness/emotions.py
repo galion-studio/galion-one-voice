@@ -1,5 +1,5 @@
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 """Samantha's twelve Emotion V2 categories.
 
 Names are the harness contract. Paths accept the lowercase id or the

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 # G.A.L.I.O.N. — General Autonomous Local Intelligence Open Network
 # Developed and distributed by Galion Labs
 # Perpetual Open MIT License

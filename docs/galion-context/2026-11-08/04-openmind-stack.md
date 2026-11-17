@@ -1,6 +1,6 @@
 # OpenMind stack — desktop pair 03
 
-Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 
 Written 2026-11-08T04:30:42+01:00 (Europe/Zagreb, CET). This file is a read of source. It does not deploy, pair a device, call a model, or change a lock.
 

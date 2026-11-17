@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! Scratch repo + clip store for the consent gate tests. Synthetic only:
 //! a generated tone, fixture names, pinned sizes as sparse files. No real
 //! voice, no real weights.

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+# Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 # Section C. Texture stays. No spectral number unless both the reference and a clean baseline exist.
 set -euo pipefail
 cd "$(dirname "$0")/../.."

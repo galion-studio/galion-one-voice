@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! Pack round-trip from a tiny synthetic buffer.
 //! The inputs are bytes in this file. No wav path and no weight file.
 

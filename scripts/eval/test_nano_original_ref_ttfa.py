@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 """Judge tests for the original-ref Nano TTFA harness.
 
 Fixtures are not a measurement of this host. No torch, no weights, no WAV.

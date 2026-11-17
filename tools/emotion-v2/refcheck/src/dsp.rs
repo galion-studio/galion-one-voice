@@ -1,4 +1,4 @@
-// Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+// Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 //! Meters for the capture gate.
 //!
 //! Loudness is mono ITU-R BS.1770-4 (K-weighting, 400 ms blocks, absolute gate,

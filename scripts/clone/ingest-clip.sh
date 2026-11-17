@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 #
 # Check one reference clip the human already placed. Does not fetch, does not
 # record, does not trim, does not write the wav, and does not edit LOCKS.toml.

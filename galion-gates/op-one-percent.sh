@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 # OP "one-percent" CPU gate (V6 engine account inside symphony).
 #   P1  non-inference CPU ≤ 1% of the 80 ms tick (800 µs)
 #   P3  p99 of that tick work < 800 µs; p3_much_less records p99 < 80 µs

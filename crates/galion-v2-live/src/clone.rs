@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! Client for the persistent out-of-process Chatterbox Nano clone worker
 //! (LOCKS v2s14 exception: PyTorch CPU, out of process). The worker loads
 //! once and caches speaker conditionals per persona. Protocol: one JSON

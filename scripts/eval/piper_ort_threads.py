@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 #
 # lat240 / agent 01 (EVAL ONLY): Piper VITS onnx inference time vs onnxruntime
 # intra-op threads / spinning / core pinning. Phoneme ids come from the real

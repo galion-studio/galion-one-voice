@@ -1,4 +1,4 @@
-// Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+// Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 //! Instruction-floor rule engine. No model, no weights, no network.
 //!
 //! Owner ruling 2026-11-04: the reply path is in-house only (no Qwen, no

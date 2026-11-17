@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 """TTFA / streaming latency gate for live sectors.
 
 Reads LOCKS.toml. Does not write it.
@@ -480,7 +480,7 @@ def write_eval(body: dict) -> None:
             [
                 "# Symphony self-eval",
                 "",
-                "Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.",
+                "Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.",
                 "Europe/Zagreb.",
                 "",
                 "A section is complete when its gate passes and the receipt below matches the script.",

@@ -1,5 +1,5 @@
 #!/bin/sh
-# Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+# Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 # Symphony sections D and E. CPU-only gates. Exits 0 only when every row passes.
 set -eu
 cd "$(dirname "$0")/.."

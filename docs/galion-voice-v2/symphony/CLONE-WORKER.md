@@ -1,6 +1,6 @@
 # Clone worker
 
-Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 Europe/Zagreb. From the repository root.
 
 The contract is `docs/galion-voice-v2/CLONE-WORKER.md`. The child is `scripts/clone/chatterbox_worker.py`. The Rust side is `crates/galion-ml-voice/src/speech/clone_worker.rs`. One long-lived process, one JSON line in, raw 24 kHz s16le on stdout, `galion-clone-utt:` on stderr. CPU only, out of process, no GPU. PyTorch is not imported by the stub.

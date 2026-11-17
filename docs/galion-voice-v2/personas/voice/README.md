@@ -1,6 +1,6 @@
 # Persona voice configs
 
-Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Perpetual Open MIT License. (c) 2026 Galion Labs.
 Europe/Zagreb. Drafts. The `/v2` demo route reads these files for
 prosody, wash, and the tag rule. The clone worker reads `send_reference`,
 `clip_path`, and the pinned sha256 when a local wav is present. `wired`

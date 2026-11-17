@@ -1,5 +1,5 @@
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 """Synthetic distributions for the offline nebula metric.
 
 No audio, no model, no generated dataset. The 0.70/0.30 emotion_match

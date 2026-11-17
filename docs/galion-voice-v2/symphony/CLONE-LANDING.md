@@ -1,6 +1,6 @@
 # Symphony B · Clone landing
 
-Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 Europe/Zagreb. 2026-11-03. The harness is the spec.
 
 Master slogan: "The seamless connection with the human being, on the voice only."

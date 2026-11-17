@@ -1,4 +1,4 @@
-// Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+// Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 //! S0 student brain probe. CPU file read through [`galion_tensor::GqFile`].
 //!
 //! No download, no network, no third-party teacher, no weight write.

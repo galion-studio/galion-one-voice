@@ -1,5 +1,5 @@
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 """Loopback session for the UI emotion feed.
 
 The server checks every line before it writes. A line that is not a legal

@@ -1,5 +1,5 @@
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 """Generic Emotion V2 training-data pipeline.
 
 Python, same side of the repo as the Chatterbox worker and the pipeline

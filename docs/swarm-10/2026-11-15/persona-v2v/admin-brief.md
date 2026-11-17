@@ -1,6 +1,6 @@
 # Swarm 10 — persona-v2v admin-brief (Lane C, C4)
 
-Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 Europe/Zagreb. The spelling is **Galion**. The product is Galion Voice.
 
 **Unsigned.** Prepared by Swarm 10 worker `admin-brief`. This file is not a signature. No agent ticked a box in `docs/galion-voice-v2/ADMIN-UI-CHECK.md`. No agent wrote the sign-off date. The sign-off name, when Maciej signs, is **Maciej Grajczyk**.

@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! Score rules for the virtual user.
 //! Task facts are the canned English lines. Interim must not claim recognition.
 //! The same metric names the presence harness rejects are rejected here.

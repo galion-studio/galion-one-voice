@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! `galion-ref-recut --in SRC.wav --out OUT.wav [--start S --end E]
 //!   [--persona P [--texture T] [--update-refs]]`
 //!

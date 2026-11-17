@@ -1,4 +1,4 @@
-// Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+// Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 use galion_emotion::{DefaultConsentGate, Purpose};
 use galion_heartbeat::{FrameIn, HeartbeatConfig, FRAME_SAMPLES, RIKA_BITS};
 use galion_symphony::{

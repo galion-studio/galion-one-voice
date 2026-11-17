@@ -1,6 +1,6 @@
 # Samantha V2
 
-Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 Europe/Zagreb. A session spec. It is not a claim that the session is built,
 and it is not V3.
 

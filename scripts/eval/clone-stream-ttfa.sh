@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 #
 # Stream TTFA gate. Piper is the hard live path (t301).
 # Nano streaming stays in scripts/clone/nano_stream.py.

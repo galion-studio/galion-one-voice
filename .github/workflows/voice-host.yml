@@ -1,4 +1,4 @@
-# Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+# Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 # Host checks for the voice units. No deploy, no SSH, no board.
 name: voice-host
 

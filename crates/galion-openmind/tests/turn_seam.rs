@@ -1,4 +1,4 @@
-// Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+// Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 //! Local Open Mind seam. A missing store or a missing weights file is
 //! BLOCKED. Stored text is returned unchanged. Nothing here is a thought trace.
 use galion_openmind::{

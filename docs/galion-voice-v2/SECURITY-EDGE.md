@@ -1,6 +1,6 @@
 # V2-S3 · Secure edge and retention
 
-Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 TLS ends at the edge. The app speaks HTTP on loopback. This file is the
 retention note the phone path owes.
 

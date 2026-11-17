@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! Writer for Galion `.gq` v1. The reader lives in `galion-tensor`. This writer
 //! exists so a clone interchange can land on that reader. Names must already
 //! be in the `sym.` namespace.

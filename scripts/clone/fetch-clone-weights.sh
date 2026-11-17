@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 #
 # V2-S14 · fetch pinned Chatterbox safetensors into weights/clone/ (not vendored).
 # weights/.gitignore ignores everything under weights/. CI must not run this.

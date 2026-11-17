@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+# Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 # Section A. Cites the synthetic .gq compiler gate. Does not convert Chatterbox weights.
 # Real-weights G5 stays PENDING, as galion-gates/g5-gq-synthetic.sh already says.
 set -euo pipefail

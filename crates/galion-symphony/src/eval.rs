@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! Self-eval for the translator. A missing owner file is BLOCKED, not a pass.
 
 use crate::host_cpu::{self, HostId};

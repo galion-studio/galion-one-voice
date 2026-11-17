@@ -1,6 +1,6 @@
 # Emotion V2 CI
 
-Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 
 Samantha, Galion Voice V2. Tuning standard: **432 Hz**. This harness scores her twelve emotions. It does not deploy, it does not merge, and it does not read a caller's voice.
 

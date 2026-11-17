@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+# Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 # Section B. Cites the clone-worker contract and runs the protocol smoke.
 # protocol-stub PCM is not a landed voice. Ref hashes are computed only when the wav is on disk.
 set -euo pipefail

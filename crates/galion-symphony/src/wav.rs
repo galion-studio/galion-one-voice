@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! WAV facts for the clip ABI. This reader does not downmix, resample, or drop chunks.
 //! `galion-presence` downmixes stereo for the harness. A reference clip must not.
 

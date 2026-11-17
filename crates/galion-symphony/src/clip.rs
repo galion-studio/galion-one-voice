@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! Clip ABI v1 (`.gclip`).
 //!
 //! The interchange is a WAV file. The symphony object is this container.

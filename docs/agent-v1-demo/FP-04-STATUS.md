@@ -1,5 +1,5 @@
 # FP-04 · E2E test + real-life UX + runbook — STATUS
-Galion Voice — Perpetual Open MIT License · © 2026 Maciej Grajczyk · 2026-11-02 15:58–16:20 (Europe/Zagreb, UTC+1)
+Galion Voice — Perpetual Open MIT License · © 2026 Galion Labs · 2026-11-02 15:58–16:20 (Europe/Zagreb, UTC+1)
 **LOCAL ONLY.** I made no SSH connection to and no deploy on 51.38.137.193, and I did not push or use gh. Live runs used side ports (17904–17908) so they did not collide with :7878.
 
 ## Results (latest tree, after FP-01/02/03 landed)

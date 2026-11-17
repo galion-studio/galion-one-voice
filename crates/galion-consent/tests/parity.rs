@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! Parity with the retired Python gate (tools/legacy/consent.py.bak).
 //!
 //! Python runs here and only here (tests). Each fixture is evaluated by the

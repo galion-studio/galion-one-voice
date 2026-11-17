@@ -1,6 +1,6 @@
 # Swarm 10 — persona-v2v / v2v (C3 and C5)
 
-Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 Written 2026-11-15 22:12 +01:00 (Europe/Zagreb).
 
 Lane plan: pull request #150 (`Swarm 10 persona-v2v plan`). This note stays on C3 and C5.

@@ -1,6 +1,6 @@
 # FP-02 — Backend wiring: Heartbeat + Rika → ONE dot on :7878 (first-principles pass)
 
-Perpetual Open MIT License · © 2026 Maciej Grajczyk · 2026-11-02 (Europe/Zagreb, UTC+1)
+Perpetual Open MIT License · © 2026 Galion Labs · 2026-11-02 (Europe/Zagreb, UTC+1)
 **LOCAL ONLY.** Nothing was deployed (51.38.137.193: SSH denied) and nothing was pushed.
 
 ## 1. Wiring (live path, `scripts/run-v1-demo.sh`)

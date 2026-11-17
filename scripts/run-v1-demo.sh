@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 #
 # V1-02 · ONE command, ONE screen. Orchestrates the V1 demo build (V4 locks + Rika/D20 + Wave-21)
 # behind the single one-dot screen. LOCAL ONLY, offline, no weights, no extra windows.

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 #
 # t301 · live Piper CPU stream TTFA (see scripts/eval/piper-stream-ttfa.sh).
 #

@@ -1,4 +1,4 @@
-// Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+// Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 //! sha256 manifest of capture originals. The tool reads audio; it does not rewrite it.
 
 use serde::{Deserialize, Serialize};

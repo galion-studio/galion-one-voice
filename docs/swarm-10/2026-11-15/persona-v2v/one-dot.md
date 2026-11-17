@@ -1,6 +1,6 @@
 # Swarm 10 — persona-v2v one-dot (C2)
 
-Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Perpetual Open MIT License. (c) 2026 Galion Labs.
 Written 2026-11-15 22:10 +01:00 (Europe/Zagreb). Persona edit removed 2026-11-15 22:12 +01:00.
 
 The spelling is **Galion**. The product is Galion Voice. Owner: Maciej Grajczyk.

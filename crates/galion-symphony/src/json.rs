@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! A small JSON reader for safetensors headers. Objects keep source order.
 
 use crate::{Error, Result};

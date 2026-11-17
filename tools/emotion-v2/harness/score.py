@@ -1,5 +1,5 @@
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 """Score one emotion, and score Samantha's twelve.
 
 For each emotion the categorical posterior of the renders is compared with

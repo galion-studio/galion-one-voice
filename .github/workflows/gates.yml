@@ -1,4 +1,4 @@
-# Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+# Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 # PR checks for the V2 track. Tests and lock gates only. No deploy, no SSH.
 name: gates
 

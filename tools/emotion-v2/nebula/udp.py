@@ -1,5 +1,5 @@
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 """Send one live frame per datagram to a loopback UDP port.
 
 The visualiser binds. This process only sends, and only to a loopback

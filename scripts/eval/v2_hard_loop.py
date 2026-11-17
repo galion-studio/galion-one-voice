@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 """Hard loop for Galion Voice V2.
 
 Penetrates the voice loop: reference hashes, Nano generate when the pinned

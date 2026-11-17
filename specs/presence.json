@@ -1,7 +1,7 @@
 {
   "schema": "galion-presence/v1",
   "program": "Galion Voice",
-  "licence": "Perpetual Open MIT, (c) 2026 Maciej Grajczyk",
+  "licence": "Perpetual Open MIT, (c) 2026 Galion Labs",
   "agent": "A13",
   "frame_ms": 80,
   "backend": "mock",

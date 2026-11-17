@@ -1,6 +1,6 @@
 # Bot outputs publication — Nebula V3 swarm, stopped
 
-Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 
 | | |
 |---|---|

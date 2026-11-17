@@ -1,6 +1,6 @@
 #!/bin/sh
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 # Section A gate. PASS is a zero exit and the lines in
 # docs/galion-voice-v2/symphony/SELF-EVAL.md.
 set -eu

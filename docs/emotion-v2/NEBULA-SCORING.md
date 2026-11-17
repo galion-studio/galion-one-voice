@@ -1,6 +1,6 @@
 # Nebula scoring
 
-Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 
 Nebula scoring is an **additional offline report**. A clip is a distribution over the twelve Emotion V2 emotions, plus Samantha-only `seductive`, together with valence, arousal, and dominance. It is not one label.
 

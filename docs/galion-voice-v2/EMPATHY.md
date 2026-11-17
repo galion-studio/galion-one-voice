@@ -1,6 +1,6 @@
 # Empathy
 
-Galion Voice — Perpetual Open MIT. (c) 2026 Maciej Grajczyk.
+Galion Voice — Perpetual Open MIT. (c) 2026 Galion Labs.
 
 Empathy is a weight on the outbound feeling frame, not a sentence and not a
 ninth emotion label. `StubExpressor::voice_color` in `galion-emotion` reads

@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! Voice-only handoff from Galion One to Galion Research.
 //!
 //! The voice stack is the host `voice.galion.app`. A spoken cue ("go deep",

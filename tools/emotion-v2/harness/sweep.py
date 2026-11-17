@@ -1,5 +1,5 @@
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 """Score frozen emotion-sweep clips against the Voice V2 rollout gate.
 
 The clip set is the synthetic listening set already in

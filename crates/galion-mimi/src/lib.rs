@@ -1,6 +1,6 @@
 // Galion Voice — Perpetual Open MIT License
 // SPDX-License-Identifier: MIT
-// © 2026 Maciej Grajczyk
+// © 2026 Galion Labs
 //! `galion-mimi`: Mimi neural audio codec path (agent A6).
 //!
 //! STATUS: STUB (`IS_STUB = true`). There are **no weights** in this crate and none may be added

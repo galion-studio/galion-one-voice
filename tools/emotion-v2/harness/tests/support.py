@@ -1,5 +1,5 @@
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 """Path setup for the Emotion V2 harness tests. Synthetic signals only."""
 
 from __future__ import annotations

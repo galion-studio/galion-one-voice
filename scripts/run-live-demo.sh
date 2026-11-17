@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 #
 # W21-01 · one-command LIVE demo on the real 80 ms path. LOCAL ONLY, offline, no weights.
 #   you WAV (or synthetic) -> 80 ms frames @ 24 kHz -> Heartbeat::step + RikaReplayBackend

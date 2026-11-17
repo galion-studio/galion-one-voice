@@ -1,4 +1,4 @@
-// Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+// Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 //! # galion-heartbeat
 //!
 //! The 80 ms heartbeat: **one** `step()` per frame that carries the you band,

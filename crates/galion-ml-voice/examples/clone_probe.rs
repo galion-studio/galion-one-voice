@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! One real clone through the shipped slot: `CloneTts::try_new` (consent gate,
 //! ref allowlist, weights, tokenizer), then one `synthesize`, written as a
 //! 16-bit mono WAV. Prints one JSON line with the timings.

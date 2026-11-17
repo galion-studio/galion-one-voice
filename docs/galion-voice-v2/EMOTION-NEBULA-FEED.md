@@ -1,6 +1,6 @@
 # Emotion and nebula feed
 
-Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 
 Schema `galion-voice-v2-emotion-feed/1`. This is the contract between the side stream and the picture. The machine-readable field list is [`emotion-nebula-feed.schema.json`](emotion-nebula-feed.schema.json). The checker that runs before a line is sent is `tools/emotion-v2/nebula/contract.py`.
 

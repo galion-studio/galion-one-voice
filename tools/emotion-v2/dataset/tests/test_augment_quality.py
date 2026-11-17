@@ -1,5 +1,5 @@
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 """Augmentation, licences, and the quality gate. Synthetic signals only."""
 
 from __future__ import annotations

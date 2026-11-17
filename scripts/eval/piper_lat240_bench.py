@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 #
 # lat240 / agent 01: warm Piper first-audio bench (EVAL ONLY, not shipped).
 # Real wall clock around a real Piper 2023.11.14-2 child: JSON line written ->

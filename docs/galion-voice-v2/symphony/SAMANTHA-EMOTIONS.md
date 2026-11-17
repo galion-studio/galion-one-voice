@@ -1,6 +1,6 @@
 # Samantha emotions
 
-Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Perpetual Open MIT License. (c) 2026 Galion Labs.
 Europe/Zagreb. 2026-11-03. Symphony section. Index: [README.md](README.md).
 
 The spelling is **Galion**. The product is Galion Voice.
@@ -37,7 +37,7 @@ BASE=http://127.0.0.1:7878 scripts/eval/v2-persona-selftest.sh
 The screen check already refuses a canned empathy line on the grief sentence. Record the gate in [SELF-EVAL.md](SELF-EVAL.md).
 # Samantha — emotions and sounds
 
-Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 Europe/Zagreb. Symphony section D. A register spec for the internal test voice.
 It is not a claim that a film voice is live, and it is not V3.
 

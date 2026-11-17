@@ -1,5 +1,5 @@
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 """End-to-end stub run. Output stays in a temporary directory. No real voice."""
 
 from __future__ import annotations

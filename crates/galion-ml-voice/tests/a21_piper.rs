@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! FP-03: the A21 slot speaks through the real Piper pack when it is on disk (CPU).
 //! Skips (passes with a note) when weights/ is not fetched (scripts/a21/fetch-a21.sh).
 #![cfg(feature = "speech")]

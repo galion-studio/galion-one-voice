@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! Safetensors is an interchange file. It is read here and not kept as the
 //! symphony runtime. Only F32 and BF16 are accepted. Other dtypes are refused
 //! rather than cast.

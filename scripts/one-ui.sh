@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+# Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 # One-UI note. The phone page does not need a Python virtualenv.
 #   scripts/one-ui.sh           # print the note and exit 0
 #   scripts/one-ui.sh --venv    # optional empty venv; the page and CI do not use it

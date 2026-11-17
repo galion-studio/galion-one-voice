@@ -1,6 +1,6 @@
 # One-dot workflow
 
-Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 Europe/Zagreb. Symphony section E. CPU-only. One mark. No second AI interface.
 
 The surface is the page already served at `/`: the circle, the mic, the persona floor, and the text box (`crates/galion-console/assets/v1-screen.html`). `GET /v2` redirects to `/`. It does not record on its own.

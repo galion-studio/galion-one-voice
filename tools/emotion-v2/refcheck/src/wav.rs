@@ -1,4 +1,4 @@
-// Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+// Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 //! RIFF/WAVE reader and writer for the capture checker.
 //!
 //! Integer PCM (8/16/24/32) and IEEE float 32. Packed 24-bit is three bytes per

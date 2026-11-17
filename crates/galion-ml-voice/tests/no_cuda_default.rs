@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! Default features of `galion-ml-voice` must not enable CUDA.
 //!
 //! Pi synthesis stays on the CPU. This test reads this crate's `Cargo.toml`

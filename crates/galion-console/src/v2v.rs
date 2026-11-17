@@ -15,7 +15,7 @@
 //! child stay blocked. Piper remains the fallback the phone already has.
 //! The hub layer is mixed here, at playback, and is absent from the worker line.
 //!
-//! Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+//! Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 
 use galion_emotion::{EmotionClock, EmotionFrame, VoiceColor};
 use galion_render::v2_persona::{self, Floor, Prosody};

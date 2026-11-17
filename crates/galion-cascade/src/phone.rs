@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! S4+S5+S6 · **phone turn**: 16 kHz PCM/WAV in → transcript → reply text → 24 kHz
 //! spoken WAV out (feature `cascade`). ENGLISH ONLY, CPU, fallback lane (never the
 //! 80 ms primary path).

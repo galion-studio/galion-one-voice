@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! Streaming SHA-256 (FIPS 180-4). Same digest as `galion_tensor::gq::sha256`.
 
 const K: [u32; 64] = [

@@ -1,5 +1,5 @@
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 """The Rust const, the Python mirror, and the research doc stay identical."""
 
 from __future__ import annotations

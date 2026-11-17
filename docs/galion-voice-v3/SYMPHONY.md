@@ -1,6 +1,6 @@
 # V3-B · Extensions to the V2 symphony
 
-Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Perpetual Open MIT License. (c) 2026 Galion Labs.
 Europe/Zagreb. 2026-11-03. A planning note. It names four extensions.
 It does not add a crate, a flag, or a compiler.
 

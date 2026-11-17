@@ -2229,7 +2229,7 @@ mod tests {
                 "Perpetual Open MIT License",
                 "Copyright © 2026 Galion Labs. All rights reserved.",
                 "Permission is hereby granted, free of charge",
-                "Copyright (c) 2026 Maciej Grajczyk",
+                "Copyright (c) 2026 Galion Labs",
                 "#0B0F14",
                 "#58C4FF",
                 "#B8E8FF",

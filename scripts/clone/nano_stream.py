@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 """Chunked PCM for Chatterbox Nano. This module does not call generate().
 
 Verified against resemble-ai/chatterbox master on 2026-11-03 (Nano commit

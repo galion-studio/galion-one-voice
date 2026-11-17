@@ -1,6 +1,6 @@
 # CPU foundation
 
-Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 Europe/Zagreb.
 
 The symphony runs CPU only, no GPU. Do not import GGUF into the voice crates. GGUF figures below are a capacity reference from the CPU foundation note, not a dependency and not a measurement.

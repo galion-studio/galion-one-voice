@@ -1,6 +1,6 @@
 # One-dot
 
-Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Perpetual Open MIT License. (c) 2026 Galion Labs.
 Europe/Zagreb. 2026-11-03. Symphony section. Index: [README.md](README.md).
 
 The spelling is **Galion**. The product is Galion Voice.
@@ -30,7 +30,7 @@ What happens after the recording is [AUTO-WORKFLOW.md](AUTO-WORKFLOW.md). The me
 Record the gate in [SELF-EVAL.md](SELF-EVAL.md).
 # One dot
 
-Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 Europe/Zagreb. From the repository root.
 
 One surface. The page is `crates/galion-console/assets/v1-screen.html`, served at `/`. `crates/galion-console/assets/v2-screen.html` only redirects (`location.replace("/")`). The UI lock is one dot, `dot_count` 1, `chrome_allowed` false. This page does not edit `LOCKS.toml`.

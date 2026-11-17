@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 #
 # Offline checks for CPU-venv / tokenizer staging. No pip, no generate,
 # no edit of REFS.sha256 or LOCKS.toml, no WAV.

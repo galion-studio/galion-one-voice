@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! v2-call: a LIVE dual-band duplex call between two personas.
 //!
 //! Band L = Samantha (cloned from the CC0 Amy Koenig donor), band R = Jarvis

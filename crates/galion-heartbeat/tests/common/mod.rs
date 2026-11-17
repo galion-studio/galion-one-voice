@@ -1,4 +1,4 @@
-// Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+// Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 #![allow(dead_code)]
 //! Shared synthetic you-band signals (same as the G6 fixtures: seed 13, 24 kHz, 1920 samples).
 use galion_heartbeat::{FRAME_SAMPLES, SAMPLE_RATE};

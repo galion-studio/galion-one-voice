@@ -1,5 +1,5 @@
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 """Experiment helper (not shipped, LOCKS v2s14 out-of-process lane only).
 Instrumented, optionally quantized / fewer-step / cond-KV-cached / streaming
 Chatterbox Nano generate. Monkeypatch-free: the upstream package is untouched;

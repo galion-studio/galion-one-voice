@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// (c) 2026 Maciej Grajczyk / G.A.L.I.O.N.
+// (c) 2026 Galion Labs / G.A.L.I.O.N.
 //! Binary entry for the Cloning V2 preflight check.
 
 fn main() {

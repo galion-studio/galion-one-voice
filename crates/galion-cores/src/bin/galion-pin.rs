@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! `galion-pin <role> [--] <program> [args...]`
 //!
 //! Pins this process to the core-map placement for `role` (bus, asr/vosk,

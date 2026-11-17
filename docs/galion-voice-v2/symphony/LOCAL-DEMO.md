@@ -1,6 +1,6 @@
 # Local demo
 
-Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 Europe/Zagreb. From the repository root.
 
 The live demo feeds a you-band through `galion-heartbeat` at `FRAME_MS` (80 ms, 24 kHz, 1920 samples) and writes a stereo WAV plus a console capture. The me band on this path is synthetic. It is not a speech model and not a latency benchmark of one. Wave-21 detail lives in `docs/LIVE-DEMO.md`. This page is the symphony entry.

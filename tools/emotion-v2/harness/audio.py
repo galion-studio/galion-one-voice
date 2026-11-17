@@ -1,5 +1,5 @@
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 """16-bit PCM helpers and synthetic tones.
 
 The tone generator is a test signal. It is not a voice and it is not a

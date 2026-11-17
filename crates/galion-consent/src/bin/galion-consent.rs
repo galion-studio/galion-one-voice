@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! `galion-consent fields | measure --persona P | check --persona P`.
 //!
 //! Same commands, output lines and exit codes as the retired

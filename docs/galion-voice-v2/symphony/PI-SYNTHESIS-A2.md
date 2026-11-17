@@ -1,6 +1,6 @@
 # Pi synthesis A2
 
-Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Perpetual Open MIT License. (c) 2026 Galion Labs.
 Europe/Zagreb. 2026-11-06.
 
 `galion-ml-voice` default features leave CUDA off. The gate is `crates/galion-ml-voice/tests/no_cuda_default.rs`. It reads `crates/galion-ml-voice/Cargo.toml` and walks the `default` feature list, including same-crate features the list turns on. A missing `default` key is Cargo's empty set.

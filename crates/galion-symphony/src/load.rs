@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! Open a symphony pack through `galion-tensor`'s `.gq` reader and the clip ABI.
 
 use crate::clip::{self, Clip};

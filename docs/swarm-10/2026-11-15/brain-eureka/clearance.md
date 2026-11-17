@@ -1,6 +1,6 @@
 # Swarm 10 brain-eureka clearance — t273 originals vs t623u CC0 donors
 
-Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Perpetual Open MIT License. (c) 2026 Galion Labs.
 Europe/Zagreb. **Written 2026-11-15 22:06 +01:00.** Record only. Not legal advice. Not an owner signature. Not a clearance.
 
 **Role:** Lane D worker D4 (rights clearance) plus the A0 owner brief.

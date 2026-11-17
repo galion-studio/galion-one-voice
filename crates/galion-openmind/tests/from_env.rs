@@ -1,4 +1,4 @@
-// Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+// Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 //! One test, so the process environment is not shared with a sibling test.
 use galion_openmind::{NerveEmitter, VoiceNote};
 use std::time::{Duration, Instant};

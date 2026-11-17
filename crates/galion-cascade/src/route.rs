@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! W21-03: per-turn language route for the cascade lane (plan P0.2 contract).
 //!
 //! Precedence: explicit `lang_pin` > sideband `language_hint` > LID > default.

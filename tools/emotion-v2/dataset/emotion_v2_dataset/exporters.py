@@ -1,5 +1,5 @@
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 """PersonaPlex exporters.
 
 NVIDIA has not published a fine-tune dump. The default adapter writes the

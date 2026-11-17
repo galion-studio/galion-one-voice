@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! Re-cut a reference wav to the gate's 8–12 s mono 16-bit shape, and move
 //! its sha256 pin (owner item 4, 2026-11-04).
 //!

@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! eSpeak-ng phonemizer, loaded at runtime from the A21 Piper pack
 //! (`libespeak-ng.so.1`, rhasspy fork with `espeak_TextToPhonemesWithTerminator`).
 //! Mirrors piper-phonemize 1.2 `phonemize_eSpeak`: one IPA string per clause,

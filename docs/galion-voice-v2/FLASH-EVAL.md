@@ -1,6 +1,6 @@
 # V2-S14 · Flash eval (CPU time to first audio)
 
-Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 Europe/Zagreb. A plan and a harness stub. Not a measurement.
 
 The spelling is **Galion**. The product is Galion Voice.
