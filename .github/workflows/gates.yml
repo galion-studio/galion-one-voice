@@ -40,6 +40,8 @@ jobs:
         run: cargo test --manifest-path tools/symphony/mne/Cargo.toml
       - name: Throat glottal source (synthetic LF, no audio)
         run: cargo test --manifest-path tools/symphony/throat/Cargo.toml
+      - name: Symphony sound-out layer (synthetic signals, no weights)
+        run: cargo test --manifest-path tools/symphony/sound-out/Cargo.toml
       - name: One-percent symphony gate
         run: galion-gates/op-one-percent.sh
       - name: Clone worker scaffold (no weight download)
@@ -48,6 +50,8 @@ jobs:
         run: scripts/clone/stage-clone-prep.test.sh
       - name: Speaking rate changes the PCM
         run: python3 scripts/clone/test_speaking_rate.py
+      - name: Clone controls change the PCM
+        run: python3 scripts/clone/test_controls.py
       - name: Flash TTFA harness (no number without a run)
         run: scripts/eval/flash-ttfa.sh
       - name: Hard loop classifiers (no product verdict)

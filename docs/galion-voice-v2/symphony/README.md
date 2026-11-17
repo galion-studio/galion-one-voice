@@ -26,6 +26,7 @@ Paths in the Doc column live in this directory. The Anchor column is the page th
 | Lungs | [LUNGS.md](LUNGS.md) | Physiology track: inhalations planned from the phrase, relative lung volume and subglottal pressure, audible breaths. Not an emotion. `tools/symphony/lungs`. | [ARTICULATION-V2-SPEC.md](ARTICULATION-V2-SPEC.md) |
 | MnE contract | [MNE-CONTRACT.md](MNE-CONTRACT.md) | Versioned 80 ms intent and read-back between Inner Life and mouth-and-expressions. `tools/symphony/mne-contract`. | [ARTICULATION-V2-SPEC.md](ARTICULATION-V2-SPEC.md) |
 | Throat | [THROAT.md](THROAT.md) | Glottal source per 80 ms tick: pitch versus the speaker baseline, phonation, open quotient, spectral tilt. `tools/symphony/throat`. | [ARTICULATION-V2-SPEC.md](ARTICULATION-V2-SPEC.md) |
+| Sound out | [SOUND-OUT.md](SOUND-OUT.md) | Cloner trait and the mix that leaves the mouth: Chatterbox, Piper, Moshi stub, breath, bursts, room. `tools/symphony/sound-out`. | [LUNGS.md](LUNGS.md) |
 | Persona | [PERSONA.md](PERSONA.md) | Personality, behaviour, and emotion in the voice. Timbre is the body. The feeling band is the person. | [personas/README.md](../personas/README.md), [SAMANTHA-V2.md](../SAMANTHA-V2.md) |
 | One-dot | [ONE-DOT.md](ONE-DOT.md) | One surface at `/`. Speak, the page records, the workflow proceeds. `GET /v2` redirects to `/`. | [ONE-UI.md](../ONE-UI.md), [ORB.md](../ORB.md) |
 | Runbooks | [RUNBOOKS.md](RUNBOOKS.md) | How each environment is started. The commands below are the short form. | [V1-DEMO.md](../../V1-DEMO.md), [LIVE-DEMO.md](../../LIVE-DEMO.md) |
