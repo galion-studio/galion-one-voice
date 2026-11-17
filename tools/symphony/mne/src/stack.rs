@@ -222,7 +222,7 @@ fn run_one(
         .open(Some(backend_name), Some("cpu"))
         .map_err(|e| format!("{id}: sound-out: {e}"))?;
     let sounded = sound_render(&moment, &mut *backend, &bursts, Some("cpu"))?;
-    let (audio, guard) = voice_guard(repo, sounded.samples);
+    let (audio, guard) = voice_guard(repo, id, sounded.samples)?;
 
     let read =
         decode::analyse(&audio, SAMPLE_RATE as f64).map_err(|e| format!("{id}: listen: {e}"))?;
@@ -288,9 +288,14 @@ fn lungs_name(name: &str) -> String {
     }
 }
 
-fn voice_guard(repo: &Path, samples: Vec<f64>) -> (Vec<f64>, &'static str) {
-    let landed = repo.join("tools/symphony/voice-guard/Cargo.toml").is_file();
-    (samples, if landed { "landed" } else { "waiting" })
+fn voice_guard(repo: &Path, id: &str, samples: Vec<f64>) -> Result<(Vec<f64>, String), String> {
+    let cfg = galion_voice_guard::load_config(&repo.join("configs/symphony/voice-guard.toml"))
+        .map_err(|e| format!("{id}: guard: {e}"))?;
+    let pcm: Vec<f32> = samples.iter().copied().map(|s| s as f32).collect();
+    match galion_voice_guard::before_listen(&pcm, SAMPLE_RATE, &cfg, None, None) {
+        Ok(report) => Ok((samples, report.verdict.to_string())),
+        Err(report) => Err(format!("{id}: guard: {}", report.reason)),
+    }
 }
 
 fn readback_doc(

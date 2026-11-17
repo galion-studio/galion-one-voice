@@ -1,0 +1,111 @@
+# Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
+# Gates for tools/symphony/voice-guard. A number is a published bar only where
+# the comment says so. Everything else is an operational limit: the papers
+# define the measurement, not a universal fail point for rendered speech.
+# Do not copy a number from this file into a result as if a study had published it.
+
+schema = "galion-voice-guard-config/1"
+
+# LOCKS clock.frame_ms. The same 80 ms tick as the rest of the Symphony stack.
+tick_ms = 80
+
+[format]
+# Rates the stack already renders. 16 kHz: articulation and the integrator
+# stimulus. 24 kHz: lungs render and the clone path. 48 kHz: the emotion-v2
+# capture spec. Any other rate is a mismatch.
+allowed_sample_rate_hz = [16000, 24000, 48000]
+channels = 1
+allowed_bits = [16, 24, 32]
+
+[dc]
+# Sample mean, in dBFS (20 log10 of the absolute mean). Same meter as
+# galion-refcheck dc_offset_dbfs. AES17 measures DC offset this way.
+# docs/emotion-v2/capture-spec.toml sets -50 for a studio reference.
+# ITU-R BS.1770-4 does not publish a pass/fail for the mean; its ~38 Hz
+# high-pass removes DC before the loudness gate.
+max_dbfs = -50.0
+
+[clip]
+# |sample| at or above this is a clipped sample.
+# galion-hygiene (own-clone-analysis): 0.99.
+linear = 0.99
+# EBU Tech 3344 maximum true-peak level for distribution, and
+# docs/emotion-v2/capture-spec.toml. The meter is the ebur128 crate
+# (ITU-R BS.1770 4× oversampling).
+max_true_peak_dbtp = -1.0
+
+[click]
+# First difference. galion-hygiene (own-clone-analysis): 0.35.
+jump = 0.35
+# Forward LPC residual. The clean-signal model is the autoregressive
+# click model in Godsill and Rayner, Digital Audio Restoration (Springer,
+# 1998), and Godsill and Rayner, IEEE Trans. Speech and Audio Processing,
+# 1995. Speech LPC order is about 2 + fs/1000 (Markel and Gray, Linear
+# Prediction of Speech, 1976). 16 is inside that span at 16 kHz and is the
+# operational order at every allowed rate. The residual gate is the same
+# absolute level as `jump`: Godsill and Rayner do not publish a PCM fail bar.
+ar_order = 16
+ar_residual = 0.35
+
+[dropout]
+# Internal gap. Leading and trailing silence are not dropouts.
+# 0.20 s is the refprep pause split reused by galion-articulation select
+# (PAUSE_S). A longer hole inside active audio is that same boundary.
+min_gap_s = 0.20
+# Quietest window. -60 dBFS is the capture-spec noise floor
+# (docs/emotion-v2/capture-spec.toml). A digital mute is well below it.
+silence_dbfs = -60.0
+window_ms = 10
+
+[loop]
+# Normalised correlation of successive non-overlapping 80 ms frames.
+# 1.0 is an exact copy. 0.98 leaves room for float roundoff. It is not a
+# published TTS constant. A run is ignored when a pitch lag (Rabiner,
+# IEEE Trans. ASSP, 1977, autocorrelation pitch) tiles the frame: a
+# stationary tone whose period divides 80 ms is not separable from a copy.
+ncc = 0.98
+min_run_frames = 3
+pitch_ncc = 0.50
+pitch_lag_tolerance_samples = 2
+
+[flatness]
+# Spectral flatness, geometric mean over arithmetic mean of the power
+# spectrum (Johnston, IEEE J. Sel. Areas Commun., 1988). 0 is a tone and
+# 1 is white. A Hann window keeps a finite noise draw below 1. The gate
+# is the midpoint of that scale: a frame above it is more noise-like than
+# tonal. Johnston does not publish a babble cutoff.
+max_median = 0.50
+# Frames quieter than this are not scored. -60 dBFS is the capture noise
+# floor; lungs breath sits near -50 dBFS. -40 dBFS is the operational
+# "loud enough to be speech-like noise" line. Not a published level.
+speech_floor_dbfs = -40.0
+
+[buzz]
+# Harmonics-to-noise ratio from praatfan harmonicity (Boersma, IFA
+# Proceedings 17, 1993), via galion-articulation. The Praat manual
+# (Harmonicity) defines 0 dB as equal energy in the harmonics and in the
+# noise. Below that, noise dominates. The same page's "around 20 dB" for a
+# healthy [a] is an illustration, not this gate.
+min_hnr_db = 0.0
+
+[cutoff]
+# A jump of `jump` (same definition as [click]) into a trailing mute.
+# The tail has to last this long before it is an ending rather than a
+# zero crossing. The duration is operational.
+jump = 0.35
+min_tail_ms = 20
+
+[speaker]
+# TractPrint v2. ARTICULATION-LAYER.md: a synthetic male-range control
+# scores under 0.55 on speaker; a same-speaker pair stays over 0.85.
+min_speaker = 0.55
+# tools/emotion-v2/thresholds.toml guards.ecapa_min. The gate is strict:
+# the cosine must be greater than this. The cosine is supplied by the
+# caller from galion-ecapa. This file does not run that model.
+min_embedding_cos = 0.7057
+
+[neural]
+# DNSMOS, UTMOS, and NISQA are not linked. ort is not a dependency.
+# CI leaves this false. No weights are downloaded.
+enabled = false
+command = ""

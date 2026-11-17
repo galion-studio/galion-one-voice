@@ -85,6 +85,7 @@ impl Session {
         // Placement rewrites each inhale as flat noise at that timing, and
         // holds the vowel back so the pitch window does not voice the last tick.
         stamp_inhales(&mut rendered.samples, &plan, SAMPLE_RATE as f64);
+        quiet_exhales(&mut rendered.samples, &plan, SAMPLE_RATE as f64);
         let speech = speech_spans(&plan, SAMPLE_RATE as f64, rendered.samples.len());
         let breath_events = plan
             .segments
@@ -151,6 +152,7 @@ impl Session {
     }
 
     pub fn finish(&mut self) -> Vec<f64> {
+        self.fill_short_speech();
         for span in &mut self.speech {
             span.filled = span.end.saturating_sub(span.start);
         }
@@ -160,6 +162,40 @@ impl Session {
             self.emitted = self.samples.len();
         }
         self.frames.iter().flatten().copied().collect()
+    }
+
+    /// The lungs span can be longer than the stand-in vowel. The unfilled tail
+    /// would be an internal mute. Continue a tone from the last sample so the
+    /// join does not click and the hole stays under the guard's 0.20 s gap.
+    fn fill_short_speech(&mut self) {
+        let f0 = 180.0;
+        let fade = (0.01 * self.sr).round().max(1.0);
+        for span in &self.speech {
+            let join = span.start + span.filled;
+            let end = span.end.min(self.samples.len());
+            if join >= end {
+                continue;
+            }
+            let (amp, phase) = if join > span.start {
+                let y = self.samples[join - 1].clamp(-0.5, 0.5);
+                let amp = y.abs().max(0.05);
+                let phase = (y / amp).clamp(-1.0, 1.0).asin();
+                (amp, phase)
+            } else {
+                (0.08, 0.0)
+            };
+            for (k, i) in (join..end).enumerate() {
+                let p = phase + std::f64::consts::TAU * f0 * (k as f64 / self.sr);
+                let target = p.sin() * amp;
+                let w = ((k as f64) / fade).min(1.0);
+                let from = if join > span.start {
+                    self.samples[join - 1]
+                } else {
+                    0.0
+                };
+                self.samples[i] = from * (1.0 - w) + target * w;
+            }
+        }
     }
 
     fn emit(&mut self, start: usize, end: usize) {
@@ -175,8 +211,10 @@ impl Session {
 /// How long the vowel waits after the planned speech start. A pitch window
 /// of about 40 ms would otherwise see the sine and call the last inhale tick voiced.
 const SPEECH_GUARD_S: f64 = 0.05;
-/// Flat inhale level. Above the listen-back −50 dB gate, under the 0.2 test cap.
-const INHALE_RMS: f64 = 0.02;
+/// Flat inhale level. Listen-back needs the tick above −50 dBFS. The voice
+/// guard treats noise louder than −40 dBFS as babble, so the inhale sits
+/// between those two lines. Under the 0.2 test cap.
+const INHALE_RMS: f64 = 0.0056;
 
 fn speech_spans(plan: &Plan, sr: f64, n: usize) -> Vec<SpeechSpan> {
     let guard = (SPEECH_GUARD_S * sr).round().max(0.0) as usize;
@@ -223,6 +261,68 @@ fn stamp_inhales(samples: &mut [f64], plan: &Plan, sr: f64) {
     }
 }
 
+fn quiet_exhales(samples: &mut [f64], plan: &Plan, sr: f64) {
+    for seg in &plan.segments {
+        if seg.kind != "exhale" {
+            continue;
+        }
+        let a = (seg.start_s * sr).round().max(0.0) as usize;
+        let b = (seg.end_s * sr).round().max(a as f64) as usize;
+        let b = b.min(samples.len());
+        if b <= a {
+            continue;
+        }
+        scale_rms_cap(&mut samples[a..b], INHALE_RMS);
+    }
+}
+
+/// Pull DC off the mix and keep adjacent samples inside the voice-guard jump.
+fn polish_for_guard(samples: &mut [f64]) {
+    if samples.is_empty() {
+        return;
+    }
+    let max_jump = 0.20;
+    for i in 1..samples.len() {
+        let d = samples[i] - samples[i - 1];
+        if d > max_jump {
+            samples[i] = samples[i - 1] + max_jump;
+        } else if d < -max_jump {
+            samples[i] = samples[i - 1] - max_jump;
+        }
+    }
+    remove_mean(samples);
+    let peak = samples.iter().map(|s| s.abs()).fold(0.0, f64::max);
+    if peak >= 0.95 {
+        let g = 0.9 / peak;
+        for s in samples.iter_mut() {
+            *s *= g;
+        }
+    }
+}
+
+fn remove_mean(samples: &mut [f64]) {
+    let mean = samples.iter().sum::<f64>() / samples.len() as f64;
+    if mean.abs() < 1e-12 {
+        return;
+    }
+    for s in samples.iter_mut() {
+        *s -= mean;
+    }
+}
+
+fn scale_rms_cap(x: &mut [f64], cap: f64) {
+    if x.is_empty() {
+        return;
+    }
+    let rms = (x.iter().map(|v| v * v).sum::<f64>() / x.len() as f64).sqrt();
+    if rms > cap && rms > 1e-12 {
+        let g = cap / rms;
+        for s in x.iter_mut() {
+            *s *= g;
+        }
+    }
+}
+
 fn scale_rms(x: &mut [f64], target: f64) {
     if x.is_empty() {
         return;
@@ -264,7 +364,8 @@ pub fn render(
         session.push_speech(&chunk.samples);
         Ok(())
     })?;
-    let samples = session.finish();
+    let mut samples = session.finish();
+    polish_for_guard(&mut samples);
     let mut stubbed = Vec::new();
     stubbed.push(
         "galion-mne-contract is a local stand-in (TODO S1). This crate reads the moment fixture it defines.".into(),

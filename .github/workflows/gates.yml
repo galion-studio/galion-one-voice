@@ -52,6 +52,8 @@ jobs:
         run: cargo test --manifest-path tools/symphony/feeling/Cargo.toml --workspace
       - name: Symphony nose and wordless layer (synthetic signals, no audio)
         run: cargo test --manifest-path tools/symphony/nose/Cargo.toml
+      - name: Voice guard (synthetic tones, no weights)
+        run: cargo test --manifest-path tools/symphony/voice-guard/Cargo.toml
       - name: One-percent symphony gate
         run: galion-gates/op-one-percent.sh
       - name: Clone worker scaffold (no weight download)

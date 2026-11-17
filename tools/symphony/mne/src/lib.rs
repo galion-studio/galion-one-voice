@@ -3,8 +3,8 @@
 //! Integrator for the mouth-and-expressions stack (Swarm 13, S8).
 //!
 //! Feeling, lungs, throat, mouth, nose, sound-out and listen-back are called.
-//! They are not reimplemented here. S9 voice-guard is a slot between sound-out
-//! and listen-back; audio passes through until that crate lands.
+//! They are not reimplemented here. S9 `before_listen` sits on the sound-out
+//! PCM. A failed report does not reach listening-back.
 
 #![forbid(unsafe_code)]
 
@@ -110,7 +110,7 @@ pub fn layer_status(repo: &Path) -> Vec<LayerStatus> {
                     "galion-sound-out Piper default; ONNX if a pack is on disk, else the stand-in"
                 }
                 "S7" => "galion-listen-back decode and score",
-                "S9" => "passthrough until tools/symphony/voice-guard lands",
+                "S9" => "galion_voice_guard::before_listen on the sound-out PCM",
                 _ => "none",
             },
         })
