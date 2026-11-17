@@ -114,20 +114,22 @@ class AugmentTests(unittest.TestCase):
 
 
 class QualityTests(unittest.TestCase):
-    def test_missing_scorers_pass_until_required(self) -> None:
+    def test_missing_scorers_reject_by_default(self) -> None:
         card, _unused = score_clip(_clip(), [])
-        self.assertTrue(decide(card, QualityThresholds()).accepted)
-        refused = decide(card, QualityThresholds(require_scorers=True))
+        refused = decide(card, QualityThresholds())
         self.assertFalse(refused.accepted)
         self.assertIn("missing scorers", refused.reason)
+        # Only the synthetic-test opt-out keeps an unscored clip.
+        self.assertTrue(decide(card, QualityThresholds(require_scorers=False)).accepted)
 
     def test_wer_and_emotion_thresholds(self) -> None:
+        loose = QualityThresholds(require_scorers=False)
         poor = FunctionScorer("wer", lambda _clip: 0.9)
         card, _unused = score_clip(_clip(), [poor])
-        self.assertFalse(decide(card, QualityThresholds()).accepted)
+        self.assertFalse(decide(card, loose).accepted)
         good = FunctionScorer("emotion", lambda _clip: 0.2)
         card, _unused = score_clip(_clip(), [good])
-        decision = decide(card, QualityThresholds())
+        decision = decide(card, loose, "Neutral")
         self.assertFalse(decision.accepted)
         self.assertIn("emotion", decision.reason)
 

@@ -18,7 +18,13 @@ import numpy as np
 
 from emotion_v2_dataset.errors import PipelineError
 from emotion_v2_dataset.profile import PITCH_STANDARD_HZ, forbid_pitch_standard
-from emotion_v2_dataset.taxonomy import EMOTION_CENTS, EMOTION_TILT, require_emotion
+from emotion_v2_dataset.taxonomy import (
+    EMOTION_CENTS,
+    EMOTION_TILT,
+    STUB_DEFAULT_CENTS,
+    STUB_DEFAULT_TILT,
+    require_emotion,
+)
 
 RENDER_RATE = 24_000
 PHONE_RATE = 8_000
@@ -62,12 +68,12 @@ def synthesize_stub(
     duration = min(2.4, max(0.45, 0.11 * words))
     count = int(sample_rate * duration)
     time = np.arange(count, dtype=np.float64) / sample_rate
-    cents = EMOTION_CENTS[emotion] * float(intensity)
+    cents = EMOTION_CENTS.get(emotion, STUB_DEFAULT_CENTS) * float(intensity)
     # Cents relative to the given centre. The 440/432 concert ratio is never applied.
     fundamental = float(pitch_centre_hz) * (2.0 ** (cents / 1200.0))
     vibrato = 1.0 + (0.004 + 0.008 * float(intensity)) * np.sin(2.0 * np.pi * 4.5 * time)
     phase = 2.0 * np.pi * fundamental * np.cumsum(vibrato) / sample_rate
-    tilt = EMOTION_TILT[emotion]
+    tilt = EMOTION_TILT.get(emotion, STUB_DEFAULT_TILT)
     signal = np.sin(phase)
     signal += tilt * 0.40 * np.sin(2.0 * phase)
     signal += tilt * 0.18 * np.sin(3.0 * phase)
@@ -81,14 +87,21 @@ def synthesize_stub(
     return AudioBuffer(signal, sample_rate)
 
 
-def write_wav(path: Path, audio: AudioBuffer) -> None:
+def write_wav(path: Path, audio: AudioBuffer, bit_depth: int = 16) -> None:
+    """Mono PCM. ``bit_depth`` is 16 or 24. Out-of-range samples are clipped here,
+    so callers that must not clip check first (see ``capture.count_clipped``)."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    pcm = _pcm16(audio.samples)
+    if bit_depth == 16:
+        payload = _pcm16(audio.samples).tobytes()
+    elif bit_depth == 24:
+        payload = _pcm24_bytes(audio.samples)
+    else:
+        raise PipelineError(f"only 16-bit or 24-bit wav is written, got {bit_depth}")
     with wave.open(str(path), "wb") as handle:
         handle.setnchannels(1)
-        handle.setsampwidth(2)
+        handle.setsampwidth(bit_depth // 8)
         handle.setframerate(audio.sample_rate)
-        handle.writeframes(pcm.tobytes())
+        handle.writeframes(payload)
 
 
 def write_stereo_wav(path: Path, left: AudioBuffer, right: AudioBuffer) -> None:
@@ -119,9 +132,12 @@ def read_wav(path: Path) -> tuple[np.ndarray, int, int]:
         rate = handle.getframerate()
         frames = handle.getnframes()
         raw = handle.readframes(frames)
-    if width != 2:
-        raise PipelineError(f"only 16-bit wav is read, got width {width}")
-    pcm = np.frombuffer(raw, dtype=np.int16).astype(np.float64) / 32767.0
+    if width == 2:
+        pcm = np.frombuffer(raw, dtype=np.int16).astype(np.float64) / 32767.0
+    elif width == 3:
+        pcm = _pcm24_decode(raw)
+    else:
+        raise PipelineError(f"only 16-bit or 24-bit wav is read, got width {width}")
     if channels == 1:
         return pcm, rate, 1
     if channels == 2:
@@ -311,6 +327,20 @@ def measure_snr_db(clean: np.ndarray, mixed: np.ndarray) -> float:
 def _pcm16(samples: np.ndarray) -> np.ndarray:
     clipped = np.clip(np.asarray(samples, dtype=np.float64), -1.0, 1.0)
     return np.round(clipped * 32767.0).astype(np.int16)
+
+
+def _pcm24_bytes(samples: np.ndarray) -> bytes:
+    clipped = np.clip(np.asarray(samples, dtype=np.float64), -1.0, 1.0)
+    codes = np.round(clipped * 8388607.0).astype(np.int32)
+    little = codes.astype("<i4").view(np.uint8).reshape(-1, 4)
+    return little[:, :3].tobytes()
+
+
+def _pcm24_decode(raw: bytes) -> np.ndarray:
+    data = np.frombuffer(raw, dtype=np.uint8).reshape(-1, 3).astype(np.int32)
+    codes = data[:, 0] | (data[:, 1] << 8) | (data[:, 2] << 16)
+    codes = np.where(codes & 0x800000, codes - 0x1000000, codes)
+    return codes.astype(np.float64) / 8388607.0
 
 
 def _pad(samples: np.ndarray, count: int) -> np.ndarray:
