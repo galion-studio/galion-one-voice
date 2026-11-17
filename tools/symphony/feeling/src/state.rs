@@ -18,7 +18,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use galion_mne_contract::IntentFrame;
+use crate::frame::IntentFrame;
 
 use crate::config::{Config, Coupling};
 use crate::feed::{assemble, AppliedPin, FeelingOut, LungsMoment, LungsRequest, Run, Snapshot};
@@ -82,7 +82,7 @@ impl Feeling {
         Ok(Run {
             schema: SCHEMA.to_string(),
             tick_ms: TICK_MS,
-            contract: galion_mne_contract::SCHEMA.to_string(),
+            contract: crate::frame::SCHEMA.to_string(),
             lungs: LungsRequest {
                 category: first.category.clone(),
                 arousal: first.arousal,

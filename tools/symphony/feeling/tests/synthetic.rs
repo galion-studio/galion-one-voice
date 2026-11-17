@@ -7,7 +7,7 @@ use std::path::PathBuf;
 use std::process::Command;
 
 use galion_feeling::{alpha, Config, Feeling, Inventory, TICK_MS};
-use galion_mne_contract::{parse_frames, AxisTarget, IntentFrame, PinIntent, SCHEMA as CONTRACT};
+use galion_feeling::{parse_frames, AxisTarget, IntentFrame, PinIntent, FRAME_SCHEMA as CONTRACT};
 
 fn bundled() -> (Config, Inventory) {
     let cfg = Config::load(&Config::bundled_path()).unwrap();

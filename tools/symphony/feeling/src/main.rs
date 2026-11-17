@@ -8,8 +8,8 @@ use std::io::{self, Read};
 use std::path::PathBuf;
 use std::process::ExitCode;
 
+use galion_feeling::parse_frames;
 use galion_feeling::{Config, Feeling, Inventory, SCHEMA};
-use galion_mne_contract::parse_frames;
 
 fn main() -> ExitCode {
     match run() {

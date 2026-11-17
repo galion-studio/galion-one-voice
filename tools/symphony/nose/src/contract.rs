@@ -16,7 +16,7 @@ use crate::plan::{self, NasalSpan, Request, TimedFeeling};
 use crate::read::{self, Reading};
 
 pub const SCHEMA: &str = "galion-mne-intent-stub/0";
-pub const TODO: &str = "TODO(S1): replace contract.rs with the galion-mne-contract crate";
+pub const TODO: &str = "TODO(S1): JSON schema galion-mne-intent-stub/0 remains for this crate's own tests. The integrator builds a Request from galion-mne-contract via request_from_document.";
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct Intent {
@@ -106,6 +106,54 @@ impl Intent {
 
 /// Plan from the stub. The reading is returned beside the plan and is not
 /// written into the plan's burst list unless `adopt_reading` was set.
+/// Nose request from an S1 intent. Phones and explicit nasal spans are not on that document.
+pub fn request_from_document(
+    doc: &galion_mne_contract::Document,
+    speaker_f0_hz: f64,
+) -> Result<crate::plan::Request, String> {
+    if doc.kind != galion_mne_contract::DocKind::Intent {
+        return Err("nose input must be an intent document".into());
+    }
+    let frame = doc
+        .intent_frames
+        .first()
+        .ok_or("nose input has no frames")?;
+    let (category, burst) = match &frame.feeling.pin {
+        None => ("neutral".to_string(), Vec::new()),
+        Some(pin) => {
+            let id = pin.name.as_str().to_string();
+            let burst = if matches!(pin.track, galion_mne_contract::Track::Burst) {
+                vec![crate::feeling::Weight {
+                    id: id.clone(),
+                    w: pin.weight,
+                }]
+            } else {
+                Vec::new()
+            };
+            (id, burst)
+        }
+    };
+    let feeling = crate::feeling::OpenFeeling {
+        arousal: frame.feeling.arousal,
+        valence: frame.feeling.valence,
+        dominance: frame.feeling.dominance,
+        intensity: frame.intent.strength,
+        category,
+        burst,
+    };
+    let mut req = crate::plan::Request::new(
+        &doc.text,
+        feeling,
+        crate::baseline::Speaker {
+            f0_hz: speaker_f0_hz,
+            velum_rest: 0.0,
+            phon_nasal: None,
+        },
+    );
+    req.place_from_feeling = req.feeling.burst.iter().any(|w| w.w > 0.0);
+    Ok(req)
+}
+
 pub fn plan_intent(
     intent: &Intent,
     cfg: &crate::config::Config,

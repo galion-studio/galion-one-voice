@@ -1,17 +1,17 @@
 // Galion Voice — Perpetual Open MIT License
 // Copyright (c) 2026 Galion Labs.
-//! Local stub of the intent contract.
+//! Mouth-only extras on top of `galion-mne-contract`.
 //!
-//! TODO(S1): replace [`IntentStub`] with `galion-mne-contract`.
-//! Agent S1 owns that crate. It is not in this workspace. The fields below
-//! are the ones the mouth reads, and nothing else.
+//! [`IntentStub::from_document`] reads the utterance text from S1.
+//! Phones, smile, and precision are not on that document, so they stay
+//! at the caller's values (empty, false, omitted) unless a test sets them.
 
 use serde::{Deserialize, Serialize};
 
 use crate::error::MouthError;
 
-pub const CONTRACT_SCHEMA: &str = "galion-mne-contract-stub/0";
-pub const CONTRACT_TODO: &str = "TODO(S1): replace IntentStub with galion-mne-contract. Agent S1 owns that crate. This stub is the mouth's local view until the contract lands.";
+pub const CONTRACT_SCHEMA: &str = galion_mne_contract::SCHEMA;
+pub const CONTRACT_TODO: &str = "Text comes from galion-mne-contract. Phones, smile, and precision are mouth extras and stay unset unless the caller fills them.";
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum PrecisionIntent {
@@ -68,6 +68,16 @@ pub struct IntentStub {
 }
 
 impl IntentStub {
+    pub fn from_document(doc: &galion_mne_contract::Document) -> Self {
+        Self {
+            text: doc.text.clone(),
+            phones: Vec::new(),
+            smile: false,
+            address_in_noise: false,
+            precision: None,
+        }
+    }
+
     pub fn precision_intent(&self) -> Result<Option<PrecisionIntent>, MouthError> {
         match &self.precision {
             None => Ok(None),

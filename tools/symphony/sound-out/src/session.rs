@@ -7,7 +7,7 @@
 //! leave while the cloner is still producing the phrase. Environment is
 //! applied at emit time. It does not need the future.
 
-use crate::backend::{ClonerBackend, SpeakMeta, SAMPLE_RATE, SAMPLES_PER_FRAME};
+use crate::backend::{ClonerBackend, SpeakMeta, SAMPLES_PER_FRAME, SAMPLE_RATE};
 use crate::contract::MomentFixture;
 use crate::device::{detect_with, DeviceChoice};
 use crate::environment::{wet_sample, Burst, Environment};
@@ -66,13 +66,17 @@ impl Session {
     pub fn open(moment: &MomentFixture, bursts: &[Burst]) -> Result<Self, String> {
         let cfg = Config::bundled()?;
         let inventory = Inventory::bundled()?;
-        let req = Request::constant(
+        let mut req = Request::constant(
             &moment.text,
             &moment.category,
             moment.arousal,
             moment.energy,
             moment.fatigue,
         );
+        if let Some(traj) = &moment.lungs_trajectory {
+            req.trajectory = serde_json::from_value(traj.clone())
+                .map_err(|e| format!("lungs trajectory: {e}"))?;
+        }
         let plan = plan::plan(&req, &cfg, &inventory)?;
         let rendered = synth::render_track(&plan, SAMPLE_RATE as f64, None, &cfg)?;
         let speech = speech_spans(&plan, SAMPLE_RATE as f64, rendered.samples.len());

@@ -1,13 +1,10 @@
 // Galion Voice — Perpetual Open MIT License
 // Copyright (c) 2026 Galion Labs.
-//! Local stand-in for the intent contract.
+//! Feeling drive for the glottal source.
 //!
-//! TODO(S1): replace this module with `galion-mne-contract` when agent S1
-//! publishes that crate. Do not grow a second inventory here.
-//!
-//! The fields follow the decoder tick from draft PR 191 (`t_ms`, `arousal`,
-//! `valence`, `dominance`, `intensity`) and the render target from draft
-//! PR 192 (`category`, `track`). `blend` is accepted and ignored.
+//! Names go through `galion-mne-contract` (`resolve_name`). This module keeps
+//! the throat's own `Feeling` value, which the LF step reads. `blend` on a
+//! decoder tick is still accepted and ignored.
 
 use crate::inventory::{self, Category, Track};
 use serde::{Deserialize, Serialize};
@@ -155,8 +152,18 @@ pub fn parse_feeling(value: &Value) -> Result<Feeling, String> {
         None => (None, None),
         Some(s) if s.trim().is_empty() => (None, None),
         Some(s) => {
-            let r = inventory::resolve(s)?;
-            (r.category, r.track_override)
+            let r = galion_mne_contract::resolve_name(s, galion_mne_contract::Track::Prosody)?;
+            let category = match r.pin {
+                None => None,
+                Some(name) => inventory::resolve(name.as_str())?.category,
+            };
+            // Laughter is the one alias that forces the burst track.
+            let forced = if matches!(r.alias_from, Some("laughter")) {
+                Some(inventory::Track::Burst)
+            } else {
+                None
+            };
+            (category, forced)
         }
     };
     let track_name = raw.track.as_deref().or(raw.channel.as_deref());
@@ -211,6 +218,42 @@ pub struct Speaker {
     /// Absent means the config's LF reference Rd, which is not a measurement.
     #[serde(default)]
     pub rd: Option<f64>,
+}
+
+/// One drive from an S1 intent document. A frame without a pin is baseline.
+pub fn drive_from_document(doc: &galion_mne_contract::Document) -> Result<FeelingDrive, String> {
+    if doc.kind != galion_mne_contract::DocKind::Intent {
+        return Err("throat input must be an intent document".into());
+    }
+    let mut moments = Vec::with_capacity(doc.intent_frames.len());
+    for frame in &doc.intent_frames {
+        let (category, track) = match &frame.feeling.pin {
+            None => (None, inventory::Track::Prosody),
+            Some(pin) => {
+                let category = inventory::resolve(pin.name.as_str())?.category;
+                let track = match pin.track {
+                    galion_mne_contract::Track::Burst => inventory::Track::Burst,
+                    galion_mne_contract::Track::Prosody => inventory::Track::Prosody,
+                };
+                (category, track)
+            }
+        };
+        moments.push(Feeling {
+            t_ms: frame.t_ms,
+            category,
+            track,
+            arousal: frame.feeling.arousal,
+            valence: frame.feeling.valence,
+            dominance: frame.feeling.dominance,
+            intensity: frame.intent.strength,
+            creaky: false,
+        });
+    }
+    moments.sort_by_key(|m| m.t_ms);
+    if moments.is_empty() {
+        return Err("throat input has no frames".into());
+    }
+    Ok(FeelingDrive::Moments(moments))
 }
 
 pub fn parse_speaker(baseline_f0_hz: f64, rd: Option<f64>) -> Result<Speaker, String> {

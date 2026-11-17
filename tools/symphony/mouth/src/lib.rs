@@ -9,7 +9,8 @@
 //! Reading reuses the V1 card. SPARC, Phonet, Rhubarb and praatfan are not
 //! reimplemented here.
 //!
-//! TODO(S1): `intent::IntentStub` stands in for `galion-mne-contract`.
+//! Text and the spoken pin come from `galion-mne-contract`.
+//! Phones, smile, and precision are mouth-only extras the contract does not carry.
 #![forbid(unsafe_code)]
 
 pub mod coart;

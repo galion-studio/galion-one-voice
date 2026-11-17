@@ -12,6 +12,7 @@ name = "galion-listen-back"
 path = "src/main.rs"
 
 [dependencies]
+galion-mne-contract = { path = "../mne-contract" }
 galion-articulation = { path = "../articulation" }
 hound = "3.5"
 serde = { version = "1", features = ["derive"] }

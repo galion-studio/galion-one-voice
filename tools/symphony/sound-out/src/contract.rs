@@ -43,6 +43,12 @@ pub struct MomentFixture {
     pub environment: Environment,
     #[serde(default)]
     pub controls: ControlPatch,
+    /// Per-tick lungs moments from the feeling core, as JSON. Empty keeps a constant plan.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub lungs_trajectory: Option<serde_json::Value>,
+    /// `clone_mouth` from the mouth layer. Placed on the worker line.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub clone_mouth: Option<serde_json::Value>,
 }
 
 /// The clone-request fields sound-out forwards. Defaults are the worker's
@@ -98,6 +104,8 @@ impl MomentFixture {
             fatigue: 0.0,
             environment: Environment::default(),
             controls: ControlPatch::default(),
+            lungs_trajectory: None,
+            clone_mouth: None,
         }
     }
 
@@ -115,6 +123,7 @@ impl MomentFixture {
             cfg_weight,
             temperature: self.controls.temperature,
             prosody: self.controls.prosody.clone(),
+            clone_mouth: self.clone_mouth.clone(),
         }
         .normalized()
     }

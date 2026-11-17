@@ -21,6 +21,7 @@
 
 mod config;
 mod feed;
+mod frame;
 mod inventory;
 mod state;
 
@@ -32,7 +33,12 @@ pub use feed::{
 pub use inventory::Inventory;
 pub use state::{alpha, Feeling};
 
-pub use galion_mne_contract::{IntentFrame, TICK_MS};
+pub use frame::{
+    frames_from_document, parse_frames, AxisTarget, IntentFrame, PinIntent, SCHEMA as FRAME_SCHEMA,
+};
+pub use galion_mne_contract::Document;
+
+pub use crate::frame::TICK_MS;
 
 pub const SCHEMA: &str = "galion-feeling/1";
 

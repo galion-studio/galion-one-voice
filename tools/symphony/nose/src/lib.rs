@@ -56,5 +56,5 @@ pub const REUSES: &[&str] = &[
     "F0 band cut 165 Hz: speaker_baseline in that crate. A prior for the label column, not a new sexing.",
     "Emotion inventory: configs/emotions-v2.toml (draft PR 189). This crate does not edit the list.",
     "Noise LCG: crates/galion-heartbeat/src/presence.rs, seed 13. Used for unvoiced bursts, not as a breath model.",
-    "Intent object: local stub of galion-mne-contract. TODO(S1). Delete contract.rs when that crate lands.",
+    "Intent document: galion-mne-contract (draft PR 198), via contract::request_from_document.",
 ];

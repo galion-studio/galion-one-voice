@@ -1,36 +1,41 @@
 // Galion Voice — Perpetual Open MIT License
 // Copyright (c) 2026 Galion Labs.
-//! Synthetic tone only. No download, no dataset, no person audio.
+//! The eight S1 fixtures, synthetic audio only.
 
-use std::path::PathBuf;
-
-use galion_mne::{layer_status, repo_root, run, RunIn};
+use galion_mne::{layer_status, repo_root, run_fixtures};
 
 #[test]
-fn layer_slots_are_waiting_on_their_owners() {
+fn landed_layers_are_the_seven_and_the_guard_is_waiting() {
     let layers = layer_status(&repo_root());
-    assert_eq!(layers.len(), 7);
-    assert!(layers.iter().all(|s| s.state == "waiting"), "{layers:?}");
-    assert_eq!(layers[0].crate_name, "galion-mne-contract");
+    let waiting: Vec<_> = layers
+        .iter()
+        .filter(|s| s.state == "waiting")
+        .map(|s| s.owner)
+        .collect();
+    assert_eq!(waiting, vec!["S9"]);
 }
 
 #[test]
-fn stacked_drafts_run_one_pass_on_a_synthetic_tone() {
-    let repo = repo_root();
-    let voice = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../voice-v2/voices/synthetic.toml");
-    let report = run(&RunIn {
-        repo: &repo,
-        text: "Hello. This is a short line.",
-        pin: "embarrassment",
-        voice: &voice,
-    })
-    .unwrap();
-    assert_eq!(report.tick_ms, 80);
-    assert!(report.lungs.n_ticks >= 1);
-    assert!(report.lungs.not_emotion);
-    assert_eq!(report.clone_request_patch["emotion"], "embarrassment");
-    assert_eq!(report.clone_request_patch["track"], "prosody");
-    assert!(report.listen.iterations >= 1 && report.listen.iterations <= 2);
-    assert_eq!(report.listen.profile.schema, "galion-voice-decode/2");
-    assert!((report.voice_f0_hz - 180.0).abs() < 1e-6);
+fn eight_fixtures_score_through_listen_back() {
+    let scores = run_fixtures(&repo_root()).unwrap();
+    assert_eq!(scores.len(), 8);
+    for row in &scores {
+        println!(
+            "{} feeling={} pitch_err={:?} breath={} quality={} backend={} guard={}",
+            row.id,
+            row.feeling,
+            row.pitch_error_st,
+            row.breath,
+            row.pitch_quality,
+            row.backend,
+            row.guard
+        );
+        assert!(row.feeling.is_finite(), "{}", row.id);
+        assert!(row.pitch_quality.is_finite(), "{}", row.id);
+        assert!(row.breath.is_finite(), "{}", row.id);
+        assert!(row.samples > 0, "{}", row.id);
+        assert!(row.readback_ok, "{}", row.id);
+        assert_eq!(row.guard, "waiting");
+        assert_eq!(row.backend, "piper-stand-in");
+    }
 }

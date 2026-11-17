@@ -83,6 +83,9 @@ pub struct CloneRequest {
     pub temperature: f64,
     #[serde(default)]
     pub prosody: Prosody,
+    /// Mouth packet (`galion-mouth/1` `clone_mouth`). Forwarded, not interpreted here.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub clone_mouth: Option<serde_json::Value>,
 }
 
 impl CloneRequest {
@@ -96,6 +99,7 @@ impl CloneRequest {
             cfg_weight: 0.0,
             temperature: 0.8,
             prosody: Prosody::identity(),
+            clone_mouth: None,
         }
     }
 
@@ -124,7 +128,7 @@ impl CloneRequest {
     /// Device stays `cpu` because that process refuses anything else.
     pub fn worker_line(&self) -> String {
         let req = self.clone().normalized();
-        serde_json::json!({
+        let mut line = serde_json::json!({
             "text": req.text,
             "persona": req.persona,
             "model": "nano",
@@ -143,9 +147,12 @@ impl CloneRequest {
                 "energy": req.prosody.energy,
                 "warmth": req.prosody.warmth,
                 "pre_pause_ms": req.prosody.pre_pause_ms,
-            }
-        })
-        .to_string()
+            },
+        });
+        if let Some(mouth) = &req.clone_mouth {
+            line["clone_mouth"] = mouth.clone();
+        }
+        line.to_string()
     }
 }
 

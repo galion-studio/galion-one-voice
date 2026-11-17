@@ -66,44 +66,19 @@ pub struct Resolved {
 }
 
 pub fn resolve(name: &str) -> Result<Resolved, String> {
-    let prosody = |category| Resolved {
-        track: "prosody",
-        category,
-    };
-    let burst = |category| Resolved {
-        track: "burst",
-        category,
-    };
-    match name {
-        "neutral" | "calm" => Ok(Resolved {
+    let got = galion_mne_contract::resolve_name(name, galion_mne_contract::Track::Prosody)?;
+    match got.pin {
+        None => Ok(Resolved {
             track: "baseline",
             category: "neutral",
         }),
-        "breath" => Err("breath is physiology, not an emotion".into()),
-        "sigh" => Err(
-            "sigh is a detector across relief, sadness, disappointment, and contentment; name one"
-                .into(),
-        ),
-        "laughter" => Ok(burst("amusement")),
-        "seductive" => Ok(prosody("desire")),
-        "tender" => Ok(prosody("adoration")),
-        "angry" => Ok(prosody("anger")),
-        "fearful" => Ok(prosody("fear")),
-        "sad" => Ok(prosody("sadness")),
-        "disappointed" => Ok(prosody("disappointment")),
-        "amused" => Ok(prosody("amusement")),
-        "disgusted" => Ok(prosody("contempt")),
-        "happy" => Err("happy splits into amusement and interest; name one".into()),
-        "excited" => {
-            Err("excited splits into interest and amusement; elation is its own category".into())
-        }
-        "surprised" => Err("surprised splits into awe and confusion".into()),
-        other => COWEN
-            .iter()
-            .find(|id| **id == other)
-            .copied()
-            .map(prosody)
-            .ok_or_else(|| format!("unknown emotion {other}")),
+        Some(pin) => Ok(Resolved {
+            track: match got.track {
+                galion_mne_contract::Track::Burst => "burst",
+                galion_mne_contract::Track::Prosody => "prosody",
+            },
+            category: pin.as_str(),
+        }),
     }
 }
 

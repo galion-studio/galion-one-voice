@@ -1,20 +1,19 @@
 // Galion Voice — Perpetual Open MIT License
 // Copyright (c) 2026 Galion Labs.
-//! TODO(S1): `galion-mne-contract` is owned by agent S1.
+//! Dynamics input. Not the wire contract.
 //!
-//! This is a local stand-in, version 0, so the Feeling layer can compile
-//! before that contract lands. It carries one intent frame. It has no body,
-//! no voice, and no audio. When S1's crate lands, point Feeling at it and
-//! delete this copy. Do not grow the stand-in into a second contract.
-//!
-//! A frame whose `schema` is present and is not [`SCHEMA`] is refused.
+//! The wire document is `galion-mne-contract` (S1). [`frames_from_document`]
+//! maps that document onto this frame, which is what the 80 ms chase reads.
+//! [`SCHEMA`] stays `galion-mne-contract/0` so the existing synthetic tests
+//! still name the old JSON shape. New callers use the real document.
 #![forbid(unsafe_code)]
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-/// Wire schema of this stand-in. Not S1's finished contract.
+/// Old JSON shape used by this crate's own tests. Not S1's wire schema.
 pub const SCHEMA: &str = "galion-mne-contract/0";
+#[allow(dead_code)]
 pub const VERSION: u32 = 0;
 /// Symphony clock. `LOCKS.toml` `clock.frame_ms`. Not a feeling time constant.
 pub const TICK_MS: u32 = 80;
@@ -156,6 +155,63 @@ fn validate(frame: &IntentFrame) -> Result<(), String> {
         }
     }
     Ok(())
+}
+
+/// Map S1's document onto the frames this chase reads.
+/// Arousal and dominance stay on the contract's 0..1 scale; both sit inside
+/// the chase's −1..1 check. Approach is omitted, so it is not pulled to zero.
+pub fn frames_from_document(
+    doc: &galion_mne_contract::Document,
+) -> Result<Vec<IntentFrame>, String> {
+    if doc.kind != galion_mne_contract::DocKind::Intent {
+        return Err("feeling input must be an intent document".into());
+    }
+    if doc.intent_frames.is_empty() {
+        return Err("intent document has no frames".into());
+    }
+    let mut out = Vec::with_capacity(doc.intent_frames.len());
+    for frame in &doc.intent_frames {
+        let mut axes = vec![
+            AxisTarget {
+                name: "arousal".into(),
+                value: frame.feeling.arousal,
+            },
+            AxisTarget {
+                name: "valence".into(),
+                value: frame.feeling.valence,
+            },
+            AxisTarget {
+                name: "dominance".into(),
+                value: frame.feeling.dominance,
+            },
+        ];
+        axes.retain(|a| a.value.is_finite());
+        let pins = match &frame.feeling.pin {
+            Some(pin) => vec![PinIntent {
+                id: pin.name.as_str().into(),
+                w: pin.weight,
+            }],
+            None => Vec::new(),
+        };
+        let track = frame.feeling.pin.as_ref().map(|pin| match pin.track {
+            galion_mne_contract::Track::Prosody => "prosody".into(),
+            galion_mne_contract::Track::Burst => "burst".into(),
+        });
+        out.push(IntentFrame {
+            schema: None,
+            t_ms: frame.t_ms,
+            axes,
+            pins,
+            blend: Some(frame.intent.strength),
+            track,
+            energy: Some(frame.inner.energy),
+            fatigue: Some(frame.inner.fatigue),
+            environment: Some(doc.moment.place.clone()),
+            listener_distance_m: None,
+            release: false,
+        });
+    }
+    Ok(out)
 }
 
 #[cfg(test)]

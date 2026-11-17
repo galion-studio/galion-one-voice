@@ -35,6 +35,40 @@ pub struct FeelingTick {
 }
 
 impl FeelingTick {
+    pub fn from_document(doc: &galion_mne_contract::Document) -> Vec<Self> {
+        doc.intent_frames
+            .iter()
+            .map(|frame| match &frame.feeling.pin {
+                None => Self {
+                    t_ms: frame.t_ms,
+                    track: "baseline".into(),
+                    parts: Vec::new(),
+                    arousal: frame.feeling.arousal,
+                    valence: frame.feeling.valence,
+                    dominance: frame.feeling.dominance,
+                    intensity: frame.intent.strength,
+                },
+                Some(pin) => Self {
+                    t_ms: frame.t_ms,
+                    track: match pin.track {
+                        galion_mne_contract::Track::Burst => "burst".into(),
+                        galion_mne_contract::Track::Prosody => "prosody".into(),
+                    },
+                    parts: vec![Part {
+                        category: pin.name.as_str().into(),
+                        weight: pin.weight,
+                        alias_from: None,
+                        pole: None,
+                    }],
+                    arousal: frame.feeling.arousal,
+                    valence: frame.feeling.valence,
+                    dominance: frame.feeling.dominance,
+                    intensity: frame.intent.strength,
+                },
+            })
+            .collect()
+    }
+
     pub fn baseline(t_ms: u32) -> Self {
         Self {
             t_ms,

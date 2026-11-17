@@ -14,7 +14,8 @@
 //! 1996). It is not a new glottal model. The optional reference is that
 //! derivative, for tests. It is not a radiated vowel and not a person.
 //!
-//! [`contract`] is a local stand-in for `galion-mne-contract` (agent S1).
+//! Names come from `galion-mne-contract`. [`contract::drive_from_document`]
+//! is the intent path.
 #![forbid(unsafe_code)]
 
 pub mod config;
@@ -52,6 +53,6 @@ pub const DIRECTIONS: &[&str] = &[
 pub const REUSES: &[&str] = &[
     "Subglottal pressure, f0_st and loudness_db: tools/symphony/lungs on cursor/lungs-breath-layer-b72f (draft PR 195). This layer reads that JSON. It does not plan breaths.",
     "Feeling signs for pitch: the same published calls as tools/symphony/emotion-render (draft PR 192). Step sizes stay in configs/symphony/throat.toml. Burst does not take the speech signs.",
-    "Category inventory: configs/emotions-v2.toml (draft PR 189). galion-mne-contract is not in this tree; contract.rs is the local stand-in.",
+    "Category names: galion-mne-contract (draft PR 198). The throat still keeps its own Feeling value for the LF step.",
     "80 ms clock: LOCKS clock.frame_ms. Not a published glottal time constant.",
 ];
