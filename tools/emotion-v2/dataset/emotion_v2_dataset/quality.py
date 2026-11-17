@@ -5,7 +5,8 @@
 Defaults are the Galion Voice V2 rollout gate (``tools/emotion-v2/thresholds.toml``):
 
 * WER at or below 0.018 (inclusive upper bound),
-* ECAPA strictly above 0.7057 (the Samantha merge-v2 baseline),
+* ECAPA strictly above 0.7057 (merge-v2 baseline of the first test voice;
+  another voice passes its own gate file, see ``high_quality_violations``),
 * emotion match at or above 0.83, checked per emotion class. Every class in
   ``emotion-v2/emotions.toml`` (12 today, 14 planned) has its own threshold;
   all default to 0.83.
@@ -86,24 +87,35 @@ HIGH_QUALITY_THRESHOLDS = QualityThresholds()
 SYNTHETIC_TEST_THRESHOLDS = QualityThresholds(require_scorers=False)
 
 
-def high_quality_violations(thresholds: QualityThresholds) -> list[str]:
-    """Ways ``thresholds`` is looser than the gate. Empty means high quality."""
+def high_quality_violations(
+    thresholds: QualityThresholds,
+    floor: QualityThresholds | None = None,
+) -> list[str]:
+    """Ways ``thresholds`` is looser than ``floor``. Empty means high quality.
+
+    ``floor`` is the gate for this voice. It defaults to the repo gate
+    (``tools/emotion-v2/thresholds.toml``). The stack is voice-agnostic: a
+    different cloned voice passes its own gate file (``--thresholds``), for
+    example with its own ECAPA baseline, and that file becomes the floor.
+    """
+    gate = floor if floor is not None else HIGH_QUALITY_THRESHOLDS
     problems: list[str] = []
     if not thresholds.require_scorers:
         problems.append("require_scorers is off")
-    if thresholds.max_wer is None or thresholds.max_wer > GATE_MAX_WER:
-        problems.append(f"max_wer {thresholds.max_wer} is looser than {GATE_MAX_WER}")
-    if thresholds.min_ecapa is None or thresholds.min_ecapa < GATE_MIN_ECAPA:
-        problems.append(f"min_ecapa {thresholds.min_ecapa} is looser than {GATE_MIN_ECAPA}")
+    if thresholds.max_wer is None or (gate.max_wer is not None and thresholds.max_wer > gate.max_wer):
+        problems.append(f"max_wer {thresholds.max_wer} is looser than {gate.max_wer}")
+    if thresholds.min_ecapa is None or (gate.min_ecapa is not None and thresholds.min_ecapa < gate.min_ecapa):
+        problems.append(f"min_ecapa {thresholds.min_ecapa} is looser than {gate.min_ecapa}")
     for emotion in CANONICAL_EMOTIONS:
         value = thresholds.emotion_threshold(emotion)
-        if value is None or value < GATE_MIN_EMOTION:
-            problems.append(f"emotion {emotion} threshold {value} is looser than {GATE_MIN_EMOTION}")
+        limit = gate.emotion_threshold(emotion)
+        if value is None or (limit is not None and value < limit):
+            problems.append(f"emotion {emotion} threshold {value} is looser than {limit}")
     return problems
 
 
-def require_high_quality(thresholds: QualityThresholds) -> None:
-    problems = high_quality_violations(thresholds)
+def require_high_quality(thresholds: QualityThresholds, floor: QualityThresholds | None = None) -> None:
+    problems = high_quality_violations(thresholds, floor)
     if problems:
         raise QualityError(
             "high-quality-only: " + "; ".join(problems)

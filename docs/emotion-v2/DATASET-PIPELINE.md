@@ -180,7 +180,9 @@ environments = 192 clips. Pass `--max-scenarios-per-emotion` and
    `GALION_EMOTIONS_TOML` overrides the path)
    (`QualityThresholds.min_emotion_by_class`, or `--thresholds FILE` to read
    per-class targets). High-quality mode refuses any threshold looser than
-   the gate. Rejected lines go to `rejected.jsonl` and are not augmented.
+   the gate. The stack is voice-agnostic: another cloned voice passes its own
+   gate file with `--thresholds` (for example its own ECAPA baseline), and that
+   file becomes the floor for the run. Samantha is the first test voice. Rejected lines go to `rejected.jsonl` and are not augmented.
 4. Augment each accepted line across the environment matrix.
 5. Capture-spec gate on every augmented clip (`capture.py`, numbers from
    `capture-spec.toml`): resample to 48 kHz, level to −20 LUFS, require

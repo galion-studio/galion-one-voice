@@ -88,6 +88,9 @@ class RunConfig:
     # Opt-out for synthetic stub tests ONLY. Keeps unscored clips and skips
     # the capture spec. Refused for a real profile or a non-stub backend.
     allow_unscored_synthetic_test: bool = False
+    # Per-voice gate floor (voice-agnostic stack). None = the repo gate in
+    # tools/emotion-v2/thresholds.toml. Thresholds may be stricter, never looser.
+    gate_floor: QualityThresholds | None = None
     # Scorer device: "cpu" (production default, all threads), "auto" (CUDA if
     # available, else all CPU threads), or "cuda". Passed to build_scorers().
     scorer_device: str = PRODUCTION_DEVICE
@@ -151,7 +154,7 @@ def run_pipeline(config: RunConfig) -> RunResult:
     else:
         quality_mode = QUALITY_MODE_HIGH
         thresholds = config.thresholds or QualityThresholds()
-        require_high_quality(thresholds)
+        require_high_quality(thresholds, config.gate_floor)
         capture = config.capture or HIGH_QUALITY_CAPTURE
         _require_capture_spec(capture)
     compute = resolve_device(

@@ -76,7 +76,8 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument("--min-emotion", type=float, default=None,
                      help="Threshold for every emotion class. High-quality mode accepts only >= 0.83.")
     run.add_argument("--thresholds", type=Path, default=None,
-                     help="thresholds.toml with [guards] and per-class [emotion.targets].")
+                     help="Per-voice gate file like tools/emotion-v2/thresholds.toml ([guards], "
+                     "per-class [emotion.targets]). Becomes the floor for this run.")
     run.add_argument("--scorer-module", action="append", default=None,
                      help="Python module with build_scorers(config) -> list. Repeatable.")
     run.add_argument(
@@ -106,8 +107,11 @@ def main(argv: list[str] | None = None) -> int:
     if args.allow_unscored_synthetic_test and args.require_scorers:
         parser.error("--require-scorers and --allow-unscored-synthetic-test conflict")
     base = SYNTHETIC_TEST_THRESHOLDS if args.allow_unscored_synthetic_test else HIGH_QUALITY_THRESHOLDS
+    gate_floor = None
     if args.thresholds is not None:
+        # A per-voice gate file: it is both the default and the floor.
         loaded = thresholds_from_toml(args.thresholds)
+        gate_floor = loaded
         base = replace(loaded, require_scorers=base.require_scorers)
     if args.max_wer is not None:
         base = replace(base, max_wer=args.max_wer)
@@ -139,6 +143,7 @@ def main(argv: list[str] | None = None) -> int:
         today=today,
         scorer_modules=tuple(args.scorer_module) if args.scorer_module else None,
         allow_unscored_synthetic_test=args.allow_unscored_synthetic_test,
+        gate_floor=gate_floor,
         scorer_device=args.scorer_device,
         scorer_threads=args.scorer_threads,
     )

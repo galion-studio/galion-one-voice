@@ -172,6 +172,13 @@ class GateDefaultTests(unittest.TestCase):
         self.assertTrue(high_quality_violations(QualityThresholds(min_ecapa=0.5)))
         self.assertTrue(high_quality_violations(QualityThresholds(require_scorers=False)))
 
+    def test_another_voice_brings_its_own_gate_floor(self) -> None:
+        other = QualityThresholds(min_ecapa=0.65)  # e.g. a different cloned voice's baseline
+        self.assertTrue(high_quality_violations(other))
+        self.assertEqual(high_quality_violations(other, floor=other), [])
+        self.assertTrue(high_quality_violations(QualityThresholds(min_ecapa=0.6), floor=other))
+        self.assertTrue(decide(ScoreCard(0.0, 0.66, 0.9), other, "Calm").accepted)
+
     def test_twelve_class_posterior_scorer_uses_the_clip_class(self) -> None:
         posterior = {name.lower(): 0.01 for name in CANONICAL_EMOTIONS}
         posterior["sad"] = 0.91
