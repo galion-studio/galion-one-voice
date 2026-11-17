@@ -1,0 +1,22 @@
+# Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
+[package]
+name = "galion-mouth"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+publish = false
+description = "Symphony mouth layer: per-80 ms articulation targets (formants, lips, jaw, tongue, precision, rate, coarticulation) and viseme timing. Reads V1 articulation JSON. Does not reimplement SPARC, Phonet, Rhubarb, or praatfan."
+
+[[bin]]
+name = "galion-mouth"
+path = "src/main.rs"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+
+# Own workspace, same pattern as tools/symphony/articulation and tools/symphony/lungs.
+# The locked voice runtime does not build this tool, and this crate does not
+# pull praatfan (that brick stays inside galion-articulation).
+[workspace]
