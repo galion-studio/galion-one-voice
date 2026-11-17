@@ -72,7 +72,7 @@ It is slow per clip (it re-embeds that emotion's references for every clip); use
 
 ## GitHub CI (no weights)
 
-`.github/workflows/emotion-v2-ci.yml` job `gate-matrix-logic`: `bash -n` on the eval scripts, the
+`.github/workflows/eval-gate.yml` job `gate-matrix-logic`: `bash -n` on the eval scripts, the
 galion-emotion gate verdict unit tests (`cargo test`), and the plugin tests with fake tools and a
 synthetic 432 Hz tone. The scored run needs the pinned models and stays on the laptop.
 

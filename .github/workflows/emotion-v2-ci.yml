@@ -31,22 +31,3 @@ jobs:
         run: python -m unittest discover -s tools/cloning-v2/emotion-match/tests -v
       - name: Nebula live feed unit tests (no audio)
         run: python -m unittest discover -s tools/emotion-v2/nebula/tests -v
-
-  gate-matrix-logic:
-    # Rollout-gate eval glue (scripts/eval/emotion-eval.sh --matrix). No weights, no audio:
-    # the gate verdict unit tests in galion-emotion and the #182 scorer plugin with fake tools.
-    # The real scored run is the laptop eval CI (docs/emotion-v2/EVAL-CI.md).
-    name: emotion-v2 gate matrix logic (no weights)
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - name: Eval scripts parse
-        run: bash -n scripts/eval/emotion-eval.sh && bash -n scripts/eval/crema-d-fixture.sh
-      - name: galion-emotion gate verdict tests
-        run: cargo test --locked --manifest-path tools/cloning-v2/scorers/emotion/Cargo.toml
-      - name: "#182 scorer plugin (fake tools, synthetic tone)"
-        run: pip install numpy==2.1.3 && python -m unittest discover -s tools/emotion-v2/eval/tests -v
