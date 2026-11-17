@@ -1,0 +1,13 @@
+# Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
+# Emotion eval scorers (432 Hz standard). One row per scorer. Tab-separated.
+# kind:   ort      = galion-emotion bench (Rust, ONNX Runtime; CUDA when present, else all CPU threads)
+#         harness  = existing Python harness `score --backend <model>` (locked 0.70*category+0.30*emb, gate 0.83)
+# model / head:  path under $GALION_MODELS (default /mnt/g/galion/models); head "-" when the model outputs probs
+# labels: model output labels ("-" = read from head)
+# map:    model label -> Galion emotion(s), same families as tools/emotion-v2/scorer12/galion12-map.toml
+# To plug in a new scorer (e.g. the 12-emotion scorer from swarm11/emotion-scorer-12), add one row
+# and pin its files in MODELS.lock. A row whose files are missing or mismatched fails the run (exit 2).
+#name	kind	model	head	labels	map
+superb-er-4	ort	emotion/superb-er/superb_er.onnx	-	neu,hap,ang,sad	neu=neutral|calm,hap=happy|amused|excited|tender,ang=angry,sad=sad|disappointed
+emotion2vec-plus-base-9	ort	emotion/emotion2vec-plus-base-onnx/emotion2vec_plus_base.onnx	emotion/emotion2vec-plus-base-onnx/emotion2vec_head.json	-	neutral=neutral|calm,happy=happy|amused|excited|tender,sad=sad|disappointed,angry=angry,fearful=fearful,surprised=surprised,disgusted=disgusted
+superb-er-4-gate	harness	superb/wav2vec2-base-superb-er	-	-	-

@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 const USAGE: &str = "usage: galion-wer [--ref TEXT | --ref-file F | --text-dir DIR (uses DIR/<stem>.txt)] \
-[--model VOSK_DIR] [--lib libvosk.so] [--jobs N<=2] [--out out.json] clip.wav...\n       galion-wer --score-only --ref TEXT --hyp TEXT";
+[--model VOSK_DIR] [--lib libvosk.so] [--jobs N<=CPU threads] [--out out.json] clip.wav...\n       galion-wer --score-only --ref TEXT --hyp TEXT";
 const R: &str = "/workspace/swarm/voice-v2-sprint/repo/weights/asr/";
 
 pub fn norm(s: &str) -> Vec<String> {
@@ -116,7 +116,7 @@ fn main() {
     if fixed_ref.is_none() && text_dir.is_none() { cli::die("galion-wer: need --ref, --ref-file or --text-dir") }
     let lib = a.get("lib").map(PathBuf::from).unwrap_or_else(|| PathBuf::from(format!("{R}libvosk/libvosk.so")));
     let model = a.get("model").map(PathBuf::from).unwrap_or_else(|| PathBuf::from(format!("{R}vosk-model-small-en-us-0.15")));
-    let jobs: usize = a.get("jobs").and_then(|s| s.parse().ok()).unwrap_or(1).clamp(1, 2);
+    let jobs: usize = a.get("jobs").and_then(|s| s.parse().ok()).unwrap_or(1).clamp(1, std::thread::available_parallelism().map(|n| n.get()).unwrap_or(2));
     let t0 = Instant::now();
     let v = Vosk::open(&lib, &model).unwrap_or_else(|e| cli::die(&e));
     let load_s = t0.elapsed().as_secs_f64();

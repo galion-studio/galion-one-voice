@@ -1,0 +1,12 @@
+# Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
+# sha256  path-under-$GALION_MODELS   (checked by scripts/eval/emotion-eval.sh before any score; mismatch = exit 2)
+# Laptop: G:\galion\models. Sources and licences: docs/emotion-v2/EVAL-CI.md
+4fbb599d2659bcf5a3dee77c5416e2cec5ae390cb6cb25858bf1c6284babf404  emotion/superb-er/superb_er.onnx
+a9ddcc2f4254c3da1dc2a51ea5e38df32e2a84724519e343499f05f0ea2b3506  emotion/emotion2vec-plus-base-onnx/emotion2vec_plus_base.onnx
+69666ff0d2873f016f5a8187b685e32a2c419130876bf97b069c981c44cfe02c  emotion/emotion2vec-plus-base-onnx/emotion2vec_head.json
+a11392c045f046f19fc0901f8373ef5f067a6e38d978296e72324c763db54277  speaker/ecapa/ecapa.onnx
+85c4654de3acdeb99abab86eeb2a6e603927d37089597c0fcc33d8638dc2ccaf  asr/vosk-linux-x86_64-0.3.45/libvosk.so
+75370a0137f9daf8f469dedd7daa4513ae7a621f03240c6e512e2b50b656a7b6  asr/vosk-model-small-en-us-0.15/am/final.mdl
+a96f132e5eb5ca04e23a7d2fc1078fb95aa591e8d71d0f237702ece3a1e0f4ea  emotion/ort/onnxruntime-linux-x64-1.31.1/lib/libonnxruntime.so
+43c4028a88fd86be88d795b3423a7bdeddcbae6aa8e775a950e7bff1bbc1702d  emotion/ort/onnxruntime-linux-x64-gpu_cuda13-1.31.1/lib/libonnxruntime.so
+82586610865e67dc73505087e04dd40a3cc69b281028731ce763faafe14b1347  runtime/cuda13/lib/libcurand.so.10

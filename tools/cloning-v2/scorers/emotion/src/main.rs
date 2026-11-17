@@ -1,5 +1,7 @@
 //! galion-emotion: Rust-native emotion scorer for voice clones.
 mod audio;
+mod bench;
+mod matrix;
 mod models;
 mod proxies;
 
@@ -13,11 +15,27 @@ const MODELS_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/models");
 const SCHEMA_VERSION: &str = "galion-emotion/1";
 
 const USAGE: &str = "galion-emotion score [--ref REF.wav] [options] FILE.wav...
+galion-emotion bench --manifest LIST.tsv --label-map MAP [--name NAME] [options]
+galion-emotion matrix --config emotions.toml --build-dir DIR --models-root M --out-dir O
+                      [--reference-dir R] [--wer-dir W] [--ecapa-dir E] [--device D] [--threads N]
+
+matrix: per emotion in the config, DIR/<id>/*.wav vs R/<id>/*.wav; WER from W/<id>.json
+(galion-wer), ECAPA from E/<id>.json (galion-ecapa). Writes matrix.json + matrix.md.
+Exit 0 all PASS, 1 any FAIL, 3 none failed but some UNMEASURED.
+
+bench: LIST.tsv is `path<TAB>true_label` per line. MAP is `model_label=true_label,...`
+(a model label may map to several true labels with `|`). Reports accuracy, UAR,
+per-class recall, the confusion matrix, and the device used. True labels that no
+model label maps to are reported as `not_covered` (the scorer cannot name them).
 
 Options:
   --ref PATH          reference recording; adds per-file `vs_ref` and a summary
   --out PATH          write JSON to PATH (default stdout)
-  --threads N         ORT intra-op threads (default 2)
+  --threads N         ORT intra-op threads (default 0 = all logical CPUs)
+  --device D          auto | cpu | cuda (default cpu; auto tries CUDA then falls back to CPU)
+  --ser-head PATH     linear head JSON for a frame-feature SER model (emotion2vec ONNX format)
+  --ser-labels LIST   comma-separated labels of the SER model output (default neu,hap,ang,sad)
+  --summary-md PATH   bench: append one markdown table row to PATH
   --ser-model PATH    categorical SER ONNX (default <crate>/models/superb_er.onnx)
   --dim-model PATH    A/D/V ONNX (default <crate>/models/msp_dim.onnx)
   --int8              use dynamic-int8 quantized models (*.int8.onnx; ~3x smaller, faster, small accuracy cost)
@@ -67,6 +85,8 @@ struct FileScore {
 }
 
 struct Scorer {
+    labels: Vec<String>,
+    head: Option<models::Head>,
     ser: Option<ort::session::Session>,
     dim: Option<ort::session::Session>,
 }
@@ -85,12 +105,13 @@ impl Scorer {
         let mut ser_vec = None;
         if let Some(s) = self.ser.as_mut() {
             let t = Instant::now();
-            let p = models::ser(s, &x16)?;
+            let p = match &self.head { Some(h) => models::ser_with_head(s, &x16, h)?, None => models::ser(s, &x16)? };
+            anyhow::ensure!(p.len() == self.labels.len(), "SER model returned {} values for {} labels", p.len(), self.labels.len());
             tm.insert("ser".into(), t.elapsed().as_secs_f64() * 1e3);
             let (bi, bv) = p.iter().enumerate().fold((0, f32::MIN), |acc, (i, &v)| if v > acc.1 { (i, v) } else { acc });
             ser = Some(Ser {
-                probs: models::SER_LABELS.iter().zip(&p).map(|(l, v)| (l.to_string(), *v)).collect(),
-                top: models::SER_LABELS[bi].into(),
+                probs: self.labels.iter().zip(&p).map(|(l, v)| (l.to_string(), *v)).collect(),
+                top: self.labels[bi].clone(),
                 top_conf: bv,
             });
             ser_vec = Some(p);
@@ -232,10 +253,18 @@ fn main() -> Result<()> {
         print!("{USAGE}");
         return Ok(());
     }
-    if args[0] != "score" {
+    if args[0] == "matrix" {
+        return run_matrix(&args[1..]);
+    }
+    if args[0] != "score" && args[0] != "bench" {
         bail!("unknown command {:?}\n{USAGE}", args[0]);
     }
-    let (mut refp, mut outp, mut threads) = (None, None, 2usize);
+    let is_bench = args[0] == "bench";
+    let (mut refp, mut outp, mut threads) = (None, None, 0usize);
+    let mut device = models::Device::Cpu;
+    let (mut ser_head, mut ser_labels): (Option<String>, Option<String>) = (None, None);
+    let (mut manifest, mut label_map, mut bench_name): (Option<String>, Option<String>, String) = (None, None, "ser".into());
+    let mut summary_md: Option<String> = None;
     let mut ser_model = format!("{MODELS_DIR}/superb_er.onnx");
     let mut dim_model = format!("{MODELS_DIR}/msp_dim.onnx");
     let (mut no_ser, mut no_dim, mut compact) = (false, false, false);
@@ -257,9 +286,52 @@ fn main() -> Result<()> {
             "--no-models" => { no_ser = true; no_dim = true; }
             "--compact" => compact = true,
             "--ort-lib" => ort_lib = Some(val()?),
+            "--device" => device = val()?.parse()?,
+            "--ser-head" => ser_head = Some(val()?),
+            "--ser-labels" => ser_labels = Some(val()?),
+            "--manifest" => manifest = Some(val()?),
+            "--label-map" => label_map = Some(val()?),
+            "--name" => bench_name = val()?,
+            "--summary-md" => summary_md = Some(val()?),
             s if s.starts_with("--") => bail!("unknown option {s}\n{USAGE}"),
             _ => files.push(a.clone()),
         }
+    }
+    let head = match &ser_head { Some(p) => Some(models::load_head(p)?), None => None };
+    let labels: Vec<String> = match (&head, &ser_labels) {
+        (Some(h), _) => h.labels.clone(),
+        (None, Some(l)) => l.split(',').map(|x| x.trim().to_string()).filter(|x| !x.is_empty()).collect(),
+        (None, None) => models::SER_LABELS.iter().map(|x| x.to_string()).collect(),
+    };
+    if is_bench {
+        let manifest = manifest.context("bench needs --manifest")?;
+        let label_map = label_map.context("bench needs --label-map")?;
+        let entries = bench::read_manifest(&manifest)?;
+        let map = bench::parse_label_map(&label_map, &labels)?;
+        models::init_ort(ort_lib.as_deref())?;
+        let t = Instant::now();
+        let (sess, dev) = models::session(&ser_model, threads, device)?;
+        let load_ms = t.elapsed().as_secs_f64() * 1e3;
+        eprintln!("galion-emotion bench {bench_name}: {} files, model {ser_model}, device {dev}", entries.len());
+        let mut sc = Scorer { labels: labels.clone(), head, ser: Some(sess), dim: None };
+        let wall0 = Instant::now();
+        let mut preds = Vec::with_capacity(entries.len());
+        for (path, truth) in &entries {
+            let s = sc.score(path)?;
+            preds.push((truth.clone(), s.ser.map(|x| x.top).unwrap_or_default()));
+        }
+        let report = bench::report(&bench_name, &ser_model, &dev, resolve_threads_for_report(threads, &dev), &labels, &map, &preds, load_ms, wall0.elapsed().as_secs_f64());
+        let txt = serde_json::to_string_pretty(&report)? + "\n";
+        if let Some(p) = &summary_md {
+            use std::io::Write;
+            let mut f = std::fs::OpenOptions::new().create(true).append(true).open(p).with_context(|| format!("open {p}"))?;
+            writeln!(f, "{}", bench::md_row(&report))?;
+        }
+        match outp {
+            Some(p) => std::fs::write(&p, txt).with_context(|| format!("write {p}"))?,
+            None => print!("{txt}"),
+        }
+        return Ok(());
     }
     if files.is_empty() && refp.is_none() {
         bail!("no input files\n{USAGE}");
@@ -272,10 +344,11 @@ fn main() -> Result<()> {
     let cpu0 = cpu_s();
     let t = Instant::now();
     if !(no_ser && no_dim) { models::init_ort(ort_lib.as_deref())?; }
-    let mut sc = Scorer {
-        ser: if no_ser { None } else { Some(models::session(&ser_model, threads)?) },
-        dim: if no_dim { None } else { Some(models::session(&dim_model, threads)?) },
-    };
+    let mut devices: BTreeMap<&str, String> = BTreeMap::new();
+    let ser = if no_ser { None } else { let (s, d) = models::session(&ser_model, threads, device)?; devices.insert("ser", d); Some(s) };
+    let dim = if no_dim { None } else { let (s, d) = models::session(&dim_model, threads, device)?; devices.insert("dim", d); Some(s) };
+    for (k, d) in &devices { eprintln!("galion-emotion {k}: device {d}"); }
+    let mut sc = Scorer { labels: labels.clone(), head, ser, dim };
     let load_ms = t.elapsed().as_secs_f64() * 1e3;
     let reference = match &refp { Some(p) => Some(sc.score(p)?), None => None };
     let mut scores = Vec::new();
@@ -291,8 +364,9 @@ fn main() -> Result<()> {
         "models": {
             "ser": if no_ser { None } else { Some(&ser_model) },
             "dim": if no_dim { None } else { Some(&dim_model) },
-            "ser_labels": models::SER_LABELS,
-            "threads": threads,
+            "ser_labels": labels,
+            "threads": models::resolve_threads(threads),
+            "device": devices,
         },
         "reference": reference.map(strip),
         "files": scores.into_iter().map(strip).collect::<Vec<_>>(),
@@ -309,4 +383,115 @@ fn main() -> Result<()> {
         None => println!("{txt}"),
     }
     Ok(())
+}
+
+fn resolve_threads_for_report(threads: usize, dev: &str) -> Option<usize> {
+    if dev.starts_with("cpu") { Some(models::resolve_threads(threads)) } else { None }
+}
+
+fn run_matrix(args: &[String]) -> Result<()> {
+    use std::path::PathBuf;
+    let mut kv: BTreeMap<String, String> = BTreeMap::new();
+    let mut it = args.iter();
+    while let Some(a) = it.next() {
+        let k = a.strip_prefix("--").with_context(|| format!("unexpected argument {a}"))?;
+        kv.insert(k.to_string(), it.next().cloned().with_context(|| format!("{a} needs a value"))?);
+    }
+    let get = |k: &str| kv.get(k).cloned();
+    let need = |k: &str| get(k).with_context(|| format!("matrix needs --{k}"));
+    let cfg_path = need("config")?;
+    let cfg = matrix::load(&cfg_path)?;
+    let build = PathBuf::from(need("build-dir")?);
+    let root = PathBuf::from(need("models-root")?);
+    let outd = PathBuf::from(need("out-dir")?);
+    std::fs::create_dir_all(&outd)?;
+    let refs = get("reference-dir").map(PathBuf::from);
+    let werd = get("wer-dir").map(PathBuf::from);
+    let ecd = get("ecapa-dir").map(PathBuf::from);
+    let device: models::Device = get("device").unwrap_or_else(|| "cpu".into()).parse()?;
+    let threads: usize = get("threads").unwrap_or_else(|| "0".into()).parse()?;
+    let model = root.join(&cfg.scorer.model).display().to_string();
+    let head = models::load_head(&root.join(&cfg.scorer.head).display().to_string())?;
+    for e in &cfg.emotion {
+        for l in &e.labels {
+            anyhow::ensure!(head.labels.contains(l), "{cfg_path}: emotion {} uses label {l:?}, not a scorer label ({})", e.id, head.labels.join(","));
+        }
+    }
+    // --scores FILE: per-file emotion2vec+ output from galion-emotion12 (PR #187, A2's gate scorer,
+    // schema galion-emotion12/1). Then no session is opened here; the matrix only does the gate math.
+    let pre: Option<BTreeMap<String, (Vec<f32>, Vec<f32>)>> = match get("scores") {
+        None => None,
+        Some(p) => {
+            let v: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&p).with_context(|| format!("read {p}"))?)?;
+            anyhow::ensure!(v["schema"] == "galion-emotion12/1", "{p}: expected schema galion-emotion12/1");
+            let ml: Vec<String> = serde_json::from_value(v["model_labels"].clone())?;
+            anyhow::ensure!(ml == head.labels, "{p}: model_labels {ml:?} differ from the head labels {:?}", head.labels);
+            let mut m = BTreeMap::new();
+            for r in v["files"].as_array().with_context(|| format!("{p}: no files"))? {
+                let f = r["file"].as_str().context("file")?.to_string();
+                m.insert(f, (serde_json::from_value(r["model_probs"].clone())?, serde_json::from_value(r["embedding"].clone())?));
+            }
+            Some(m)
+        }
+    };
+    let t = Instant::now();
+    let (mut sess, dev) = if let Some(p) = get("scores") {
+        (None, format!("galion-emotion12 scores {p}"))
+    } else {
+        models::init_ort(get("ort-lib").as_deref())?;
+        let (s, d) = models::session(&model, threads, device)?;
+        (Some(s), d.to_string())
+    };
+    let load_ms = t.elapsed().as_secs_f64() * 1e3;
+    eprintln!("galion-emotion matrix: {} emotions, scorer {}, device {dev}", cfg.emotion.len(), cfg.scorer.name);
+    let wall0 = Instant::now();
+    let mut analyse = |files: &[String]| -> Result<(Vec<Vec<f32>>, Vec<Vec<f32>>)> {
+        let (mut post, mut emb) = (Vec::new(), Vec::new());
+        for f in files {
+            if let Some(m) = &pre {
+                let (p, e) = m.get(f).with_context(|| format!("{f}: not in --scores"))?;
+                post.push(p.clone());
+                emb.push(e.clone());
+                continue;
+            }
+            let sess = sess.as_mut().context("no session")?;
+            let a = audio::load_wav(f)?;
+            let x16 = audio::resample(&a.samples, a.sr, proxies::SR as u32);
+            let pooled = models::pooled_features(sess, &x16)?;
+            post.push(models::apply_head(&head, &pooled)?);
+            emb.push(pooled);
+        }
+        Ok((post, emb))
+    };
+    let mut rows = Vec::new();
+    let mut n_files = 0usize;
+    for e in &cfg.emotion {
+        let rf = matrix::wavs(&build.join(&e.id));
+        let ff = refs.as_ref().map(|r| matrix::wavs(&r.join(&e.id))).unwrap_or_default();
+        n_files += rf.len() + ff.len();
+        let (mut cb, mut es, mut tp) = (None, None, None);
+        if !rf.is_empty() {
+            let (rp, re) = analyse(&rf)?;
+            let idx: Vec<usize> = e.labels.iter().filter_map(|l| head.labels.iter().position(|h| h == l)).collect();
+            tp = Some(rp.iter().map(|p| idx.iter().map(|&i| p[i] as f64).sum::<f64>()).sum::<f64>() / rp.len() as f64);
+            if !ff.is_empty() {
+                let (fp, fe) = analyse(&ff)?;
+                cb = Some(matrix::cos(&matrix::mean(&rp), &matrix::mean(&fp)));
+                es = Some(matrix::cos(&matrix::mean(&re), &matrix::mean(&fe)));
+            }
+        }
+        let wer = werd.as_ref().and_then(|d| matrix::tool_mean(&d.join(format!("{}.json", e.id)), "/summary/mean"));
+        let ecapa = ecd.as_ref().and_then(|d| matrix::tool_mean(&d.join(format!("{}.json", e.id)), "/mean"));
+        rows.push(matrix::Row { id: e.id.clone(), n_render: rf.len(), n_ref: ff.len(), category_blend: cb, emb_sim: es, target_prob: tp, wer, ecapa });
+    }
+    let wall = wall0.elapsed().as_secs_f64();
+    let extra = json!({"config": cfg_path, "build_dir": build, "reference_dir": refs, "model": model, "files_scored": n_files,
+        "model_load_ms": load_ms, "wall_s": wall, "files_per_s": n_files as f64 / wall.max(1e-9)});
+    let (j, md) = matrix::render(&cfg, &rows, &dev, extra);
+    std::fs::write(outd.join("matrix.json"), serde_json::to_string_pretty(&j)? + "\n")?;
+    std::fs::write(outd.join("matrix.md"), &md)?;
+    print!("{md}");
+    let t = &j["totals"];
+    let code = if t["fail"].as_u64() > Some(0) { 1 } else if t["unmeasured"].as_u64() > Some(0) { 3 } else { 0 };
+    std::process::exit(code);
 }

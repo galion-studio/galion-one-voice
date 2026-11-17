@@ -18,14 +18,64 @@ pub fn init_ort(lib: Option<&str>) -> Result<()> {
     Ok(())
 }
 
-pub fn session(path: &str, threads: usize) -> Result<Session> {
-    let s = Session::builder()?
+/// Where a session runs. `Auto` tries the CUDA execution provider first and
+/// falls back to the CPU provider; `Cpu` (the default) never touches a GPU.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Device {
+    Auto,
+    Cpu,
+    Cuda,
+}
+
+impl std::str::FromStr for Device {
+    type Err = anyhow::Error;
+    fn from_str(s: &str) -> Result<Self> {
+        match s {
+            "auto" => Ok(Device::Auto),
+            "cpu" => Ok(Device::Cpu),
+            "cuda" | "gpu" => Ok(Device::Cuda),
+            _ => anyhow::bail!("--device must be auto, cpu, or cuda (got {s:?})"),
+        }
+    }
+}
+
+/// `0` means every logical CPU the OS gives this process.
+pub fn resolve_threads(threads: usize) -> usize {
+    if threads > 0 {
+        return threads;
+    }
+    std::thread::available_parallelism().map(|n| n.get()).unwrap_or(1)
+}
+
+fn builder(threads: usize) -> Result<ort::session::builder::SessionBuilder> {
+    Ok(Session::builder()?
         .with_optimization_level(GraphOptimizationLevel::Level3)?
         .with_intra_threads(threads)?
-        .with_inter_threads(1)?
-        .commit_from_file(path)
-        .with_context(|| format!("load model {path}"))?;
-    Ok(s)
+        .with_inter_threads(1)?)
+}
+
+/// Open a model on the requested device. Returns the session and a plain
+/// description of the device it actually runs on (logged in every report).
+pub fn session(path: &str, threads: usize, device: Device) -> Result<(Session, String)> {
+    let threads = resolve_threads(threads);
+    if device != Device::Cpu {
+        use ort::execution_providers::CUDAExecutionProvider;
+        let cuda = builder(threads)?
+            .with_execution_providers([CUDAExecutionProvider::default().with_device_id(0).build().error_on_failure()])
+            .and_then(|b| b.commit_from_file(path));
+        match cuda {
+            Ok(s) => return Ok((s, "cuda:0 (onnxruntime CUDAExecutionProvider)".into())),
+            Err(e) if device == Device::Cuda => {
+                return Err(anyhow::anyhow!("CUDA requested but unavailable for {path}: {e}"));
+            }
+            Err(e) => {
+                let s = builder(threads)?.commit_from_file(path).with_context(|| format!("load model {path}"))?;
+                return Ok((s, format!("cpu ({threads} threads; CUDA fallback: {e})")));
+            }
+        }
+    }
+    let s = builder(threads)?.commit_from_file(path).with_context(|| format!("load model {path}"))?;
+    Ok((s, format!("cpu ({threads} threads)")))
 }
 
 fn run_vec(sess: &mut Session, x: &[f32]) -> Result<Vec<f32>> {
@@ -65,6 +115,58 @@ pub fn ser(sess: &mut Session, x16: &[f32]) -> Result<Vec<f32>> {
     chunked(sess, x16, |c| c.to_vec())
 }
 
+/// Linear classification head published with a frame-feature model
+/// (emotion2vec ONNX export format: `{"labels": [...], "weight": [[...]], "bias": [...]}`).
+/// Usage follows the publisher's README: mean-pool frames, `W·x + b`, softmax.
+#[derive(serde::Deserialize, Clone)]
+pub struct Head {
+    pub labels: Vec<String>,
+    pub weight: Vec<Vec<f32>>,
+    pub bias: Vec<f32>,
+}
+
+pub fn load_head(path: &str) -> Result<Head> {
+    let h: Head = serde_json::from_str(&std::fs::read_to_string(path).with_context(|| format!("read head {path}"))?)
+        .with_context(|| format!("parse head {path}"))?;
+    anyhow::ensure!(h.labels.len() == h.weight.len() && h.labels.len() == h.bias.len(), "head {path}: labels/weight/bias length mismatch");
+    Ok(h)
+}
+
+fn softmax(v: &[f32]) -> Vec<f32> {
+    let m = v.iter().cloned().fold(f32::MIN, f32::max);
+    let e: Vec<f32> = v.iter().map(|x| (x - m).exp()).collect();
+    let s: f32 = e.iter().sum();
+    e.into_iter().map(|x| x / s).collect()
+}
+
+/// Frame features `[1, T, D]` -> mean over T (the publisher's pooled utterance embedding).
+pub fn pooled_features(sess: &mut Session, x16: &[f32]) -> Result<Vec<f32>> {
+    let t = Tensor::from_array(([1usize, x16.len()], x16.to_vec()))?;
+    let out = sess.run(ort::inputs![t])?;
+    let (shape, data) = out[0].try_extract_tensor::<f32>()?;
+    let d = *shape.last().context("feature output has no dims")? as usize;
+    let frames = data.len() / d.max(1);
+    anyhow::ensure!(frames > 0, "feature output is empty");
+    let mut pooled = vec![0f32; d];
+    for f in data.chunks(d) {
+        for (p, v) in pooled.iter_mut().zip(f) {
+            *p += v / frames as f32;
+        }
+    }
+    Ok(pooled)
+}
+
+/// Head on a pooled embedding -> softmax probs in `head.labels` order.
+pub fn apply_head(head: &Head, pooled: &[f32]) -> Result<Vec<f32>> {
+    anyhow::ensure!(pooled.len() == head.weight[0].len(), "feature dim {} does not match head dim {}", pooled.len(), head.weight[0].len());
+    let logits: Vec<f32> = head.weight.iter().zip(&head.bias).map(|(w, b)| w.iter().zip(pooled).map(|(a, x)| a * x).sum::<f32>() + b).collect();
+    Ok(softmax(&logits))
+}
+
+pub fn ser_with_head(sess: &mut Session, x16: &[f32], head: &Head) -> Result<Vec<f32>> {
+    let pooled = pooled_features(sess, x16)?;
+    apply_head(head, &pooled)
+}
 /// Returns (arousal, dominance, valence), roughly 0..1. Input normalized zero-mean/unit-var like Wav2Vec2FeatureExtractor.
 pub fn adv(sess: &mut Session, x16: &[f32]) -> Result<[f32; 3]> {
     let v = chunked(sess, x16, |c| {

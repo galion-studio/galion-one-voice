@@ -1,0 +1,78 @@
+# Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
+# Samantha · Galion Voice V2. 432 Hz tuning standard.
+#
+# ONE config for the emotion eval CI: the emotion list, the scorer, and the gate.
+# The CI reads however many [[emotion]] rows are here. Default: 14 (Mate, card t1359s6830).
+#
+# Per emotion and per build the matrix reports:
+#   emotion_match = 0.70*category_blend + 0.30*emb_sim   (locked formula, vs that emotion's reference clips)
+#   wer           = galion-wer (vosk) mean over the emotion's clips, text from <clip>.txt
+#   ecapa         = galion-ecapa mean cosine vs the speaker reference
+# PASS only when all three are measured and inside the gate. Missing = UNMEASURED, never PASS.
+
+schema = "galion-emotion-eval/1"
+tuning_hz = 432
+
+[gate]
+# Locked rollout gate. Do not edit without Mate's card.
+wer_max = 0.018        # inclusive
+ecapa_min = 0.7057     # strict: ecapa > 0.7057
+emotion_min = 0.83     # inclusive
+category_weight = 0.70
+embedding_weight = 0.30
+
+[scorer]
+# emotion2vec+ base, ONNX export (MIT packaging; weights FunASR Model Licence v1.1, attribution "emotion2vec+").
+# Paths are under $GALION_MODELS. Pinned in MODELS.lock.
+name = "emotion2vec-plus-base"
+model = "emotion/emotion2vec-plus-base-onnx/emotion2vec_plus_base.onnx"
+head = "emotion/emotion2vec-plus-base-onnx/emotion2vec_head.json"
+
+# id = folder name in a build / reference tree. labels = scorer classes that count as a hit
+# for this emotion (families as in tools/emotion-v2/scorer12/galion12-map.toml).
+[[emotion]]
+id = "neutral"
+labels = ["neutral"]
+[[emotion]]
+id = "calm"
+labels = ["neutral"]
+[[emotion]]
+id = "happy"
+labels = ["happy"]
+[[emotion]]
+id = "amused"
+labels = ["happy"]
+[[emotion]]
+id = "excited"
+labels = ["happy", "surprised"]
+[[emotion]]
+id = "tender"
+labels = ["happy", "neutral"]
+[[emotion]]
+id = "sad"
+labels = ["sad"]
+[[emotion]]
+id = "disappointed"
+labels = ["sad"]
+[[emotion]]
+id = "angry"
+labels = ["angry"]
+[[emotion]]
+id = "fearful"
+labels = ["fearful"]
+[[emotion]]
+id = "surprised"
+labels = ["surprised"]
+[[emotion]]
+id = "disgusted"
+labels = ["disgusted"]
+# Mate, card t1359s6830 (17 Nov 2026): 12 V2 emotions + laughter + seductive = 14, gate per emotion
+# emotion2vec+ emotion_match >= 0.83. emotion2vec+ has no laughter/seductive class: the gate score is
+# emotion_match against that emotion's own reference clips, so it still works; `labels` here only feed
+# the informational "target prob" column.
+[[emotion]]
+id = "laughter"
+labels = ["happy"]
+[[emotion]]
+id = "seductive"
+labels = ["happy", "neutral"]
