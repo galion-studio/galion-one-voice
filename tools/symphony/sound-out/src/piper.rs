@@ -34,16 +34,14 @@ impl PiperBackend {
         Self { real: None }
     }
 
-    /// Real Piper only when `GALION_PIPER_RUNTIME`, `GALION_PIPER_MODEL` and
-    /// `GALION_PIPER_CONFIG` already point at files. Otherwise an error.
+    /// Real Piper when the environment already points at files. Otherwise an error.
+    /// Does not download.
     pub fn real_if_present() -> Result<Self, String> {
         let runtime = env_path("GALION_PIPER_RUNTIME")?;
         let model = env_path("GALION_PIPER_MODEL")?;
         let config = env_path("GALION_PIPER_CONFIG")?;
         if !runtime.is_file() || !model.is_file() || !config.is_file() {
-            return Err(
-                "piper runtime, model or config is not on disk (not downloaded)".into(),
-            );
+            return Err("piper runtime, model or config is not on disk (not downloaded)".into());
         }
         let sample_rate = read_sample_rate(&config).unwrap_or(22_050);
         Ok(Self {
@@ -54,6 +52,32 @@ impl PiperBackend {
                 sample_rate,
             }),
         })
+    }
+
+    /// Pack on disk (config paths, else the environment) or the stand-in.
+    /// A missing pack is not an error and is not downloaded.
+    pub fn resolve() -> Self {
+        Self::real_if_present().unwrap_or_else(|_| Self::stand_in())
+    }
+
+    pub fn resolve_files(runtime: Option<&str>, model: Option<&str>, config: Option<&str>) -> Self {
+        if let (Some(runtime), Some(model), Some(config)) = (runtime, model, config) {
+            let runtime = PathBuf::from(runtime);
+            let model = PathBuf::from(model);
+            let config = PathBuf::from(config);
+            if runtime.is_file() && model.is_file() && config.is_file() {
+                let sample_rate = read_sample_rate(&config).unwrap_or(22_050);
+                return Self {
+                    real: Some(RealPaths {
+                        runtime,
+                        model,
+                        config,
+                        sample_rate,
+                    }),
+                };
+            }
+        }
+        Self::resolve()
     }
 }
 

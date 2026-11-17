@@ -10,7 +10,7 @@
 
 use galion_sound_out::contract::MomentFixture;
 use galion_sound_out::environment::Room;
-use galion_sound_out::{render, ChatterboxBackend, MoshiStub, PiperBackend};
+use galion_sound_out::{render, Policy};
 use std::collections::HashMap;
 
 fn args() -> (String, HashMap<String, String>) {
@@ -29,7 +29,10 @@ fn args() -> (String, HashMap<String, String>) {
 fn run() -> Result<(), String> {
     let (cmd, m) = args();
     if cmd != "speak" {
-        return Err("usage: galion-sound-out speak --text \"...\" [--backend piper] [--out file.wav]".into());
+        return Err(
+            "usage: galion-sound-out speak --text \"...\" [--backend piper] [--out file.wav]"
+                .into(),
+        );
     }
     let text = m.get("text").cloned().unwrap_or_else(|| "Hello.".into());
     let mut moment = MomentFixture::new(&text);
@@ -45,31 +48,17 @@ fn run() -> Result<(), String> {
         };
     }
     if let Some(d) = m.get("distance") {
-        moment.environment.listener_distance_m = d.parse().map_err(|_| "distance is not a number")?;
+        moment.environment.listener_distance_m =
+            d.parse().map_err(|_| "distance is not a number")?;
     }
     if let Some(n) = m.get("noise-db") {
         moment.environment.noise_db = n.parse().map_err(|_| "noise-db is not a number")?;
     }
-    let backend_name = m.get("backend").map(|s| s.as_str()).unwrap_or("piper");
+    let policy = policy_from_disk();
+    let named = m.get("backend").map(|s| s.as_str());
     let device = m.get("device").map(|s| s.as_str());
-    let out = match backend_name {
-        "chatterbox" => {
-            let mut b = ChatterboxBackend::stub();
-            render(&moment, &mut b, &[], device)?
-        }
-        "moshi" => {
-            let mut b = MoshiStub;
-            render(&moment, &mut b, &[], device)?
-        }
-        "piper-real" => {
-            let mut b = PiperBackend::real_if_present()?;
-            render(&moment, &mut b, &[], device)?
-        }
-        _ => {
-            let mut b = PiperBackend::stand_in();
-            render(&moment, &mut b, &[], device)?
-        }
-    };
+    let mut backend = policy.open(named, device)?;
+    let out = render(&moment, &mut *backend, &[], device)?;
     if let Some(path) = m.get("out") {
         galion_lungs::wav::write_wav_mono_i16(
             std::path::Path::new(path),
@@ -92,8 +81,17 @@ fn run() -> Result<(), String> {
         "stubbed": out.stubbed,
         "controls_echo": out.controls_echo,
     });
-    println!("{}", serde_json::to_string_pretty(&report).map_err(|e| e.to_string())?);
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&report).map_err(|e| e.to_string())?
+    );
     Ok(())
+}
+
+fn policy_from_disk() -> Policy {
+    let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../configs/symphony/sound-out.toml");
+    Policy::load(&path).unwrap_or_else(|_| Policy::builtin())
 }
 
 fn main() {

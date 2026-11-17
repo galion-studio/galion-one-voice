@@ -27,8 +27,7 @@ use galion_nose::plan as nose_plan;
 use galion_nose::synth as nose_synth;
 use galion_sound_out::contract::MomentFixture;
 use galion_sound_out::environment::Burst;
-use galion_sound_out::piper::PiperBackend;
-use galion_sound_out::{render as sound_render, SAMPLE_RATE};
+use galion_sound_out::{render as sound_render, Policy, SAMPLE_RATE};
 use galion_throat::contract::{self as throat_contract, Speaker};
 use galion_throat::lungs_in::parse_lungs;
 use galion_throat::render::{self as throat_render, Request as ThroatReq};
@@ -47,6 +46,7 @@ pub struct FixtureScore {
     pub backend: String,
     pub guard: String,
     pub readback_ok: bool,
+    pub planned_inhales: usize,
 }
 
 pub fn fixture_dir(repo: &Path) -> PathBuf {
@@ -54,6 +54,10 @@ pub fn fixture_dir(repo: &Path) -> PathBuf {
 }
 
 pub fn run_fixtures(repo: &Path) -> Result<Vec<FixtureScore>, String> {
+    run_fixtures_on(repo, "piper")
+}
+
+pub fn run_fixtures_on(repo: &Path, backend: &str) -> Result<Vec<FixtureScore>, String> {
     let loaded = load_dir(&fixture_dir(repo))?;
     let mut scores = Vec::new();
     for (path, doc) in loaded {
@@ -66,7 +70,7 @@ pub fn run_fixtures(repo: &Path) -> Result<Vec<FixtureScore>, String> {
             .unwrap_or("fixture")
             .trim_end_matches(".intent")
             .to_string();
-        scores.push(run_one(repo, &id, &doc)?);
+        scores.push(run_one(repo, &id, &doc, backend)?);
     }
     if scores.len() != 8 {
         return Err(format!("expected 8 intent fixtures, ran {}", scores.len()));
@@ -74,7 +78,12 @@ pub fn run_fixtures(repo: &Path) -> Result<Vec<FixtureScore>, String> {
     Ok(scores)
 }
 
-fn run_one(repo: &Path, id: &str, doc: &Document) -> Result<FixtureScore, String> {
+fn run_one(
+    repo: &Path,
+    id: &str,
+    doc: &Document,
+    backend_name: &str,
+) -> Result<FixtureScore, String> {
     validate(doc).map_err(|e| format!("{id}: intent: {e}"))?;
     let feel_cfg = FeelCfg::load(&repo.join("configs/symphony/feeling.toml"))?;
     let feel_inv = FeelInv::load(&FeelInv::bundled_path())?;
@@ -204,8 +213,15 @@ fn run_one(repo: &Path, id: &str, doc: &Document) -> Result<FixtureScore, String
     ));
     moment.clone_mouth = Some(serde_json::to_value(&mouth.clone_mouth).map_err(|e| e.to_string())?);
 
-    let mut backend = PiperBackend::stand_in();
-    let sounded = sound_render(&moment, &mut backend, &bursts, Some("cpu"))?;
+    let policy = Policy::load(&repo.join("configs/symphony/sound-out.toml"))
+        .unwrap_or_else(|_| Policy::builtin());
+    if policy.default_backend != "piper" {
+        return Err("sound-out default backend must be piper".into());
+    }
+    let mut backend = policy
+        .open(Some(backend_name), Some("cpu"))
+        .map_err(|e| format!("{id}: sound-out: {e}"))?;
+    let sounded = sound_render(&moment, &mut *backend, &bursts, Some("cpu"))?;
     let (audio, guard) = voice_guard(repo, sounded.samples);
 
     let read =
@@ -260,6 +276,7 @@ fn run_one(repo: &Path, id: &str, doc: &Document) -> Result<FixtureScore, String
         backend: sounded.backend,
         guard: guard.into(),
         readback_ok: true,
+        planned_inhales: listen_intent.breaths.len(),
     })
 }
 

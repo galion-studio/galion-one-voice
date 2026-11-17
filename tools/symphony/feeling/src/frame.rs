@@ -158,8 +158,11 @@ fn validate(frame: &IntentFrame) -> Result<(), String> {
 }
 
 /// Map S1's document onto the frames this chase reads.
-/// Arousal and dominance stay on the contract's 0..1 scale; both sit inside
-/// the chase's −1..1 check. Approach is omitted, so it is not pulled to zero.
+///
+/// The contract's arousal and dominance are 0..1. This chase's axes are
+/// −1..1, so those two are expanded across the whole axis: 0 → −1, 0.5 → 0,
+/// 1 → +1. Valence is already −1..1. Energy and fatigue stay 0..1. Approach
+/// is not on the contract, so it is omitted and is not pulled to zero.
 pub fn frames_from_document(
     doc: &galion_mne_contract::Document,
 ) -> Result<Vec<IntentFrame>, String> {
@@ -174,15 +177,15 @@ pub fn frames_from_document(
         let mut axes = vec![
             AxisTarget {
                 name: "arousal".into(),
-                value: frame.feeling.arousal,
+                value: unit_to_axis(frame.feeling.arousal),
             },
             AxisTarget {
                 name: "valence".into(),
-                value: frame.feeling.valence,
+                value: frame.feeling.valence.clamp(-1.0, 1.0),
             },
             AxisTarget {
                 name: "dominance".into(),
-                value: frame.feeling.dominance,
+                value: unit_to_axis(frame.feeling.dominance),
             },
         ];
         axes.retain(|a| a.value.is_finite());
@@ -212,6 +215,11 @@ pub fn frames_from_document(
         });
     }
     Ok(out)
+}
+
+/// Contract 0..1 onto the chase's −1..1 axis.
+fn unit_to_axis(unit: f64) -> f64 {
+    (unit.clamp(0.0, 1.0) * 2.0 - 1.0).clamp(-1.0, 1.0)
 }
 
 #[cfg(test)]
@@ -247,6 +255,86 @@ mod tests {
         let raw = r#"{"schema":"galion-mne-contract/9","t_ms":0}"#;
         let err = parse_frames(raw).unwrap_err();
         assert!(err.contains("S1"), "{err}");
+    }
+
+    #[test]
+    fn s1_unit_axes_fill_the_chase_scale() {
+        let doc = sample_doc(0.0, -0.4, 1.0);
+        let frames = frames_from_document(&doc).unwrap();
+        let axis = |name: &str| {
+            frames[0]
+                .axes
+                .iter()
+                .find(|a| a.name == name)
+                .unwrap()
+                .value
+        };
+        assert!((axis("arousal") - -1.0).abs() < 1e-9);
+        assert!((axis("valence") - -0.4).abs() < 1e-9);
+        assert!((axis("dominance") - 1.0).abs() < 1e-9);
+        assert!(frames[0].axes.iter().all(|a| a.name != "approach"));
+        let mid = frames_from_document(&sample_doc(0.5, 0.0, 0.5)).unwrap();
+        let arousal = mid[0]
+            .axes
+            .iter()
+            .find(|a| a.name == "arousal")
+            .unwrap()
+            .value;
+        assert!(arousal.abs() < 1e-9);
+    }
+
+    fn sample_doc(arousal: f64, valence: f64, dominance: f64) -> galion_mne_contract::Document {
+        use galion_mne_contract::*;
+        Document {
+            schema: SCHEMA.into(),
+            schema_version: SCHEMA_VERSION,
+            kind: DocKind::Intent,
+            frame_ms: FRAME_MS,
+            value_origin: ValueOrigin::StandIn,
+            note: String::new(),
+            persona: PersonaRef {
+                persona_id: "galion-one".into(),
+                voice_id: "synthetic".into(),
+            },
+            moment: Moment {
+                moment_id: "scale".into(),
+                memory_id: "mem".into(),
+                memory_snippet: String::new(),
+                place: "quiet_room".into(),
+                distance: "conversational".into(),
+                noise: "quiet".into(),
+                listener: "one_person".into(),
+            },
+            text: "Hello.".into(),
+            baseline: BaselinePoint {
+                arousal: 0.5,
+                valence: 0.0,
+                dominance: 0.5,
+            },
+            intent_frames: vec![IntentFrame {
+                t_ms: 0,
+                intent: Intent {
+                    verb: "greet".into(),
+                    strength: 1.0,
+                },
+                feeling: Feeling {
+                    arousal,
+                    valence,
+                    dominance,
+                    pin: None,
+                },
+                inner: InnerFactors {
+                    energy: 0.5,
+                    fatigue: 0.1,
+                    health: 1.0,
+                },
+                text_span: TextSpan {
+                    start_byte: 0,
+                    end_byte: 6,
+                },
+            }],
+            readback_frames: Vec::new(),
+        }
     }
 
     #[test]

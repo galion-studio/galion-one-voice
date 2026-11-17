@@ -2,8 +2,8 @@
 // Copyright (c) 2026 Galion Labs.
 //! Sound out. The last stage before the listener.
 //!
-//! One [`ClonerBackend`] trait. Three adapters: the existing Chatterbox
-//! worker, Piper, and a Moshi stub. Speech from the backend is placed on
+//! One [`ClonerBackend`] trait. Piper is the realtime CPU default. Chatterbox
+//! is an optional offline backend. Moshi is GPU-only and opt-in. Speech is placed on
 //! the lungs timeline from PR #195, bursts from the nose layer (S5) are
 //! added, and the moment's room, distance and noise are applied.
 //!
@@ -18,16 +18,20 @@ pub mod device;
 pub mod environment;
 pub mod moshi;
 pub mod piper;
+pub mod policy;
 pub mod request;
 pub mod session;
 
-pub use backend::{Capabilities, ClonerBackend, PcmChunk, SpeakMeta, SAMPLE_RATE, SAMPLES_PER_FRAME};
+pub use backend::{
+    Capabilities, ClonerBackend, PcmChunk, SpeakMeta, SAMPLES_PER_FRAME, SAMPLE_RATE,
+};
 pub use chatterbox::ChatterboxBackend;
 pub use contract::MomentFixture;
-pub use device::{detect, detect_with, choose, DeviceChoice, DeviceKind};
+pub use device::{choose, detect, detect_with, DeviceChoice, DeviceKind};
 pub use environment::{Burst, Environment, Room};
 pub use moshi::MoshiStub;
 pub use piper::PiperBackend;
+pub use policy::Policy;
 pub use request::CloneRequest;
 pub use session::{render, Session, SoundOut};
 

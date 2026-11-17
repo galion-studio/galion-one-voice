@@ -36,6 +36,20 @@ fn eight_fixtures_score_through_listen_back() {
         assert!(row.samples > 0, "{}", row.id);
         assert!(row.readback_ok, "{}", row.id);
         assert_eq!(row.guard, "waiting");
-        assert_eq!(row.backend, "piper-stand-in");
+        assert!(
+            row.backend == "piper" || row.backend == "piper-stand-in",
+            "{} backend {}",
+            row.id,
+            row.backend
+        );
+        if row.planned_inhales > 0 {
+            assert!(
+                row.breath > 0.0,
+                "{} planned {} inhales but breath={}",
+                row.id,
+                row.planned_inhales,
+                row.breath
+            );
+        }
     }
 }

@@ -1,0 +1,27 @@
+# Galion Voice — Perpetual Open MIT License
+# Copyright (c) 2026 Galion Labs.
+# Sound-out backend policy. No weights are fetched from here.
+
+schema = "galion-sound-out/1"
+
+# Realtime CPU default. A voice pack already on disk is used; otherwise the stand-in.
+default_backend = "piper"
+
+[piper]
+role = "default"
+device = "cpu"
+realtime = true
+# Empty means the GALION_PIPER_RUNTIME / MODEL / CONFIG environment, then the stand-in.
+runtime = ""
+model = ""
+config = ""
+
+[chatterbox]
+role = "opt-in"
+device = "cpu"
+quality = "offline"
+
+[moshi]
+role = "opt-in"
+device = "gpu"
+realtime_on_cpu = false

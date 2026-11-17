@@ -23,6 +23,12 @@ pub struct ChatterboxBackend {
 }
 
 impl ChatterboxBackend {
+    /// Real Nano when the pinned pack is already on disk, otherwise the protocol stub.
+    /// A missing pack is not downloaded.
+    pub fn present() -> Self {
+        Self::real().unwrap_or_else(|_| Self::stub())
+    }
+
     pub fn stub() -> Self {
         Self {
             real: false,
@@ -65,7 +71,8 @@ impl ClonerBackend for ChatterboxBackend {
             streaming: true,
             weights_used: self.real,
             stub: !self.real,
-            note: "The worker process stays on CPU. GPU auto-detect does not cross that landing.".into(),
+            note: "The worker process stays on CPU. GPU auto-detect does not cross that landing."
+                .into(),
         }
     }
 
@@ -75,7 +82,10 @@ impl ClonerBackend for ChatterboxBackend {
         on_chunk: &mut dyn FnMut(PcmChunk) -> Result<(), String>,
     ) -> Result<SpeakMeta, String> {
         if !self.script.is_file() {
-            return Err(format!("chatterbox worker missing at {}", self.script.display()));
+            return Err(format!(
+                "chatterbox worker missing at {}",
+                self.script.display()
+            ));
         }
         let line = request.clone().normalized().worker_line();
         let mut cmd = Command::new(&self.python);
@@ -114,17 +124,17 @@ impl ClonerBackend for ChatterboxBackend {
         let status = child.wait().map_err(|e| format!("worker wait: {e}"))?;
         let err = err_handle.join().unwrap_or_default();
         if !status.success() {
-            return Err(format!(
-                "chatterbox worker exited {status}: {}",
-                err.trim()
-            ));
+            return Err(format!("chatterbox worker exited {status}: {}", err.trim()));
         }
         if err.contains("galion-clone-refuse") || err.contains("galion-clone-absent") {
             return Err(err.trim().to_string());
         }
         let samples = s16le_to_f64(&pcm);
         emit_frames(&samples, on_chunk)?;
-        let echo = err.lines().find(|l| l.starts_with("galion-clone-controls:")).map(|s| s.to_string());
+        let echo = err
+            .lines()
+            .find(|l| l.starts_with("galion-clone-controls:"))
+            .map(|s| s.to_string());
         Ok(SpeakMeta {
             backend: self.id().into(),
             weights_used: self.real,

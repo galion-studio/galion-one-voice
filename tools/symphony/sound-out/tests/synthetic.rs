@@ -9,8 +9,8 @@ use galion_sound_out::piper::{stand_in_samples, PiperBackend};
 use galion_sound_out::request::CloneRequest;
 use galion_sound_out::session::Session;
 use galion_sound_out::{
-    choose, render, Burst, ChatterboxBackend, ClonerBackend, DeviceKind, MoshiStub, SAMPLE_RATE,
-    SAMPLES_PER_FRAME,
+    choose, render, Burst, ChatterboxBackend, ClonerBackend, DeviceKind, MoshiStub,
+    SAMPLES_PER_FRAME, SAMPLE_RATE,
 };
 
 fn rms(x: &[f64]) -> f64 {
@@ -109,7 +109,11 @@ fn piper_stand_in_is_realtime_and_streams_frames() {
             Ok(())
         })
         .unwrap();
-    assert!(chunks.len() >= 2, "expected more than one 80 ms frame, got {}", chunks.len());
+    assert!(
+        chunks.len() >= 2,
+        "expected more than one 80 ms frame, got {}",
+        chunks.len()
+    );
     assert_eq!(chunks[0], SAMPLES_PER_FRAME);
     assert!(meta.realtime_on_cpu);
     assert!(!meta.weights_used);
@@ -183,8 +187,38 @@ fn chatterbox_stub_reads_energy_pause_pitch_and_the_model_knobs() {
     assert!(shaped.len() > pause_n);
     assert!(shaped[..pause_n].iter().all(|s| s.abs() < 1e-6));
     let voiced = &shaped[pause_n..];
-    assert!(rms(voiced) > rms(&base) * 1.05, "energy should raise the stub");
-    assert_ne!(shaped.len(), base.len() + pause_n as usize, "pitch resample changes length");
+    assert!(
+        rms(voiced) > rms(&base) * 1.05,
+        "energy should raise the stub"
+    );
+    assert_ne!(
+        shaped.len(),
+        base.len() + pause_n as usize,
+        "pitch resample changes length"
+    );
+}
+
+#[test]
+fn piper_is_the_default_and_a_missing_pack_is_the_stand_in() {
+    let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../configs/symphony/sound-out.toml");
+    let policy = galion_sound_out::Policy::load(&path).unwrap();
+    assert_eq!(policy.default_backend, "piper");
+    let backend = policy.open(None, Some("cpu")).unwrap_or_else(|e| panic!("{e}"));
+    let id = backend.id();
+    assert!(id == "piper" || id == "piper-stand-in", "{id}");
+    if std::env::var_os("GALION_PIPER_MODEL").is_none() {
+        assert_eq!(id, "piper-stand-in");
+    }
+    assert!(backend.capabilities().realtime_on_cpu);
+    if galion_sound_out::detect().gpu_present {
+        return;
+    }
+    let err = match policy.open(Some("moshi"), Some("cpu")) {
+        Err(err) => err,
+        Ok(_) => panic!("moshi ran without a GPU"),
+    };
+    assert!(err.contains("GPU"), "{err}");
 }
 
 #[test]
@@ -193,7 +227,10 @@ fn breath_frames_leave_before_speech_arrives() {
     let mut session = Session::open(&moment, &[]).unwrap();
     let early = session.drain_frames();
     assert!(!early.is_empty(), "the inhale is known before speech");
-    assert!(rms(&early[0]) > 1e-4, "the first frame is an audible breath");
+    assert!(
+        rms(&early[0]) > 1e-4,
+        "the first frame is an audible breath"
+    );
     assert!(rms(&early[0]) < 0.2);
     let tone = vec![0.2; SAMPLES_PER_FRAME * 4];
     session.push_speech(&tone);
@@ -264,7 +301,10 @@ fn real_backends_do_not_download_weights() {
         }
         Err(err) => {
             let err = err.to_lowercase();
-            assert!(err.contains("not on disk") || err.contains("not downloaded"), "{err}");
+            assert!(
+                err.contains("not on disk") || err.contains("not downloaded"),
+                "{err}"
+            );
         }
     }
     match galion_sound_out::PiperBackend::real_if_present() {
@@ -272,7 +312,9 @@ fn real_backends_do_not_download_weights() {
         Err(err) => {
             let err = err.to_lowercase();
             assert!(
-                err.contains("not on disk") || err.contains("unset") || err.contains("not downloaded"),
+                err.contains("not on disk")
+                    || err.contains("unset")
+                    || err.contains("not downloaded"),
                 "{err}"
             );
         }

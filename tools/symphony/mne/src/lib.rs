@@ -14,7 +14,7 @@ use std::path::Path;
 
 use serde::Serialize;
 
-pub use stack::{fixture_dir, run_fixtures, FixtureScore};
+pub use stack::{fixture_dir, run_fixtures, run_fixtures_on, FixtureScore};
 
 pub const TICK_MS: u32 = 80;
 
@@ -106,7 +106,9 @@ pub fn layer_status(repo: &Path) -> Vec<LayerStatus> {
                 "S3" => "galion-throat drive_from_document",
                 "S4" => "galion-mouth from_document, clone_mouth into sound-out",
                 "S5" => "galion-nose request_from_document, bursts into sound-out",
-                "S6" => "galion-sound-out Piper stand-in, no weights",
+                "S6" => {
+                    "galion-sound-out Piper default; ONNX if a pack is on disk, else the stand-in"
+                }
                 "S7" => "galion-listen-back decode and score",
                 "S9" => "passthrough until tools/symphony/voice-guard lands",
                 _ => "none",

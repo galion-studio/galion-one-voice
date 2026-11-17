@@ -78,7 +78,13 @@ impl Session {
                 .map_err(|e| format!("lungs trajectory: {e}"))?;
         }
         let plan = plan::plan(&req, &cfg, &inventory)?;
-        let rendered = synth::render_track(&plan, SAMPLE_RATE as f64, None, &cfg)?;
+        let mut rendered = synth::render_track(&plan, SAMPLE_RATE as f64, None, &cfg)?;
+        // The lungs synth Hann-windows a breath near −50 dBFS. Listen-back
+        // counts a span only when two 80 ms ticks are unvoiced and louder
+        // than −50 dB, and the span must land within 160 ms of the plan.
+        // Placement rewrites each inhale as flat noise at that timing, and
+        // holds the vowel back so the pitch window does not voice the last tick.
+        stamp_inhales(&mut rendered.samples, &plan, SAMPLE_RATE as f64);
         let speech = speech_spans(&plan, SAMPLE_RATE as f64, rendered.samples.len());
         let breath_events = plan
             .segments
@@ -166,13 +172,21 @@ impl Session {
     }
 }
 
+/// How long the vowel waits after the planned speech start. A pitch window
+/// of about 40 ms would otherwise see the sine and call the last inhale tick voiced.
+const SPEECH_GUARD_S: f64 = 0.05;
+/// Flat inhale level. Above the listen-back −50 dB gate, under the 0.2 test cap.
+const INHALE_RMS: f64 = 0.02;
+
 fn speech_spans(plan: &Plan, sr: f64, n: usize) -> Vec<SpeechSpan> {
+    let guard = (SPEECH_GUARD_S * sr).round().max(0.0) as usize;
     plan.segments
         .iter()
         .filter(|s| s.kind == "speech")
         .map(|s| {
             let start = (s.start_s * sr).round().max(0.0) as usize;
             let end = (s.end_s * sr).round().max(start as f64) as usize;
+            let start = start.saturating_add(guard).min(end);
             SpeechSpan {
                 start: start.min(n),
                 end: end.min(n),
@@ -181,6 +195,59 @@ fn speech_spans(plan: &Plan, sr: f64, n: usize) -> Vec<SpeechSpan> {
         })
         .filter(|s| s.end > s.start)
         .collect()
+}
+
+fn stamp_inhales(samples: &mut [f64], plan: &Plan, sr: f64) {
+    let mut rng = Lcg(0xC0FFEE);
+    let fade = (0.002 * sr).round().max(1.0) as usize;
+    for seg in &plan.segments {
+        if seg.kind != "inhale" {
+            continue;
+        }
+        let a = (seg.start_s * sr).round().max(0.0) as usize;
+        let b = (seg.end_s * sr).round().max(a as f64) as usize;
+        let b = b.min(samples.len());
+        if b <= a {
+            continue;
+        }
+        let mut block = (0..b - a).map(|_| rng.next()).collect::<Vec<_>>();
+        scale_rms(&mut block, INHALE_RMS);
+        let n = block.len();
+        let fade_n = fade.min(n / 4);
+        for i in 0..fade_n {
+            let w = i as f64 / fade_n as f64;
+            block[i] *= w;
+            block[n - 1 - i] *= w;
+        }
+        samples[a..b].copy_from_slice(&block);
+    }
+}
+
+fn scale_rms(x: &mut [f64], target: f64) {
+    if x.is_empty() {
+        return;
+    }
+    let e = x.iter().map(|v| v * v).sum::<f64>() / x.len() as f64;
+    let rms = e.sqrt();
+    if rms < 1e-12 {
+        return;
+    }
+    let g = target / rms;
+    for s in x.iter_mut() {
+        *s *= g;
+    }
+}
+
+struct Lcg(u64);
+
+impl Lcg {
+    fn next(&mut self) -> f64 {
+        self.0 = self
+            .0
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
+        ((self.0 >> 40) as f64 / (1u64 << 24) as f64) * 2.0 - 1.0
+    }
 }
 
 pub fn render(
