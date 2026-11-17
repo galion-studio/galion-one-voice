@@ -1,4 +1,4 @@
-# Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+# Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 # Emotion eval scorers (432 Hz standard). One row per scorer. Tab-separated.
 # kind:   ort      = galion-emotion bench (Rust, ONNX Runtime; CUDA when present, else all CPU threads)
 #         harness  = existing Python harness `score --backend <model>` (locked 0.70*category+0.30*emb, gate 0.83)

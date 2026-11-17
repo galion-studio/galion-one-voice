@@ -1,4 +1,4 @@
-# Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+# Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 # sha256  path-under-$GALION_MODELS   (checked by scripts/eval/emotion-eval.sh before any score; mismatch = exit 2)
 # Laptop: G:\galion\models. Sources and licences: docs/emotion-v2/EVAL-CI.md
 4fbb599d2659bcf5a3dee77c5416e2cec5ae390cb6cb25858bf1c6284babf404  emotion/superb-er/superb_er.onnx

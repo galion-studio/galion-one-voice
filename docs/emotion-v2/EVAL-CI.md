@@ -1,6 +1,6 @@
 # Emotion eval CI (laptop) — Samantha × 14
 
-Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk. Galion Labs.
+Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 Samantha · Galion Voice V2. Tuning standard: **432 Hz**.
 
 One command scores any voice build (universal: a folder per emotion) across the emotions in

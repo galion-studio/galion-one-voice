@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
-# Galion Labs. Samantha · Galion Voice V2. 432 Hz tuning standard.
+# Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
+# Samantha · Galion Voice V2. 432 Hz tuning standard.
 #
 # Emotion eval run (laptop CI). Thin glue only: it pins the scorer models,
 # builds a file list, and calls existing tools:
@@ -76,6 +76,10 @@ BIN="${CARGO_TARGET_DIR:-$CRATE/target}/release/galion-emotion"
 
 if [ "$MATRIX" = 1 ]; then
   [ -d "$BUILD" ] && [ -d "$REFS" ] && [ -f "$SPK" ] || die2 "--matrix needs --build-dir, --reference-dir and --speaker-ref"
+  # Every emotion in the V2 inventory (emotion-v2/emotions.toml) must have a gate row here.
+  for id in $(sed -n 's/^id = "\(.*\)"/\1/p' "$ROOT/emotion-v2/emotions.toml"); do
+    grep -q "^id = \"$id\"" "$CONFIG" || die2 "emotion $id from emotion-v2/emotions.toml has no row in $CONFIG"
+  done
   # Existing scorers: galion-ecapa (ort) and galion-wer (vosk; needs Rust >= 1.92 for ort rc.15).
   cargo build -q --release --manifest-path "$ROOT/tools/cloning-v2/scorers/ecapa/Cargo.toml"
   cargo +stable build -q --release --bin galion-wer --manifest-path "$ROOT/tools/cloning-v2/scorers/quality/galion-quality/Cargo.toml"

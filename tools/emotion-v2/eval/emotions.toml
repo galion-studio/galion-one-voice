@@ -1,5 +1,5 @@
-# Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
-# Galion Labs. Samantha · Galion Voice V2. 432 Hz tuning standard.
+# Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
+# Samantha · Galion Voice V2. 432 Hz tuning standard.
 #
 # ONE config for the emotion eval CI: the emotion list, the scorer, and the gate.
 # The CI reads however many [[emotion]] rows are here. Default: 14 (Mate, card t1359s6830).

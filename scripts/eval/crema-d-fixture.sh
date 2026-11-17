@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+# Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 # Build an emotion-eval test tree from the public CREMA-D benchmark (ODbL; no own-voice audio).
 #   build/<emotion>/  one actor's clips (+ <clip>.txt transcript for WER) = the "voice build" under test
 #   ref/<emotion>/    the other actors' clips of that emotion = emotion references
