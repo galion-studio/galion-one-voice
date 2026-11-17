@@ -157,7 +157,7 @@ One chain, in order. A feeling does not skip a stage.
 1. **Lungs.** Behavioural breathing is not metabolic breathing (Homma & Masaoka, 2008). Air is inhaled, then spent across a phrase. Subglottal pressure and lung-volume decline are real and, here, unmeasured. What the tick can see is loudness, the unvoiced gaps, the voiced-segment rate, and — only where a respiratory study exists — breath rate, inspiratory time, tidal volume and inspiratory pause.
 2. **Glottis.** F0 is the rate at which the folds open and close (Juslin & Laukka, 2003, Table 6, p. 790). Incomplete closure lets air through and lowers HNR. F0 and loudness rise together in the high-arousal poles and in noise (§1.3).
 3. **Vocal tract.** The radiated sound is source filtered by the tract. Fitch and Giedd (1999) cite Fant (1960) for the path from glottis to lips. Fant's pages were not re-read; no Fant formula is copied. F1, F2 and F3 are the measured resonances. Tract length is baseline (§1.2), not a feeling.
-4. **Nose.** V1's nasal output is a speech-class posterior, not nasalance (`ARTICULATION-LAYER.md`). No per-region nasalance was read. Nasality stays out of the labels.
+4. **Nose.** V1's nasal output is a speech-class posterior, not nasalance (`ARTICULATION-LAYER.md`). No per-region nasalance was read. Nasality stays out of the labels. The planning model is `tools/symphony/nose` (`NOSE.md`): velum opening and a nasal murmur on the 80 ms tick, and wordless sounds on their own track. Magnitudes are `configs/symphony/nose.toml`. They are not measurements.
 5. **Lips and jaw.** F1 tracks jaw opening in the preliminary emotion results (Juslin, p. 796: F1 higher in anger and happiness, lower in fear and sadness). A smile shortens and spreads the tract and raises formants (Tartter, 1980). Lip opening also increases in noise when the speaker is addressing someone (Garnier et al., 2010, Experiment 2). SPARC units are not the label.
 
 Eye-to-eye proximity, whisper, and an audible intimate exhale are human-connection cues. Their acoustic sizes were not in the sources read. They stay unknown. The one cited "speaking to someone who matters" effect is the F0 drop in Hughes et al. (2010), and it is a few hertz in that phone-message task, not a whisper recipe.
@@ -181,6 +181,8 @@ Bachorowski, Smoski and Owren (2001), 1,024 laugh bouts, 97 young adults. These 
 | Voiced open-mouth F1, F2, F3 | 535 (112), 1592 (153), 2576 (180) Hz; 41 laughers | 653 (155), 1713 (182), 2875 (227) Hz; 34 laughers | Table IV, p. 1589 |
 
 Open-mouth calls had higher F0 than closed-mouth calls (p. 1586). Laughter sat in central vowel space, not in a stereotyped "tee-hee" (p. 1589). z against each laugher's own speech neutral is unknown.
+
+The wordless track is planned in `tools/symphony/nose`. A laugh uses the Bachorowski anchors as config defaults. A sigh is still not one category. Moan, gasp, hum and "mm" have no acoustic target in the sources read.
 
 ## 4. How to read the label file
 

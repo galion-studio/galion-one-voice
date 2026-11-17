@@ -1,0 +1,118 @@
+# Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
+# Knobs for the nose and wordless-sound layer. A coefficient is a cited
+# direction only where the comment says so. Every magnitude is config.
+# ARTICULATION-V2-SPEC leaves per-category nasalance unread. Do not copy a
+# number from this file into a result as if a study had published it.
+
+schema = "galion-nose-config/1"
+
+# LOCKS clock.frame_ms. No paper cited here says the velum ticks at 80 ms.
+tick_s = 0.08
+
+[speech]
+# Spoken-character rate used only to turn text length into a duration.
+# Not words per minute, and not eGeMAPS VoicedSegmentsPerSec.
+chars_per_s = 12.0
+
+[speaker]
+# The cut in galion-articulation speaker_baseline (draft PR 191) that picks
+# the emotion-labels column. A prior for that file, not a sex measurement.
+f0_band_hz = 165.0
+
+[velum]
+# 0 is closed, 1 is fully coupled. Not a port area in cm².
+# Stevens (1998): the velopharyngeal port is the control that couples the nose.
+span_open = 1.0
+# A hum and an "mm" leave through the nose: lips closed, velum open.
+# Stevens (1998), nasal consonants and the nasal murmur.
+hum_open = 1.0
+mm_open = 1.0
+# Bachorowski, Smoski and Owren (2001) split laughs by mouth opening and F0,
+# not by nasalance. Zero does not open the velum for a laugh.
+laugh_add = 0.0
+
+[feeling]
+# No per-region nasalance was read (ARTICULATION-V2-SPEC §2). The gain is
+# wired so an open feeling can move the velum. Zero keeps the speaker baseline.
+velum_per_intensity = 0.0
+literature = "none"
+
+[murmur]
+# House and Stevens (1956): opening the velum adds low-frequency energy.
+# The hertz and the RMS are knobs, not a copied nasal formant or Chen's P0.
+hz = 250.0
+rms_at_open = 0.02
+literature_hz = "none"
+
+[a1_p0]
+# Chen (1997): A1–P0 rises with vowel nasalization. The dB slope is not a
+# number from that paper. Zero keeps the direction word and writes no dB.
+db_per_velum = 0.0
+literature = "chen1997-direction-only"
+
+[place]
+# Burst-track amusement above this weight may place a laugh when the caller
+# asked for placement from feeling. Prosody amusement does not. Zero means
+# any weight above zero. Not a recognition threshold from Cowen.
+amusement_min = 0.0
+
+[laugh]
+# Bachorowski, Smoski and Owren (2001), Table I, p. 1585: call duration
+# 0.17 s for both sexes. Calls per bout: men 3.61, women 3.20. The integers
+# below are this planner's rounding of those means, not a new count.
+call_s = 0.17
+calls_low = 4
+calls_high = 3
+# Used only when the speaker baseline has no F0. Not a sex mean.
+calls_unset = 1
+# Inter-call gap. Table I's bout duration is not this gap. literature none.
+gap_s = 0.05
+# Table I bout means, recorded and not used as the rendered length.
+published_bout_low_s = 0.95
+published_bout_high_s = 0.82
+# Table II, p. 1588. Absolute laugh Hz, not z against this speaker's speech.
+# Low column = men, high column = women. The 165 Hz cut that picks the column
+# is the decoder's prior, not Bachorowski's sexing.
+f0_low_open_hz = 279.0
+f0_low_closed_hz = 216.0
+f0_high_open_hz = 415.0
+f0_high_closed_hz = 355.0
+# Must stay 0. A missing baseline is not filled with either sex mean.
+f0_when_baseline_missing_hz = 0.0
+
+[sigh]
+# Spec §3 and §5: a sigh has no acoustic target.
+duration_s = 0.80
+literature = "none"
+
+[moan]
+duration_s = 0.64
+# Semitones added to the speaker baseline. No moan F0 was read.
+f0_st = 0.0
+literature = "none"
+
+[gasp]
+duration_s = 0.24
+attack_fraction = 0.08
+decay = 6.0
+literature = "none"
+
+[hum]
+duration_s = 0.64
+literature = "none"
+
+[mm]
+duration_s = 0.24
+literature = "none"
+
+[level]
+# Decibels relative to full scale of this synth, not dB SPL.
+# Juslin and Laukka's speech loudness signs are not applied to bursts
+# (a wordless sound is not a shift against speech neutral). Both slopes
+# stay 0 until a burst study gives a size.
+base_db = -24.0
+db_per_intensity = 0.0
+db_per_arousal = 0.0
+literature = "none"
+# Same LCG seed as crates/galion-heartbeat/src/presence.rs.
+seed = 13
