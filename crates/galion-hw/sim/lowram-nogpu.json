@@ -1,0 +1,1 @@
+{"os":"linux","os_version":"simulated: 1 GB board, no GPU","kernel":"6.1","arch":"aarch64","wsl":false,"cpu_brand":"Cortex-A53","physical_cores":4,"logical_threads":4,"simd":"neon","ram_total_mib":2048,"ram_available_mib":1400,"ram_limit_mib":null,"gpus":[],"npus":[],"runtimes":[],"probe_notes":["nvml: simulated absent","wgpu: no adapters"]}

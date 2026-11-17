@@ -1,0 +1,1 @@
+{"os":"linux","os_version":"simulated: router / clock, 512 MB","kernel":"5.15","arch":"mips","wsl":false,"cpu_brand":"MT7621","physical_cores":2,"logical_threads":4,"simd":"scalar","ram_total_mib":512,"ram_available_mib":300,"ram_limit_mib":null,"gpus":[],"npus":[],"runtimes":[],"probe_notes":[]}

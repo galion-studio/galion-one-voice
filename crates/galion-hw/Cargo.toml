@@ -1,0 +1,33 @@
+# G.A.L.I.O.N. — General Autonomous Local Intelligence Open Network
+# Developed and distributed by Galion Labs
+# Perpetual Open MIT License
+# Copyright © 2026 Galion Labs. All rights reserved.
+[package]
+name = "galion-hw"
+description = "Hardware detect + device profile, assembled from existing crates: sysinfo (CPU/RAM), nvml-wrapper (NVIDIA), wgpu (every GPU adapter: Vulkan/Metal/DX12/GL), galion-tensor features (SIMD). Thin glue only."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version = "1.85"
+publish = false
+
+[features]
+default = ["nvidia", "gpu-enum"]
+# NVML is loaded at runtime (dlopen); no CUDA toolkit needed to build.
+nvidia = ["dep:nvml-wrapper"]
+# wgpu adapter enumeration; Vulkan/Metal/DX12 loaders are opened at runtime.
+gpu-enum = ["dep:wgpu"]
+
+[dependencies]
+# Bricks (pinned). Licences: see crates/galion-hw/BRICKS.md.
+sysinfo = { version = "=0.36.1", default-features = false, features = ["system"] }
+nvml-wrapper = { version = "=0.11.0", optional = true }
+wgpu = { version = "=23.0.1", optional = true }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+galion-tensor = { path = "../galion-tensor", default-features = false }
+
+[[bin]]
+name = "galion-hw"
+path = "src/bin/galion-hw.rs"
