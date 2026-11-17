@@ -22,7 +22,8 @@ FAKE = {
         'o=""; c=""; while [ $# -gt 0 ]; do case "$1" in --out-dir) o="$2";; --config) c="$2";; esac; shift; done; '
         'n=$(grep -c "^\\[\\[emotion\\]\\]" "$c"); e=$(sed -n \'s/^id = "\\(.*\\)"/\\1/p\' "$c"); '
         '[ "$n" = 1 ] || exit 3; '
-        'echo "{\\"rows\\":[{\\"emotion\\":\\"$e\\",\\"emotion_match\\":0.9,\\"wer\\":0.0,\\"ecapa\\":0.81}]}" > "$o/matrix.json"'
+        'echo "{\\"rows\\":[{\\"emotion\\":\\"$e\\",\\"emotion_match\\":0.9,\\"wer\\":0.0,\\"ecapa\\":0.81}]}" > "$o/matrix.json"; '
+        'exit 1'  # like the real tool: exit 1 when the gate row FAILs, report still written
     ),
 }
 

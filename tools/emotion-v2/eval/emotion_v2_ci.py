@@ -69,10 +69,10 @@ class _Runner:
         self.threads = str(config.get("num_threads") or os.cpu_count() or 1)
         self.cache: dict[int, tuple[Any, dict[str, Any]]] = {}
 
-    def _run(self, args: list[str], log: Path) -> None:
+    def _run(self, args: list[str], log: Path, ok: tuple[int, ...] = (0,)) -> None:
         with log.open("w") as fh:
             c = subprocess.run(args, stdout=fh, stderr=subprocess.STDOUT, check=False)
-        if c.returncode != 0:
+        if c.returncode not in ok:
             raise ScorerUnavailable(f"{Path(args[0]).name} exit {c.returncode}: {log.read_text()[-400:]}")
 
     def row(self, clip: Any) -> dict[str, Any]:
@@ -100,7 +100,7 @@ class _Runner:
             self._run([str(self.bins / "galion-emotion"), "matrix", "--config", str(cfg), "--build-dir", str(t / "build"),
                        "--reference-dir", self.refs, "--models-root", str(m), "--wer-dir", str(t / "wer"),
                        "--ecapa-dir", str(t / "ecapa"), "--device", self.device, "--threads", "0", "--out-dir", str(t / "out")],
-                      t / "matrix.log")
+                      t / "matrix.log", ok=(0, 1, 3))  # galion-emotion matrix: 1 = a gate FAIL, 3 = UNMEASURED; the report is still written
             rows = json.loads((t / "out" / "matrix.json").read_text())["rows"]
         row = next(r for r in rows if r["emotion"] == e)
         self.cache[id(clip)] = (clip, row)
