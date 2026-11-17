@@ -54,6 +54,28 @@ Licences are recorded for review before any public release (RULES: LICENCES ON H
 New code (glue): `--device` + `--ser-head` + `bench` + `matrix` in `galion-emotion` (Rust), `galion-wer --jobs` up to
 all CPU threads, `galion-ecapa` switched to `load-dynamic` so it uses the same pinned ONNX Runtime, two bash scripts.
 
+## Same scorers in the dataset HQ gate (#182)
+
+`tools/emotion-v2/eval/emotion_v2_ci.py` is the `emotion_v2_ci` scorer plugin that #182's
+`--scorer-module` / `build_scorers(config)` interface asks for. It writes each rendered clip to a temp
+tree and calls the same three Rust tools as `--matrix` (galion-wer, galion-ecapa, galion-emotion matrix
+with a one-emotion config), so the dataset gate and the clone eval report identical numbers.
+A tool that fails or a value it cannot measure raises; it is never a pass.
+
+```bash
+PYTHONPATH=tools/emotion-v2/eval:tools/emotion-v2/dataset \
+GALION_EVAL_BIN=$CARGO_TARGET_DIR/release GALION_EVAL_SPEAKER_REF=SPK.wav GALION_EVAL_REFERENCE_DIR=REF \
+ORT_DYLIB_PATH=.../libonnxruntime.so python -m emotion_v2_dataset run --scorer-module emotion_v2_ci ...
+```
+
+It is slow per clip (it re-embeds that emotion's references for every clip); use `--matrix` for whole builds.
+
+## GitHub CI (no weights)
+
+`.github/workflows/emotion-v2-ci.yml` job `gate-matrix-logic`: `bash -n` on the eval scripts, the
+galion-emotion gate verdict unit tests (`cargo test`), and the plugin tests with fake tools and a
+synthetic 432 Hz tone. The scored run needs the pinned models and stays on the laptop.
+
 ## Plug in another scorer
 
 Change `[scorer]` in `emotions.toml` (any ONNX frame-feature model + linear head JSON in the emotion2vec export
