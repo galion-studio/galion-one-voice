@@ -1,0 +1,29 @@
+# Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
+[package]
+name = "galion-voice-card"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+publish = false
+description = "Stage 0 pre-clone analysis: any reference clip -> machine-readable voice card (TOML) + short .md (432 Hz standard)"
+
+[[bin]]
+name = "galion-voice-card"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1.0.95"
+hound = "3.5.1"
+rustfft = "6"
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+toml = { version = "0.8", features = ["preserve_order"] }
+sha2 = "0.10"
+# indexmap 2.14 needs edition 2024 (Rust 1.85+). Pin the 1.83-compatible line (same as refcheck).
+indexmap = "=2.2.6"
+
+# Own workspace: the locked voice runtime does not build this tool (no ort/candle here either).
+[workspace]
+
+[profile.release]
+opt-level = 3
