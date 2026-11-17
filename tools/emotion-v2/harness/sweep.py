@@ -733,6 +733,15 @@ def _resolve_emotion(backend, analyse, measurement, backend_name):
     selected = (backend or os.environ.get("EMOTION_V2_BACKEND") or "auto").strip().lower()
     if selected in {"stub", "fake", "cpu-stub", "sine"}:
         return None, None, STUB_REFUSAL, False
+    from . import scorer12
+
+    if selected in scorer12.ALIASES or (selected in {"auto", "default"} and scorer12.ready()):
+        # Per-emotion emotion2vec+ (gate decision t1359s6830). Formula and the
+        # 0.83 gate are unchanged; only the recogniser behind them differs.
+        if scorer12.locate_binary() is None:
+            return None, None, "galion-emotion12 is not built. emotion_match is unmeasured.", False
+        recogniser12 = scorer12.Emotion2VecPlusBackend()
+        return recogniser12.analyse_path, recogniser12.name, "emotion2vec+ via galion-emotion12 (ort)", True
     if selected not in {"auto", "default", "superb", "superb/wav2vec2-base-superb-er"}:
         return None, None, f"unknown emotion backend {backend!r}. emotion_match is unmeasured.", False
     found = discover_superb_weights()

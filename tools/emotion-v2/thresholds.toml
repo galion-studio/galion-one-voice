@@ -38,6 +38,9 @@ disgusted = 0.83
 # reported. Set `min` to adopt it as a gate. This cut does not.
 
 [backend]
-# Used when a local weight directory is present. CPU CI forces the stub.
-id = "superb/wav2vec2-base-superb-er"
+# Gate decision t1359s6830: per-emotion emotion2vec+ (Rust galion-emotion12 via
+# ort, emotion set in emotion12/gate-emotions.toml). SUPERB is the fallback when
+# emotion2vec+ is not built. CPU CI forces the stub. The 0.83 target is unchanged.
+id = "emotion2vec+"
+fallback = "superb/wav2vec2-base-superb-er"
 stub = "stub"
