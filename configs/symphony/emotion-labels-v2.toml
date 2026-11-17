@@ -241,8 +241,9 @@ pause_ms = "unknown, to be learned from data"
 source = "juslin2003"
 locus = "p. 796"
 
-# --- prosody regions (the 12) ---
-# Names come from configs/emotions-v2.toml. Do not add a retired name here.
+# --- cited acoustic rows ---
+# The 24 names, both tracks, and the prosody tiers live in configs/emotions-v2.toml.
+# A row here is a cited direction, not a second inventory. Do not add a retired name.
 # juslin_modal: high / low / fast / slow / bimodal / inconsistent
 # banse_z_*: Table 6, sex and actor partialed out, vs the cross-emotion mean.
 # articulation_duration_z is Banse DurArt. Higher means slower, not faster.
@@ -499,14 +500,15 @@ loudness_z = 1.05
 articulation_duration_z = 0.12
 source = "banse1996"
 locus = "Table 6, p. 625"
-note = "Elation is a burst-only category. These z values are Banse's speech portrayals, not that burst."
+note = "Elation is one of the 24 and is valid in prosody at the lower tier. These z values are Banse's speech portrayals. They are not copied onto interest or amusement."
 
-# --- bursts that carry a cited number. Other burst names are in emotions-v2.toml. ---
+# --- burst channel of a shared category. The category is also legal in prosody. ---
 
 [bursts.amusement]
 from_detector = "laughter"
+channel = "burst"
 kind = "absolute_laugh_not_z"
-not_prosody = true
+category_also_in_prosody = true
 z_vs_speech_neutral = "unknown, to be learned from data"
 source = "bachorowski2001"
 locus = "p. 1586; Tables I, II, IV"
@@ -547,9 +549,10 @@ f1_open_hz = 653
 f2_open_hz = 1713
 f3_open_hz = 2875
 
-[bursts.disgust]
-not_prosody = true
-note = "Banse speech portrayals of disgust. Not a prosody label. Recognition 15%."
+[regions.disgust]
+prosody_tier = "valid in prosody, lower recognition evidence"
+channel = "prosody"
+note = "Banse speech portrayals: a word said with disgust. Not contempt. Recognition 15%. The same category also exists as a burst; no burst recording is stored here."
 scope = "sex_partialed"
 f0_mean_z = -0.29
 loudness_z = -0.51

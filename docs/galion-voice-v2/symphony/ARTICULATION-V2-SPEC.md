@@ -23,28 +23,32 @@ The point has three continuous axes:
 
 Russell (1980) is the precedent for a pleasure–arousal circumplex. No coordinate is copied from his figures. Dominance is kept because the same emotion word covers opposite acoustic poles. It is not a measured third loading.
 
-### 1.1a Two tracks, one baseline
+### 1.1a One set of 24, two ways of sounding
 
-Three tracks. They are not interchangeable.
+The inventory is 24 categories (Cowen, Elfenbein, Laukka & Keltner, 2019, *American Psychologist, 74*(6), 698–712, doi:10.1037/amp0000399, PMC6586540, Figure 3B): adoration, amusement, anger, awe, confusion, contempt, contentment, desire, disappointment, disgust, distress, ecstasy, elation, embarrassment, fear, interest, pain, realization, relief, sadness, surprise_negative, surprise_positive, sympathy, triumph.
 
-| Track | What it is | Inventory |
+Both tracks use that whole set. **Prosody** is how the words are said, including a word said with embarrassment. **Burst** is the same category with no words. The track is the channel, not a shorter list of feelings.
+
+| Track | What it is | Categories |
 |---|---|---|
-| Prosody | Emotion recognised in speech melody, rhythm and timbre | 12 categories |
-| Burst | Emotion recognised in a brief non-speech vocalisation | 24 categories |
+| Prosody | How words are said | all 24 |
+| Burst | The same category, no words | all 24 |
 | Breath | Lungs and airflow (§2). Physiology. | not an emotion |
 
-**Neutral** is the speaker's own baseline (§1.2). z = 0 by definition. It is not a thirteenth prosody category and not a twenty-fifth burst. Cowen, Elfenbein, Laukka and Keltner (2019) excluded "Neutral" from the burst dimensions because a forced-choice neutral is redundant (American Psychologist, 74(6), the NNMF paragraph). Banse and Scherer (1996) recorded no neutral portrayals.
+**Neutral** is the speaker's own baseline (§1.2). z = 0 by definition. It is not a twenty-fifth category. Cowen, Elfenbein, Laukka and Keltner excluded "Neutral" from the burst dimensions because a forced-choice neutral is redundant. Banse and Scherer (1996) recorded no neutral portrayals.
 
-Prosody, the 12 that survived across US and Indian listeners (Cowen, Laukka, Elfenbein, Liu & Keltner, 2019, *Nature Human Behaviour, 3*(4), 369–382, doi:10.1038/s41562-019-0533-6, PMC6687085): adoration, amusement, anger, awe, confusion, contempt, desire, disappointment, distress, fear, interest, sadness. Each of the 12 rotated dimensions loaded maximally on one of these words. Awe and surprise were used similarly (their dimension D). Gradients join particular pairs, including amusement–adoration, confusion–interest, fear–sadness, anger–contempt, and sadness–distress (Fig. 7). A tick may sit on a gradient, in a blend, or between regions. Onset shape and mixture weights are unknown.
+Confidence in *prosody* is a tier, not a gate. The 12 that the speech-prosody study preserved across US and Indian listeners are **cross-culturally reliable in prosody** (Cowen, Laukka, Elfenbein, Liu & Keltner, 2019, *Nature Human Behaviour, 3*(4), 369–382, doi:10.1038/s41562-019-0533-6, PMC6687085): adoration, amusement, anger, awe, confusion, contempt, desire, disappointment, distress, fear, interest, sadness. Each of those rotated dimensions loaded maximally on one of these words. Awe and surprise were used similarly (their dimension D). Gradients join particular pairs, including amusement–adoration, confusion–interest, fear–sadness, anger–contempt, and sadness–distress (Fig. 7).
 
-Bursts, the 24 dimensions (Cowen, Elfenbein, Laukka & Keltner, 2019, *American Psychologist, 74*(6), 698–712, doi:10.1037/amp0000399, PMC6586540, Figure 3B): the same 12, plus contentment, disgust, ecstasy, elation, embarrassment, pain, realization, relief, surprise_negative, surprise_positive, sympathy, triumph. Those last 12 are burst-only. Candidates that did **not** form their own dimension: guilt, pride, romantic love, serenity, shame.
+The other 12 are **valid in prosody, lower recognition evidence**: contentment, disgust, ecstasy, elation, embarrassment, pain, realization, relief, surprise_negative, surprise_positive, sympathy, triumph. They were not among the 12 prosody dimensions preserved across those two cultures. A word may still be said in any of them. A tick may sit on a gradient, in a blend, or between regions. Onset shape and mixture weights are unknown.
+
+Candidates that did **not** form their own burst dimension, and are not in the 24: guilt, pride, romantic love, serenity, shame.
 
 The old 14 names are retired. The crosswalk is the Galion map; it is not a claim that the cited acoustic study used the new word.
 
 | Old name | Goes to | What is not copied across |
 |---|---|---|
 | neutral | baseline, z = 0 | — |
-| calm | the same baseline, low arousal on the core axis | no calm category in the 12; serenity was not a distinct burst |
+| calm | the same baseline, low arousal on the core axis | serenity was not one of the 24 |
 | tender | prosody adoration | Juslin's love–tenderness profile stays labelled as tenderness |
 | seductive | prosody desire | Hughes is courtship-directed speech, not a desire portrayal |
 | angry | prosody anger | hot and cold anger stay two poles |
@@ -53,10 +57,10 @@ The old 14 names are retired. The crosswalk is the Galion map; it is not a claim
 | disappointed | prosody disappointment | no acoustic row; still unknown |
 | happy | prosody amusement **and** interest | Juslin/Banse happiness numbers are not assigned to either word alone |
 | amused | prosody amusement | Boiten's breath change stays here. It is not the laugh numbers |
-| excited | prosody interest **and** amusement | Banse elation is not copied onto either word. Elation is its own burst, not a prosody category |
+| excited | prosody interest **and** amusement | Banse elation is not copied onto either word. Elation is its own category, valid in prosody at the lower tier |
 | surprised | prosody awe **and** confusion | no acoustic row. Dimension D ties surprise to awe; confusion's published gradient is with interest |
-| disgusted | prosody contempt | Banse's disgust profile is not contempt. Disgust is burst-only |
-| laughter | burst amusement | Bachorowski measured laughs, not the prosody category |
+| disgusted | prosody contempt | Banse's disgust profile is not contempt. Disgust is its own category and may be spoken; its prosody tier is the lower one |
+| laughter | burst channel of amusement | A word said amused is prosody amusement. Bachorowski measured laughs |
 | sigh | burst relief, sadness, disappointment, or contentment | no sigh-to-category table was read; the detector may be any of the four |
 
 A region can still contain opposite poles inside one new name. Banse and Scherer (1996, p. 625) partialed out speaker and sex and scored against the mean of the emotions they portrayed, with a strong change as 1 SD and a weak change as 0.5 SD. That is not z against a speaker's own neutral. Juslin and Laukka (2003, p. 789, note 9) warn that studies do not share a baseline.
@@ -80,7 +84,7 @@ z = (x - mean_neutral) / sd_neutral
 
 `mean_neutral` and `sd_neutral` are that speaker's. Sex, age, vocal-tract length and personality sit in the baseline. They are not feelings. Banse's z removed sex on purpose, which is why those z values must not be copied in as male or female targets.
 
-No source read here reports this z for any of the twelve prosody regions. Every `z_vs_own_neutral` in the label file is **unknown, to be learned from data**. Directions in the file are the modal pattern (Juslin) or the cross-emotion residual (Banse), and they are labelled as such.
+No source read here reports this z for any of the 24 categories. Every `z_vs_own_neutral` in the label file is **unknown, to be learned from data**. Directions in the file are the modal pattern (Juslin) or the cross-emotion residual (Banse), and they are labelled as such.
 
 Absolute population numbers are anchors for the baseline, never substitutes for z:
 
@@ -160,9 +164,9 @@ Eye-to-eye proximity, whisper, and an audible intimate exhale are human-connecti
 
 ## 3. Vocal bursts
 
-Laughter is not a prosody category. It is the burst detector for **amusement** (Cowen, Elfenbein, Laukka & Keltner, 2019, Figure 3B). A sigh is a burst detector that may be relief, sadness, disappointment, or contentment; Cowen names sighs as examples of bursts and does not publish that four-way assignment. Breath rate, inspiratory time, tidal volume and an inspiratory pause are the physiology track (§1.3, §2), not a burst and not an emotion.
+A laugh is amusement with no words. The same category, said on a word, is prosody amusement (Cowen, Elfenbein, Laukka & Keltner, 2019, Figure 3B). A sigh, also with no words, may be relief, sadness, disappointment, or contentment; Cowen names sighs as examples of bursts and does not publish that four-way assignment. Breath rate, inspiratory time, tidal volume and an inspiratory pause are the physiology track (§1.3, §2), not a category.
 
-Bachorowski, Smoski and Owren (2001), 1,024 laugh bouts, 97 young adults. These are absolute laugh values, not z against the same person's speech, and not a prosody-amusement target.
+Bachorowski, Smoski and Owren (2001), 1,024 laugh bouts, 97 young adults. These are absolute laugh values, not z against the same person's speech, and not the prosody of a word said amused.
 
 | | Men | Women | Where |
 |---|---|---|---|
@@ -191,7 +195,7 @@ Open-mouth calls had higher F0 than closed-mouth calls (p. 1586). Laughter sat i
 
 ## 5. Gaps
 
-Unknown, to be learned from data, and not filled from a neighbour: prosody acoustics for awe, confusion, contempt, disappointment, distress, interest, and for amusement as speech (the laugh numbers are bursts). Desire has only the Hughes courtship F0 drop. Disgust, as a burst, has Banse's speech-portrayal profile (15% recognition) and no burst recording in this file. Sigh has no acoustic target. Also unknown: whisper; eye-to-eye level; subglottal pressure; lung-volume slope; audible breath level; breath-group length; fatigue; hydration; health; adult-age F0; personality offsets; mixture weights; onset shape; every z against the speaker's own neutral; speech F0 population norms (Hillenbrand and Peterson & Barney were not re-read).
+Unknown, to be learned from data, and not filled from a neighbour: acoustics for awe, confusion, contempt, disappointment, distress, interest, and for amusement said on words (the laugh numbers are the burst channel). Desire has only the Hughes courtship F0 drop. Disgust, spoken, has Banse's speech-portrayal profile (15% recognition). Sigh has no acoustic target. Also unknown: whisper; eye-to-eye level; subglottal pressure; lung-volume slope; audible breath level; breath-group length; fatigue; hydration; health; adult-age F0; personality offsets; mixture weights; onset shape; every z against the speaker's own neutral; speech F0 population norms (Hillenbrand and Peterson & Barney were not re-read).
 
 ## Sources read for a number or a direction
 
