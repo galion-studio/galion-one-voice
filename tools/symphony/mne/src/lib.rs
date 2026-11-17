@@ -23,6 +23,7 @@ use galion_emotion_render::{
 use galion_lungs::plan::{self, Plan, Request as BreathRequest};
 use galion_lungs::synth::{self, Rendered as BreathAudio};
 use galion_lungs::{config::Config, inventory::Inventory};
+use galion_voice_guard::Report as GuardReport;
 use serde::Serialize;
 use serde_json::Value;
 
@@ -119,7 +120,7 @@ fn wired_today(owner: &str) -> &'static str {
         "S4" => "galion-articulation mouth tracks (PR #191)",
         "S5" => "galion-articulation nose section (PR #191); wordless sounds not invented here",
         "S6" => "galion-articulation closed_loop stand-in renderer, until galion-mne-sound lands",
-        "S7" => "the same closed_loop read-back, one extra pass (max_iter = 2)",
+        "S7" => "galion-voice-guard admit, then closed_loop read-back only if the clip passes",
         _ => "none",
     }
 }
@@ -140,7 +141,9 @@ pub struct RunReport {
     pub lungs: Plan,
     pub controls: Value,
     pub clone_request_patch: Value,
-    pub listen: LoopReport,
+    /// S9. Fail closed: listening-back runs only when this report passes.
+    pub guard: GuardReport,
+    pub listen: Option<LoopReport>,
     pub samples: usize,
     pub sample_rate_hz: u32,
     #[serde(skip)]
@@ -181,17 +184,31 @@ pub fn run(input: &RunIn<'_>) -> Result<RunReport, String> {
         stimulus::SR,
     );
     let mixed = mix_breath(&tone, &breath.samples);
-    let listen = closed_loop::run_standin(
-        &mixed,
-        stimulus::SR,
-        &closed_loop::Request {
-            emotion: Some(input.pin),
-            env_name: None,
-            enrol: None,
-            max_iter: 2,
-            start_exaggeration: None,
-        },
-    )?;
+    let sample_rate_hz = stimulus::SR.round() as u32;
+    // Between the stand-in for sound out and listening-back. A bad clip
+    // does not reach the decoder. PR #199's PCM uses the same hook.
+    let pcm: Vec<f32> = mixed.iter().map(|s| *s as f32).collect();
+    let guard_cfg =
+        galion_voice_guard::load_config(&input.repo.join("configs/symphony/voice-guard.toml"))
+            .or_else(|_| galion_voice_guard::Config::bundled())?;
+    let (guard, listen) =
+        match galion_voice_guard::before_listen(&pcm, sample_rate_hz, &guard_cfg, None, None) {
+            Ok(guard) => {
+                let listen = closed_loop::run_standin(
+                    &mixed,
+                    stimulus::SR,
+                    &closed_loop::Request {
+                        emotion: Some(input.pin),
+                        env_name: None,
+                        enrol: None,
+                        max_iter: 2,
+                        start_exaggeration: None,
+                    },
+                )?;
+                (guard, Some(listen))
+            }
+            Err(guard) => (guard, None),
+        };
 
     Ok(RunReport {
         schema: "galion-mne-run/1",
@@ -201,9 +218,10 @@ pub fn run(input: &RunIn<'_>) -> Result<RunReport, String> {
         lungs,
         controls: serde_json::to_value(&controls).map_err(|e| e.to_string())?,
         clone_request_patch: patch,
+        guard,
         listen,
         samples: mixed.len(),
-        sample_rate_hz: stimulus::SR.round() as u32,
+        sample_rate_hz,
         audio: mixed,
     })
 }

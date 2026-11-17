@@ -16,6 +16,7 @@ S5 nose + wordless sounds  waiting   tools/symphony/mne-nose
         |  air: galion-lungs (PR #195), already wired
 S6 sound out               waiting   tools/symphony/mne-sound
         |  until then: articulation closed-loop stand-in
+        |  galion-voice-guard (S9) admits the PCM or refuses it
 S7 listening back          waiting   tools/symphony/mne-listen
         |  until then: the same decoder reads the tone back, one extra pass
 ```
@@ -31,3 +32,5 @@ cargo run --manifest-path tools/symphony/mne/Cargo.toml -- \
 ```
 
 The voice file is the pluggable baseline (profile toml). The tone in tests is synthetic. Nothing is downloaded.
+
+`run` calls `galion-voice-guard` on the mixed PCM before the read-back. The current stand-in (impulse-train vowel plus breath) is refused, so listening-back does not see it. A clean tone is admitted by `galion_voice_guard::before_listen`.

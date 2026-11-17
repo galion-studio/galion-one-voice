@@ -47,10 +47,12 @@ fn run_cli() -> Result<(), String> {
                 let json = serde_json::to_string_pretty(&report).map_err(|e| e.to_string())?;
                 std::fs::write(dir.join("report.json"), json).map_err(|e| e.to_string())?;
             }
+            let passes = report.listen.as_ref().map(|l| l.iterations).unwrap_or(0);
             println!(
-                "ticks={} listen_passes={} pin={}",
+                "ticks={} guard={} listen_passes={} pin={}",
                 report.lungs.n_ticks,
-                report.listen.iterations,
+                report.guard.verdict,
+                passes,
                 report.clone_request_patch.get("emotion").and_then(|v| v.as_str()).unwrap_or("?")
             );
             Ok(())

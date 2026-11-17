@@ -15,7 +15,7 @@ fn layer_slots_are_waiting_on_their_owners() {
 }
 
 #[test]
-fn stacked_drafts_run_one_pass_on_a_synthetic_tone() {
+fn guard_refuses_the_stand_in_before_listening_back() {
     let repo = repo_root();
     let voice = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../voice-v2/voices/synthetic.toml");
     let report = run(&RunIn {
@@ -30,7 +30,11 @@ fn stacked_drafts_run_one_pass_on_a_synthetic_tone() {
     assert!(report.lungs.not_emotion);
     assert_eq!(report.clone_request_patch["emotion"], "embarrassment");
     assert_eq!(report.clone_request_patch["track"], "prosody");
-    assert!(report.listen.iterations >= 1 && report.listen.iterations <= 2);
-    assert_eq!(report.listen.profile.schema, "galion-voice-decode/2");
+    assert_eq!(report.guard.schema, "galion-voice-guard/1");
+    // The stand-in mixes an impulse-train vowel with breath. That PCM is
+    // refused (DC and sample jumps), so listening-back does not run.
+    assert!(report.guard.bad, "{}", report.guard.reason);
+    assert!(report.listen.is_none());
+    assert!(report.guard.reason.contains("dc"));
     assert!((report.voice_f0_hz - 180.0).abs() < 1e-6);
 }
