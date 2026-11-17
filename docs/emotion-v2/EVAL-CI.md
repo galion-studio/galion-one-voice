@@ -54,6 +54,14 @@ Licences are recorded for review before any public release (RULES: LICENCES ON H
 New code (glue): `--device` + `--ser-head` + `bench` + `matrix` in `galion-emotion` (Rust), `galion-wer --jobs` up to
 all CPU threads, `galion-ecapa` switched to `load-dynamic` so it uses the same pinned ONNX Runtime, two bash scripts.
 
+## Emotion scorer: galion-emotion12 (PR #187)
+
+Set `EMOTION12_DIR=<checkout of #187>/tools/emotion-v2/emotion12` and the `--matrix` run scores every build and
+reference clip once with A2's `galion-emotion12 score` (emotion2vec+ base, FunASR utterance recipe incl. the
+waveform layer-norm), then `galion-emotion matrix --scores emotion12.json` does only the gate math (same
+0.70/0.30 formula, same 0.83). Without it, galion-emotion's own ONNX path is used. Both read the same pinned
+emotion2vec+ base export (rev 041e7567).
+
 ## Same scorers in the dataset HQ gate (#182)
 
 `tools/emotion-v2/eval/emotion_v2_ci.py` is the `emotion_v2_ci` scorer plugin that #182's

@@ -417,18 +417,47 @@ fn run_matrix(args: &[String]) -> Result<()> {
             anyhow::ensure!(head.labels.contains(l), "{cfg_path}: emotion {} uses label {l:?}, not a scorer label ({})", e.id, head.labels.join(","));
         }
     }
-    models::init_ort(get("ort-lib").as_deref())?;
+    // --scores FILE: per-file emotion2vec+ output from galion-emotion12 (PR #187, A2's gate scorer,
+    // schema galion-emotion12/1). Then no session is opened here; the matrix only does the gate math.
+    let pre: Option<BTreeMap<String, (Vec<f32>, Vec<f32>)>> = match get("scores") {
+        None => None,
+        Some(p) => {
+            let v: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&p).with_context(|| format!("read {p}"))?)?;
+            anyhow::ensure!(v["schema"] == "galion-emotion12/1", "{p}: expected schema galion-emotion12/1");
+            let ml: Vec<String> = serde_json::from_value(v["model_labels"].clone())?;
+            anyhow::ensure!(ml == head.labels, "{p}: model_labels {ml:?} differ from the head labels {:?}", head.labels);
+            let mut m = BTreeMap::new();
+            for r in v["files"].as_array().with_context(|| format!("{p}: no files"))? {
+                let f = r["file"].as_str().context("file")?.to_string();
+                m.insert(f, (serde_json::from_value(r["model_probs"].clone())?, serde_json::from_value(r["embedding"].clone())?));
+            }
+            Some(m)
+        }
+    };
     let t = Instant::now();
-    let (mut sess, dev) = models::session(&model, threads, device)?;
+    let (mut sess, dev) = if let Some(p) = get("scores") {
+        (None, format!("galion-emotion12 scores {p}"))
+    } else {
+        models::init_ort(get("ort-lib").as_deref())?;
+        let (s, d) = models::session(&model, threads, device)?;
+        (Some(s), d.to_string())
+    };
     let load_ms = t.elapsed().as_secs_f64() * 1e3;
     eprintln!("galion-emotion matrix: {} emotions, scorer {}, device {dev}", cfg.emotion.len(), cfg.scorer.name);
     let wall0 = Instant::now();
     let mut analyse = |files: &[String]| -> Result<(Vec<Vec<f32>>, Vec<Vec<f32>>)> {
         let (mut post, mut emb) = (Vec::new(), Vec::new());
         for f in files {
+            if let Some(m) = &pre {
+                let (p, e) = m.get(f).with_context(|| format!("{f}: not in --scores"))?;
+                post.push(p.clone());
+                emb.push(e.clone());
+                continue;
+            }
+            let sess = sess.as_mut().context("no session")?;
             let a = audio::load_wav(f)?;
             let x16 = audio::resample(&a.samples, a.sr, proxies::SR as u32);
-            let pooled = models::pooled_features(&mut sess, &x16)?;
+            let pooled = models::pooled_features(sess, &x16)?;
             post.push(models::apply_head(&head, &pooled)?);
             emb.push(pooled);
         }

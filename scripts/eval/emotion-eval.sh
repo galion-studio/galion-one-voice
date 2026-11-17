@@ -96,8 +96,25 @@ if [ "$MATRIX" = 1 ]; then
       > "$OUT/ecapa/$e.log" 2>&1 || echo "  $e: galion-ecapa failed (see ecapa/$e.log)"
   done
   echo "wer+ecapa: $(( $(date +%s) - t0 )) s (cpu, $(nproc) threads)" | tee -a "$OUT/device.log"
+  # Emotion scorer: A2's galion-emotion12 (PR #187, emotion2vec+ with FunASR's utterance recipe) when
+  # EMOTION12_DIR points at its crate (tools/emotion-v2/emotion12); else galion-emotion's own ONNX path.
+  SCORES=()
+  if [ -n "${EMOTION12_DIR:-}" ]; then
+    cargo build -q --release --manifest-path "$EMOTION12_DIR/Cargo.toml"
+    E12="${CARGO_TARGET_DIR:-$EMOTION12_DIR/target}/release/galion-emotion12"
+    E12M="$OUT/emotion12-models"; mkdir -p "$E12M"; ln -sfn "$M/emotion/emotion2vec-plus-base-onnx" "$E12M/emotion2vec_plus_base_onnx"
+    files=(); for e in $(sed -n 's/^id = "\(.*\)"/\1/p' "$CONFIG"); do
+      ls "$BUILD/$e"/*.wav >/dev/null 2>&1 || continue   # no clips: UNMEASURED, refs not needed
+      for f in "$BUILD/$e"/*.wav "$REFS/$e"/*.wav; do [ -f "$f" ] && files+=("$f"); done
+    done
+    t1=$(date +%s)
+    "$E12" score --emotions "$EMOTION12_DIR/gate-emotions.toml" --models-dir "$E12M" --device "$DEVICE" --threads "$(nproc)" \
+      --out "$OUT/emotion12.json" "${files[@]}" > "$OUT/emotion12.log" 2>&1 || die2 "galion-emotion12 failed (see emotion12.log)"
+    echo "emotion scorer: galion-emotion12 ($(grep -o '"device": *"[^"]*"' "$OUT/emotion12.json" | head -1)), ${#files[@]} files, $(( $(date +%s) - t1 )) s" | tee -a "$OUT/device.log"
+    SCORES=(--scores "$OUT/emotion12.json")
+  fi
   set +e
-  "$BIN" matrix --config "$CONFIG" --build-dir "$BUILD" --reference-dir "$REFS" --models-root "$M" \
+  "$BIN" matrix "${SCORES[@]}" --config "$CONFIG" --build-dir "$BUILD" --reference-dir "$REFS" --models-root "$M" \
     --wer-dir "$OUT/wer" --ecapa-dir "$OUT/ecapa" --device "$DEVICE" --threads 0 --out-dir "$OUT" 2> "$OUT/matrix.log"
   c=$?; set -e
   cat "$OUT/matrix.log"; echo "reports: $OUT"
