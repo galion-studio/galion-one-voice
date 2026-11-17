@@ -10,6 +10,8 @@ The articulation layer is a new application layer under the Symphony stack. It r
 
 It is universal. The voice is a pluggable input (one reference WAV, one clone WAV). No voice name or voice-specific constant appears in the code. Samantha is just the first test voice.
 
+Eval harness (not a gate): [ARTICULATION-V2-EVALS.md](ARTICULATION-V2-EVALS.md).
+
 ## Where it sits
 
 ```
