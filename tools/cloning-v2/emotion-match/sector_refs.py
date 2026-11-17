@@ -144,8 +144,9 @@ SHARED_SECTORS: tuple[str, ...] = (
     "disgusted",
 )
 
-# Samantha-only overlay. Required only when a scored line uses it.
-OVERLAY_SECTORS: tuple[str, ...] = ("seductive",)
+# Gate set extension (card t1359s6830: 12 V2 emotions + laughter + seductive).
+# Optional sectors: required only when a scored line uses them.
+OVERLAY_SECTORS: tuple[str, ...] = ("laughter", "seductive")
 
 KNOWN_SECTORS: tuple[str, ...] = SHARED_SECTORS + OVERLAY_SECTORS
 

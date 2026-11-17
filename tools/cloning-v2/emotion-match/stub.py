@@ -32,6 +32,7 @@ STUB_FREQ_HZ: dict[str, float] = {
     "fearful": 1230.0,
     "surprised": 1470.0,
     "disgusted": 1710.0,
+    "laughter": 1800.0,
     "seductive": 1890.0,
 }
 

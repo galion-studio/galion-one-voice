@@ -122,7 +122,7 @@ class ThresholdsTest(unittest.TestCase):
         thresholds = load_thresholds()
         self.assertEqual(thresholds.persona, "samantha")
         self.assertEqual(thresholds.tuning_hz, 432)
-        self.assertEqual(thresholds.backend_id, SUPERB_ID)
+        self.assertEqual(thresholds.backend_id, "emotion2vec+")  # gate decision t1359s6830
         self.assertTrue(math.isclose(thresholds.wer_max, 0.018))
         self.assertTrue(math.isclose(thresholds.ecapa_min, 0.7057))
         self.assertTrue(math.isclose(thresholds.emotion_target, 0.83))

@@ -40,7 +40,7 @@ def main(argv: list[str] | None = None) -> int:
     score.add_argument(
         "--backend",
         default=None,
-        help="auto (default), stub, or superb/wav2vec2-base-superb-er",
+        help="auto (default: emotion2vec+ when built, else superb, else stub), stub, emotion2vec+, or superb/wav2vec2-base-superb-er",
     )
     score.add_argument("--speaker-ref", type=Path, default=None)
     score.add_argument(
@@ -66,7 +66,7 @@ def main(argv: list[str] | None = None) -> int:
     sweep.add_argument(
         "--backend",
         default=None,
-        help="auto (default) or superb. stub is recorded as unmeasured and is not a score",
+        help="auto (default: emotion2vec+ when built, else superb), emotion2vec+, or superb. stub is recorded as unmeasured and is not a score",
     )
     sweep.add_argument(
         "--require-scorers",

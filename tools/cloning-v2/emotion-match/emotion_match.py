@@ -14,8 +14,10 @@
 # per sector: one weak sector cannot hide inside the aggregate. The single-ref
 # --ref path remains for the historical series only; it is not the V2 gate.
 #
-# Weights: superb/wav2vec2-base-superb-er (Apache-2.0), already in the local
-# Hugging Face cache, or --backend stub (no weights). CPU only. The cache is
+# Default backend (gate decision t1359s6830): emotion2vec+ via the Rust
+# galion-emotion12 binary (ort; CUDA when present, else CPU). Also:
+# superb/wav2vec2-base-superb-er (Apache-2.0) from the local Hugging Face
+# cache, or --backend stub (no weights). The cache is
 # outside this git checkout. This tool does not download weights.
 
 from __future__ import annotations
@@ -59,7 +61,7 @@ def usage(code: int) -> None:
     sys.stdout.write(
         "emotion_match — 0.70*category_blend+0.30*emb_sim\n"
         "usage: emotion_match --manifest REFS.json [--renders-dir DIR] [--root DIR]\n"
-        "                     [--backend stub|superb] [--out out.json] [clip.wav...]\n"
+        "                     [--backend emotion2vec+|stub|superb] [--out out.json] [clip.wav...]\n"
         "       emotion_match --ref REF.wav clip.wav... [--threads N] [--out out.json]\n"
         "       emotion_match --self-test\n"
         "\n"
@@ -148,7 +150,8 @@ def parse(argv: list[str]):
         i += 1
     if manifest:
         if backend is None:
-            backend = "stub" if os.environ.get("EMOTION_V2_BACKEND") == "stub" else "superb"
+            # Gate decision t1359s6830: per-emotion emotion2vec+ is the default.
+            backend = "stub" if os.environ.get("EMOTION_V2_BACKEND") == "stub" else "emotion2vec+"
         return {
             "mode": "per-sector",
             "manifest": manifest,
@@ -291,9 +294,42 @@ def _resolve_backend(name: str, threads: int):
             "Apache-2.0",
             bundle,
         )
+    if key in {"emotion2vec", "emotion2vec+", "galion-emotion12"}:
+        return _emotion2vec_backend()
     raise SystemExit(
-        f"emotion_match: unknown backend {name!r}; expected stub or superb"
+        f"emotion_match: unknown backend {name!r}; expected stub, emotion2vec+ or superb"
     )
+
+
+def _emotion2vec_backend():
+    """emotion2vec+ through the Rust galion-emotion12 binary (ort). Glue only:
+    the binary and its JSON live in tools/emotion-v2/emotion12."""
+    harness_root = os.path.join(_DIR, "..", "..", "emotion-v2")
+    if harness_root not in sys.path:
+        sys.path.insert(0, os.path.abspath(harness_root))
+    from harness import scorer12  # noqa: E402
+
+    if scorer12.locate_binary() is None:
+        raise SystemExit(
+            "emotion_match: emotion2vec+ backend unavailable: build tools/emotion-v2/emotion12 "
+            "(cargo build --release) or set GALION_EMOTION12_BIN; nothing is downloaded"
+        )
+    cache: dict[str, tuple[list[float], list[float]]] = {}
+
+    def prefetch(paths) -> None:
+        todo = [Path(p) for p in paths if str(p) not in cache]
+        if todo:
+            for key, row in scorer12.run_batch(todo).items():
+                cache[key] = (list(row["posterior"]), list(row["embedding"]))
+
+    def analyse(path):
+        if str(path) not in cache:
+            prefetch([path])
+        return cache[str(path)]
+
+    analyse.prefetch = prefetch  # type: ignore[attr-defined]
+    licence = "emotion2vec+ weights: FunASR Model Licence v1.1 (recorded; licences on hold, t1360u)"
+    return "emotion2vec+", analyse, licence, None
 
 
 def run_per_sector(args: dict) -> int:
@@ -311,6 +347,12 @@ def run_per_sector(args: dict) -> int:
             args["backend"], args["threads"]
         )
         sectors = []
+        if hasattr(analyse, "prefetch"):
+            # one batch run of the scorer for every reference and render
+            analyse.prefetch(
+                [resolve_ref(manifest, e).path for e in required_sectors(jobs)]
+                + [job.path for job in jobs]
+            )
         for emotion in required_sectors(jobs):
             ref = resolve_ref(manifest, emotion)
             ref_prob, ref_emb = analyse(ref.path)

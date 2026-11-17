@@ -1,0 +1,78 @@
+# Galion Voice — Perpetual Open MIT License
+# Copyright (c) 2026 Galion Labs.
+#
+# Emotion gate set (Mate, card t1359s6830): per-emotion emotion2vec+ scoring,
+# threshold 0.83 per emotion. Universal (any voice); first target Samantha. 14 emotions = the 12 Emotion V2
+# emotions (emotion-v2/emotions.toml) + laughter + seductive.
+# `emotion2vec` = the emotion2vec+ class this emotion is read from.
+# `emotion2vec_in_set = true` only where emotion2vec+ has that exact class.
+# A shared class is split evenly between the emotions that use it (config,
+# nothing learned). A3's 14-emotion file (swarm11/clone-14-emotions) can
+# replace this one with --emotions as long as it keeps these three keys.
+# 432 Hz tuning standard; nothing here retunes.
+schema = "galion-emotion-gate-set/1"
+persona = "any"  # universal: works for any voice; first tested on Samantha
+gate = 0.83
+
+[[emotions]]
+id = "neutral"
+emotion2vec = "neutral"
+emotion2vec_in_set = true
+
+[[emotions]]
+id = "calm"
+emotion2vec = "neutral"
+
+[[emotions]]
+id = "happy"
+emotion2vec = "happy"
+emotion2vec_in_set = true
+
+[[emotions]]
+id = "amused"
+emotion2vec = "happy"
+
+[[emotions]]
+id = "excited"
+emotion2vec = "happy"
+
+[[emotions]]
+id = "tender"
+emotion2vec = "happy"
+
+[[emotions]]
+id = "sad"
+emotion2vec = "sad"
+emotion2vec_in_set = true
+
+[[emotions]]
+id = "disappointed"
+emotion2vec = "sad"
+
+[[emotions]]
+id = "angry"
+emotion2vec = "angry"
+emotion2vec_in_set = true
+
+[[emotions]]
+id = "fearful"
+emotion2vec = "fearful"
+emotion2vec_in_set = true
+
+[[emotions]]
+id = "surprised"
+emotion2vec = "surprised"
+emotion2vec_in_set = true
+
+[[emotions]]
+id = "disgusted"
+emotion2vec = "disgusted"
+emotion2vec_in_set = true
+
+[[emotions]]
+id = "laughter"
+emotion2vec = "happy"
+
+[[emotions]]
+id = "seductive"
+emotion2vec = "happy"

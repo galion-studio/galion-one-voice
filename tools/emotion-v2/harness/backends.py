@@ -2,8 +2,9 @@
 # Copyright (c) 2026 Galion Labs.
 """Pluggable categorical emotion backends.
 
-The default recogniser is ``superb/wav2vec2-base-superb-er``, and only when a
-complete weight directory is already on disk. This module never downloads.
+The default recogniser is emotion2vec+ through the Rust ``galion-emotion12``
+binary (gate decision t1359s6830) when it is built and its models are local,
+then ``superb/wav2vec2-base-superb-er`` when its weights are on disk. This module never downloads.
 
 The stub is a deterministic spectral stand-in. CPU CI runs the stub. It does
 not claim to recognise emotion; it returns a stable posterior so the harness,
@@ -279,7 +280,16 @@ def resolve_backend(choice: str | None = None) -> EmotionBackend:
     selected = (choice or os.environ.get("EMOTION_V2_BACKEND") or "auto").strip().lower()
     if selected in {"stub", "fake"}:
         return StubBackend()
+    from . import scorer12
+
+    if selected in scorer12.ALIASES:
+        return scorer12.Emotion2VecPlusBackend()
     if selected in {"auto", "default"}:
+        # Gate decision t1359s6830: per-emotion emotion2vec+ is the default
+        # scorer when it is built and its models are local. SUPERB stays as
+        # the fallback; the stub stays the CPU-CI path.
+        if scorer12.ready():
+            return scorer12.Emotion2VecPlusBackend()
         found = discover_superb_weights()
         if found is None:
             return StubBackend()
@@ -293,5 +303,5 @@ def resolve_backend(choice: str | None = None) -> EmotionBackend:
             )
         return SuperbBackend(found)
     raise BackendUnavailable(
-        f"unknown backend {choice!r}; expected auto, stub, or {SUPERB_ID}"
+        f"unknown backend {choice!r}; expected auto, stub, emotion2vec+, or {SUPERB_ID}"
     )
