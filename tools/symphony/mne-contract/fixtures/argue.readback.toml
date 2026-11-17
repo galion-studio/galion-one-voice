@@ -1,0 +1,271 @@
+# Galion Voice — Perpetual Open MIT License
+# Copyright (c) 2026 Galion Labs.
+# Stand-in scenario. No recording. Numbers are fixture knobs.
+
+schema = "galion-mne-contract"
+schema_version = 1
+kind = "readback"
+frame_ms = 80
+value_origin = "stand_in"
+note = "Argue. Anger pin. Arousal and dominance stay high through the line. No hertz target is stored."
+
+text = "That is not what I said, and it matters."
+
+[persona]
+persona_id = "galion-one"
+voice_id = "profile:galion-one-steady"
+
+[moment]
+moment_id = "argue-what-was-said"
+memory_id = "mem-standin-what-was-said"
+memory_snippet = "The sentence they repeated was not the sentence that was said."
+place = "quiet_room"
+distance = "conversational"
+noise = "some"
+listener = "one_person"
+
+[baseline]
+arousal = 0.4
+valence = 0.0
+dominance = 0.5
+
+[[readback_frames]]
+t_ms = 0
+
+[readback_frames.feeling]
+arousal = 0.587
+valence = -0.17
+dominance = 0.602
+
+[readback_frames.feeling.pin]
+name = "anger"
+track = "prosody"
+weight = 0.702
+
+[readback_frames.body]
+origin = "unmeasured"
+
+[readback_frames.body.lungs]
+segment = "unknown"
+
+[readback_frames.confidence]
+feeling = 0.62
+body = 0.0
+confounded = false
+
+[[readback_frames]]
+t_ms = 80
+
+[readback_frames.feeling]
+arousal = 0.6021
+valence = -0.1936
+dominance = 0.6171
+
+[readback_frames.feeling.pin]
+name = "anger"
+track = "prosody"
+weight = 0.708
+
+[readback_frames.body]
+origin = "unmeasured"
+
+[readback_frames.body.lungs]
+segment = "unknown"
+
+[readback_frames.confidence]
+feeling = 0.62
+body = 0.0
+confounded = false
+
+[[readback_frames]]
+t_ms = 160
+
+[readback_frames.feeling]
+arousal = 0.6172
+valence = -0.2172
+dominance = 0.6322
+
+[readback_frames.feeling.pin]
+name = "anger"
+track = "prosody"
+weight = 0.714
+
+[readback_frames.body]
+origin = "unmeasured"
+
+[readback_frames.body.lungs]
+segment = "unknown"
+
+[readback_frames.confidence]
+feeling = 0.62
+body = 0.0
+confounded = false
+
+[[readback_frames]]
+t_ms = 240
+
+[readback_frames.feeling]
+arousal = 0.6323
+valence = -0.2408
+dominance = 0.6473
+
+[readback_frames.feeling.pin]
+name = "anger"
+track = "prosody"
+weight = 0.72
+
+[readback_frames.body]
+origin = "unmeasured"
+
+[readback_frames.body.lungs]
+segment = "unknown"
+
+[readback_frames.confidence]
+feeling = 0.62
+body = 0.0
+confounded = false
+
+[[readback_frames]]
+t_ms = 320
+
+[readback_frames.feeling]
+arousal = 0.6474
+valence = -0.2644
+dominance = 0.6624
+
+[readback_frames.feeling.pin]
+name = "anger"
+track = "prosody"
+weight = 0.726
+
+[readback_frames.body]
+origin = "unmeasured"
+
+[readback_frames.body.lungs]
+segment = "unknown"
+
+[readback_frames.confidence]
+feeling = 0.62
+body = 0.0
+confounded = false
+
+[[readback_frames]]
+t_ms = 400
+
+[readback_frames.feeling]
+arousal = 0.6626
+valence = -0.2881
+dominance = 0.6776
+
+[readback_frames.feeling.pin]
+name = "anger"
+track = "prosody"
+weight = 0.732
+
+[readback_frames.body]
+origin = "unmeasured"
+
+[readback_frames.body.lungs]
+segment = "unknown"
+
+[readback_frames.confidence]
+feeling = 0.62
+body = 0.0
+confounded = false
+
+[[readback_frames]]
+t_ms = 480
+
+[readback_frames.feeling]
+arousal = 0.6777
+valence = -0.3117
+dominance = 0.6927
+
+[readback_frames.feeling.pin]
+name = "anger"
+track = "prosody"
+weight = 0.738
+
+[readback_frames.body]
+origin = "unmeasured"
+
+[readback_frames.body.lungs]
+segment = "unknown"
+
+[readback_frames.confidence]
+feeling = 0.62
+body = 0.0
+confounded = false
+
+[[readback_frames]]
+t_ms = 560
+
+[readback_frames.feeling]
+arousal = 0.6928
+valence = -0.3353
+dominance = 0.7078
+
+[readback_frames.feeling.pin]
+name = "anger"
+track = "prosody"
+weight = 0.744
+
+[readback_frames.body]
+origin = "unmeasured"
+
+[readback_frames.body.lungs]
+segment = "unknown"
+
+[readback_frames.confidence]
+feeling = 0.62
+body = 0.0
+confounded = false
+
+[[readback_frames]]
+t_ms = 640
+
+[readback_frames.feeling]
+arousal = 0.7079
+valence = -0.3589
+dominance = 0.7229
+
+[readback_frames.feeling.pin]
+name = "anger"
+track = "prosody"
+weight = 0.75
+
+[readback_frames.body]
+origin = "unmeasured"
+
+[readback_frames.body.lungs]
+segment = "unknown"
+
+[readback_frames.confidence]
+feeling = 0.62
+body = 0.0
+confounded = false
+
+[[readback_frames]]
+t_ms = 720
+
+[readback_frames.feeling]
+arousal = 0.723
+valence = -0.3825
+dominance = 0.738
+
+[readback_frames.feeling.pin]
+name = "anger"
+track = "prosody"
+weight = 0.756
+
+[readback_frames.body]
+origin = "unmeasured"
+
+[readback_frames.body.lungs]
+segment = "unknown"
+
+[readback_frames.confidence]
+feeling = 0.62
+body = 0.0
+confounded = false
+

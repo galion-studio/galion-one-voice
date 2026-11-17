@@ -1,0 +1,291 @@
+# Galion Voice — Perpetual Open MIT License
+# Copyright (c) 2026 Galion Labs.
+# Stand-in scenario. No recording. Numbers are fixture knobs.
+
+schema = "galion-mne-contract"
+schema_version = 1
+kind = "intent"
+frame_ms = 80
+value_origin = "stand_in"
+note = "Tease. Amusement pin and positive valence rise, then stay up instead of snapping back."
+
+text = "You did say you would stop at one chapter."
+
+[persona]
+persona_id = "galion-one"
+voice_id = "profile:galion-one-steady"
+
+[moment]
+moment_id = "tease-one-more-chapter"
+memory_id = "mem-standin-one-chapter"
+memory_snippet = "They swore the book would stay shut after one chapter."
+place = "quiet_room"
+distance = "conversational"
+noise = "quiet"
+listener = "one_person"
+
+[baseline]
+arousal = 0.4
+valence = 0.0
+dominance = 0.5
+
+[[intent_frames]]
+t_ms = 0
+
+[intent_frames.intent]
+verb = "tease"
+strength = 0.55
+
+[intent_frames.feeling]
+arousal = 0.44
+valence = 0.05
+dominance = 0.52
+
+[intent_frames.feeling.pin]
+name = "amusement"
+track = "prosody"
+weight = 0.2
+
+[intent_frames.inner]
+energy = 0.65
+fatigue = 0.08
+health = 1.0
+
+[intent_frames.text_span]
+start_byte = 0
+end_byte = 42
+
+[[intent_frames]]
+t_ms = 80
+
+[intent_frames.intent]
+verb = "tease"
+strength = 0.55
+
+[intent_frames.feeling]
+arousal = 0.4556
+valence = 0.0911
+dominance = 0.5233
+
+[intent_frames.feeling.pin]
+name = "amusement"
+track = "prosody"
+weight = 0.2489
+
+[intent_frames.inner]
+energy = 0.65
+fatigue = 0.08
+health = 1.0
+
+[intent_frames.text_span]
+start_byte = 0
+end_byte = 42
+
+[[intent_frames]]
+t_ms = 160
+
+[intent_frames.intent]
+verb = "tease"
+strength = 0.55
+
+[intent_frames.feeling]
+arousal = 0.4711
+valence = 0.1322
+dominance = 0.5267
+
+[intent_frames.feeling.pin]
+name = "amusement"
+track = "prosody"
+weight = 0.2978
+
+[intent_frames.inner]
+energy = 0.65
+fatigue = 0.08
+health = 1.0
+
+[intent_frames.text_span]
+start_byte = 0
+end_byte = 42
+
+[[intent_frames]]
+t_ms = 240
+
+[intent_frames.intent]
+verb = "tease"
+strength = 0.55
+
+[intent_frames.feeling]
+arousal = 0.4867
+valence = 0.1733
+dominance = 0.53
+
+[intent_frames.feeling.pin]
+name = "amusement"
+track = "prosody"
+weight = 0.3467
+
+[intent_frames.inner]
+energy = 0.65
+fatigue = 0.08
+health = 1.0
+
+[intent_frames.text_span]
+start_byte = 0
+end_byte = 42
+
+[[intent_frames]]
+t_ms = 320
+
+[intent_frames.intent]
+verb = "tease"
+strength = 0.55
+
+[intent_frames.feeling]
+arousal = 0.5022
+valence = 0.2144
+dominance = 0.5333
+
+[intent_frames.feeling.pin]
+name = "amusement"
+track = "prosody"
+weight = 0.3956
+
+[intent_frames.inner]
+energy = 0.65
+fatigue = 0.08
+health = 1.0
+
+[intent_frames.text_span]
+start_byte = 0
+end_byte = 42
+
+[[intent_frames]]
+t_ms = 400
+
+[intent_frames.intent]
+verb = "tease"
+strength = 0.55
+
+[intent_frames.feeling]
+arousal = 0.5178
+valence = 0.2556
+dominance = 0.5367
+
+[intent_frames.feeling.pin]
+name = "amusement"
+track = "prosody"
+weight = 0.4444
+
+[intent_frames.inner]
+energy = 0.65
+fatigue = 0.08
+health = 1.0
+
+[intent_frames.text_span]
+start_byte = 0
+end_byte = 42
+
+[[intent_frames]]
+t_ms = 480
+
+[intent_frames.intent]
+verb = "tease"
+strength = 0.55
+
+[intent_frames.feeling]
+arousal = 0.5333
+valence = 0.2967
+dominance = 0.54
+
+[intent_frames.feeling.pin]
+name = "amusement"
+track = "prosody"
+weight = 0.4933
+
+[intent_frames.inner]
+energy = 0.65
+fatigue = 0.08
+health = 1.0
+
+[intent_frames.text_span]
+start_byte = 0
+end_byte = 42
+
+[[intent_frames]]
+t_ms = 560
+
+[intent_frames.intent]
+verb = "tease"
+strength = 0.55
+
+[intent_frames.feeling]
+arousal = 0.5489
+valence = 0.3378
+dominance = 0.5433
+
+[intent_frames.feeling.pin]
+name = "amusement"
+track = "prosody"
+weight = 0.5422
+
+[intent_frames.inner]
+energy = 0.65
+fatigue = 0.08
+health = 1.0
+
+[intent_frames.text_span]
+start_byte = 0
+end_byte = 42
+
+[[intent_frames]]
+t_ms = 640
+
+[intent_frames.intent]
+verb = "tease"
+strength = 0.55
+
+[intent_frames.feeling]
+arousal = 0.5644
+valence = 0.3789
+dominance = 0.5467
+
+[intent_frames.feeling.pin]
+name = "amusement"
+track = "prosody"
+weight = 0.5911
+
+[intent_frames.inner]
+energy = 0.65
+fatigue = 0.08
+health = 1.0
+
+[intent_frames.text_span]
+start_byte = 0
+end_byte = 42
+
+[[intent_frames]]
+t_ms = 720
+
+[intent_frames.intent]
+verb = "tease"
+strength = 0.55
+
+[intent_frames.feeling]
+arousal = 0.58
+valence = 0.42
+dominance = 0.55
+
+[intent_frames.feeling.pin]
+name = "amusement"
+track = "prosody"
+weight = 0.64
+
+[intent_frames.inner]
+energy = 0.65
+fatigue = 0.08
+health = 1.0
+
+[intent_frames.text_span]
+start_byte = 0
+end_byte = 42
+

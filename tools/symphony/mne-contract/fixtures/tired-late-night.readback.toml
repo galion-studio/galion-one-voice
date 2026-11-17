@@ -1,0 +1,271 @@
+# Galion Voice — Perpetual Open MIT License
+# Copyright (c) 2026 Galion Labs.
+# Stand-in scenario. No recording. Numbers are fixture knobs.
+
+schema = "galion-mne-contract"
+schema_version = 1
+kind = "readback"
+frame_ms = 80
+value_origin = "stand_in"
+note = "Tired late night. No Cowen pin. Fatigue is an inner factor, not an emotion. Arousal sits below the speaker baseline and stays there."
+
+text = "We can leave the rest for morning."
+
+[persona]
+persona_id = "galion-one"
+voice_id = "profile:galion-one-steady"
+
+[moment]
+moment_id = "tired-late-night"
+memory_id = "mem-standin-late-list"
+memory_snippet = "The clock is past midnight and the list is still open."
+place = "late_night_room"
+distance = "conversational"
+noise = "quiet"
+listener = "one_person"
+
+[baseline]
+arousal = 0.4
+valence = 0.0
+dominance = 0.5
+
+[[readback_frames]]
+t_ms = 0
+
+[readback_frames.feeling]
+arousal = 0.298
+valence = 0.017
+dominance = 0.4575
+
+[readback_frames.body]
+origin = "stand_in"
+
+[readback_frames.body.lungs]
+segment = "speech"
+lung_volume_rel = 0.35
+
+[readback_frames.confidence]
+feeling = 0.62
+body = 0.3
+confounded = false
+
+[[readback_frames]]
+t_ms = 80
+
+[readback_frames.feeling]
+arousal = 0.298
+valence = 0.017
+dominance = 0.4575
+
+[readback_frames.body]
+origin = "stand_in"
+
+[readback_frames.body.lungs]
+segment = "speech"
+lung_volume_rel = 0.35
+
+[readback_frames.confidence]
+feeling = 0.62
+body = 0.3
+confounded = false
+
+[[readback_frames]]
+t_ms = 160
+
+[readback_frames.feeling]
+arousal = 0.298
+valence = 0.017
+dominance = 0.4575
+
+[readback_frames.body]
+origin = "stand_in"
+
+[readback_frames.body.lungs]
+segment = "speech"
+lung_volume_rel = 0.35
+
+[readback_frames.confidence]
+feeling = 0.62
+body = 0.3
+confounded = false
+
+[[readback_frames]]
+t_ms = 240
+
+[readback_frames.feeling]
+arousal = 0.298
+valence = 0.017
+dominance = 0.4575
+
+[readback_frames.body]
+origin = "stand_in"
+
+[readback_frames.body.lungs]
+segment = "speech"
+lung_volume_rel = 0.35
+
+[readback_frames.confidence]
+feeling = 0.62
+body = 0.3
+confounded = false
+
+[[readback_frames]]
+t_ms = 320
+
+[readback_frames.feeling]
+arousal = 0.298
+valence = 0.017
+dominance = 0.4575
+
+[readback_frames.body]
+origin = "stand_in"
+
+[readback_frames.body.lungs]
+segment = "speech"
+lung_volume_rel = 0.35
+
+[readback_frames.confidence]
+feeling = 0.62
+body = 0.3
+confounded = false
+
+[[readback_frames]]
+t_ms = 400
+
+[readback_frames.feeling]
+arousal = 0.298
+valence = 0.017
+dominance = 0.4575
+
+[readback_frames.body]
+origin = "stand_in"
+
+[readback_frames.body.lungs]
+segment = "speech"
+lung_volume_rel = 0.35
+
+[readback_frames.confidence]
+feeling = 0.62
+body = 0.3
+confounded = false
+
+[[readback_frames]]
+t_ms = 480
+
+[readback_frames.feeling]
+arousal = 0.298
+valence = 0.017
+dominance = 0.4575
+
+[readback_frames.body]
+origin = "stand_in"
+
+[readback_frames.body.lungs]
+segment = "speech"
+lung_volume_rel = 0.35
+
+[readback_frames.confidence]
+feeling = 0.62
+body = 0.3
+confounded = false
+
+[[readback_frames]]
+t_ms = 560
+
+[readback_frames.feeling]
+arousal = 0.298
+valence = 0.017
+dominance = 0.4575
+
+[readback_frames.body]
+origin = "stand_in"
+
+[readback_frames.body.lungs]
+segment = "speech"
+lung_volume_rel = 0.35
+
+[readback_frames.confidence]
+feeling = 0.62
+body = 0.3
+confounded = false
+
+[[readback_frames]]
+t_ms = 640
+
+[readback_frames.feeling]
+arousal = 0.298
+valence = 0.017
+dominance = 0.4575
+
+[readback_frames.body]
+origin = "stand_in"
+
+[readback_frames.body.lungs]
+segment = "speech"
+lung_volume_rel = 0.35
+
+[readback_frames.confidence]
+feeling = 0.62
+body = 0.3
+confounded = false
+
+[[readback_frames]]
+t_ms = 720
+
+[readback_frames.feeling]
+arousal = 0.298
+valence = 0.017
+dominance = 0.4575
+
+[readback_frames.body]
+origin = "stand_in"
+
+[readback_frames.body.lungs]
+segment = "speech"
+lung_volume_rel = 0.35
+
+[readback_frames.confidence]
+feeling = 0.62
+body = 0.3
+confounded = false
+
+[[readback_frames]]
+t_ms = 800
+
+[readback_frames.feeling]
+arousal = 0.298
+valence = 0.017
+dominance = 0.4575
+
+[readback_frames.body]
+origin = "stand_in"
+
+[readback_frames.body.lungs]
+segment = "speech"
+lung_volume_rel = 0.35
+
+[readback_frames.confidence]
+feeling = 0.62
+body = 0.3
+confounded = false
+
+[[readback_frames]]
+t_ms = 880
+
+[readback_frames.feeling]
+arousal = 0.298
+valence = 0.017
+dominance = 0.4575
+
+[readback_frames.body]
+origin = "stand_in"
+
+[readback_frames.body.lungs]
+segment = "speech"
+lung_volume_rel = 0.35
+
+[readback_frames.confidence]
+feeling = 0.62
+body = 0.3
+confounded = false
+

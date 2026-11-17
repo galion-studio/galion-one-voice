@@ -1,0 +1,229 @@
+# Galion Voice — Perpetual Open MIT License
+# Copyright (c) 2026 Galion Labs.
+# Stand-in scenario. No recording. Numbers are fixture knobs.
+
+schema = "galion-mne-contract"
+schema_version = 1
+kind = "intent"
+frame_ms = 80
+value_origin = "stand_in"
+note = "Comfort. Sympathy pin rises and then holds. Valence stays warm of the speaker baseline. Arousal stays near it."
+
+text = "I'm here. Take the next minute slowly."
+
+[persona]
+persona_id = "galion-one"
+voice_id = "profile:galion-one-steady"
+
+[moment]
+moment_id = "comfort-after-a-long-meeting"
+memory_id = "mem-standin-long-meeting"
+memory_snippet = "They said the meeting ran long and they skipped lunch."
+place = "quiet_room"
+distance = "conversational"
+noise = "quiet"
+listener = "one_person"
+
+[baseline]
+arousal = 0.4
+valence = 0.0
+dominance = 0.5
+
+[[intent_frames]]
+t_ms = 0
+
+[intent_frames.intent]
+verb = "comfort"
+strength = 0.8
+
+[intent_frames.feeling]
+arousal = 0.4
+valence = 0.02
+dominance = 0.5
+
+[intent_frames.inner]
+energy = 0.6
+fatigue = 0.15
+health = 1.0
+
+[intent_frames.text_span]
+start_byte = 0
+end_byte = 9
+
+[[intent_frames]]
+t_ms = 80
+
+[intent_frames.intent]
+verb = "comfort"
+strength = 0.8
+
+[intent_frames.feeling]
+arousal = 0.41
+valence = 0.06
+dominance = 0.49
+
+[intent_frames.inner]
+energy = 0.6
+fatigue = 0.15
+health = 1.0
+
+[intent_frames.text_span]
+start_byte = 0
+end_byte = 9
+
+[[intent_frames]]
+t_ms = 160
+
+[intent_frames.intent]
+verb = "comfort"
+strength = 0.8
+
+[intent_frames.feeling]
+arousal = 0.42
+valence = 0.12
+dominance = 0.48
+
+[intent_frames.feeling.pin]
+name = "sympathy"
+track = "prosody"
+weight = 0.4
+
+[intent_frames.inner]
+energy = 0.6
+fatigue = 0.15
+health = 1.0
+
+[intent_frames.text_span]
+start_byte = 0
+end_byte = 9
+
+[[intent_frames]]
+t_ms = 240
+
+[intent_frames.intent]
+verb = "comfort"
+strength = 0.8
+
+[intent_frames.feeling]
+arousal = 0.41
+valence = 0.16
+dominance = 0.47
+
+[intent_frames.feeling.pin]
+name = "sympathy"
+track = "prosody"
+weight = 0.55
+
+[intent_frames.inner]
+energy = 0.6
+fatigue = 0.15
+health = 1.0
+
+[intent_frames.text_span]
+start_byte = 0
+end_byte = 9
+
+[[intent_frames]]
+t_ms = 320
+
+[intent_frames.intent]
+verb = "comfort"
+strength = 0.8
+
+[intent_frames.feeling]
+arousal = 0.4
+valence = 0.2
+dominance = 0.47
+
+[intent_frames.feeling.pin]
+name = "sympathy"
+track = "prosody"
+weight = 0.62
+
+[intent_frames.inner]
+energy = 0.6
+fatigue = 0.15
+health = 1.0
+
+[intent_frames.text_span]
+start_byte = 10
+end_byte = 38
+
+[[intent_frames]]
+t_ms = 400
+
+[intent_frames.intent]
+verb = "comfort"
+strength = 0.8
+
+[intent_frames.feeling]
+arousal = 0.4
+valence = 0.21
+dominance = 0.47
+
+[intent_frames.feeling.pin]
+name = "sympathy"
+track = "prosody"
+weight = 0.64
+
+[intent_frames.inner]
+energy = 0.6
+fatigue = 0.15
+health = 1.0
+
+[intent_frames.text_span]
+start_byte = 10
+end_byte = 38
+
+[[intent_frames]]
+t_ms = 480
+
+[intent_frames.intent]
+verb = "comfort"
+strength = 0.8
+
+[intent_frames.feeling]
+arousal = 0.39
+valence = 0.2
+dominance = 0.47
+
+[intent_frames.feeling.pin]
+name = "sympathy"
+track = "prosody"
+weight = 0.63
+
+[intent_frames.inner]
+energy = 0.6
+fatigue = 0.15
+health = 1.0
+
+[intent_frames.text_span]
+start_byte = 10
+end_byte = 38
+
+[[intent_frames]]
+t_ms = 560
+
+[intent_frames.intent]
+verb = "comfort"
+strength = 0.8
+
+[intent_frames.feeling]
+arousal = 0.4
+valence = 0.19
+dominance = 0.47
+
+[intent_frames.feeling.pin]
+name = "sympathy"
+track = "prosody"
+weight = 0.61
+
+[intent_frames.inner]
+energy = 0.6
+fatigue = 0.15
+health = 1.0
+
+[intent_frames.text_span]
+start_byte = 10
+end_byte = 38
+

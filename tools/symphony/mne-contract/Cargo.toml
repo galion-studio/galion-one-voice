@@ -1,0 +1,25 @@
+# Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
+[package]
+name = "galion-mne-contract"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.83"
+license = "MIT"
+publish = false
+description = "Versioned 80 ms contract between Inner Life and Mouth-and-Expressions: intent in, read-back out, compact binary plus a lossless JSON/TOML mirror."
+
+[[bin]]
+name = "galion-mne-contract"
+path = "src/main.rs"
+
+[dependencies]
+# Pinned so the crate builds on Rust 1.83.
+# toml 0.8.19 depends on indexmap 2, and the newest indexmap needs edition 2024.
+serde = { version = "=1.0.210", features = ["derive"] }
+serde_json = "=1.0.128"
+toml = "=0.8.19"
+indexmap = "=2.2.6"
+
+# Own workspace, same pattern as tools/symphony/articulation.
+# The locked voice runtime does not build this tool.
+[workspace]
