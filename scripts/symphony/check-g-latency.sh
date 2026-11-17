@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+# Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 # Section G. 80 ms tick, 1% non-inference ceiling, EPYC / CX23 / CX43 cited as a plan.
 # Heartbeat::step is measured on the stub path. No other latency number is invented.
 set -euo pipefail

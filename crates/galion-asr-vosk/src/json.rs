@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! Tiny JSON subset for the Vosk worker protocol. No serde. Objects keep
 //! insertion order so tests can match the bytes we emit.
 

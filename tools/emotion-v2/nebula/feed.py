@@ -1,5 +1,5 @@
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 """Smooth Emotion V2 posteriors into Nebula live frames.
 
 The input is a posterior the existing scorer or engine already produced:

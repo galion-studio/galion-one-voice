@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 #
 # Gate tests always. Real Nano generate only when GALION_CLONE_SMOKE=1
 # and the pinned weights plus an allowlisted reference are already on disk.

@@ -1,6 +1,6 @@
 # Galion Voice V2
 
-Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Perpetual Open MIT License. (c) 2026 Galion Labs.
 Europe/Zagreb. This is the program plan. It is not a claim that V2 is finished,
 and it is not V3.
 

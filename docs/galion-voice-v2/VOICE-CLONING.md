@@ -1,6 +1,6 @@
 # V2-S14 · Real-voice cloning
 
-Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Perpetual Open MIT License. (c) 2026 Galion Labs.
 Europe/Zagreb. Priority 1 of the V2 backlog. Record only.
 
 Master slogan: "The seamless connection with the human being, on the voice only."

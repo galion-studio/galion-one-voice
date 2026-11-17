@@ -1,6 +1,6 @@
 # Plus — Galion Voice V2 symphony
 
-Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 Europe/Zagreb. 2026-11-03. Symphony sizing plan for the Plus SKU (t284).
 
 The spelling is **Galion**. The product is Galion Voice.

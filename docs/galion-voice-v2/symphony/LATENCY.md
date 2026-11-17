@@ -1,6 +1,6 @@
 # Latency bar
 
-Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 Europe/Zagreb.
 
 The live tick is 80 ms. `galion-heartbeat::FRAME_MS` is 80. The same constant is the Mimi frame, the render dot, and the console heartbeat. `LOCKS.toml` `[clock] frame_ms = 80` and `frame_budget_p95_ms` stays at or under 80. The clock is not configurable. This page does not edit the lock.

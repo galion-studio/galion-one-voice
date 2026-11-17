@@ -1,6 +1,6 @@
 # Galion One
 
-Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Perpetual Open MIT License. (c) 2026 Galion Labs.
 Europe/Zagreb. Runtime instruction file. Follow it while you speak.
 
 **Status.** Main product voice for Galion Voice / Galion One.

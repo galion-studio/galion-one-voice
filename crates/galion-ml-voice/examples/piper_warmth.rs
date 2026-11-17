@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! V2-S6 cold vs warm first-clause PCM for one Piper process.
 //!
 //! Does not pre-warm: the first `speak` is cold (process start, model load,

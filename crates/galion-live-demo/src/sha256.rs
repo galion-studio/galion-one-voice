@@ -1,4 +1,4 @@
-// Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+// Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 //! Minimal std-only SHA-256 (FIPS 180-4) for `SHA256SUMS` (no crates, builds --offline).
 
 const K: [u32; 64] = [

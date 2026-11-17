@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 # Check the systemd units shipped in this tree. Not an install. Not a deploy.
 # The ExecStart binaries are absent on a CI runner. That one diagnostic is expected.
 # Any other systemd-analyze verify line fails the check.

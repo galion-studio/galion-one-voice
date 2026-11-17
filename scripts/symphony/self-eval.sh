@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+# Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 # Eureka symphony gates A–G. Exit 0 only when every section PASSes.
 # OPEN is incomplete and exits 1. LOCKS.toml is hashed before and after and must not change.
 #   scripts/symphony/self-eval.sh

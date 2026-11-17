@@ -1,4 +1,4 @@
-# Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+# Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 # Machine spec for Emotion V2 controlled-reference capture.
 # Human procedure: CAPTURE-PROTOCOL.md. refcheck reads this file.
 # The numbers here are the gate. Do not put audio next to this file.

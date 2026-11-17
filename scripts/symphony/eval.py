@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+# Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 """Symphony self-eval for Eureka sections A–G.
 
 Each gate runs against the tree and returns PASS or OPEN.

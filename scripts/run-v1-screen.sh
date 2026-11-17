@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+# Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 # V1 screen + phone path: one orb on near-black at http://127.0.0.1:7878/.
 # The page posts /mic and /turn; the turn worker (off the 80 ms thread) answers on /reply.
 # LOCAL ONLY (galion-render refuses public binds). Public HTTPS is ngrok (or Caddy later).

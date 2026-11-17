@@ -1,5 +1,5 @@
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 """Call the existing WER and ECAPA scorers when they are on disk.
 
 The invocation matches ``galion-voicecheck``: ``galion-wer --text-dir`` and

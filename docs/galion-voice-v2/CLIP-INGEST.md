@@ -1,6 +1,6 @@
 # V2-S14 · Film-clip ingest (outline)
 
-Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 Europe/Zagreb. Outline only. The gate is closed.
 
 Master slogan: "The seamless connection with the human being, on the voice only."

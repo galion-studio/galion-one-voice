@@ -1,6 +1,6 @@
 # Swarm 10 — latency-harness plan
 
-Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Perpetual Open MIT License. (c) 2026 Galion Labs.
 Europe/Zagreb. 2026-11-15 22:05 +01:00.
 
 The spelling is **Galion**. The product is Galion Voice.

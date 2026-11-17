@@ -1,6 +1,6 @@
 #!/bin/sh
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 # Clone PCM → voices/compiled/<persona>.gq. Does not start PyTorch.
 set -eu
 cd "$(dirname "$0")/../.."

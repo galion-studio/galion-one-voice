@@ -1,6 +1,6 @@
 # emotion_match
 
-Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 
 `emotion_match = 0.70*category_blend+0.30*emb_sim`. Those weights are locked.
 The Emotion V2 release bar is **0.83**, also locked, and it is applied **per

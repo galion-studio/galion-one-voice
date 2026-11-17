@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 """TTFA gate for the clone stream hook.
 
 A protocol-stub clock is FAIL. It is not a pass and not a product claim.

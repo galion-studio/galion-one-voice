@@ -1,4 +1,4 @@
-// Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+// Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 //! W21-04 hook (feature `dot-viz`): feed the one-dot visualizer from the live frame loop.
 //! Pure presentation — runs after `step_live`, never inside `Heartbeat::step`. Writes a PNG
 //! sequence (+ `latest.png`) under `<out>/dot/`. Window surface is unsupported upstream.

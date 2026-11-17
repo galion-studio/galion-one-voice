@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 #
 # t301 · live Piper CPU stream TTFA. One JSON object on stdout.
 #

@@ -1,5 +1,5 @@
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 """Quality gate. WER, ECAPA, and emotion scores apply only when a scorer exists.
 
 Missing scorers do not reject a clip unless ``require_scorers`` is set. This

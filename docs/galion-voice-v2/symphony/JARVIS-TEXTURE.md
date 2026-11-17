@@ -1,6 +1,6 @@
 # Jarvis texture
 
-Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Perpetual Open MIT License. (c) 2026 Galion Labs.
 Europe/Zagreb. 2026-11-03. Symphony section. Index: [README.md](README.md).
 
 The spelling is **Galion**. The product is Galion Voice.
@@ -35,7 +35,7 @@ The hub is part of the reference, not a line he speaks about. He does not narrat
 Record the curves and the hash in [SELF-EVAL.md](SELF-EVAL.md).
 # Jarvis hub texture
 
-Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 Europe/Zagreb. The hub is a layer. The toggle mixes it. The asset stays.
 
 Master slogan: "The seamless connection with the human being, on the voice only."

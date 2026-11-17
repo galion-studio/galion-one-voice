@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 #
 # Offline clone check. Runs the clone tests that do not need a pack and do
 # not open a socket. Does not train Piper. Does not download anything.

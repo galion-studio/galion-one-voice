@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! W21-03: runnable ENGLISH demo lane (behind feature `cascade`).
 //!
 //! ASR-stub (galion-ml-voice `StubAsr`) -> route (pin > hint > LID) ->

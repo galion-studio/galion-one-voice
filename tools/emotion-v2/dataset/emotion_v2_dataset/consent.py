@@ -1,5 +1,5 @@
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 """Per-voice consent gate for training-data generation.
 
 Real-voice generation, and any use of the Chatterbox backend, requires a

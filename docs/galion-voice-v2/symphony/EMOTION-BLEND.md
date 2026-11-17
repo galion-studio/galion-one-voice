@@ -1,6 +1,6 @@
 # Emotion blend (Cloning V2)
 
-Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 Europe/Zagreb. Symphony section. Index: [README.md](README.md).
 
 Opt-in conditioning prep for Chatterbox Turbo ONNX (cbx) voice profiles.

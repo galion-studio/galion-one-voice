@@ -1,6 +1,6 @@
 # Open Mind nerve and cortex
 
-Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Perpetual Open MIT License. (c) 2026 Galion Labs.
 Europe/Zagreb. This is the voice-side seam. It is not a copy of Obsidian
 Open Mind, and it is not a claim that the nerve or Hermes is running in
 this workspace.

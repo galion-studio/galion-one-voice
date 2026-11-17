@@ -1,5 +1,5 @@
 # FP-04 · Real-life UX: how a person hears Galion and sees the dot
-Galion Voice — Perpetual Open MIT License · © 2026 Maciej Grajczyk · 2026-11-02 (Europe/Zagreb, UTC+1) · LOCAL ONLY
+Galion Voice — Perpetual Open MIT License · © 2026 Galion Labs · 2026-11-02 (Europe/Zagreb, UTC+1) · LOCAL ONLY
 
 ## What a person experiences (`scripts/run-v1-demo.sh`, measured on the box)
 1. **Start:** they open `http://127.0.0.1:7878/`. The screen shows one off-white dot on near-black with a slow amber→violet wash.

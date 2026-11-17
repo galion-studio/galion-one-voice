@@ -1,4 +1,4 @@
-// Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+// Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 //! W21-04 · one dot driven by the real 80 ms heartbeat + live console bars.
 //!
 //! ```text

@@ -1,6 +1,6 @@
 # Emotion V2 — capture kit
 
-Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 Europe/Zagreb. 2026-11-14. Ready-to-run kit for the controlled reference capture
 in [`../CAPTURE-PROTOCOL.md`](../CAPTURE-PROTOCOL.md). The taxonomy is
 [`../TAXONOMY.md`](../TAXONOMY.md) (PR #89): twelve official emotions in four

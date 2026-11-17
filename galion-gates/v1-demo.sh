@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Galion Voice — Perpetual Open MIT License. Copyright (c) 2026 Maciej Grajczyk.
+# Galion Voice — Perpetual Open MIT License. Copyright (c) 2026 Galion Labs.
 # V1 — V1 demo smoke (V1-04, soft gate). Runs scripts/run-v1-demo.sh --headless into a temp dir.
 #   rc 0 = PASS, rc 3 = SKIP (script absent), other = SOFTFAIL. No display, no network, no weights.
 #   Speech-as-tone (C7) is reported but only fails here with V1_STRICT=1.

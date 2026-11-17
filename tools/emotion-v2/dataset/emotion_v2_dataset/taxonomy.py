@@ -1,5 +1,5 @@
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 """The twelve Emotion V2 labels, and the slot the taxonomy branch fills.
 
 ``cursor/emotion-v2-taxonomy`` is a separate branch. When it lands, expose an

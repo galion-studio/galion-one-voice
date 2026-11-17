@@ -1,4 +1,4 @@
-//! Galion Voice — Perpetual Open MIT License. Copyright (c) 2026 Maciej Grajczyk.
+//! Galion Voice — Perpetual Open MIT License. Copyright (c) 2026 Galion Labs.
 //!
 //! W21-03 · multilingual plan P0.1 (types + tests only): `language_hint` and
 //! `lang_pin` side-band fields. No routing logic lives here; the engine's

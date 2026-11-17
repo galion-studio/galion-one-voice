@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! Read a captured reply WAV. The virtual user scores what is in the file,
 //! not a timestamp the synthesizer printed beside it.
 

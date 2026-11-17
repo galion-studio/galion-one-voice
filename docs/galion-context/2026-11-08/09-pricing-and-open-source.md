@@ -28,7 +28,7 @@ Spelling in the tree is **Galion One** and **Galion Research**, with a space. Th
 
 Sources named on that table are `Q-BRANDING.Q9`, `Q-BRANDING.Q10`, and `Q-BRANDING.Q13` (`LOCKS.toml` lines 177–183).
 
-The root `README.md` repeats that lock: code is Perpetual Open MIT, free forever, no paid tiers, and weights stay out of git (`README.md` lines 154–156). The root `LICENSE` is the standard MIT text, copyright 2026 Maciej Grajczyk, including the usual MIT right to sell copies of the software. That grant is a copyright licence on the code. It is not a hosted-subscription product, and it is not a waiver of `paid_tiers = false`.
+The root `README.md` repeats that lock: code is Perpetual Open MIT, free forever, no paid tiers, and weights stay out of git (`README.md` lines 154–156). The root `LICENSE` is the standard MIT text, copyright 2026 Galion Labs, including the usual MIT right to sell copies of the software. That grant is a copyright licence on the code. It is not a hosted-subscription product, and it is not a waiver of `paid_tiers = false`.
 
 `docs/brand/GALION-VOICE-BRAND.md` (lines 65–81) says the same lock, says weights are outside the grant, and says the one-dot page shows no price, no trial, and no checkout. It points at the Ultra host plan and says putting that plan into `[licence]` is a later owner edit of the lock, with counsel and a `LEDGER.md` line. Until that edit, `paid_tiers` stays false.
 
@@ -82,7 +82,7 @@ These are disagreements between files that are already on `main`. This note list
 
 ## Open source and publication policy
 
-Code publication stays on the licence already in the tree: Perpetual Open MIT for Galion code, copyright 2026 Maciej Grajczyk, weights separate. Third-party trees under `tools/cloning-v2/pipeline/` carry their own `LICENSE-MIT` and `LICENSE-APACHE` files. This policy does not relicense them and does not change repository visibility.
+Code publication stays on the licence already in the tree: Perpetual Open MIT for Galion code, copyright 2026 Galion Labs, weights separate. Third-party trees under `tools/cloning-v2/pipeline/` carry their own `LICENSE-MIT` and `LICENSE-APACHE` files. This policy does not relicense them and does not change repository visibility.
 
 Owner publication rule for this swarm, 2026-11-08:
 

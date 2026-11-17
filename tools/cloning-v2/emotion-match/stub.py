@@ -1,5 +1,5 @@
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 """CPU stub analyser and sine fixtures for emotion_match.
 
 No torch, no transformers, no weights, no network. A pure tone at

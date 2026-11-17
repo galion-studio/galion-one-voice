@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! `galion-asr-vosk` — Vosk letter A, out of process, CPU only.
 //!
 //! Loads libvosk with dlopen (not linked into galion-cascade). Reads one

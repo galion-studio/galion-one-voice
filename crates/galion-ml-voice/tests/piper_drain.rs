@@ -1,4 +1,4 @@
-// Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+// Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 //! Real Piper PCM feeds the symphony ring when `GALION_SPEECH=a21`.
 //! The step still allocates nothing. A late frame is a pause.
 //! `GALION_CLONE_STUB_FRAMES` is not this feed.

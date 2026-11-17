@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! Post-synthesis emotion DSP for the Piper path (owner t641u/t644u).
 //!
 //! * **Pitch**: streaming linear-interpolation resample by `ratio = 2^(st/12)`.

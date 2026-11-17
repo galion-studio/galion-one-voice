@@ -1,6 +1,6 @@
 # Galion Research console
 
-Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Perpetual Open MIT License. (c) 2026 Galion Labs.
 Europe/Zagreb. 2026-11-03. Symphony plan. The console is not built here.
 `LOCKS.toml` is not edited.
 

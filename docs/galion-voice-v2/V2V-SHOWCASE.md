@@ -1,6 +1,6 @@
 # Voice-to-voice showcase
 
-Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 Europe/Zagreb. Samantha and Jarvis. A host outline, not a V3 build.
 
 Master slogan: "The seamless connection with the human being, on the voice only."

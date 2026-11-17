@@ -1,4 +1,4 @@
-// Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+// Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 //! One-dot workflow. The page stays the circle.
 //!
 //! Speech is already recorded by the mic on `/` (`POST /turn`). This module

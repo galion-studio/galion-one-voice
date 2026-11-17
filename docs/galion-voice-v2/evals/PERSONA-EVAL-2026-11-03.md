@@ -1,6 +1,6 @@
 # Persona eval · Samantha and Jarvis · 2026-11-03
 
-Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Perpetual Open MIT License. (c) 2026 Galion Labs.
 
 This pass scores the **instruction layer** on `/v2` plus the calm-circle page.
 There is no film clone. Piper `en_US-ljspeech-medium` is not installed here.

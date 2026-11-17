@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 # Virtual-user presence eval (T0–T2). Offline. Loopback only. No SSH.
 #
 # Injects text or a fixture WAV into PhoneLane, synthesizes with CannedLlm and

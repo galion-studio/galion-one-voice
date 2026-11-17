@@ -1,4 +1,4 @@
-// Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+// Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 use galion_openmind::{
     NerveConfig, NerveEmitter, NerveSink, NoteDrop, VoiceBackendSlot, VoiceNote,
 };

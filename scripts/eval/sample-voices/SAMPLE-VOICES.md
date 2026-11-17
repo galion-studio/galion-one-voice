@@ -1,6 +1,6 @@
 # CC0 / public-domain sample voices
 
-Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 
 These four clips sit next to this note. They are not Samantha or Jarvis,
 and they are not film audio. Piper does not use them as a conditioning

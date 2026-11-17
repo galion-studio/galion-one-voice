@@ -1,6 +1,6 @@
 # tools/legacy
 
-Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 
 Retired code kept for reference and for parity tests. Nothing here ships and
 nothing in the live turn path calls it.

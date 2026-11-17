@@ -1,5 +1,5 @@
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 """Read a JSON file of posteriors and run them through the live feed.
 
 No audio is opened. The file is numbers already produced by a scorer, or a

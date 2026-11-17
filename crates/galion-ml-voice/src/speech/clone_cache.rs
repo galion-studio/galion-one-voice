@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! On-disk cache of Chatterbox voice conditioning (owner item 10, 2026-11-04).
 //!
 //! The Nano worker used to recompute the conditioning (`model.conds`: speaker

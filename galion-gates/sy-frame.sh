@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+# Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 # SY — symphony frame bar (soft gate). 80 ms tick, 1% stub-step ceiling.
 #   rc 0 = PASS, other = SOFTFAIL unless GALION_GATES_HARD=1.
 # Skip with GALION_GATES_NO_SY=1. Does not invent a latency number.

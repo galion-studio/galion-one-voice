@@ -1,4 +1,4 @@
-// Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+// Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 //! WAV/PCM loader: committed fixtures, spec integration, format coverage.
 use galion_presence::backend::{MockBackend, MockConfig};
 use galion_presence::spec::{parse_presence_at, YouState};

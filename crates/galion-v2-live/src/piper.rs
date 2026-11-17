@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! Warm Piper (A21 pin, out of process, CPU). One persistent child per
 //! voice setting; text goes in as one JSON line per clause; raw s16le PCM
 //! comes back on stdout and is timestamped by a reader thread the moment

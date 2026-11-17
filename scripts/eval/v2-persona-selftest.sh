@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+# Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 # STUB-PASS only. Local check for /health, /dot, persona files, and moods.
 # Does not fetch a clip. Does not hash a reference. Does not run Nano.
 # A green line here is not HARD-PASS. The hard loop is

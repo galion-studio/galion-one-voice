@@ -1,6 +1,6 @@
 # Galion Voice V2 research
 
-Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Perpetual Open MIT License. (c) 2026 Galion Labs.
 Europe/Zagreb. **Research synthesis dated 2026-11-03.** Docs only.
 
 This tree is the desk synthesis Maciej Grajczyk authorized to land. It is not

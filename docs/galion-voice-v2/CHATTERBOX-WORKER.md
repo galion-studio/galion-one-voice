@@ -1,6 +1,6 @@
 # V2-S14 · Chatterbox Nano worker — build plan
 
-Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Perpetual Open MIT License. (c) 2026 Galion Labs.
 Europe/Zagreb. A build plan. Record only.
 
 Master slogan: "The seamless connection with the human being, on the voice only."

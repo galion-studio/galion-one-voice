@@ -1,4 +1,4 @@
-// Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+// Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 //! # galion-presence (agent A13)
 //!
 //! Harness before model. Reads `specs/presence.json`, replays every spec frame by

@@ -1,6 +1,6 @@
 # Indoor PersonaPlex reinforcement-learning plan
 
-Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 Europe/Zagreb. 2026-11-08. Voice and Galion One. Doc only.
 
 This file is a **new plan**. It does not train a model, ingest a corpus, download a weight, or open a bill. It does not resume a visual live-emotion bridge. `LOCKS.toml`, persona refs, and `REFS.sha256` are not edited.

@@ -1,4 +1,4 @@
-// Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+// Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 //! Live streaming sectors on the one 80 ms heartbeat.
 //!
 //! Clone, persona, and the one dot do not own a clock. The host calls

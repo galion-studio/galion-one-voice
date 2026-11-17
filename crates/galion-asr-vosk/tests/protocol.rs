@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! Worker protocol, without libvosk and without a model.
 
 use galion_asr_vosk::{parse_event, VoskClient, WorkerEvent};

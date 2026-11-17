@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! v2-acoustic: measurable tone/tonality/colour/contrast features of WAVs.
 //! F0 (YIN, 40 ms frames), F0 range in semitones, loudness (RMS dB) and its
 //! dynamic range, spectral centroid (colour/brightness), voiced ratio and a

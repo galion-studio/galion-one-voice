@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! Protocol peer for tests. Not speech recognition. The screen script does
 //! not launch this binary, and it never emits a duration-bucket sentence.
 //!

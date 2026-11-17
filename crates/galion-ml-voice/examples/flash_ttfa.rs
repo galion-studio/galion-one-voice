@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! V2-S14 Flash eval stub. One JSON object on stdout.
 //!
 //! Without `GALION_FLASH_EVAL=1` the object has `"measured": false` and no

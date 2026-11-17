@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 #
 # Local checks for the clone-weight fetch. No GitHub upload. No 4.6 GiB blob.
 set -euo pipefail

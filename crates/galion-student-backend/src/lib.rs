@@ -1,4 +1,4 @@
-// Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+// Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 //! Student slot, adapt-not-train (sector 09). NO weights are vendored or invented.
 //!
 //! * [`SlotManifest`] lists the published artifacts the slot expects (see

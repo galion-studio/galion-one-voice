@@ -1,6 +1,6 @@
 # Clip store
 
-Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Perpetual Open MIT License. (c) 2026 Galion Labs.
 Europe/Zagreb. 2026-11-03. Symphony section. Index: [README.md](README.md).
 
 The spelling is **Galion**. The product is Galion Voice.
@@ -43,7 +43,7 @@ sha256sum /workspace/galion-clip-store/samantha/reference.wav \
 **FAIL** when a hash mismatches, when an mp3 is used as the ref, or when a WAV is committed.
 
 **BLOCKED** when the files are absent on this machine. The placeholders are the slots. Absence is not a hash. WER, ECAPA, MOS, and timings are not measured from these files on this page. Those gates stay **BLOCKED**.
-Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 Europe/Zagreb. From the repository root.
 
 Film audio stays out of git. The outline is `docs/galion-voice-v2/CLIP-INGEST.md`. `GALION_CLIP_STORE` is unset in this repository and stays unset in CI. Unset means the store does not exist. There is no default under the work tree, under `weights/`, or under `/tmp`.

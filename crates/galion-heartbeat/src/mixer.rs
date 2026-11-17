@@ -1,4 +1,4 @@
-// Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+// Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 //! Dual-band mixer. CPU only. No GPU, no heap, no second clock.
 //!
 //! One call is one 80 ms frame ([`crate::FRAME_MS`]). The you band and the me

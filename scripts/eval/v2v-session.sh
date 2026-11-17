@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+# Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 # One text-inject session for Samantha and one for Jarvis.
 # WAV stays under /tmp or /var/tmp. This script does not start the clone
 # worker, does not set GALION_CLONE_STUB_PCM, and does not claim C5.

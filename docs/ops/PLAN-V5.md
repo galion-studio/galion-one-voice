@@ -1,6 +1,6 @@
 # Plan V5 — deploy track
 
-Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Perpetual Open MIT License. (c) 2026 Galion Labs.
 Europe/Zagreb.
 
 Plan V4 is the dry-run that already exists (`scripts/deploy/harden-dryrun.sh`,

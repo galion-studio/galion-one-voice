@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! The clone-time gate: valid consent passes; missing, tampered, expired or
 //! celebrity consent refuses with a clear error and records the refusal.
 

@@ -1,5 +1,5 @@
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 """UI contract: explicit absence, validation, reconnect, and the bridge.
 
 No audio is read or written. Frames are numbers.

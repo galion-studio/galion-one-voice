@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! A21 neural-weight slot (FP-03, owner decision t123u: BUILD A21 on CPU with an
 //! MIT-licensed neural TTS). Honest by construction:
 //! - no weights on disk            -> [`WeightStatus::Absent`]  (caller falls back to flite)

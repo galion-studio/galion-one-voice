@@ -1,5 +1,5 @@
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 """Element ids for an emitted emotion distribution.
 
 The ids are labels. They are not fed back into pitch, energy, or logits.

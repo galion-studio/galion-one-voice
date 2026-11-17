@@ -1,5 +1,5 @@
 # Galion Voice — Perpetual Open MIT License
-# (c) 2026 Maciej Grajczyk / G.A.L.I.O.N.
+# (c) 2026 Galion Labs / G.A.L.I.O.N.
 """Load and validate ``emotion-v2/emotions.toml``.
 
 The file is Samantha's Emotion V2 inventory. This module checks the

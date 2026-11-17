@@ -1,6 +1,6 @@
 # Voice releases
 
-Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 Europe/Zagreb. Repo tooling. The git tree has no filled release index.
 
 G.A.L.I.O.N. — General Autonomous Local Intelligence Open Network.

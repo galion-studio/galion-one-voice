@@ -1,6 +1,6 @@
 # V2-S14 · Clone worker contract
 
-Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 Europe/Zagreb. Nano generate is wired in the child. A run still needs weights and an allowlisted reference on that machine. This file is not a claim that a number was measured here.
 Europe/Zagreb. Nano speaks only behind the env gate in `NANO-BACKEND.md`.
 Piper speaks otherwise. Not a claim that a film voice shipped.

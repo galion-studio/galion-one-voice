@@ -1,6 +1,6 @@
 # Galion Voice — V1 demo runbook
 
-Perpetual Open MIT License · © 2026 Maciej Grajczyk · 2026-11-02 (Europe/Zagreb, UTC+1)
+Perpetual Open MIT License · © 2026 Galion Labs · 2026-11-02 (Europe/Zagreb, UTC+1)
 **LOCAL ONLY.** Deploy to 51.38.137.193 is deferred: SSH was denied. No push, no gh, no training. The only weights are the A21 Piper TTS pack (`scripts/a21/fetch-a21.sh`).
 
 ## 1. One command

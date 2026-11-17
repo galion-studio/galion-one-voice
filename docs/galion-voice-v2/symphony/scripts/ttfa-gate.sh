@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 #
 # TTFA / streaming latency gate. Frame bar (80 ms) plus presence onset,
 # barge-in, and e_to_a. Default run is the mock stub. A wall-clock ttfa_ms

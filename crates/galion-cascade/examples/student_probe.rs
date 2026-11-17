@@ -1,4 +1,4 @@
-// Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+// Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 //! Print the S0 student probe. Does not download, write, or speak a weight.
 //!
 //! `cargo run -p galion-cascade --example student_probe`

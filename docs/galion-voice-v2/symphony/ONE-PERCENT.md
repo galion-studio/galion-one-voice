@@ -1,6 +1,6 @@
 # One-percent
 
-Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Perpetual Open MIT License. (c) 2026 Galion Labs.
 Europe/Zagreb. 2026-11-03. Symphony section. Index: [README.md](README.md).
 
 The spelling is **Galion**. The product is Galion Voice.
@@ -33,7 +33,7 @@ Inference (the clone child, Piper, Vosk, a future `.gq` student) is outside that
 The frame the budget sits inside is [80MS.md](80MS.md). Record the sample in [SELF-EVAL.md](SELF-EVAL.md).
 # One-percent engine
 
-Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 Europe/Zagreb. V6 non-inference account, wired into symphony.
 
 

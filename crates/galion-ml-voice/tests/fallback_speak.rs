@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! Fallback speak with no weight download and no network.
 //!
 //! `SpeechStack::detect` tries the clone slot, then the A21 Piper pack, then

@@ -1,5 +1,5 @@
 # Galion Voice — Chatterbox Nano tokenizer text. sha256 of the file bytes.
-# Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+# Perpetual Open MIT License. (c) 2026 Galion Labs.
 #
 # Hugging Face ResembleAI/chatterbox-nano @ 71ccd1d0081b430592cea481f4307e764e07bc64
 # These are not safetensors and not audio. conds.pt is intentionally absent.

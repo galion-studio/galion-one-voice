@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! V1-03 real-speech path (feature `speech`). ENGLISH ONLY.
 //!
 //! Selection order (first that can actually speak wins):

@@ -1,5 +1,5 @@
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 """Minimal interfaces for the sibling Emotion V2 branches.
 
 Those branches are not merged here and are not edited by this pipeline.

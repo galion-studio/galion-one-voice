@@ -1,4 +1,4 @@
-// Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+// Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 //! A `galion-presence` [`ReplayBackend`] driven by the real [`Heartbeat`]
 //! (feature `presence`, harness only). Turn-taking and E-out come from the
 //! deterministic `MockBackend`; the feeling band (Rika) is the real state

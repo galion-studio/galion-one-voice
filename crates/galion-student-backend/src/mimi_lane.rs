@@ -1,4 +1,4 @@
-// Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+// Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 //! W21-02 · Mimi passthrough lane (sector 01 / A6) for the live demo.
 //!
 //! One call = one 80 ms heartbeat frame:

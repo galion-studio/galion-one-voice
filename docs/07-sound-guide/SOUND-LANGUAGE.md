@@ -1,6 +1,6 @@
 # Sound language
 
-Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 
 Interface tones only. Not speech, not a voice, and not a recording. The pages synthesise them with WebAudio sine oscillators. There is no audio file.
 

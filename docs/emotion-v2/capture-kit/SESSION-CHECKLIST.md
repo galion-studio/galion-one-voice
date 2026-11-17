@@ -1,6 +1,6 @@
 # Emotion V2 — session checklist
 
-Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 Europe/Zagreb. One card is one session id. A change of room, microphone, gain,
 or distance is a new session id and a new manifest. Fill this card before
 arming record. Keep it as `SESSION.txt` next to the session manifest.

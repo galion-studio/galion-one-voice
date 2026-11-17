@@ -1,5 +1,5 @@
 # FP-01 · First-principles pass: evaluate + delete (one-dot)
-Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk. · 2026-11-02 (CET)
+Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs. · 2026-11-02 (CET)
 
 ## Result
 - I deleted or disabled the extras. The list is in `FP-01-DELETED.md`. There is now one port (`:7878`) and one page.

@@ -1,5 +1,5 @@
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 """Environment matrix applied after the dry render.
 
 Impulse responses and noise are synthesized in this process. No proprietary

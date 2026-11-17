@@ -1,6 +1,6 @@
 # Self-eval gates
 
-Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 Europe/Zagreb. From the repository root.
 
 One command writes the ledger and exits non-zero if any section check fails:
