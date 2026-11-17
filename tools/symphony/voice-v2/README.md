@@ -36,7 +36,7 @@ Waiting on the features agent:
 
 - eGeMAPS names, nasality, breathiness, breath stage
 - TractPrint v2 speaker/emotion split
-- `chatterbox.params_json` with schema `galion-voice-v2-chatterbox-params` (decode JSON → Chatterbox params). Until that file exists, pitch comes from a pipeline default, not a cited coordinate.
+- PR #192 `galion-emotion-render`. Set `GALION_EMOTION_RENDER` to that binary and the pipeline uses its `clone_request_patch`. Until then, pitch is a stand-in so the read-back loop can be tested. A `chatterbox.params_json` file of schema `galion-voice-v2-chatterbox-params` also overrides pitch.
 - Real-life isolate in front of `refprep` (DeepFilterNet, Demucs, pyannote, Silero VAD). Unset `GALION_REFPREP` is a passthrough.
 
 Waiting on the spec agent (PR #189): cited z against the speaker's own neutral. This crate does not invent those targets.

@@ -18,7 +18,8 @@ use crate::fluid::{FluidCore, TargetState, TickFeeling};
 use crate::profile::VoiceFile;
 use crate::profile::VoiceProfile;
 use crate::render::{
-    correct_pitch, diff_f0, params_for, render, ChatterboxParams, Diff, Rendered, RendererKind,
+    apply_emotion_render, clone_request_patch, correct_pitch, diff_f0, params_for, render,
+    ChatterboxParams, Diff, Rendered, RendererKind,
 };
 use crate::TICK_MS;
 
@@ -45,6 +46,8 @@ pub struct SpeakOut {
     pub renderer_note: String,
     pub params: ChatterboxParams,
     pub corrected_params: ChatterboxParams,
+    /// Same shape as PR #192 `clone_request_patch`. Merge this into the worker request.
+    pub clone_request_patch: serde_json::Value,
     pub stubs: Vec<String>,
 }
 
@@ -59,7 +62,8 @@ pub fn speak(req: &SpeakIn<'_>) -> Result<SpeakOut, String> {
         );
     }
     let device = detect_with(req.device);
-    let params = params_for(req.voice, req.target)?;
+    let mut params = params_for(req.voice, req.target)?;
+    apply_emotion_render(req.target, req.text, &mut params);
     // The feeling's pitch stays the target. The correction changes what we ask
     // the renderer for; it does not move the goal both passes are scored against.
     let goal_f0 = crate::render::f0_from_st(
@@ -86,7 +90,7 @@ pub fn speak(req: &SpeakIn<'_>) -> Result<SpeakOut, String> {
     stubs.push(second.rendered.note.clone());
     if params.source == "pipeline-default" {
         stubs.push(
-            "TODO(features): Chatterbox params are a pipeline default. Drop a galion-voice-v2-chatterbox-params file on chatterbox.params_json to replace them."
+            "TODO(PR #192): pitch is a pipeline stand-in. Set GALION_EMOTION_RENDER to galion-emotion-render; its clone_request_patch replaces this. Unknown step sizes there stay unknown."
                 .into(),
         );
     }
@@ -104,8 +108,9 @@ pub fn speak(req: &SpeakIn<'_>) -> Result<SpeakOut, String> {
         device,
         renderer: second.rendered.kind,
         renderer_note: second.rendered.note,
-        params,
+        params: params.clone(),
         corrected_params: corrected,
+        clone_request_patch: clone_request_patch(req.target, &params),
         stubs,
     })
 }

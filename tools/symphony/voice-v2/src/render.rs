@@ -115,6 +115,112 @@ pub fn params_for(voice: &VoiceFile, target: &TargetState) -> Result<ChatterboxP
     })
 }
 
+/// The object PR #192 (`galion-emotion-render`) told this pipeline to merge
+/// into the clone worker request. Same keys as `clone_request_patch` there.
+pub fn clone_request_patch(target: &TargetState, params: &ChatterboxParams) -> serde_json::Value {
+    let track = match target.track {
+        crate::emotion::Track::Prosody => "prosody",
+        crate::emotion::Track::Burst => "burst",
+    };
+    serde_json::json!({
+        "emotion": target.feeling.as_str(),
+        "track": track,
+        "exaggeration": params.exaggeration,
+        "cfg_weight": 0.0,
+        "temperature": params.temperature,
+        "prosody": {
+            "pitch_st": params.plan_pitch_semitones,
+            "range": 1.0,
+            "rate": params.pace,
+            "energy": 1.0,
+            "pre_pause_ms": 0
+        }
+    })
+}
+
+/// When `GALION_EMOTION_RENDER` is the `galion-emotion-render` binary from
+/// PR #192, its controls replace the pipeline-default pitch. A missing binary
+/// leaves the stand-in in place. This never downloads.
+pub fn apply_emotion_render(
+    target: &TargetState,
+    text: &str,
+    params: &mut ChatterboxParams,
+) -> bool {
+    let Ok(bin) = std::env::var("GALION_EMOTION_RENDER") else {
+        return false;
+    };
+    let bin = bin.trim();
+    if bin.is_empty() || !std::path::Path::new(bin).is_file() {
+        return false;
+    }
+    let avd = target.goal_avd();
+    let track = match target.track {
+        crate::emotion::Track::Prosody => "prosody",
+        crate::emotion::Track::Burst => "burst",
+    };
+    let tick = serde_json::json!({
+        "t_ms": 0,
+        "track": track,
+        "emotion": target.feeling.as_str(),
+        "intensity": target.intensity.clamp(0.0, 1.0),
+        "arousal": avd.arousal.clamp(-1.0, 1.0),
+        "valence": avd.valence.clamp(-1.0, 1.0),
+        "dominance": (avd.dominance * 2.0 - 1.0).clamp(-1.0, 1.0),
+        "text": text,
+    });
+    let mut child = match std::process::Command::new(bin)
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+    {
+        Ok(child) => child,
+        Err(_) => return false,
+    };
+    if let Some(mut stdin) = child.stdin.take() {
+        use std::io::Write;
+        if stdin.write_all(tick.to_string().as_bytes()).is_err() {
+            let _ = child.kill();
+            let _ = child.wait();
+            return false;
+        }
+    }
+    let output = match child.wait_with_output() {
+        Ok(output) if output.status.success() => output,
+        _ => return false,
+    };
+    let Ok(value) = serde_json::from_slice::<serde_json::Value>(&output.stdout) else {
+        return false;
+    };
+    let controls = value.get("controls").unwrap_or(&value);
+    let Some(pitch) = controls
+        .pointer("/prosody/pitch_st")
+        .and_then(|v| v.as_f64())
+    else {
+        return false;
+    };
+    let rate = controls
+        .pointer("/prosody/rate")
+        .and_then(|v| v.as_f64())
+        .unwrap_or(1.0);
+    params.plan_pitch_semitones = pitch.clamp(-6.0, 6.0) as f32;
+    params.pace = (rate as f32).clamp(0.8, 1.2);
+    if let Some(ex) = controls
+        .pointer("/chatterbox/exaggeration")
+        .and_then(|v| v.as_f64())
+    {
+        params.exaggeration = ex as f32;
+    }
+    if let Some(temp) = controls
+        .pointer("/chatterbox/temperature")
+        .and_then(|v| v.as_f64())
+    {
+        params.temperature = temp as f32;
+    }
+    params.source = "galion-emotion-render".into();
+    true
+}
+
 pub fn correct_pitch(params: &ChatterboxParams, error_semitones: Option<f64>) -> ChatterboxParams {
     let mut next = params.clone();
     if let Some(err) = error_semitones {
@@ -335,6 +441,10 @@ mod tests {
         let target = TargetState::spoken(EmotionId::Embarrassment, 1.0);
         let params = params_for(&voice, &target).unwrap();
         assert_eq!(params.source, "pipeline-default");
+        let patch = clone_request_patch(&target, &params);
+        assert_eq!(patch["emotion"], "embarrassment");
+        assert_eq!(patch["track"], "prosody");
+        assert!(patch["prosody"]["pitch_st"].is_number());
         let requested = params.requested_semitones();
         assert!(requested > 3.0, "{requested}");
         let measured_st = requested * SYNTH_UNDERSHOOT;
