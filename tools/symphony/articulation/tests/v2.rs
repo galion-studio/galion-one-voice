@@ -101,14 +101,21 @@ fn decode_trajectory_is_per_tick_and_maps_to_chatterbox() {
     assert!(mid.intensity > edge.intensity);
     let sum: f64 = mid.blend.iter().map(|b| b.w).sum();
     assert!((sum - 1.0).abs() < 1e-6, "blend sum {sum}");
-    assert_eq!(mid.blend.len(), 13);
+    assert_eq!(mid.blend.len(), 25);
+    assert_eq!(mid.burst.len(), 24);
+    assert_eq!(profile.target.track, "prosody");
     assert_eq!(profile.target.top, "desire");
     assert_eq!(state::top_blend(&mid.blend), "desire");
-    assert!(mid.blend.iter().all(|b| b.id != "seductive" && b.id != "laughter"));
-    assert!(profile.bursts.laughter.is_none());
-    assert!(profile.bursts.sigh.is_none());
-    assert!(state::target_trajectory("laughter", 4).is_err());
+    assert!(mid.burst.iter().all(|b| b.w == 0.0));
+    assert!(state::PROSODY_RELIABLE.contains(&"desire"));
+    assert!(!state::PROSODY_RELIABLE.contains(&"triumph"));
+    assert!(state::COWEN.contains(&"triumph"));
+    let laugh = state::target_trajectory("laughter", 4).unwrap();
+    assert_eq!(state::top_blend(&laugh[2].blend), "neutral");
+    assert_eq!(state::top_blend(&laugh[2].burst), "amusement");
     assert!(state::target_trajectory("breath", 4).is_err());
+    assert!(state::target_trajectory("triumph", 4).is_ok());
+    assert!(state::resolve("sigh").is_err());
     assert!(profile.chatterbox.exaggeration > 0.3 && profile.chatterbox.exaggeration <= 1.5);
     assert!(profile.chatterbox.cfg >= 0.3 && profile.chatterbox.cfg <= 0.85);
     assert!(profile.chatterbox.speed >= 0.8 && profile.chatterbox.speed <= 1.25);
@@ -195,9 +202,17 @@ fn labels_file_scores_a_matching_z() {
     z.insert("loudness_sma3_amean".into(), 0.6);
     z.insert("HNRdBACF_sma3nz_amean".into(), 0.2);
     assert_eq!(labels.alias.get("seductive").map(String::as_str), Some("desire"));
+    assert_eq!(labels.set.len(), 24);
+    assert!(labels.set.contains(&"triumph".into()));
     assert!(labels.set.contains(&"desire".into()));
-    assert!(!labels.set.iter().any(|s| s == "seductive" || s == "laughter"));
-    assert_eq!(labels.bursts, vec!["laughter".to_string(), "sigh".into(), "breath".into()]);
+    assert!(!labels.set.iter().any(|s| s == "neutral" || s == "seductive" || s == "breath"));
+    let inventory = std::fs::read_to_string(
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../configs/emotions-v2.toml"),
+    )
+    .unwrap();
+    for name in state::COWEN {
+        assert!(inventory.contains(&format!("\"{name}\"")), "{name} missing from emotions-v2.toml");
+    }
     let fixture = r#"
 schema = 2
 relative_to = "speaker_neutral"

@@ -51,17 +51,17 @@ pub struct SectionSnap {
 #[derive(Clone, Debug, Serialize)]
 pub struct FluidSide {
     pub source: String,
+    /// `prosody`, `burst`, or `baseline`.
+    pub track: String,
     pub top: String,
     pub ticks: Vec<TickState>,
 }
 
 #[derive(Clone, Debug, Serialize)]
-pub struct VocalBursts {
-    /// Presence 0..1 when a detector ran. Absent until then.
-    pub laughter: Option<f64>,
-    pub sigh: Option<f64>,
-    /// Fraction of the clip covered by inhale cues. Not an emotion weight.
-    pub breath: f64,
+pub struct BurstTrack {
+    /// Mean weight of the wordless 24 across the target ticks. Same ids as prosody.
+    pub weights: Vec<state::BlendWeight>,
+    pub top: String,
     pub source: String,
 }
 
@@ -75,7 +75,7 @@ pub struct VoiceProfile {
     pub mouth: SectionSnap,
     pub nose: SectionSnap,
     pub lungs: Lungs,
-    pub bursts: VocalBursts,
+    pub burst: BurstTrack,
     pub environment: Environment,
     pub chatterbox: RenderParams,
     pub trajectory: Vec<TickParams>,
@@ -159,6 +159,35 @@ fn snap(art: &Articulation) -> (SectionSnap, SectionSnap, SectionSnap) {
     (throat, mouth, nose)
 }
 
+fn burst_summary(ticks: &[TickState]) -> BurstTrack {
+    let mut acc: BTreeMap<String, f64> = BTreeMap::new();
+    for id in state::COWEN {
+        acc.insert(id.into(), 0.0);
+    }
+    if !ticks.is_empty() {
+        for t in ticks {
+            for b in &t.burst {
+                *acc.entry(b.id.clone()).or_default() += b.w;
+            }
+        }
+        let n = ticks.len() as f64;
+        for v in acc.values_mut() {
+            *v /= n;
+        }
+    }
+    let top = acc
+        .iter()
+        .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
+        .filter(|(_, w)| **w > 0.0)
+        .map(|(k, _)| k.clone())
+        .unwrap_or_else(|| "none".into());
+    let weights = state::COWEN
+        .iter()
+        .map(|id| state::BlendWeight { id: (*id).into(), w: acc.get(*id).copied().unwrap_or(0.0) })
+        .collect();
+    BurstTrack { weights, top, source: "same-24-as-prosody".into() }
+}
+
 fn top_name(weights: &BTreeMap<String, f64>) -> String {
     weights
         .iter()
@@ -192,9 +221,14 @@ fn trajectory(ticks: &[TickState]) -> Vec<TickParams> {
     ticks.iter()
         .map(|t| {
             let p = params_for(t);
+            let burst = t.burst.iter().max_by(|a, b| a.w.partial_cmp(&b.w).unwrap_or(std::cmp::Ordering::Equal));
+            let emotion = match burst {
+                Some(b) if b.w > 0.0 => b.id.clone(),
+                _ => state::top_blend(&t.blend),
+            };
             TickParams {
                 t_ms: t.t_ms,
-                emotion: state::top_blend(&t.blend),
+                emotion,
                 intensity: r4(t.intensity),
                 exaggeration: p.exaggeration,
                 cfg: p.cfg,
@@ -218,11 +252,16 @@ pub fn profile(art: &Articulation, samples: &[f64], sr: f64, opts: &Opts) -> Res
         let (ticks, src) = state::measure_fluid(art, state::Avd { arousal: 0.0, valence: 0.0, dominance: 0.0 });
         (ticks, src)
     };
-    let (target_ticks, target_source, target_name) = if let Some(name) = opts.emotion {
-        let canon = state::canonical_emotion(name)?;
-        (state::target_trajectory(canon, art.n_ticks)?, format!("target:{canon}"), canon.to_string())
+    let (target_ticks, target_source, target_track, target_name) = if let Some(name) = opts.emotion {
+        let resolved = state::resolve(name)?;
+        (
+            state::target_trajectory(name, art.n_ticks)?,
+            format!("target:{}:{}", resolved.track, resolved.category),
+            resolved.track.to_string(),
+            resolved.category.to_string(),
+        )
     } else {
-        (measured_ticks.clone(), measured_source.clone(), "measured".into())
+        (measured_ticks.clone(), measured_source.clone(), "prosody".into(), "measured".into())
     };
     let traj = trajectory(&target_ticks);
     let chatterbox = median_params(&traj.iter().map(|t| RenderParams { exaggeration: t.exaggeration, cfg: t.cfg, speed: t.speed }).collect::<Vec<_>>());
@@ -245,19 +284,10 @@ pub fn profile(art: &Articulation, samples: &[f64], sr: f64, opts: &Opts) -> Res
     if egemaps.is_none() {
         gaps.push("egemaps: openSMILE eGeMAPSv02 did not run (workers/egemaps_worker.py)".into());
     }
-    gaps.push("bursts.laughter: no detector ran (vocal burst, not an emotion)".into());
-    gaps.push("bursts.sigh: no detector ran (vocal burst, not an emotion)".into());
-    let breath_cover = if art.duration_s > 0.0 {
-        lungs.cues.iter().map(|c| (c.end_s - c.start_s).max(0.0)).sum::<f64>() / art.duration_s
-    } else {
-        0.0
-    };
-    let bursts = VocalBursts {
-        laughter: None,
-        sigh: None,
-        breath: breath_cover.clamp(0.0, 1.0),
-        source: lungs.source.clone(),
-    };
+    if target_track != "burst" {
+        gaps.push("burst: no wordless detector ran; the 24 burst weights stay 0 unless the render target is a burst".into());
+    }
+    let burst = burst_summary(&target_ticks);
     if let (Some(labels), Some(clip), Some(neutral_v)) = (opts.labels, egemaps.as_ref(), opts.neutral_egemaps) {
         if let Some(neutral) = feature_map(neutral_v) {
             let z = crate::labels::z_scores(clip, &neutral, labels);
@@ -271,9 +301,10 @@ pub fn profile(art: &Articulation, samples: &[f64], sr: f64, opts: &Opts) -> Res
     Ok(VoiceProfile {
         schema: "galion-voice-decode/2".into(),
         speaker,
-        measured: FluidSide { source: measured_source, top: measured_top, ticks: measured_ticks },
+        measured: FluidSide { source: measured_source, track: "prosody".into(), top: measured_top, ticks: measured_ticks },
         target: FluidSide {
             source: target_source,
+            track: target_track,
             top: target_name,
             ticks: target_ticks,
         },
@@ -281,7 +312,7 @@ pub fn profile(art: &Articulation, samples: &[f64], sr: f64, opts: &Opts) -> Res
         mouth,
         nose,
         lungs,
-        bursts,
+        burst,
         environment: env,
         chatterbox,
         trajectory: traj,

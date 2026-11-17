@@ -1,35 +1,44 @@
 # Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
-# Schema stub. The spec agent's table (PR 189) owns published directions.
-# Emotion set is Cowen et al. 2019 prosody, plus neutral.
-# Laughter, sigh and breath are bursts, not rows of `set`.
-# seductive is the render alias of desire.
-# Feature ids use openSMILE eGeMAPSv02 names from ARTICULATION-V2-SPEC.md.
-# z against the speaker's own neutral is unknown until measured. This stub
-# does not invent those z values.
+# Acoustic-label stub. The name inventory is configs/emotions-v2.toml (24).
+# Prosody and burst use that same set. Neutral is the baseline, not a row.
+# Breath is physiology, not a row. seductive renders as desire.
+# Feature ids are openSMILE eGeMAPSv02 names.
+# z against the speaker's own neutral is unknown until measured.
 
 schema = 2
 relative_to = "speaker_neutral"
+inventory = "configs/emotions-v2.toml"
 
 set = [
-  "neutral",
   "adoration",
   "amusement",
   "anger",
   "awe",
   "confusion",
   "contempt",
+  "contentment",
   "desire",
   "disappointment",
+  "disgust",
   "distress",
+  "ecstasy",
+  "elation",
+  "embarrassment",
   "fear",
   "interest",
+  "pain",
+  "realization",
+  "relief",
   "sadness",
+  "surprise_negative",
+  "surprise_positive",
+  "sympathy",
+  "triumph",
 ]
-
-bursts = ["laughter", "sigh", "breath"]
 
 [alias]
 seductive = "desire"
+laughter = "amusement"
 
 [features.f0_mean]
 unit = "z"

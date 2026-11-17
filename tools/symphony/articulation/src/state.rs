@@ -8,19 +8,52 @@
 //! output it only moves arousal with the loudness and F0 already measured
 //! by praatfan, and says so in `source`.
 //!
-//! Blend weights are neutral plus the twelve Cowen, Laukka, Elfenbein, Liu
-//! and Keltner (2019) prosody categories. Laughter, sigh and breath are vocal
-//! bursts, not blend weights. `seductive` is the render alias of `desire`.
+//! One inventory of 24 categories (Cowen, Elfenbein, Laukka and Keltner, 2019,
+//! American Psychologist), shared by the prosody track (how words are said)
+//! and the burst track (the same category, no words). The twelve Nature Human
+//! Behaviour categories are the cross-culturally reliable prosody tier; the
+//! other twelve are legal on both tracks. Neutral is the speaker baseline,
+//! not one of the 24. Breath is physiology, not an emotion.
+//! `seductive` renders as prosody `desire`. A laugh is burst `amusement`.
 //! No coordinate is copied from a figure. A requested category gets the
-//! intensity envelope; arousal moves only where ARTICULATION-V2-SPEC.md
-//! cites a direction (anger, fear, sadness high/low; desire a small F0 drop).
+//! intensity envelope; arousal moves only where the articulation spec cites
+//! a direction (anger, fear, sadness; desire a small F0 drop).
 
 use crate::Articulation;
 use serde::Serialize;
 use std::collections::BTreeMap;
 
-/// Cowen et al. 2019 prosody categories, in the owner's order.
-pub const COWEN: [&str; 12] = [
+/// The 24 vocalization categories, Figure 3B order from the emotions inventory.
+pub const COWEN: [&str; 24] = [
+    "adoration",
+    "amusement",
+    "anger",
+    "awe",
+    "confusion",
+    "contempt",
+    "contentment",
+    "desire",
+    "disappointment",
+    "disgust",
+    "distress",
+    "ecstasy",
+    "elation",
+    "embarrassment",
+    "fear",
+    "interest",
+    "pain",
+    "realization",
+    "relief",
+    "sadness",
+    "surprise_negative",
+    "surprise_positive",
+    "sympathy",
+    "triumph",
+];
+
+/// Cross-culturally reliable in prosody (Cowen et al. 2019, Nature Human Behaviour).
+/// A tier, not a smaller inventory. Words may still carry any of the 24.
+pub const PROSODY_RELIABLE: [&str; 12] = [
     "adoration",
     "amusement",
     "anger",
@@ -35,7 +68,8 @@ pub const COWEN: [&str; 12] = [
     "sadness",
 ];
 
-pub const BLEND_IDS: [&str; 13] = [
+/// Neutral baseline plus the 24. Neutral is not one of the 24.
+pub const BLEND_IDS: [&str; 25] = [
     "neutral",
     "adoration",
     "amusement",
@@ -43,30 +77,60 @@ pub const BLEND_IDS: [&str; 13] = [
     "awe",
     "confusion",
     "contempt",
+    "contentment",
     "desire",
     "disappointment",
+    "disgust",
     "distress",
+    "ecstasy",
+    "elation",
+    "embarrassment",
     "fear",
     "interest",
+    "pain",
+    "realization",
+    "relief",
     "sadness",
+    "surprise_negative",
+    "surprise_positive",
+    "sympathy",
+    "triumph",
 ];
 
-/// Not emotions. A separate detector track.
-pub const BURSTS: [&str; 3] = ["laughter", "sigh", "breath"];
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Resolved {
+    /// `prosody`, `burst`, or `baseline`.
+    pub track: &'static str,
+    pub category: &'static str,
+}
 
-/// `seductive` is desire. Bursts are refused here.
-pub fn canonical_emotion(name: &str) -> Result<&'static str, String> {
-    if BURSTS.contains(&name) {
-        return Err(format!("{name} is a vocal burst, not an emotion"));
+fn in_inventory(name: &str) -> Option<&'static str> {
+    COWEN.iter().find(|id| **id == name).copied()
+}
+
+/// Map a requested name onto the shared 24, the neutral baseline, or a burst.
+/// Splits from the retired 14 are refused: the caller names one category.
+pub fn resolve(name: &str) -> Result<Resolved, String> {
+    let prosody = |category| Resolved { track: "prosody", category };
+    let burst = |category| Resolved { track: "burst", category };
+    match name {
+        "neutral" | "calm" => Ok(Resolved { track: "baseline", category: "neutral" }),
+        "breath" => Err("breath is physiology, not an emotion".into()),
+        "sigh" => Err("sigh is a detector across relief, sadness, disappointment, and contentment; name one".into()),
+        "laughter" => Ok(burst("amusement")),
+        "seductive" => Ok(prosody("desire")),
+        "tender" => Ok(prosody("adoration")),
+        "angry" => Ok(prosody("anger")),
+        "fearful" => Ok(prosody("fear")),
+        "sad" => Ok(prosody("sadness")),
+        "disappointed" => Ok(prosody("disappointment")),
+        "amused" => Ok(prosody("amusement")),
+        "disgusted" => Ok(prosody("contempt")),
+        "happy" => Err("happy splits into amusement and interest; name one".into()),
+        "excited" => Err("excited splits into interest and amusement; elation is its own category".into()),
+        "surprised" => Err("surprised splits into awe and confusion".into()),
+        other => in_inventory(other).map(prosody).ok_or_else(|| format!("unknown emotion {other}")),
     }
-    if name == "seductive" {
-        return Ok("desire");
-    }
-    BLEND_IDS
-        .iter()
-        .find(|id| **id == name)
-        .copied()
-        .ok_or_else(|| format!("unknown emotion {name}"))
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -82,7 +146,10 @@ pub struct TickState {
     pub valence: f64,
     pub dominance: f64,
     pub intensity: f64,
+    /// Prosody: neutral baseline plus the 24. Sums to 1.
     pub blend: Vec<BlendWeight>,
+    /// Wordless track: the same 24, no neutral. All zero when no burst is targeted.
+    pub burst: Vec<BlendWeight>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -146,17 +213,29 @@ pub fn speaker_baseline(art: &Articulation) -> SpeakerBaseline {
     }
 }
 
+pub fn burst_weights(category: Option<&str>, intensity: f64) -> Vec<BlendWeight> {
+    let intensity = intensity.clamp(0.0, 1.0);
+    COWEN
+        .iter()
+        .map(|id| BlendWeight {
+            id: (*id).into(),
+            w: if Some(*id) == category { intensity } else { 0.0 },
+        })
+        .collect()
+}
+
 /// Mass `intensity` on `emotion`, the rest on neutral. Other categories stay 0.
 /// This is not a circumplex fitted to Cowen. The spec publishes no coordinates.
 pub fn named_blend(emotion: &str, intensity: f64) -> Vec<BlendWeight> {
-    let intensity = if emotion == "neutral" { 0.0 } else { intensity.clamp(0.0, 1.0) };
+    let on_category = emotion != "neutral";
+    let intensity = if on_category { intensity.clamp(0.0, 1.0) } else { 0.0 };
     BLEND_IDS
         .iter()
         .map(|id| {
-            let w = if *id == emotion {
-                intensity
-            } else if *id == "neutral" {
+            let w = if *id == "neutral" {
                 1.0 - intensity
+            } else if on_category && *id == emotion {
+                intensity
             } else {
                 0.0
             };
@@ -203,24 +282,31 @@ fn measured_tick(t_ms: u32, v: f64, a: f64, d: f64) -> TickState {
         dominance: d,
         intensity: (v * v + a * a).sqrt().clamp(0.0, 1.0),
         blend: named_blend("neutral", 0.0),
+        burst: burst_weights(None, 0.0),
     }
 }
 
-/// One requested emotion as a trajectory: intensity eases in and out.
-/// `seductive` resolves to `desire`. A burst name is an error.
+/// One requested category as a trajectory. Prosody and burst share the 24 names.
+/// `seductive` is prosody desire. `laughter` is burst amusement. Breath is refused.
 pub fn target_trajectory(emotion: &str, n_ticks: usize) -> Result<Vec<TickState>, String> {
-    let name = canonical_emotion(emotion)?;
-    let (pa, pv, pd) = render_prior(name);
+    let resolved = resolve(emotion)?;
+    let (pa, pv, pd) = render_prior(resolved.category);
     Ok((0..n_ticks)
         .map(|i| {
-            let env = if name == "neutral" { 0.0 } else { envelope(i, n_ticks) };
+            let env = if resolved.track == "baseline" { 0.0 } else { envelope(i, n_ticks) };
+            let (blend, burst) = if resolved.track == "burst" {
+                (named_blend("neutral", 0.0), burst_weights(Some(resolved.category), env))
+            } else {
+                (named_blend(resolved.category, env), burst_weights(None, 0.0))
+            };
             TickState {
                 t_ms: (i as u32) * 80,
                 arousal: pa * env,
                 valence: pv * env,
                 dominance: pd * env,
                 intensity: env,
-                blend: named_blend(name, env),
+                blend,
+                burst,
             }
         })
         .collect())

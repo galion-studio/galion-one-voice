@@ -4,9 +4,9 @@ Perpetual Open MIT License. (c) 2026 Galion Labs.
 
 Symphony articulation layer: throat / mouth / nose per 80 ms tick, and the TractPrint reference-vs-clone score. Design: [docs/galion-voice-v2/symphony/ARTICULATION-LAYER.md](../../../docs/galion-voice-v2/symphony/ARTICULATION-LAYER.md).
 
-Reused, unchanged: praatfan_rust (MIT, Rust, in process); refcheck noise-floor and RT60 (Rust, path dependency); SPARC, DisVoice, Phonet (MIT, Python, out of process, `workers/`); Rhubarb Lip Sync (MIT, C++ CLI). Optional and out of process, only when already installed: openSMILE eGeMAPSv02, galion-emotion (MSP-dim), DeepFilterNet, Demucs, pyannote, Silero, galion-ecapa, YAMNet, a local laughter checkout. Own code: the 80 ms tick glue, TractPrint v2, the Cowen-12 emotion trajectory, and the decode / select / loop glue.
+Reused, unchanged: praatfan_rust (MIT, Rust, in process); refcheck noise-floor and RT60 (Rust, path dependency); SPARC, DisVoice, Phonet (MIT, Python, out of process, `workers/`); Rhubarb Lip Sync (MIT, C++ CLI). Optional and out of process, only when already installed: openSMILE eGeMAPSv02, galion-emotion (MSP-dim), DeepFilterNet, Demucs, pyannote, Silero, galion-ecapa, YAMNet, a local laughter checkout. Own code: the 80 ms tick glue, TractPrint v2, the 24-category emotion trajectory, and the decode / select / loop glue.
 
-Emotion blend is neutral plus the twelve Cowen et al. 2019 prosody categories. `seductive` renders as `desire`. Laughter, sigh and breath are a burst track, not blend weights.
+Prosody and burst share one 24-category inventory (`configs/emotions-v2.toml`). The twelve Nature Human Behaviour names are the reliable prosody tier, not a shorter list. Neutral is the baseline. Breath is physiology. `seductive` renders as prosody `desire`. A laugh is burst `amusement`.
 
 Worker environment (laptop WSL, CPU torch):
 
