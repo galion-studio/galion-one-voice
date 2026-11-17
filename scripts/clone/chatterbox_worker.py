@@ -531,7 +531,7 @@ def cond_path_ok(path: object, persona: str) -> str | None:
     return real
 
 
-def cond_meta(msg: dict, persona: str, ref_digest: str) -> dict | None:
+def cond_meta(msg: dict, persona: str, ref_digest: str, exaggeration: float = 0.0) -> dict | None:
     meta = msg.get("cond_meta")
     if not isinstance(meta, dict):
         return None
@@ -546,7 +546,7 @@ def cond_meta(msg: dict, persona: str, ref_digest: str) -> dict | None:
         or out["persona"] != persona
         or out["model"] != "nano"
         or out["ref_sha256"] != ref_digest
-        or out["exaggeration"] != "0.0"
+        or not exaggeration_matches(out["exaggeration"], exaggeration)
         or out["norm_loudness"] != "true"
     ):
         return None
@@ -622,14 +622,19 @@ def load_conds(path: str, meta: dict):
         return None
 
 
-def use_cond_cache(model, msg: dict, persona: str, ref_path: str) -> bool:
+def use_cond_cache(model, msg: dict, persona: str, ref_path: str, exaggeration: float = 0.0) -> bool:
     """Set ``model.conds`` for ``ref_path``: cached file if valid, else from
-    the wav (then save if the slot asked). Returns True when conds are set."""
+    the wav (then save if the slot asked). Returns True when conds are set.
+
+    A cache file is used only when its exaggeration metadata matches the
+    request. The Rust key still writes ``0.0``. A different exaggeration
+    recomputes conditionals instead of replaying the zero file.
+    """
     load_to = msg.get("cond_load")
     save_to = msg.get("cond_save")
     if not load_to and not save_to:
         return False
-    meta = cond_meta(msg, persona, sha256_file(ref_path))
+    meta = cond_meta(msg, persona, sha256_file(ref_path), exaggeration)
     if meta is None:
         cond_log("skip (cond_meta does not match this reference)")
         return False
@@ -640,7 +645,7 @@ def use_cond_cache(model, msg: dict, persona: str, ref_path: str) -> bool:
             model.conds = conds
             cond_log(f"loaded {os.path.basename(real)}")
             return True
-    model.prepare_conditionals(ref_path, exaggeration=0.0, norm_loudness=True)
+    model.prepare_conditionals(ref_path, exaggeration=exaggeration, norm_loudness=True)
     if save_to:
         real = cond_path_ok(save_to, persona)
         if real and ".tmp-" in os.path.basename(real):
@@ -826,19 +831,57 @@ def wav_to_s16le(wav) -> bytes:
     return raw.tobytes()
 
 
-def render(model, text: str, path: str, cache: dict) -> bytes:
+def generate_kwargs(model, controls: Controls, base: dict) -> dict:
+    """Pass cfg and temperature when this install's generate() accepts them.
+
+    Exaggeration is applied in prepare_conditionals. It is also forwarded
+    when the signature has the parameter, so a library that conditions
+    inside generate() does not fall back to its own default.
+    """
+    import inspect
+
+    kwargs = dict(base)
+    try:
+        params = inspect.signature(model.generate).parameters
+    except (TypeError, ValueError):
+        params = {}
+    if "exaggeration" in params:
+        kwargs["exaggeration"] = controls.exaggeration
+    if "cfg_weight" in params:
+        kwargs["cfg_weight"] = controls.cfg_weight
+    elif "cfg" in params:
+        kwargs["cfg"] = controls.cfg_weight
+    if "temperature" in params:
+        kwargs["temperature"] = controls.temperature
+    return kwargs
+
+
+def render(model, text: str, path: str, cache: dict, controls: Controls | None = None) -> bytes:
     sys.stderr.write("galion-clone-gen: start\n")
     sys.stderr.flush()
-    # Reuse conditionals when the allowlisted path is unchanged. The first
-    # call passes the path through with no denoise, trim, or high-pass.
-    kwargs = {}
-    if cache.get("path") != path:
+    if controls is None:
+        controls = controls_of({})
+    # Reuse conditionals when the allowlisted path and exaggeration are unchanged.
+    # The first call passes the path through with no denoise, trim, or high-pass.
+    same = cache.get("path") == path and abs(float(cache.get("exaggeration", 0.0)) - controls.exaggeration) < 1e-6
+    prepared = False
+    if not same:
+        try:
+            model.prepare_conditionals(path, exaggeration=controls.exaggeration, norm_loudness=True)
+            prepared = True
+            cache["path"] = path
+            cache["exaggeration"] = controls.exaggeration
+        except Exception as exc:
+            refuse(f"chatterbox nano conditioning failed ({type(exc).__name__}: {one_line(exc)})")
+    kwargs: dict = {}
+    if not prepared and not same:
         kwargs["audio_prompt_path"] = path
     try:
-        wav = model.generate(text, **kwargs)
+        wav = model.generate(text, **generate_kwargs(model, controls, kwargs))
     except Exception as exc:
         refuse(f"chatterbox nano generate failed ({type(exc).__name__}: {one_line(exc)})")
     cache["path"] = path
+    cache["exaggeration"] = controls.exaggeration
     pcm = wav_to_s16le(wav)
     sys.stderr.write(f"galion-clone-gen: bytes {len(pcm)}\n")
     sys.stderr.flush()
@@ -858,9 +901,12 @@ def read_request() -> dict | None:
     return msg
 
 
-# Pitch, energy, warmth, and pause are logged. `rate` is applied to the PCM
-# before it is written (owner decision 2026-11-15). Nano generate itself
-# does not take the number; this process stretches the samples.
+# `rate` is a pitch-preserving stretch of the PCM (owner decision 2026-11-15).
+# Pitch, energy and pre_pause_ms are applied to that PCM as well. Exaggeration,
+# cfg_weight and temperature are read off the request and passed into
+# prepare_conditionals / generate. Nano's sampler does not take pitch.
+# Missing fields keep the literals this worker already used: exaggeration 0.0,
+# cfg_weight 0.0, temperature 0.8, pitch 0, energy 1, pause 0, rate 1.
 def speaking_rate_of(msg: dict) -> float:
     raw = msg.get("prosody") if isinstance(msg, dict) else None
     if not isinstance(raw, dict):
@@ -981,6 +1027,211 @@ def _best_start(samples: list, prev: list, ideal: int, radius: int, win: int) ->
     return best
 
 
+class Controls:
+    """Knobs taken from one request line. Identity matches the old literals."""
+
+    def __init__(
+        self,
+        exaggeration: float,
+        cfg_weight: float,
+        temperature: float,
+        pitch_st: float,
+        energy: float,
+        rate: float,
+        pre_pause_ms: int,
+    ) -> None:
+        self.exaggeration = exaggeration
+        self.cfg_weight = cfg_weight
+        self.temperature = temperature
+        self.pitch_st = pitch_st
+        self.energy = energy
+        self.rate = rate
+        self.pre_pause_ms = pre_pause_ms
+
+    def prosody_identity(self) -> bool:
+        return (
+            abs(self.pitch_st) < 1e-4
+            and abs(self.energy - 1.0) < 1e-4
+            and abs(self.rate - 1.0) < 1e-4
+            and self.pre_pause_ms == 0
+        )
+
+
+def _finite(value: object, default: float) -> float:
+    try:
+        number = float(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return default
+    if number != number or number in (float("inf"), float("-inf")):
+        return default
+    return number
+
+
+def _clamp(value: float, lo: float, hi: float) -> float:
+    if value < lo:
+        return lo
+    if value > hi:
+        return hi
+    return value
+
+
+def controls_of(msg: dict | None) -> Controls:
+    """Read exaggeration, cfg, temperature, pitch, energy, pauses, and rate.
+
+    Clamps match `FrameProsody::clamped` in galion-ml-voice for pitch, energy,
+    rate and pause. Exaggeration stays in 0..=2, cfg_weight in 0..=1,
+    temperature in 0.05..=1.5. A missing field is the worker literal.
+    """
+    if not isinstance(msg, dict):
+        msg = {}
+    raw = msg.get("prosody")
+    if not isinstance(raw, dict):
+        raw = {}
+    cfg_src = msg.get("cfg_weight", msg.get("cfg", 0.0))
+    try:
+        pause = int(raw.get("pre_pause_ms", 0))
+    except (TypeError, ValueError):
+        pause = 0
+    return Controls(
+        exaggeration=_clamp(_finite(msg.get("exaggeration", 0.0), 0.0), 0.0, 2.0),
+        cfg_weight=_clamp(_finite(cfg_src, 0.0), 0.0, 1.0),
+        temperature=_clamp(_finite(msg.get("temperature", 0.8), 0.8), 0.05, 1.5),
+        pitch_st=_clamp(_finite(raw.get("pitch_st", 0.0), 0.0), -4.0, 4.0),
+        energy=_clamp(_finite(raw.get("energy", 1.0), 1.0), 0.6, 1.2),
+        rate=speaking_rate_of(msg),
+        pre_pause_ms=max(0, min(pause, 400)),
+    )
+
+
+def exaggeration_matches(stored: str, requested: float) -> bool:
+    """Cache metadata. Zero stays the exact string ``0.0`` the Rust key writes."""
+    if abs(requested) < 1e-9:
+        return stored == "0.0"
+    try:
+        return abs(float(stored) - requested) < 1e-6
+    except (TypeError, ValueError):
+        return False
+
+
+def _pcm_samples(pcm: bytes) -> list[float] | None:
+    if len(pcm) < 2 or len(pcm) % 2:
+        return None
+    return [s / 32768.0 for s in struct.unpack("<" + "h" * (len(pcm) // 2), pcm)]
+
+
+def _pack_floats(samples: list[float]) -> bytes:
+    out = bytearray()
+    for x in samples:
+        if x > 1.0:
+            x = 1.0
+        elif x < -1.0:
+            x = -1.0
+        out += struct.pack("<h", int(round(x * 32767.0)))
+    return bytes(out)
+
+
+def apply_energy(pcm: bytes, energy: float) -> bytes:
+    if abs(energy - 1.0) < 1e-4:
+        return pcm
+    samples = _pcm_samples(pcm)
+    if samples is None:
+        return pcm
+    return _pack_floats([s * energy for s in samples])
+
+
+def apply_pitch(pcm: bytes, semitones: float) -> bytes:
+    """Linear resample by ``2^(st/12)``. Same ratio as galion-ml-voice.
+
+    A higher pitch shortens the buffer. Formants move with the pitch.
+    """
+    if abs(semitones) < 1e-4:
+        return pcm
+    samples = _pcm_samples(pcm)
+    if samples is None or len(samples) < 2:
+        return pcm
+    ratio = 2.0 ** (semitones / 12.0)
+    if ratio != ratio or abs(ratio - 1.0) < 1e-4:
+        return pcm
+    n = max(1, int(len(samples) / ratio))
+    out: list[float] = []
+    last = len(samples) - 1
+    for i in range(n):
+        pos = i * ratio
+        i0 = int(pos)
+        if i0 > last:
+            i0 = last
+        frac = pos - i0
+        a = samples[i0]
+        b = samples[i0 + 1] if i0 + 1 <= last else a
+        out.append(a + (b - a) * frac)
+    return _pack_floats(out)
+
+
+def apply_pause(pcm: bytes, pre_pause_ms: int, sample_rate: int = NANO_SR) -> bytes:
+    if pre_pause_ms <= 0 or sample_rate <= 0:
+        return pcm
+    n = (pre_pause_ms * sample_rate) // 1000
+    if n <= 0:
+        return pcm
+    return b"\x00\x00" * n + pcm
+
+
+def apply_prosody_pcm(pcm: bytes, controls: Controls, *, pause: bool = True) -> bytes:
+    """Energy, then pitch, then rate, then an optional leading pause.
+
+    Identity prosody returns the same bytes. This does not call a model.
+    """
+    if controls.prosody_identity() and not pause:
+        return pcm
+    if controls.prosody_identity():
+        return pcm
+    pcm = apply_energy(pcm, controls.energy)
+    pcm = apply_pitch(pcm, controls.pitch_st)
+    pcm = apply_speaking_rate(pcm, controls.rate)
+    if pause:
+        pcm = apply_pause(pcm, controls.pre_pause_ms)
+    return pcm
+
+
+def stub_tone(text: str, controls: Controls) -> int:
+    """Protocol-stub sample. Defaults keep the old ``1000 + (n % 50)`` value.
+
+    A non-default exaggeration, cfg or temperature shifts that constant so a
+    test can see the request was read. It is not a Chatterbox sample.
+    """
+    n = max(1, min(len(text), 32767))
+    tone = 1000 + (n % 50)
+    if (
+        abs(controls.exaggeration) > 1e-6
+        or abs(controls.cfg_weight) > 1e-6
+        or abs(controls.temperature - 0.8) > 1e-6
+    ):
+        tone += int(round(controls.exaggeration * 1000.0))
+        tone += int(round(controls.cfg_weight * 500.0))
+        tone += int(round((controls.temperature - 0.8) * 100.0))
+        if tone > 32767:
+            tone = 32767
+        elif tone < -32767:
+            tone = -32767
+    return tone
+
+
+def log_controls(controls: Controls) -> None:
+    sys.stderr.write(
+        "galion-clone-controls: exaggeration=%.4f cfg_weight=%.4f temperature=%.4f "
+        "pitch_st=%.4f energy=%.4f pre_pause_ms=%d rate=%.4f\n"
+        % (
+            controls.exaggeration,
+            controls.cfg_weight,
+            controls.temperature,
+            controls.pitch_st,
+            controls.energy,
+            controls.pre_pause_ms,
+            controls.rate,
+        )
+    )
+
+
 def log_prosody(msg: dict) -> None:
     raw = msg.get("prosody")
     if not isinstance(raw, dict):
@@ -1036,18 +1287,27 @@ def run_stub(pcm_fd: int) -> None:
         text = str(msg.get("text", ""))
         persona = normalize_persona(msg.get("persona", "samantha"))
         log_prosody(msg)
+        controls = controls_of(msg)
+        log_controls(controls)
         guard(msg, persona)
         if persona == "jarvis":
             text = TAG.sub("", text)
         text = " ".join(text.split())
-        rate = speaking_rate_of(msg)
-        n = max(1, min(len(text), 32767))
-        tone = 1000 + (n % 50)
+        tone = stub_tone(text, controls)
         frames = stub_frame_count()
         sys.stderr.write("galion-clone-emit: galion-vc\n")
         if frames:
-            one = apply_speaking_rate(struct.pack("<h", tone) * FRAME, rate)
-            frame_utterance(pcm_fd, b"", "protocol-stub", persona, announce=len(one) * frames)
+            one = apply_prosody_pcm(struct.pack("<h", tone) * FRAME, controls, pause=False)
+            pause = apply_pause(b"", controls.pre_pause_ms)
+            frame_utterance(
+                pcm_fd,
+                b"",
+                "protocol-stub",
+                persona,
+                announce=len(pause) + len(one) * frames,
+            )
+            if pause:
+                write_all(pcm_fd, pause)
             for i in range(frames):
                 sys.stderr.write(f"galion-clone-progress: {i}\n")
                 sys.stderr.flush()
@@ -1060,10 +1320,12 @@ def run_stub(pcm_fd: int) -> None:
         import nano_stream
 
         def paced():
-            for index, chunk in enumerate(nano_stream.protocol_chunks(text)):
+            for index, chunk in enumerate(
+                nano_stream.protocol_chunks(text, tone=stub_tone(text, controls))
+            ):
                 if index:
                     time.sleep(0.05)
-                yield apply_speaking_rate(chunk, rate)
+                yield apply_prosody_pcm(chunk, controls, pause=(index == 0))
 
         nano_stream.write_chunks(
             stub_pcm_file(pcm_fd),
@@ -1096,6 +1358,8 @@ def run_nano(pcm_fd: int, allow: dict[str, tuple[str, str]]) -> None:
             return
         persona = normalize_persona(msg.get("persona", "samantha"))
         log_prosody(msg)
+        controls = controls_of(msg)
+        log_controls(controls)
         for key in ("denoise", "strip", "clean", "normalize"):
             if truthy(msg.get(key)):
                 refuse("denoise refused; texture is character")
@@ -1118,13 +1382,14 @@ def run_nano(pcm_fd: int, allow: dict[str, tuple[str, str]]) -> None:
             if not tokenizer_ready(root):
                 absent("tokenizer files missing or not pinned")
             model = load_nano(build_ckpt(root))
-        if cache.get("path") != path:
+        if cache.get("path") != path or abs(float(cache.get("exaggeration", 0.0)) - controls.exaggeration) > 1e-6:
             try:
-                if use_cond_cache(model, msg, persona, path):
+                if use_cond_cache(model, msg, persona, path, controls.exaggeration):
                     cache["path"] = path
+                    cache["exaggeration"] = controls.exaggeration
             except Exception as exc:
                 refuse(f"chatterbox nano conditioning failed ({type(exc).__name__}: {one_line(exc)})")
-        pcm = apply_speaking_rate(render(model, text, path, cache), speaking_rate_of(msg))
+        pcm = apply_prosody_pcm(render(model, text, path, cache, controls), controls)
         sys.stderr.write("galion-clone-emit: galion-vc\n")
         frame_utterance(pcm_fd, pcm, "chatterbox-nano", persona)
 
@@ -1152,6 +1417,8 @@ def run_stream(pcm_fd: int, allow: dict[str, tuple[str, str]]) -> None:
             return
         persona = normalize_persona(msg.get("persona", "samantha"))
         log_prosody(msg)
+        controls = controls_of(msg)
+        log_controls(controls)
         for key in ("denoise", "strip", "clean", "normalize"):
             if truthy(msg.get(key)):
                 refuse("denoise refused; texture is character")
@@ -1172,22 +1439,35 @@ def run_stream(pcm_fd: int, allow: dict[str, tuple[str, str]]) -> None:
         # Item 10: prepare (or load) conditioning once per reference path,
         # not on every request; iter_pcm then reuses model.conds.
         stream_ref = ref_path
-        if ref_path and cond_for == ref_path:
+        if ref_path and cond_for == (ref_path, controls.exaggeration):
             stream_ref = None
         elif ref_path:
             try:
-                if use_cond_cache(model, msg, persona, ref_path):
-                    cond_for = ref_path
+                if use_cond_cache(model, msg, persona, ref_path, controls.exaggeration):
+                    cond_for = (ref_path, controls.exaggeration)
                     stream_ref = None
             except Exception as exc:
                 nano_stream.write_unwired(sys.stderr, f"conditioning failed ({type(exc).__name__})")
                 continue
         sys.stderr.write("galion-clone-emit: galion-vc\n")
-        rate = speaking_rate_of(msg)
+
+        def paced_stream():
+            for index, chunk in enumerate(
+                nano_stream.iter_pcm(
+                    model,
+                    text,
+                    stream_ref,
+                    exaggeration=controls.exaggeration,
+                    cfg_weight=controls.cfg_weight,
+                    temperature=controls.temperature,
+                )
+            ):
+                yield apply_prosody_pcm(chunk, controls, pause=(index == 0))
+
         try:
             nano_stream.write_chunks(
                 pcm,
-                (apply_speaking_rate(chunk, rate) for chunk in nano_stream.iter_pcm(model, text, stream_ref)),
+                paced_stream(),
                 engine="nano",
                 persona=persona,
                 path="stream",
