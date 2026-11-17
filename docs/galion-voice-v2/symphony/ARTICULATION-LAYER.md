@@ -141,3 +141,15 @@ Other limitations:
 * Rust tests passed on laptop Rust 1.100 and 1.85: two synthetic-signal integration tests, no voice audio fixtures. Cargo.lock pins `encoding_rs` to 0.8.35 because 0.8.44 needs Rust 1.88.
 * Distributions depend on what is said and the emotion. A fair bar needs reference and clone sets with comparable text and emotion.
 * Not wired into conditioning, the voice card writer or the gate yet. That needs the stage-0 branch to land first.
+
+## V2
+
+Same crate, `tools/symphony/articulation`. Commands: `decode`, `select`, `loop` (`galion-artic` is the same binary).
+
+The fluid state is one point per 80 ms tick: arousal, valence, dominance, intensity, and blend weights. The blend is **neutral plus the twelve Cowen et al. 2019 prosody categories** (adoration, amusement, anger, awe, confusion, contempt, desire, disappointment, distress, fear, interest, sadness). `seductive` is the render alias of `desire`. Laughter, sigh and breath are a **burst track**, not blend weights. Breath cues come from the praatfan voicing gap (an unvoiced run louder than the clip floor and quieter than the speech). Laughter and sigh stay empty until a local detector is pointed at them. No model is downloaded by the build.
+
+TractPrint v2 reports `speaker` and `expression` separately. Speaker weight is F0 baseline, vocal-tract length when it falls in 10–22 cm, and F1–F3, plus an optional embedding cosine. Expression is the remaining tracks. A synthetic male-range control with the same expression tracks scores below 0.55 on `speaker`; a same-speaker pair stays above 0.85. That is the fix for the v1 collapse, checked on synthetic tones, not on the Norman recording.
+
+`decode` writes `galion-voice-decode/2`: speaker baseline, measured and target trajectories, throat / mouth / nose, lungs, bursts, environment (refcheck noise floor and Schroeder RT60), and Chatterbox `exaggeration`, `cfg` (`cfg_weight`) and `speed`, including the per-tick trajectory. `select` keeps segments that match an enrolment clip on F0 and formants (the refprep pause split). DeepFilterNet, Demucs, pyannote, Silero and galion-ecapa are optional out-of-process tools (`workers/scene_tools.py`); when they are absent the table says so and the acoustic match still runs. `loop` writes that profile, renders with a stand-in (one gain, one time-scale), reads the result with the same decoder, and corrects exaggeration and speed. Speaker F0 is checked and not steered. `--render-cmd` is the hook for a real cloner.
+
+Open gaps, left empty rather than filled in: A1–P0 nasality, CPPS, the full eGeMAPSv02 vector (openSMILE worker only), MSP-dim (the existing `galion-emotion` binary only), and the three scene tools above. `configs/symphony/emotion-labels-v2.toml` is a schema stub for the Cowen set and the eGeMAPS names. Numeric z against the speaker's own neutral is not invented.

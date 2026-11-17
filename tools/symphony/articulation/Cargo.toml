@@ -5,18 +5,25 @@ version = "0.1.0"
 edition = "2021"
 license = "MIT"
 publish = false
-description = "Symphony articulation layer: throat / mouth / nose features per 80 ms tick for any voice, plus a reference-vs-clone articulation score (TractPrint). Glue around praatfan_rust (MIT) in process, and SPARC, DisVoice, Phonet and Rhubarb (all MIT) out of process."
+description = "Symphony articulation layer: throat / mouth / nose / lungs per 80 ms tick, TractPrint v2, and a voice-decode profile a cloner can read. Glue around praatfan_rust (MIT) in process. SPARC, DisVoice, Phonet, Rhubarb, openSMILE, and the scene tools stay out of process."
 
 [[bin]]
 name = "galion-articulation"
 path = "src/main.rs"
 
+[[bin]]
+name = "galion-artic"
+path = "src/main.rs"
+
 [dependencies]
 # Reused brick: clean-room Praat analysis in pure Rust (MIT), pinned to the v0.1.16 tag.
 praatfan_rust = { git = "https://github.com/ucpresearch/praatfan-core-clean", tag = "v0.1.16" }
+# Reused brick: noise floor and Schroeder RT60 from the Emotion V2 capture checker.
+galion-refcheck = { path = "../../emotion-v2/refcheck" }
 hound = "3.5"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+toml = "0.8"
 
 # Own workspace: the locked voice runtime does not build this tool
 # (same pattern as tools/emotion-v2/refcheck and runtimes/galion-piper-rt).
