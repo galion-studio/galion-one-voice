@@ -195,7 +195,7 @@ fn breath_cue_on_a_gap_between_vowels() {
 
 #[test]
 fn labels_file_scores_a_matching_z() {
-    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../configs/symphony/emotion-labels-v2.toml");
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../configs/symphony/emotion-labels-decoder.toml");
     let labels = labels::load(&path).unwrap();
     let mut z = BTreeMap::new();
     z.insert("F0semitoneFrom27.5Hz_sma3nz_amean".into(), 0.8);

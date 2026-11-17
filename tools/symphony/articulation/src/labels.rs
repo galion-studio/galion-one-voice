@@ -1,6 +1,7 @@
 // Galion Voice — Perpetual Open MIT License
 // Copyright (c) 2026 Galion Labs.
-//! Reader for `configs/symphony/emotion-labels-v2.toml`.
+//! Reader for `configs/symphony/emotion-labels-decoder.toml`.
+//! The cited direction tables stay in `emotion-labels-v2.toml` (a different schema).
 //!
 //! Values are z-scores against the speaker's own neutral, one column per
 //! F0 band (`female` / `male`). Feature names are openSMILE eGeMAPSv02
