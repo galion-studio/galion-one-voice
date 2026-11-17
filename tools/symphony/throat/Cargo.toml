@@ -1,0 +1,24 @@
+# Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
+[package]
+name = "galion-throat"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+publish = false
+description = "Throat / glottal source for one utterance: per-80 ms pitch and voice-quality controls from feeling and subglottal pressure, using the Liljencrants-Fant model."
+
+[[bin]]
+name = "galion-throat"
+path = "src/main.rs"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+
+# Own workspace: the locked voice runtime does not build this tool
+# (same pattern as tools/symphony/articulation).
+[workspace]
+
+[profile.release]
+opt-level = 3
