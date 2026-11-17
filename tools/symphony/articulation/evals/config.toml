@@ -10,34 +10,93 @@ speaker_fields = ["f0_st", "f1_hz", "f2_hz", "f3_hz", "vtl_cm", "hnr_db"]
 # Emotion part: level and spread, after the speaker's own neutral is subtracted.
 emotion_fields = ["f0_st", "hnr_db", "voicing", "f1_hz", "f2_hz"]
 
-# Cowen et al. 2019 prosody emotions, plus neutral as the baseline.
-# Laughter, sigh and breath are vocal-burst detectors, not members of this list.
-emotions = [
-  "neutral",
-  "adoration",
-  "amusement",
-  "anger",
-  "awe",
-  "confusion",
-  "contempt",
-  "desire",
-  "disappointment",
-  "distress",
-  "fear",
-  "interest",
-  "sadness",
+# Same inventory as configs/emotions-v2.toml (PR #189).
+# One set of 24. Prosody and burst tracks both use it.
+# A word can carry any of the 24. Neutral is the baseline, not a category.
+# The 12 NHB names are the reliable prosody tier, not a smaller emotion set.
+baseline = "neutral"
+
+inventory = [
+  "adoration", "amusement", "anger", "awe", "confusion", "contempt",
+  "contentment", "desire", "disappointment", "disgust", "distress",
+  "ecstasy", "elation", "embarrassment", "fear", "interest", "pain",
+  "realization", "relief", "sadness", "surprise_negative", "surprise_positive",
+  "sympathy", "triumph",
 ]
 
-bursts = ["laughter", "sigh", "breath"]
+reliable = [
+  "adoration", "amusement", "anger", "awe", "confusion", "contempt",
+  "desire", "disappointment", "distress", "fear", "interest", "sadness",
+]
 
-# Spelling only. A public-dataset name is mapped when it is the same category.
-# happy, disgust, surprise and calm are not mapped onto amusement, contempt, awe or neutral.
-[aliases]
-angry = "anger"
-fearful = "fear"
-sad = "sadness"
-disappointed = "disappointment"
-amused = "amusement"
+lower = [
+  "contentment", "disgust", "ecstasy", "elation", "embarrassment", "pain",
+  "realization", "relief", "surprise_negative", "surprise_positive",
+  "sympathy", "triumph",
+]
+
+not_in_set = ["guilt", "pride", "romantic_love", "serenity", "shame"]
+
+# Retired names. A split stays a split: the harness does not pick one category.
+[map.neutral]
+track = "baseline"
+to = ["neutral"]
+
+[map.calm]
+track = "baseline"
+to = ["neutral"]
+
+[map.tender]
+track = "prosody"
+to = ["adoration"]
+
+[map.seductive]
+track = "prosody"
+to = ["desire"]
+
+[map.angry]
+track = "prosody"
+to = ["anger"]
+
+[map.fearful]
+track = "prosody"
+to = ["fear"]
+
+[map.sad]
+track = "prosody"
+to = ["sadness"]
+
+[map.disappointed]
+track = "prosody"
+to = ["disappointment"]
+
+[map.amused]
+track = "prosody"
+to = ["amusement"]
+
+[map.happy]
+track = "prosody"
+to = ["amusement", "interest"]
+
+[map.excited]
+track = "prosody"
+to = ["interest", "amusement"]
+
+[map.surprised]
+track = "prosody"
+to = ["awe", "confusion"]
+
+[map.disgusted]
+track = "prosody"
+to = ["contempt"]
+
+[map.laughter]
+track = "burst"
+to = ["amusement"]
+
+[map.sigh]
+track = "burst"
+to = ["relief", "sadness", "disappointment", "contentment"]
 
 # The rollout gate is unchanged. This eval does not measure it and does not add a bar to it.
 [rollout_gate]
@@ -53,6 +112,7 @@ snr_db = 40.0
 [labels]
 # Sibling file. If none of these exist, the direction comparison is not measured.
 candidates = [
+  "configs/symphony/emotion-labels-v2.toml",
   "tools/symphony/articulation/emotion-labels-v2.toml",
   "tools/symphony/articulation/evals/emotion-labels-v2.toml",
   "docs/galion-voice-v2/symphony/emotion-labels-v2.toml",

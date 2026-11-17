@@ -9,8 +9,10 @@ speech: a second reading of the same file, a mild gain and a mild noise
 reading (the decoder noise floor), and how far fields move between real
 takes. It also scores the acoustic speaker part and the emotion part.
 
-The emotion set is neutral plus the 12 Cowen et al. 2019 prosody emotions.
-Laughter, sigh and breath are vocal-burst detectors, not emotions. CI runs
+Taxonomy matches configs/emotions-v2.toml: one inventory of 24 Cowen 2019
+categories, shared by the prosody track and the burst track. The 12 NHB
+names are the reliable prosody tier. Neutral is the speaker baseline, not
+a category. Breath is physiology. A word may carry any of the 24. CI runs
 the synthetic smoke test only. Dataset commands are not the CI path.
 
 It does not render a clone, it does not download weights, and it does not
@@ -71,21 +73,26 @@ def load_config() -> dict:
         return tomllib.load(handle)
 
 
-def canonical_label(native: str, cfg: dict) -> tuple[str, str]:
-    """Map a dataset name to (emotion, burst). A burst is never an emotion."""
-    bursts = set(cfg["bursts"])
-    burst_aliases = cfg.get("burst_aliases") or {}
-    if native in bursts:
-        return "", native
-    if native in burst_aliases:
-        return "", str(burst_aliases[native])
-    emotions = set(cfg["emotions"])
-    if native in emotions:
-        return native, ""
-    mapped = (cfg.get("aliases") or {}).get(native)
-    if mapped in emotions:
-        return str(mapped), ""
-    return "", ""
+def resolve_name(native: str, cfg: dict) -> dict:
+    """Map a name to a track and categories. A word may be any of the 24."""
+    inventory = set(cfg["inventory"])
+    mapped = (cfg.get("map") or {}).get(native)
+    if isinstance(mapped, dict) and mapped.get("to"):
+        return {"track": str(mapped.get("track", "")), "categories": [str(x) for x in mapped["to"]]}
+    if native == "breath":
+        return {"track": "physiology", "categories": []}
+    if native in inventory:
+        return {"track": "prosody", "categories": [native]}
+    return {"track": "", "categories": []}
+
+
+def single_category(resolved: dict) -> str:
+    categories = resolved["categories"]
+    if resolved["track"] == "baseline":
+        return "neutral"
+    if len(categories) == 1 and resolved["track"] in {"prosody", "burst"}:
+        return categories[0]
+    return ""
 
 
 def percentile(values: list[float], p: float) -> float | None:
@@ -428,14 +435,15 @@ def decode_many(binary: Path, jobs: list[tuple[str, str, str]], workers: int) ->
 
 
 class Clip:
-    def __init__(self, clip_id: str, speaker: str, sex: str, emotion: str, wav: Path, native: str | None = None, burst: str = "") -> None:
+    def __init__(self, clip_id: str, speaker: str, sex: str, emotion: str, wav: Path, native: str | None = None, burst: str = "", track: str = "") -> None:
         self.clip_id = clip_id
         self.speaker = speaker
         self.sex = sex
-        # Canonical prosody emotion, or "" when the dataset name is not in the 12 + neutral.
+        # One category, "neutral" for the baseline, or "" when the name splits.
         self.emotion = emotion
         self.native = emotion if native is None else native
         self.burst = burst
+        self.track = track
         self.wav = wav
         self.summary: dict[str, list[float]] | None = None
         self.tp: dict | None = None
@@ -515,8 +523,10 @@ def ensure_crema(root: Path, cfg: dict) -> None:
 
 
 def _tagged(clip_id: str, speaker: str, sex: str, native: str, wav: Path, cfg: dict) -> Clip:
-    emotion, burst = canonical_label(native, cfg)
-    return Clip(clip_id, speaker, sex, emotion, wav, native=native, burst=burst)
+    resolved = resolve_name(native, cfg)
+    emotion = single_category(resolved)
+    burst = emotion if resolved["track"] == "burst" else ""
+    return Clip(clip_id, speaker, sex, emotion, wav, native=native, burst=burst, track=resolved["track"])
 
 
 def index_crema(root: Path, cfg: dict) -> list[Clip]:
@@ -738,6 +748,8 @@ def classify(clips: list[Clip], centered: dict[int, list[float]], sex: str | Non
     for i, vector in centered.items():
         if sex is not None and clips[i].sex != sex:
             continue
+        if clips[i].track in {"burst", "physiology", "baseline"}:
+            continue
         if clips[i].emotion not in labels:
             continue
         chosen.append(i)
@@ -793,7 +805,7 @@ def noise_picks(clips: list[Clip]) -> list[Clip]:
     for speaker in sorted(by_speaker):
         items = sorted(by_speaker[speaker], key=lambda clip: clip.clip_id)
         pick = []
-        for emotion in ("neutral", "angry"):
+        for emotion in ("neutral", "anger"):
             hit = next((clip for clip in items if clip.emotion == emotion), None)
             if hit is not None:
                 pick.append(hit)
@@ -1053,7 +1065,7 @@ def observed_movement(clips: list[Clip], floor: dict, allowed: set[str]) -> dict
 
 
 def label_sanity(clips: list[Clip], floor: dict, cfg: dict) -> dict:
-    observed = observed_movement(clips, floor, set(cfg["emotions"]))
+    observed = observed_movement(clips, floor, set(cfg["inventory"]))
     path = find_labels(cfg)
     if path is None:
         return {
@@ -1061,7 +1073,7 @@ def label_sanity(clips: list[Clip], floor: dict, cfg: dict) -> dict:
             "reason": "emotion-labels-v2.toml is not on this branch",
             "observed_versus_neutral": observed,
         }
-    emotions = set(cfg["emotions"])
+    emotions = set(cfg["inventory"])
     fields = {field for sex in observed.values() for emotion in sex.values() for field in emotion}
     predicted = load_directions(path, emotions, fields)
     if not predicted:
@@ -1118,7 +1130,7 @@ def evaluate_dataset(name: str, clips: list[Clip], root: Path, binary: Path, cfg
     failures = attach_profiles(clips, cache, binary, workers)
     decoded = [clip for clip in clips if clip.summary is not None]
     source, speaker_vecs, emotion_vecs = tract_vectors(clips, cfg)
-    present_emotions = [emotion for emotion in cfg["emotions"] if any(clip.emotion == emotion and clip.summary for clip in clips)]
+    present_emotions = [emotion for emotion in cfg["inventory"] if any(clip.emotion == emotion and clip.track == "prosody" and clip.summary for clip in clips)]
     # Drop classes the classifier cannot see.
     labels = [emotion for emotion in present_emotions if emotion != "" ]
     print(f"{name}: noise floor", file=sys.stderr, flush=True)
@@ -1155,10 +1167,12 @@ def evaluate_dataset(name: str, clips: list[Clip], root: Path, binary: Path, cfg
         "n_failed": len(failures),
         "failures_sample": failures[:8],
         "n_by_sex": sexes,
-        "emotions": cfg["emotions"],
-        "bursts": cfg["bursts"],
-        "coverage": coverage(decoded, cfg["emotions"]),
-        "burst_coverage": _burst_coverage(decoded, cfg["bursts"]),
+        "inventory": cfg["inventory"],
+        "reliable_tier": cfg["reliable"],
+        "lower_tier": cfg["lower"],
+        "baseline": cfg["baseline"],
+        "coverage": coverage(decoded, cfg["inventory"]),
+        "burst_coverage": _burst_coverage(decoded, cfg["inventory"]),
         "speaker_part": {
             "same_vs_different": verification(clips, speaker_vecs, False),
             "same_vs_different_same_emotion": verification(clips, speaker_vecs, True),
@@ -1182,47 +1196,75 @@ def _burst_coverage(clips: list[Clip], bursts: list[str]) -> dict:
     return counts
 
 
+INVENTORY = [
+    "adoration", "amusement", "anger", "awe", "confusion", "contempt",
+    "contentment", "desire", "disappointment", "disgust", "distress",
+    "ecstasy", "elation", "embarrassment", "fear", "interest", "pain",
+    "realization", "relief", "sadness", "surprise_negative", "surprise_positive",
+    "sympathy", "triumph",
+]
+RELIABLE = [
+    "adoration", "amusement", "anger", "awe", "confusion", "contempt",
+    "desire", "disappointment", "distress", "fear", "interest", "sadness",
+]
+LOWER = [
+    "contentment", "disgust", "ecstasy", "elation", "embarrassment", "pain",
+    "realization", "relief", "surprise_negative", "surprise_positive",
+    "sympathy", "triumph",
+]
+NOT_IN_SET = ["guilt", "pride", "romantic_love", "serenity", "shame"]
+
+
 def self_check_taxonomy(cfg: dict) -> None:
-    """The 12 prosody emotions, neutral, and the three burst detectors. No audio."""
-    expected = [
-        "neutral",
-        "adoration",
-        "amusement",
-        "anger",
-        "awe",
-        "confusion",
-        "contempt",
-        "desire",
-        "disappointment",
-        "distress",
-        "fear",
-        "interest",
-        "sadness",
-    ]
-    if list(cfg["emotions"]) != expected:
-        raise SystemExit(f"emotion set is {cfg['emotions']}")
-    if list(cfg["bursts"]) != ["laughter", "sigh", "breath"]:
-        raise SystemExit(f"bursts are {cfg['bursts']}")
-    if set(cfg["emotions"]) & set(cfg["bursts"]):
-        raise SystemExit("a burst is listed as an emotion")
-    checks = {
-        "laughter": ("", "laughter"),
-        "sigh": ("", "sigh"),
-        "breath": ("", "breath"),
-        "happy": ("", ""),
-        "disgusted": ("", ""),
-        "surprised": ("", ""),
-        "calm": ("", ""),
-        "angry": ("anger", ""),
-        "fearful": ("fear", ""),
-        "sad": ("sadness", ""),
-        "neutral": ("neutral", ""),
-        "amusement": ("amusement", ""),
+    """24 shared categories, 12 reliable, neutral baseline. No audio."""
+    if list(cfg["inventory"]) != INVENTORY:
+        raise SystemExit(f"inventory is {cfg['inventory']}")
+    if list(cfg["reliable"]) != RELIABLE or list(cfg["lower"]) != LOWER:
+        raise SystemExit("prosody tiers do not match the Cowen lists")
+    if set(RELIABLE) & set(LOWER) or set(RELIABLE) | set(LOWER) != set(INVENTORY):
+        raise SystemExit("the two prosody tiers must partition the 24")
+    if cfg["baseline"] != "neutral" or "neutral" in INVENTORY or "breath" in INVENTORY:
+        raise SystemExit("neutral is the baseline and breath is not a category")
+    if any(name in INVENTORY for name in NOT_IN_SET):
+        raise SystemExit("a non-category is in the 24")
+    for name in INVENTORY:
+        got = resolve_name(name, cfg)
+        if got != {"track": "prosody", "categories": [name]}:
+            raise SystemExit(f"a word cannot carry {name}: {got}")
+    expect = {
+        "neutral": {"track": "baseline", "categories": ["neutral"]},
+        "calm": {"track": "baseline", "categories": ["neutral"]},
+        "angry": {"track": "prosody", "categories": ["anger"]},
+        "fearful": {"track": "prosody", "categories": ["fear"]},
+        "sad": {"track": "prosody", "categories": ["sadness"]},
+        "amused": {"track": "prosody", "categories": ["amusement"]},
+        "disgusted": {"track": "prosody", "categories": ["contempt"]},
+        "happy": {"track": "prosody", "categories": ["amusement", "interest"]},
+        "laughter": {"track": "burst", "categories": ["amusement"]},
+        "sigh": {"track": "burst", "categories": ["relief", "sadness", "disappointment", "contentment"]},
+        "breath": {"track": "physiology", "categories": []},
+        "embarrassment": {"track": "prosody", "categories": ["embarrassment"]},
     }
-    for native, want in checks.items():
-        got = canonical_label(native, cfg)
+    for native, want in expect.items():
+        got = resolve_name(native, cfg)
         if got != want:
             raise SystemExit(f"{native} mapped to {got}, want {want}")
+    sibling = REPO / "configs" / "emotions-v2.toml"
+    if sibling.is_file():
+        with sibling.open("rb") as handle:
+            doc = tomllib.load(handle)
+        if list(doc["inventory"]["labels"]) != INVENTORY:
+            raise SystemExit("configs/emotions-v2.toml inventory drifted")
+        if list(doc["prosody_tier"]["cross_culturally_reliable"]["labels"]) != RELIABLE:
+            raise SystemExit("configs/emotions-v2.toml reliable tier drifted")
+        if list(doc["prosody_tier"]["valid_lower_recognition_evidence"]["labels"]) != LOWER:
+            raise SystemExit("configs/emotions-v2.toml lower tier drifted")
+        if doc["tracks"]["prosody"]["uses"] != "inventory" or doc["tracks"]["burst"]["uses"] != "inventory":
+            raise SystemExit("prosody and burst must share the inventory")
+        if doc["baseline"]["neutral"].get("not_emotion") is not True:
+            raise SystemExit("neutral must stay the baseline")
+        if doc["tracks"]["breath"].get("not_emotion") is not True:
+            raise SystemExit("breath must stay physiology")
 
 
 def smoke(binary: Path) -> None:
