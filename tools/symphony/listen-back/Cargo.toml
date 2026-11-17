@@ -1,0 +1,25 @@
+# Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
+[package]
+name = "galion-listen-back"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+publish = false
+description = "MnE V2 listening-back: run a fixture, decode it, score the layers, correct once, score again."
+
+[[bin]]
+name = "galion-listen-back"
+path = "src/main.rs"
+
+[dependencies]
+galion-articulation = { path = "../articulation" }
+hound = "3.5"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Own workspace, same pattern as tools/symphony/articulation.
+# The locked voice runtime does not build this tool.
+[workspace]
+
+[profile.release]
+opt-level = 3

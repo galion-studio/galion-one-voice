@@ -32,6 +32,8 @@ jobs:
         run: cargo test --manifest-path tools/symphony/articulation/Cargo.toml
       - name: Articulation loop eval smoke (synthetic, no datasets)
         run: python3 tools/symphony/articulation/evals/loop_eval.py smoke
+      - name: Listening-back loop (synthetic signals, no audio)
+        run: cargo test --manifest-path tools/symphony/listen-back/Cargo.toml
       - name: One-percent symphony gate
         run: galion-gates/op-one-percent.sh
       - name: Clone worker scaffold (no weight download)
