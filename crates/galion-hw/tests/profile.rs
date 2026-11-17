@@ -129,3 +129,24 @@ fn fake_root_nodes_and_sysfs_vram() {
     assert_eq!((f.gpus[0].vram_total_mib, f.gpus[0].vram_free_mib), (Some(16384), Some(15360)));
     assert_eq!(profile(&f, "auto").primary, "rocm");
 }
+
+#[test]
+fn nested_cgroup_cap_is_read() {
+    let root = std::env::temp_dir().join(format!("galion-hw-cg-{}", std::process::id()));
+    let scope = root.join("sys/fs/cgroup/user.slice/run-x.scope");
+    std::fs::create_dir_all(&scope).unwrap();
+    std::fs::create_dir_all(root.join("proc/self")).unwrap();
+    std::fs::write(root.join("proc/self/cgroup"), "0::/user.slice/run-x.scope\n").unwrap();
+    std::fs::write(scope.join("memory.max"), "943718400\n").unwrap();
+    std::fs::write(root.join("sys/fs/cgroup/user.slice/memory.max"), "max\n").unwrap();
+    assert_eq!(galion_hw::own_cgroup_cap_mib(&root), Some(900));
+}
+
+#[test]
+fn gpu_needs_host_ram_too() {
+    let mut f = rtx4060();
+    f.ram_limit_mib = Some(900);
+    let p = profile(&f, "auto");
+    assert_eq!((p.tier.as_str(), p.primary.as_str()), ("micro", "cpu"));
+    assert_eq!(p.backends[0], "cuda", "GPU is still listed");
+}

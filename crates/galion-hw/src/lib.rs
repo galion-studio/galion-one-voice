@@ -106,7 +106,33 @@ fn cpu_ram(f: &mut Facts) {
             f.ram_limit_mib = Some(cap);
         }
     }
+    // sysinfo reads the container-root cgroup only; a nested cgroup v2 cap
+    // (systemd scope/service, k8s pod) lives on this process's own path.
+    if let Some(cap) = own_cgroup_cap_mib(Path::new("/")) {
+        if cap < f.ram_limit_mib.unwrap_or(f.ram_total_mib) {
+            f.ram_limit_mib = Some(cap);
+        }
+    }
     f.wsl = f.kernel.to_ascii_lowercase().contains("microsoft") || Path::new("/dev/dxg").exists();
+}
+
+/// Smallest cgroup v2 `memory.max` on this process's path and its parents.
+pub fn own_cgroup_cap_mib(root: &Path) -> Option<u64> {
+    let cg = std::fs::read_to_string(root.join("proc/self/cgroup")).ok()?;
+    let rel = cg.lines().find_map(|l| l.strip_prefix("0::"))?.trim().trim_start_matches('/');
+    let mut dir = root.join("sys/fs/cgroup").join(rel);
+    let mut best: Option<u64> = None;
+    loop {
+        if let Ok(v) = std::fs::read_to_string(dir.join("memory.max")) {
+            if let Ok(b) = v.trim().parse::<u64>() {
+                best = Some(best.map_or(b, |x: u64| x.min(b)));
+            }
+        }
+        if dir.ends_with("sys/fs/cgroup") || !dir.pop() {
+            break;
+        }
+    }
+    best.map(|b| b / MIB)
 }
 
 #[cfg(feature = "nvidia")]
@@ -365,7 +391,8 @@ pub fn profile(f: &Facts, policy: &str) -> Profile {
     let cpu_only = policy.eq_ignore_ascii_case("cpu");
     let best = gpus.first().copied();
     let vram = best.map_or(0, |g| usable_vram(g, f));
-    let use_gpu = !cpu_only && vram >= 2048;
+    // A GPU tier still needs host RAM to stage weights (2 GiB floor).
+    let use_gpu = !cpu_only && vram >= 2048 && ram >= 2048;
     let primary = if use_gpu { backends[0].clone() } else { "cpu".to_string() };
 
     // Tier table (RAM decides CPU tiers; usable VRAM decides GPU tiers).
