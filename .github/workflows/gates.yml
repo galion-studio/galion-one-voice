@@ -48,6 +48,8 @@ jobs:
         run: cargo test --manifest-path tools/symphony/listen-back/Cargo.toml
       - name: Symphony mouth layer (synthetic targets, no audio)
         run: cargo test --manifest-path tools/symphony/mouth/Cargo.toml
+      - name: Feeling core (synthetic intent, no audio)
+        run: cargo test --manifest-path tools/symphony/feeling/Cargo.toml --workspace
       - name: One-percent symphony gate
         run: galion-gates/op-one-percent.sh
       - name: Clone worker scaffold (no weight download)
