@@ -1,0 +1,6 @@
+# Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
+# Downloaded audio and per-clip profiles stay outside the repo.
+*.wav
+*.zip
+cache/
+reports/

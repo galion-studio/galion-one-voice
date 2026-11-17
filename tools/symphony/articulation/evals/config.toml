@@ -1,0 +1,101 @@
+# Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
+# Articulation loop eval. Not a gate. Audio is downloaded at run time and is not committed.
+
+schema = "galion-articulation-eval/1"
+
+# Speaker part: level of the tract. f0_hz is omitted because f0_st is the same pitch.
+# Used only when a profile has no tractprint_v2.speaker vector.
+speaker_fields = ["f0_st", "f1_hz", "f2_hz", "f3_hz", "vtl_cm", "hnr_db"]
+
+# Emotion part: level and spread, after the speaker's own neutral is subtracted.
+emotion_fields = ["f0_st", "hnr_db", "voicing", "f1_hz", "f2_hz"]
+
+# Cowen et al. 2019 prosody emotions, plus neutral as the baseline.
+# Laughter, sigh and breath are vocal-burst detectors, not members of this list.
+emotions = [
+  "neutral",
+  "adoration",
+  "amusement",
+  "anger",
+  "awe",
+  "confusion",
+  "contempt",
+  "desire",
+  "disappointment",
+  "distress",
+  "fear",
+  "interest",
+  "sadness",
+]
+
+bursts = ["laughter", "sigh", "breath"]
+
+# Spelling only. A public-dataset name is mapped when it is the same category.
+# happy, disgust, surprise and calm are not mapped onto amusement, contempt, awe or neutral.
+[aliases]
+angry = "anger"
+fearful = "fear"
+sad = "sadness"
+disappointed = "disappointment"
+amused = "amusement"
+
+# The rollout gate is unchanged. This eval does not measure it and does not add a bar to it.
+[rollout_gate]
+wer_max = 0.018
+ecapa_min = 0.7057
+emotion_min = 0.83
+note = "Existing gate. Articulation numbers below are not part of it."
+
+[augment]
+gain = 0.97
+snr_db = 40.0
+
+[labels]
+# Sibling file. If none of these exist, the direction comparison is not measured.
+candidates = [
+  "tools/symphony/articulation/emotion-labels-v2.toml",
+  "tools/symphony/articulation/evals/emotion-labels-v2.toml",
+  "docs/galion-voice-v2/symphony/emotion-labels-v2.toml",
+]
+
+[datasets.ravdess]
+enabled = false
+licence = "CC BY-NC-SA 4.0"
+licence_note = "Internal evaluation only. Audio is not committed and is not redistributed."
+url = "https://zenodo.org/records/1188976"
+zip_url = "https://zenodo.org/records/1188976/files/Audio_Speech_Actors_01-24.zip"
+zip_bytes = 208468073
+
+[datasets.crema-d]
+enabled = false
+licence = "Open Database License (ODbL) v1.0; contents under the Database Contents License (DbCL) v1.0"
+licence_note = "Internal evaluation only. Audio is not committed and is not redistributed."
+url = "https://github.com/CheyneyComputerScience/CREMA-D"
+audio_url = "https://media.githubusercontent.com/media/CheyneyComputerScience/CREMA-D/master/AudioWAV/{name}.wav"
+summary_url = "https://raw.githubusercontent.com/CheyneyComputerScience/CREMA-D/master/processedResults/summaryTable.csv"
+demographics_url = "https://raw.githubusercontent.com/CheyneyComputerScience/CREMA-D/master/VideoDemographics.csv"
+
+# Not downloaded in the CREMA-D + RAVDESS run. Reasons are access, not a claim that the audio was scored.
+[datasets.esd]
+enabled = false
+reason = "Not run. ESD is released by request from the HLT Singapore page, not as an open zip."
+
+[datasets.tess]
+enabled = false
+reason = "Not run. Toronto Emotional Speech Set is a two-speaker set; this run stopped after CREMA-D and RAVDESS."
+
+[datasets.emov-db]
+enabled = false
+reason = "Not run. EmoV-DB would add amused. This run stopped after CREMA-D and RAVDESS."
+
+[datasets.msp-podcast]
+enabled = false
+reason = "Not accessible here. MSP-Podcast requires a signed academic licence from UT Dallas."
+
+[datasets.audioset-laughter]
+enabled = false
+reason = "Not run. Laughter is a vocal-burst detector, not one of the 12 prosody emotions."
+
+[datasets.icsi]
+enabled = false
+reason = "Not accessible. The ICSI Meeting Corpus is LDC2004S02, a paid LDC licence."
