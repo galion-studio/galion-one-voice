@@ -30,6 +30,8 @@ jobs:
         run: cargo test --manifest-path tools/emotion-v2/refcheck/Cargo.toml
       - name: Symphony articulation layer (synthetic signals, no audio)
         run: cargo test --manifest-path tools/symphony/articulation/Cargo.toml
+      - name: Symphony lungs layer (synthetic signals, no audio)
+        run: cargo test --manifest-path tools/symphony/lungs/Cargo.toml
       - name: One-percent symphony gate
         run: galion-gates/op-one-percent.sh
       - name: Clone worker scaffold (no weight download)
