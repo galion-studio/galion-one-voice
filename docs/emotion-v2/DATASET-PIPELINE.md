@@ -209,6 +209,13 @@ is tried. An emotion scorer may return one float or a mapping of class
 names to scores (a 12- or 14-class posterior); the clip's own class is used.
 A named module that does not import is an error, never a silent pass.
 
+Decided 17 Nov (Mate): the emotion scorer is emotion2vec+
+(`emotion2vec/emotion2vec_plus_large`), checked per emotion at 0.83, over the
+12 V2 emotions plus Laughter and Seductive (14). This package does not ship
+that model; the scorer module (`swarm11/emotion-scorer-12` branch) plugs in
+through `--scorer-module` and returns the clip's class score. The class list
+itself comes from `emotion-v2/emotions.toml`.
+
 `config` carries `device`, `num_threads`, and `device_reason`.
 `--scorer-device cpu` is the production default (no GPU probe, all CPU
 threads). `--scorer-device auto` picks CUDA when torch sees a GPU, otherwise

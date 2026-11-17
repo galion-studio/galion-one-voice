@@ -84,7 +84,7 @@ class EmotionListTests(unittest.TestCase):
     def test_a_fourteen_class_file_gives_fourteen_per_class_thresholds(self) -> None:
         from emotion_v2_dataset.taxonomy import load_config_emotions
 
-        names = list(CANONICAL_EMOTIONS) + ["Proud", "Bored"]
+        names = list(CANONICAL_EMOTIONS) + ["Laughter", "Seductive"]
         body = "".join(f'[[emotions]]\nname = "{n}"\n\n' for n in names)
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "emotions.toml"
@@ -97,13 +97,13 @@ class EmotionListTests(unittest.TestCase):
             code = (
                 "from emotion_v2_dataset.quality import QualityThresholds, decide, ScoreCard;"
                 "t=QualityThresholds();print(len(t.min_emotion_by_class));"
-                "print(decide(ScoreCard(0.0,0.9,0.82),t,'Bored').reason)"
+                "print(decide(ScoreCard(0.0,0.9,0.82),t,'Seductive').reason)"
             )
             done = subprocess.run([sys.executable, "-c", code], env=env, capture_output=True, text=True, check=False)
             self.assertEqual(done.returncode, 0, done.stderr)
             lines = done.stdout.split("\n")
             self.assertEqual(lines[0], str(len(names)))
-            self.assertIn("emotion Bored 0.8200 below 0.8300", lines[1])
+            self.assertIn("emotion Seductive 0.8200 below 0.8300", lines[1])
 
 
 class GateDefaultTests(unittest.TestCase):
