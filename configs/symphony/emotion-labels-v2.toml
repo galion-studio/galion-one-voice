@@ -1,7 +1,8 @@
 # Galion Voice — Perpetual Open MIT License
 # Copyright (c) 2026 Galion Labs.
 #
-# Universal emotion labels, articulation V2.
+# Acoustic directions for the Cowen 2019 names.
+# The inventory is configs/emotions-v2.toml. This file does not define it.
 # Prose and citations: docs/galion-voice-v2/symphony/ARTICULATION-V2-SPEC.md
 #
 # z_vs_own_neutral = (x - this_speaker_neutral_mean) / this_speaker_neutral_sd
@@ -240,75 +241,19 @@ pause_ms = "unknown, to be learned from data"
 source = "juslin2003"
 locus = "p. 796"
 
-# --- regions ---
+# --- prosody regions (the 12) ---
+# Names come from configs/emotions-v2.toml. Do not add a retired name here.
 # juslin_modal: high / low / fast / slow / bimodal / inconsistent
 # banse_z_*: Table 6, sex and actor partialed out, vs the cross-emotion mean.
 # articulation_duration_z is Banse DurArt. Higher means slower, not faster.
+# A missing feature is unknown, to be learned from data.
 
-[regions.neutral]
-role = "baseline"
-z_vs_own_neutral = 0
-note = "Defined as this speaker's neutral. Not a portrayed emotion."
-
-[regions.calm]
+[regions.adoration]
+from_old = "tender"
 z_vs_own_neutral = "unknown, to be learned from data"
-note = "No row in Juslin Table 7 or Banse Table 6. Not tenderness."
+scope_note = "Juslin called this love-tenderness, not adoration."
 
-[regions.happy.juslin_modal]
-scope = "pooled"
-family = "happiness, which pools elation and quieter happiness"
-f0_mean = "higher"
-f0_range = "higher"
-loudness = "higher"
-rate = "faster"
-alpha_ratio = "higher"
-f1 = "higher"
-f1_status = "preliminary"
-source = "juslin2003"
-locus = "Table 7, pp. 792-795; F1 on p. 796"
-
-[regions.happy.banse_low_pole]
-name = "happiness"
-scope = "sex_partialed"
-f0_mean_z = -0.64
-loudness_z = -0.48
-articulation_duration_z = -0.49
-source = "banse1996"
-locus = "Table 6, p. 625"
-note = "Opposite F0 sign from the Juslin modal. Do not average the two poles."
-
-[regions.happy.banse_high_pole]
-name = "elation"
-scope = "sex_partialed"
-f0_mean_z = 1.24
-loudness_z = 1.05
-articulation_duration_z = 0.12
-source = "banse1996"
-locus = "Table 6, p. 625"
-
-[regions.happy.male]
-same_as = "pooled and sex_partialed rows"
-sex_specific_z = "unknown, to be learned from data"
-
-[regions.happy.female]
-same_as = "pooled and sex_partialed rows"
-sex_specific_z = "unknown, to be learned from data"
-
-[regions.amused]
-z_vs_own_neutral = "unknown, to be learned from data"
-speech = "unknown, to be learned from data"
-inspiratory_time = "shorter"
-tidal_volume = "smaller"
-breath_amount = "unknown, to be learned from data"
-breath_scope = "not split by sex in the abstract"
-source = "boiten1998"
-note = "Respiratory amusement only. Not laughter."
-
-[regions.excited]
-z_vs_own_neutral = "unknown, to be learned from data"
-note = "No measured row. Banse elation is not copied onto excited."
-
-[regions.tender.juslin_modal]
+[regions.adoration.juslin_modal]
 scope = "pooled"
 f0_mean = "lower"
 f0_range = "lower"
@@ -319,59 +264,29 @@ pause = "unknown, to be learned from data"
 source = "juslin2003"
 locus = "Table 7, pp. 792-795; pauses p. 796"
 
-[regions.tender.male]
+[regions.adoration.male]
 same_as = "juslin_modal"
 sex_specific_z = "unknown, to be learned from data"
 
-[regions.tender.female]
+[regions.adoration.female]
 same_as = "juslin_modal"
 sex_specific_z = "unknown, to be learned from data"
 
-[regions.sad.juslin_modal]
-scope = "pooled"
-f0_mean = "lower"
-f0_range = "lower"
-loudness = "lower"
-rate = "slower"
-alpha_ratio = "lower"
-pause = "more"
-f1 = "lower"
-f1_status = "preliminary"
-source = "juslin2003"
-locus = "Table 7; pauses and F1, p. 796"
-
-[regions.sad.banse_low_pole]
-name = "sadness"
-scope = "sex_partialed"
-f0_mean_z = -0.32
-loudness_z = -1.16
-articulation_duration_z = 1.04
-source = "banse1996"
-locus = "Table 6, p. 625"
-
-[regions.sad.banse_high_pole]
-name = "despair"
-scope = "sex_partialed"
-f0_mean_z = 0.99
-loudness_z = 1.00
-articulation_duration_z = 0.32
-source = "banse1996"
-locus = "Table 6, p. 625"
-note = "High arousal inside the sadness family. Not the Juslin modal."
-
-[regions.sad.male]
-same_as = "pooled and sex_partialed rows"
-sex_specific_z = "unknown, to be learned from data"
-
-[regions.sad.female]
-same_as = "pooled and sex_partialed rows"
-sex_specific_z = "unknown, to be learned from data"
-
-[regions.disappointed]
+[regions.amusement]
+from_old = ["amused", "happy", "excited"]
 z_vs_own_neutral = "unknown, to be learned from data"
-note = "Not sadness."
+speech = "unknown, to be learned from data"
+note = "Happy and excited are a split with interest. Their acoustic profiles are not copied here. Laugh acoustics are under bursts.amusement."
+inspiratory_time = "shorter"
+tidal_volume = "smaller"
+breath_amount = "unknown, to be learned from data"
+breath_scope = "not split by sex in the abstract"
+breath_source = "boiten1998"
 
-[regions.angry.juslin_modal]
+[regions.anger]
+from_old = "angry"
+
+[regions.anger.juslin_modal]
 scope = "pooled"
 f0_mean = "higher"
 f0_range = "higher"
@@ -384,7 +299,7 @@ f1_status = "preliminary"
 source = "juslin2003"
 locus = "Table 7; pauses and F1, p. 796"
 
-[regions.angry.banse_high_pole]
+[regions.anger.banse_high_pole]
 name = "hot_anger"
 scope = "sex_partialed"
 f0_mean_z = 1.13
@@ -393,7 +308,7 @@ articulation_duration_z = -0.31
 source = "banse1996"
 locus = "Table 6, p. 625"
 
-[regions.angry.banse_low_pole]
+[regions.anger.banse_low_pole]
 name = "cold_anger"
 scope = "sex_partialed"
 f0_mean_z = 0.16
@@ -402,15 +317,63 @@ articulation_duration_z = -0.14
 source = "banse1996"
 locus = "Table 6, p. 625"
 
-[regions.angry.male]
+[regions.anger.male]
 same_as = "pooled and sex_partialed rows"
 sex_specific_z = "unknown, to be learned from data"
 
-[regions.angry.female]
+[regions.anger.female]
 same_as = "pooled and sex_partialed rows"
 sex_specific_z = "unknown, to be learned from data"
 
-[regions.fearful.juslin_modal]
+[regions.awe]
+from_old = "surprised"
+z_vs_own_neutral = "unknown, to be learned from data"
+note = "Surprise also maps to confusion. No acoustic row."
+
+[regions.confusion]
+from_old = "surprised"
+z_vs_own_neutral = "unknown, to be learned from data"
+note = "Cowen 2019 NHB Fig. 7 blends confusion with interest, not with surprise. No acoustic row."
+
+[regions.contempt]
+from_old = "disgusted"
+z_vs_own_neutral = "unknown, to be learned from data"
+note = "Banse disgust is not copied here. It is under bursts.disgust."
+
+[regions.desire]
+from_old = "seductive"
+z_vs_own_neutral = "unknown, to be learned from data"
+note = "Hughes is courtship-directed speech, not a desire portrayal."
+f0_mean = "lower"
+f0_source = "hughes2010"
+hnr = "unknown, to be learned from data"
+rate = "unknown, to be learned from data"
+audible_exhale = "unknown, to be learned from data"
+
+[regions.desire.male]
+f0_attractive_hz = 142.95
+f0_unattractive_hz = 145.25
+source = "hughes2010"
+locus = "p. 160, descriptive means; interaction n.s."
+
+[regions.desire.female]
+f0_attractive_hz = 261.55
+f0_unattractive_hz = 271.59
+source = "hughes2010"
+locus = "p. 160, descriptive means; interaction n.s."
+
+[regions.disappointment]
+from_old = "disappointed"
+z_vs_own_neutral = "unknown, to be learned from data"
+
+[regions.distress]
+z_vs_own_neutral = "unknown, to be learned from data"
+note = "Not Banse despair. Despair stays under sadness as Banse's word."
+
+[regions.fear]
+from_old = "fearful"
+
+[regions.fear.juslin_modal]
 scope = "pooled"
 f0_mean = "higher"
 f0_range = "inconsistent"
@@ -422,7 +385,7 @@ f1_status = "preliminary"
 source = "juslin2003"
 locus = "Table 7; F1, p. 796"
 
-[regions.fearful.banse_high_pole]
+[regions.fear.banse_high_pole]
 name = "panic"
 scope = "sex_partialed"
 f0_mean_z = 1.23
@@ -431,7 +394,7 @@ articulation_duration_z = -0.58
 source = "banse1996"
 locus = "Table 6, p. 625"
 
-[regions.fearful.banse_low_pole]
+[regions.fear.banse_low_pole]
 name = "anxiety"
 scope = "sex_partialed"
 f0_mean_z = -0.58
@@ -443,43 +406,112 @@ breath_source = "homma2008"
 source = "banse1996"
 locus = "Table 6, p. 625"
 
-[regions.fearful.male]
+[regions.fear.male]
 same_as = "pooled and sex_partialed rows"
 sex_specific_z = "unknown, to be learned from data"
 
-[regions.fearful.female]
+[regions.fear.female]
 same_as = "pooled and sex_partialed rows"
 sex_specific_z = "unknown, to be learned from data"
 
-[regions.surprised]
+[regions.interest]
+from_old = ["happy", "excited"]
 z_vs_own_neutral = "unknown, to be learned from data"
+note = "Split with amusement. No interest-specific acoustic row was read."
 
-[regions.disgusted.banse]
+[regions.sadness]
+from_old = "sad"
+
+[regions.sadness.juslin_modal]
+scope = "pooled"
+f0_mean = "lower"
+f0_range = "lower"
+loudness = "lower"
+rate = "slower"
+alpha_ratio = "lower"
+pause = "more"
+f1 = "lower"
+f1_status = "preliminary"
+source = "juslin2003"
+locus = "Table 7; pauses and F1, p. 796"
+
+[regions.sadness.banse_low_pole]
+name = "sadness"
 scope = "sex_partialed"
-f0_mean_z = -0.29
-loudness_z = -0.51
-recognition = 0.15
-recognition_note = "Weak profile. Do not treat as a firm target."
+f0_mean_z = -0.32
+loudness_z = -1.16
+articulation_duration_z = 1.04
 source = "banse1996"
-locus = "Table 6, p. 625; recognition text p. 622"
+locus = "Table 6, p. 625"
 
-[regions.disgusted.breath]
-inspiratory_pause = "longer"
-amount = "unknown, to be learned from data"
-scope = "not split by sex in the abstract"
-source = "boiten1998"
+[regions.sadness.banse_high_pole]
+name = "despair"
+scope = "sex_partialed"
+f0_mean_z = 0.99
+loudness_z = 1.00
+articulation_duration_z = 0.32
+source = "banse1996"
+locus = "Table 6, p. 625"
+note = "Banse's word. Not Cowen's distress."
 
-[regions.disgusted.male]
-same_as = "banse and breath"
+[regions.sadness.male]
+same_as = "pooled and sex_partialed rows"
 sex_specific_z = "unknown, to be learned from data"
 
-[regions.disgusted.female]
-same_as = "banse and breath"
+[regions.sadness.female]
+same_as = "pooled and sex_partialed rows"
 sex_specific_z = "unknown, to be learned from data"
 
-[regions.laughter.male]
+# Happiness-family numbers, kept so the citation is not dropped.
+# Not a category. Not assigned to amusement or to interest.
+[legacy_evidence.happiness]
+not_a_category = true
+maps_to = ["amusement", "interest"]
+
+[legacy_evidence.happiness.juslin_modal]
+scope = "pooled"
+family = "happiness, which pools elation and quieter happiness"
+f0_mean = "higher"
+f0_range = "higher"
+loudness = "higher"
+rate = "faster"
+alpha_ratio = "higher"
+f1 = "higher"
+f1_status = "preliminary"
+source = "juslin2003"
+locus = "Table 7, pp. 792-795; F1 on p. 796"
+
+[legacy_evidence.happiness.banse_low_pole]
+name = "happiness"
+scope = "sex_partialed"
+f0_mean_z = -0.64
+loudness_z = -0.48
+articulation_duration_z = -0.49
+source = "banse1996"
+locus = "Table 6, p. 625"
+note = "Opposite F0 sign from the Juslin modal. Do not average the two poles."
+
+[legacy_evidence.happiness.banse_high_pole]
+name = "elation"
+scope = "sex_partialed"
+f0_mean_z = 1.24
+loudness_z = 1.05
+articulation_duration_z = 0.12
+source = "banse1996"
+locus = "Table 6, p. 625"
+note = "Elation is a burst-only category. These z values are Banse's speech portrayals, not that burst."
+
+# --- bursts that carry a cited number. Other burst names are in emotions-v2.toml. ---
+
+[bursts.amusement]
+from_detector = "laughter"
 kind = "absolute_laugh_not_z"
+not_prosody = true
 z_vs_speech_neutral = "unknown, to be learned from data"
+source = "bachorowski2001"
+locus = "p. 1586; Tables I, II, IV"
+
+[bursts.amusement.male]
 f0_mean_hz_voiced = 272
 f0_mean_sd = 148
 f0_max_hz = 1245
@@ -496,12 +528,8 @@ bout_duration_s = 0.95
 f1_open_hz = 535
 f2_open_hz = 1592
 f3_open_hz = 2576
-source = "bachorowski2001"
-locus = "p. 1586; Tables I, II, IV"
 
-[regions.laughter.female]
-kind = "absolute_laugh_not_z"
-z_vs_speech_neutral = "unknown, to be learned from data"
+[bursts.amusement.female]
 f0_mean_hz_voiced = 405
 f0_mean_sd = 193
 f0_max_hz = 2083
@@ -518,29 +546,24 @@ bout_duration_s = 0.82
 f1_open_hz = 653
 f2_open_hz = 1713
 f3_open_hz = 2875
-source = "bachorowski2001"
-locus = "p. 1586; Tables I, II, IV"
 
-[regions.seductive]
-z_vs_own_neutral = "unknown, to be learned from data"
-note = "Not a basic emotion. Only the courtship F0 drop is cited, and it is not sex-specific."
-f0_mean = "lower"
-f0_source = "hughes2010"
-hnr = "unknown, to be learned from data"
-rate = "unknown, to be learned from data"
-audible_exhale = "unknown, to be learned from data"
+[bursts.disgust]
+not_prosody = true
+note = "Banse speech portrayals of disgust. Not a prosody label. Recognition 15%."
+scope = "sex_partialed"
+f0_mean_z = -0.29
+loudness_z = -0.51
+recognition = 0.15
+source = "banse1996"
+locus = "Table 6, p. 625; recognition text p. 622"
+inspiratory_pause = "longer"
+inspiratory_pause_amount = "unknown, to be learned from data"
+inspiratory_pause_source = "boiten1998"
 
-[regions.seductive.male]
-f0_attractive_hz = 142.95
-f0_unattractive_hz = 145.25
-source = "hughes2010"
-locus = "p. 160, descriptive means; interaction n.s."
-
-[regions.seductive.female]
-f0_attractive_hz = 261.55
-f0_unattractive_hz = 271.59
-source = "hughes2010"
-locus = "p. 160, descriptive means; interaction n.s."
+[bursts.sigh]
+detector = true
+may_be = ["relief", "sadness", "disappointment", "contentment"]
+acoustics = "unknown, to be learned from data"
 
 [sources.banse1996]
 citation = "Banse, R., & Scherer, K. R. (1996). Acoustic profiles in vocal emotion expression. Journal of Personality and Social Psychology, 70(3), 614-636."

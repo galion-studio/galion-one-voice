@@ -5,7 +5,7 @@ Europe/Zagreb. 2026-11-17.
 
 This note is the foundation. Everything else in the articulation layer is built on it. It is a specification of how a voice carries a feeling, not a model of a named person and not a gate.
 
-The machine-readable labels are `configs/symphony/emotion-labels-v2.toml`. A number appears in either file only when a source below states it. Where a source does not, the value is **unknown, to be learned from data**.
+The category inventory is `configs/emotions-v2.toml`. That file is the only list of emotion names. Acoustic directions, still unknown as z against the speaker's own neutral, stay in `configs/symphony/emotion-labels-v2.toml`. A number appears only when a source below states it. Where a source does not, the value is **unknown, to be learned from data**.
 
 V1 (`ARTICULATION-LAYER.md`) already measures the throat, the mouth and a nasal-class posterior on the 80 ms Symphony tick. TractPrint did not separate speakers: a male control scored 0.795 overall, inside the clone band 0.785–0.850. Pitch and formants alone scored that control 0.578. Extra channels diluted the separation. V2 therefore keeps the smallest set that the literature actually uses to separate feelings, and the smallest set that separates speakers (F0 and vocal-tract length). It does not add a new score.
 
@@ -23,22 +23,50 @@ The point has three continuous axes:
 
 Russell (1980) is the precedent for a pleasure–arousal circumplex. No coordinate is copied from his figures. Dominance is kept because the same emotion word covers opposite acoustic poles. It is not a measured third loading.
 
-The fourteen names are **regions** on that point, not an inventory of human feeling. A tick may sit inside one region, between regions, or in several at once. Intensity is how far the point sits from the speaker's own neutral toward a pole. Onset, offset, transition shape and mixture weights are unknown, to be learned from data.
+### 1.1a Two tracks, one baseline
 
-A region can contain opposite poles. Banse and Scherer (1996, p. 625) had no neutral utterances. Their z values are residuals after speaker identity and sex were partialed out, relative to the mean of the fourteen portrayed emotions, with a strong change defined as 1 SD and a weak change as 0.5 SD (p. 625). They are not z against a speaker's own neutral. Juslin and Laukka (2003, p. 789, note 9) warn that studies do not share a baseline, so their Table 7 is a count of high / medium / low calls, not a z.
+Three tracks. They are not interchangeable.
 
-| Region | What the sources actually split | Do not collapse to |
+| Track | What it is | Inventory |
 |---|---|---|
-| happy | Banse **happiness** is the low pole (F0 z = −0.64, energy z = −0.48). Banse **elation** is the high pole (F0 z = 1.24, energy z = 1.05). Juslin's "happiness" pools both and is mostly the high pattern. | one "happy = higher F0" rule |
-| angry | Juslin anger is fast, loud, high F0, high F0 variability, high high-frequency energy, few pauses. Banse **hot anger** F0 z = 1.13, energy z = 1.19. Banse **cold anger** F0 z = 0.16, energy z = 0.52. | one anger |
-| fearful | Juslin fear is mostly fast and high F0; intensity and high-frequency energy are bimodal; F0-variability studies fall more often in the low bin than the high bin (Table 7). Banse **panic** F0 z = 1.23, energy z = 0.84. Banse **anxiety** F0 z = −0.58, energy z = −0.37. | one fear |
-| sad | Juslin sadness is slow, quiet, low F0, low F0 variability, low high-frequency energy, many pauses. Banse **sadness** F0 z = −0.32, energy z = −1.16, articulation-duration z = 1.04 (higher means slower). Banse **despair** F0 z = 0.99, energy z = 1.00. | one sadness |
-| disgusted | Banse disgust F0 z = −0.29, energy z = −0.51. Listeners recognised it at 15% (text, p. 622). The profile is weak. | a confident disgust target |
-| tender | Juslin love–tenderness only: slow, quiet, low F0, low F0 variability, low high-frequency energy. Pauses were little studied. | calm, or seductive |
-| laughter | Not speech. See §3. | amused speech |
-| neutral | The baseline in §1.2. z = 0 by definition. It is not an acoustic target. | a portrayed "neutral emotion" (Banse and Scherer did not record one) |
+| Prosody | Emotion recognised in speech melody, rhythm and timbre | 12 categories |
+| Burst | Emotion recognised in a brief non-speech vocalisation | 24 categories |
+| Breath | Lungs and airflow (§2). Physiology. | not an emotion |
 
-Calm, amused speech (as distinct from laughter), excited, disappointed, surprised and seductive have **no** row in Juslin's Table 7 or Banse's Table 6. Excited is not assigned Banse's elation numbers. Seductive is not a basic emotion; the only cited vocal change is in §1.3 under intent.
+**Neutral** is the speaker's own baseline (§1.2). z = 0 by definition. It is not a thirteenth prosody category and not a twenty-fifth burst. Cowen, Elfenbein, Laukka and Keltner (2019) excluded "Neutral" from the burst dimensions because a forced-choice neutral is redundant (American Psychologist, 74(6), the NNMF paragraph). Banse and Scherer (1996) recorded no neutral portrayals.
+
+Prosody, the 12 that survived across US and Indian listeners (Cowen, Laukka, Elfenbein, Liu & Keltner, 2019, *Nature Human Behaviour, 3*(4), 369–382, doi:10.1038/s41562-019-0533-6, PMC6687085): adoration, amusement, anger, awe, confusion, contempt, desire, disappointment, distress, fear, interest, sadness. Each of the 12 rotated dimensions loaded maximally on one of these words. Awe and surprise were used similarly (their dimension D). Gradients join particular pairs, including amusement–adoration, confusion–interest, fear–sadness, anger–contempt, and sadness–distress (Fig. 7). A tick may sit on a gradient, in a blend, or between regions. Onset shape and mixture weights are unknown.
+
+Bursts, the 24 dimensions (Cowen, Elfenbein, Laukka & Keltner, 2019, *American Psychologist, 74*(6), 698–712, doi:10.1037/amp0000399, PMC6586540, Figure 3B): the same 12, plus contentment, disgust, ecstasy, elation, embarrassment, pain, realization, relief, surprise_negative, surprise_positive, sympathy, triumph. Those last 12 are burst-only. Candidates that did **not** form their own dimension: guilt, pride, romantic love, serenity, shame.
+
+The old 14 names are retired. The crosswalk is the Galion map; it is not a claim that the cited acoustic study used the new word.
+
+| Old name | Goes to | What is not copied across |
+|---|---|---|
+| neutral | baseline, z = 0 | — |
+| calm | the same baseline, low arousal on the core axis | no calm category in the 12; serenity was not a distinct burst |
+| tender | prosody adoration | Juslin's love–tenderness profile stays labelled as tenderness |
+| seductive | prosody desire | Hughes is courtship-directed speech, not a desire portrayal |
+| angry | prosody anger | hot and cold anger stay two poles |
+| fearful | prosody fear | panic and anxiety stay two poles |
+| sad | prosody sadness | Banse despair is not distress |
+| disappointed | prosody disappointment | no acoustic row; still unknown |
+| happy | prosody amusement **and** interest | Juslin/Banse happiness numbers are not assigned to either word alone |
+| amused | prosody amusement | Boiten's breath change stays here. It is not the laugh numbers |
+| excited | prosody interest **and** amusement | Banse elation is not copied onto either word. Elation is its own burst, not a prosody category |
+| surprised | prosody awe **and** confusion | no acoustic row. Dimension D ties surprise to awe; confusion's published gradient is with interest |
+| disgusted | prosody contempt | Banse's disgust profile is not contempt. Disgust is burst-only |
+| laughter | burst amusement | Bachorowski measured laughs, not the prosody category |
+| sigh | burst relief, sadness, disappointment, or contentment | no sigh-to-category table was read; the detector may be any of the four |
+
+A region can still contain opposite poles inside one new name. Banse and Scherer (1996, p. 625) partialed out speaker and sex and scored against the mean of the emotions they portrayed, with a strong change as 1 SD and a weak change as 0.5 SD. That is not z against a speaker's own neutral. Juslin and Laukka (2003, p. 789, note 9) warn that studies do not share a baseline.
+
+| Prosody region | Cited split that still applies | Do not collapse to |
+|---|---|---|
+| anger | Juslin: fast, loud, high F0, high F0 variability, high high-frequency energy, few pauses. Banse hot anger F0 z = 1.13, energy z = 1.19. Cold anger F0 z = 0.16, energy z = 0.52. | one anger |
+| fear | Juslin: mostly fast and high F0; intensity and high-frequency energy bimodal; F0-variability studies fall more often in the low bin (Table 7). Banse panic F0 z = 1.23, energy z = 0.84. Anxiety F0 z = −0.58, energy z = −0.37. | one fear |
+| sadness | Juslin: slow, quiet, low F0, low F0 variability, low high-frequency energy, many pauses. Banse sadness F0 z = −0.32, energy z = −1.16, articulation-duration z = 1.04 (higher means slower). | Banse despair (F0 z = 0.99, energy z = 1.00), which is not Cowen's distress |
+| adoration | Juslin love–tenderness: slow, quiet, low F0, low F0 variability, low high-frequency energy. Pauses little studied. | calm, or desire |
 
 ### 1.2 Stable baseline, fluid state
 
@@ -52,7 +80,7 @@ z = (x - mean_neutral) / sd_neutral
 
 `mean_neutral` and `sd_neutral` are that speaker's. Sex, age, vocal-tract length and personality sit in the baseline. They are not feelings. Banse's z removed sex on purpose, which is why those z values must not be copied in as male or female targets.
 
-No source read here reports this z for any of the fourteen regions. Every `z_vs_own_neutral` in the label file is **unknown, to be learned from data**. Directions in the file are the modal pattern (Juslin) or the cross-emotion residual (Banse), and they are labelled as such.
+No source read here reports this z for any of the twelve prosody regions. Every `z_vs_own_neutral` in the label file is **unknown, to be learned from data**. Directions in the file are the modal pattern (Juslin) or the cross-emotion residual (Banse), and they are labelled as such.
 
 Absolute population numbers are anchors for the baseline, never substitutes for z:
 
@@ -130,9 +158,11 @@ One chain, in order. A feeling does not skip a stage.
 
 Eye-to-eye proximity, whisper, and an audible intimate exhale are human-connection cues. Their acoustic sizes were not in the sources read. They stay unknown. The one cited "speaking to someone who matters" effect is the F0 drop in Hughes et al. (2010), and it is a few hertz in that phone-message task, not a whisper recipe.
 
-## 3. Laughter
+## 3. Vocal bursts
 
-Bachorowski, Smoski and Owren (2001), 1,024 laugh bouts, 97 young adults. These are absolute laugh values, not z against the same person's speech.
+Laughter is not a prosody category. It is the burst detector for **amusement** (Cowen, Elfenbein, Laukka & Keltner, 2019, Figure 3B). A sigh is a burst detector that may be relief, sadness, disappointment, or contentment; Cowen names sighs as examples of bursts and does not publish that four-way assignment. Breath rate, inspiratory time, tidal volume and an inspiratory pause are the physiology track (§1.3, §2), not a burst and not an emotion.
+
+Bachorowski, Smoski and Owren (2001), 1,024 laugh bouts, 97 young adults. These are absolute laugh values, not z against the same person's speech, and not a prosody-amusement target.
 
 | | Men | Women | Where |
 |---|---|---|---|
@@ -161,7 +191,7 @@ Open-mouth calls had higher F0 than closed-mouth calls (p. 1586). Laughter sat i
 
 ## 5. Gaps
 
-Unknown, to be learned from data, and not implied by a neighbour region: calm; amused speech; excited as its own category; disappointed; surprised; seductive beyond the Hughes F0 drop; whisper; eye-to-eye level; subglottal pressure; lung-volume slope; audible breath level; breath-group length; fatigue; hydration; health; adult-age F0; personality offsets; mixture weights; onset shape; every z against the speaker's own neutral; speech F0 population norms (the classic vowel tables were not re-read). Disgust's acoustic profile is published and weak (15% recognition).
+Unknown, to be learned from data, and not filled from a neighbour: prosody acoustics for awe, confusion, contempt, disappointment, distress, interest, and for amusement as speech (the laugh numbers are bursts). Desire has only the Hughes courtship F0 drop. Disgust, as a burst, has Banse's speech-portrayal profile (15% recognition) and no burst recording in this file. Sigh has no acoustic target. Also unknown: whisper; eye-to-eye level; subglottal pressure; lung-volume slope; audible breath level; breath-group length; fatigue; hydration; health; adult-age F0; personality offsets; mixture weights; onset shape; every z against the speaker's own neutral; speech F0 population norms (Hillenbrand and Peterson & Barney were not re-read).
 
 ## Sources read for a number or a direction
 
@@ -176,6 +206,8 @@ Unknown, to be learned from data, and not implied by a neighbour region: calm; a
 9. Tartter, V. C. (1980). Happy talk: Perceptual and acoustic effects of smiling on speech. *Perception & Psychophysics, 27*, 24–27. Direction read from the paper text. Per-speaker Hz table not copied.
 10. Garnier, M., Henrich, N., & Dubois, D. (2010). Influence of sound immersion and communicative interaction on the Lombard effect. *Journal of Speech, Language, and Hearing Research, 53*(3), 588–608. Experiments 1 and 2.
 11. Russell, J. A. (1980). A circumplex model of affect. *Journal of Personality and Social Psychology, 39*(6), 1161–1178. Axis precedent only. No figure was digitised.
+12. Cowen, A. S., Laukka, P., Elfenbein, H. A., Liu, R., & Keltner, D. (2019). The primacy of categories in the recognition of 12 emotions in speech prosody across two cultures. *Nature Human Behaviour, 3*(4), 369–382. doi:10.1038/s41562-019-0533-6. PMC6687085.
+13. Cowen, A. S., Elfenbein, H. A., Laukka, P., & Keltner, D. (2019). Mapping 24 emotions conveyed by brief human vocalization. *American Psychologist, 74*(6), 698–712. doi:10.1037/amp0000399. PMC6586540.
 
 Named by those papers and not re-read, so not used for a number: Scherer (1986), Fant (1960), Tartter and Braun (1994), Masaoka and Homma (2001), Nyklíček et al. (1997). Titze and Hixon were not opened.
 

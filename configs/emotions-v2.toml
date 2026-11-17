@@ -1,0 +1,177 @@
+# Galion Voice — Perpetual Open MIT License
+# Copyright (c) 2026 Galion Labs.
+#
+# Single inventory of emotion names for Galion Voice V2.
+# Acoustic directions: configs/symphony/emotion-labels-v2.toml
+# Prose: docs/galion-voice-v2/symphony/ARTICULATION-V2-SPEC.md
+#
+# Two tracks. Breath is physiology, not a third emotion list.
+# Neutral is the speaker baseline (z = 0), not an emotion.
+
+schema = "galion-emotions-v2"
+taxonomy = "cowen-2019"
+
+[tracks.prosody]
+kind = "speech_prosody"
+n = 12
+source = "cowen2019_nhb"
+labels = [
+  "adoration",
+  "amusement",
+  "anger",
+  "awe",
+  "confusion",
+  "contempt",
+  "desire",
+  "disappointment",
+  "distress",
+  "fear",
+  "interest",
+  "sadness",
+]
+
+[tracks.burst]
+kind = "vocal_burst"
+n = 24
+source = "cowen2019_ap"
+labels = [
+  "adoration",
+  "amusement",
+  "anger",
+  "awe",
+  "confusion",
+  "contempt",
+  "contentment",
+  "desire",
+  "disappointment",
+  "disgust",
+  "distress",
+  "ecstasy",
+  "elation",
+  "embarrassment",
+  "fear",
+  "interest",
+  "pain",
+  "realization",
+  "relief",
+  "sadness",
+  "surprise_negative",
+  "surprise_positive",
+  "sympathy",
+  "triumph",
+]
+
+# The 12 prosody names are also burst names. These 12 are burst-only.
+[tracks.burst_only]
+n = 12
+labels = [
+  "contentment",
+  "disgust",
+  "ecstasy",
+  "elation",
+  "embarrassment",
+  "pain",
+  "realization",
+  "relief",
+  "surprise_negative",
+  "surprise_positive",
+  "sympathy",
+  "triumph",
+]
+
+[tracks.breath]
+kind = "physiology"
+not_emotion = true
+note = "Lungs and airflow. Not a prosody category and not a burst category."
+
+[baseline.neutral]
+role = "speaker_baseline"
+not_emotion = true
+z_vs_own_neutral = 0
+note = "Own-neutral reference. Not one of the 12 and not one of the 24."
+
+# Judged in the burst study and not recovered as their own dimension (Figure 3B).
+[not_distinct_in_burst_study]
+source = "cowen2019_ap"
+labels = ["guilt", "pride", "romantic_love", "serenity", "shame"]
+
+# Galion crosswalk from the retired 14 names. A split is two legal targets,
+# not a measurement that the old word's acoustics belong to both.
+[map.neutral]
+to_track = "baseline"
+to = ["neutral"]
+
+[map.calm]
+to_track = "baseline"
+to = ["neutral"]
+note = "Low arousal on the core axis. Not a category. Serenity was not a distinct burst."
+
+[map.tender]
+to_track = "prosody"
+to = ["adoration"]
+
+[map.seductive]
+to_track = "prosody"
+to = ["desire"]
+
+[map.angry]
+to_track = "prosody"
+to = ["anger"]
+
+[map.fearful]
+to_track = "prosody"
+to = ["fear"]
+
+[map.sad]
+to_track = "prosody"
+to = ["sadness"]
+
+[map.disappointed]
+to_track = "prosody"
+to = ["disappointment"]
+
+[map.happy]
+to_track = "prosody"
+to = ["amusement", "interest"]
+note = "Split. Juslin/Banse happiness numbers are not assigned to either name alone."
+
+[map.amused]
+to_track = "prosody"
+to = ["amusement"]
+
+[map.excited]
+to_track = "prosody"
+to = ["interest", "amusement"]
+note = "Split. Banse elation is not copied onto either name. Elation is burst-only."
+
+[map.surprised]
+to_track = "prosody"
+to = ["awe", "confusion"]
+note = "Split. Cowen 2019 NHB dimension D ties surprise with awe. Confusion's published gradient is with interest (Fig. 7)."
+
+[map.disgusted]
+to_track = "prosody"
+to = ["contempt"]
+burst_only = "disgust"
+note = "Disgust is one of the 24 bursts, not one of the 12 prosody categories. Banse's disgust profile is not contempt."
+
+[map.laughter]
+to_track = "burst"
+to = ["amusement"]
+note = "Detector. Not a prosody label. Bachorowski numbers are laugh calls."
+
+[map.sigh]
+to_track = "burst"
+to = ["relief", "sadness", "disappointment", "contentment"]
+note = "Detector. May be any of the four. No sigh-to-category table was read in Cowen 2019 AP."
+
+[sources.cowen2019_nhb]
+citation = "Cowen, A. S., Laukka, P., Elfenbein, H. A., Liu, R., & Keltner, D. (2019). The primacy of categories in the recognition of 12 emotions in speech prosody across two cultures. Nature Human Behaviour, 3(4), 369-382."
+doi = "10.1038/s41562-019-0533-6"
+pmc = "PMC6687085"
+
+[sources.cowen2019_ap]
+citation = "Cowen, A. S., Elfenbein, H. A., Laukka, P., & Keltner, D. (2019). Mapping 24 emotions conveyed by brief human vocalization. American Psychologist, 74(6), 698-712."
+doi = "10.1037/amp0000399"
+pmc = "PMC6586540"
+locus = "Figure 3B"
