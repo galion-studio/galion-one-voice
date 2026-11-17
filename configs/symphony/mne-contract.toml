@@ -1,0 +1,29 @@
+# Galion Voice — Perpetual Open MIT License
+# Copyright (c) 2026 Galion Labs.
+#
+# Knobs for galion-mne-contract fixtures.
+# Every number in this file is a stand-in. literature = "none".
+# Do not copy one of these into a render target, a z-score, or a decibel.
+
+schema = "galion-mne-contract-config"
+
+[baseline_origin]
+# Origin the fixtures treat as the speaker's own neutral.
+# Not a population voice. Not a coordinate from Russell 1980.
+# Not voice-v2's pipeline default (arousal 0.35).
+arousal = 0.40
+valence = 0.0
+dominance = 0.50
+
+[confidence_stand_in]
+# Read-back confidence used by the fixtures. Not a recognition rate.
+feeling = 0.62
+body_unmeasured = 0.0
+body_stand_in = 0.30
+
+[body_stand_in]
+# Relative lung volume on the contract's 0..1 scale. Not a litre.
+# Whisper-close is the higher of the two. Tired is the lower.
+# Subglottal pressure in cm H2O is not here. F0 in Hz is not here.
+whisper_lung_volume_rel = 0.62
+tired_lung_volume_rel = 0.35
