@@ -18,7 +18,13 @@ import numpy as np
 
 from emotion_v2_dataset.errors import PipelineError
 from emotion_v2_dataset.profile import PITCH_STANDARD_HZ, forbid_pitch_standard
-from emotion_v2_dataset.taxonomy import EMOTION_CENTS, EMOTION_TILT, require_emotion
+from emotion_v2_dataset.taxonomy import (
+    EMOTION_CENTS,
+    EMOTION_TILT,
+    STUB_DEFAULT_CENTS,
+    STUB_DEFAULT_TILT,
+    require_emotion,
+)
 
 RENDER_RATE = 24_000
 PHONE_RATE = 8_000
@@ -62,12 +68,12 @@ def synthesize_stub(
     duration = min(2.4, max(0.45, 0.11 * words))
     count = int(sample_rate * duration)
     time = np.arange(count, dtype=np.float64) / sample_rate
-    cents = EMOTION_CENTS[emotion] * float(intensity)
+    cents = EMOTION_CENTS.get(emotion, STUB_DEFAULT_CENTS) * float(intensity)
     # Cents relative to the given centre. The 440/432 concert ratio is never applied.
     fundamental = float(pitch_centre_hz) * (2.0 ** (cents / 1200.0))
     vibrato = 1.0 + (0.004 + 0.008 * float(intensity)) * np.sin(2.0 * np.pi * 4.5 * time)
     phase = 2.0 * np.pi * fundamental * np.cumsum(vibrato) / sample_rate
-    tilt = EMOTION_TILT[emotion]
+    tilt = EMOTION_TILT.get(emotion, STUB_DEFAULT_TILT)
     signal = np.sin(phase)
     signal += tilt * 0.40 * np.sin(2.0 * phase)
     signal += tilt * 0.18 * np.sin(3.0 * phase)

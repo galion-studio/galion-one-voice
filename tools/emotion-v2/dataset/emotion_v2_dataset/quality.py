@@ -6,8 +6,9 @@ Defaults are the Galion Voice V2 rollout gate (``tools/emotion-v2/thresholds.tom
 
 * WER at or below 0.018 (inclusive upper bound),
 * ECAPA strictly above 0.7057 (the Samantha merge-v2 baseline),
-* emotion match at or above 0.83, checked per emotion class. Every one of the
-  twelve classes has its own threshold; all twelve default to 0.83.
+* emotion match at or above 0.83, checked per emotion class. Every class in
+  ``emotion-v2/emotions.toml`` (12 today, 14 planned) has its own threshold;
+  all default to 0.83.
 
 A missing scorer rejects the clip by default (``require_scorers=True``).
 The only way to keep an unscored clip is :data:`SYNTHETIC_TEST_THRESHOLDS`,
@@ -17,8 +18,8 @@ compared with the gate in that mode.
 
 Scorers are pluggable: any object with ``.name`` in ``{'wer', 'ecapa',
 'emotion'}`` and ``.score(clip)``. An emotion scorer may return either one
-float (the match score for ``clip.emotion``) or a mapping of all twelve class
-names to scores, for example a 12-class recogniser's posterior. For a mapping,
+float (the match score for ``clip.emotion``) or a mapping of class names to
+scores, for example a 12- or 14-class recogniser's posterior. For a mapping,
 the clip's own class is used.
 """
 

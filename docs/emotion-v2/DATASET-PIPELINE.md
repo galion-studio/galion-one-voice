@@ -49,7 +49,8 @@ impulse-response and noise source plus licence, and `telephony_hz` (`8000`
 for the phone environment, otherwise `null`). Scores are measured on the dry
 render. Environment and SNR describe the augmented file.
 
-The twelve emotions, in dataset order:
+The emotions, in dataset order. The list is read from `emotion-v2/emotions.toml`
+(today twelve):
 
 Neutral, Calm, Happy, Amused, Excited, Tender, Sad, Disappointed, Angry,
 Fearful, Surprised, Disgusted.
@@ -174,7 +175,9 @@ environments = 192 clips. Pass `--max-scenarios-per-emotion` and
    (`--require-scorers` is now the default and kept only as a no-op flag).
    Default thresholds are the rollout gate from
    `tools/emotion-v2/thresholds.toml`: WER ≤ 0.018, ECAPA > 0.7057, and
-   emotion ≥ 0.83 checked **per emotion class** for all twelve classes
+   emotion ≥ 0.83 checked **per emotion class** for every class listed in
+   `emotion-v2/emotions.toml` (the single emotion list; 12 today, 14 planned;
+   `GALION_EMOTIONS_TOML` overrides the path)
    (`QualityThresholds.min_emotion_by_class`, or `--thresholds FILE` to read
    per-class targets). High-quality mode refuses any threshold looser than
    the gate. Rejected lines go to `rejected.jsonl` and are not augmented.
@@ -202,8 +205,8 @@ The package code is glue only: thresholds, the clipped-sample count, and the
 
 Scorers are pluggable. `--scorer-module NAME` (repeatable) imports a module
 with `build_scorers(config) -> list`; without it the `emotion_v2_ci` plugin
-is tried. An emotion scorer may return one float or a mapping of all twelve
-class names to scores (a 12-class posterior); the clip's own class is used.
+is tried. An emotion scorer may return one float or a mapping of class
+names to scores (a 12- or 14-class posterior); the clip's own class is used.
 A named module that does not import is an error, never a silent pass.
 
 `config` carries `device`, `num_threads`, and `device_reason`.

@@ -310,8 +310,7 @@ class BankAndPluginTests(unittest.TestCase):
     def test_nominal_matrix_size(self) -> None:
         bank = load_scenarios(DATA_DIR / "scenarios.json")
         lines = sum(len(items) for items in bank.values())
-        self.assertEqual(lines * len(CANONICAL_EMOTIONS) // 12, lines)
-        self.assertEqual(lines * 8, 12 * 2 * 8)
+        self.assertEqual(lines * 8, len(CANONICAL_EMOTIONS) * 2 * 8)
 
     def test_gitignore_covers_the_default_output(self) -> None:
         if REPO is None:

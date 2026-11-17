@@ -72,13 +72,47 @@ def clip(emotion: str = "Neutral") -> RenderedClip:
     return RenderedClip(AudioBuffer(tone(432.0, 0.1, 0.1), RATE), "line", emotion, "stub-sine", 0.5)
 
 
+class EmotionListTests(unittest.TestCase):
+    def test_emotion_list_comes_from_emotions_toml(self) -> None:
+        import tomllib
+
+        if REPO is None:
+            self.skipTest("repo root not found")
+        data = tomllib.loads((REPO / "emotion-v2" / "emotions.toml").read_text(encoding="utf-8"))
+        self.assertEqual(CANONICAL_EMOTIONS, tuple(item["name"] for item in data["emotions"]))
+
+    def test_a_fourteen_class_file_gives_fourteen_per_class_thresholds(self) -> None:
+        from emotion_v2_dataset.taxonomy import load_config_emotions
+
+        names = list(CANONICAL_EMOTIONS) + ["Proud", "Bored"]
+        body = "".join(f'[[emotions]]\nname = "{n}"\n\n' for n in names)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "emotions.toml"
+            path.write_text(body, encoding="utf-8")
+            loaded = load_config_emotions(path)
+            self.assertEqual(len(loaded), len(CANONICAL_EMOTIONS) + 2)
+            env = os.environ.copy()
+            env["GALION_EMOTIONS_TOML"] = str(path)
+            env["PYTHONPATH"] = str(PACKAGE) + os.pathsep + env.get("PYTHONPATH", "")
+            code = (
+                "from emotion_v2_dataset.quality import QualityThresholds, decide, ScoreCard;"
+                "t=QualityThresholds();print(len(t.min_emotion_by_class));"
+                "print(decide(ScoreCard(0.0,0.9,0.82),t,'Bored').reason)"
+            )
+            done = subprocess.run([sys.executable, "-c", code], env=env, capture_output=True, text=True, check=False)
+            self.assertEqual(done.returncode, 0, done.stderr)
+            lines = done.stdout.split("\n")
+            self.assertEqual(lines[0], str(len(names)))
+            self.assertIn("emotion Bored 0.8200 below 0.8300", lines[1])
+
+
 class GateDefaultTests(unittest.TestCase):
     def test_defaults_are_the_rollout_gate(self) -> None:
         t = QualityThresholds()
         self.assertEqual((t.max_wer, t.min_ecapa, t.min_emotion), (0.018, 0.7057, 0.83))
         self.assertTrue(t.require_scorers)
         self.assertEqual(set(t.min_emotion_by_class), set(CANONICAL_EMOTIONS))
-        self.assertEqual(len(t.min_emotion_by_class), 12)
+        self.assertEqual(len(t.min_emotion_by_class), len(CANONICAL_EMOTIONS))
         self.assertTrue(all(v == 0.83 for v in t.min_emotion_by_class.values()))
         self.assertEqual(high_quality_violations(t), [])
 
@@ -244,9 +278,11 @@ class PipelineHighQualityTests(unittest.TestCase):
     def test_all_twelve_emotions_meet_the_capture_spec(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             result = self._run(Path(tmp), scorers=passing())
-            self.assertEqual(result.record["counts"]["rendered"], 12)
+            self.assertEqual(result.record["counts"]["rendered"], len(CANONICAL_EMOTIONS))
             self.assertEqual({r.emotion for r in result.rows}, set(CANONICAL_EMOTIONS))
-            self.assertEqual(len(result.rows) + result.record["counts"]["rejected_capture"], 36)
+            self.assertEqual(
+                len(result.rows) + result.record["counts"]["rejected_capture"], 3 * len(CANONICAL_EMOTIONS)
+            )
             self.assertGreater(len(result.rows), 0)
             for row in read_jsonl(result.manifest_path):
                 self.assertEqual(row["sample_rate_hz"], 48000)
@@ -263,7 +299,7 @@ class PipelineHighQualityTests(unittest.TestCase):
                 self.assertTrue(item["reason"].startswith("capture:"), item["reason"])
             record = json.loads((result.run_dir / "run.json").read_text(encoding="utf-8"))
             self.assertEqual(record["capture_spec"]["sample_rate_hz"], 48000)
-            self.assertEqual(len(record["thresholds"]["min_emotion_by_class"]), 12)
+            self.assertEqual(len(record["thresholds"]["min_emotion_by_class"]), len(CANONICAL_EMOTIONS))
 
     def test_per_class_emotion_failure_only_drops_that_class(self) -> None:
         def emotion(c: RenderedClip) -> float:
@@ -289,7 +325,7 @@ class PipelineHighQualityTests(unittest.TestCase):
         fake = types.SimpleNamespace(build_scorers=build_scorers)
 
         def importer(name: str):
-            if name == "emotion_scorer_12":
+            if name == "emotion_scorer_n":
                 return fake
             raise ImportError(name)
 
@@ -299,10 +335,10 @@ class PipelineHighQualityTests(unittest.TestCase):
                 emotions=("Tender",),
                 environments=("dry studio",),
                 importer=importer,
-                scorer_modules=("emotion_scorer_12",),
+                scorer_modules=("emotion_scorer_n",),
             )
             self.assertEqual(len(result.rows), 1)
-            self.assertEqual(result.record["plugins"]["ci"], "emotion_scorer_12")
+            self.assertEqual(result.record["plugins"]["ci"], "emotion_scorer_n")
             self.assertEqual(seen["device"], "cpu")
             self.assertGreaterEqual(seen["num_threads"], 1)
             with self.assertRaises(QualityError):
