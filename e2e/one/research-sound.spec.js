@@ -209,6 +209,61 @@ test("Silence blocks the window bell and later research cues", async ({ page }) 
   for (const hz of heard) expect(allowed).toContain(hz);
 });
 
+test("Silence is remembered across visits in galion-research-silence", async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem("galion-one-silence", "1");
+  });
+  await page.goto("/research");
+  await expect(page.locator("body")).toHaveAttribute("data-silence", "off");
+  await expect(page.locator("body")).toHaveAttribute("data-resonance", "on");
+  expect(await page.evaluate(() => localStorage.getItem("galion-one-silence"))).toBe("1");
+
+  await page.evaluate(() => document.getElementById("silence").click());
+  await expect(page.locator("body")).toHaveAttribute("data-silence", "on");
+  await expect(page.locator("#silence")).toHaveAttribute("aria-pressed", "true");
+  expect(await page.evaluate(() => localStorage.getItem("galion-research-silence"))).toBe("1");
+  expect(await page.evaluate(() => localStorage.getItem("galion-one-silence"))).toBe("1");
+
+  await page.reload();
+  await expect(page.locator("body")).toHaveAttribute("data-silence", "on");
+  await expect(page.locator("body")).toHaveAttribute("data-resonance", "off");
+  await page.waitForTimeout(400);
+  expect(await cues(page)).toBe("");
+  expect(await tones(page)).toEqual([]);
+
+  await page.evaluate(() => document.getElementById("silence").click());
+  expect(await page.evaluate(() => localStorage.getItem("galion-research-silence"))).toBe("0");
+  await page.reload();
+  await expect(page.locator("body")).toHaveAttribute("data-silence", "off");
+  await expect(page.locator("body")).toHaveAttribute("data-resonance", "on");
+  await expect.poll(() => cues(page)).toBe("window-open");
+});
+
+test("reduced motion holds the voice mark still and plays no cue", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/research");
+  await expect(page.locator("body")).toHaveAttribute("data-motion", "reduced");
+  await expect(page.locator("body")).toHaveAttribute("data-silence", "off");
+  await expect(page.locator("body")).toHaveAttribute("data-resonance", "on");
+  await page.waitForTimeout(250);
+  const first = await page.locator("#voice-dot").screenshot();
+  await page.waitForTimeout(500);
+  const second = await page.locator("#voice-dot").screenshot();
+  expect(Buffer.compare(first, second)).toBe(0);
+
+  await page.locator("#prompt").fill("What colour is the wash?");
+  await page.locator("#prompt").press("Enter");
+  await expect(page.locator("#reading-body")).toContainText("The wash is amber to violet.", { timeout: 8000 });
+  await page.evaluate(() => {
+    Object.defineProperty(document, "visibilityState", { configurable: true, get: () => "hidden" });
+    document.dispatchEvent(new Event("visibilitychange"));
+  });
+  await page.waitForTimeout(400);
+  expect(await cues(page)).toBe("");
+  expect(await tones(page)).toEqual([]);
+  expect(await page.evaluate(() => localStorage.getItem("galion-research-silence"))).toBe("0");
+});
+
 test("bells fire only for window open, close, minimise, and settle", async ({ page }) => {
   await page.goto("/research");
   await expect.poll(() => cues(page)).toBe("window-open");

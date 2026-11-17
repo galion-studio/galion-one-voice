@@ -49,7 +49,9 @@ Silence on this page is the `#silence` control. It reads `localStorage` key `gal
 
 ## Galion Research, `/research`
 
-Source: `crates/galion-console/assets/research.html`. The desk uses the same Silence control and the same `galion-one-silence` key. On this page the `s` key toggles silence only when focus is not in a field, so typing the letter still works. A silenced desk schedules nothing, including the window bell on open.
+Source: `crates/galion-console/assets/research.html`. Silence on this desk is remembered in `localStorage` key `galion-research-silence` (`1` on, `0` off), separate from Galion One's `galion-one-silence`. The query `silence=1` still opts in for that visit and is written to the research key. The `s` key toggles silence only when focus is not in a field, so typing the letter still works. A silenced desk schedules nothing, including the window bell on open.
+
+`prefers-reduced-motion: reduce` holds the voice mark still and schedules no cue. It does not rewrite `galion-research-silence`.
 
 Research events are resonance. Window events are bells. A research event never strikes a bell. A window event never plays a research melody.
 
