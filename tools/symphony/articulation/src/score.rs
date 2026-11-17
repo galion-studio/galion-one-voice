@@ -18,6 +18,13 @@ use std::collections::BTreeMap;
 /// Tracks that duplicate another one on a different scale are not scored twice.
 const SKIP: [&str; 1] = ["f0_hz"];
 
+/// Skewness and kurtosis of a few seconds of glottal cycles are too unstable to
+/// compare (their sign flips between takes of the same voice), so only the
+/// mean and spread functionals of the static glottal / phonation sets are scored.
+fn static_scored(name: &str) -> bool {
+    !(name.contains("kurtosis") || name.contains("skewness"))
+}
+
 #[derive(Debug, Serialize)]
 pub struct FeatureScore {
     pub name: String,
@@ -69,7 +76,7 @@ pub fn compare(r: &Articulation, c: &Articulation) -> TractScore {
             clone_median: Some(cs.q[4]),
         });
     }
-    for (k, (sec, a)) in &r.statics {
+    for (k, (sec, a)) in r.statics.iter().filter(|(k, _)| static_scored(k)) {
         let Some((_, b)) = c.statics.get(k) else { continue };
         let d = a.abs() + b.abs();
         let sim = if d == 0.0 { 1.0 } else { 1.0 - (a - b).abs() / d };
