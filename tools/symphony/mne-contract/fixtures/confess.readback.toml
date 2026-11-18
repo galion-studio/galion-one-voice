@@ -1,0 +1,271 @@
+# Galion Voice — Perpetual Open MIT License
+# Copyright (c) 2026 Galion Labs.
+# Stand-in scenario. No recording. Numbers are fixture knobs.
+
+schema = "galion-mne-contract"
+schema_version = 1
+kind = "readback"
+frame_ms = 80
+value_origin = "stand_in"
+note = "Confess. Embarrassment is legal on the word. Valence falls and dominance falls. The pin does not clear inside the line."
+
+text = "I kept the letter. I should have told you."
+
+[persona]
+persona_id = "galion-one"
+voice_id = "profile:galion-one-steady"
+
+[moment]
+moment_id = "confess-the-letter"
+memory_id = "mem-standin-the-letter"
+memory_snippet = "The letter has been in the drawer since Tuesday."
+place = "quiet_room"
+distance = "conversational"
+noise = "quiet"
+listener = "one_person"
+
+[baseline]
+arousal = 0.4
+valence = 0.0
+dominance = 0.5
+
+[[readback_frames]]
+t_ms = 0
+
+[readback_frames.feeling]
+arousal = 0.485
+valence = 0.0
+dominance = 0.483
+
+[readback_frames.feeling.pin]
+name = "embarrassment"
+track = "prosody"
+weight = 0.27
+
+[readback_frames.body]
+origin = "unmeasured"
+
+[readback_frames.body.lungs]
+segment = "unknown"
+
+[readback_frames.confidence]
+feeling = 0.62
+body = 0.0
+confounded = false
+
+[[readback_frames]]
+t_ms = 80
+
+[readback_frames.feeling]
+arousal = 0.5039
+valence = -0.0302
+dominance = 0.466
+
+[readback_frames.feeling.pin]
+name = "embarrassment"
+track = "prosody"
+weight = 0.315
+
+[readback_frames.body]
+origin = "unmeasured"
+
+[readback_frames.body.lungs]
+segment = "unknown"
+
+[readback_frames.confidence]
+feeling = 0.62
+body = 0.0
+confounded = false
+
+[[readback_frames]]
+t_ms = 160
+
+[readback_frames.feeling]
+arousal = 0.5228
+valence = -0.0604
+dominance = 0.449
+
+[readback_frames.feeling.pin]
+name = "embarrassment"
+track = "prosody"
+weight = 0.36
+
+[readback_frames.body]
+origin = "unmeasured"
+
+[readback_frames.body.lungs]
+segment = "unknown"
+
+[readback_frames.confidence]
+feeling = 0.62
+body = 0.0
+confounded = false
+
+[[readback_frames]]
+t_ms = 240
+
+[readback_frames.feeling]
+arousal = 0.5417
+valence = -0.0907
+dominance = 0.432
+
+[readback_frames.feeling.pin]
+name = "embarrassment"
+track = "prosody"
+weight = 0.405
+
+[readback_frames.body]
+origin = "unmeasured"
+
+[readback_frames.body.lungs]
+segment = "unknown"
+
+[readback_frames.confidence]
+feeling = 0.62
+body = 0.0
+confounded = false
+
+[[readback_frames]]
+t_ms = 320
+
+[readback_frames.feeling]
+arousal = 0.5606
+valence = -0.1209
+dominance = 0.415
+
+[readback_frames.feeling.pin]
+name = "embarrassment"
+track = "prosody"
+weight = 0.45
+
+[readback_frames.body]
+origin = "unmeasured"
+
+[readback_frames.body.lungs]
+segment = "unknown"
+
+[readback_frames.confidence]
+feeling = 0.62
+body = 0.0
+confounded = false
+
+[[readback_frames]]
+t_ms = 400
+
+[readback_frames.feeling]
+arousal = 0.5794
+valence = -0.1511
+dominance = 0.398
+
+[readback_frames.feeling.pin]
+name = "embarrassment"
+track = "prosody"
+weight = 0.495
+
+[readback_frames.body]
+origin = "unmeasured"
+
+[readback_frames.body.lungs]
+segment = "unknown"
+
+[readback_frames.confidence]
+feeling = 0.62
+body = 0.0
+confounded = false
+
+[[readback_frames]]
+t_ms = 480
+
+[readback_frames.feeling]
+arousal = 0.5983
+valence = -0.1813
+dominance = 0.381
+
+[readback_frames.feeling.pin]
+name = "embarrassment"
+track = "prosody"
+weight = 0.54
+
+[readback_frames.body]
+origin = "unmeasured"
+
+[readback_frames.body.lungs]
+segment = "unknown"
+
+[readback_frames.confidence]
+feeling = 0.62
+body = 0.0
+confounded = false
+
+[[readback_frames]]
+t_ms = 560
+
+[readback_frames.feeling]
+arousal = 0.6172
+valence = -0.2116
+dominance = 0.364
+
+[readback_frames.feeling.pin]
+name = "embarrassment"
+track = "prosody"
+weight = 0.585
+
+[readback_frames.body]
+origin = "unmeasured"
+
+[readback_frames.body.lungs]
+segment = "unknown"
+
+[readback_frames.confidence]
+feeling = 0.62
+body = 0.0
+confounded = false
+
+[[readback_frames]]
+t_ms = 640
+
+[readback_frames.feeling]
+arousal = 0.6361
+valence = -0.2418
+dominance = 0.347
+
+[readback_frames.feeling.pin]
+name = "embarrassment"
+track = "prosody"
+weight = 0.63
+
+[readback_frames.body]
+origin = "unmeasured"
+
+[readback_frames.body.lungs]
+segment = "unknown"
+
+[readback_frames.confidence]
+feeling = 0.62
+body = 0.0
+confounded = false
+
+[[readback_frames]]
+t_ms = 720
+
+[readback_frames.feeling]
+arousal = 0.655
+valence = -0.272
+dominance = 0.33
+
+[readback_frames.feeling.pin]
+name = "embarrassment"
+track = "prosody"
+weight = 0.675
+
+[readback_frames.body]
+origin = "unmeasured"
+
+[readback_frames.body.lungs]
+segment = "unknown"
+
+[readback_frames.confidence]
+feeling = 0.62
+body = 0.0
+confounded = false
+

@@ -1,0 +1,213 @@
+# Galion Voice — Perpetual Open MIT License
+# Copyright (c) 2026 Galion Labs.
+# Stand-in scenario. No recording. Numbers are fixture knobs.
+
+schema = "galion-mne-contract"
+schema_version = 1
+kind = "readback"
+frame_ms = 80
+value_origin = "stand_in"
+note = "Quiet awe. The line starts unnamed. The awe pin arrives and holds. Arousal rises only a little."
+
+text = "Look at that sky."
+
+[persona]
+persona_id = "galion-one"
+voice_id = "profile:galion-one-steady"
+
+[moment]
+moment_id = "quiet-awe-the-sky"
+memory_id = "mem-standin-clear-sky"
+memory_snippet = "The window faces a clear sky and neither of them has spoken yet."
+place = "by_the_window"
+distance = "conversational"
+noise = "quiet"
+listener = "one_person"
+
+[baseline]
+arousal = 0.4
+valence = 0.0
+dominance = 0.5
+
+[[readback_frames]]
+t_ms = 0
+
+[readback_frames.feeling]
+arousal = 0.417
+valence = 0.068
+dominance = 0.432
+
+[readback_frames.body]
+origin = "unmeasured"
+
+[readback_frames.body.lungs]
+segment = "unknown"
+
+[readback_frames.confidence]
+feeling = 0.62
+body = 0.0
+confounded = false
+
+[[readback_frames]]
+t_ms = 80
+
+[readback_frames.feeling]
+arousal = 0.451
+valence = 0.102
+dominance = 0.432
+
+[readback_frames.body]
+origin = "unmeasured"
+
+[readback_frames.body.lungs]
+segment = "unknown"
+
+[readback_frames.confidence]
+feeling = 0.62
+body = 0.0
+confounded = false
+
+[[readback_frames]]
+t_ms = 160
+
+[readback_frames.feeling]
+arousal = 0.485
+valence = 0.153
+dominance = 0.432
+
+[readback_frames.feeling.pin]
+name = "awe"
+track = "prosody"
+weight = 0.27
+
+[readback_frames.body]
+origin = "unmeasured"
+
+[readback_frames.body.lungs]
+segment = "unknown"
+
+[readback_frames.confidence]
+feeling = 0.62
+body = 0.0
+confounded = false
+
+[[readback_frames]]
+t_ms = 240
+
+[readback_frames.feeling]
+arousal = 0.502
+valence = 0.187
+dominance = 0.432
+
+[readback_frames.feeling.pin]
+name = "awe"
+track = "prosody"
+weight = 0.405
+
+[readback_frames.body]
+origin = "unmeasured"
+
+[readback_frames.body.lungs]
+segment = "unknown"
+
+[readback_frames.confidence]
+feeling = 0.62
+body = 0.0
+confounded = false
+
+[[readback_frames]]
+t_ms = 320
+
+[readback_frames.feeling]
+arousal = 0.519
+valence = 0.221
+dominance = 0.432
+
+[readback_frames.feeling.pin]
+name = "awe"
+track = "prosody"
+weight = 0.495
+
+[readback_frames.body]
+origin = "unmeasured"
+
+[readback_frames.body.lungs]
+segment = "unknown"
+
+[readback_frames.confidence]
+feeling = 0.62
+body = 0.0
+confounded = false
+
+[[readback_frames]]
+t_ms = 400
+
+[readback_frames.feeling]
+arousal = 0.519
+valence = 0.238
+dominance = 0.432
+
+[readback_frames.feeling.pin]
+name = "awe"
+track = "prosody"
+weight = 0.522
+
+[readback_frames.body]
+origin = "unmeasured"
+
+[readback_frames.body.lungs]
+segment = "unknown"
+
+[readback_frames.confidence]
+feeling = 0.62
+body = 0.0
+confounded = false
+
+[[readback_frames]]
+t_ms = 480
+
+[readback_frames.feeling]
+arousal = 0.5105
+valence = 0.2465
+dominance = 0.432
+
+[readback_frames.feeling.pin]
+name = "awe"
+track = "prosody"
+weight = 0.522
+
+[readback_frames.body]
+origin = "unmeasured"
+
+[readback_frames.body.lungs]
+segment = "unknown"
+
+[readback_frames.confidence]
+feeling = 0.62
+body = 0.0
+confounded = false
+
+[[readback_frames]]
+t_ms = 560
+
+[readback_frames.feeling]
+arousal = 0.5105
+valence = 0.255
+dominance = 0.432
+
+[readback_frames.feeling.pin]
+name = "awe"
+track = "prosody"
+weight = 0.513
+
+[readback_frames.body]
+origin = "unmeasured"
+
+[readback_frames.body.lungs]
+segment = "unknown"
+
+[readback_frames.confidence]
+feeling = 0.62
+body = 0.0
+confounded = false
+

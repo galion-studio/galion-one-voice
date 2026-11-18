@@ -1,0 +1,291 @@
+# Galion Voice — Perpetual Open MIT License
+# Copyright (c) 2026 Galion Labs.
+# Stand-in scenario. No recording. Numbers are fixture knobs.
+
+schema = "galion-mne-contract"
+schema_version = 1
+kind = "intent"
+frame_ms = 80
+value_origin = "stand_in"
+note = "Reassure. Sympathy weight eases and does not reach zero. Valence stays warm of the baseline."
+
+text = "You did not break it. We can look at it together."
+
+[persona]
+persona_id = "galion-one"
+voice_id = "profile:galion-one-steady"
+
+[moment]
+moment_id = "reassure-it-is-not-broken"
+memory_id = "mem-standin-small-mistake"
+memory_snippet = "They think a small mistake undid the whole evening."
+place = "quiet_room"
+distance = "conversational"
+noise = "quiet"
+listener = "one_person"
+
+[baseline]
+arousal = 0.4
+valence = 0.0
+dominance = 0.5
+
+[[intent_frames]]
+t_ms = 0
+
+[intent_frames.intent]
+verb = "reassure"
+strength = 0.75
+
+[intent_frames.feeling]
+arousal = 0.42
+valence = 0.12
+dominance = 0.48
+
+[intent_frames.feeling.pin]
+name = "sympathy"
+track = "prosody"
+weight = 0.7
+
+[intent_frames.inner]
+energy = 0.58
+fatigue = 0.18
+health = 1.0
+
+[intent_frames.text_span]
+start_byte = 0
+end_byte = 21
+
+[[intent_frames]]
+t_ms = 80
+
+[intent_frames.intent]
+verb = "reassure"
+strength = 0.75
+
+[intent_frames.feeling]
+arousal = 0.4178
+valence = 0.1233
+dominance = 0.4822
+
+[intent_frames.feeling.pin]
+name = "sympathy"
+track = "prosody"
+weight = 0.6644
+
+[intent_frames.inner]
+energy = 0.58
+fatigue = 0.18
+health = 1.0
+
+[intent_frames.text_span]
+start_byte = 0
+end_byte = 21
+
+[[intent_frames]]
+t_ms = 160
+
+[intent_frames.intent]
+verb = "reassure"
+strength = 0.75
+
+[intent_frames.feeling]
+arousal = 0.4156
+valence = 0.1267
+dominance = 0.4844
+
+[intent_frames.feeling.pin]
+name = "sympathy"
+track = "prosody"
+weight = 0.6289
+
+[intent_frames.inner]
+energy = 0.58
+fatigue = 0.18
+health = 1.0
+
+[intent_frames.text_span]
+start_byte = 0
+end_byte = 21
+
+[[intent_frames]]
+t_ms = 240
+
+[intent_frames.intent]
+verb = "reassure"
+strength = 0.75
+
+[intent_frames.feeling]
+arousal = 0.4133
+valence = 0.13
+dominance = 0.4867
+
+[intent_frames.feeling.pin]
+name = "sympathy"
+track = "prosody"
+weight = 0.5933
+
+[intent_frames.inner]
+energy = 0.58
+fatigue = 0.18
+health = 1.0
+
+[intent_frames.text_span]
+start_byte = 0
+end_byte = 21
+
+[[intent_frames]]
+t_ms = 320
+
+[intent_frames.intent]
+verb = "reassure"
+strength = 0.75
+
+[intent_frames.feeling]
+arousal = 0.4111
+valence = 0.1333
+dominance = 0.4889
+
+[intent_frames.feeling.pin]
+name = "sympathy"
+track = "prosody"
+weight = 0.5578
+
+[intent_frames.inner]
+energy = 0.58
+fatigue = 0.18
+health = 1.0
+
+[intent_frames.text_span]
+start_byte = 0
+end_byte = 21
+
+[[intent_frames]]
+t_ms = 400
+
+[intent_frames.intent]
+verb = "reassure"
+strength = 0.75
+
+[intent_frames.feeling]
+arousal = 0.4089
+valence = 0.1367
+dominance = 0.4911
+
+[intent_frames.feeling.pin]
+name = "sympathy"
+track = "prosody"
+weight = 0.5222
+
+[intent_frames.inner]
+energy = 0.58
+fatigue = 0.18
+health = 1.0
+
+[intent_frames.text_span]
+start_byte = 22
+end_byte = 49
+
+[[intent_frames]]
+t_ms = 480
+
+[intent_frames.intent]
+verb = "reassure"
+strength = 0.75
+
+[intent_frames.feeling]
+arousal = 0.4067
+valence = 0.14
+dominance = 0.4933
+
+[intent_frames.feeling.pin]
+name = "sympathy"
+track = "prosody"
+weight = 0.4867
+
+[intent_frames.inner]
+energy = 0.58
+fatigue = 0.18
+health = 1.0
+
+[intent_frames.text_span]
+start_byte = 22
+end_byte = 49
+
+[[intent_frames]]
+t_ms = 560
+
+[intent_frames.intent]
+verb = "reassure"
+strength = 0.75
+
+[intent_frames.feeling]
+arousal = 0.4044
+valence = 0.1433
+dominance = 0.4956
+
+[intent_frames.feeling.pin]
+name = "sympathy"
+track = "prosody"
+weight = 0.4511
+
+[intent_frames.inner]
+energy = 0.58
+fatigue = 0.18
+health = 1.0
+
+[intent_frames.text_span]
+start_byte = 22
+end_byte = 49
+
+[[intent_frames]]
+t_ms = 640
+
+[intent_frames.intent]
+verb = "reassure"
+strength = 0.75
+
+[intent_frames.feeling]
+arousal = 0.4022
+valence = 0.1467
+dominance = 0.4978
+
+[intent_frames.feeling.pin]
+name = "sympathy"
+track = "prosody"
+weight = 0.4156
+
+[intent_frames.inner]
+energy = 0.58
+fatigue = 0.18
+health = 1.0
+
+[intent_frames.text_span]
+start_byte = 22
+end_byte = 49
+
+[[intent_frames]]
+t_ms = 720
+
+[intent_frames.intent]
+verb = "reassure"
+strength = 0.75
+
+[intent_frames.feeling]
+arousal = 0.4
+valence = 0.15
+dominance = 0.5
+
+[intent_frames.feeling.pin]
+name = "sympathy"
+track = "prosody"
+weight = 0.38
+
+[intent_frames.inner]
+energy = 0.58
+fatigue = 0.18
+health = 1.0
+
+[intent_frames.text_span]
+start_byte = 22
+end_byte = 49
+

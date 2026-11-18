@@ -1,0 +1,291 @@
+# Galion Voice — Perpetual Open MIT License
+# Copyright (c) 2026 Galion Labs.
+# Stand-in scenario. No recording. Numbers are fixture knobs.
+
+schema = "galion-mne-contract"
+schema_version = 1
+kind = "intent"
+frame_ms = 80
+value_origin = "stand_in"
+note = "Confess. Embarrassment is legal on the word. Valence falls and dominance falls. The pin does not clear inside the line."
+
+text = "I kept the letter. I should have told you."
+
+[persona]
+persona_id = "galion-one"
+voice_id = "profile:galion-one-steady"
+
+[moment]
+moment_id = "confess-the-letter"
+memory_id = "mem-standin-the-letter"
+memory_snippet = "The letter has been in the drawer since Tuesday."
+place = "quiet_room"
+distance = "conversational"
+noise = "quiet"
+listener = "one_person"
+
+[baseline]
+arousal = 0.4
+valence = 0.0
+dominance = 0.5
+
+[[intent_frames]]
+t_ms = 0
+
+[intent_frames.intent]
+verb = "confess"
+strength = 0.7
+
+[intent_frames.feeling]
+arousal = 0.5
+valence = 0.0
+dominance = 0.48
+
+[intent_frames.feeling.pin]
+name = "embarrassment"
+track = "prosody"
+weight = 0.3
+
+[intent_frames.inner]
+energy = 0.5
+fatigue = 0.25
+health = 1.0
+
+[intent_frames.text_span]
+start_byte = 0
+end_byte = 18
+
+[[intent_frames]]
+t_ms = 80
+
+[intent_frames.intent]
+verb = "confess"
+strength = 0.7
+
+[intent_frames.feeling]
+arousal = 0.5222
+valence = -0.0356
+dominance = 0.46
+
+[intent_frames.feeling.pin]
+name = "embarrassment"
+track = "prosody"
+weight = 0.35
+
+[intent_frames.inner]
+energy = 0.5
+fatigue = 0.25
+health = 1.0
+
+[intent_frames.text_span]
+start_byte = 0
+end_byte = 18
+
+[[intent_frames]]
+t_ms = 160
+
+[intent_frames.intent]
+verb = "confess"
+strength = 0.7
+
+[intent_frames.feeling]
+arousal = 0.5444
+valence = -0.0711
+dominance = 0.44
+
+[intent_frames.feeling.pin]
+name = "embarrassment"
+track = "prosody"
+weight = 0.4
+
+[intent_frames.inner]
+energy = 0.5
+fatigue = 0.25
+health = 1.0
+
+[intent_frames.text_span]
+start_byte = 0
+end_byte = 18
+
+[[intent_frames]]
+t_ms = 240
+
+[intent_frames.intent]
+verb = "confess"
+strength = 0.7
+
+[intent_frames.feeling]
+arousal = 0.5667
+valence = -0.1067
+dominance = 0.42
+
+[intent_frames.feeling.pin]
+name = "embarrassment"
+track = "prosody"
+weight = 0.45
+
+[intent_frames.inner]
+energy = 0.5
+fatigue = 0.25
+health = 1.0
+
+[intent_frames.text_span]
+start_byte = 0
+end_byte = 18
+
+[[intent_frames]]
+t_ms = 320
+
+[intent_frames.intent]
+verb = "confess"
+strength = 0.7
+
+[intent_frames.feeling]
+arousal = 0.5889
+valence = -0.1422
+dominance = 0.4
+
+[intent_frames.feeling.pin]
+name = "embarrassment"
+track = "prosody"
+weight = 0.5
+
+[intent_frames.inner]
+energy = 0.5
+fatigue = 0.25
+health = 1.0
+
+[intent_frames.text_span]
+start_byte = 0
+end_byte = 18
+
+[[intent_frames]]
+t_ms = 400
+
+[intent_frames.intent]
+verb = "confess"
+strength = 0.7
+
+[intent_frames.feeling]
+arousal = 0.6111
+valence = -0.1778
+dominance = 0.38
+
+[intent_frames.feeling.pin]
+name = "embarrassment"
+track = "prosody"
+weight = 0.55
+
+[intent_frames.inner]
+energy = 0.5
+fatigue = 0.25
+health = 1.0
+
+[intent_frames.text_span]
+start_byte = 19
+end_byte = 42
+
+[[intent_frames]]
+t_ms = 480
+
+[intent_frames.intent]
+verb = "confess"
+strength = 0.7
+
+[intent_frames.feeling]
+arousal = 0.6333
+valence = -0.2133
+dominance = 0.36
+
+[intent_frames.feeling.pin]
+name = "embarrassment"
+track = "prosody"
+weight = 0.6
+
+[intent_frames.inner]
+energy = 0.5
+fatigue = 0.25
+health = 1.0
+
+[intent_frames.text_span]
+start_byte = 19
+end_byte = 42
+
+[[intent_frames]]
+t_ms = 560
+
+[intent_frames.intent]
+verb = "confess"
+strength = 0.7
+
+[intent_frames.feeling]
+arousal = 0.6556
+valence = -0.2489
+dominance = 0.34
+
+[intent_frames.feeling.pin]
+name = "embarrassment"
+track = "prosody"
+weight = 0.65
+
+[intent_frames.inner]
+energy = 0.5
+fatigue = 0.25
+health = 1.0
+
+[intent_frames.text_span]
+start_byte = 19
+end_byte = 42
+
+[[intent_frames]]
+t_ms = 640
+
+[intent_frames.intent]
+verb = "confess"
+strength = 0.7
+
+[intent_frames.feeling]
+arousal = 0.6778
+valence = -0.2844
+dominance = 0.32
+
+[intent_frames.feeling.pin]
+name = "embarrassment"
+track = "prosody"
+weight = 0.7
+
+[intent_frames.inner]
+energy = 0.5
+fatigue = 0.25
+health = 1.0
+
+[intent_frames.text_span]
+start_byte = 19
+end_byte = 42
+
+[[intent_frames]]
+t_ms = 720
+
+[intent_frames.intent]
+verb = "confess"
+strength = 0.7
+
+[intent_frames.feeling]
+arousal = 0.7
+valence = -0.32
+dominance = 0.3
+
+[intent_frames.feeling.pin]
+name = "embarrassment"
+track = "prosody"
+weight = 0.75
+
+[intent_frames.inner]
+energy = 0.5
+fatigue = 0.25
+health = 1.0
+
+[intent_frames.text_span]
+start_byte = 19
+end_byte = 42
+
