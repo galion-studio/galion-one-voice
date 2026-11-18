@@ -1,0 +1,64 @@
+# Galion Voice — Perpetual Open MIT License
+# Copyright (c) 2026 Galion Labs.
+#
+# Step sizes for the mouth layer. A published sign is not a size.
+# "unknown" stays null in the control packet. Do not fill these from a
+# neighbour, from Banse z, or from Tartter's per-speaker hertz.
+# phone_ms is the Symphony clock used when a phone has no duration.
+# It is not a measured phone length.
+
+[timing]
+phone_ms = 80
+
+[scales]
+f1_hz = "unknown"
+f2_hz = "unknown"
+f3_hz = "unknown"
+smile_formant_hz = "unknown"
+smile_spread = "unknown"
+address_f1_hz = "unknown"
+address_jaw = "unknown"
+address_lip_opening = "unknown"
+jaw_emotion = "unknown"
+rate = "unknown"
+precision = "unknown"
+coarticulation = "unknown"
+
+# Pole names so a later measurement can differ. The cited signs do not.
+[poles.hot_anger]
+f1_hz = "unknown"
+jaw_emotion = "unknown"
+rate = "unknown"
+
+[poles.cold_anger]
+f1_hz = "unknown"
+jaw_emotion = "unknown"
+rate = "unknown"
+
+[poles.anger_modal]
+f1_hz = "unknown"
+jaw_emotion = "unknown"
+rate = "unknown"
+
+[poles.panic]
+f1_hz = "unknown"
+jaw_emotion = "unknown"
+rate = "unknown"
+
+[poles.anxiety]
+f1_hz = "unknown"
+jaw_emotion = "unknown"
+rate = "unknown"
+
+[poles.fear_modal]
+f1_hz = "unknown"
+jaw_emotion = "unknown"
+rate = "unknown"
+
+[poles.sadness]
+f1_hz = "unknown"
+jaw_emotion = "unknown"
+rate = "unknown"
+
+[poles.elation]
+rate = "unknown"
