@@ -490,6 +490,12 @@ mod tests {
         let (pre, post) = voice.split_once("<button id=\"silence\"").expect("silence");
         let (_, rest) = post.split_once("<!-- /silence -->").expect("silence end");
         let voice = format!("{pre}{rest}");
+        let (pre, post) = voice.split_once("<p id=\"mode\"").expect("mode");
+        let (_, rest) = post.split_once("<!-- /mode -->").expect("mode end");
+        let voice = format!("{pre}{rest}");
+        let (pre, post) = voice.split_once("<p id=\"note\"").expect("note");
+        let (_, rest) = post.split_once("<!-- /note -->").expect("note end");
+        let voice = format!("{pre}{rest}");
         for tag in ["<div", "<form", "<input", "<button", "<label", "<span", "<p>", "<a "] {
             assert!(!voice.contains(tag), "{tag} is on the voice screen");
         }
@@ -527,7 +533,19 @@ mod tests {
         assert!(SCREEN_HTML.contains("Razgovarate s umjetnom inteligencijom. Galion je AI asistent, a ne osoba."));
         assert!(SCREEN_HTML.contains("You are talking to an AI. Galion is an AI assistant, not a person."));
         assert!(SCREEN_HTML.contains("function discloseAi"));
-        assert!(SCREEN_HTML.contains("fetch(\"session\""));
+        assert!(SCREEN_HTML.contains("fetch(\"/session\""));
+        assert!(SCREEN_HTML.contains("fetch(\"/dot\""));
+        assert!(SCREEN_HTML.contains("fetch(\"/mic\""));
+        assert!(SCREEN_HTML.contains("fetch(\"/turn\""));
+        assert!(SCREEN_HTML.contains("fetch(\"/v2/say\""));
+        assert!(SCREEN_HTML.contains("aria-label=\"Galion. Resting.\""));
+        assert!(SCREEN_HTML.contains("The microphone is off. Allow it, then tap the dot."));
+        assert!(SCREEN_HTML.contains("width:44px;height:44px"));
+        assert!(SCREEN_HTML.contains("padding:0"));
+        assert!(!SCREEN_HTML.contains("100dvw"), "a dvw canvas overflows a 360px phone");
+        assert!(!SCREEN_HTML.contains("user-scalable=no"));
+        assert!(!SCREEN_HTML.contains("Message failed ("));
+        assert!(!SCREEN_HTML.contains("Voice turn failed ("));
         assert!(SCREEN_HTML.contains("X-Galion-Session"));
         assert!(!SCREEN_HTML.contains("?token=") && !SCREEN_HTML.contains("?session="));
         assert!(SCREEN_HTML.contains("function markInner"));

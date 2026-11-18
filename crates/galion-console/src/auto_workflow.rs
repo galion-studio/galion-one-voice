@@ -129,7 +129,7 @@ mod tests {
         assert!(PAGE.contains("if(ok) proceedTurn(frames,barge);"));
         assert!(PAGE.contains("X-Galion-Proceed"));
         assert!(PAGE.contains("\"auto\""));
-        assert!(PAGE.contains("fetch(\"turn\""));
+        assert!(PAGE.contains("fetch(\"/turn\""));
         assert!(!PAGE.contains("id=\"workflow\""));
         assert!(!PAGE.contains("id=\"chat\""));
         assert!(!PAGE.contains("id=\"skills\""));

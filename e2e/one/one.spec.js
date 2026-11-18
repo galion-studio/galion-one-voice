@@ -269,3 +269,168 @@ test("dot against the ground meets WCAG AA contrast", async ({ page }) => {
   expect(dotOnWash).toBeGreaterThanOrEqual(3);
   await page.screenshot({ path: join(shots, "one-contrast-desktop.png") });
 });
+
+async function radiusOf(page) {
+  return page.evaluate(() => {
+    const cv = document.querySelector("#s");
+    const ctx = cv.getContext("2d");
+    const w = cv.width;
+    const h = cv.height;
+    const data = ctx.getImageData(0, 0, w, h).data;
+    const cx = Math.round(w / 2);
+    const cy = Math.round(h / 2);
+    const bright = (x, y) => {
+      const i = (y * w + x) * 4;
+      return data[i] > 210 && data[i + 1] > 210 && data[i + 2] > 210;
+    };
+    let rx = 0;
+    let ry = 0;
+    for (let x = cx; x < w; x += 1) {
+      if (!bright(x, cy)) break;
+      rx = x - cx;
+    }
+    for (let y = cy; y < h; y += 1) {
+      if (!bright(cx, y)) break;
+      ry = y - cy;
+    }
+    return { rx, ry };
+  });
+}
+
+test("360px stays round, reachable, and visibly in each state", async ({ page }) => {
+  const problems = [];
+  page.on("pageerror", (err) => problems.push(err.message));
+  page.on("console", (msg) => {
+    if (msg.type() === "error") problems.push(msg.text());
+  });
+  await page.setViewportSize({ width: 360, height: 640 });
+  await openOne(page);
+  await page.waitForTimeout(700);
+  const box = await page.locator("#s").boundingBox();
+  expect(Math.round(box.width)).toBe(360);
+  expect(Math.round(box.height)).toBe(640);
+  const layout = await page.evaluate(() => ({
+    scroll: document.documentElement.scrollWidth,
+    client: document.documentElement.clientWidth,
+    pad: getComputedStyle(document.querySelector("#s")).padding,
+  }));
+  expect(layout.scroll).toBeLessThanOrEqual(layout.client + 1);
+  expect(layout.pad).toBe("0px");
+  const idle = await radiusOf(page);
+  expect(Math.abs(idle.rx - idle.ry)).toBeLessThanOrEqual(2);
+  await expect(page.locator("#s")).toHaveAttribute("aria-label", "Galion. Resting.");
+  await expect(page.locator("#mode")).toHaveText("Resting");
+
+  const silence = await page.locator("#silence").boundingBox();
+  expect(silence.width).toBeGreaterThanOrEqual(44);
+  expect(silence.height).toBeGreaterThanOrEqual(44);
+  expect(silence.x).toBeGreaterThanOrEqual(0);
+  expect(silence.y).toBeGreaterThanOrEqual(0);
+  expect(silence.y + silence.height).toBeLessThanOrEqual(640);
+
+  await page.request.post("/__state", { data: { mode: "speaking" } });
+  await expect(page.locator("#s")).toHaveAttribute("aria-label", "Galion. Speaking.");
+  await page.waitForTimeout(1500);
+  const speaking = await radiusOf(page);
+
+  await page.request.post("/__state", { data: { mode: "thinking" } });
+  await expect(page.locator("#s")).toHaveAttribute("aria-label", "Galion. Thinking.");
+  await page.waitForTimeout(1500);
+  const thinking = await radiusOf(page);
+
+  await page.request.post("/__state", { data: { mode: "listening" } });
+  await expect(page.locator("#s")).toHaveAttribute("aria-label", "Galion. Listening.");
+  await page.waitForTimeout(1500);
+  const listening = await radiusOf(page);
+
+  expect(speaking.rx).toBeGreaterThan(idle.rx + 4);
+  expect(thinking.rx).toBeGreaterThan(speaking.rx + 3);
+  expect(listening.rx).toBeGreaterThan(thinking.rx + 3);
+  expect(problems).toEqual([]);
+  await page.screenshot({ path: join(shots, "one-listening-360.png") });
+});
+
+test("trailing slash still reaches /dot", async ({ page }) => {
+  const paths = [];
+  page.on("request", (req) => paths.push(new URL(req.url()).pathname));
+  await page.setViewportSize({ width: 360, height: 640 });
+  await page.request.post("/__state", { data: { mode: "idle" } });
+  await page.goto("/one/");
+  await expect(page.locator("#s")).toHaveAttribute("data-mode", "idle");
+  await page.waitForTimeout(1800);
+  await expect(page.locator("#s")).not.toHaveAttribute("data-mode", "offline");
+  expect(paths).toContain("/dot");
+  expect(paths).not.toContain("/one/dot");
+  expect(paths).not.toContain("/one/session");
+});
+
+test("a refused microphone is one calm line", async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 640 });
+  await openOne(page);
+  await page.evaluate(() => {
+    window.__micCalls = 0;
+    navigator.mediaDevices.getUserMedia = () => {
+      window.__micCalls += 1;
+      return Promise.reject(new DOMException("no", "NotAllowedError"));
+    };
+  });
+  await page.locator("canvas").dispatchEvent("touchend");
+  await page.locator("canvas").click();
+  await expect(page.locator("#note")).toHaveText("The microphone is off. Allow it, then tap the dot.");
+  await expect(page.locator("#note")).toHaveAttribute("role", "status");
+  await expect(page.locator("#note")).toHaveAttribute("aria-live", "polite");
+  expect(await page.locator("#note").innerText()).not.toMatch(/\d{3}/);
+  expect(await page.evaluate(() => window.__micCalls)).toBe(1);
+});
+
+test("boot does not start audio before a gesture when autoplay is blocked", async ({ page }) => {
+  await page.addInitScript(() => {
+    window.__starts = 0;
+    window.__resumes = 0;
+    class Fake {
+      constructor() {
+        this.state = "suspended";
+        this.currentTime = 0;
+        this.destination = {};
+      }
+      resume() {
+        window.__resumes += 1;
+        this.state = "running";
+        return Promise.resolve();
+      }
+      close() {
+        return Promise.resolve();
+      }
+      createOscillator() {
+        window.__starts += 1;
+        return {
+          type: "sine",
+          frequency: { value: 0 },
+          connect() {},
+          start() {
+            window.__starts += 1;
+          },
+          stop() {},
+        };
+      }
+      createGain() {
+        return {
+          gain: { value: 0, setValueAtTime() {}, exponentialRampToValueAtTime() {} },
+          connect() {},
+        };
+      }
+      createBuffer() {
+        return {};
+      }
+      createBufferSource() {
+        return { connect() {}, start() {} };
+      }
+    }
+    window.AudioContext = Fake;
+    window.webkitAudioContext = Fake;
+  });
+  await page.goto("/one");
+  await expect.poll(async () => (await page.locator("#s").getAttribute("data-cues")) || "").toContain("boot");
+  expect(await page.evaluate(() => window.__starts)).toBe(0);
+  expect(await page.evaluate(() => window.__resumes)).toBe(0);
+});

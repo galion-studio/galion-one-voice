@@ -30,7 +30,7 @@
      CC0 consent is enforced at clone time in Rust, so the call shows no CC0 UI.
      The session token comes from POST /session's body and is never put in the URL. -->
 <html lang="en"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0A0A0C" media="(prefers-color-scheme: dark)">
 <meta name="theme-color" content="#0A0A0C">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -42,9 +42,7 @@
 html,body{margin:0;width:100%;height:100%;height:100dvh;background:#0A0A0C;overflow:hidden;
   touch-action:manipulation;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;
   overscroll-behavior:none;cursor:default}
-canvas{display:block;position:fixed;inset:0;width:100%;height:100%;width:100dvw;height:100dvh;
-  padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
-  box-sizing:border-box}
+canvas{display:block;position:fixed;inset:0;width:100%;height:100%;padding:0;border:0;background:#0A0A0C}
 #decide{display:none}
 @media (min-width:1100px){
   body[data-session="samantha"] #decide{display:flex;flex-direction:column;gap:14px;position:fixed;top:28px;right:28px;width:300px;z-index:2;
@@ -52,12 +50,17 @@ canvas{display:block;position:fixed;inset:0;width:100%;height:100%;width:100dvw;
   #decide .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
   #decide .q{flex:1 1 140px}
   #decide button{appearance:none;border:1px solid rgba(245,165,36,.55);background:transparent;color:#F5F5F7;
-    border-radius:999px;padding:6px 14px;font:inherit;cursor:pointer}
+    border-radius:999px;padding:6px 14px;min-width:44px;min-height:44px;font:inherit;cursor:pointer}
   #decide button[aria-pressed="true"]{background:#F5A524;color:#0A0A0C;border-color:#F5A524}
 }
-#silence{position:fixed;left:0;bottom:0;z-index:3;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;
-  clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;border:0;
-  background:#0A0A0C;color:#F5F5F7;font:16px/1.2 system-ui,sans-serif}
+.sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+#note{position:fixed;left:20px;right:20px;bottom:max(72px,calc(env(safe-area-inset-bottom) + 64px));z-index:2;
+  margin:0;text-align:center;pointer-events:none;color:#F5F5F7;font:16px/1.45 system-ui,sans-serif}
+#note:empty{display:none}
+#silence{position:fixed;left:max(12px,env(safe-area-inset-left));bottom:max(12px,env(safe-area-inset-bottom));
+  z-index:4;width:44px;height:44px;margin:0;padding:0;overflow:hidden;white-space:nowrap;
+  border:0;border-radius:999px;background:#0A0A0C;color:#F5F5F7;font:0/44px system-ui,sans-serif}
+#silence:focus-visible{font-size:16px;outline:1px solid #F5F5F7;outline-offset:2px}
 </style>
 <script type="module">
 import { drawNebula } from "/nebula/vocabulary.mjs";
@@ -65,15 +68,19 @@ window.drawNebula = drawNebula;
 </script>
 </head>
 <body>
-<canvas id="s" data-mark="orb" data-profile="luti" data-persona="samantha" data-mouth="piper" data-film-voice="false" data-rights="hold"></canvas>
+<canvas id="s" role="img" aria-label="Galion. Resting." data-mark="orb" data-profile="luti" data-persona="samantha" data-mouth="piper" data-film-voice="false" data-rights="hold"></canvas>
 <div id="decide">
   <div class="row" data-id="here"><span class="q">Keep this session on this machine</span><button type="button" data-yes="yes">Yes</button><button type="button" data-yes="no">No</button></div>
   <div class="row" data-id="quiet"><span class="q">Stay quiet when the turn ends</span><button type="button" data-yes="yes">Yes</button><button type="button" data-yes="no">No</button></div>
   <div class="row" data-id="english"><span class="q">Keep replies in English</span><button type="button" data-yes="yes">Yes</button><button type="button" data-yes="no">No</button></div>
 </div>
 <!-- /decide -->
-<button id="silence" type="button" aria-pressed="false">Silence</button>
+<button id="silence" type="button" aria-pressed="false" aria-label="Silence">Silence</button>
 <!-- /silence -->
+<p id="mode" class="sr" aria-live="polite">Resting</p>
+<!-- /mode -->
+<p id="note" role="status" aria-live="polite"></p>
+<!-- /note -->
 <script>
 "use strict";
 const TOK={dot:"#F5F5F7",base:"#0A0A0C",from:"#F5A524",to:"#7C3AED"};
@@ -82,7 +89,7 @@ const TOK={dot:"#F5F5F7",base:"#0A0A0C",from:"#F5A524",to:"#7C3AED"};
 const MARK={core:"#F5F5F7",edge:"#E8E8ED",stroke:"rgba(255,255,255,0.55)",strokePx:1};
 const WASH=0.38, WASH_MS=24000, IDLE_MS=1600, BW=96, BH=54;
 // Radius fractions mirror galion-render DotParams scale. Brightness here is glow (0..1), not pigment.
-const R={idle:0.100, listen:0.135, speak:0.105, speakDepth:0.028, off:0.060};
+const R={idle:0.100, listen:0.172, speak:0.128, speakDepth:0.030, off:0.060};
 const B={idle:0.48, listen:0.72, off:0.08};
 const POLL_MS=80, MAX_INFLIGHT=3, FETCH_TIMEOUT_MS=1200, OFFLINE_MS=1500;
 const HOLD_IDLE_MS=300, HOLD_LEAVE_SPEAK_MS=160, LOCAL_VOICE=0.02;
@@ -95,7 +102,7 @@ const clamp=(x,a,b)=>Math.min(b,Math.max(a,x));
 const cv=document.getElementById("s"), cx=cv.getContext("2d",{alpha:false});
 const bg=document.createElement("canvas"); bg.width=BW; bg.height=BH;
 const bx=bg.getContext("2d"), img=bx.createImageData(BW,BH);
-// No on-screen text (owner t653u): errors go to the console only.
+// A fault is one calm line in #note. The same words go to the console. The mark stays one circle.
 const AI_DISCLOSURE={hr:"Razgovarate s umjetnom inteligencijom. Galion je AI asistent, a ne osoba.",en:"You are talking to an AI. Galion is an AI assistant, not a person."};
 let aiDisclosed=false;
 const t0=performance.now();
@@ -132,7 +139,7 @@ function sessionHeaders(extra){
 async function ensureSession(){
   if(sessionToken) return;
   try{
-    const r=await fetch("session",{method:"POST",cache:"no-store",
+    const r=await fetch("/session",{method:"POST",cache:"no-store",
       headers:{"Content-Type":"application/json","ngrok-skip-browser-warning":"1"},
       body:"{\"op\":\"open\"}"});
     if(!r.ok) return;
@@ -250,12 +257,26 @@ function setSilence(on){
   if(btn) btn.setAttribute("aria-pressed", silence?"true":"false");
   try{ localStorage.setItem("galion-one-silence", silence?"1":"0"); }catch(e){}
 }
+let audioUnlocked=false, audioBlocked=false;
 function toneContext(){
   try{
     const AC=window.AudioContext||window.webkitAudioContext;
     if(!AC) return null;
-    if(!micCtx) micCtx=new AC({latencyHint:"interactive"});
-    if(micCtx.state==="suspended") micCtx.resume().catch(()=>{});
+    const gestured=audioUnlocked||(navigator.userActivation&&navigator.userActivation.hasBeenActive);
+    if(!micCtx){
+      if(audioBlocked&&!gestured) return null;
+      const created=new AC({latencyHint:"interactive"});
+      if(created.state==="suspended"&&!gestured){
+        audioBlocked=true;
+        created.close().catch(()=>{});
+        return null;
+      }
+      micCtx=created;
+    }
+    if(micCtx.state==="suspended"){
+      if(!gestured) return null;
+      micCtx.resume().catch(()=>{});
+    }
     return micCtx;
   }catch(e){ return null; }
 }
@@ -378,19 +399,16 @@ function target(mode,now,dt){
   if(mode==="listening"){
     const local=clamp((micRms-micFloor)*6,0,1);
     const lv=Math.max(clamp(+(latest&&latest.level)||0,0,1), local, micEnv*2.5);
-    return [R.listen+0.028*lv+0.004*Math.sin(t/1100), B.listen+0.16*lv];
+    return [R.listen+0.020*lv+0.003*Math.sin(t/1400), B.listen+0.12*lv];
   }
   if(mode==="thinking"){
-    const s=0.5+0.5*Math.sin(t/1100);
-    return [0.108+0.008*s, 0.50+0.10*s];
+    const s=0.5+0.5*Math.sin(t/2600);
+    return [0.150+0.004*s, 0.58+0.05*s];
   }
   if(mode==="speaking"){
-    const breath=Math.sin(t/1400);
-    if(playing) return [R.speak+R.speakDepth*env+0.006*breath, 0.40+0.32*env];
-    if(latest&&typeof latest.radius==="number"&&(latest.mode==="speaking"||latest.state==="speaking"))
-      return [clamp(+latest.radius,0,0.5), 0.40+0.28*clamp(+latest.brightness||0.8,0,1)];
-    const s=Math.sin(((t%2800)/2800)*2*Math.PI);
-    return [R.speak+0.012*s, 0.46+0.08*s];
+    const breath=0.5+0.5*Math.sin(t/900);
+    if(playing) return [R.speak+R.speakDepth*env+0.004*Math.sin(t/1400), 0.46+0.32*env];
+    return [R.speak+0.010*breath, 0.54+0.12*breath];
   }
   const s=Math.sin(((t%IDLE_MS)/IDLE_MS)*2*Math.PI);
   const lean=clamp(+(latest&&latest.lean)||0,0,1);
@@ -401,6 +419,11 @@ function draw(){
   const now=performance.now(), dt=Math.min(50,now-lastFrame); lastFrame=now;
   shown=pickMode(now);
   cv.dataset.mode=shown;
+  const modeName={idle:"Resting",listening:"Listening",thinking:"Thinking",speaking:"Speaking",offline:"Away"}[shown]||"Resting";
+  const modeLabel="Galion. "+modeName+".";
+  if(cv.getAttribute("aria-label")!==modeLabel) cv.setAttribute("aria-label", modeLabel);
+  const modeLive=document.getElementById("mode");
+  if(modeLive&&modeLive.textContent!==modeName) modeLive.textContent=modeName;
   const [tr,tb]=target(shown,now,dt);
   const aim=SPRING[shown]||SPRING.idle;
   const gk=1-Math.exp(-dt/GAIN_TAU);
@@ -471,7 +494,7 @@ function pollOnce(){
   inflight++;
   const ac=window.AbortController?new AbortController():null;
   const to=setTimeout(()=>{try{ac&&ac.abort();}catch(e){}},FETCH_TIMEOUT_MS);
-  fetch("dot",{cache:"no-store",signal:ac?ac.signal:undefined,headers:{"ngrok-skip-browser-warning":"1"}})
+  fetch("/dot",{cache:"no-store",signal:ac?ac.signal:undefined,headers:{"ngrok-skip-browser-warning":"1"}})
     .then(r=>r.ok?r.json():null)
     .then(j=>{
       if(!j||typeof j.radius!=="number") return;
@@ -495,6 +518,8 @@ setInterval(pollOnce,POLL_MS);
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible") pollOnce();});
 
 function showErr(msg){
+  const note=document.getElementById("note");
+  if(note) note.textContent=msg||"";
   if(!msg) return;
   try{console.warn("[galion]",msg);}catch(e){}
   if(productIsOne()) playSound("error");
@@ -513,7 +538,7 @@ function tickMic(){
     micPosting=true;
     const lv={rms:+micRms.toFixed(4),t:Date.now()}; if(playing) lv.playing=playId;
     if(sessionToken) lv.session=sessionToken;
-    try{fetch("mic",{method:"POST",headers:sessionHeaders({"Content-Type":"application/json"}),
+    try{fetch("/mic",{method:"POST",headers:sessionHeaders({"Content-Type":"application/json"}),
       body:JSON.stringify(lv)}).catch(()=>{}).finally(()=>{micPosting=false;});}
     catch(e){micPosting=false;}
   }
@@ -523,12 +548,11 @@ function tickMic(){
 async function enableMic(){
   if(micState==="on"||micState==="pending") return;
   discloseAi();
-  await ensureSession();
   if(!window.isSecureContext && location.hostname!=="localhost" && location.hostname!=="127.0.0.1"){
-    showErr("Microphone needs HTTPS. Open the https:// link."); return;
+    showErr("The microphone needs a secure page. Open the https link."); return;
   }
   if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
-    showErr("This browser cannot open the microphone."); return;
+    showErr("This browser can't open a microphone."); return;
   }
   micState="pending"; showErr("");
   // Create + unlock the AudioContext synchronously inside the tap (before any await) so that
@@ -536,6 +560,7 @@ async function enableMic(){
   ensureAudio();
   if(productIsOne()) playSound("wake");
   try{
+    await ensureSession();
     micStream=await navigator.mediaDevices.getUserMedia({
       audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true,channelCount:1},
       video:false
@@ -550,23 +575,24 @@ async function enableMic(){
     hideHint();
     showErr("");
     tickMic();
-    startCapture(src).catch(()=>showErr("Speech capture unavailable — level only."));
+    startCapture(src).catch(()=>showErr("I can hear the room, but not clearly enough for words yet."));
   }catch(e){
     micState="denied";
     const name=e&&(e.name||"");
     if(name==="NotAllowedError"||name==="PermissionDeniedError")
-      showErr("Microphone blocked — allow it in browser settings, then tap again.");
-    else if(name==="NotFoundError")
-      showErr("No microphone found on this device.");
+      showErr("The microphone is off. Allow it, then tap the dot.");
+    else if(name==="NotFoundError"||name==="DevicesNotFoundError")
+      showErr("I can't find a microphone on this device.");
     else
-      showErr("Could not open the microphone.");
+      showErr("I couldn't open the microphone. Tap the dot to try again.");
   }
 }
 
+let lastTouch=0;
 function onActivate(e){
-  // First intentional tap: mic. Avoid synthetic click-after-touch double fire.
-  if(e.type==="touchend"){ e.preventDefault(); enableMic(); return; }
-  if(e.type==="click"){ enableMic(); }
+  // First intentional tap: mic. A touch also synthesises a click; ignore that echo.
+  if(e.type==="touchend"){ e.preventDefault(); lastTouch=performance.now(); enableMic(); return; }
+  if(e.type==="click"){ if(performance.now()-lastTouch<700) return; enableMic(); }
 }
 // A tap anywhere on the screen starts the mic (the canvas spans the whole screen).
 document.addEventListener("touchend",onActivate,{passive:false});
@@ -581,7 +607,7 @@ async function sendText(text){
   const t=(text||"").trim();
   if(!t) return;
   // Same gesture as Send: unlock playback before any await, mic or not.
-  if(!ensureAudio()){ showErr("This browser cannot play audio."); return; }
+  if(!ensureAudio()){ showErr("This browser can't play sound."); return; }
   const barge=playing;
   if(playing) stopPlayback();
   discloseAi();
@@ -589,9 +615,9 @@ async function sendText(text){
   turnsInFlight++;
   const watch=turnsInFlight;
   try{
-    const r=await fetch("v2/say",{method:"POST",cache:"no-store",headers:sessionHeaders({"Content-Type":"application/json"}),
+    const r=await fetch("/v2/say",{method:"POST",cache:"no-store",headers:sessionHeaders({"Content-Type":"application/json"}),
       body:JSON.stringify({text:t,barge:!!barge,e:0,sense:false})});
-    if(!r.ok){ turnsInFlight=Math.max(0,turnsInFlight-1); showErr("Message failed ("+r.status+")."); return; }
+    if(!r.ok){ turnsInFlight=Math.max(0,turnsInFlight-1); showErr("I didn't catch that. Try once more."); return; }
     const j=await r.json();
     showErr("");
     if(j&&j.persona) cv.dataset.persona=j.persona;
@@ -602,7 +628,7 @@ async function sendText(text){
     }
     hideHint();
     if(j&&(j.silence||!j.reply)){ turnsInFlight=Math.max(0,turnsInFlight-1); return; }
-  }catch(e){ turnsInFlight=Math.max(0,turnsInFlight-1); showErr("Could not send that."); }
+  }catch(e){ turnsInFlight=Math.max(0,turnsInFlight-1); showErr("I didn't catch that. Try once more."); }
   setTimeout(()=>{ if(!playing&&turnsInFlight>=watch) turnsInFlight=Math.max(0,turnsInFlight-1); }, 20000);
 }
 
@@ -612,6 +638,7 @@ function ensureAudio(){
   try{
     const AC=window.AudioContext||window.webkitAudioContext;
     if(!AC) return false;
+    audioUnlocked=true;
     if(!micCtx) micCtx=new AC({latencyHint:"interactive"});
     unlockAudio(micCtx);
     hearReplies=true;
@@ -715,10 +742,10 @@ function postTurn(frames,barge){
   const wav=encodeWav(frames,CAP_SR), id=Date.now().toString(36)+"-"+(++turnSeq);
   turnsInFlight++;
   const watch=turnsInFlight;
-  fetch("turn",{method:"POST",cache:"no-store",body:wav,headers:sessionHeaders({
+  fetch("/turn",{method:"POST",cache:"no-store",body:wav,headers:sessionHeaders({
       "Content-Type":"audio/wav","X-Turn-Id":id,"X-Sample-Rate":String(CAP_SR),
       "X-Barge-In":barge?"1":"0","X-Galion-Proceed":"auto"})})
-    .then(r=>{ if(!r.ok&&r.status!==404){ turnsInFlight=Math.max(0,turnsInFlight-1); showErr("Voice turn failed ("+r.status+")."); } else showErr(""); })
+    .then(r=>{ if(!r.ok&&r.status!==404){ turnsInFlight=Math.max(0,turnsInFlight-1); showErr("That didn't go through. Tap the dot when you want to try again."); } else showErr(""); })
     .catch(()=>{ turnsInFlight=Math.max(0,turnsInFlight-1); });
   setTimeout(()=>{ if(!playing&&turnsInFlight>=watch) turnsInFlight=Math.max(0,turnsInFlight-1); }, 20000);
 }
@@ -787,7 +814,7 @@ addEventListener("pagehide",()=>{ if(productIsOne()) playSound("shutdown"); });
   function postIfComplete(){
     if(rows.some(row=>!(row.dataset.id in picks))) return;
     const answers=rows.map(row=>({id:row.dataset.id,yes:picks[row.dataset.id]==="yes"}));
-    fetch("v2/decide",{method:"POST",cache:"no-store",headers:sessionHeaders({"Content-Type":"application/json"}),
+    fetch("/v2/decide",{method:"POST",cache:"no-store",headers:sessionHeaders({"Content-Type":"application/json"}),
       body:JSON.stringify({schema:"galion-session-decision/1",persona:"samantha",answers})})
       .then(r=>r.ok?r.json():null).then(j=>{ if(j&&j.reply) box.dataset.posted="1"; }).catch(()=>{});
   }
