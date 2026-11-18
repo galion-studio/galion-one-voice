@@ -1,0 +1,291 @@
+# Galion Voice — Perpetual Open MIT License
+# Copyright (c) 2026 Galion Labs.
+# Stand-in scenario. No recording. Numbers are fixture knobs.
+
+schema = "galion-mne-contract"
+schema_version = 1
+kind = "intent"
+frame_ms = 80
+value_origin = "stand_in"
+note = "Argue. Anger pin. Arousal and dominance stay high through the line. No hertz target is stored."
+
+text = "That is not what I said, and it matters."
+
+[persona]
+persona_id = "galion-one"
+voice_id = "profile:galion-one-steady"
+
+[moment]
+moment_id = "argue-what-was-said"
+memory_id = "mem-standin-what-was-said"
+memory_snippet = "The sentence they repeated was not the sentence that was said."
+place = "quiet_room"
+distance = "conversational"
+noise = "some"
+listener = "one_person"
+
+[baseline]
+arousal = 0.4
+valence = 0.0
+dominance = 0.5
+
+[[intent_frames]]
+t_ms = 0
+
+[intent_frames.intent]
+verb = "argue"
+strength = 0.85
+
+[intent_frames.feeling]
+arousal = 0.62
+valence = -0.2
+dominance = 0.62
+
+[intent_frames.feeling.pin]
+name = "anger"
+track = "prosody"
+weight = 0.78
+
+[intent_frames.inner]
+energy = 0.8
+fatigue = 0.05
+health = 1.0
+
+[intent_frames.text_span]
+start_byte = 0
+end_byte = 40
+
+[[intent_frames]]
+t_ms = 80
+
+[intent_frames.intent]
+verb = "argue"
+strength = 0.85
+
+[intent_frames.feeling]
+arousal = 0.6378
+valence = -0.2278
+dominance = 0.6378
+
+[intent_frames.feeling.pin]
+name = "anger"
+track = "prosody"
+weight = 0.7867
+
+[intent_frames.inner]
+energy = 0.8
+fatigue = 0.05
+health = 1.0
+
+[intent_frames.text_span]
+start_byte = 0
+end_byte = 40
+
+[[intent_frames]]
+t_ms = 160
+
+[intent_frames.intent]
+verb = "argue"
+strength = 0.85
+
+[intent_frames.feeling]
+arousal = 0.6556
+valence = -0.2556
+dominance = 0.6556
+
+[intent_frames.feeling.pin]
+name = "anger"
+track = "prosody"
+weight = 0.7933
+
+[intent_frames.inner]
+energy = 0.8
+fatigue = 0.05
+health = 1.0
+
+[intent_frames.text_span]
+start_byte = 0
+end_byte = 40
+
+[[intent_frames]]
+t_ms = 240
+
+[intent_frames.intent]
+verb = "argue"
+strength = 0.85
+
+[intent_frames.feeling]
+arousal = 0.6733
+valence = -0.2833
+dominance = 0.6733
+
+[intent_frames.feeling.pin]
+name = "anger"
+track = "prosody"
+weight = 0.8
+
+[intent_frames.inner]
+energy = 0.8
+fatigue = 0.05
+health = 1.0
+
+[intent_frames.text_span]
+start_byte = 0
+end_byte = 40
+
+[[intent_frames]]
+t_ms = 320
+
+[intent_frames.intent]
+verb = "argue"
+strength = 0.85
+
+[intent_frames.feeling]
+arousal = 0.6911
+valence = -0.3111
+dominance = 0.6911
+
+[intent_frames.feeling.pin]
+name = "anger"
+track = "prosody"
+weight = 0.8067
+
+[intent_frames.inner]
+energy = 0.8
+fatigue = 0.05
+health = 1.0
+
+[intent_frames.text_span]
+start_byte = 0
+end_byte = 40
+
+[[intent_frames]]
+t_ms = 400
+
+[intent_frames.intent]
+verb = "argue"
+strength = 0.85
+
+[intent_frames.feeling]
+arousal = 0.7089
+valence = -0.3389
+dominance = 0.7089
+
+[intent_frames.feeling.pin]
+name = "anger"
+track = "prosody"
+weight = 0.8133
+
+[intent_frames.inner]
+energy = 0.8
+fatigue = 0.05
+health = 1.0
+
+[intent_frames.text_span]
+start_byte = 0
+end_byte = 40
+
+[[intent_frames]]
+t_ms = 480
+
+[intent_frames.intent]
+verb = "argue"
+strength = 0.85
+
+[intent_frames.feeling]
+arousal = 0.7267
+valence = -0.3667
+dominance = 0.7267
+
+[intent_frames.feeling.pin]
+name = "anger"
+track = "prosody"
+weight = 0.82
+
+[intent_frames.inner]
+energy = 0.8
+fatigue = 0.05
+health = 1.0
+
+[intent_frames.text_span]
+start_byte = 0
+end_byte = 40
+
+[[intent_frames]]
+t_ms = 560
+
+[intent_frames.intent]
+verb = "argue"
+strength = 0.85
+
+[intent_frames.feeling]
+arousal = 0.7444
+valence = -0.3944
+dominance = 0.7444
+
+[intent_frames.feeling.pin]
+name = "anger"
+track = "prosody"
+weight = 0.8267
+
+[intent_frames.inner]
+energy = 0.8
+fatigue = 0.05
+health = 1.0
+
+[intent_frames.text_span]
+start_byte = 0
+end_byte = 40
+
+[[intent_frames]]
+t_ms = 640
+
+[intent_frames.intent]
+verb = "argue"
+strength = 0.85
+
+[intent_frames.feeling]
+arousal = 0.7622
+valence = -0.4222
+dominance = 0.7622
+
+[intent_frames.feeling.pin]
+name = "anger"
+track = "prosody"
+weight = 0.8333
+
+[intent_frames.inner]
+energy = 0.8
+fatigue = 0.05
+health = 1.0
+
+[intent_frames.text_span]
+start_byte = 0
+end_byte = 40
+
+[[intent_frames]]
+t_ms = 720
+
+[intent_frames.intent]
+verb = "argue"
+strength = 0.85
+
+[intent_frames.feeling]
+arousal = 0.78
+valence = -0.45
+dominance = 0.78
+
+[intent_frames.feeling.pin]
+name = "anger"
+track = "prosody"
+weight = 0.84
+
+[intent_frames.inner]
+energy = 0.8
+fatigue = 0.05
+health = 1.0
+
+[intent_frames.text_span]
+start_byte = 0
+end_byte = 40
+

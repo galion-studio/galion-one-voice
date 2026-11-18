@@ -1,0 +1,10 @@
+{
+  "burst": {
+    "weights": [
+      { "id": "amusement", "w": 0.2 },
+      { "id": "sadness", "w": 0.0 }
+    ],
+    "top": "amusement",
+    "source": "same-24-as-prosody"
+  }
+}

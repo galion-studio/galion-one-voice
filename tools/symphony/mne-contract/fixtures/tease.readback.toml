@@ -1,0 +1,271 @@
+# Galion Voice — Perpetual Open MIT License
+# Copyright (c) 2026 Galion Labs.
+# Stand-in scenario. No recording. Numbers are fixture knobs.
+
+schema = "galion-mne-contract"
+schema_version = 1
+kind = "readback"
+frame_ms = 80
+value_origin = "stand_in"
+note = "Tease. Amusement pin and positive valence rise, then stay up instead of snapping back."
+
+text = "You did say you would stop at one chapter."
+
+[persona]
+persona_id = "galion-one"
+voice_id = "profile:galion-one-steady"
+
+[moment]
+moment_id = "tease-one-more-chapter"
+memory_id = "mem-standin-one-chapter"
+memory_snippet = "They swore the book would stay shut after one chapter."
+place = "quiet_room"
+distance = "conversational"
+noise = "quiet"
+listener = "one_person"
+
+[baseline]
+arousal = 0.4
+valence = 0.0
+dominance = 0.5
+
+[[readback_frames]]
+t_ms = 0
+
+[readback_frames.feeling]
+arousal = 0.434
+valence = 0.0425
+dominance = 0.517
+
+[readback_frames.feeling.pin]
+name = "amusement"
+track = "prosody"
+weight = 0.18
+
+[readback_frames.body]
+origin = "unmeasured"
+
+[readback_frames.body.lungs]
+segment = "unknown"
+
+[readback_frames.confidence]
+feeling = 0.62
+body = 0.0
+confounded = false
+
+[[readback_frames]]
+t_ms = 80
+
+[readback_frames.feeling]
+arousal = 0.4472
+valence = 0.0774
+dominance = 0.5198
+
+[readback_frames.feeling.pin]
+name = "amusement"
+track = "prosody"
+weight = 0.224
+
+[readback_frames.body]
+origin = "unmeasured"
+
+[readback_frames.body.lungs]
+segment = "unknown"
+
+[readback_frames.confidence]
+feeling = 0.62
+body = 0.0
+confounded = false
+
+[[readback_frames]]
+t_ms = 160
+
+[readback_frames.feeling]
+arousal = 0.4604
+valence = 0.1124
+dominance = 0.5227
+
+[readback_frames.feeling.pin]
+name = "amusement"
+track = "prosody"
+weight = 0.268
+
+[readback_frames.body]
+origin = "unmeasured"
+
+[readback_frames.body.lungs]
+segment = "unknown"
+
+[readback_frames.confidence]
+feeling = 0.62
+body = 0.0
+confounded = false
+
+[[readback_frames]]
+t_ms = 240
+
+[readback_frames.feeling]
+arousal = 0.4737
+valence = 0.1473
+dominance = 0.5255
+
+[readback_frames.feeling.pin]
+name = "amusement"
+track = "prosody"
+weight = 0.312
+
+[readback_frames.body]
+origin = "unmeasured"
+
+[readback_frames.body.lungs]
+segment = "unknown"
+
+[readback_frames.confidence]
+feeling = 0.62
+body = 0.0
+confounded = false
+
+[[readback_frames]]
+t_ms = 320
+
+[readback_frames.feeling]
+arousal = 0.4869
+valence = 0.1823
+dominance = 0.5283
+
+[readback_frames.feeling.pin]
+name = "amusement"
+track = "prosody"
+weight = 0.356
+
+[readback_frames.body]
+origin = "unmeasured"
+
+[readback_frames.body.lungs]
+segment = "unknown"
+
+[readback_frames.confidence]
+feeling = 0.62
+body = 0.0
+confounded = false
+
+[[readback_frames]]
+t_ms = 400
+
+[readback_frames.feeling]
+arousal = 0.5001
+valence = 0.2172
+dominance = 0.5312
+
+[readback_frames.feeling.pin]
+name = "amusement"
+track = "prosody"
+weight = 0.4
+
+[readback_frames.body]
+origin = "unmeasured"
+
+[readback_frames.body.lungs]
+segment = "unknown"
+
+[readback_frames.confidence]
+feeling = 0.62
+body = 0.0
+confounded = false
+
+[[readback_frames]]
+t_ms = 480
+
+[readback_frames.feeling]
+arousal = 0.5133
+valence = 0.2522
+dominance = 0.534
+
+[readback_frames.feeling.pin]
+name = "amusement"
+track = "prosody"
+weight = 0.444
+
+[readback_frames.body]
+origin = "unmeasured"
+
+[readback_frames.body.lungs]
+segment = "unknown"
+
+[readback_frames.confidence]
+feeling = 0.62
+body = 0.0
+confounded = false
+
+[[readback_frames]]
+t_ms = 560
+
+[readback_frames.feeling]
+arousal = 0.5266
+valence = 0.2871
+dominance = 0.5368
+
+[readback_frames.feeling.pin]
+name = "amusement"
+track = "prosody"
+weight = 0.488
+
+[readback_frames.body]
+origin = "unmeasured"
+
+[readback_frames.body.lungs]
+segment = "unknown"
+
+[readback_frames.confidence]
+feeling = 0.62
+body = 0.0
+confounded = false
+
+[[readback_frames]]
+t_ms = 640
+
+[readback_frames.feeling]
+arousal = 0.5398
+valence = 0.3221
+dominance = 0.5397
+
+[readback_frames.feeling.pin]
+name = "amusement"
+track = "prosody"
+weight = 0.532
+
+[readback_frames.body]
+origin = "unmeasured"
+
+[readback_frames.body.lungs]
+segment = "unknown"
+
+[readback_frames.confidence]
+feeling = 0.62
+body = 0.0
+confounded = false
+
+[[readback_frames]]
+t_ms = 720
+
+[readback_frames.feeling]
+arousal = 0.553
+valence = 0.357
+dominance = 0.5425
+
+[readback_frames.feeling.pin]
+name = "amusement"
+track = "prosody"
+weight = 0.576
+
+[readback_frames.body]
+origin = "unmeasured"
+
+[readback_frames.body.lungs]
+segment = "unknown"
+
+[readback_frames.confidence]
+feeling = 0.62
+body = 0.0
+confounded = false
+

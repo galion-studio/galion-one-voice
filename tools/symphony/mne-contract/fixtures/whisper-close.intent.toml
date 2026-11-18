@@ -1,0 +1,239 @@
+# Galion Voice — Perpetual Open MIT License
+# Copyright (c) 2026 Galion Labs.
+# Stand-in scenario. No recording. Numbers are fixture knobs.
+
+schema = "galion-mne-contract"
+schema_version = 1
+kind = "intent"
+frame_ms = 80
+value_origin = "stand_in"
+note = "Whisper close. Adoration pin. Arousal sits at or under the baseline. Distance is a token. No whisper gain and no F0 drop are stored."
+
+text = "Stay. I'm right here."
+
+[persona]
+persona_id = "galion-one"
+voice_id = "profile:galion-one-steady"
+
+[moment]
+moment_id = "whisper-stay-close"
+memory_id = "mem-standin-stay-close"
+memory_snippet = "The room is quiet and they are close enough to lower the voice."
+place = "quiet_room"
+distance = "whisper_close"
+noise = "quiet"
+listener = "one_person"
+
+[baseline]
+arousal = 0.4
+valence = 0.0
+dominance = 0.5
+
+[[intent_frames]]
+t_ms = 0
+
+[intent_frames.intent]
+verb = "whisper_close"
+strength = 0.6
+
+[intent_frames.feeling]
+arousal = 0.4
+valence = 0.1
+dominance = 0.48
+
+[intent_frames.feeling.pin]
+name = "adoration"
+track = "prosody"
+weight = 0.25
+
+[intent_frames.inner]
+energy = 0.45
+fatigue = 0.12
+health = 1.0
+
+[intent_frames.text_span]
+start_byte = 0
+end_byte = 5
+
+[[intent_frames]]
+t_ms = 80
+
+[intent_frames.intent]
+verb = "whisper_close"
+strength = 0.6
+
+[intent_frames.feeling]
+arousal = 0.39
+valence = 0.1257
+dominance = 0.4743
+
+[intent_frames.feeling.pin]
+name = "adoration"
+track = "prosody"
+weight = 0.2857
+
+[intent_frames.inner]
+energy = 0.45
+fatigue = 0.12
+health = 1.0
+
+[intent_frames.text_span]
+start_byte = 0
+end_byte = 5
+
+[[intent_frames]]
+t_ms = 160
+
+[intent_frames.intent]
+verb = "whisper_close"
+strength = 0.6
+
+[intent_frames.feeling]
+arousal = 0.38
+valence = 0.1514
+dominance = 0.4686
+
+[intent_frames.feeling.pin]
+name = "adoration"
+track = "prosody"
+weight = 0.3214
+
+[intent_frames.inner]
+energy = 0.45
+fatigue = 0.12
+health = 1.0
+
+[intent_frames.text_span]
+start_byte = 0
+end_byte = 5
+
+[[intent_frames]]
+t_ms = 240
+
+[intent_frames.intent]
+verb = "whisper_close"
+strength = 0.6
+
+[intent_frames.feeling]
+arousal = 0.37
+valence = 0.1771
+dominance = 0.4629
+
+[intent_frames.feeling.pin]
+name = "adoration"
+track = "prosody"
+weight = 0.3571
+
+[intent_frames.inner]
+energy = 0.45
+fatigue = 0.12
+health = 1.0
+
+[intent_frames.text_span]
+start_byte = 0
+end_byte = 5
+
+[[intent_frames]]
+t_ms = 320
+
+[intent_frames.intent]
+verb = "whisper_close"
+strength = 0.6
+
+[intent_frames.feeling]
+arousal = 0.36
+valence = 0.2029
+dominance = 0.4571
+
+[intent_frames.feeling.pin]
+name = "adoration"
+track = "prosody"
+weight = 0.3929
+
+[intent_frames.inner]
+energy = 0.45
+fatigue = 0.12
+health = 1.0
+
+[intent_frames.text_span]
+start_byte = 6
+end_byte = 21
+
+[[intent_frames]]
+t_ms = 400
+
+[intent_frames.intent]
+verb = "whisper_close"
+strength = 0.6
+
+[intent_frames.feeling]
+arousal = 0.35
+valence = 0.2286
+dominance = 0.4514
+
+[intent_frames.feeling.pin]
+name = "adoration"
+track = "prosody"
+weight = 0.4286
+
+[intent_frames.inner]
+energy = 0.45
+fatigue = 0.12
+health = 1.0
+
+[intent_frames.text_span]
+start_byte = 6
+end_byte = 21
+
+[[intent_frames]]
+t_ms = 480
+
+[intent_frames.intent]
+verb = "whisper_close"
+strength = 0.6
+
+[intent_frames.feeling]
+arousal = 0.34
+valence = 0.2543
+dominance = 0.4457
+
+[intent_frames.feeling.pin]
+name = "adoration"
+track = "prosody"
+weight = 0.4643
+
+[intent_frames.inner]
+energy = 0.45
+fatigue = 0.12
+health = 1.0
+
+[intent_frames.text_span]
+start_byte = 6
+end_byte = 21
+
+[[intent_frames]]
+t_ms = 560
+
+[intent_frames.intent]
+verb = "whisper_close"
+strength = 0.6
+
+[intent_frames.feeling]
+arousal = 0.33
+valence = 0.28
+dominance = 0.44
+
+[intent_frames.feeling.pin]
+name = "adoration"
+track = "prosody"
+weight = 0.5
+
+[intent_frames.inner]
+energy = 0.45
+fatigue = 0.12
+health = 1.0
+
+[intent_frames.text_span]
+start_byte = 6
+end_byte = 21
+

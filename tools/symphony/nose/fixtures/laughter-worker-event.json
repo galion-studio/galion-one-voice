@@ -1,0 +1,4 @@
+{
+  "source": "events",
+  "events": [{ "start_s": 0.24, "end_s": 0.88, "kind": "laugh" }]
+}

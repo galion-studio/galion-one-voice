@@ -1,0 +1,27 @@
+# Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
+[package]
+name = "galion-sound-out"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+publish = false
+description = "Symphony sound-out: one cloner trait, adapters for the Chatterbox worker, Piper, and a Moshi stub, then breath, bursts, and the room."
+
+[[bin]]
+name = "galion-sound-out"
+path = "src/main.rs"
+
+[features]
+default = []
+# Opt-in. CI does not pass this flag and does not download weights.
+# The tests only check that a missing pack is reported. They do not synthesize.
+real-backends = []
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+galion-lungs = { path = "../lungs" }
+
+# Own workspace, same pattern as tools/symphony/lungs.
+# The locked voice runtime does not build this tool.
+[workspace]

@@ -1,0 +1,35 @@
+# Galion Voice — Perpetual Open MIT License
+# Copyright (c) 2026 Galion Labs.
+#
+# Synthetic voice. Numbers are a test tone, not a person.
+# Chatterbox fields stay empty so the tool does not download weights.
+
+schema = "galion-voice-v2-voice"
+id = "synthetic-a"
+reference_is_neutral = true
+
+[baseline]
+f0_hz_mean = 180.0
+f0_hz_sd = 8.0
+energy_mean = 0.15
+energy_sd = 0.05
+hnr_db_mean = 12.0
+hnr_db_sd = 3.0
+f1_hz_mean = 700.0
+f1_hz_sd = 40.0
+f2_hz_mean = 1200.0
+
+[baseline.conditions]
+room = "quiet"
+noise_db = 0.0
+listener_distance_m = 1.0
+
+[chatterbox]
+bin = ""
+voice = ""
+voice_wav = ""
+weights = ""
+params_json = ""
+repo_id = "ResembleAI/chatterbox-turbo-ONNX"
+revision = "d21799bd0354adb85e348b8a0442a8405110a2cf"
+dtype = "fp32"
