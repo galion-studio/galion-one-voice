@@ -1,0 +1,92 @@
+# Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
+# Feeling-core knobs. A sign on a pin is a cited direction.
+# A half-life, a linger weight, and a rest point are config.
+# They are not measurements. "unknown" is not applied.
+
+schema = "galion-feeling-config/1"
+
+# LOCKS clock.frame_ms. No paper cited here establishes 80 ms as a feeling time.
+tick_ms = 80
+
+[dynamics]
+# Kuppens, Oravecz and Tuerlinckx (2010): core affect has inertia and a home
+# base. Their estimated time constants are not copied.
+inertia_half_life_s = 0.16
+mood_half_life_s = 0.80
+# Convex weight of the slow mood inside the target the moment chases.
+# Not a published mixture weight. Must be in [0, 1).
+linger = 0.35
+# Used when an intent frame omits blend. 1 replaces the held target on the
+# axes that frame sets. The moment still moves with inertia.
+default_blend = 1.0
+# Core axes plus learned names. A cap so a bad stream cannot grow without bound.
+max_axes = 32
+
+[factors]
+# Thayer (1989): energetic arousal is not tense arousal. Energy is its own
+# factor. 0.5 is the neutral point of the lungs energy knob (energy.at in
+# that layer's config), not a measured effort.
+energy_rest = 0.5
+# Spec §1.3: fatigue has no published voice magnitude. 0 leaves the lungs
+# fatigue term at rest (that layer multiplies by fatigue, so 0 adds nothing).
+fatigue_rest = 0.0
+half_life_s = 0.40
+
+[inner.energy]
+axis = "arousal"
+per_unit = "unknown"
+
+[inner.fatigue]
+axis = "arousal"
+per_unit = "unknown"
+
+[outer.listener_distance]
+# Spec §1.3: no distance-to-feeling function was read. Unknown is not applied.
+# Garnier, Henrich and Dubois (2010) measured loudness in noise. That is a
+# body effect, not a coordinate here.
+axis = "valence"
+per_metre = "unknown"
+
+# Environment is a label on the frame. This layer stores it and does not map
+# the word onto an axis.
+
+# Pins. literature must stay "direction_only". A placed axis is the pole
+# (+1 or -1) of that axis, which is the end of the state space, not a loading
+# copied from a figure. An omitted axis is unplaced and does not move.
+# Names that are not listed here are still legal pins when the intent names
+# them. They do not move the space.
+
+[pins.anger]
+literature = "direction_only"
+cite = "Russell (1980), JPSP 39: unpleasant, high arousal. Carver and Harmon-Jones (2009), Psychological Bulletin 135: anger is approach. Dominance is omitted because hot and cold anger are opposite poles (spec §1.1)."
+valence = -1
+arousal = 1
+approach = 1
+
+[pins.fear]
+literature = "direction_only"
+cite = "Russell (1980): unpleasant. Carver and Harmon-Jones (2009): fear is the withdrawal contrast to anger's approach. Arousal and dominance are omitted: Juslin and Laukka (2003) Table 7 finds fear intensity bimodal, and panic versus anxiety are opposite dominance poles (spec §1.1)."
+valence = -1
+approach = -1
+
+[pins.sadness]
+literature = "direction_only"
+cite = "Russell (1980): unpleasant, low arousal. Juslin and Laukka (2003) Table 7: slow, quiet, low F0."
+valence = -1
+arousal = -1
+
+[pins.disgust]
+literature = "direction_only"
+cite = "Russell (1980): unpleasant. Arousal and approach are omitted; no single pole was read for them."
+valence = -1
+
+[pins.adoration]
+literature = "direction_only"
+cite = "Juslin and Laukka (2003) Table 7, love-tenderness: slow, quiet, low F0. The spec maps that row onto adoration and records that the study's word was tenderness. Valence is omitted."
+arousal = -1
+
+[pins.contentment]
+literature = "direction_only"
+cite = "Russell (1980): contentment sits on the pleasant, low-arousal side of the circumplex. No angle is copied."
+valence = 1
+arousal = -1

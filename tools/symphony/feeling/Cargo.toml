@@ -1,0 +1,23 @@
+# Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
+[package]
+name = "galion-feeling"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+publish = false
+description = "Feeling core for MnE: an open continuous state on the 80 ms clock. Cowen names are optional pins. Output feeds the emotion-render tick and the lungs request."
+
+[[bin]]
+name = "galion-feeling"
+path = "src/main.rs"
+
+[dependencies]
+galion-mne-contract = { path = "../mne-contract" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# toml 0.8.23 pulls indexmap 2.14, which needs edition 2024. Same pin as refcheck.
+toml = "=0.8.19"
+indexmap = "=2.2.6"
+
+# Own workspace. The real contract crate is a path dependency, not a member.
+[workspace]
