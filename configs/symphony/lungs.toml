@@ -1,0 +1,122 @@
+# Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
+# Physiology knobs for the lungs layer. A coefficient is a direction from a
+# paper only where the comment says so. Every magnitude is config: the papers
+# were not re-measured here, and ARTICULATION-V2-SPEC leaves these sizes unknown.
+# Do not copy a number from this file into a result as if a study had published it.
+
+schema = "galion-lungs-config/1"
+
+# LOCKS clock.frame_ms. No respiratory paper cited here establishes 80 ms.
+tick_s = 0.08
+
+[phrase]
+# Spoken-character rate used only to turn text length into a duration.
+# Not words per minute, and not eGeMAPS VoicedSegmentsPerSec.
+chars_per_s = 12.0
+# Breath-group length is unknown (spec §1.3). These are planning limits.
+max_group_s = 4.0
+min_group_s = 0.48
+# A comma, semicolon or colon may close a group once it has reached this length.
+# Sentence ends always close a group (Winkworth and colleagues, direction only).
+clause_break_s = 1.2
+
+[inspiration]
+# Whalen and Kinsella-Shaw (1997): inspiration duration rises with the upcoming
+# utterance. Slope and clamps are not their published seconds.
+base_s = 0.24
+per_phrase_s = 0.08
+min_s = 0.16
+max_s = 0.80
+# Winkworth, Davis, Adams and Ellis (1994, 1995): a longer following phrase is
+# preceded by a deeper inspiration. Depth is a fraction of `volume.span`, not litres.
+depth_base = 0.35
+depth_per_phrase_s = 0.08
+depth_min = 0.15
+depth_max = 1.0
+# Label threshold only. Not a measured volume.
+deep_depth = 0.65
+
+[volume]
+# Relative lung volume, not litres and not percent vital capacity.
+# Hixon, Goldman and Mead (1973): speech is expiration, and lung volume falls
+# across the breath group. The resting level here is just the model's origin.
+rest = 0.40
+floor = 0.15
+span = 0.45
+# Fraction of the volume just inhaled that is spent by the end of the phrase.
+spend_fraction = 0.75
+# Fraction of the remaining rise released on the unvoiced exhale after speech.
+exhale_spend = 0.25
+
+[pressure]
+# Relative pressure, not cm H2O. Titze's and Hixon's pressure tables were not copied.
+ps_ref = 1.0
+# Pressure falls as volume falls (Lieberman 1967; Strik and Boves 1995).
+ps_per_volume = 0.80
+# Ladefoged and McKinney (1963): louder when subglottal pressure is higher.
+loudness_db_per_ps = 6.0
+# Titze (1989): fundamental frequency rises with subglottal pressure.
+# Semitones per relative-pressure unit. Not Hz per cm H2O.
+f0_st_per_ps = 0.40
+
+[energy]
+# Energy is an inner factor. More energy, more expiratory drive, higher pressure.
+# The size is unknown. `at` is the neutral point of the knob, not a measured effort.
+at = 0.5
+ps_per_unit = 0.25
+
+[arousal]
+# Homma and Masaoka (2008): more rapid breathing during an arousal state.
+# No breaths per minute were copied. Positive arousal shortens the breath group.
+# Negative arousal does not lengthen it (the citation is "more rapid", not "slower").
+rate_k = 0.50
+# High arousal is louder in the speech record (Juslin and Laukka 2003). Loudness
+# here is read out of pressure, so arousal adds drive. The size is config.
+ps_per_unit = 0.15
+
+[fatigue]
+# Spec §1.3: fatigue's effect on the voice is unknown. These coefficients exist
+# so the factor is wired. They are not a published direction. Zero disables it.
+# depth_per_unit multiplies planned depth by (1 + depth_per_unit * fatigue).
+# group_per_unit multiplies the breath-group limit the same way.
+depth_per_unit = -0.20
+group_per_unit = -0.20
+literature = "none"
+
+[categories.amusement]
+# Boiten (1998), abstract: inspiratory time and tidal volume both decrease.
+# The scales are not in that abstract.
+insp_time_scale = 0.75
+depth_scale = 0.75
+
+[categories.disgust]
+# Boiten (1998), abstract: the inspiratory pause is prolonged (breath-holding).
+# The duration is unknown.
+hold_s = 0.32
+
+[categories.fear]
+# Homma and Masaoka (2008): anticipatory anxiety raises respiratory rate, and
+# the label file maps that citation onto fear. Panic and anxiety are not two
+# breath recipes. The scale shortens the breath group. It is not breaths/min.
+group_scale = 0.70
+
+[audible]
+# crates/galion-heartbeat/src/presence.rs synthesises a breath as white noise
+# at RMS 0.003. That is the neutral level of this synth, not a measured dB SPL.
+neutral_rms = 0.003
+# crates/galion-presence/src/wav.rs Gate::default: a frame at or above this
+# level is breath rather than silence. Used as a floor check, not as physiology.
+silence_floor_dbfs = -55.0
+# How planned depth, arousal, energy and fatigue move inhale level, in dB.
+# None of these slopes were published in the sources read for this layer.
+db_per_depth = 6.0
+db_per_arousal = 3.0
+db_per_energy = 3.0
+db_per_fatigue = -2.0
+# Unvoiced release after phonation. Not a sigh. Sigh acoustics are unknown.
+# The offset is config. -3 dB keeps a neutral release above the presence
+# gate's -55 dBFS breath floor; -6 dB would put that same release under it.
+exhale_s = 0.16
+exhale_db_offset = -3.0
+# Same seed as the heartbeat breath noise (presence.rs SEED).
+seed = 13
