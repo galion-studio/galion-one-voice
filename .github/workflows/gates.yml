@@ -28,6 +28,32 @@ jobs:
         run: cargo test --workspace
       - name: Emotion V2 reference checker
         run: cargo test --manifest-path tools/emotion-v2/refcheck/Cargo.toml
+      - name: Symphony articulation layer (synthetic signals, no audio)
+        run: cargo test --manifest-path tools/symphony/articulation/Cargo.toml
+      - name: Emotion render controls (synthetic, no audio)
+        run: cargo test --manifest-path tools/symphony/emotion-render/Cargo.toml
+      - name: Symphony lungs layer (synthetic signals, no audio)
+        run: cargo test --manifest-path tools/symphony/lungs/Cargo.toml
+      - name: Voice V2 pipeline (synthetic tones, no download)
+        run: cargo test --manifest-path tools/symphony/voice-v2/Cargo.toml
+      - name: Mouth stack integrator (synthetic tone, no download)
+        run: cargo test --manifest-path tools/symphony/mne/Cargo.toml
+      - name: Throat glottal source (synthetic LF, no audio)
+        run: cargo test --manifest-path tools/symphony/throat/Cargo.toml
+      - name: Symphony sound-out layer (synthetic signals, no weights)
+        run: cargo test --manifest-path tools/symphony/sound-out/Cargo.toml
+      - name: Articulation loop eval smoke (synthetic, no datasets)
+        run: python3 tools/symphony/articulation/evals/loop_eval.py smoke
+      - name: Listening-back loop (synthetic signals, no audio)
+        run: cargo test --manifest-path tools/symphony/listen-back/Cargo.toml
+      - name: Symphony mouth layer (synthetic targets, no audio)
+        run: cargo test --manifest-path tools/symphony/mouth/Cargo.toml
+      - name: Feeling core (synthetic intent, no audio)
+        run: cargo test --manifest-path tools/symphony/feeling/Cargo.toml --workspace
+      - name: Symphony nose and wordless layer (synthetic signals, no audio)
+        run: cargo test --manifest-path tools/symphony/nose/Cargo.toml
+      - name: Voice guard (synthetic tones, no weights)
+        run: cargo test --manifest-path tools/symphony/voice-guard/Cargo.toml
       - name: One-percent symphony gate
         run: galion-gates/op-one-percent.sh
       - name: Clone worker scaffold (no weight download)
@@ -36,6 +62,8 @@ jobs:
         run: scripts/clone/stage-clone-prep.test.sh
       - name: Speaking rate changes the PCM
         run: python3 scripts/clone/test_speaking_rate.py
+      - name: Clone controls change the PCM
+        run: python3 scripts/clone/test_controls.py
       - name: Flash TTFA harness (no number without a run)
         run: scripts/eval/flash-ttfa.sh
       - name: Hard loop classifiers (no product verdict)
