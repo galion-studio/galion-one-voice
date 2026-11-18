@@ -1,0 +1,56 @@
+# Galion Voice — Perpetual Open MIT License
+# Copyright (c) 2026 Galion Labs.
+#
+# Step sizes for tools/symphony/emotion-render.
+# A published sign is not a size. "unknown" means the knob stays at the
+# speaker's own neutral (or at the engine literal, for Chatterbox).
+# Do not write Banse & Scherer 1996 Table 6 z values here. Those z are
+# versus the cross-emotion mean, with sex partialed out, not semitones
+# versus this speaker's neutral.
+# Do not write the Hughes 2010 hertz means here. Those are absolute Hz
+# in one phone-message task.
+
+schema = "galion-emotion-render-magnitudes"
+
+[engine]
+# Existing Chatterbox Nano literals in this repo. Not emotion effect sizes.
+# scripts/clone/chatterbox_worker.py: prepare_conditionals(..., exaggeration=0.0)
+# scripts/clone/nano_stream.py _iter_turbo_tokens: temperature = 0.8, cfg_weight=0.0
+exaggeration = 0.0
+cfg_weight = 0.0
+temperature = 0.8
+
+[scales]
+# Shared step at weight 1, before the literature sign is applied.
+pitch_st = "unknown"
+rate = "unknown"
+energy = "unknown"
+pause_ms = "unknown"
+pitch_range = "unknown"
+# Chatterbox knobs are not Scherer / Juslin / Cowen parameters.
+exaggeration = "unknown"
+cfg_weight = "unknown"
+temperature = "unknown"
+
+# Optional replacements for one published pole. Unknown falls back to [scales].
+# Keys: hot_anger, cold_anger, panic, anxiety.
+
+[poles.hot_anger]
+pitch_st = "unknown"
+rate = "unknown"
+energy = "unknown"
+
+[poles.cold_anger]
+pitch_st = "unknown"
+rate = "unknown"
+energy = "unknown"
+
+[poles.panic]
+pitch_st = "unknown"
+rate = "unknown"
+energy = "unknown"
+
+[poles.anxiety]
+pitch_st = "unknown"
+rate = "unknown"
+energy = "unknown"
