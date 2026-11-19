@@ -43,6 +43,10 @@ Restart=always
 MemoryMax=256M
 NoNewPrivileges=yes
 PrivateTmp=yes
+# Loopback only. IPv4 is the unit bind and the Hermes default. IPv6 stays
+# for the [::1] form the client already accepts. AF_UNIX stays for nss.
+# Packet, netlink, and other families are refused.
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
 ProtectSystem=strict
 ProtectHome=yes
 ReadWritePaths=/opt/galion/voice
