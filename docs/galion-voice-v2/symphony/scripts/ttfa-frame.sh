@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 #
 # Live-sector frame bar. Reads LOCKS.toml, both presence specs, the heartbeat
 # constant, and live-sectors.json. Asserts frame_ms = 80. Does not write LOCKS.

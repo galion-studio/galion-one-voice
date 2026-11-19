@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! Compile Chatterbox clone PCM into a Galion `.gq` voice clip.
 //!
 //! This process does not load PyTorch and does not speak. Clone generation

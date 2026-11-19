@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! Recorded bounds for this process.
 //!
 //! Piper training on own-voice clips is forbidden. This runtime is not the

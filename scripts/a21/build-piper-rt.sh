@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 #
 # lat240 / agent 01 · default A21 Piper runtime (owner approval t613s2992, 2026-11-04):
 # galion-piper-rt = the same Piper voice pack and espeak-ng phonemizer as piper 2023.11.14-2,

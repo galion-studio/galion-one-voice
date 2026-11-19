@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+# Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 # Section D. Cites the persona docs, the empathy map, and the HTTP self-test.
 # The HTTP half needs a live page. This check does not start one.
 set -euo pipefail

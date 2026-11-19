@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! One-dot auto-record proceed.
 //!
 //! The `/` page already cuts speech (VAD) and posts the WAV to `POST /turn`.

@@ -1,4 +1,4 @@
-// Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+// Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 //! `presence.json` schema: typed model + validator.
 //!
 //! Rules enforced here (A13, FINAL-BUILD-SPEC S8):

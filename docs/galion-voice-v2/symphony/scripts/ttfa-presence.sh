@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 #
 # Presence gates for the live-sector clock: onset p50, barge-in, e_to_a.
 # Runs galion-presence --json on specs/presence.json and specs/presence-wav.json

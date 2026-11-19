@@ -1,4 +1,4 @@
-// Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+// Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 //! `galion-heartbeat-presence [SPEC=specs/presence.json] [--json]`
 //! Runs presence.json through the real heartbeat with Rika ON (v0 thresholds)
 //! and prints the report. Exit 0 green, 1 red, 2 invalid/IO.

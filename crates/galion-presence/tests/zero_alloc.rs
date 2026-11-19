@@ -1,4 +1,4 @@
-// Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+// Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 //! Zero allocation in the frame loop: MockBackend::step must never touch the heap.
 use galion_presence::backend::{AffectIn, FrameIn, MockBackend, MockConfig, ReplayBackend};
 use galion_presence::spec::YouState;

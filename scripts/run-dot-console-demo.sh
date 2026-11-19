@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+# Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 # W21-04 · one-dot render + live console, driven by the real 80 ms heartbeat.
 # LOCAL ONLY: no network, no weights, no display server needed.
 #

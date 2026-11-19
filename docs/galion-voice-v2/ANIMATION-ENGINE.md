@@ -1,6 +1,6 @@
 # V2-S2 · Animation engine
 
-Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 The spelling is Galion. This is the design for the CPU orb integrator, and
 the note for the Rust foundation that landed beside it. It is not V3.
 There is no separate white paper in this repository. This file is the

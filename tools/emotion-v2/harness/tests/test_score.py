@@ -1,5 +1,5 @@
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 """Score the twelve emotions on synthetic tones and exercise the CLI.
 
 No committed audio. Renders and references are sines written into a temporary

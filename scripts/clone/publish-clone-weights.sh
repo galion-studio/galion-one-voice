@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 #
 # One-shot publish of the five pinned Chatterbox safetensors as GitHub
 # Release assets on tag clone-weights-v1. Run this on the admin box that

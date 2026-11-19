@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! `SYMPHONY.txt` — the pack's own text record. Not JSON, not a weight file.
 
 use crate::host_cpu::{self, HostClass, HostId, VoiceBudget};

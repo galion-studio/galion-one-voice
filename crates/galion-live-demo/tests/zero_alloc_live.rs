@@ -1,4 +1,4 @@
-// Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+// Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 //! Counting allocator: `RikaReplayBackend::step_live` (Heartbeat::step + mock) allocates nothing.
 use galion_emotion::band::consent_bits;
 use galion_emotion::Purpose;

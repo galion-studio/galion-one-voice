@@ -1,6 +1,6 @@
 # V2-S14 · Rights clearance (Samantha, Jarvis)
 
-Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Perpetual Open MIT License. (c) 2026 Galion Labs.
 Europe/Zagreb. A checklist. Record only. **Not legal advice.** Counsel
 writes the opinion. This file does not grant a right, and it does not
 check a box.

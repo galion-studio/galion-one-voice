@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! Clip-store gate for the V2-S14 worker.
 //!
 //! `send_reference` is on only when owner clearance t273 is recorded and

@@ -1,0 +1,22 @@
+{
+  "schema": "galion-mne-contract/0",
+  "note": "Synthetic stand-in intent. No person. No audio.",
+  "frames": [
+    {
+      "schema": "galion-mne-contract/0",
+      "t_ms": 0,
+      "pins": [{ "id": "anger", "w": 1.0 }],
+      "energy": 0.8,
+      "fatigue": 0.1,
+      "environment": "quiet",
+      "listener_distance_m": 2.0
+    },
+    { "t_ms": 80, "pins": [{ "id": "anger", "w": 1.0 }] },
+    { "t_ms": 160, "pins": [{ "id": "anger", "w": 1.0 }] },
+    { "t_ms": 240, "pins": [{ "id": "anger", "w": 1.0 }] },
+    { "t_ms": 320, "pins": [{ "id": "anger", "w": 1.0 }], "axes": [{ "name": "d4", "value": 0.4 }] },
+    { "t_ms": 400, "release": true },
+    { "t_ms": 480, "release": true },
+    { "t_ms": 560, "release": true }
+  ]
+}

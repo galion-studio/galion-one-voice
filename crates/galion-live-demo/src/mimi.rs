@@ -1,4 +1,4 @@
-// Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+// Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 //! W21-02 hook: route the me band through the student backend's Mimi lane
 //! (`StudentBackend::step_frame`, 1920 samples / 80 ms @ 24 kHz) every frame.
 //! The codec is synthetic (`IS_STUB`, ZeroWeights, demo widths). For an audible demo

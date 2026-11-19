@@ -609,7 +609,7 @@ mod tests {
     fn the_one_dot_page_imports_the_halo() {
         let page = include_str!("../assets/v1-screen.html");
         let preview = include_str!("../assets/nebula/preview.html");
-        assert!(page.contains("import { drawNebula } from \"/nebula/vocabulary.mjs\""));
+        assert!(page.contains("import { drawNebula } from \"/nebula/vocabulary.mjs?v=__GALION_ASSET_V__\""));
         assert!(page.contains("drawNebula(cx,input,tms/1000,"));
         assert!(page.contains("estimate===\"none\""));
         assert!(!page.contains("return {neutral:1}"));

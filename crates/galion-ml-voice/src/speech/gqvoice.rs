@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! Compiler: Chatterbox worker PCM → a Galion `.gqvoice` packet.
 //!
 //! The worker's stdout is raw s16le. That buffer is not the runtime format.

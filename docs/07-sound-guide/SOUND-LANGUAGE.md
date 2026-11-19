@@ -1,6 +1,6 @@
 # Sound language
 
-Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 
 Interface tones only. Not speech, not a voice, and not a recording. The pages synthesise them with WebAudio sine oscillators. There is no audio file.
 
@@ -49,7 +49,7 @@ Silence on this page is the `#silence` control. It reads `localStorage` key `gal
 
 ## Galion Research, `/research`
 
-Source: `crates/galion-console/assets/research.html`. The desk uses the same Silence control and the same `galion-one-silence` key. On this page the `s` key toggles silence only when focus is not in a field, so typing the letter still works. A silenced desk schedules nothing, including the window bell on open.
+The live desk moved to galion-studio/hermes-research. This host serves a notice at `/research`. The cue table below describes the archived page at `docs/archive/research-web/research.html`, which used the same Silence control and the same `galion-one-silence` key. On that archived page the `s` key toggles silence only when focus is not in a field, so typing the letter still works. A silenced desk schedules nothing, including the window bell on open.
 
 Research events are resonance. Window events are bells. A research event never strikes a bell. A window event never plays a research melody.
 

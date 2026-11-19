@@ -1,5 +1,5 @@
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 """Voice profile: id, per-emotion reference directories, 432 Hz pitch centre.
 
 ``pitch_centre_hz`` is the voice's fundamental on the 432 Hz pitch standard

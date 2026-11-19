@@ -1,6 +1,6 @@
 # Rollout and consent blockers
 
-Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 
 Status of open pull requests **#87**, **#88**, **#83**, and **#78** against `main` at `b9bd890` (2026-11-07). That tip includes #85 and #89–#95. This note is a proposal. It does not merge, deploy, retarget, or push those four branches. It does not add a measurement or a consent record.
 

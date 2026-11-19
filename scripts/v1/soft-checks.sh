@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Galion Voice — Perpetual Open MIT License. Copyright (c) 2026 Maciej Grajczyk.
+# Galion Voice — Perpetual Open MIT License. Copyright (c) 2026 Galion Labs.
 # V1-04 · soft checks for a V1 demo out dir (written by scripts/run-v1-demo.sh).
 # Usage: scripts/v1/soft-checks.sh <V1_OUT>    env: V1_SPEECH_KIND (from run-v1-demo.sh), V1_STRICT=1
 # Writes <V1_OUT>/V1-SUMMARY.txt + V1-SUMMARY.json.

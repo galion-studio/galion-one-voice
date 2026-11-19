@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 """Chunked PCM for Chatterbox Nano. This module does not call generate().
 
 Verified against resemble-ai/chatterbox master on 2026-11-03 (Nano commit
@@ -122,14 +122,17 @@ def flatten_audio(audio) -> list:
     return list(audio)
 
 
-def protocol_chunks(text: str) -> list:
+def protocol_chunks(text: str, tone: int | None = None) -> list:
     """Two PCM writes. The first is one sample so a reader can clock TTFA.
 
     Same bytes as the old single write: a length sample, then 200 tone
     samples. Not a voice. The gap is in the worker, between the writes.
+    ``tone`` overrides the constant when the worker has read non-default
+    exaggeration, cfg or temperature. The default tone is unchanged.
     """
     n = max(1, min(len(text), 32767))
-    tone = 1000 + (n % 50)
+    if tone is None:
+        tone = 1000 + (n % 50)
     head = struct.pack("<h", n)
     tail = struct.pack("<" + "h" * 200, *([tone] * 200))
     return [head, tail]
@@ -304,20 +307,33 @@ def try_load():
     return model, ""
 
 
-def iter_pcm(model, text: str, ref_path: str | None):
-    """Yield s16le chunks. Raises ``NoStreamHook`` rather than calling generate()."""
+def iter_pcm(
+    model,
+    text: str,
+    ref_path: str | None,
+    exaggeration: float = 0.0,
+    cfg_weight: float = 0.0,
+    temperature: float = 0.8,
+):
+    """Yield s16le chunks. Raises ``NoStreamHook`` rather than calling generate().
+
+    Defaults keep the previous literals (exaggeration 0.0, cfg_weight 0.0,
+    temperature 0.8). Callers that omit the knobs are unchanged.
+    """
     path = select_path(model)
     if path == "refuse":
         raise NoStreamHook("no streaming hook; refusing whole-utterance generate")
     if ref_path:
-        model.prepare_conditionals(ref_path, exaggeration=0.0, norm_loudness=True)
+        model.prepare_conditionals(ref_path, exaggeration=exaggeration, norm_loudness=True)
     if path == "stream_api":
-        yield from _pcm_from_stream_api(model, text)
+        yield from _pcm_from_stream_api(model, text, cfg_weight=cfg_weight, temperature=temperature)
         return
-    yield from _pcm_from_chunked_meanflow(model, text)
+    yield from _pcm_from_chunked_meanflow(
+        model, text, cfg_weight=cfg_weight, temperature=temperature
+    )
 
 
-def _pcm_from_stream_api(model, text: str):
+def _pcm_from_stream_api(model, text: str, cfg_weight: float = 0.0, temperature: float = 0.8):
     import inspect
 
     fn = model.stream
@@ -331,6 +347,10 @@ def _pcm_from_stream_api(model, text: str):
         kwargs["chunk_tokens"] = chunk
     if "crossfade_ms" in params:
         kwargs["crossfade_ms"] = 12.0
+    if "cfg_weight" in params:
+        kwargs["cfg_weight"] = cfg_weight
+    if "temperature" in params:
+        kwargs["temperature"] = temperature
     for chunk_obj in fn(text, **kwargs):
         audio = getattr(chunk_obj, "audio", chunk_obj)
         raw = f32_to_s16le(flatten_audio(audio))
@@ -345,7 +365,7 @@ def _chunk_tokens() -> int:
     return CHUNK_TOKENS
 
 
-def _pcm_from_chunked_meanflow(model, text: str):
+def _pcm_from_chunked_meanflow(model, text: str, cfg_weight: float = 0.0, temperature: float = 0.8):
     import torch
     from chatterbox.tts_turbo import punc_norm
 
@@ -367,7 +387,9 @@ def _pcm_from_chunked_meanflow(model, text: str):
     except Exception:
         pass
     with torch.inference_mode():
-        for token in _iter_turbo_tokens(model, text_tokens):
+        for token in _iter_turbo_tokens(
+            model, text_tokens, temperature=temperature, cfg_weight=cfg_weight
+        ):
             value = int(token.view(-1)[0].item())
             if value == stop:
                 break
@@ -457,7 +479,7 @@ def _grow_noise(noise, need: int, *, device, dtype):
     return torch.cat([noise, extra], dim=-1)
 
 
-def _iter_turbo_tokens(model, text_tokens):
+def _iter_turbo_tokens(model, text_tokens, temperature: float = 0.8, cfg_weight: float = 0.0):
     """Yield each sampled speech token. Does not call ``inference_turbo``.
 
     The loop matches the public KV-cache body of ``T3.inference_turbo``
@@ -474,7 +496,6 @@ def _iter_turbo_tokens(model, text_tokens):
         TopPLogitsWarper,
     )
 
-    temperature = 0.8
     top_k = 1000
     top_p = 0.95
     repetition_penalty = 1.2
@@ -495,7 +516,7 @@ def _iter_turbo_tokens(model, text_tokens):
         t3_cond=model.conds.t3,
         text_tokens=text_tokens,
         speech_tokens=speech_start,
-        cfg_weight=0.0,
+        cfg_weight=cfg_weight,
     )
     generated = []
     outputs = t3.tfmr(inputs_embeds=embeds, use_cache=True)

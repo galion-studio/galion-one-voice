@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! V2-S1 process bus (`docs/galion-voice-v2/IPC.md`).
 //!
 //! One typed [`BusMsg`] envelope for capture, the turn worker, reply publish,

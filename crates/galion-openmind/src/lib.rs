@@ -1,4 +1,4 @@
-// Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+// Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 //! Voice-side seam to Obsidian Open Mind.
 //!
 //! Two channels, neither of them inside `Heartbeat::step` (this crate does not

@@ -1,6 +1,6 @@
 # 08 — context review
 
-Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 
 Date: 2026-11-08, Europe/Zagreb (CET). Scope: read, reason, and write notes. No build, no deploy, no merge, no training, no audio upload.
 

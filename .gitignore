@@ -73,6 +73,9 @@ link.env
 *.wav
 *.flac
 *.mp3
+# Pre-rendered Galion One preview clips stay in $GALION_PREVIEW_AUDIO_DIR, never in git.
+*.ogg
+*.opus
 *.cbxvoice
 clip-store*/
 venv/
@@ -111,3 +114,6 @@ tools/laptop-runbooks/**/*.ogg
 
 # Emotion V2 capture originals (owner recordings + session manifests). Never commit.
 /originals/
+tools/symphony/articulation/target/
+tools/symphony/articulation/out/
+tools/symphony/articulation/.venv/

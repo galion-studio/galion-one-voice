@@ -1,6 +1,6 @@
 # Galion Voice V2
 
-Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Perpetual Open MIT License. (c) 2026 Galion Labs.
 Europe/Zagreb. This is the program plan. It is not a claim that V2 is finished,
 and it is not V3.
 
@@ -106,8 +106,9 @@ the screen demo.
 the loopback gateway
 (`GALION_LLM_URL`, default `http://127.0.0.1:8642/v1/chat/completions`,
 15 s failure ceiling, `GALION_LLM_TIMEOUT_MS`). `canned` is the rule table.
-Unknown values error. A dead gateway says `model can't be reached`
-and does not fall back to canned. `TurnWorker` in `galion-console` (feature `phone-turn`) runs
+Unknown values error. A dead gateway says `model can't be reached`.
+A gateway that stays quiet until the failure ceiling says `That took too long. I don't have an answer yet.`
+Neither line falls back to canned. `TurnWorker` in `galion-console` (feature `phone-turn`) runs
 that lane on its own thread. `PhoneHost` polls it from the screen demo.
 `WebSurface` serves `POST /mic`, `POST /turn`, `GET /reply/<id>.wav`, and
 puts `reply` on `/dot`.

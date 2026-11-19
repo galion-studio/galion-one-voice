@@ -1,6 +1,6 @@
 # Galion Voice V3 — symphony plan
 
-Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Perpetual Open MIT License. (c) 2026 Galion Labs.
 Europe/Zagreb. 2026-11-03.
 
 **Status. PLAN ONLY. Gate closed.** This file authorises no crate, no worker,

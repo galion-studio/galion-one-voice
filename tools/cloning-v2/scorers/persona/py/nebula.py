@@ -1,5 +1,5 @@
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 """Offline nebula score. A clip is a distribution, not one label.
 
 The support is the twelve Emotion V2 emotions, in inventory order.

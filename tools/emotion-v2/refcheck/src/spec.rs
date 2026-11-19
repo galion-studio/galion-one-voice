@@ -1,4 +1,4 @@
-// Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+// Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 //! The capture spec. Thresholds come from the TOML; the twelve emotion names are fixed.
 
 use serde::Deserialize;

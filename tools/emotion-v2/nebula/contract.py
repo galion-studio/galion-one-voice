@@ -1,5 +1,5 @@
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 """UI contract for the Nebula live feed.
 
 ``galion-nebula-live-feed/1`` (docs/emotion-v2/NEBULA-LIVE-FEED.md) is the

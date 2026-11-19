@@ -1,6 +1,6 @@
 # Galion Voice V2 — Symphony index
 
-Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Perpetual Open MIT License. (c) 2026 Galion Labs.
 Europe/Zagreb. 2026-11-03. Program t282.
 
 The spelling is **Galion**. The product is Galion Voice.
@@ -22,6 +22,15 @@ Paths in the Doc column live in this directory. The Anchor column is the page th
 | Compiler | [COMPILER.md](COMPILER.md) | Chatterbox clone output compiled into the Galion voice file (`.gq` and the clip ABI) the Rust stack runs. | [GALION-VOICE-V2.md](../GALION-VOICE-V2.md) |
 | Clone | [CLONE.md](CLONE.md) | Current Samantha and Jarvis models. WAV refs only. Voice lands as PCM from the out-of-process worker. | [CLONE-WORKER.md](../CLONE-WORKER.md), [VOICE-CLONING.md](../VOICE-CLONING.md) |
 | Emotion blend | [EMOTION-BLEND.md](EMOTION-BLEND.md) | Opt-in cbx conditioning prep (coherent rotation / montage). OFF by default. Samantha coherent blendfix promoted 2026-11-05. | [CBX-CLONE-WORKER.md](../CBX-CLONE-WORKER.md), `tools/cloning-v2/` |
+| Articulation | [ARTICULATION-LAYER.md](ARTICULATION-LAYER.md) | Throat, mouth and nose features per 80 ms tick for any voice, and the TractPrint reference-vs-clone score. `tools/symphony/articulation`. | [PERSONA.md](PERSONA.md) |
+| Lungs | [LUNGS.md](LUNGS.md) | Physiology track: inhalations planned from the phrase, relative lung volume and subglottal pressure, audible breaths. Not an emotion. `tools/symphony/lungs`. | [ARTICULATION-V2-SPEC.md](ARTICULATION-V2-SPEC.md) |
+| MnE contract | [MNE-CONTRACT.md](MNE-CONTRACT.md) | Versioned 80 ms intent and read-back between Inner Life and mouth-and-expressions. `tools/symphony/mne-contract`. | [ARTICULATION-V2-SPEC.md](ARTICULATION-V2-SPEC.md) |
+| Feeling | [FEELING.md](FEELING.md) | Open continuous state on the 80 ms clock: valence, arousal, dominance, approach, lingering mood, energy and fatigue. Pins are optional. `tools/symphony/feeling`. | [ARTICULATION-V2-SPEC.md](ARTICULATION-V2-SPEC.md) |
+| Throat | [THROAT.md](THROAT.md) | Glottal source per 80 ms tick: pitch versus the speaker baseline, phonation, open quotient, spectral tilt. `tools/symphony/throat`. | [ARTICULATION-V2-SPEC.md](ARTICULATION-V2-SPEC.md) |
+| Sound out | [SOUND-OUT.md](SOUND-OUT.md) | Cloner trait and the mix that leaves the mouth: Chatterbox, Piper, Moshi stub, breath, bursts, room. `tools/symphony/sound-out`. | [LUNGS.md](LUNGS.md) |
+| Mouth | [MOUTH.md](MOUTH.md) | Per-80 ms mouth targets for the cloner and viseme timing for any avatar. `tools/symphony/mouth`. | [ARTICULATION-V2-SPEC.md](ARTICULATION-V2-SPEC.md) |
+| Nose | [NOSE.md](NOSE.md) | Velum and nasal murmur per 80 ms tick, and wordless sounds (laugh, sigh, moan, gasp, hum, mm) on their own track. `tools/symphony/nose`. | [ARTICULATION-V2-SPEC.md](ARTICULATION-V2-SPEC.md) |
+| Listen-back | [LISTEN-BACK.md](LISTEN-BACK.md) | Closed eval loop: decode the audio that left the mouth and score feeling, breath, pitch and voice quality. `tools/symphony/listen-back`. | [ARTICULATION-V2-SPEC.md](ARTICULATION-V2-SPEC.md) |
 | Persona | [PERSONA.md](PERSONA.md) | Personality, behaviour, and emotion in the voice. Timbre is the body. The feeling band is the person. | [personas/README.md](../personas/README.md), [SAMANTHA-V2.md](../SAMANTHA-V2.md) |
 | One-dot | [ONE-DOT.md](ONE-DOT.md) | One surface at `/`. Speak, the page records, the workflow proceeds. `GET /v2` redirects to `/`. | [ONE-UI.md](../ONE-UI.md), [ORB.md](../ORB.md) |
 | Runbooks | [RUNBOOKS.md](RUNBOOKS.md) | How each environment is started. The commands below are the short form. | [V1-DEMO.md](../../V1-DEMO.md), [LIVE-DEMO.md](../../LIVE-DEMO.md) |
@@ -226,7 +235,7 @@ Rust 1.85. This is the local check. It does not fetch weights and it does not op
 8. [RUNBOOKS.md](RUNBOOKS.md) when a command in this index needs a longer page.
 # Galion Voice V2 symphony
 
-Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 Europe/Zagreb.
 
 Champion: a conversation is one heartbeat, not a pipeline.

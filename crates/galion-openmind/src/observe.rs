@@ -1,4 +1,4 @@
-// Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+// Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 //! What the heartbeat host may tell the nerve after a frame, not during it.
 //!
 //! `Heartbeat::step` forbids channels, locks, and allocation. Call

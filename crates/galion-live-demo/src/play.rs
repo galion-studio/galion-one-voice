@@ -1,4 +1,4 @@
-// Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+// Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 //! FP-03 · local playback of the spoken reply, in sync with the dot.
 //!
 //! A [`FrameSink`]: on each me-band **onset** (the frame the dot turns *speaking*) it starts the

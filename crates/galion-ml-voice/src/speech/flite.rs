@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! INTERIM system TTS: distro `libflite1` (CMU Flite 2.2) opened at RUNTIME via
 //! `dlopen`. Nothing is linked at build time and nothing is vendored; if the
 //! library is absent, [`FliteTts::open_default`] returns an error and the

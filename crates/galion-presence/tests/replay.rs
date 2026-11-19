@@ -1,4 +1,4 @@
-// Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+// Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 use galion_presence::backend::{AffectOut, FrameIn, FrameOut, MockBackend, MockConfig, ReplayBackend};
 use galion_presence::replay::Status;
 use galion_presence::spec::{parse_presence, PresenceFile};

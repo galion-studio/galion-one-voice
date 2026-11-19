@@ -1,4 +1,4 @@
-// Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+// Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 //! Headless framebuffer surface (W21-04): rasterises the one dot with the same CPU
 //! path a window / `/dev/fb0` backend uses ([`crate::dot::rasterize`]) and writes PNGs.
 //! No display server, no deps. std-only, always compiled.

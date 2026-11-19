@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! Audio parity: galion-piper-rt (onnxruntime 1.31.1) against the legacy
 //! piper 2023.11.14-2 CLI (onnxruntime 1.14.1) on the same pinned voice pack,
 //! deterministic prosody (noise 0). Same sample count and correlation >= 0.999

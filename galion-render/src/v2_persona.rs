@@ -2,7 +2,7 @@
 //!
 //! `GET /v2` redirects there. This module still answers `POST /v2/say`.
 //!
-//! Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+//! Perpetual Open MIT License. (c) 2026 Galion Labs.
 //!
 //! Reads the Samantha and Jarvis voice configs
 //! (`docs/galion-voice-v2/personas/voice/*.toml`) and answers in the register

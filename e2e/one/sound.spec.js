@@ -120,12 +120,15 @@ test("feed, wake, task done, approval, and shutdown each cue once", async ({ pag
   await page.request.post("/__state", { data: { mode: "idle", approval: false } });
   await expect.poll(() => cues(page)).toContain("done");
 
-  await page.evaluate(() => {
-    navigator.mediaDevices.getUserMedia = () => Promise.reject(new DOMException("no", "NotAllowedError"));
-  });
   await page.locator("canvas").click();
-  await expect.poll(() => cues(page)).toContain("wake");
-  await expect.poll(() => cues(page)).toContain("error");
+  await expect.poll(async () => page.evaluate(() => {
+    const el = document.getElementById("voice-preview");
+    return el && !el.paused ? el.currentTime : 0;
+  })).toBeGreaterThan(0.02);
+  expect(await cues(page)).not.toContain("wake");
+  expect(await cues(page)).not.toContain("error");
+  await page.waitForTimeout(500);
+  await page.locator("canvas").click();
 
   await page.request.post("/__hold");
   await expect(page.locator("#s")).toHaveAttribute("data-mode", "offline", { timeout: 5000 });

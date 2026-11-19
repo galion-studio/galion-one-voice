@@ -1,6 +1,6 @@
 # Voice personas
 
-Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Perpetual Open MIT License. (c) 2026 Galion Labs.
 Europe/Zagreb. Index only. Each linked file is a runtime instruction file.
 
 The spelling is **Galion**. The product is Galion Voice.

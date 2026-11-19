@@ -1,0 +1,73 @@
+# Galion Voice — Perpetual Open MIT License
+# Copyright (c) 2026 Galion Labs.
+#
+# Knobs for tools/symphony/throat.
+# A published sign is not a size. "unknown" means that term is not applied.
+# Do not write Banse & Scherer 1996 Table 6 z values here. Those z are
+# versus the cross-emotion mean, with sex partialed out, not semitones
+# versus this speaker's neutral, and not an Rd.
+# Fant's Ra/Rk/Rg regressions are the LF model. They are not in this file.
+
+schema = "galion-throat/1"
+tick_ms = 80
+
+[model]
+# Fant & Kruckenberg 1996, TMH-QPSR 37(4), Table 2, the Rd = 1 row.
+# A reference shape for the LF model, not this speaker's measured Rd.
+rd_baseline = 1.0
+# Fant 1995 regressions, as restated for Rd in 0.3..=2.7
+# (Gobl 2017, Interspeech, citing Fant 1995). Outside this range the
+# fit is not the published one, so Rd is clamped and the tick says so.
+rd_min = 0.3
+rd_max = 2.7
+# Fant & Kruckenberg 1996 prose on that table: Rd = 0.5 is a highly
+# adducted, somewhat pressed voice; Rd = 2.7 is breathy. Modal is the
+# open interval between those anchors. Not an emotion magnitude.
+pressed_rd_max = 0.5
+breathy_rd_min = 2.7
+# Synthetic reference only. Not a recorded voice.
+source_hz = 16000
+tilt_harmonic_from = 2
+tilt_harmonic_to = 10
+
+[effort]
+# Fant & Kruckenberg 1996: 1 dB more Ee with about 0.5 dB less Rd is a
+# typical voice-effort covariation (Ks), and Ks ranges from 0 to 1.
+# Unknown here: this speaker's Ks is not that typical value.
+ks = "unknown"
+
+[scales]
+# Shared step at weight 1, before the literature sign.
+# pitch_st is semitones versus this speaker's baseline.
+# pitch_range_st is the intended F0 span, not a vibrato painted onto the pulse.
+# rd_db is a change in Rd, in amplitude-decibels (20 log10), along the
+# high-frequency-energy sign. It is not a measured Rd.
+pitch_st = "unknown"
+pitch_range_st = "unknown"
+rd_db = "unknown"
+# Jitter and shimmer have no per-category sign that this layer will apply.
+# Juslin & Laukka 2003, p. 796: jitter has no definitive conclusion.
+jitter = "unknown"
+shimmer = "unknown"
+
+# Optional replacements for one published pole. Unknown falls back to [scales].
+
+[poles.hot_anger]
+pitch_st = "unknown"
+pitch_range_st = "unknown"
+rd_db = "unknown"
+
+[poles.cold_anger]
+pitch_st = "unknown"
+pitch_range_st = "unknown"
+rd_db = "unknown"
+
+[poles.panic]
+pitch_st = "unknown"
+pitch_range_st = "unknown"
+rd_db = "unknown"
+
+[poles.anxiety]
+pitch_st = "unknown"
+pitch_range_st = "unknown"
+rd_db = "unknown"

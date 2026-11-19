@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! `CloneFrameDrain::drain_frame` allocates nothing and does not generate.
 #![cfg(feature = "speech")]
 

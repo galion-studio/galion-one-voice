@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! A live turn with an already-cloned voice makes no consent call.
 //!
 //! A fake `python3` heads PATH and writes a marker if anything runs it. The

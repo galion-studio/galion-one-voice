@@ -1,5 +1,5 @@
 # Galion Voice — Perpetual Open MIT License
-# (c) 2026 Maciej Grajczyk / G.A.L.I.O.N.
+# (c) 2026 Galion Labs / G.A.L.I.O.N.
 """Validate emotion-v2/emotions.toml and the parser's rejection of bad edits."""
 
 from __future__ import annotations

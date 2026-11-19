@@ -1,0 +1,213 @@
+# Galion Voice — Perpetual Open MIT License
+# Copyright (c) 2026 Galion Labs.
+# Stand-in scenario. No recording. Numbers are fixture knobs.
+
+schema = "galion-mne-contract"
+schema_version = 1
+kind = "readback"
+frame_ms = 80
+value_origin = "stand_in"
+note = "Comfort. Sympathy pin rises and then holds. Valence stays warm of the speaker baseline. Arousal stays near it."
+
+text = "I'm here. Take the next minute slowly."
+
+[persona]
+persona_id = "galion-one"
+voice_id = "profile:galion-one-steady"
+
+[moment]
+moment_id = "comfort-after-a-long-meeting"
+memory_id = "mem-standin-long-meeting"
+memory_snippet = "They said the meeting ran long and they skipped lunch."
+place = "quiet_room"
+distance = "conversational"
+noise = "quiet"
+listener = "one_person"
+
+[baseline]
+arousal = 0.4
+valence = 0.0
+dominance = 0.5
+
+[[readback_frames]]
+t_ms = 0
+
+[readback_frames.feeling]
+arousal = 0.4
+valence = 0.017
+dominance = 0.5
+
+[readback_frames.body]
+origin = "unmeasured"
+
+[readback_frames.body.lungs]
+segment = "unknown"
+
+[readback_frames.confidence]
+feeling = 0.62
+body = 0.0
+confounded = false
+
+[[readback_frames]]
+t_ms = 80
+
+[readback_frames.feeling]
+arousal = 0.4085
+valence = 0.051
+dominance = 0.4915
+
+[readback_frames.body]
+origin = "unmeasured"
+
+[readback_frames.body.lungs]
+segment = "unknown"
+
+[readback_frames.confidence]
+feeling = 0.62
+body = 0.0
+confounded = false
+
+[[readback_frames]]
+t_ms = 160
+
+[readback_frames.feeling]
+arousal = 0.417
+valence = 0.102
+dominance = 0.483
+
+[readback_frames.feeling.pin]
+name = "sympathy"
+track = "prosody"
+weight = 0.36
+
+[readback_frames.body]
+origin = "unmeasured"
+
+[readback_frames.body.lungs]
+segment = "unknown"
+
+[readback_frames.confidence]
+feeling = 0.62
+body = 0.0
+confounded = false
+
+[[readback_frames]]
+t_ms = 240
+
+[readback_frames.feeling]
+arousal = 0.4085
+valence = 0.136
+dominance = 0.4745
+
+[readback_frames.feeling.pin]
+name = "sympathy"
+track = "prosody"
+weight = 0.495
+
+[readback_frames.body]
+origin = "unmeasured"
+
+[readback_frames.body.lungs]
+segment = "unknown"
+
+[readback_frames.confidence]
+feeling = 0.62
+body = 0.0
+confounded = false
+
+[[readback_frames]]
+t_ms = 320
+
+[readback_frames.feeling]
+arousal = 0.4
+valence = 0.17
+dominance = 0.4745
+
+[readback_frames.feeling.pin]
+name = "sympathy"
+track = "prosody"
+weight = 0.558
+
+[readback_frames.body]
+origin = "unmeasured"
+
+[readback_frames.body.lungs]
+segment = "unknown"
+
+[readback_frames.confidence]
+feeling = 0.62
+body = 0.0
+confounded = false
+
+[[readback_frames]]
+t_ms = 400
+
+[readback_frames.feeling]
+arousal = 0.4
+valence = 0.1785
+dominance = 0.4745
+
+[readback_frames.feeling.pin]
+name = "sympathy"
+track = "prosody"
+weight = 0.576
+
+[readback_frames.body]
+origin = "unmeasured"
+
+[readback_frames.body.lungs]
+segment = "unknown"
+
+[readback_frames.confidence]
+feeling = 0.62
+body = 0.0
+confounded = false
+
+[[readback_frames]]
+t_ms = 480
+
+[readback_frames.feeling]
+arousal = 0.3915
+valence = 0.17
+dominance = 0.4745
+
+[readback_frames.feeling.pin]
+name = "sympathy"
+track = "prosody"
+weight = 0.567
+
+[readback_frames.body]
+origin = "unmeasured"
+
+[readback_frames.body.lungs]
+segment = "unknown"
+
+[readback_frames.confidence]
+feeling = 0.62
+body = 0.0
+confounded = false
+
+[[readback_frames]]
+t_ms = 560
+
+[readback_frames.feeling]
+arousal = 0.4
+valence = 0.1615
+dominance = 0.4745
+
+[readback_frames.feeling.pin]
+name = "sympathy"
+track = "prosody"
+weight = 0.549
+
+[readback_frames.body]
+origin = "unmeasured"
+
+[readback_frames.body.lungs]
+segment = "unknown"
+
+[readback_frames.confidence]
+feeling = 0.62
+body = 0.0
+confounded = false
+

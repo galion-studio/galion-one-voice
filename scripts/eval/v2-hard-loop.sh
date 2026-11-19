@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 #
 # Hard loop for Galion Voice V2. Replaces a stub SELF-EVAL as the claim.
 # scripts/eval/v2-persona-selftest.sh and scripts/eval/flash-ttfa.sh stay

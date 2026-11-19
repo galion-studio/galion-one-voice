@@ -1,6 +1,6 @@
 # V2-S2 · Orb motion contract
 
-Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 Master slogan: "The seamless connection with the human being, on the voice only."
 The orb is the mark that connection has. It is still one mark. The slogan is
 not drawn on it.

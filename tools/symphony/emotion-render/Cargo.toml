@@ -1,0 +1,23 @@
+# Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
+[package]
+name = "galion-emotion-render"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+publish = false
+description = "Map one 80 ms emotion target onto the existing Chatterbox cloning controls. Directions are cited. Magnitudes come from config."
+
+[[bin]]
+name = "galion-emotion-render"
+path = "src/main.rs"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "=0.8.19"
+# indexmap 2.14 needs edition 2024 (Rust 1.85+). Pin the 1.83-compatible line.
+indexmap = "=2.2.6"
+
+# Own workspace, same pattern as tools/symphony/articulation.
+# The locked voice runtime does not build this tool.
+[workspace]

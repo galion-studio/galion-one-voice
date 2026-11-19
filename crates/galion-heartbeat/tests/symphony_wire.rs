@@ -1,4 +1,4 @@
-// Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+// Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 //! Harness for the 80 ms symphony wire.
 //! `Heartbeat::step` then `SymphonyWire::step`: no alloc, no block, late = pause.
 mod common;

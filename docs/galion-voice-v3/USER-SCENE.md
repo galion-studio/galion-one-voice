@@ -1,6 +1,6 @@
 # V3-A · User-scene, beside Jarvis texture
 
-Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Perpetual Open MIT License. (c) 2026 Galion Labs.
 Europe/Zagreb. 2026-11-03. A planning note. It specifies a boundary.
 It does not specify a separator, a model, or a build.
 

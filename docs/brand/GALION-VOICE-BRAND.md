@@ -1,6 +1,6 @@
 # Galion Voice — brand
 
-Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Perpetual Open MIT License. (c) 2026 Galion Labs.
 The name is Galion. The product is Galion Voice.
 
 ## Slogan
@@ -66,7 +66,7 @@ one value.
 
 `LOCKS.toml` `[licence]`:
 
-- Code: Perpetual Open MIT. (c) 2026 Maciej Grajczyk.
+- Code: Perpetual Open MIT. (c) 2026 Galion Labs.
 - `free_forever = true`.
 - `paid_tiers = false`.
 

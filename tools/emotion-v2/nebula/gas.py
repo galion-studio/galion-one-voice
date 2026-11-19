@@ -1,5 +1,5 @@
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 """Fixed gas-line ids for the thirteen Nebula emotions.
 
 The id is a label the visualiser binds to a particle. It does not change

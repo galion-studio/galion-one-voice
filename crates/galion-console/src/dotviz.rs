@@ -1,4 +1,4 @@
-// Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+// Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 //! W21-04 · heartbeat → one dot + live console bars (feature `dot-viz`).
 //!
 //! The bridge W21-01 attaches to its live loop. Per 80 ms frame:
@@ -484,18 +484,48 @@ mod tests {
         assert!(SCREEN_HTML.contains("<!-- /decide -->"));
         assert!(SCREEN_HTML.contains("id=\"silence\""));
         assert!(SCREEN_HTML.contains("<!-- /silence -->"));
+        assert!(SCREEN_HTML.contains("<!-- one-shell -->"));
+        assert!(SCREEN_HTML.contains("<!-- /one-shell -->"));
+        let shell = SCREEN_HTML
+            .split_once("<!-- one-shell -->")
+            .expect("shell")
+            .1
+            .split_once("<!-- /one-shell -->")
+            .expect("shell end")
+            .0;
+        let plus = shell.find("id=\"files\"").expect("plus");
+        let field = shell.find("id=\"command\"").expect("field");
+        let voice_btn = shell.find("id=\"voice\"").expect("voice");
+        assert!(plus < field && field < voice_btn, "prompt is plus, then the field, then voice");
+        assert!(shell.contains("placeholder=\"Ask anything…\""));
+        assert!(shell.contains("aria-label=\"Add files\""));
+        assert!(shell.contains("aria-label=\"Voice\""));
+        assert!(shell.contains("Galion One for live users is coming very soon."));
+        assert!(shell.contains("Download alpha on GitHub"));
+        assert!(shell.contains(
+            "https://github.com/galion-studio/obsidian-open-mind/actions/workflows/openmind-desktop.yml"
+        ));
+        assert!(shell.contains("Galion Research"));
+        assert!(shell.contains("Windows") && shell.contains("macOS") && shell.contains("Linux"));
+        assert!(shell.contains("MIT License"));
+        assert!(shell.contains("Developed by Galion Labs"));
+        assert!(shell.contains("built in Rust"));
+        assert!(!shell.to_ascii_lowercase().contains("hermes"));
         let (head, tail) = SCREEN_HTML.split_once("<div id=\"decide\">").expect("decide");
         let (_, after) = tail.split_once("<!-- /decide -->").expect("decide end");
         let voice = format!("{head}{after}");
         let (pre, post) = voice.split_once("<button id=\"silence\"").expect("silence");
         let (_, rest) = post.split_once("<!-- /silence -->").expect("silence end");
         let voice = format!("{pre}{rest}");
+        let (before_shell, shell_tail) = voice.split_once("<!-- one-shell -->").expect("shell");
+        let (_, after_shell) = shell_tail.split_once("<!-- /one-shell -->").expect("shell end");
+        let voice = format!("{before_shell}{after_shell}");
         for tag in ["<div", "<form", "<input", "<button", "<label", "<span", "<p>", "<a "] {
             assert!(!voice.contains(tag), "{tag} is on the voice screen");
         }
         assert!(!SCREEN_HTML.contains("fillText"), "the canvas draws no text");
         assert!(!SCREEN_HTML.contains("fetch(\"v2/cc0\""));
-        assert!(SCREEN_HTML.contains("document.addEventListener(\"click\",onActivate)"), "a tap anywhere starts the mic");
+        assert!(SCREEN_HTML.contains("document.addEventListener(\"click\",onActivate)"), "a tap anywhere starts the preview");
         assert!(SCREEN_HTML.contains("data-mouth=\"piper\""));
         assert!(SCREEN_HTML.contains("data-film-voice=\"false\""));
         assert!(SCREEN_HTML.contains("data-rights=\"hold\""));
@@ -524,9 +554,44 @@ mod tests {
         assert!(SCREEN_HTML.contains("MARK.core"));
         assert!(!SCREEN_HTML.contains("react") && !SCREEN_HTML.contains("vue") && !SCREEN_HTML.contains("svelte"));
         assert!(!SCREEN_HTML.contains("from \"react\"") && !SCREEN_HTML.contains("from 'vue'"));
-        assert!(SCREEN_HTML.contains("Razgovarate s umjetnom inteligencijom. Galion je AI asistent, a ne osoba."));
-        assert!(SCREEN_HTML.contains("You are talking to an AI. Galion is an AI assistant, not a person."));
-        assert!(SCREEN_HTML.contains("function discloseAi"));
+        assert!(!SCREEN_HTML.contains("Razgovarate s umjetnom inteligencijom. Galion je AI asistent, a ne osoba."));
+        assert!(!SCREEN_HTML.contains("You are talking to an AI. Galion is an AI assistant, not a person."));
+        assert!(!SCREEN_HTML.contains("function discloseAi"));
+        assert!(!SCREEN_HTML.contains("id=\"ai-note\""));
+        assert!(!SCREEN_HTML.contains("speechSynthesis"), "the robotic browser voice is gone");
+        assert!(!SCREEN_HTML.contains("SpeechSynthesisUtterance"));
+        assert!(SCREEN_HTML.contains("const PREVIEW_ONLY=true"));
+        assert!(SCREEN_HTML.contains("if(PREVIEW_ONLY) return"));
+        assert!(SCREEN_HTML.contains("dataset.previewOnly"));
+        assert!(SCREEN_HTML.contains("dataset.liveVoice"));
+        let enable_mic = SCREEN_HTML
+            .split_once("async function enableMic")
+            .expect("enableMic")
+            .1;
+        let preview_gate = enable_mic.find("if(PREVIEW_ONLY) return").expect("PREVIEW_ONLY gate");
+        let gum = enable_mic.find("getUserMedia").expect("getUserMedia");
+        assert!(preview_gate < gum, "preview must skip getUserMedia");
+        let orb = SCREEN_HTML
+            .split_once("function onOrbGesture")
+            .expect("onOrbGesture")
+            .1;
+        let preview_tap = orb.find("if(PREVIEW_ONLY){").expect("PREVIEW_ONLY tap");
+        let live_mic = orb.find("enableMic({fallbackPreview:true").expect("live enableMic");
+        assert!(preview_tap < live_mic, "preview tap must return before live voice");
+        assert!(SCREEN_HTML.contains("LIVE_SESSION_MS=1500"));
+        assert!(SCREEN_HTML.contains("id=\"voice-preview\""));
+        assert!(SCREEN_HTML.contains("function playPreviewNow"));
+        assert!(SCREEN_HTML.contains("el.play()"));
+        assert!(SCREEN_HTML.contains("preview/voice-preview.json"));
+        assert!(SCREEN_HTML.contains("voice-preview.opus"));
+        assert!(SCREEN_HTML.contains("voice-preview.mp3"));
+        assert!(SCREEN_HTML.contains("voice-preview.wav"));
+        assert!(SCREEN_HTML.contains("?v=__GALION_ASSET_V__"));
+        assert!(SCREEN_HTML.contains("id=\"caption\""));
+        assert!(SCREEN_HTML.contains("function startPreview"));
+        assert!(SCREEN_HTML.contains("function ensurePlayTap"));
+        assert!(SCREEN_HTML.contains("AnalyserNode"));
+        assert!(SCREEN_HTML.contains("fallbackPreview"));
         assert!(SCREEN_HTML.contains("fetch(\"session\""));
         assert!(SCREEN_HTML.contains("X-Galion-Session"));
         assert!(!SCREEN_HTML.contains("?token=") && !SCREEN_HTML.contains("?session="));

@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! Clone-time consent gate for one Samantha or Jarvis reference clip.
 //!
 //! Owner decision (2026-11-04 02:39 CET): the consent check runs only when a

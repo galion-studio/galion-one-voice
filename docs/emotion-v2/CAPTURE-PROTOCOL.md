@@ -1,6 +1,6 @@
 # Emotion V2 — controlled reference capture
 
-Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 Europe/Zagreb. 2026-11-07. Emotion V2 foundation, part B.
 
 The spelling is **Galion**. The product is Galion Voice. The standard is **galion-voice-v2-432** (the 432 Hz standard).

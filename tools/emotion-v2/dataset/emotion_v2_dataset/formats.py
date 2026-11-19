@@ -1,5 +1,5 @@
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 """Citations for the PersonaPlex export adapters.
 
 NVIDIA's PersonaPlex README, paper, and project page describe the model and

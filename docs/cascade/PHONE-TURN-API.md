@@ -25,7 +25,7 @@ One-shot: `galion_cascade::phone_turn(&pcm)` / `phone_turn_wav(&bytes)`.
 | `GALION_LLM_KEY_FILE` | optional dotenv path. One `NAME=value` line, named by `GALION_LLM_KEY_NAME`. Same shape as Research (`GALION_RESEARCH_KEY_FILE` / `GALION_RESEARCH_KEY_NAME`). Not logged. |
 | `GALION_LLM_KEY_NAME` | line name inside that file. The Hermes gateway file uses `API_SERVER_KEY`. |
 | `GALION_LLM_KEY` | fallback bearer when the file is unset, unreadable, or has no matching line. Not logged. |
-| `GALION_LLM_TIMEOUT_MS` | default `15000` (failure ceiling for one live completion, clamped 50..=30000). Not a measured reply time. Timeout or a refused connect speaks `model can't be reached`. No canned fallback. |
+| `GALION_LLM_TIMEOUT_MS` | default `15000` (failure ceiling for one live completion, clamped 50..=30000). Not a measured reply time. A connect or read that waits out that ceiling speaks `That took too long. I don't have an answer yet.` A refused connect still speaks `model can't be reached`. No canned fallback. |
 | `GALION_SPEECH` | `auto` (A21 Piper, else flite) · `a21` · `flite` · `off` → `NoSpeech` |
 
 The live unit is `deploy/systemd/templates/galion-voice-stage.service`. It sets `Environment=GALION_LLM=hermes`. Unset selects the same gateway; the unit states it so a drop-in does not leave the process on the rule table. The gateway key lines stay commented. A human sets `GALION_LLM_KEY_FILE` and `GALION_LLM_KEY_NAME` in a drop-in and adds that file to `ReadOnlyPaths`. `GALION_LLM_KEY` remains the fallback. The key is not written in the unit.

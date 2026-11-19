@@ -1,0 +1,32 @@
+# Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
+# Host checks for the voice units. No deploy, no SSH, no board.
+name: voice-host
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  systemd:
+    name: systemd-analyze verify
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify shipped units
+        run: scripts/deploy/verify-systemd-units.sh
+
+  aarch64:
+    # GitHub-hosted arm64. This is not a Raspberry Pi 5.
+    # No Pi board, no install, and no timing is measured here.
+    name: aarch64 voice service (not a Raspberry Pi 5)
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.85.0
+      - name: Build the stage binary and run its crate tests
+        run: |
+          echo "GitHub-hosted arm64. Not a Raspberry Pi 5."
+          cargo test -p galion-console --features dot-viz-web --lib
+          cargo build -p galion-console --features dot-viz-web --example dot_console_demo

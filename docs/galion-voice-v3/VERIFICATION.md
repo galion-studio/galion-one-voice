@@ -1,6 +1,6 @@
 # V3 · Real-life verification
 
-Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Perpetual Open MIT License. (c) 2026 Galion Labs.
 Europe/Zagreb. 2026-11-03. A checklist for a person in a room.
 Every box below is open. A desk reading does not close one.
 

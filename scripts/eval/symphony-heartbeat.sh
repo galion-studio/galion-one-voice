@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+# Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 # 80 ms heartbeat harness. Prints verdict=PASS, verdict=FAIL, or verdict=BLOCKED.
 # Does not fetch weights. Does not edit LOCKS.toml.
 set -euo pipefail

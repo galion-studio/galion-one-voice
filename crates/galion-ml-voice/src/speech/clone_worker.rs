@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! V2-S14 out-of-process clone worker. Text in, PCM out.
 //!
 //! One child per [`CloneWorker`], the same shape as the warm Piper worker.

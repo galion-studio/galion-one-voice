@@ -1,4 +1,4 @@
-// Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+// Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 //
 // Nebula vocabulary for the emotion halo around the one dot.
 // The one-dot page is not wired here. The halo imports this module.

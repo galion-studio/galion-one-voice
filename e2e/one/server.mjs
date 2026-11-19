@@ -28,9 +28,11 @@ const state = {
   nebula: neutral,
   persona: "samantha",
   approval: false,
+  lastSay: "",
 };
 let tMs = 1000;
 let holdDot = false;
+let sessionOk = true;
 const research = {
   delayMs: 0,
   fail: false,
@@ -77,11 +79,38 @@ function dotBody() {
   return JSON.stringify(body);
 }
 
+function toneWav(seconds = 29, sr = 24000) {
+  const n = Math.floor(sr * seconds);
+  const buf = Buffer.alloc(44 + n * 2);
+  buf.write("RIFF", 0);
+  buf.writeUInt32LE(36 + n * 2, 4);
+  buf.write("WAVE", 8);
+  buf.write("fmt ", 12);
+  buf.writeUInt32LE(16, 16);
+  buf.writeUInt16LE(1, 20);
+  buf.writeUInt16LE(1, 22);
+  buf.writeUInt32LE(sr, 24);
+  buf.writeUInt32LE(sr * 2, 28);
+  buf.writeUInt16LE(2, 32);
+  buf.writeUInt16LE(16, 34);
+  buf.write("data", 36);
+  buf.writeUInt32LE(n * 2, 40);
+  for (let i = 0; i < n; i += 1) {
+    const s = Math.sin((2 * Math.PI * 440 * i) / sr);
+    buf.writeInt16LE(Math.max(-32767, Math.min(32767, Math.round(s * 16000))), 44 + i * 2);
+  }
+  return buf;
+}
+
+const previewWav = toneWav(29, 24000);
+const previewJson = Buffer.from(JSON.stringify({ text: "", segments: [] }));
+
 const port = Number(process.env.PORT || 4173);
 const server = createServer((req, res) => {
   const url = new URL(req.url || "/", "http://127.0.0.1");
   if (req.method === "POST" && (url.pathname === "/__hold" || url.pathname === "/__release")) {
     holdDot = url.pathname === "/__hold";
+    if (url.pathname === "/__release") sessionOk = true;
     res.writeHead(204);
     res.end();
     return;
@@ -121,9 +150,52 @@ const server = createServer((req, res) => {
     res.end(dotBody());
     return;
   }
+  if (req.method === "POST" && url.pathname === "/__session-down") {
+    sessionOk = false;
+    res.writeHead(204);
+    res.end();
+    return;
+  }
+  if (req.method === "POST" && url.pathname === "/__session-up") {
+    sessionOk = true;
+    res.writeHead(204);
+    res.end();
+    return;
+  }
   if (req.method === "POST" && url.pathname === "/session") {
+    if (!sessionOk) {
+      res.writeHead(503, { "content-type": "text/plain", "cache-control": "no-store" });
+      res.end("unavailable");
+      return;
+    }
     res.writeHead(200, { "content-type": "application/json" });
     res.end('{"token":"desktop-e2e"}');
+    return;
+  }
+  if (req.method === "GET" && url.pathname === "/preview/voice-preview.wav") {
+    res.writeHead(200, { "content-type": "audio/wav", "cache-control": "no-store", "accept-ranges": "bytes" });
+    res.end(previewWav);
+    return;
+  }
+  if (req.method === "GET" && url.pathname === "/preview/voice-preview.json") {
+    res.writeHead(200, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
+    res.end(previewJson);
+    return;
+  }
+  if (req.method === "GET" && (url.pathname === "/preview/voice-preview.mp3" || url.pathname === "/preview/voice-preview.opus")) {
+    res.writeHead(404, { "content-type": "text/plain", "cache-control": "no-store" });
+    res.end("not found");
+    return;
+  }
+  if (req.method === "POST" && url.pathname === "/v2/say") {
+    readBody(req).then((raw) => {
+      state.lastSay = raw;
+      sendJson(res, 200, { ok: true, silence: true });
+    });
+    return;
+  }
+  if (req.method === "GET" && url.pathname === "/__say") {
+    sendJson(res, 200, { body: state.lastSay || "" });
     return;
   }
   if (req.method === "GET" && (url.pathname === "/research" || url.pathname === "/research/")) {

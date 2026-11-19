@@ -1,4 +1,4 @@
-// Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+// Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 //! The replay backend contract and the deterministic `MockBackend`.
 //!
 //! A backend sees exactly one 80 ms frame at a time (causal: no look-ahead) and

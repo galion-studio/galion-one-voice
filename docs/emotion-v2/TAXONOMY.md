@@ -1,6 +1,6 @@
 # Emotion V2 — Samantha, twelve emotions
 
-Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 Europe/Zagreb. Design inventory for Galion Voice V2 inside Galion One.
 The numbers live in [`../../emotion-v2/emotions.toml`](../../emotion-v2/emotions.toml).
 `emotion-v2/taxonomy.py` rejects a file that drifts from the rules below.

@@ -1,4 +1,4 @@
-// Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+// Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 //! Deterministic CPU replay: expand a spec into frames, drive a backend, measure.
 
 use crate::backend::{AffectIn, AffectOut, FrameIn, FrameOut, ReplayBackend};

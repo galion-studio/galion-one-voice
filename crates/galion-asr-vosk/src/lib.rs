@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! Letter A English ASR: Vosk out of process.
 //!
 //! [`VoskClient`] talks NDJSON to the `galion-asr-vosk` binary. That binary

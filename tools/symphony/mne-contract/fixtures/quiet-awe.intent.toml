@@ -1,0 +1,229 @@
+# Galion Voice — Perpetual Open MIT License
+# Copyright (c) 2026 Galion Labs.
+# Stand-in scenario. No recording. Numbers are fixture knobs.
+
+schema = "galion-mne-contract"
+schema_version = 1
+kind = "intent"
+frame_ms = 80
+value_origin = "stand_in"
+note = "Quiet awe. The line starts unnamed. The awe pin arrives and holds. Arousal rises only a little."
+
+text = "Look at that sky."
+
+[persona]
+persona_id = "galion-one"
+voice_id = "profile:galion-one-steady"
+
+[moment]
+moment_id = "quiet-awe-the-sky"
+memory_id = "mem-standin-clear-sky"
+memory_snippet = "The window faces a clear sky and neither of them has spoken yet."
+place = "by_the_window"
+distance = "conversational"
+noise = "quiet"
+listener = "one_person"
+
+[baseline]
+arousal = 0.4
+valence = 0.0
+dominance = 0.5
+
+[[intent_frames]]
+t_ms = 0
+
+[intent_frames.intent]
+verb = "share_wonder"
+strength = 0.5
+
+[intent_frames.feeling]
+arousal = 0.42
+valence = 0.08
+dominance = 0.42
+
+[intent_frames.inner]
+energy = 0.55
+fatigue = 0.1
+health = 1.0
+
+[intent_frames.text_span]
+start_byte = 0
+end_byte = 17
+
+[[intent_frames]]
+t_ms = 80
+
+[intent_frames.intent]
+verb = "share_wonder"
+strength = 0.5
+
+[intent_frames.feeling]
+arousal = 0.46
+valence = 0.12
+dominance = 0.42
+
+[intent_frames.inner]
+energy = 0.55
+fatigue = 0.1
+health = 1.0
+
+[intent_frames.text_span]
+start_byte = 0
+end_byte = 17
+
+[[intent_frames]]
+t_ms = 160
+
+[intent_frames.intent]
+verb = "share_wonder"
+strength = 0.5
+
+[intent_frames.feeling]
+arousal = 0.5
+valence = 0.18
+dominance = 0.42
+
+[intent_frames.feeling.pin]
+name = "awe"
+track = "prosody"
+weight = 0.3
+
+[intent_frames.inner]
+energy = 0.55
+fatigue = 0.1
+health = 1.0
+
+[intent_frames.text_span]
+start_byte = 0
+end_byte = 17
+
+[[intent_frames]]
+t_ms = 240
+
+[intent_frames.intent]
+verb = "share_wonder"
+strength = 0.5
+
+[intent_frames.feeling]
+arousal = 0.52
+valence = 0.22
+dominance = 0.42
+
+[intent_frames.feeling.pin]
+name = "awe"
+track = "prosody"
+weight = 0.45
+
+[intent_frames.inner]
+energy = 0.55
+fatigue = 0.1
+health = 1.0
+
+[intent_frames.text_span]
+start_byte = 0
+end_byte = 17
+
+[[intent_frames]]
+t_ms = 320
+
+[intent_frames.intent]
+verb = "share_wonder"
+strength = 0.5
+
+[intent_frames.feeling]
+arousal = 0.54
+valence = 0.26
+dominance = 0.42
+
+[intent_frames.feeling.pin]
+name = "awe"
+track = "prosody"
+weight = 0.55
+
+[intent_frames.inner]
+energy = 0.55
+fatigue = 0.1
+health = 1.0
+
+[intent_frames.text_span]
+start_byte = 0
+end_byte = 17
+
+[[intent_frames]]
+t_ms = 400
+
+[intent_frames.intent]
+verb = "share_wonder"
+strength = 0.5
+
+[intent_frames.feeling]
+arousal = 0.54
+valence = 0.28
+dominance = 0.42
+
+[intent_frames.feeling.pin]
+name = "awe"
+track = "prosody"
+weight = 0.58
+
+[intent_frames.inner]
+energy = 0.55
+fatigue = 0.1
+health = 1.0
+
+[intent_frames.text_span]
+start_byte = 0
+end_byte = 17
+
+[[intent_frames]]
+t_ms = 480
+
+[intent_frames.intent]
+verb = "share_wonder"
+strength = 0.5
+
+[intent_frames.feeling]
+arousal = 0.53
+valence = 0.29
+dominance = 0.42
+
+[intent_frames.feeling.pin]
+name = "awe"
+track = "prosody"
+weight = 0.58
+
+[intent_frames.inner]
+energy = 0.55
+fatigue = 0.1
+health = 1.0
+
+[intent_frames.text_span]
+start_byte = 0
+end_byte = 17
+
+[[intent_frames]]
+t_ms = 560
+
+[intent_frames.intent]
+verb = "share_wonder"
+strength = 0.5
+
+[intent_frames.feeling]
+arousal = 0.53
+valence = 0.3
+dominance = 0.42
+
+[intent_frames.feeling.pin]
+name = "awe"
+track = "prosody"
+weight = 0.57
+
+[intent_frames.inner]
+energy = 0.55
+fatigue = 0.1
+health = 1.0
+
+[intent_frames.text_span]
+start_byte = 0
+end_byte = 17
+

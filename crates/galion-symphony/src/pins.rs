@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! Whole-file pins for the clone interchange. Same three columns as
 //! `scripts/clone/PINS.sha256`. The bytes are not in git.
 

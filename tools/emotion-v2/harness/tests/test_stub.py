@@ -1,5 +1,5 @@
 # Galion Voice — Perpetual Open MIT License
-# Copyright (c) 2026 Maciej Grajczyk.
+# Copyright (c) 2026 Galion Labs.
 """Thresholds, stub posteriors, and the offline SUPERB contract.
 
 Every signal in this module is synthesized. No fixture audio is read from git.

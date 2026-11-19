@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! Minimal streaming SHA-256 (FIPS 180-4) for A21 weight verification. No deps.
 
 const K: [u32; 64] = [

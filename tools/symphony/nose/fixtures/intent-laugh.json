@@ -1,0 +1,15 @@
+{
+  "schema": "galion-mne-intent-stub/0",
+  "text": "That was perfect.",
+  "feeling": {
+    "arousal": 0.2,
+    "valence": 0.4,
+    "dominance": 0.0,
+    "intensity": 0.6,
+    "category": "amusement",
+    "burst": [{ "id": "amusement", "w": 0.0 }]
+  },
+  "bursts": [{ "gesture": "laugh", "place": "end", "mouth": "open" }],
+  "speaker": { "f0_hz": 120.0, "velum_rest": 0.0 },
+  "place_from_feeling": false
+}

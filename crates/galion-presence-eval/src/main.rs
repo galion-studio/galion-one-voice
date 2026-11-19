@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! `galion-presence-eval [--headless] [--out REPORT.json] [--wav-dir DIR] [--commit HEX]`
 //!
 //! Exit 0 green, 1 a scored case failed, 2 usage or IO.

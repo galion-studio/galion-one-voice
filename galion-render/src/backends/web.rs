@@ -18,10 +18,14 @@
 //!                  not add a talk path for `/one`.
 //!   GET /reply/<id>.wav -> reply audio the host published with [`ReplyBox::set_reply`];
 //!                  `audio/wav`, 404 when unknown/evicted.
+//!   GET /preview/voice-preview.opus|mp3|wav|json -> a pre-rendered clip and its
+//!                  caption script from `GALION_PREVIEW_AUDIO_DIR` (outside the repo).
+//!                  Correct content type, `Accept-Ranges: bytes`, one-byte ranges,
+//!                  and `Cache-Control: public, max-age=3600`. A missing file is 404.
 //!   GET / , /screen, /one, /one/ -> the caller's single-screen HTML page, only when one was set with
 //!                      [`WebSurface::with_page`] (V1-01; the page itself is owned by
 //!                      galion-console, this crate only serves the bytes); 404 otherwise
-//!   GET /research, /research/ -> the Galion Research desk, same gate as /one.
+//!   GET /research, /research/ -> a notice. The desk lives in galion-studio/hermes-research. Same gate as /one.
 //!                      Sets `galion_research`, an HttpOnly SameSite=Strict cookie.
 //!                      `X-Galion-Research` carries the same id when there is no cookie jar.
 //!   GET /research/hermes, GET /research/history, GET /research/progress,
@@ -578,6 +582,8 @@ struct Shared {
     /// First accepted `/turn` of this process already carried the Art. 50 line.
     disclosure_sent: Arc<AtomicBool>,
     research: Arc<Mutex<ResearchDesk>>,
+    /// `GALION_PREVIEW_AUDIO_DIR`. `None` serves every preview name as 404.
+    preview_dir: Option<std::path::PathBuf>,
 }
 
 /// Unit tests pin the V1 demo defaults. A developer shell that exports
@@ -585,6 +591,12 @@ struct Shared {
 /// built with `cfg(test)` and reads the environment in [`initial_edge`].
 fn initial_edge() -> EdgeCfg {
     if cfg!(test) { EdgeCfg::v1_demo() } else { EdgeCfg::from_env() }
+}
+
+/// Tests pin an empty preview dir so a developer shell cannot change the route.
+/// The demo binary reads `GALION_PREVIEW_AUDIO_DIR` when the surface is built.
+fn initial_preview_dir() -> Option<std::path::PathBuf> {
+    if cfg!(test) { None } else { super::preview::dir_from_env() }
 }
 
 pub struct WebSurface {
@@ -619,6 +631,7 @@ impl WebSurface {
             disclosure_sent: Arc::new(AtomicBool::new(false)),
             research: Arc::new(Mutex::new(ResearchDesk::new())),
             edge,
+            preview_dir: initial_preview_dir(),
         };
         Self {
             bind: None,
@@ -636,7 +649,7 @@ impl WebSurface {
         s
     }
     /// Serve `html` at `/`, `/screen`, `/one`, and `/one/` (set before `open()`).
-    /// `GET /research` uses the same gate and serves the research prompt.
+    /// `GET /research` uses the same gate and serves the research notice.
     pub fn with_page(mut self, html: &'static str) -> Self {
         self.sh.page = Some(html);
         self
@@ -669,6 +682,12 @@ impl WebSurface {
     /// `GALION_ALLOW_PUBLIC_BIND`. `open` still refuses `0.0.0.0` without auth.
     pub fn with_allow_public_bind(mut self, on: bool) -> Self {
         self.sh.edge.allow_public_bind = on;
+        self
+    }
+    /// Directory of `voice-preview.opus`, `.mp3`, `.wav`, and `.json`.
+    /// Set before [`RenderSurface::open`]; the connection threads keep this path.
+    pub fn with_preview_dir(mut self, dir: impl Into<std::path::PathBuf>) -> Self {
+        self.sh.preview_dir = Some(dir.into());
         self
     }
     /// Art. 50 disclosure. The demo default is on.
@@ -717,8 +736,10 @@ impl WebSurface {
 
 const V2_REDIRECT_HTML: &str = "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta http-equiv=\"refresh\" content=\"0; url=/\"><title>Galion Voice</title><script>location.replace(\"/\");</script></head><body><p><a href=\"/\">Galion Voice</a></p></body></html>";
 
-/// Galion Research. Served at `/research` and `/research/` when a product page is set,
-/// the same gate as `/one`.
+/// A notice served at `/research` and `/research/` when a product page is set,
+/// the same gate as `/one`. The desk lives in galion-studio/hermes-research.
+/// The earlier page is `docs/archive/research-web/research.html`.
+/// `POST /research/ask` stays.
 const RESEARCH_HTML: &str = include_str!("../../../crates/galion-console/assets/research.html");
 
 #[derive(Clone)]
@@ -1496,6 +1517,20 @@ fn research_ask_request(
     (body, Some(cookie))
 }
 
+/// Placeholder the orb page bakes into cache-busted asset URLs.
+const ASSET_V_PLACEHOLDER: &str = "__GALION_ASSET_V__";
+
+fn asset_v() -> &'static str {
+    match option_env!("GALION_GIT_SHA") {
+        Some(s) if !s.is_empty() => s,
+        _ => "dev",
+    }
+}
+
+fn stamp_page(html: &str) -> String {
+    html.replace(ASSET_V_PLACEHOLDER, asset_v())
+}
+
 const SECURITY_HEADERS: &str = concat!(
     "X-Content-Type-Options: nosniff\r\n",
     "Referrer-Policy: no-referrer\r\n",
@@ -1519,49 +1554,85 @@ fn format_acao(origin: Option<String>) -> String {
     }
 }
 
+struct Served {
+    status: &'static str,
+    ctype: &'static str,
+    body: Vec<u8>,
+    acao: Acao,
+    set_cookie: Option<String>,
+    cache_control: &'static str,
+    extra: String,
+    content_length: usize,
+}
+
+fn served(
+    status: &'static str,
+    ctype: &'static str,
+    body: Vec<u8>,
+    acao: Acao,
+    set_cookie: Option<String>,
+) -> Served {
+    let content_length = body.len();
+    Served {
+        status,
+        ctype,
+        body,
+        acao,
+        set_cookie,
+        cache_control: "no-store",
+        extra: String::new(),
+        content_length,
+    }
+}
+
 fn handle(mut stream: std::net::TcpStream, sh: &Shared) {
     let _ = stream.set_read_timeout(Some(Duration::from_millis(2000)));
-    let (status, ctype, mut body, acao, mut set_cookie) = match read_request(&mut stream, MAX_BODY_BYTES) {
-        Err((st, msg)) => (st, "text/plain", msg.as_bytes().to_vec(), Acao::Unscoped, None),
+    let mut served = match read_request(&mut stream, MAX_BODY_BYTES) {
+        Err((st, msg)) => served(st, "text/plain", msg.as_bytes().to_vec(), Acao::Unscoped, None),
         Ok(mut req) => dispatch(&mut req, sh),
     };
-    let cors = match acao {
+    let cors = match served.acao {
         Acao::Omit => String::new(),
         Acao::Keep(o) => format_acao(o),
         Acao::Unscoped => {
             if sh.edge.wildcard() { format_acao(Some("*".to_string())) } else { String::new() }
         }
     };
-    let location = if status.starts_with("302") { "Location: /\r\n" } else { "" };
-    let mut cookie_line = match set_cookie.as_deref() {
+    let location = if served.status.starts_with("302") { "Location: /\r\n" } else { "" };
+    let mut cookie_line = match served.set_cookie.as_deref() {
         Some(c) if !c.is_empty() => format!("Set-Cookie: {c}\r\n"),
         _ => String::new(),
     };
-    wipe_opt(&mut set_cookie);
+    wipe_opt(&mut served.set_cookie);
     let mut head = format!(
-        "HTTP/1.1 {status}\r\nContent-Type: {ctype}\r\nContent-Length: {}\r\nCache-Control: no-store\r\n{location}{cors}{cookie_line}Access-Control-Allow-Methods: GET, POST, DELETE, OPTIONS\r\nAccess-Control-Allow-Headers: {CORS_ALLOW_HEADERS}\r\n{SECURITY_HEADERS}Connection: close\r\n\r\n",
-        body.len()
+        "HTTP/1.1 {status}\r\nContent-Type: {ctype}\r\nContent-Length: {len}\r\nCache-Control: {cache}\r\n{extra}{location}{cors}{cookie_line}Access-Control-Allow-Methods: GET, POST, DELETE, OPTIONS\r\nAccess-Control-Allow-Headers: {CORS_ALLOW_HEADERS}\r\n{SECURITY_HEADERS}Connection: close\r\n\r\n",
+        status = served.status,
+        ctype = served.ctype,
+        len = served.content_length,
+        cache = served.cache_control,
+        extra = served.extra,
     );
     let _ = stream.write_all(head.as_bytes());
-    let _ = stream.write_all(&body);
+    let _ = stream.write_all(&served.body);
     let _ = stream.flush();
     // The socket has the bytes. Do not leave a token or a WAV sitting in this buffer.
     wipe_string(&mut head);
     wipe_string(&mut cookie_line);
-    zeroise_bytes(&mut body);
+    wipe_string(&mut served.extra);
+    zeroise_bytes(&mut served.body);
 }
 
-fn dispatch(req: &mut Request, sh: &Shared) -> (&'static str, &'static str, Vec<u8>, Acao, Option<String>) {
+fn dispatch(req: &mut Request, sh: &Shared) -> Served {
     if query_carries_token(&req.query) {
         zeroise_bytes(&mut req.body);
-        return ("400 Bad Request", "text/plain", b"session token must not be in the URL".to_vec(), Acao::Omit, None);
+        return served("400 Bad Request", "text/plain", b"session token must not be in the URL".to_vec(), Acao::Omit, None);
     }
     let origin = req.header("origin").map(str::to_string);
     let sensitive = route_is_sensitive(&req.method, &req.path);
     match check_origin(origin.as_deref(), &sh.edge.cors_origins, sensitive) {
         OriginCheck::Reject => {
             zeroise_bytes(&mut req.body);
-            ("403 Forbidden", "text/plain", b"origin rejected".to_vec(), Acao::Omit, None)
+            served("403 Forbidden", "text/plain", b"origin rejected".to_vec(), Acao::Omit, None)
         }
         OriginCheck::Allow { acao } => {
             if route_needs_session(&req.method, &req.path) && sh.edge.session_required() {
@@ -1576,12 +1647,34 @@ fn dispatch(req: &mut Request, sh: &Shared) -> (&'static str, &'static str, Vec<
                 }
                 if !ok {
                     zeroise_bytes(&mut req.body);
-                    return ("401 Unauthorized", "text/plain", b"session required".to_vec(), Acao::Keep(acao), None);
+                    return served("401 Unauthorized", "text/plain", b"session required".to_vec(), Acao::Keep(acao), None);
+                }
+            }
+            let head = req.method == "HEAD";
+            let method = if head { "GET" } else { req.method.as_str() };
+            if method == "GET" {
+                if let Some(reply) = super::preview::serve(
+                    sh.preview_dir.as_deref(),
+                    &req.path,
+                    head,
+                    req.header("range"),
+                    req.header("if-none-match"),
+                ) {
+                    return Served {
+                        status: reply.status,
+                        ctype: reply.content_type,
+                        content_length: reply.content_length,
+                        body: reply.body,
+                        acao: Acao::Keep(acao),
+                        set_cookie: None,
+                        cache_control: reply.cache_control,
+                        extra: reply.extra,
+                    };
                 }
             }
             let mut set_cookie = None;
             let (st, ct, body) = route(req, sh, &mut set_cookie);
-            (st, ct, body, Acao::Keep(acao), set_cookie)
+            served(st, ct, body, Acao::Keep(acao), set_cookie)
         }
     }
 }
@@ -1821,7 +1914,7 @@ fn route(req: &mut Request, sh: &Shared, set_cookie: &mut Option<String>) -> (&'
                 "/" | "/screen" | "/one" | "/one/" if sh.page.is_some() => {
                     let html = sh.page.unwrap_or_default();
                     let page = if sh.edge.disclosure { html.to_string() } else { strip_ai_disclosure(html) };
-                    ("200 OK", "text/html; charset=utf-8", page.into_bytes())
+                    ("200 OK", "text/html; charset=utf-8", stamp_page(&page).into_bytes())
                 }
                 "/research/hermes" if sh.page.is_some() => {
                     let mut cookie_id = research_cookie_id(req);
@@ -2152,99 +2245,25 @@ mod tests {
             let body = r.split_once("\r\n\r\n").map(|(_, b)| b).unwrap_or("");
             for needle in [
                 "<title>Galion Research</title>",
-                "data-product=\"research\"",
-                "id=\"prompt\"",
-                "id=\"voice\"",
-                "id=\"voice-dot\"",
-                "id=\"voice-name\"",
-                "aria-label=\"Voice\"",
-                "function markInner",
-                "edge:\"#E8E8ED\"",
-                "Galion Research is the Hermes research app, a voice of Galion One",
-                "id=\"hermes-status\"",
-                "id=\"history\"",
-                "data-app=\"hermes\"",
-                "/research/ask",
-                "/research/hermes",
-                "/research/history",
-                "/research/sources",
-                "readAsText",
-                "data-voice=\"galion-research\"",
-                "id=\"add-file\"",
-                "id=\"add-image\"",
-                "id=\"sources\"",
-                "id=\"answer\"",
-                "id=\"citations\"",
-                "id=\"to-one\"",
-                "href=\"/one\"",
-                "No source yet.",
-                "None in hand.",
-                "galion.app/research",
-                "Ultra $220/€220 per month",
-                "id=\"sources-local\"",
-                "id=\"sources-reading\"",
-                "id=\"sources-arriving\"",
-                "id=\"notebook\"",
-                "id=\"found\"",
-                "id=\"inferred\"",
-                "id=\"unknown\"",
-                "id=\"experiment\"",
-                "Ask first",
-                "data-voice-to-voice=\"on\"",
-                "id=\"ui-toggle\"",
-                "id=\"helpers\"",
-                "<details id=\"helpers\">",
-                "id=\"helpers-summary\"",
-                "Helpers are quiet.",
-                "/research/progress",
-                "id=\"silence\"",
-                "id:\"question-sent\"",
-                "id:\"thinking\"",
-                "id:\"answer-ready\"",
-                "id:\"source-attached\"",
-                "id:\"source-cited\"",
-                "id:\"error\"",
-                "id:\"window-open\"",
-                "id:\"window-close\"",
-                "id:\"window-minimise\"",
-                "id:\"window-settle\"",
-                "var FUND=432",
-                "FUND*(5/4)",
-                "FUND*(3/2)",
-                "FUND*2",
-                "FUND/4",
-                "galion-one-silence",
-                "o.type=\"sine\"",
-                "docs/07-sound-guide/SOUND-LANGUAGE.md",
-                "Local. What is already known stays marked local.",
-                "data-ui=\"minimal\"",
-                "data-standard=\"432\"",
-                "--ink:#E6EDF3",
-                "--sky:#58C4FF",
-                "id=\"offline-mark\"",
-                "aria-live=\"polite\"",
-                ">Offline<",
-                "G.A.L.I.O.N. — General Autonomous Local Intelligence Open Network",
-                "Developed and distributed by Galion Labs",
-                "Perpetual Open MIT License",
-                "Copyright © 2026 Galion Labs. All rights reserved.",
-                "Permission is hereby granted, free of charge",
-                "Copyright (c) 2026 Maciej Grajczyk",
+                "This page is no longer the research desk.",
+                "Galion Research web interface",
+                "galion-studio/hermes-research",
+                "research.galion.app",
+                "docs/archive/research-web/research.html",
+                "Open the Galion Research app",
+                "Developed by Galion Labs",
+                "MIT License",
                 "#0B0F14",
                 "#58C4FF",
                 "#B8E8FF",
-                "#0B5FA5",
-                "#F5F5F7",
             ] {
                 assert!(body.contains(needle), "{p} missing {needle}");
             }
-            assert!(body.contains("<details id=\"helpers\">"), "helper progress is a disclosure");
-            assert!(!body.contains("<details id=\"helpers\" open"), "helpers stay collapsed until opened");
-            assert!(body.contains("<canvas id=\"voice-dot\""), "the restyled Voice V2 dot is the entry");
+            assert!(!body.contains("id=\"prompt\""), "{p} still has the prompt");
+            assert!(!body.contains("id=\"voice\""), "{p} still has the voice control");
+            assert!(!body.contains("Hermes"), "{p} names Hermes");
             assert!(!body.contains("id=\"s\""), "research is not the full-screen one-dot page");
             assert!(!body.contains("data-mark=\"orb\""), "the full-screen orb stays on /one");
-            assert!(!body.contains("hz:288"), "research cues stay on 2:1, 3:2, and 5:4");
-            assert!(!body.contains("id:\"ask\"") && !body.contains("id:\"local\""), "the old single-tone set is gone");
             assert!(!body.contains(".wav") && !body.contains(".mp3") && !body.contains(".ogg"));
             assert!(!body.contains("type=\"square\"") && !body.contains("type=\"sawtooth\"") && !body.contains("type=\"triangle\""));
             assert!(!body.contains("howler") && !body.contains("tone.js"));
@@ -2923,7 +2942,7 @@ mod tests {
         let a = w.local_addr().unwrap();
         let page = get(a, "/research");
         assert_research_cookie(&page);
-        assert!(page.contains("data-ui=\"minimal\"") && page.contains("--ink:#E6EDF3") && page.contains("--sky:#58C4FF"), "{page}");
+        assert!(page.contains("This page is no longer the research desk.") && page.contains("galion-studio/hermes-research"), "{page}");
         let blocked = get(a, "/research/sources?galion_research=not-a-cookie");
         assert!(blocked.starts_with("HTTP/1.1 400"), "{blocked}");
 
@@ -3635,6 +3654,19 @@ mod tests {
     }
 
     #[test]
+    fn orb_asset_urls_are_cache_busted() {
+        let html = concat!(
+            "<script type=\"module\">import { drawNebula } from \"/nebula/vocabulary.mjs?v=__GALION_ASSET_V__\";</script>",
+            "<source src=\"/preview/voice-preview.mp3?v=__GALION_ASSET_V__\" type=\"audio/mpeg\">",
+        );
+        let stamped = stamp_page(html);
+        assert!(!stamped.contains(ASSET_V_PLACEHOLDER), "{stamped}");
+        assert!(stamped.contains("/nebula/vocabulary.mjs?v="), "{stamped}");
+        assert!(stamped.contains("/preview/voice-preview.mp3?v="), "{stamped}");
+        assert!(!stamped.contains("speechSynthesis"));
+    }
+
+    #[test]
     fn disclosure_flag_off_strips_the_page_and_the_first_turn() {
         let page = "<!--galion-ai-disclosure--><p id=\"ai-disclosure\">AI</p><!--/galion-ai-disclosure--><canvas id=\"s\">";
         let mut w = WebSurface::serve("127.0.0.1:0".parse().unwrap())
@@ -3676,6 +3708,137 @@ mod tests {
         assert!(b.set_reply("s4", b"RIFF0000WAVE".to_vec(), 80));
         assert!(!b.latest_json().unwrap().contains("hub_texture"));
         assert!(!b.set_reply_hub("bad id", Vec::new(), 1, true));
+    }
+
+    fn preview_dir(label: &str) -> std::path::PathBuf {
+        let dir = std::env::temp_dir().join(format!(
+            "galion-preview-{}-{}-{}",
+            std::process::id(),
+            label,
+            std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_nanos()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    fn tone_wav() -> Vec<u8> {
+        let rate = 16_000u32;
+        let n = rate / 20; // 50 ms
+        let samples: Vec<i16> = (0..n)
+            .map(|i| {
+                let t = i as f32 / rate as f32;
+                (0.25 * (t * 440.0 * std::f32::consts::TAU).sin() * i16::MAX as f32) as i16
+            })
+            .collect();
+        encode_wav_pcm16(rate, 1, &samples)
+    }
+
+    #[test]
+    fn preview_route_types_ranges_cache_and_missing_file() {
+        let dir = preview_dir("route");
+        let wav = tone_wav();
+        let script = br#"{"text":"Galion One.","segments":[{"start":0.0,"end":1.0,"text":"Galion One."}]}"#;
+        std::fs::write(dir.join("voice-preview.wav"), &wav).unwrap();
+        std::fs::write(dir.join("voice-preview.mp3"), b"ID3placeholder").unwrap();
+        std::fs::write(dir.join("voice-preview.opus"), b"OggSplaceholder").unwrap();
+        std::fs::write(dir.join("voice-preview.json"), script).unwrap();
+        std::fs::write(dir.join("notes.txt"), b"not served").unwrap();
+
+        let mut w = WebSurface::serve("127.0.0.1:0".parse().unwrap()).with_preview_dir(&dir);
+        w.open().unwrap();
+        let a = w.local_addr().unwrap();
+
+        let (h, body) = split_resp(&raw(a, b"GET /preview/voice-preview.wav HTTP/1.1\r\nHost: x\r\n\r\n"));
+        assert!(h.starts_with("HTTP/1.1 200"), "{h}");
+        assert!(h.contains("Content-Type: audio/wav"), "{h}");
+        assert!(h.contains("Accept-Ranges: bytes"), "{h}");
+        assert!(h.contains("Cache-Control: public, max-age=3600"), "{h}");
+        assert!(h.contains("ETag: \""), "{h}");
+        assert!(!h.contains("Cache-Control: no-store"), "{h}");
+        assert_eq!(body, wav);
+
+        let (h, body) = split_resp(&raw(a, b"GET /preview/voice-preview.mp3 HTTP/1.1\r\nHost: x\r\n\r\n"));
+        assert!(h.starts_with("HTTP/1.1 200") && h.contains("Content-Type: audio/mpeg"), "{h}");
+        assert_eq!(body, b"ID3placeholder");
+
+        let (h, body) = split_resp(&raw(a, b"GET /preview/voice-preview.opus HTTP/1.1\r\nHost: x\r\n\r\n"));
+        assert!(h.starts_with("HTTP/1.1 200") && h.contains("Content-Type: audio/ogg; codecs=opus"), "{h}");
+        assert_eq!(body, b"OggSplaceholder");
+
+        let (h, body) = split_resp(&raw(a, b"GET /preview/voice-preview.json HTTP/1.1\r\nHost: x\r\n\r\n"));
+        assert!(h.starts_with("HTTP/1.1 200"), "{h}");
+        assert!(h.contains("Content-Type: application/json; charset=utf-8"), "{h}");
+        assert!(h.contains("Cache-Control: public, max-age=3600"), "{h}");
+        assert_eq!(body, script);
+
+        let (h, body) = split_resp(&raw(a, b"GET /preview/voice-preview.wav HTTP/1.1\r\nHost: x\r\nRange: bytes=0-3\r\n\r\n"));
+        assert!(h.starts_with("HTTP/1.1 206"), "{h}");
+        assert!(h.contains(&format!("Content-Range: bytes 0-3/{}", wav.len())), "{h}");
+        assert!(h.contains("Content-Length: 4"), "{h}");
+        assert_eq!(body, b"RIFF");
+
+        let (h, body) = split_resp(&raw(a, b"GET /preview/voice-preview.wav HTTP/1.1\r\nHost: x\r\nRange: bytes=-4\r\n\r\n"));
+        assert!(h.starts_with("HTTP/1.1 206"), "{h}");
+        assert_eq!(body.len(), 4);
+        assert_eq!(body, &wav[wav.len() - 4..]);
+
+        let (h, _) = split_resp(&raw(a, b"GET /preview/voice-preview.wav HTTP/1.1\r\nHost: x\r\nRange: bytes=999999-999999\r\n\r\n"));
+        assert!(h.starts_with("HTTP/1.1 416"), "{h}");
+        assert!(h.contains(&format!("Content-Range: bytes */{}", wav.len())), "{h}");
+        assert!(h.contains("Cache-Control: no-store"), "{h}");
+
+        let etag = h_etag(&split_resp(&raw(a, b"HEAD /preview/voice-preview.wav HTTP/1.1\r\nHost: x\r\n\r\n")).0);
+        let (h, body) = split_resp(&raw(a, b"HEAD /preview/voice-preview.wav HTTP/1.1\r\nHost: x\r\n\r\n"));
+        assert!(h.starts_with("HTTP/1.1 200"), "{h}");
+        assert!(h.contains(&format!("Content-Length: {}", wav.len())), "{h}");
+        assert!(body.is_empty(), "HEAD has no body");
+        let req = format!("GET /preview/voice-preview.wav HTTP/1.1\r\nHost: x\r\nIf-None-Match: {etag}\r\n\r\n");
+        let (h, body) = split_resp(&raw(a, req.as_bytes()));
+        assert!(h.starts_with("HTTP/1.1 304"), "{h}");
+        assert!(body.is_empty(), "{body:?}");
+
+        let (h, body) = split_resp(&raw(a, b"GET /preview/voice-preview.flac HTTP/1.1\r\nHost: x\r\n\r\n"));
+        assert!(h.starts_with("HTTP/1.1 404"), "{h}");
+        assert_eq!(body, b"not found");
+        let (h, _) = split_resp(&raw(a, b"GET /preview/notes.txt HTTP/1.1\r\nHost: x\r\n\r\n"));
+        assert!(h.starts_with("HTTP/1.1 404"), "{h}");
+
+        std::fs::remove_file(dir.join("voice-preview.mp3")).unwrap();
+        let (h, body) = split_resp(&raw(a, b"GET /preview/voice-preview.mp3 HTTP/1.1\r\nHost: x\r\n\r\n"));
+        assert!(h.starts_with("HTTP/1.1 404"), "{h}");
+        assert!(h.contains("Cache-Control: no-store"), "{h}");
+        assert_eq!(body, b"not found");
+
+        let health = get(a, "/health");
+        assert!(health.contains("Cache-Control: no-store"), "{health}");
+        w.close().unwrap();
+
+        #[cfg(unix)]
+        {
+            let link = dir.join("voice-preview.mp3");
+            std::os::unix::fs::symlink("/etc/passwd", &link).unwrap();
+            let mut w = WebSurface::serve("127.0.0.1:0".parse().unwrap()).with_preview_dir(&dir);
+            w.open().unwrap();
+            let (h, body) = split_resp(&raw(w.local_addr().unwrap(), b"GET /preview/voice-preview.mp3 HTTP/1.1\r\nHost: x\r\n\r\n"));
+            assert!(h.starts_with("HTTP/1.1 404"), "symlink outside the dir is not served: {h}");
+            assert!(!body.windows(5).any(|w| w == b"root:"), "{body:?}");
+            w.close().unwrap();
+        }
+
+        let mut bare = WebSurface::serve("127.0.0.1:0".parse().unwrap());
+        bare.open().unwrap();
+        let (h, body) = split_resp(&raw(bare.local_addr().unwrap(), b"GET /preview/voice-preview.wav HTTP/1.1\r\nHost: x\r\n\r\n"));
+        assert!(h.starts_with("HTTP/1.1 404"), "{h}");
+        assert!(h.contains("Cache-Control: no-store"), "{h}");
+        assert_eq!(body, b"not found");
+        bare.close().unwrap();
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    fn h_etag(head: &str) -> String {
+        head.lines()
+            .find_map(|l| l.strip_prefix("ETag:").map(|v| v.trim().to_string()))
+            .expect("etag")
     }
 
 }

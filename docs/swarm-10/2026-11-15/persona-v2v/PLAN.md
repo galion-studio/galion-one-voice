@@ -1,6 +1,6 @@
 # Swarm 10 — persona-v2v plan (Lane C)
 
-Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Perpetual Open MIT License. (c) 2026 Galion Labs.
 Written 2026-11-15 22:02 +01:00 (Europe/Zagreb).
 
 The spelling is **Galion**. The product is Galion Voice. Owner: Maciej Grajczyk.

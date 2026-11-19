@@ -1,6 +1,6 @@
 # Swarm 10 — latency-harness / one-percent (B4)
 
-Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Perpetual Open MIT License. (c) 2026 Galion Labs.
 Europe/Zagreb. Written 2026-11-15 22:06 +01:00.
 
 The spelling is **Galion**. The product is Galion Voice.

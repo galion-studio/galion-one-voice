@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! Barge-in cancel against [`galion_console::turn_worker::TurnWorker::supersede`].
 //!
 //! This is the worker drop: a stale reply must not be delivered after `supersede`.

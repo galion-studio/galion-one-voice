@@ -1,4 +1,4 @@
-// Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+// Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 //! One-dot workflow. The page stays the circle.
 //!
 //! Speech is already recorded by the mic on `/` (`POST /turn`). This module
@@ -91,7 +91,9 @@ mod tests {
         assert_eq!(page.matches("<canvas").count(), 1);
         assert!(page.contains("function postTurn"));
         assert!(page.contains("fetch(\"turn\""));
-        assert!(!page.contains("id=\"say\""), "no text box: voice-to-voice only (owner t653u)");
+        assert!(!page.contains("id=\"say\""), "typed lines use the desktop prompt, not a second say box");
+        assert!(page.contains("id=\"command\""));
+        assert!(page.contains("placeholder=\"Ask anything…\""));
         assert!(!page.to_ascii_lowercase().contains("<textarea"));
         assert!(v2.contains("url=/"));
         assert!(v2.contains("location.replace(\"/\")"));

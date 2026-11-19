@@ -1,6 +1,6 @@
 # Auto-workflow
 
-Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Perpetual Open MIT License. (c) 2026 Galion Labs.
 Europe/Zagreb. 2026-11-03. Symphony section. Index: [README.md](README.md).
 
 The spelling is **Galion**. The product is Galion Voice.
@@ -37,7 +37,7 @@ scripts/check-phone-pipeline.sh
 Record the gate in [SELF-EVAL.md](SELF-EVAL.md).
 # One-dot auto-record → workflow
 
-Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 Master slogan: "The seamless connection with the human being, on the voice only."
 Europe/Zagreb. 2026-11-03.
 

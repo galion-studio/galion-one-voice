@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! Parent side of the Vosk worker. Spawns a process, writes one utterance,
 //! reads partials until a final or an error. Never substitutes a sentence.
 #![allow(unsafe_code)]

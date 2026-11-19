@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// (c) 2026 Maciej Grajczyk / G.A.L.I.O.N.
+// (c) 2026 Galion Labs / G.A.L.I.O.N.
 //! CPU score wrapper for Cloning V2.
 //!
 //! This crate does not score audio itself. It shells out to an existing

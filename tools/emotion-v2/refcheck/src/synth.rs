@@ -1,4 +1,4 @@
-// Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+// Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 //! Synthetic sine and noise for the checker tests.
 //!
 //! These are not a voice, not a recording of a person, and not a clone.

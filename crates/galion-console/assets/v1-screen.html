@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+<!-- Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
      One screen: one dot. Mobile-safe. Tap anywhere → mic. Replies are Piper audio on /reply.
      UX-01: the page animates on its own 60 fps clock from /dot {mode,level} (no 80 ms stutter),
      listening = larger + full bright + still; speaking = smaller base, pulsing; idle = slow breath;
@@ -23,23 +23,27 @@
                     (hub_texture:true = the Jarvis hub bed is mixed into that WAV; body[data-hub-texture]),
                     the AudioContext unlocked by the tap. User speech during playback = barge-in:
                     playback stops at once and the new utterance is captured.
-     V2-S3: AI Act Art. 50 disclosure (HR+EN) is spoken on the first tap (audio only).
-     Owner t653u: pure voice-to-voice. The screen is one dot in the centre and one
-     full-screen object (the canvas wash). No text, labels, buttons, captions,
-     persona names or transcript. A tap anywhere starts the mic, invisibly.
+     The page does not use the browser speech engine. PREVIEW_ONLY is the default:
+     a tap on the mark plays /preview/voice-preview from start to end. Live voice,
+     getUserMedia, VAD, and barge-in stay off until that flag is flipped.
+     Owner t653u: the voice surface is still one dot. The canvas draws no text,
+     persona names, or transcript. Preview captions are the HTML line in the shell.
+     The Galion One shell (hero, prompt, footer) sits over that dot. It is the
+     same prompt as the desktop app: plus, one field, voice. Typed lines use
+     the existing POST /v2/say path. File names stay on the page.
      CC0 consent is enforced at clone time in Rust, so the call shows no CC0 UI.
      The session token comes from POST /session's body and is never put in the URL. -->
 <html lang="en"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<meta name="theme-color" content="#0A0A0C" media="(prefers-color-scheme: dark)">
-<meta name="theme-color" content="#0A0A0C">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0B0F14" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#0B0F14">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="format-detection" content="telephone=no">
-<title>Galion Voice</title>
+<title>Galion One</title>
 <style>
-html,body{margin:0;width:100%;height:100%;height:100dvh;background:#0A0A0C;overflow:hidden;
+html,body{margin:0;width:100%;height:100%;height:100dvh;background:#0B0F14;color-scheme:dark;overflow:hidden;
   touch-action:manipulation;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;
   overscroll-behavior:none;cursor:default}
 canvas{display:block;position:fixed;inset:0;width:100%;height:100%;width:100dvw;height:100dvh;
@@ -58,9 +62,59 @@ canvas{display:block;position:fixed;inset:0;width:100%;height:100%;width:100dvw;
 #silence{position:fixed;left:0;bottom:0;z-index:3;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;
   clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;border:0;
   background:#0A0A0C;color:#F5F5F7;font:16px/1.2 system-ui,sans-serif}
+#one{
+  --bg:#0B0F14;--panel:#131A22;--line:#24303C;--fg:#E6EDF3;--muted:#A7B6C4;
+  --accent:#58C4FF;--accent-fg:#0B0F14;--focus:#58C4FF;
+  position:fixed;inset:0;z-index:4;display:flex;flex-direction:column;align-items:center;gap:12px;
+  box-sizing:border-box;
+  padding:calc(16px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right)) calc(16px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left));
+  pointer-events:none;overflow:auto;color:var(--fg);
+  font:16px/1.45 "IBM Plex Sans",system-ui,sans-serif;
+  -webkit-user-select:text;user-select:text}
+#one>*{pointer-events:auto;width:min(42rem,100%);box-sizing:border-box}
+#one .stage{pointer-events:none;flex:1 1 auto;min-height:22vh;width:100%;position:relative}
+#caption{position:fixed;left:50%;top:62%;transform:translateX(-50%);z-index:6;width:min(36rem,calc(100% - 32px));margin:0;pointer-events:none;text-align:center;color:#E6EDF3;font:600 1.12rem/1.35 "IBM Plex Sans",system-ui,sans-serif;text-shadow:0 2px 18px #0B0F14,0 0 2px #0B0F14}
+#caption:empty{display:none}
+#one header{display:flex;align-items:center}
+.kicker{margin:0;color:var(--muted);font:600 12px/1 "IBM Plex Sans",system-ui,sans-serif;letter-spacing:.16em;text-transform:uppercase}
+.hero{display:flex;flex-direction:column;align-items:flex-start;gap:12px;padding:18px 18px 16px;background:var(--panel);border:1px solid var(--line);border-radius:20px}
+.hero h1{margin:0;font:600 1.35rem/1.25 "IBM Plex Sans",system-ui,sans-serif;letter-spacing:-0.02em;color:var(--fg)}
+.about{display:flex;flex-direction:column;gap:6px}
+.lede,.artifact{margin:0;color:var(--muted);font-size:.95rem;line-height:1.45}
+.download{display:inline-flex;align-items:center;justify-content:center;min-height:48px;padding:0 18px;background:var(--accent);color:var(--accent-fg);border-radius:11px;font-weight:600;text-decoration:none}
+.download:hover{filter:brightness(1.06)}
+#one :focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.download:focus-visible{outline-color:var(--fg)}
+.prompt{display:flex;align-items:center;gap:8px;width:100%;margin:0;padding:6px;background:var(--panel);border:1px solid var(--line);border-radius:11px}
+.plus,.voice{position:relative;display:grid;place-items:center;width:44px;height:44px;flex:none;border-radius:11px;border:1px solid var(--line);background:transparent;color:var(--fg);cursor:pointer;padding:0}
+.plus svg,.voice svg{width:22px;height:22px;display:block;pointer-events:none}
+.plus input{position:absolute;inset:0;z-index:1;margin:0;opacity:0;cursor:pointer;font-size:16px}
+.voice[aria-pressed="true"]{color:var(--accent);border-color:var(--accent)}
+#command{flex:1;min-width:0;height:44px;border:0;background:transparent;color:var(--fg);font:inherit;padding:0 4px}
+#command::placeholder{color:var(--muted);opacity:1}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:0;padding:0;list-style:none}
+.chips:empty{display:none}
+.chip{max-width:100%;padding:4px 10px;border-radius:999px;background:var(--panel);border:1px solid var(--line);color:var(--fg);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.note,.status{margin:0;min-height:0;color:var(--muted);font-size:13px}
+.note:empty,.status:empty{display:none}
+#one footer{padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:11px}
+#one footer p{margin:0;color:var(--muted);font-size:13px}
+#one footer a{color:var(--fg)}
+.sr{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;border:0}
+#voice-preview{pointer-events:none}
+@media (max-width:720px){
+  #one{gap:10px;padding:calc(12px + env(safe-area-inset-top)) calc(12px + env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom)) calc(12px + env(safe-area-inset-left))}
+  .hero{padding:14px}
+  .hero h1{font-size:1.15rem}
+}
+@media (max-height:720px){
+  #one{gap:8px;padding-bottom:calc(8px + env(safe-area-inset-bottom))}
+  .about{gap:4px}
+  .lede,.artifact{font-size:.8125rem;line-height:1.35}
+}
 </style>
 <script type="module">
-import { drawNebula } from "/nebula/vocabulary.mjs";
+import { drawNebula } from "/nebula/vocabulary.mjs?v=__GALION_ASSET_V__";
 window.drawNebula = drawNebula;
 </script>
 </head>
@@ -74,9 +128,43 @@ window.drawNebula = drawNebula;
 <!-- /decide -->
 <button id="silence" type="button" aria-pressed="false">Silence</button>
 <!-- /silence -->
+<!-- one-shell -->
+<div id="one">
+  <header><p class="kicker">Galion One</p></header>
+  <section class="hero" aria-labelledby="soon">
+    <h1 id="soon">Galion One for live users is coming very soon.</h1>
+    <a class="download" href="https://github.com/galion-studio/obsidian-open-mind/actions/workflows/openmind-desktop.yml" target="_blank" rel="noopener noreferrer">Download alpha on GitHub<span class="sr"> (opens in a new tab)</span></a>
+  </section>
+  <div class="stage"><p id="caption" aria-live="polite"></p></div>
+  <audio id="voice-preview" class="sr" preload="auto" playsinline webkit-playsinline>
+    <source src="/preview/voice-preview.mp3?v=__GALION_ASSET_V__" type="audio/mpeg">
+    <source src="/preview/voice-preview.opus?v=__GALION_ASSET_V__" type="audio/ogg; codecs=opus">
+    <source src="/preview/voice-preview.wav?v=__GALION_ASSET_V__" type="audio/wav">
+  </audio>
+  <section class="about" aria-label="About Galion One">
+    <p class="lede">Galion One is the assistant you talk to. Speak, or type. The mark in the middle is the voice. Galion Research is the research engine for the deeper questions.</p>
+    <p class="artifact">An alpha test build for Windows, macOS and Linux. Open source under the MIT License. Developed by Galion Labs, built in Rust.</p>
+  </section>
+  <p class="sr" id="mark-help">The circle in the middle is Galion. Tap it to talk. The field below is for typing.</p>
+  <form id="ask" class="prompt" action="#ask" method="post" aria-describedby="mark-help">
+    <label class="plus">
+      <input id="files" type="file" multiple aria-label="Add files">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+    </label>
+    <input id="command" type="text" name="ask" autocomplete="off" enterkeyhint="send" placeholder="Ask anything…" aria-label="Ask anything">
+    <button id="voice" class="voice" type="button" aria-pressed="false" aria-label="Voice">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4a3 3 0 0 0-3 3v4a3 3 0 0 0 6 0V7a3 3 0 0 0-3-3M8 18a4 4 0 0 0 8 0M12 18v2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+    </button>
+  </form>
+  <ul id="picked" class="chips" aria-label="Attached files"></ul>
+  <p id="files-note" class="note"></p>
+  <p id="status" class="status" role="status" aria-live="polite"></p>
+  <footer><p>Developed by Galion Labs, <a href="https://github.com/galion-studio/obsidian-open-mind/blob/main/LICENSE">MIT License</a>.</p></footer>
+</div>
+<!-- /one-shell -->
 <script>
 "use strict";
-const TOK={dot:"#F5F5F7",base:"#0A0A0C",from:"#F5A524",to:"#7C3AED"};
+const TOK={dot:"#F5F5F7",base:"#0B0F14",from:"#F5A524",to:"#7C3AED"};
 // Body of the mark is the locked token. Edge is a whisper darker, still the same pigment.
 // Stroke is a 1-device-pixel hairline. Brightness never scales these channels.
 const MARK={core:"#F5F5F7",edge:"#E8E8ED",stroke:"rgba(255,255,255,0.55)",strokePx:1};
@@ -95,9 +183,8 @@ const clamp=(x,a,b)=>Math.min(b,Math.max(a,x));
 const cv=document.getElementById("s"), cx=cv.getContext("2d",{alpha:false});
 const bg=document.createElement("canvas"); bg.width=BW; bg.height=BH;
 const bx=bg.getContext("2d"), img=bx.createImageData(BW,BH);
-// No on-screen text (owner t653u): errors go to the console only.
-const AI_DISCLOSURE={hr:"Razgovarate s umjetnom inteligencijom. Galion je AI asistent, a ne osoba.",en:"You are talking to an AI. Galion is an AI assistant, not a person."};
-let aiDisclosed=false;
+// The canvas draws no text. The shell status line shows the same message the tone marks.
+const ASSET_V="__GALION_ASSET_V__";
 const t0=performance.now();
 let latest=null, lastOk=0, lastT=-1, inflight=0, everOk=false;
 let shown="idle", cand="idle", candSince=0;          // displayed mode + hysteresis
@@ -112,6 +199,17 @@ let capNode=null, capSink=null, capRatio=1, capPos=0, capFrame=new Float32Array(
 let vadFloor=0.003, vadOn=false, vadRun=0, vadQuiet=0, vadSpeechMs=0, uttMs=0, uttBarge=false;
 let preroll=[], utt=[], turnSeq=0;
 let playSrc=null, playId=null, playing=false, seenReplies=new Set();
+// Pre-rendered preview. PREVIEW_ONLY keeps live voice, the mic, VAD, and barge-in
+// off. The <audio> element is in the document from the start so play() runs inside
+// the tap. Flip this when a live session is ready to open.
+const PREVIEW_ONLY=true;
+const LIVE_SESSION_MS=1500;
+function assetUrl(path){
+  const join=path.indexOf("?")>=0?"&":"?";
+  return path+join+"v="+encodeURIComponent(ASSET_V);
+}
+let arming=false, previewOn=false, previewScript=null, previewSeg=-1, previewRaf=0, voiceGen=0;
+let previewScriptTried=false;
 // V2 orb: spring state. Gains ease from the idle aim. No aspect — the mark is a circle.
 const LUTI={idle:{w:1.8,z:0.92},listening:{w:3.4,z:0.88},thinking:{w:2.4,z:0.90},speaking:{w:3.0,z:0.92},offline:{w:2.0,z:1.02}};
 const SPRING=LUTI;
@@ -129,26 +227,28 @@ function sessionHeaders(extra){
   if(sessionToken) h["X-Galion-Session"]=sessionToken;
   return h;
 }
+function postSession(ms){
+  if(sessionToken) return Promise.resolve(true);
+  const ac=(ms&&window.AbortController)?new AbortController():null;
+  let timer=0;
+  if(ac) timer=setTimeout(()=>{ try{ac.abort();}catch(e){} }, ms);
+  const opts={method:"POST",cache:"no-store",
+    headers:{"Content-Type":"application/json","ngrok-skip-browser-warning":"1"},
+    body:"{\"op\":\"open\"}"};
+  if(ac) opts.signal=ac.signal;
+  return fetch("session",opts).then(r=>r.ok?r.json():null).then(j=>{
+    if(j&&typeof j.token==="string"&&j.token){ sessionToken=j.token; return true; }
+    return false;
+  }).catch(()=>false).finally(()=>{ if(timer) clearTimeout(timer); });
+}
 async function ensureSession(){
   if(sessionToken) return;
-  try{
-    const r=await fetch("session",{method:"POST",cache:"no-store",
-      headers:{"Content-Type":"application/json","ngrok-skip-browser-warning":"1"},
-      body:"{\"op\":\"open\"}"});
-    if(!r.ok) return;
-    const j=await r.json();
-    if(j&&typeof j.token==="string") sessionToken=j.token;
-  }catch(e){}
+  await postSession(0);
 }
-function discloseAi(){
-  if(aiDisclosed) return;
-  aiDisclosed=true;
-  try{
-    if(!window.speechSynthesis||!window.SpeechSynthesisUtterance) return;
-    speechSynthesis.cancel();
-    const hr=new SpeechSynthesisUtterance(AI_DISCLOSURE.hr); hr.lang="hr-HR"; speechSynthesis.speak(hr);
-    const en=new SpeechSynthesisUtterance(AI_DISCLOSURE.en); en.lang="en-GB"; speechSynthesis.speak(en);
-  }catch(e){}
+function openLiveSession(){ return postSession(LIVE_SESSION_MS); }
+function showCaption(text){
+  const el=document.getElementById("caption");
+  if(el) el.textContent=text||"";
 }
 
 // Surround + interior targets. The disc body stays #F5F5F7. These only move the wash.
@@ -220,7 +320,11 @@ function clearFeed(){
   if(!latest) latest={radius:R.idle,t_ms:0};
   latest.nebula={schema:FEED_SCHEMA,estimate:"none",present:false,distribution:false,reason:"disconnected",origin:"client",weights:null};
 }
-function productIsOne(){ const p=location.pathname; return p==="/one"||p==="/one/"; }
+function productIsOne(){
+  const p=location.pathname;
+  if(p==="/one"||p==="/one/") return true;
+  return location.hostname==="one.galion.app";
+}
 // Galion OS tones. 432 Hz just intonation: 2:1, 3:2, 5:4. Warm hum at 216 and 108.
 // boot, shutdown, notification, wake (Galion One wake), done (task done),
 // approval (approval needed), error. Oscillators only. No audio files.
@@ -288,10 +392,16 @@ function playSound(id){
   cv.dataset.resonance="on";
 }
 function paintHalo(tms,W,H,mark){
-  const input=haloInput();
+  let input=haloInput();
+  let outer=mark*2.6;
+  if(previewOn&&playing){
+    const pulse=clamp(playEnv,0,1);
+    input={sense:true,label:"warm",confidence:1,valence:0.42,arousal:clamp(0.28+0.72*pulse,0,1)};
+    outer=mark*(2.2+0.85*pulse);
+  }
   let drew=false;
   if(typeof drawNebula==="function"){
-    drew=drawNebula(cx,input,tms/1000,{cx:W/2,cy:H/2,inner:mark,outer:mark*2.6})===true;
+    drew=drawNebula(cx,input,tms/1000,{cx:W/2,cy:H/2,inner:mark,outer:outer})===true;
   }
   const state=drew?"gas":"hold";
   cv.dataset.nebula=state;
@@ -314,6 +424,8 @@ function paintBg(tms,b){
 
 // Server mode → displayed mode with hysteresis, local mic preempt, offline state.
 function pickMode(now){
+  if(playing) return "speaking";
+  if(arming&&micState!=="on") return "thinking";
   if(now-lastOk>OFFLINE_MS) return "offline";
   let m=(latest&&latest.mode)||latest&&latest.state||"idle";
   if(m==="rika") m="idle"; // lean-in stays idle motion; /dot "lean" carries the feeling
@@ -386,7 +498,11 @@ function target(mode,now,dt){
   }
   if(mode==="speaking"){
     const breath=Math.sin(t/1400);
-    if(playing) return [R.speak+R.speakDepth*env+0.006*breath, 0.40+0.32*env];
+    if(playing){
+      const depth=previewOn?0.05:R.speakDepth;
+      const bright=previewOn?0.42+0.5*env:0.40+0.32*env;
+      return [R.speak+depth*env+0.006*breath, bright];
+    }
     if(latest&&typeof latest.radius==="number"&&(latest.mode==="speaking"||latest.state==="speaking"))
       return [clamp(+latest.radius,0,0.5), 0.40+0.28*clamp(+latest.brightness||0.8,0,1)];
     const s=Math.sin(((t%2800)/2800)*2*Math.PI);
@@ -401,6 +517,7 @@ function draw(){
   const now=performance.now(), dt=Math.min(50,now-lastFrame); lastFrame=now;
   shown=pickMode(now);
   cv.dataset.mode=shown;
+  cv.dataset.preview=previewOn?(playing?"on":"text"):"off";
   const [tr,tb]=target(shown,now,dt);
   const aim=SPRING[shown]||SPRING.idle;
   const gk=1-Math.exp(-dt/GAIN_TAU);
@@ -495,6 +612,8 @@ setInterval(pollOnce,POLL_MS);
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible") pollOnce();});
 
 function showErr(msg){
+  const line=document.getElementById("status");
+  if(line) line.textContent=msg||"";
   if(!msg) return;
   try{console.warn("[galion]",msg);}catch(e){}
   if(productIsOne()) playSound("error");
@@ -520,39 +639,116 @@ function tickMic(){
   setTimeout(tickMic,80);
 }
 
-async function enableMic(){
+function syncVoice(){
+  const b=document.getElementById("voice");
+  if(!b) return;
+  const on=micState==="on"||micState==="pending";
+  b.setAttribute("aria-pressed",on?"true":"false");
+}
+function stopMic(){
+  micState="off";
+  if(micStream){
+    micStream.getTracks().forEach(t=>{ try{t.stop();}catch(e){} });
+    micStream=null;
+  }
+  if(capNode){ try{capNode.disconnect();}catch(e){} capNode=null; }
+  syncVoice();
+}
+function onVoice(e){
+  if(e){ e.preventDefault(); e.stopPropagation(); }
+  if(PREVIEW_ONLY){ onOrbGesture(e); return; }
+  if(micState==="pending") return;
+  if(micState==="on") stopMic();
+  else enableMic();
+}
+function mountPrompt(){
+  const form=document.getElementById("ask");
+  const field=document.getElementById("command");
+  const files=document.getElementById("files");
+  const picked=document.getElementById("picked");
+  const note=document.getElementById("files-note");
+  const voice=document.getElementById("voice");
+  if(form&&field){
+    form.addEventListener("submit",e=>{
+      e.preventDefault();
+      e.stopPropagation();
+      const text=field.value;
+      sendText(text).then(ok=>{ if(ok) field.value=""; });
+    });
+  }
+  if(files&&picked){
+    files.addEventListener("change",()=>{
+      picked.replaceChildren();
+      const list=files.files?Array.from(files.files):[];
+      for(const f of list){
+        const li=document.createElement("li");
+        li.className="chip";
+        li.textContent=f.name;
+        picked.appendChild(li);
+      }
+      if(note) note.textContent=list.length?"Names stay on this page.":"";
+    });
+  }
+  if(voice) voice.addEventListener("click",onVoice);
+}
+function timeoutError(ms){
+  return new Promise((_,rej)=>setTimeout(()=>rej(Object.assign(new Error("timeout"),{name:"TimeoutError"})), ms));
+}
+function dropStream(stream){
+  if(!stream||!stream.getTracks) return;
+  stream.getTracks().forEach(t=>{ try{t.stop();}catch(e){} });
+}
+async function enableMic(opts){
+  if(PREVIEW_ONLY) return;
+  opts=opts||{};
   if(micState==="on"||micState==="pending") return;
-  discloseAi();
-  await ensureSession();
+  const gen=opts.gen||voiceGen;
+  if(!opts.fallbackPreview) await ensureSession();
   if(!window.isSecureContext && location.hostname!=="localhost" && location.hostname!=="127.0.0.1"){
+    if(opts.fallbackPreview) return;
     showErr("Microphone needs HTTPS. Open the https:// link."); return;
   }
   if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
+    if(opts.fallbackPreview) return;
     showErr("This browser cannot open the microphone."); return;
   }
-  micState="pending"; showErr("");
-  // Create + unlock the AudioContext synchronously inside the tap (before any await) so that
-  // mobile Safari/Chrome let us play reply audio later. Reused for capture and playback.
+  micState="pending"; syncVoice(); showErr("");
+  // Unlock happened on the tap, before any await. This call resumes a context
+  // the gesture already created so iOS Safari, Android Chrome, and desktop can play later.
   ensureAudio();
   if(productIsOne()) playSound("wake");
+  const gum=navigator.mediaDevices.getUserMedia({
+    audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true,channelCount:1},
+    video:false
+  });
   try{
-    micStream=await navigator.mediaDevices.getUserMedia({
-      audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true,channelCount:1},
-      video:false
-    });
+    const wait=opts.fallbackPreview?Promise.race([gum, timeoutError(LIVE_SESSION_MS)]):gum;
+    micStream=await wait;
+    if(gen!==voiceGen){ dropStream(micStream); micStream=null; if(micState==="pending"){ micState="off"; syncVoice(); } return; }
     if(micCtx.state==="suspended") await micCtx.resume();
+    stopPreview();
     const src=micCtx.createMediaStreamSource(micStream);
     micAnalyser=micCtx.createAnalyser();
     micAnalyser.fftSize=1024;
     src.connect(micAnalyser);
     micData=new Uint8Array(micAnalyser.fftSize);
     micState="on";
+    syncVoice();
     hideHint();
     showErr("");
     tickMic();
     startCapture(src).catch(()=>showErr("Speech capture unavailable — level only."));
   }catch(e){
+    gum.then(s=>dropStream(s)).catch(()=>{});
+    if(opts.fallbackPreview){
+      micState="off";
+      syncVoice();
+      showErr("");
+      if(productIsOne()) playSound("error");
+      return;
+    }
     micState="denied";
+    syncVoice();
     const name=e&&(e.name||"");
     if(name==="NotAllowedError"||name==="PermissionDeniedError")
       showErr("Microphone blocked — allow it in browser settings, then tap again.");
@@ -563,35 +759,177 @@ async function enableMic(){
   }
 }
 
-function onActivate(e){
-  // First intentional tap: mic. Avoid synthetic click-after-touch double fire.
-  if(e.type==="touchend"){ e.preventDefault(); enableMic(); return; }
-  if(e.type==="click"){ enableMic(); }
+function chromeEvent(e){
+  const t=e.target;
+  return !!(t&&t.closest&&t.closest("#one"));
 }
-// A tap anywhere on the screen starts the mic (the canvas spans the whole screen).
+function previewRequested(){
+  try{ return new URLSearchParams(location.search).get("preview")==="1"; }catch(e){ return false; }
+}
+function previewEl(){ return document.getElementById("voice-preview"); }
+function parsePreviewScript(j){
+  if(!j||typeof j!=="object"||Array.isArray(j)) return null;
+  const text=typeof j.text==="string"?j.text:"";
+  const segments=[];
+  if(Array.isArray(j.segments)){
+    for(const s of j.segments){
+      if(!s||typeof s.text!=="string") continue;
+      const start=+s.start, end=+s.end;
+      if(!isFinite(start)||!isFinite(end)||end<start) continue;
+      segments.push({start:start,end:end,text:s.text});
+    }
+  }
+  return {text:text,segments:segments};
+}
+function loadPreviewScript(){
+  if(previewScriptTried) return;
+  previewScriptTried=true;
+  fetch(assetUrl("/preview/voice-preview.json"),{cache:"default",headers:{"ngrok-skip-browser-warning":"1"}})
+    .then(r=>r.ok?r.json():null)
+    .then(j=>{ previewScript=parsePreviewScript(j); })
+    .catch(()=>{});
+}
+function playPreviewNow(){
+  const el=previewEl();
+  if(!el) return false;
+  try{ el.muted=false; el.volume=1; }catch(e){}
+  previewOn=true;
+  previewSeg=-1;
+  arming=false;
+  playId="preview";
+  playing=true;
+  // play() is called in this turn of the click handler, before any await.
+  let started=false;
+  try{
+    const p=el.play();
+    started=true;
+    if(p&&p.then) p.then(()=>{ if(previewOn) tickPreviewCaption(); }).catch(err=>{
+      if(playId==="preview"){ playing=false; }
+      try{ cv.dataset.previewErr=String(err&&(err.name||err.message)||err); }catch(e){}
+    });
+  }catch(e){
+    playing=false;
+    return false;
+  }
+  tickPreviewCaption();
+  return started;
+}
+function startPreview(gen){
+  if(gen!==voiceGen) return;
+  if(micState==="on"){ arming=false; return; }
+  playPreviewNow();
+  loadPreviewScript();
+}
+function stopPreview(){
+  if(PREVIEW_ONLY) return;
+  previewOn=false;
+  previewSeg=-1;
+  arming=false;
+  if(previewRaf){ cancelAnimationFrame(previewRaf); previewRaf=0; }
+  const el=previewEl();
+  if(el){ try{ el.pause(); }catch(e){} try{ el.currentTime=0; }catch(e){} }
+  if(playId==="preview"){ playSrc=null; playing=false; playId=null; }
+  else stopPlayback();
+  showCaption("");
+}
+function tickPreviewCaption(){
+  if(!previewOn) return;
+  const el=previewEl();
+  if(!el||el.paused) return;
+  playing=true;
+  const script=previewScript;
+  const t=el.currentTime||0;
+  let line="", idx=-1;
+  if(script&&script.segments&&script.segments.length){
+    for(let i=0;i<script.segments.length;i++){
+      const s=script.segments[i];
+      if(t>=s.start&&t<s.end){ line=s.text; idx=i; break; }
+    }
+  }else if(script&&script.text){ line=script.text; idx=0; }
+  if(idx!==previewSeg){ previewSeg=idx; showCaption(line); }
+  previewRaf=requestAnimationFrame(tickPreviewCaption);
+}
+let lastOrbGesture=0;
+function onOrbGesture(e){
+  // A double-click is one tap: the second half must not undo the first.
+  const now=performance.now();
+  if(now-lastOrbGesture<450) return;
+  lastOrbGesture=now;
+  if(PREVIEW_ONLY){
+    const el=previewEl();
+    if(el&&previewOn&&!el.paused&&!el.ended){
+      try{ el.pause(); }catch(err){}
+      playing=false;
+      return;
+    }
+    if(el&&el.ended){ try{ el.currentTime=0; }catch(err){} }
+    playPreviewNow();
+    loadPreviewScript();
+    return;
+  }
+  // Unlock and play inside the user gesture, before any await.
+  ensureAudio();
+  if(previewOn||arming){
+    voiceGen++;
+    arming=false;
+    stopPreview();
+    return;
+  }
+  if(micState==="on"){ stopMic(); return; }
+  if(micState==="pending") return;
+  const gen=++voiceGen;
+  playPreviewNow();
+  loadPreviewScript();
+  if(previewRequested()) return;
+  arming=true;
+  openLiveSession().then(live=>{
+    if(gen!==voiceGen){ arming=false; return; }
+    arming=false;
+    if(!live) return;
+    enableMic({fallbackPreview:true,gen:gen});
+  });
+}
+let lastOrbTouch=0;
+function onActivate(e){
+  // Tap on the mark. The shell handles its own controls.
+  // touchend preventDefault avoids the synthetic click that would follow.
+  if(chromeEvent(e)) return;
+  if(e.type==="touchend"){
+    e.preventDefault();
+    lastOrbTouch=performance.now();
+    onOrbGesture(e);
+    return;
+  }
+  if(e.type==="click"&&performance.now()-lastOrbTouch<700) return;
+  onOrbGesture(e);
+}
+// A tap on the mark plays the preview. Live voice stays behind PREVIEW_ONLY.
 document.addEventListener("touchend",onActivate,{passive:false});
 document.addEventListener("click",onActivate);
 addEventListener("keydown",e=>{
-  if((e.key==="s"||e.key==="S")&&productIsOne()&&!e.metaKey&&!e.ctrlKey&&!e.altKey){
+  const tag=e.target&&e.target.tagName;
+  const typing=tag==="INPUT"||tag==="TEXTAREA"||(e.target&&e.target.isContentEditable);
+  const control=tag==="BUTTON"||tag==="A"||tag==="SELECT";
+  if((e.key==="s"||e.key==="S")&&productIsOne()&&!e.metaKey&&!e.ctrlKey&&!e.altKey&&!typing){
     e.preventDefault(); setSilence(!silence); return;
   }
-  if(e.key==="Enter"||e.key===" "){e.preventDefault();enableMic();}
+  if(typing||control) return;
+  if(e.key==="Enter"||e.key===" "){e.preventDefault();onOrbGesture(e);}
 });
 async function sendText(text){
   const t=(text||"").trim();
-  if(!t) return;
+  if(!t) return false;
   // Same gesture as Send: unlock playback before any await, mic or not.
-  if(!ensureAudio()){ showErr("This browser cannot play audio."); return; }
+  if(!ensureAudio()){ showErr("This browser cannot play audio."); return false; }
   const barge=playing;
-  if(playing) stopPlayback();
-  discloseAi();
+  if(!PREVIEW_ONLY && (previewOn||playing)) stopPreview();
   await ensureSession();
   turnsInFlight++;
   const watch=turnsInFlight;
   try{
     const r=await fetch("v2/say",{method:"POST",cache:"no-store",headers:sessionHeaders({"Content-Type":"application/json"}),
       body:JSON.stringify({text:t,barge:!!barge,e:0,sense:false})});
-    if(!r.ok){ turnsInFlight=Math.max(0,turnsInFlight-1); showErr("Message failed ("+r.status+")."); return; }
+    if(!r.ok){ turnsInFlight=Math.max(0,turnsInFlight-1); showErr("Message failed ("+r.status+")."); return false; }
     const j=await r.json();
     showErr("");
     if(j&&j.persona) cv.dataset.persona=j.persona;
@@ -601,9 +939,10 @@ async function sendText(text){
       latest.emotion={sense:true,label:j.mood,valence:0,arousal:0.3,lean:(latest.emotion&&latest.emotion.lean)||0};
     }
     hideHint();
-    if(j&&(j.silence||!j.reply)){ turnsInFlight=Math.max(0,turnsInFlight-1); return; }
-  }catch(e){ turnsInFlight=Math.max(0,turnsInFlight-1); showErr("Could not send that."); }
+    if(j&&(j.silence||!j.reply)){ turnsInFlight=Math.max(0,turnsInFlight-1); return true; }
+  }catch(e){ turnsInFlight=Math.max(0,turnsInFlight-1); showErr("Could not send that."); return false; }
   setTimeout(()=>{ if(!playing&&turnsInFlight>=watch) turnsInFlight=Math.max(0,turnsInFlight-1); }, 20000);
+  return true;
 }
 
 // ───────────────────────── Voice pipeline: capture → VAD → /turn, reply playback ─────────────────
@@ -633,6 +972,7 @@ const WORKLET_SRC=`class GvCap extends AudioWorkletProcessor{
 registerProcessor("gv-cap",GvCap);`;
 
 async function startCapture(src){
+  if(PREVIEW_ONLY) return;
   const ctx=micCtx; capRatio=ctx.sampleRate/CAP_SR; capPos=0;
   capSink=ctx.createGain(); capSink.gain.value=0; capSink.connect(ctx.destination); // keeps graph pulled, silent
   if(ctx.audioWorklet&&window.AudioWorkletNode&&window.Blob&&window.URL){
@@ -666,6 +1006,7 @@ function onCapChunk(x){
 // Energy VAD with adaptive floor. Start after 80 ms of speech (200 ms + higher bar while our reply
 // plays, so echo leaking past AEC does not self-barge). End of turn = 640 ms quiet after speech.
 function vadFrame(f){
+  if(PREVIEW_ONLY) return;
   let s=0; for(let i=0;i<f.length;i++) s+=f[i]*f[i];
   const rms=Math.sqrt(s/f.length), ms=1000*VAD_FRAME/CAP_SR;
   const thr=Math.max(VAD_ABS, vadFloor*VAD_FLOOR_X)*(playing?VAD_PLAY_X:1);
@@ -740,6 +1081,7 @@ function decode(ab){
 }
 
 async function playReply(id,url){
+  if(PREVIEW_ONLY) return;
   try{
     const r=await fetch(url,{cache:"no-store",headers:sessionHeaders()});
     if(!r.ok) return;
@@ -747,17 +1089,26 @@ async function playReply(id,url){
     if(vadOn) return;                                // user is mid-utterance: this reply is stale
     if(!hearReplies) return;
     if(micCtx.state==="suspended") await micCtx.resume().catch(()=>{});
-    stopPlayback();
-    if(!playAn){
-      playAn=micCtx.createAnalyser(); playAn.fftSize=1024; playAn.smoothingTimeConstant=0.35;
-      playData=new Uint8Array(playAn.fftSize);
-    }
-    const s=micCtx.createBufferSource(); s.buffer=buf; s.connect(playAn); playAn.connect(micCtx.destination);
+    stopPreview();
+    if(!ensurePlayTap()) return;
+    const s=micCtx.createBufferSource(); s.buffer=buf; s.connect(playAn);
     s.onended=()=>{ if(playSrc===s){ playSrc=null; playing=false; playId=null; turnsInFlight=0; } };
     playSrc=s; playId=id; playing=true; turnsInFlight=0; s.start(0);
   }catch(e){}
 }
 
+function ensurePlayTap(){
+  // AnalyserNode: the orb radius and the emotion halo follow this tap's amplitude.
+  if(!micCtx) return false;
+  if(!playAn){
+    playAn=micCtx.createAnalyser();
+    playAn.fftSize=1024;
+    playAn.smoothingTimeConstant=0.35;
+    playData=new Uint8Array(playAn.fftSize);
+    playAn.connect(micCtx.destination);
+  }
+  return true;
+}
 function stopPlayback(){
   const s=playSrc; playSrc=null; playing=false; playId=null;
   if(s){ try{s.onended=null; s.stop(0);}catch(e){} try{s.disconnect();}catch(e){} }
@@ -771,9 +1122,12 @@ document.addEventListener("visibilitychange",()=>{
 addEventListener("pagehide",()=>{ if(productIsOne()) playSound("shutdown"); });
 
 (function mountSession(){
+  mountPrompt();
   const one=productIsOne();
   document.body.dataset.product=one?"one":"samantha";
   document.body.dataset.session=one?"one":"samantha";
+  document.body.dataset.previewOnly=PREVIEW_ONLY?"1":"0";
+  document.body.dataset.liveVoice=PREVIEW_ONLY?"off":"on";
   setSilence(silenceRequested());
   const quiet=document.getElementById("silence");
   if(quiet) quiet.addEventListener("click",e=>{ e.preventDefault(); e.stopPropagation(); setSilence(!silence); });
@@ -802,5 +1156,16 @@ addEventListener("pagehide",()=>{ if(productIsOne()) playSound("shutdown"); });
     postIfComplete();
   });
 })();
+(function prepPreview(){
+  const el=previewEl();
+  if(!el) return;
+  el.preload="auto";
+  try{ el.setAttribute("playsinline",""); el.setAttribute("webkit-playsinline",""); }catch(e){}
+  try{ el.load(); }catch(e){}
+  el.addEventListener("ended",()=>{
+    if(playId==="preview"){ playing=false; playId=null; }
+  });
+})();
+loadPreviewScript();
 pollOnce(); requestAnimationFrame(draw);
 </script></body></html>

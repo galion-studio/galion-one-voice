@@ -1,6 +1,6 @@
 # Vosk mic ASR (letter A)
 
-Perpetual Open MIT License · © 2026 Maciej Grajczyk
+Perpetual Open MIT License · © 2026 Galion Labs
 
 The phone mic on `http://127.0.0.1:7878/` uses **Vosk** when the small English
 model is on disk. The worker is a separate process (`galion-asr-vosk`). It

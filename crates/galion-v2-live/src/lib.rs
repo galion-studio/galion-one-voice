@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! V2 live lane. Every engine runs out of process (Piper, Vosk sidecar,
 //! clone worker, curl for the LLM). Nothing here is a stub: a missing
 //! engine is an error, never a fake clock.

@@ -1,6 +1,6 @@
 # One-UI
 
-Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 The spelling is Galion. This is the phone surface for V2: one screen, one
 mark. Motion contract: `ORB.md`. Integrator: `ANIMATION-ENGINE.md`.
 

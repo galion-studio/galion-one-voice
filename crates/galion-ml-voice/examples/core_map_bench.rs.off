@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! Core-map A/B: Piper clause latency alone and while the local LLM decodes.
 //!
 //! Spawns one warm [`PiperWorker`] (it pins itself from the core map in the

@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License
-// Copyright (c) 2026 Maciej Grajczyk.
+// Copyright (c) 2026 Galion Labs.
 //! First-clause flush for the warm Piper worker.
 //!
 //! A clause is ready when it ends on punctuation (`.`, `!`, `?`, `,`, `;`,

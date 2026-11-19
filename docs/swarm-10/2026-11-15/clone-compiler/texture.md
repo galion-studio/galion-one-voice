@@ -1,6 +1,6 @@
 # Swarm 10 — clone-compiler texture
 
-Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+Perpetual Open MIT License. (c) 2026 Galion Labs.
 Europe/Zagreb. Written 2026-11-15 22:09 +01:00.
 
 Lane: clone-compiler. Role: texture. Item A3 and symphony self-eval section C.

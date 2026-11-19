@@ -1,0 +1,38 @@
+# Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
+[package]
+name = "galion-voice-guard"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+publish = false
+description = "Fail-closed corruption checks for a rendered voice clip or an 80 ms frame stream, before listening-back."
+
+[[bin]]
+name = "galion-voice-guard"
+path = "src/main.rs"
+
+[features]
+default = []
+# Optional external quality-scorer hook. Does not link ort and does not fetch weights.
+neural = []
+
+[dependencies]
+# ITU-R BS.1770 true peak. MIT. Pinned: the crate documents that true-peak
+# values must not be compared across library versions.
+ebur128 = "=0.1.11"
+# praatfan pulls symphonia, which pulls encoding_rs. 0.8.44 needs rustc 1.88.
+# 0.8.35 is the version already locked by galion-articulation.
+encoding_rs = "=0.8.35"
+galion-articulation = { path = "../articulation" }
+hound = "3.5"
+rustfft = "6.2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+
+# Own workspace, same pattern as the other Symphony tools.
+# The locked voice runtime does not build this tool.
+[workspace]
+
+[profile.release]
+opt-level = 3

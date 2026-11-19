@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+# Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 # Section F. Runbooks exist, name real commands, and the short commands run.
 set -euo pipefail
 cd "$(dirname "$0")/../.."

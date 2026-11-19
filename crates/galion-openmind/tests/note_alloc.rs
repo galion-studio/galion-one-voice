@@ -1,4 +1,4 @@
-// Galion Voice — Perpetual Open MIT License. (c) 2026 Maciej Grajczyk.
+// Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 //! `NerveEmitter::note` runs on the frame host, after `Heartbeat::step`.
 //! It must not allocate. JSON and I/O stay on the `voice-nerve` thread,
 //! where this counter is not armed.
