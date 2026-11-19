@@ -73,6 +73,9 @@ link.env
 *.wav
 *.flac
 *.mp3
+# Pre-rendered Galion One preview clips stay in $GALION_PREVIEW_AUDIO_DIR, never in git.
+*.ogg
+*.opus
 *.cbxvoice
 clip-store*/
 venv/
