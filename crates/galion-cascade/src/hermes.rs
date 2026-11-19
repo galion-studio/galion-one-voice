@@ -26,6 +26,9 @@ use std::time::{Duration, Instant};
 
 use crate::{CascadeError, Emotion, Llm, Transcript};
 
+#[path = "hermes_stream.rs"]
+mod stream;
+
 /// Spoken when the gateway does not answer. Not a canned intent line.
 pub const UNREACHABLE: &str = "model can't be reached";
 /// Spoken when the gateway is quiet until the failure ceiling. Not a measured
@@ -559,6 +562,40 @@ impl HermesLlm {
         self.complete_prompt(system_prompt(persona), &user, 480)
     }
 
+    /// One completion, with each text delta handed to `on_delta` as it arrives.
+    ///
+    /// The returned string is the same guarded text as [`Self::complete`].
+    /// A gateway that returns one JSON body calls `on_delta` once, at the end.
+    pub fn complete_stream(&self, user: &str, on_delta: &mut dyn FnMut(&str)) -> String {
+        self.complete_stream_as(&self.persona, user, on_delta)
+    }
+
+    /// [`Self::complete_stream`] for an explicit register (`samantha` or `jarvis`).
+    pub fn complete_stream_as(&self, persona: &str, user: &str, on_delta: &mut dyn FnMut(&str)) -> String {
+        let Some(target) = self.target.clone() else {
+            return UNREACHABLE.to_string();
+        };
+        if !self.key.is_empty() && !key_ok(&self.key) {
+            return UNREACHABLE.to_string();
+        }
+        let user = clip_chars(user.trim(), 2_000);
+        if user.is_empty() {
+            return UNREACHABLE.to_string();
+        }
+        match stream::post_chat_stream(
+            &target,
+            &self.model,
+            &self.key,
+            system_prompt(persona),
+            &user,
+            self.timeout,
+            on_delta,
+        ) {
+            Ok(text) => guard_model_text(&text),
+            Err(()) => UNREACHABLE.to_string(),
+        }
+    }
+
     /// Research turn for the Galion Research desk. `sources` are the files the
     /// user attached. The gateway key stays on this client. It is not copied
     /// into the reply. A citation whose id or title was not in `sources` is
@@ -888,6 +925,18 @@ impl Llm for HermesLlm {
             return Err(CascadeError::Empty);
         }
         Ok(self.complete(&t.text))
+    }
+
+    fn reply_deltas(
+        &mut self,
+        t: &Transcript,
+        _e: Emotion,
+        on_delta: &mut dyn FnMut(&str),
+    ) -> Result<String, CascadeError> {
+        if t.text.trim().is_empty() {
+            return Err(CascadeError::Empty);
+        }
+        Ok(self.complete_stream(&t.text, on_delta))
     }
 
     fn set_persona(&mut self, id: &str) {
@@ -3200,6 +3249,122 @@ Unknown
         assert!(clean.text.contains("amber"), "{}", clean.text);
         assert!(clean.text.contains("daylight"), "{}", clean.text);
         assert!(!clean.text.contains("Invented"));
+    }
+
+    #[test]
+    fn stream_first_delta_arrives_before_the_rest_of_the_body() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        let seen = Arc::new(Mutex::new(String::new()));
+        let seen_w = seen.clone();
+        thread::spawn(move || {
+            let Ok((mut sock, _)) = listener.accept() else {
+                return;
+            };
+            let _ = sock.set_read_timeout(Some(Duration::from_secs(2)));
+            let mut buf = [0u8; 8192];
+            let mut got = Vec::new();
+            loop {
+                match sock.read(&mut buf) {
+                    Ok(0) => break,
+                    Ok(n) => {
+                        got.extend_from_slice(&buf[..n]);
+                        if let Some(end) = got.windows(4).position(|w| w == b"\r\n\r\n") {
+                            let head = String::from_utf8_lossy(&got[..end]);
+                            let len = head.lines().find_map(|l| {
+                                l.split_once(':')
+                                    .filter(|(k, _)| k.eq_ignore_ascii_case("content-length"))
+                                    .and_then(|(_, v)| v.trim().parse::<usize>().ok())
+                            });
+                            if got.len() >= end + 4 + len.unwrap_or(0) {
+                                break;
+                            }
+                        }
+                    }
+                    Err(_) => break,
+                }
+            }
+            if let Ok(s) = String::from_utf8(got) {
+                *seen_w.lock().unwrap() = s;
+            }
+            let _ = sock.write_all(
+                b"HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nConnection: close\r\n\r\n",
+            );
+            let ev = |s: &str| {
+                format!(
+                    "data: {{\"choices\":[{{\"delta\":{{\"content\":{}}}}}]}}\n\n",
+                    json_string(s)
+                )
+            };
+            let _ = sock.write_all(ev("She died this morning.").as_bytes());
+            let _ = sock.flush();
+            thread::sleep(Duration::from_millis(300));
+            let _ = sock.write_all(ev(" I will stay with that.").as_bytes());
+            let _ = sock.write_all(b"data: [DONE]\n\n");
+            let _ = sock.flush();
+        });
+        let llm = HermesLlm::new(
+            &format!("http://{addr}/v1/chat/completions"),
+            LLM_NAME,
+            "",
+            Duration::from_secs(3),
+        );
+        let t0 = Instant::now();
+        let mut first = None;
+        let text = llm.complete_stream("My mother died this morning.", &mut |_| {
+            if first.is_none() {
+                first = Some(t0.elapsed());
+            }
+        });
+        let total = t0.elapsed();
+        let first = first.expect("a delta");
+        assert!(text.contains("She died this morning."), "{text}");
+        assert!(text.contains("stay"), "{text}");
+        assert!(
+            total.saturating_sub(first) >= Duration::from_millis(200),
+            "first {first:?} total {total:?}"
+        );
+        let seen = seen.lock().unwrap().clone();
+        assert!(seen.contains("\"stream\":true"), "{seen}");
+        assert!(seen.contains("Samantha"), "{seen}");
+    }
+
+    #[test]
+    fn stream_accepts_one_json_body_when_the_gateway_does_not_stream() {
+        let serve = serve_body(
+            "200 OK",
+            "{\"choices\":[{\"message\":{\"content\":\"She died this morning.\"}}]}",
+            None,
+        );
+        let llm = HermesLlm::new(
+            &format!("http://{}/v1/chat/completions", serve.addr),
+            LLM_NAME,
+            "",
+            Duration::from_secs(2),
+        );
+        let mut n = 0;
+        let mut piece = String::new();
+        let text = llm.complete_stream("hello", &mut |d| {
+            n += 1;
+            piece.push_str(d);
+        });
+        assert_eq!(n, 1);
+        assert_eq!(piece, "She died this morning.");
+        assert_eq!(text, "She died this morning.");
+    }
+
+    #[test]
+    fn stream_does_not_dial_a_name_that_is_not_loopback() {
+        let llm = HermesLlm::new(
+            "http://example.com/v1/chat/completions",
+            LLM_NAME,
+            "",
+            Duration::from_millis(200),
+        );
+        let mut n = 0;
+        let text = llm.complete_stream("hi", &mut |_| n += 1);
+        assert_eq!(text, UNREACHABLE);
+        assert_eq!(n, 0);
     }
 
 }
