@@ -1517,6 +1517,20 @@ fn research_ask_request(
     (body, Some(cookie))
 }
 
+/// Placeholder the orb page bakes into cache-busted asset URLs.
+const ASSET_V_PLACEHOLDER: &str = "__GALION_ASSET_V__";
+
+fn asset_v() -> &'static str {
+    match option_env!("GALION_GIT_SHA") {
+        Some(s) if !s.is_empty() => s,
+        _ => "dev",
+    }
+}
+
+fn stamp_page(html: &str) -> String {
+    html.replace(ASSET_V_PLACEHOLDER, asset_v())
+}
+
 const SECURITY_HEADERS: &str = concat!(
     "X-Content-Type-Options: nosniff\r\n",
     "Referrer-Policy: no-referrer\r\n",
@@ -1900,7 +1914,7 @@ fn route(req: &mut Request, sh: &Shared, set_cookie: &mut Option<String>) -> (&'
                 "/" | "/screen" | "/one" | "/one/" if sh.page.is_some() => {
                     let html = sh.page.unwrap_or_default();
                     let page = if sh.edge.disclosure { html.to_string() } else { strip_ai_disclosure(html) };
-                    ("200 OK", "text/html; charset=utf-8", page.into_bytes())
+                    ("200 OK", "text/html; charset=utf-8", stamp_page(&page).into_bytes())
                 }
                 "/research/hermes" if sh.page.is_some() => {
                     let mut cookie_id = research_cookie_id(req);
@@ -3637,6 +3651,19 @@ mod tests {
         assert!(body.contains(AI_DISCLOSURE_HR));
         assert_eq!(inbox.pending(), 1);
         w.close().unwrap();
+    }
+
+    #[test]
+    fn orb_asset_urls_are_cache_busted() {
+        let html = concat!(
+            "<script type=\"module\">import { drawNebula } from \"/nebula/vocabulary.mjs?v=__GALION_ASSET_V__\";</script>",
+            "<source src=\"/preview/voice-preview.mp3?v=__GALION_ASSET_V__\" type=\"audio/mpeg\">",
+        );
+        let stamped = stamp_page(html);
+        assert!(!stamped.contains(ASSET_V_PLACEHOLDER), "{stamped}");
+        assert!(stamped.contains("/nebula/vocabulary.mjs?v="), "{stamped}");
+        assert!(stamped.contains("/preview/voice-preview.mp3?v="), "{stamped}");
+        assert!(!stamped.contains("speechSynthesis"));
     }
 
     #[test]

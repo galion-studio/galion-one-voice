@@ -126,6 +126,8 @@ test("feed, wake, task done, approval, and shutdown each cue once", async ({ pag
   await page.locator("canvas").click();
   await expect.poll(() => cues(page)).toContain("wake");
   await expect.poll(() => cues(page)).toContain("error");
+  await page.waitForTimeout(500);
+  await page.locator("canvas").click();
 
   await page.request.post("/__hold");
   await expect(page.locator("#s")).toHaveAttribute("data-mode", "offline", { timeout: 5000 });
