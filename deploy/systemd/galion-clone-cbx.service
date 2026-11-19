@@ -29,6 +29,9 @@ Restart=on-failure
 RestartSec=5
 NoNewPrivileges=yes
 PrivateTmp=yes
+# Loopback only, same families as the stage unit. The worker binds
+# 127.0.0.1 and talks to the live service on 127.0.0.1.
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
 ProtectSystem=strict
 ProtectHome=yes
 ReadWritePaths=/opt/galion/voice/cbx

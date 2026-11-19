@@ -24,6 +24,7 @@ for unit in "${units[@]}"; do
     '^ProtectSystem=strict$' \
     '^ProtectHome=yes$' \
     '^PrivateTmp=yes$' \
+    '^RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6$' \
     '^ReadWritePaths=/opt/galion/voice(/.*)?$'
   do
     if ! grep -Eq "$key" "$unit"; then
