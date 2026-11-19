@@ -23,9 +23,12 @@
                     (hub_texture:true = the Jarvis hub bed is mixed into that WAV; body[data-hub-texture]),
                     the AudioContext unlocked by the tap. User speech during playback = barge-in:
                     playback stops at once and the new utterance is captured.
-     V2-S3: AI Act Art. 50 disclosure (HR+EN) is spoken on the first tap (audio only).
+     V2-S3: AI Act Art. 50 disclosure (HR+EN) is text on the caption line. The page
+     does not use the browser speech engine. A tap on the mark opens a live session. If that
+     session is missing, fails, or does not return within 1.5 s, or the microphone
+     cannot open, the tap plays the pre-rendered preview (or shows its text).
      Owner t653u: the voice surface is still one dot. The canvas draws no text,
-     captions, persona names, or transcript. A tap on the mark starts the mic.
+     persona names, or transcript. Preview captions are the HTML line in the shell.
      The Galion One shell (hero, prompt, footer) sits over that dot. It is the
      same prompt as the desktop app: plus, one field, voice. Typed lines use
      the existing POST /v2/say path. File names stay on the page.
@@ -70,7 +73,9 @@ canvas{display:block;position:fixed;inset:0;width:100%;height:100%;width:100dvw;
   font:16px/1.45 "IBM Plex Sans",system-ui,sans-serif;
   -webkit-user-select:text;user-select:text}
 #one>*{pointer-events:auto;width:min(42rem,100%);box-sizing:border-box}
-#one .stage{pointer-events:none;flex:1 1 auto;min-height:22vh;width:100%}
+#one .stage{pointer-events:none;flex:1 1 auto;min-height:22vh;width:100%;position:relative}
+#caption{position:fixed;left:50%;top:62%;transform:translateX(-50%);z-index:6;width:min(36rem,calc(100% - 32px));margin:0;pointer-events:none;text-align:center;color:#E6EDF3;font:600 1.12rem/1.35 "IBM Plex Sans",system-ui,sans-serif;text-shadow:0 2px 18px #0B0F14,0 0 2px #0B0F14}
+#caption:empty{display:none}
 #one header{display:flex;align-items:center}
 .kicker{margin:0;color:var(--muted);font:600 12px/1 "IBM Plex Sans",system-ui,sans-serif;letter-spacing:.16em;text-transform:uppercase}
 .hero{display:flex;flex-direction:column;align-items:flex-start;gap:12px;padding:18px 18px 16px;background:var(--panel);border:1px solid var(--line);border-radius:20px}
@@ -130,7 +135,8 @@ window.drawNebula = drawNebula;
     <h1 id="soon">Galion One for live users is coming very soon.</h1>
     <a class="download" href="https://github.com/galion-studio/obsidian-open-mind/actions/workflows/openmind-desktop.yml" target="_blank" rel="noopener noreferrer">Download alpha on GitHub<span class="sr"> (opens in a new tab)</span></a>
   </section>
-  <div class="stage"></div>
+  <div class="stage"><p id="caption" aria-live="polite"></p></div>
+  <p id="ai-note" class="sr">Razgovarate s umjetnom inteligencijom. Galion je AI asistent, a ne osoba. You are talking to an AI. Galion is an AI assistant, not a person.</p>
   <section class="about" aria-label="About Galion One">
     <p class="lede">Galion One is the assistant you talk to. Speak, or type. The mark in the middle is the voice. Galion Research is the research engine for the deeper questions.</p>
     <p class="artifact">An alpha test build for Windows, macOS and Linux. Open source under the MIT License. Developed by Galion Labs, built in Rust.</p>
@@ -190,6 +196,15 @@ let capNode=null, capSink=null, capRatio=1, capPos=0, capFrame=new Float32Array(
 let vadFloor=0.003, vadOn=false, vadRun=0, vadQuiet=0, vadSpeechMs=0, uttMs=0, uttBarge=false;
 let preroll=[], utt=[], turnSeq=0;
 let playSrc=null, playId=null, playing=false, seenReplies=new Set();
+// Pre-rendered preview. arming is the 1.5 s live-session wait. previewOn is playback or text captions.
+const LIVE_SESSION_MS=1500;
+const PREVIEW_AUDIO=[
+  ["preview/voice-preview.opus","audio/ogg; codecs=opus"],
+  ["preview/voice-preview.mp3","audio/mpeg"],
+  ["preview/voice-preview.wav","audio/wav"]
+];
+let arming=false, previewOn=false, previewScript=null, previewSeg=-1, previewT0=0, previewRaf=0, voiceGen=0;
+let previewCache=null;
 // V2 orb: spring state. Gains ease from the idle aim. No aspect — the mark is a circle.
 const LUTI={idle:{w:1.8,z:0.92},listening:{w:3.4,z:0.88},thinking:{w:2.4,z:0.90},speaking:{w:3.0,z:0.92},offline:{w:2.0,z:1.02}};
 const SPRING=LUTI;
@@ -207,26 +222,34 @@ function sessionHeaders(extra){
   if(sessionToken) h["X-Galion-Session"]=sessionToken;
   return h;
 }
+function postSession(ms){
+  if(sessionToken) return Promise.resolve(true);
+  const ac=(ms&&window.AbortController)?new AbortController():null;
+  let timer=0;
+  if(ac) timer=setTimeout(()=>{ try{ac.abort();}catch(e){} }, ms);
+  const opts={method:"POST",cache:"no-store",
+    headers:{"Content-Type":"application/json","ngrok-skip-browser-warning":"1"},
+    body:"{\"op\":\"open\"}"};
+  if(ac) opts.signal=ac.signal;
+  return fetch("session",opts).then(r=>r.ok?r.json():null).then(j=>{
+    if(j&&typeof j.token==="string"&&j.token){ sessionToken=j.token; return true; }
+    return false;
+  }).catch(()=>false).finally(()=>{ if(timer) clearTimeout(timer); });
+}
 async function ensureSession(){
   if(sessionToken) return;
-  try{
-    const r=await fetch("session",{method:"POST",cache:"no-store",
-      headers:{"Content-Type":"application/json","ngrok-skip-browser-warning":"1"},
-      body:"{\"op\":\"open\"}"});
-    if(!r.ok) return;
-    const j=await r.json();
-    if(j&&typeof j.token==="string") sessionToken=j.token;
-  }catch(e){}
+  await postSession(0);
 }
+function openLiveSession(){ return postSession(LIVE_SESSION_MS); }
 function discloseAi(){
   if(aiDisclosed) return;
   aiDisclosed=true;
-  try{
-    if(!window.speechSynthesis||!window.SpeechSynthesisUtterance) return;
-    speechSynthesis.cancel();
-    const hr=new SpeechSynthesisUtterance(AI_DISCLOSURE.hr); hr.lang="hr-HR"; speechSynthesis.speak(hr);
-    const en=new SpeechSynthesisUtterance(AI_DISCLOSURE.en); en.lang="en-GB"; speechSynthesis.speak(en);
-  }catch(e){}
+  const cap=document.getElementById("caption");
+  if(cap&&!cap.textContent) showCaption(AI_DISCLOSURE.en);
+}
+function showCaption(text){
+  const el=document.getElementById("caption");
+  if(el) el.textContent=text||"";
 }
 
 // Surround + interior targets. The disc body stays #F5F5F7. These only move the wash.
@@ -370,10 +393,16 @@ function playSound(id){
   cv.dataset.resonance="on";
 }
 function paintHalo(tms,W,H,mark){
-  const input=haloInput();
+  let input=haloInput();
+  let outer=mark*2.6;
+  if(previewOn&&playing){
+    const pulse=clamp(playEnv,0,1);
+    input={sense:true,label:"warm",confidence:1,valence:0.42,arousal:clamp(0.28+0.72*pulse,0,1)};
+    outer=mark*(2.2+0.85*pulse);
+  }
   let drew=false;
   if(typeof drawNebula==="function"){
-    drew=drawNebula(cx,input,tms/1000,{cx:W/2,cy:H/2,inner:mark,outer:mark*2.6})===true;
+    drew=drawNebula(cx,input,tms/1000,{cx:W/2,cy:H/2,inner:mark,outer:outer})===true;
   }
   const state=drew?"gas":"hold";
   cv.dataset.nebula=state;
@@ -396,6 +425,8 @@ function paintBg(tms,b){
 
 // Server mode → displayed mode with hysteresis, local mic preempt, offline state.
 function pickMode(now){
+  if(playing) return "speaking";
+  if(arming&&micState!=="on") return "thinking";
   if(now-lastOk>OFFLINE_MS) return "offline";
   let m=(latest&&latest.mode)||latest&&latest.state||"idle";
   if(m==="rika") m="idle"; // lean-in stays idle motion; /dot "lean" carries the feeling
@@ -468,7 +499,11 @@ function target(mode,now,dt){
   }
   if(mode==="speaking"){
     const breath=Math.sin(t/1400);
-    if(playing) return [R.speak+R.speakDepth*env+0.006*breath, 0.40+0.32*env];
+    if(playing){
+      const depth=previewOn?0.05:R.speakDepth;
+      const bright=previewOn?0.42+0.5*env:0.40+0.32*env;
+      return [R.speak+depth*env+0.006*breath, bright];
+    }
     if(latest&&typeof latest.radius==="number"&&(latest.mode==="speaking"||latest.state==="speaking"))
       return [clamp(+latest.radius,0,0.5), 0.40+0.28*clamp(+latest.brightness||0.8,0,1)];
     const s=Math.sin(((t%2800)/2800)*2*Math.PI);
@@ -483,6 +518,7 @@ function draw(){
   const now=performance.now(), dt=Math.min(50,now-lastFrame); lastFrame=now;
   shown=pickMode(now);
   cv.dataset.mode=shown;
+  cv.dataset.preview=previewOn?(playing?"on":"text"):"off";
   const [tr,tb]=target(shown,now,dt);
   const aim=SPRING[shown]||SPRING.idle;
   const gk=1-Math.exp(-dt/GAIN_TAU);
@@ -655,19 +691,22 @@ function mountPrompt(){
   }
   if(voice) voice.addEventListener("click",onVoice);
 }
-async function enableMic(){
+async function enableMic(opts){
+  opts=opts||{};
   if(micState==="on"||micState==="pending") return;
-  discloseAi();
+  if(!opts.fallbackPreview) discloseAi();
   await ensureSession();
   if(!window.isSecureContext && location.hostname!=="localhost" && location.hostname!=="127.0.0.1"){
+    if(opts.fallbackPreview){ startPreview(opts.gen||voiceGen); return; }
     showErr("Microphone needs HTTPS. Open the https:// link."); return;
   }
   if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
+    if(opts.fallbackPreview){ startPreview(opts.gen||voiceGen); return; }
     showErr("This browser cannot open the microphone."); return;
   }
   micState="pending"; syncVoice(); showErr("");
-  // Create + unlock the AudioContext synchronously inside the tap (before any await) so that
-  // mobile Safari/Chrome let us play reply audio later. Reused for capture and playback.
+  // Unlock happened on the tap, before any await. This call resumes a context
+  // the gesture already created so iOS Safari, Android Chrome, and desktop can play later.
   ensureAudio();
   if(productIsOne()) playSound("wake");
   try{
@@ -685,9 +724,17 @@ async function enableMic(){
     syncVoice();
     hideHint();
     showErr("");
+    discloseAi();
     tickMic();
     startCapture(src).catch(()=>showErr("Speech capture unavailable — level only."));
   }catch(e){
+    if(opts.fallbackPreview){
+      micState="off";
+      syncVoice();
+      showErr("");
+      startPreview(opts.gen||voiceGen);
+      return;
+    }
     micState="denied";
     syncVoice();
     const name=e&&(e.name||"");
@@ -704,14 +751,178 @@ function chromeEvent(e){
   const t=e.target;
   return !!(t&&t.closest&&t.closest("#one"));
 }
-function onActivate(e){
-  // First intentional tap on the mark: mic. The shell handles its own controls.
-  // Avoid synthetic click-after-touch double fire.
-  if(chromeEvent(e)) return;
-  if(e.type==="touchend"){ e.preventDefault(); enableMic(); return; }
-  if(e.type==="click"){ enableMic(); }
+function previewRequested(){
+  try{ return new URLSearchParams(location.search).get("preview")==="1"; }catch(e){ return false; }
 }
-// A tap on the mark starts the mic (the canvas spans the whole screen; the shell passes the centre through).
+function previewOrder(){
+  let el=null;
+  try{ el=document.createElement("audio"); }catch(e){}
+  const known=[], rest=[];
+  for(const row of PREVIEW_AUDIO){
+    let r="";
+    try{ r=el&&el.canPlayType?el.canPlayType(row[1]):"maybe"; }catch(e){ r="maybe"; }
+    if(r==="probably"||r==="maybe") known.push(row); else rest.push(row);
+  }
+  return known.concat(rest);
+}
+function parsePreviewScript(j){
+  if(!j||typeof j!=="object"||Array.isArray(j)) return null;
+  const text=typeof j.text==="string"?j.text:"";
+  const segments=[];
+  if(Array.isArray(j.segments)){
+    for(const s of j.segments){
+      if(!s||typeof s.text!=="string") continue;
+      const start=+s.start, end=+s.end;
+      if(!isFinite(start)||!isFinite(end)||end<start) continue;
+      segments.push({start:start,end:end,text:s.text});
+    }
+  }
+  return {text:text,segments:segments};
+}
+function prefetchPreviewFiles(){
+  if(previewCache) return previewCache;
+  previewCache=(async()=>{
+    let script=null;
+    try{
+      const r=await fetch("preview/voice-preview.json",{cache:"default",headers:{"ngrok-skip-browser-warning":"1"}});
+      if(r.ok) script=parsePreviewScript(await r.json());
+    }catch(e){}
+    const audios=[];
+    for(const row of previewOrder()){
+      try{
+        const r=await fetch(row[0],{cache:"default",headers:{"ngrok-skip-browser-warning":"1"}});
+        if(!r.ok) continue;
+        const bytes=await r.arrayBuffer();
+        if(bytes&&bytes.byteLength) audios.push(bytes);
+      }catch(e){}
+    }
+    return {script:script,audios:audios};
+  })();
+  return previewCache;
+}
+function fallbackCaption(script){
+  if(script&&script.text) return script.text;
+  if(script&&script.segments&&script.segments.length) return script.segments.map(s=>s.text).join(" ");
+  return AI_DISCLOSURE.hr+" "+AI_DISCLOSURE.en;
+}
+function stopPreview(){
+  previewOn=false;
+  previewSeg=-1;
+  arming=false;
+  if(previewRaf){ cancelAnimationFrame(previewRaf); previewRaf=0; }
+  stopPlayback();
+  showCaption("");
+}
+function tickPreviewCaption(){
+  if(!previewOn||!playing) return;
+  const script=previewScript;
+  const t=(micCtx?micCtx.currentTime:0)-previewT0;
+  let line="", idx=-1;
+  if(script&&script.segments&&script.segments.length){
+    for(let i=0;i<script.segments.length;i++){
+      const s=script.segments[i];
+      if(t>=s.start&&t<s.end){ line=s.text; idx=i; break; }
+    }
+  }else if(script&&script.text){ line=script.text; idx=0; }
+  if(idx!==previewSeg){ previewSeg=idx; showCaption(line); }
+  previewRaf=requestAnimationFrame(tickPreviewCaption);
+}
+async function decodePreview(audios){
+  if(!micCtx||!audios) return null;
+  for(const bytes of audios){
+    try{
+      const buf=await decode(bytes.slice(0));
+      if(buf&&buf.duration>0) return buf;
+    }catch(e){}
+  }
+  return null;
+}
+async function startPreview(gen){
+  let packed=null;
+  try{ packed=await prefetchPreviewFiles(); }catch(e){ packed=null; }
+  if(gen!==voiceGen) return;
+  try{ if(micCtx&&micCtx.state==="suspended") await micCtx.resume(); }catch(e){}
+  let buf=null;
+  try{ buf=await decodePreview(packed&&packed.audios); }catch(e){ buf=null; }
+  if(gen!==voiceGen) return;
+  if(micState==="on"||micState==="pending"){ arming=false; return; }
+  const script=packed&&packed.script;
+  previewScript=script||null;
+  if(!buf||!ensureAudio()||!ensurePlayTap()){
+    previewOn=true;
+    arming=false;
+    aiDisclosed=true;
+    showCaption(fallbackCaption(script));
+    return;
+  }
+  try{ if(micCtx.state==="suspended") await micCtx.resume(); }catch(e){}
+  if(gen!==voiceGen) return;
+  stopPlayback();
+  const src=micCtx.createBufferSource();
+  src.buffer=buf;
+  try{ src.connect(playAn); }catch(e){
+    previewOn=true; arming=false; aiDisclosed=true; showCaption(fallbackCaption(script)); return;
+  }
+  previewOn=true;
+  previewSeg=-1;
+  arming=false;
+  aiDisclosed=true;
+  src.onended=()=>{ if(playSrc===src) stopPreview(); };
+  playSrc=src; playId="preview"; playing=true;
+  previewT0=micCtx.currentTime;
+  try{ src.start(0); }catch(e){
+    stopPreview();
+    previewOn=true;
+    showCaption(fallbackCaption(script));
+    return;
+  }
+  tickPreviewCaption();
+}
+let lastOrbGesture=0;
+function onOrbGesture(e){
+  // A double-click is one tap: the second half must not undo the first.
+  const now=performance.now();
+  if(now-lastOrbGesture<450) return;
+  lastOrbGesture=now;
+  // Unlock inside the user gesture, before any await. iOS Safari, Android Chrome, desktop.
+  ensureAudio();
+  prefetchPreviewFiles();
+  if(previewOn||arming){
+    voiceGen++;
+    arming=false;
+    stopPreview();
+    return;
+  }
+  if(micState==="on"){ stopMic(); return; }
+  if(micState==="pending") return;
+  const gen=++voiceGen;
+  arming=true;
+  if(previewRequested()){ startPreview(gen); return; }
+  openLiveSession().then(live=>{
+    if(gen!==voiceGen){ arming=false; return; }
+    if(live){
+      arming=false;
+      enableMic({fallbackPreview:true,gen:gen});
+      return;
+    }
+    startPreview(gen);
+  });
+}
+let lastOrbTouch=0;
+function onActivate(e){
+  // Tap on the mark. The shell handles its own controls.
+  // touchend preventDefault avoids the synthetic click that would follow.
+  if(chromeEvent(e)) return;
+  if(e.type==="touchend"){
+    e.preventDefault();
+    lastOrbTouch=performance.now();
+    onOrbGesture(e);
+    return;
+  }
+  if(e.type==="click"&&performance.now()-lastOrbTouch<700) return;
+  onOrbGesture(e);
+}
+// A tap on the mark starts the live session, or the preview when that session is not available.
 document.addEventListener("touchend",onActivate,{passive:false});
 document.addEventListener("click",onActivate);
 addEventListener("keydown",e=>{
@@ -722,7 +933,7 @@ addEventListener("keydown",e=>{
     e.preventDefault(); setSilence(!silence); return;
   }
   if(typing||control) return;
-  if(e.key==="Enter"||e.key===" "){e.preventDefault();enableMic();}
+  if(e.key==="Enter"||e.key===" "){e.preventDefault();onOrbGesture(e);}
 });
 async function sendText(text){
   const t=(text||"").trim();
@@ -730,7 +941,7 @@ async function sendText(text){
   // Same gesture as Send: unlock playback before any await, mic or not.
   if(!ensureAudio()){ showErr("This browser cannot play audio."); return false; }
   const barge=playing;
-  if(playing) stopPlayback();
+  if(previewOn||playing) stopPreview();
   discloseAi();
   await ensureSession();
   turnsInFlight++;
@@ -895,17 +1106,26 @@ async function playReply(id,url){
     if(vadOn) return;                                // user is mid-utterance: this reply is stale
     if(!hearReplies) return;
     if(micCtx.state==="suspended") await micCtx.resume().catch(()=>{});
-    stopPlayback();
-    if(!playAn){
-      playAn=micCtx.createAnalyser(); playAn.fftSize=1024; playAn.smoothingTimeConstant=0.35;
-      playData=new Uint8Array(playAn.fftSize);
-    }
-    const s=micCtx.createBufferSource(); s.buffer=buf; s.connect(playAn); playAn.connect(micCtx.destination);
+    stopPreview();
+    if(!ensurePlayTap()) return;
+    const s=micCtx.createBufferSource(); s.buffer=buf; s.connect(playAn);
     s.onended=()=>{ if(playSrc===s){ playSrc=null; playing=false; playId=null; turnsInFlight=0; } };
     playSrc=s; playId=id; playing=true; turnsInFlight=0; s.start(0);
   }catch(e){}
 }
 
+function ensurePlayTap(){
+  // AnalyserNode: the orb radius and the emotion halo follow this tap's amplitude.
+  if(!micCtx) return false;
+  if(!playAn){
+    playAn=micCtx.createAnalyser();
+    playAn.fftSize=1024;
+    playAn.smoothingTimeConstant=0.35;
+    playData=new Uint8Array(playAn.fftSize);
+    playAn.connect(micCtx.destination);
+  }
+  return true;
+}
 function stopPlayback(){
   const s=playSrc; playSrc=null; playing=false; playId=null;
   if(s){ try{s.onended=null; s.stop(0);}catch(e){} try{s.disconnect();}catch(e){} }
@@ -951,5 +1171,6 @@ addEventListener("pagehide",()=>{ if(productIsOne()) playSound("shutdown"); });
     postIfComplete();
   });
 })();
+prefetchPreviewFiles();
 pollOnce(); requestAnimationFrame(draw);
 </script></body></html>

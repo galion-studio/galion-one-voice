@@ -557,6 +557,18 @@ mod tests {
         assert!(SCREEN_HTML.contains("Razgovarate s umjetnom inteligencijom. Galion je AI asistent, a ne osoba."));
         assert!(SCREEN_HTML.contains("You are talking to an AI. Galion is an AI assistant, not a person."));
         assert!(SCREEN_HTML.contains("function discloseAi"));
+        assert!(!SCREEN_HTML.contains("speechSynthesis"), "the robotic browser voice is gone");
+        assert!(!SCREEN_HTML.contains("SpeechSynthesisUtterance"));
+        assert!(SCREEN_HTML.contains("LIVE_SESSION_MS=1500"));
+        assert!(SCREEN_HTML.contains("preview/voice-preview.json"));
+        assert!(SCREEN_HTML.contains("voice-preview.opus"));
+        assert!(SCREEN_HTML.contains("voice-preview.mp3"));
+        assert!(SCREEN_HTML.contains("voice-preview.wav"));
+        assert!(SCREEN_HTML.contains("id=\"caption\""));
+        assert!(SCREEN_HTML.contains("function startPreview"));
+        assert!(SCREEN_HTML.contains("function ensurePlayTap"));
+        assert!(SCREEN_HTML.contains("AnalyserNode"));
+        assert!(SCREEN_HTML.contains("fallbackPreview"));
         assert!(SCREEN_HTML.contains("fetch(\"session\""));
         assert!(SCREEN_HTML.contains("X-Galion-Session"));
         assert!(!SCREEN_HTML.contains("?token=") && !SCREEN_HTML.contains("?session="));

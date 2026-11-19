@@ -18,6 +18,10 @@
 //!                  not add a talk path for `/one`.
 //!   GET /reply/<id>.wav -> reply audio the host published with [`ReplyBox::set_reply`];
 //!                  `audio/wav`, 404 when unknown/evicted.
+//!   GET /preview/voice-preview.opus|mp3|wav|json -> a pre-rendered clip and its
+//!                  caption script from `GALION_PREVIEW_AUDIO_DIR` (outside the repo).
+//!                  Correct content type, `Accept-Ranges: bytes`, one-byte ranges,
+//!                  and `Cache-Control: public, max-age=3600`. A missing file is 404.
 //!   GET / , /screen, /one, /one/ -> the caller's single-screen HTML page, only when one was set with
 //!                      [`WebSurface::with_page`] (V1-01; the page itself is owned by
 //!                      galion-console, this crate only serves the bytes); 404 otherwise
@@ -578,6 +582,8 @@ struct Shared {
     /// First accepted `/turn` of this process already carried the Art. 50 line.
     disclosure_sent: Arc<AtomicBool>,
     research: Arc<Mutex<ResearchDesk>>,
+    /// `GALION_PREVIEW_AUDIO_DIR`. `None` serves every preview name as 404.
+    preview_dir: Option<std::path::PathBuf>,
 }
 
 /// Unit tests pin the V1 demo defaults. A developer shell that exports
@@ -585,6 +591,12 @@ struct Shared {
 /// built with `cfg(test)` and reads the environment in [`initial_edge`].
 fn initial_edge() -> EdgeCfg {
     if cfg!(test) { EdgeCfg::v1_demo() } else { EdgeCfg::from_env() }
+}
+
+/// Tests pin an empty preview dir so a developer shell cannot change the route.
+/// The demo binary reads `GALION_PREVIEW_AUDIO_DIR` when the surface is built.
+fn initial_preview_dir() -> Option<std::path::PathBuf> {
+    if cfg!(test) { None } else { super::preview::dir_from_env() }
 }
 
 pub struct WebSurface {
@@ -619,6 +631,7 @@ impl WebSurface {
             disclosure_sent: Arc::new(AtomicBool::new(false)),
             research: Arc::new(Mutex::new(ResearchDesk::new())),
             edge,
+            preview_dir: initial_preview_dir(),
         };
         Self {
             bind: None,
@@ -669,6 +682,12 @@ impl WebSurface {
     /// `GALION_ALLOW_PUBLIC_BIND`. `open` still refuses `0.0.0.0` without auth.
     pub fn with_allow_public_bind(mut self, on: bool) -> Self {
         self.sh.edge.allow_public_bind = on;
+        self
+    }
+    /// Directory of `voice-preview.opus`, `.mp3`, `.wav`, and `.json`.
+    /// Set before [`RenderSurface::open`]; the connection threads keep this path.
+    pub fn with_preview_dir(mut self, dir: impl Into<std::path::PathBuf>) -> Self {
+        self.sh.preview_dir = Some(dir.into());
         self
     }
     /// Art. 50 disclosure. The demo default is on.
@@ -1521,49 +1540,85 @@ fn format_acao(origin: Option<String>) -> String {
     }
 }
 
+struct Served {
+    status: &'static str,
+    ctype: &'static str,
+    body: Vec<u8>,
+    acao: Acao,
+    set_cookie: Option<String>,
+    cache_control: &'static str,
+    extra: String,
+    content_length: usize,
+}
+
+fn served(
+    status: &'static str,
+    ctype: &'static str,
+    body: Vec<u8>,
+    acao: Acao,
+    set_cookie: Option<String>,
+) -> Served {
+    let content_length = body.len();
+    Served {
+        status,
+        ctype,
+        body,
+        acao,
+        set_cookie,
+        cache_control: "no-store",
+        extra: String::new(),
+        content_length,
+    }
+}
+
 fn handle(mut stream: std::net::TcpStream, sh: &Shared) {
     let _ = stream.set_read_timeout(Some(Duration::from_millis(2000)));
-    let (status, ctype, mut body, acao, mut set_cookie) = match read_request(&mut stream, MAX_BODY_BYTES) {
-        Err((st, msg)) => (st, "text/plain", msg.as_bytes().to_vec(), Acao::Unscoped, None),
+    let mut served = match read_request(&mut stream, MAX_BODY_BYTES) {
+        Err((st, msg)) => served(st, "text/plain", msg.as_bytes().to_vec(), Acao::Unscoped, None),
         Ok(mut req) => dispatch(&mut req, sh),
     };
-    let cors = match acao {
+    let cors = match served.acao {
         Acao::Omit => String::new(),
         Acao::Keep(o) => format_acao(o),
         Acao::Unscoped => {
             if sh.edge.wildcard() { format_acao(Some("*".to_string())) } else { String::new() }
         }
     };
-    let location = if status.starts_with("302") { "Location: /\r\n" } else { "" };
-    let mut cookie_line = match set_cookie.as_deref() {
+    let location = if served.status.starts_with("302") { "Location: /\r\n" } else { "" };
+    let mut cookie_line = match served.set_cookie.as_deref() {
         Some(c) if !c.is_empty() => format!("Set-Cookie: {c}\r\n"),
         _ => String::new(),
     };
-    wipe_opt(&mut set_cookie);
+    wipe_opt(&mut served.set_cookie);
     let mut head = format!(
-        "HTTP/1.1 {status}\r\nContent-Type: {ctype}\r\nContent-Length: {}\r\nCache-Control: no-store\r\n{location}{cors}{cookie_line}Access-Control-Allow-Methods: GET, POST, DELETE, OPTIONS\r\nAccess-Control-Allow-Headers: {CORS_ALLOW_HEADERS}\r\n{SECURITY_HEADERS}Connection: close\r\n\r\n",
-        body.len()
+        "HTTP/1.1 {status}\r\nContent-Type: {ctype}\r\nContent-Length: {len}\r\nCache-Control: {cache}\r\n{extra}{location}{cors}{cookie_line}Access-Control-Allow-Methods: GET, POST, DELETE, OPTIONS\r\nAccess-Control-Allow-Headers: {CORS_ALLOW_HEADERS}\r\n{SECURITY_HEADERS}Connection: close\r\n\r\n",
+        status = served.status,
+        ctype = served.ctype,
+        len = served.content_length,
+        cache = served.cache_control,
+        extra = served.extra,
     );
     let _ = stream.write_all(head.as_bytes());
-    let _ = stream.write_all(&body);
+    let _ = stream.write_all(&served.body);
     let _ = stream.flush();
     // The socket has the bytes. Do not leave a token or a WAV sitting in this buffer.
     wipe_string(&mut head);
     wipe_string(&mut cookie_line);
-    zeroise_bytes(&mut body);
+    wipe_string(&mut served.extra);
+    zeroise_bytes(&mut served.body);
 }
 
-fn dispatch(req: &mut Request, sh: &Shared) -> (&'static str, &'static str, Vec<u8>, Acao, Option<String>) {
+fn dispatch(req: &mut Request, sh: &Shared) -> Served {
     if query_carries_token(&req.query) {
         zeroise_bytes(&mut req.body);
-        return ("400 Bad Request", "text/plain", b"session token must not be in the URL".to_vec(), Acao::Omit, None);
+        return served("400 Bad Request", "text/plain", b"session token must not be in the URL".to_vec(), Acao::Omit, None);
     }
     let origin = req.header("origin").map(str::to_string);
     let sensitive = route_is_sensitive(&req.method, &req.path);
     match check_origin(origin.as_deref(), &sh.edge.cors_origins, sensitive) {
         OriginCheck::Reject => {
             zeroise_bytes(&mut req.body);
-            ("403 Forbidden", "text/plain", b"origin rejected".to_vec(), Acao::Omit, None)
+            served("403 Forbidden", "text/plain", b"origin rejected".to_vec(), Acao::Omit, None)
         }
         OriginCheck::Allow { acao } => {
             if route_needs_session(&req.method, &req.path) && sh.edge.session_required() {
@@ -1578,12 +1633,34 @@ fn dispatch(req: &mut Request, sh: &Shared) -> (&'static str, &'static str, Vec<
                 }
                 if !ok {
                     zeroise_bytes(&mut req.body);
-                    return ("401 Unauthorized", "text/plain", b"session required".to_vec(), Acao::Keep(acao), None);
+                    return served("401 Unauthorized", "text/plain", b"session required".to_vec(), Acao::Keep(acao), None);
+                }
+            }
+            let head = req.method == "HEAD";
+            let method = if head { "GET" } else { req.method.as_str() };
+            if method == "GET" {
+                if let Some(reply) = super::preview::serve(
+                    sh.preview_dir.as_deref(),
+                    &req.path,
+                    head,
+                    req.header("range"),
+                    req.header("if-none-match"),
+                ) {
+                    return Served {
+                        status: reply.status,
+                        ctype: reply.content_type,
+                        content_length: reply.content_length,
+                        body: reply.body,
+                        acao: Acao::Keep(acao),
+                        set_cookie: None,
+                        cache_control: reply.cache_control,
+                        extra: reply.extra,
+                    };
                 }
             }
             let mut set_cookie = None;
             let (st, ct, body) = route(req, sh, &mut set_cookie);
-            (st, ct, body, Acao::Keep(acao), set_cookie)
+            served(st, ct, body, Acao::Keep(acao), set_cookie)
         }
     }
 }
@@ -3604,6 +3681,137 @@ mod tests {
         assert!(b.set_reply("s4", b"RIFF0000WAVE".to_vec(), 80));
         assert!(!b.latest_json().unwrap().contains("hub_texture"));
         assert!(!b.set_reply_hub("bad id", Vec::new(), 1, true));
+    }
+
+    fn preview_dir(label: &str) -> std::path::PathBuf {
+        let dir = std::env::temp_dir().join(format!(
+            "galion-preview-{}-{}-{}",
+            std::process::id(),
+            label,
+            std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_nanos()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    fn tone_wav() -> Vec<u8> {
+        let rate = 16_000u32;
+        let n = rate / 20; // 50 ms
+        let samples: Vec<i16> = (0..n)
+            .map(|i| {
+                let t = i as f32 / rate as f32;
+                (0.25 * (t * 440.0 * std::f32::consts::TAU).sin() * i16::MAX as f32) as i16
+            })
+            .collect();
+        encode_wav_pcm16(rate, 1, &samples)
+    }
+
+    #[test]
+    fn preview_route_types_ranges_cache_and_missing_file() {
+        let dir = preview_dir("route");
+        let wav = tone_wav();
+        let script = br#"{"text":"Galion One.","segments":[{"start":0.0,"end":1.0,"text":"Galion One."}]}"#;
+        std::fs::write(dir.join("voice-preview.wav"), &wav).unwrap();
+        std::fs::write(dir.join("voice-preview.mp3"), b"ID3placeholder").unwrap();
+        std::fs::write(dir.join("voice-preview.opus"), b"OggSplaceholder").unwrap();
+        std::fs::write(dir.join("voice-preview.json"), script).unwrap();
+        std::fs::write(dir.join("notes.txt"), b"not served").unwrap();
+
+        let mut w = WebSurface::serve("127.0.0.1:0".parse().unwrap()).with_preview_dir(&dir);
+        w.open().unwrap();
+        let a = w.local_addr().unwrap();
+
+        let (h, body) = split_resp(&raw(a, b"GET /preview/voice-preview.wav HTTP/1.1\r\nHost: x\r\n\r\n"));
+        assert!(h.starts_with("HTTP/1.1 200"), "{h}");
+        assert!(h.contains("Content-Type: audio/wav"), "{h}");
+        assert!(h.contains("Accept-Ranges: bytes"), "{h}");
+        assert!(h.contains("Cache-Control: public, max-age=3600"), "{h}");
+        assert!(h.contains("ETag: \""), "{h}");
+        assert!(!h.contains("Cache-Control: no-store"), "{h}");
+        assert_eq!(body, wav);
+
+        let (h, body) = split_resp(&raw(a, b"GET /preview/voice-preview.mp3 HTTP/1.1\r\nHost: x\r\n\r\n"));
+        assert!(h.starts_with("HTTP/1.1 200") && h.contains("Content-Type: audio/mpeg"), "{h}");
+        assert_eq!(body, b"ID3placeholder");
+
+        let (h, body) = split_resp(&raw(a, b"GET /preview/voice-preview.opus HTTP/1.1\r\nHost: x\r\n\r\n"));
+        assert!(h.starts_with("HTTP/1.1 200") && h.contains("Content-Type: audio/ogg; codecs=opus"), "{h}");
+        assert_eq!(body, b"OggSplaceholder");
+
+        let (h, body) = split_resp(&raw(a, b"GET /preview/voice-preview.json HTTP/1.1\r\nHost: x\r\n\r\n"));
+        assert!(h.starts_with("HTTP/1.1 200"), "{h}");
+        assert!(h.contains("Content-Type: application/json; charset=utf-8"), "{h}");
+        assert!(h.contains("Cache-Control: public, max-age=3600"), "{h}");
+        assert_eq!(body, script);
+
+        let (h, body) = split_resp(&raw(a, b"GET /preview/voice-preview.wav HTTP/1.1\r\nHost: x\r\nRange: bytes=0-3\r\n\r\n"));
+        assert!(h.starts_with("HTTP/1.1 206"), "{h}");
+        assert!(h.contains(&format!("Content-Range: bytes 0-3/{}", wav.len())), "{h}");
+        assert!(h.contains("Content-Length: 4"), "{h}");
+        assert_eq!(body, b"RIFF");
+
+        let (h, body) = split_resp(&raw(a, b"GET /preview/voice-preview.wav HTTP/1.1\r\nHost: x\r\nRange: bytes=-4\r\n\r\n"));
+        assert!(h.starts_with("HTTP/1.1 206"), "{h}");
+        assert_eq!(body.len(), 4);
+        assert_eq!(body, &wav[wav.len() - 4..]);
+
+        let (h, _) = split_resp(&raw(a, b"GET /preview/voice-preview.wav HTTP/1.1\r\nHost: x\r\nRange: bytes=999999-999999\r\n\r\n"));
+        assert!(h.starts_with("HTTP/1.1 416"), "{h}");
+        assert!(h.contains(&format!("Content-Range: bytes */{}", wav.len())), "{h}");
+        assert!(h.contains("Cache-Control: no-store"), "{h}");
+
+        let etag = h_etag(&split_resp(&raw(a, b"HEAD /preview/voice-preview.wav HTTP/1.1\r\nHost: x\r\n\r\n")).0);
+        let (h, body) = split_resp(&raw(a, b"HEAD /preview/voice-preview.wav HTTP/1.1\r\nHost: x\r\n\r\n"));
+        assert!(h.starts_with("HTTP/1.1 200"), "{h}");
+        assert!(h.contains(&format!("Content-Length: {}", wav.len())), "{h}");
+        assert!(body.is_empty(), "HEAD has no body");
+        let req = format!("GET /preview/voice-preview.wav HTTP/1.1\r\nHost: x\r\nIf-None-Match: {etag}\r\n\r\n");
+        let (h, body) = split_resp(&raw(a, req.as_bytes()));
+        assert!(h.starts_with("HTTP/1.1 304"), "{h}");
+        assert!(body.is_empty(), "{body:?}");
+
+        let (h, body) = split_resp(&raw(a, b"GET /preview/voice-preview.flac HTTP/1.1\r\nHost: x\r\n\r\n"));
+        assert!(h.starts_with("HTTP/1.1 404"), "{h}");
+        assert_eq!(body, b"not found");
+        let (h, _) = split_resp(&raw(a, b"GET /preview/notes.txt HTTP/1.1\r\nHost: x\r\n\r\n"));
+        assert!(h.starts_with("HTTP/1.1 404"), "{h}");
+
+        std::fs::remove_file(dir.join("voice-preview.mp3")).unwrap();
+        let (h, body) = split_resp(&raw(a, b"GET /preview/voice-preview.mp3 HTTP/1.1\r\nHost: x\r\n\r\n"));
+        assert!(h.starts_with("HTTP/1.1 404"), "{h}");
+        assert!(h.contains("Cache-Control: no-store"), "{h}");
+        assert_eq!(body, b"not found");
+
+        let health = get(a, "/health");
+        assert!(health.contains("Cache-Control: no-store"), "{health}");
+        w.close().unwrap();
+
+        #[cfg(unix)]
+        {
+            let link = dir.join("voice-preview.mp3");
+            std::os::unix::fs::symlink("/etc/passwd", &link).unwrap();
+            let mut w = WebSurface::serve("127.0.0.1:0".parse().unwrap()).with_preview_dir(&dir);
+            w.open().unwrap();
+            let (h, body) = split_resp(&raw(w.local_addr().unwrap(), b"GET /preview/voice-preview.mp3 HTTP/1.1\r\nHost: x\r\n\r\n"));
+            assert!(h.starts_with("HTTP/1.1 404"), "symlink outside the dir is not served: {h}");
+            assert!(!body.windows(5).any(|w| w == b"root:"), "{body:?}");
+            w.close().unwrap();
+        }
+
+        let mut bare = WebSurface::serve("127.0.0.1:0".parse().unwrap());
+        bare.open().unwrap();
+        let (h, body) = split_resp(&raw(bare.local_addr().unwrap(), b"GET /preview/voice-preview.wav HTTP/1.1\r\nHost: x\r\n\r\n"));
+        assert!(h.starts_with("HTTP/1.1 404"), "{h}");
+        assert!(h.contains("Cache-Control: no-store"), "{h}");
+        assert_eq!(body, b"not found");
+        bare.close().unwrap();
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    fn h_etag(head: &str) -> String {
+        head.lines()
+            .find_map(|l| l.strip_prefix("ETag:").map(|v| v.trim().to_string()))
+            .expect("etag")
     }
 
 }

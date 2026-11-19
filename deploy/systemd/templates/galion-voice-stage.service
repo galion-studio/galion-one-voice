@@ -33,6 +33,10 @@ Environment=GALION_LLM=hermes
 # Environment=GALION_LLM_KEY_FILE=/etc/galion/voice-hermes.env
 # Environment=GALION_LLM_KEY_NAME=API_SERVER_KEY
 # ReadOnlyPaths=/etc/galion/voice-hermes.env
+# Pre-rendered voice preview. Not a voice model. Files live outside git.
+# Opus, mp3, wav, and the caption JSON. See docs/deploy/TITANAXE-VPS.md.
+# /opt/galion/voice is already on ReadWritePaths, so this path needs no extra line.
+# Environment=GALION_PREVIEW_AUDIO_DIR=/opt/galion/voice/preview
 ExecStart=/opt/galion/voice/release/current/dot_console_demo --headless --realtime --no-png --web 127.0.0.1:7878 --seconds 3600
 WorkingDirectory=/opt/galion/voice/release/current
 Restart=always

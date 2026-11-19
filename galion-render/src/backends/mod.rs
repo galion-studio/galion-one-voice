@@ -6,6 +6,8 @@ pub mod window;
 #[cfg(feature = "web")]
 mod edge;
 #[cfg(feature = "web")]
+mod preview;
+#[cfg(feature = "web")]
 pub mod web;
 /// Headless PNG framebuffer surface (std-only, always compiled; W21-04).
 pub mod png_seq;

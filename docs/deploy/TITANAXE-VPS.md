@@ -59,9 +59,38 @@ The voice brain (`HermesLlm::from_env` in `crates/galion-cascade`) reads the gat
 
 — Maciej Grajczyk
 
+## Voice preview (`GALION_PREVIEW_AUDIO_DIR`)
+
+The live page plays a pre-rendered clip when a tap on the orb has no live session: `POST /session` fails, or it does not return within 1.5 seconds, or the microphone cannot open. The browser speech engine is not used. A second tap stops the clip.
+
+The process reads `GALION_PREVIEW_AUDIO_DIR` when the web surface is created. The directory is outside this repo. Do not commit the audio. A missing directory or a missing file is HTTP 404 with `Cache-Control: no-store`, and the page shows the caption text instead.
+
+```
+$GALION_PREVIEW_AUDIO_DIR/
+  voice-preview.opus    Ogg Opus. Content-Type: audio/ogg; codecs=opus
+  voice-preview.mp3     Content-Type: audio/mpeg
+  voice-preview.wav     Content-Type: audio/wav
+  voice-preview.json    {"text":"...","segments":[{"start":0.0,"end":1.2,"text":"..."}]}
+```
+
+`start` and `end` are seconds. The page tries opus, then mp3, then wav, skipping a format the browser cannot decode. The JSON is the synced caption script. If every audio file is missing and the JSON is present, the page shows `text` (or the segments joined). If the JSON is missing too, it shows the Art. 50 lines as text.
+
+The service answers only those four names under `/preview/`. `GET` and `HEAD` send `Accept-Ranges: bytes`, an `ETag` of `"<bytes>-<mtime>"`, and `Cache-Control: public, max-age=3600`. One `Range: bytes=` interval returns `206` with `Content-Range`. A range that starts past the end is `416`. `If-None-Match` with the current ETag returns `304`. Anything larger than 16 MiB is `413`. A symlink that resolves outside the directory is `404`.
+
+On the stage unit, a commented `Environment=GALION_PREVIEW_AUDIO_DIR=/opt/galion/voice/preview` sits next to the other environment lines. That directory is already under `ReadWritePaths=/opt/galion/voice`. A path outside that tree needs its own `ReadOnlyPaths` entry because `ProtectSystem=strict` hides it.
+
+To hear the installed file without opening the microphone, open `/?preview=1` and tap the orb. The same player runs for the session fallback.
+
+Caddy must proxy these in addition to the routes below. Do not apply the 1 KB body cap, and do forward `Range`:
+
+- `/preview/voice-preview.opus`
+- `/preview/voice-preview.mp3`
+- `/preview/voice-preview.wav`
+- `/preview/voice-preview.json`
+
 ## Planned public path through Caddy (audio routes)
 
-- Public routes that must proxy via Caddy to `127.0.0.1:7878`: `/`, `/dot`, `/mic`, `/turn`, `/reply/*`. Everything else stays 404 at the edge.
+- Public routes that must proxy via Caddy to `127.0.0.1:7878`: `/`, `/dot`, `/mic`, `/turn`, `/reply/*`, and the four `/preview/voice-preview.*` files above. Everything else stays 404 at the edge.
 - Body size limits: `/`, `/dot`, `/reply/*` keep `max_size 1KB`. Audio uploads (`/mic`, `/turn`) need a separate matcher with `request_body { max_size 2MB }` and a longer `read_body` timeout (~15s); tune once real clip sizes are measured.
 - Port 7878 stays loopback-only (WebSurface refuses public binds); do not open it in the firewall. Caddy :80/:443 are the only public listeners.
 - Status: documented in `deploy/Caddyfile` comments only; the live config is unchanged.
