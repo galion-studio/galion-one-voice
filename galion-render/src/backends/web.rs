@@ -21,7 +21,7 @@
 //!   GET / , /screen, /one, /one/ -> the caller's single-screen HTML page, only when one was set with
 //!                      [`WebSurface::with_page`] (V1-01; the page itself is owned by
 //!                      galion-console, this crate only serves the bytes); 404 otherwise
-//!   GET /research, /research/ -> the Galion Research desk, same gate as /one.
+//!   GET /research, /research/ -> a notice. The desk lives in galion-studio/hermes-research. Same gate as /one.
 //!                      Sets `galion_research`, an HttpOnly SameSite=Strict cookie.
 //!                      `X-Galion-Research` carries the same id when there is no cookie jar.
 //!   GET /research/hermes, GET /research/history, GET /research/progress,
@@ -636,7 +636,7 @@ impl WebSurface {
         s
     }
     /// Serve `html` at `/`, `/screen`, `/one`, and `/one/` (set before `open()`).
-    /// `GET /research` uses the same gate and serves the research prompt.
+    /// `GET /research` uses the same gate and serves the research notice.
     pub fn with_page(mut self, html: &'static str) -> Self {
         self.sh.page = Some(html);
         self
@@ -717,8 +717,10 @@ impl WebSurface {
 
 const V2_REDIRECT_HTML: &str = "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta http-equiv=\"refresh\" content=\"0; url=/\"><title>Galion Voice</title><script>location.replace(\"/\");</script></head><body><p><a href=\"/\">Galion Voice</a></p></body></html>";
 
-/// Galion Research. Served at `/research` and `/research/` when a product page is set,
-/// the same gate as `/one`.
+/// A notice served at `/research` and `/research/` when a product page is set,
+/// the same gate as `/one`. The desk lives in galion-studio/hermes-research.
+/// The earlier page is `docs/archive/research-web/research.html`.
+/// `POST /research/ask` stays.
 const RESEARCH_HTML: &str = include_str!("../../../crates/galion-console/assets/research.html");
 
 #[derive(Clone)]
@@ -2152,99 +2154,25 @@ mod tests {
             let body = r.split_once("\r\n\r\n").map(|(_, b)| b).unwrap_or("");
             for needle in [
                 "<title>Galion Research</title>",
-                "data-product=\"research\"",
-                "id=\"prompt\"",
-                "id=\"voice\"",
-                "id=\"voice-dot\"",
-                "id=\"voice-name\"",
-                "aria-label=\"Voice\"",
-                "function markInner",
-                "edge:\"#E8E8ED\"",
-                "Galion Research is the Hermes research app, a voice of Galion One",
-                "id=\"hermes-status\"",
-                "id=\"history\"",
-                "data-app=\"hermes\"",
-                "/research/ask",
-                "/research/hermes",
-                "/research/history",
-                "/research/sources",
-                "readAsText",
-                "data-voice=\"galion-research\"",
-                "id=\"add-file\"",
-                "id=\"add-image\"",
-                "id=\"sources\"",
-                "id=\"answer\"",
-                "id=\"citations\"",
-                "id=\"to-one\"",
-                "href=\"/one\"",
-                "No source yet.",
-                "None in hand.",
-                "galion.app/research",
-                "Ultra $220/€220 per month",
-                "id=\"sources-local\"",
-                "id=\"sources-reading\"",
-                "id=\"sources-arriving\"",
-                "id=\"notebook\"",
-                "id=\"found\"",
-                "id=\"inferred\"",
-                "id=\"unknown\"",
-                "id=\"experiment\"",
-                "Ask first",
-                "data-voice-to-voice=\"on\"",
-                "id=\"ui-toggle\"",
-                "id=\"helpers\"",
-                "<details id=\"helpers\">",
-                "id=\"helpers-summary\"",
-                "Helpers are quiet.",
-                "/research/progress",
-                "id=\"silence\"",
-                "id:\"question-sent\"",
-                "id:\"thinking\"",
-                "id:\"answer-ready\"",
-                "id:\"source-attached\"",
-                "id:\"source-cited\"",
-                "id:\"error\"",
-                "id:\"window-open\"",
-                "id:\"window-close\"",
-                "id:\"window-minimise\"",
-                "id:\"window-settle\"",
-                "var FUND=432",
-                "FUND*(5/4)",
-                "FUND*(3/2)",
-                "FUND*2",
-                "FUND/4",
-                "galion-one-silence",
-                "o.type=\"sine\"",
-                "docs/07-sound-guide/SOUND-LANGUAGE.md",
-                "Local. What is already known stays marked local.",
-                "data-ui=\"minimal\"",
-                "data-standard=\"432\"",
-                "--ink:#E6EDF3",
-                "--sky:#58C4FF",
-                "id=\"offline-mark\"",
-                "aria-live=\"polite\"",
-                ">Offline<",
-                "G.A.L.I.O.N. — General Autonomous Local Intelligence Open Network",
-                "Developed and distributed by Galion Labs",
-                "Perpetual Open MIT License",
-                "Copyright © 2026 Galion Labs. All rights reserved.",
-                "Permission is hereby granted, free of charge",
-                "Copyright (c) 2026 Galion Labs",
+                "This page is no longer the research desk.",
+                "Galion Research web interface",
+                "galion-studio/hermes-research",
+                "research.galion.app",
+                "docs/archive/research-web/research.html",
+                "Open the Galion Research app",
+                "Developed by Galion Labs",
+                "MIT License",
                 "#0B0F14",
                 "#58C4FF",
                 "#B8E8FF",
-                "#0B5FA5",
-                "#F5F5F7",
             ] {
                 assert!(body.contains(needle), "{p} missing {needle}");
             }
-            assert!(body.contains("<details id=\"helpers\">"), "helper progress is a disclosure");
-            assert!(!body.contains("<details id=\"helpers\" open"), "helpers stay collapsed until opened");
-            assert!(body.contains("<canvas id=\"voice-dot\""), "the restyled Voice V2 dot is the entry");
+            assert!(!body.contains("id=\"prompt\""), "{p} still has the prompt");
+            assert!(!body.contains("id=\"voice\""), "{p} still has the voice control");
+            assert!(!body.contains("Hermes"), "{p} names Hermes");
             assert!(!body.contains("id=\"s\""), "research is not the full-screen one-dot page");
             assert!(!body.contains("data-mark=\"orb\""), "the full-screen orb stays on /one");
-            assert!(!body.contains("hz:288"), "research cues stay on 2:1, 3:2, and 5:4");
-            assert!(!body.contains("id:\"ask\"") && !body.contains("id:\"local\""), "the old single-tone set is gone");
             assert!(!body.contains(".wav") && !body.contains(".mp3") && !body.contains(".ogg"));
             assert!(!body.contains("type=\"square\"") && !body.contains("type=\"sawtooth\"") && !body.contains("type=\"triangle\""));
             assert!(!body.contains("howler") && !body.contains("tone.js"));
@@ -2923,7 +2851,7 @@ mod tests {
         let a = w.local_addr().unwrap();
         let page = get(a, "/research");
         assert_research_cookie(&page);
-        assert!(page.contains("data-ui=\"minimal\"") && page.contains("--ink:#E6EDF3") && page.contains("--sky:#58C4FF"), "{page}");
+        assert!(page.contains("This page is no longer the research desk.") && page.contains("galion-studio/hermes-research"), "{page}");
         let blocked = get(a, "/research/sources?galion_research=not-a-cookie");
         assert!(blocked.starts_with("HTTP/1.1 400"), "{blocked}");
 
