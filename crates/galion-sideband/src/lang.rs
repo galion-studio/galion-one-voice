@@ -46,10 +46,12 @@ impl LanguageHint {
 
 /// Explicit pin: "speak and listen in X until unpinned". A pin to a disabled
 /// language is an error at the engine, never a silent switch.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum LangPin { Pinned(LangTag), Auto }
-
-impl Default for LangPin { fn default() -> Self { LangPin::Auto } }
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub enum LangPin {
+    Pinned(LangTag),
+    #[default]
+    Auto,
+}
 
 /// Per-session language preferences carried on the side-band.
 #[derive(Debug, Clone, PartialEq, Default)]

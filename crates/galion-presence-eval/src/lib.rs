@@ -464,6 +464,7 @@ fn blank_fail(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn loop_text(
     port: u16,
     id: &str,
@@ -493,6 +494,7 @@ fn loop_text(
     ))
 }
 
+#[allow(clippy::too_many_arguments)]
 fn loop_wav(
     port: u16,
     id: &str,
@@ -526,6 +528,7 @@ fn loop_wav(
     ))
 }
 
+#[allow(clippy::too_many_arguments)]
 fn score_view(
     id: &str,
     tier: &'static str,

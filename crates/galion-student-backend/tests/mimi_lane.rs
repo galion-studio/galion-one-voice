@@ -22,8 +22,10 @@ fn run(cfg: MimiLaneConfig, frames: u64) -> MimiPassthrough {
 
 #[test]
 fn stub_flag_unchanged() {
-    assert!(IS_STUB);
-    assert!(galion_mimi::IS_STUB);
+    #[allow(clippy::assertions_on_constants)]
+    const _: () = assert!(IS_STUB);
+    #[allow(clippy::assertions_on_constants)]
+    const _: () = assert!(galion_mimi::IS_STUB);
 }
 
 #[test]

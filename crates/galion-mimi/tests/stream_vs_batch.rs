@@ -129,7 +129,8 @@ fn zero_weights_real_kernels_give_zero_codes_and_silence() {
     let cfg = tiny_cfg();
     let mut m = MimiCodec::with_weight_source(cfg.clone(), &ZeroWeights).unwrap();
     assert!(m.has_kernels());
-    assert!(IS_STUB, "kernels without cleared weights never flip IS_STUB");
+    #[allow(clippy::assertions_on_constants)]
+    const _: () = assert!(IS_STUB, "kernels without cleared weights never flip IS_STUB");
     let mut codes = vec![u16::MAX; cfg.n_codebooks];
     let mut out = vec![1.0f32; 1920];
     for fr in test_pcm(3 * 1920).chunks_exact(1920) {

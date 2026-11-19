@@ -90,10 +90,10 @@ impl CausalConv1dStream {
                 for ic in 0..self.cpg {
                     let row = &self.buf[(g * self.cpg + ic) * stride..];
                     let wr = &self.w[(oc * self.cpg + ic) * self.k..];
-                    for kk in 0..self.k {
+                    for (kk, &w_k) in wr.iter().enumerate().take(self.k) {
                         let pos = t + kk * self.dilation; // buffer index; current sample at t+hist
                         if pos >= first_valid {
-                            acc += row[pos] * wr[kk];
+                            acc += row[pos] * w_k;
                         }
                     }
                 }

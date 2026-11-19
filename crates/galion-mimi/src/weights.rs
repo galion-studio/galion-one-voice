@@ -129,7 +129,7 @@ pub fn check_manifest(m: &WeightManifest) -> Result<(), LoadError> {
     if !m.licence_cleared_by_a21 {
         return Err(LoadError::LicenceNotCleared);
     }
-    if m.file_sha256.as_deref().map_or(true, |s| s.len() != 64) {
+    if m.file_sha256.as_deref().is_none_or(|s| s.len() != 64) {
         return Err(LoadError::IntegrityMissing);
     }
     Ok(())

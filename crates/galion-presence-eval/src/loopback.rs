@@ -125,6 +125,7 @@ fn json_str(s: &str) -> String {
     Value::Str(s.to_string()).to_json()
 }
 
+#[allow(clippy::too_many_arguments)]
 fn outcome(
     ok: bool,
     error: &str,
