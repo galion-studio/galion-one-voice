@@ -141,12 +141,17 @@ GALION_CLONE_FETCH=1 scripts/clone/fetch-clone-weights.sh
 
 Pins are `scripts/clone/PINS.sha256`. Public-demo gates in `docs/galion-voice-v2/RIGHTS-CLEARANCE.md` stay closed until a human opens them.
 
+## Local studio render
+
+Offline line takes for a script, on the owner's machine. CPU unless an NVIDIA GPU is visible. The reference clip is a path passed at runtime and is not stored in git. See [`tools/local-studio/README.md`](tools/local-studio/README.md).
+
 ## Where to read next
 
 - [V2 plan](docs/galion-voice-v2/GALION-VOICE-V2.md)
 - [Symphony index](docs/galion-voice-v2/symphony/README.md)
 - [Clone landing](docs/galion-voice-v2/symphony/CLONE-LANDING.md)
 - [Voice cloning](docs/galion-voice-v2/VOICE-CLONING.md)
+- [Local studio](tools/local-studio/README.md)
 - [Persona](docs/galion-voice-v2/symphony/PERSONA.md)
 - [Presence eval](docs/eval/PRESENCE-EVAL.md)
 - [LEDGER](LEDGER.md)

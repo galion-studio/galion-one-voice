@@ -1,0 +1,8 @@
+/target/
+/out/
+*.wav
+*.wave
+*.mp3
+*.opus
+*.flac
+*.ogg

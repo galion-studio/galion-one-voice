@@ -73,6 +73,8 @@ link.env
 *.wav
 *.flac
 *.mp3
+*.opus
+*.ogg
 *.cbxvoice
 clip-store*/
 venv/
@@ -111,6 +113,12 @@ tools/laptop-runbooks/**/*.ogg
 
 # Emotion V2 capture originals (owner recordings + session manifests). Never commit.
 /originals/
+
+# Local studio renders and any output directory pointed at the checkout.
+# Owner reference clips stay outside the repo. scripts/check-audio-fixtures.sh
+# rejects tracked wav, mp3, opus, and flac above the tiny fixture ceiling.
+tools/local-studio/out/
+studio-out/
 tools/symphony/articulation/target/
 tools/symphony/articulation/out/
 tools/symphony/articulation/.venv/
