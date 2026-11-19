@@ -243,7 +243,8 @@ fn layer_scale_zero_is_identity_and_reset_restarts() {
     assert_eq!(bits(&a.data), bits(&b.data));
     let mut bad = FakeTensor::zeros(&[d + 1, 1]);
     assert!(tf.step(&mut bad).is_err());
-    assert!(IS_STUB, "synthetic tensors never flip IS_STUB");
+    #[allow(clippy::assertions_on_constants)]
+    const _: () = assert!(IS_STUB, "synthetic tensors never flip IS_STUB");
 }
 
 #[test]
@@ -258,7 +259,7 @@ fn layer_norm_and_gelu_primitives() {
     let mut g = vec![-10.0f32, -1.0, 0.0, 1.0, 3.0, 10.0];
     gelu_erf_inplace(&mut g);
     // Exact-erf GELU values (Φ(1)=0.841344746, Φ(3)=0.998650102).
-    let want = [0.0f32, -0.158_655_25, 0.0, 0.841_344_75, 2.995_950_3, 10.0];
+    let want = [0.0f32, -0.158_655_25, 0.0, 0.841_344_8, 2.995_950_3, 10.0];
     for (a, e) in g.iter().zip(want) {
         assert!((a - e).abs() < 1e-6, "{a} vs {e}");
     }

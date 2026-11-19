@@ -99,7 +99,7 @@ pub fn conv_transpose1d(x: &Tensor, w: &Tensor, bias: Option<&Tensor>, p: ConvTr
 }
 
 /// Streaming causal conv1d with carried state — stub (needed for frame-by-frame codec on CPU).
-pub fn conv1d_causal_streaming(_x: &Tensor, _w: &Tensor, _state: &mut Vec<f32>) -> Result<Tensor> {
+pub fn conv1d_causal_streaming(_x: &Tensor, _w: &Tensor, _state: &mut [f32]) -> Result<Tensor> {
     Err(TensorError::Unimplemented("conv1d_causal_streaming"))
 }
 

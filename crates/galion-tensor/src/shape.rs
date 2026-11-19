@@ -22,10 +22,10 @@ impl Shape {
     pub fn broadcast(&self, other: &Shape) -> Result<Shape> {
         let r = self.rank().max(other.rank());
         let mut out = vec![0; r];
-        for i in 0..r {
+        for (i, slot) in out.iter_mut().enumerate() {
             let a = if i < r - self.rank() { 1 } else { self.0[i - (r - self.rank())] };
             let b = if i < r - other.rank() { 1 } else { other.0[i - (r - other.rank())] };
-            out[i] = match (a, b) {
+            *slot = match (a, b) {
                 (x, y) if x == y => x,
                 (1, y) => y,
                 (x, 1) => x,
