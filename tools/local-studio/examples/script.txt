@@ -1,0 +1,5 @@
+# Galion local studio script. Perpetual Open MIT License. (c) 2026 Galion Labs.
+# One emotion direction per line. The reference clip is not in this file.
+
+[calm] The meeting is on Thursday at four.
+[warm pause_ms=360] I left the notes in your inbox.

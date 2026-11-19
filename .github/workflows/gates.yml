@@ -17,6 +17,15 @@ jobs:
         run: scripts/check-locks.sh
       - name: Forbidden formats and runtimes
         run: scripts/check-no-forbidden.sh
+      - name: Audio fixture size guard
+        run: scripts/check-audio-fixtures.sh
+      - name: Local studio pipeline (synthetic tones, no weights)
+        run: |
+          if ! command -v ffmpeg >/dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y ffmpeg
+          fi
+          cargo test --manifest-path tools/local-studio/Cargo.toml
       - name: Release manifest and stage unit label
         run: |
           if ! command -v jq >/dev/null; then

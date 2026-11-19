@@ -1,0 +1,54 @@
+# Galion local studio. Perpetual Open MIT License. (c) 2026 Galion Labs.
+# The reference clip is a path you pass on the command line. It is not stored here.
+
+[consent]
+owner_reference = true
+
+[render]
+backend = "cbx"
+takes = 3
+device = "auto"
+sample_rate = 24000
+seed = 1
+temperature = 0.7
+command = []
+
+[gates]
+wer_max = 0.018
+ecapa_min = 0.7057
+emotion_min = 0.83
+
+[whisper]
+# A model name the whisper CLI already has cached. This tool does not download it.
+model = "small"
+command = []
+
+[ecapa]
+command = []
+
+[emotion]
+command = []
+
+# galion-emotion categorical labels are neu, hap, ang, sad. This table is empty
+# on purpose: a script word is not renamed unless you write the translation.
+# [emotion.label_map]
+# calm = "neu"
+# warm = "hap"
+
+[bed]
+enabled = true
+tuning_hz = 432.0
+under_voice_db = 18.0
+
+[master]
+target_lufs = -16.0
+true_peak_dbtp = -1.0
+engine = "auto"
+
+[timing]
+lead_in_ms = 120
+gap_ms = 280
+tail_ms = 400
+
+[output]
+formats = ["wav", "opus", "mp3"]
