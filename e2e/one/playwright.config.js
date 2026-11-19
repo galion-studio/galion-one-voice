@@ -1,4 +1,4 @@
-import { defineConfig } from "@playwright/test";
+import { defineConfig, devices } from "@playwright/test";
 
 export default defineConfig({
   testDir: ".",
@@ -9,13 +9,28 @@ export default defineConfig({
   workers: 1,
   use: {
     baseURL: "http://127.0.0.1:4173",
-    viewport: { width: 1440, height: 900 },
-    deviceScaleFactor: 1,
     colorScheme: "dark",
-    launchOptions: {
-      args: ["--autoplay-policy=no-user-gesture-required"],
-    },
   },
+  projects: [
+    {
+      name: "chromium",
+      use: {
+        browserName: "chromium",
+        viewport: { width: 1440, height: 900 },
+        deviceScaleFactor: 1,
+        launchOptions: {
+          args: ["--autoplay-policy=no-user-gesture-required"],
+        },
+      },
+    },
+    {
+      name: "webkit-mobile",
+      testMatch: "preview.spec.js",
+      use: {
+        ...devices["iPhone 13"],
+      },
+    },
+  ],
   webServer: {
     command: "node server.mjs",
     url: "http://127.0.0.1:4173/one",

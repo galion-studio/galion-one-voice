@@ -23,10 +23,10 @@
                     (hub_texture:true = the Jarvis hub bed is mixed into that WAV; body[data-hub-texture]),
                     the AudioContext unlocked by the tap. User speech during playback = barge-in:
                     playback stops at once and the new utterance is captured.
-     V2-S3: AI Act Art. 50 disclosure (HR+EN) is text on the caption line. The page
-     does not use the browser speech engine. A tap on the mark opens a live session. If that
-     session is missing, fails, or does not return within 1.5 s, or the microphone
-     cannot open, the tap plays the pre-rendered preview (or shows its text).
+     The page does not use the browser speech engine. A tap on the mark plays the
+     pre-rendered preview from the audio element immediately (play() in the click
+     handler). Live voice is tried after that; if it is missing, fails, times out
+     in 1.5 s, or the microphone cannot open, the preview keeps playing.
      Owner t653u: the voice surface is still one dot. The canvas draws no text,
      persona names, or transcript. Preview captions are the HTML line in the shell.
      The Galion One shell (hero, prompt, footer) sits over that dot. It is the
@@ -102,6 +102,7 @@ canvas{display:block;position:fixed;inset:0;width:100%;height:100%;width:100dvw;
 #one footer p{margin:0;color:var(--muted);font-size:13px}
 #one footer a{color:var(--fg)}
 .sr{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;border:0}
+#voice-preview{pointer-events:none}
 @media (max-width:720px){
   #one{gap:10px;padding:calc(12px + env(safe-area-inset-top)) calc(12px + env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom)) calc(12px + env(safe-area-inset-left))}
   .hero{padding:14px}
@@ -114,7 +115,7 @@ canvas{display:block;position:fixed;inset:0;width:100%;height:100%;width:100dvw;
 }
 </style>
 <script type="module">
-import { drawNebula } from "/nebula/vocabulary.mjs";
+import { drawNebula } from "/nebula/vocabulary.mjs?v=__GALION_ASSET_V__";
 window.drawNebula = drawNebula;
 </script>
 </head>
@@ -136,7 +137,11 @@ window.drawNebula = drawNebula;
     <a class="download" href="https://github.com/galion-studio/obsidian-open-mind/actions/workflows/openmind-desktop.yml" target="_blank" rel="noopener noreferrer">Download alpha on GitHub<span class="sr"> (opens in a new tab)</span></a>
   </section>
   <div class="stage"><p id="caption" aria-live="polite"></p></div>
-  <p id="ai-note" class="sr">Razgovarate s umjetnom inteligencijom. Galion je AI asistent, a ne osoba. You are talking to an AI. Galion is an AI assistant, not a person.</p>
+  <audio id="voice-preview" class="sr" preload="auto" playsinline webkit-playsinline>
+    <source src="/preview/voice-preview.mp3?v=__GALION_ASSET_V__" type="audio/mpeg">
+    <source src="/preview/voice-preview.opus?v=__GALION_ASSET_V__" type="audio/ogg; codecs=opus">
+    <source src="/preview/voice-preview.wav?v=__GALION_ASSET_V__" type="audio/wav">
+  </audio>
   <section class="about" aria-label="About Galion One">
     <p class="lede">Galion One is the assistant you talk to. Speak, or type. The mark in the middle is the voice. Galion Research is the research engine for the deeper questions.</p>
     <p class="artifact">An alpha test build for Windows, macOS and Linux. Open source under the MIT License. Developed by Galion Labs, built in Rust.</p>
@@ -180,8 +185,7 @@ const cv=document.getElementById("s"), cx=cv.getContext("2d",{alpha:false});
 const bg=document.createElement("canvas"); bg.width=BW; bg.height=BH;
 const bx=bg.getContext("2d"), img=bx.createImageData(BW,BH);
 // The canvas draws no text. The shell status line shows the same message the tone marks.
-const AI_DISCLOSURE={hr:"Razgovarate s umjetnom inteligencijom. Galion je AI asistent, a ne osoba.",en:"You are talking to an AI. Galion is an AI assistant, not a person."};
-let aiDisclosed=false;
+const ASSET_V="__GALION_ASSET_V__";
 const t0=performance.now();
 let latest=null, lastOk=0, lastT=-1, inflight=0, everOk=false;
 let shown="idle", cand="idle", candSince=0;          // displayed mode + hysteresis
@@ -196,15 +200,15 @@ let capNode=null, capSink=null, capRatio=1, capPos=0, capFrame=new Float32Array(
 let vadFloor=0.003, vadOn=false, vadRun=0, vadQuiet=0, vadSpeechMs=0, uttMs=0, uttBarge=false;
 let preroll=[], utt=[], turnSeq=0;
 let playSrc=null, playId=null, playing=false, seenReplies=new Set();
-// Pre-rendered preview. arming is the 1.5 s live-session wait. previewOn is playback or text captions.
+// Pre-rendered preview. The <audio> element is in the document from the start so
+// play() can run inside the tap, before any await. arming is the 1.5 s live wait.
 const LIVE_SESSION_MS=1500;
-const PREVIEW_AUDIO=[
-  ["preview/voice-preview.opus","audio/ogg; codecs=opus"],
-  ["preview/voice-preview.mp3","audio/mpeg"],
-  ["preview/voice-preview.wav","audio/wav"]
-];
-let arming=false, previewOn=false, previewScript=null, previewSeg=-1, previewT0=0, previewRaf=0, voiceGen=0;
-let previewCache=null;
+function assetUrl(path){
+  const join=path.indexOf("?")>=0?"&":"?";
+  return path+join+"v="+encodeURIComponent(ASSET_V);
+}
+let arming=false, previewOn=false, previewScript=null, previewSeg=-1, previewRaf=0, voiceGen=0;
+let previewScriptTried=false;
 // V2 orb: spring state. Gains ease from the idle aim. No aspect — the mark is a circle.
 const LUTI={idle:{w:1.8,z:0.92},listening:{w:3.4,z:0.88},thinking:{w:2.4,z:0.90},speaking:{w:3.0,z:0.92},offline:{w:2.0,z:1.02}};
 const SPRING=LUTI;
@@ -241,12 +245,6 @@ async function ensureSession(){
   await postSession(0);
 }
 function openLiveSession(){ return postSession(LIVE_SESSION_MS); }
-function discloseAi(){
-  if(aiDisclosed) return;
-  aiDisclosed=true;
-  const cap=document.getElementById("caption");
-  if(cap&&!cap.textContent) showCaption(AI_DISCLOSURE.en);
-}
 function showCaption(text){
   const el=document.getElementById("caption");
   if(el) el.textContent=text||"";
@@ -691,17 +689,24 @@ function mountPrompt(){
   }
   if(voice) voice.addEventListener("click",onVoice);
 }
+function timeoutError(ms){
+  return new Promise((_,rej)=>setTimeout(()=>rej(Object.assign(new Error("timeout"),{name:"TimeoutError"})), ms));
+}
+function dropStream(stream){
+  if(!stream||!stream.getTracks) return;
+  stream.getTracks().forEach(t=>{ try{t.stop();}catch(e){} });
+}
 async function enableMic(opts){
   opts=opts||{};
   if(micState==="on"||micState==="pending") return;
-  if(!opts.fallbackPreview) discloseAi();
-  await ensureSession();
+  const gen=opts.gen||voiceGen;
+  if(!opts.fallbackPreview) await ensureSession();
   if(!window.isSecureContext && location.hostname!=="localhost" && location.hostname!=="127.0.0.1"){
-    if(opts.fallbackPreview){ startPreview(opts.gen||voiceGen); return; }
+    if(opts.fallbackPreview) return;
     showErr("Microphone needs HTTPS. Open the https:// link."); return;
   }
   if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
-    if(opts.fallbackPreview){ startPreview(opts.gen||voiceGen); return; }
+    if(opts.fallbackPreview) return;
     showErr("This browser cannot open the microphone."); return;
   }
   micState="pending"; syncVoice(); showErr("");
@@ -709,12 +714,16 @@ async function enableMic(opts){
   // the gesture already created so iOS Safari, Android Chrome, and desktop can play later.
   ensureAudio();
   if(productIsOne()) playSound("wake");
+  const gum=navigator.mediaDevices.getUserMedia({
+    audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true,channelCount:1},
+    video:false
+  });
   try{
-    micStream=await navigator.mediaDevices.getUserMedia({
-      audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true,channelCount:1},
-      video:false
-    });
+    const wait=opts.fallbackPreview?Promise.race([gum, timeoutError(LIVE_SESSION_MS)]):gum;
+    micStream=await wait;
+    if(gen!==voiceGen){ dropStream(micStream); micStream=null; if(micState==="pending"){ micState="off"; syncVoice(); } return; }
     if(micCtx.state==="suspended") await micCtx.resume();
+    stopPreview();
     const src=micCtx.createMediaStreamSource(micStream);
     micAnalyser=micCtx.createAnalyser();
     micAnalyser.fftSize=1024;
@@ -724,17 +733,15 @@ async function enableMic(opts){
     syncVoice();
     hideHint();
     showErr("");
-    discloseAi();
     tickMic();
     startCapture(src).catch(()=>showErr("Speech capture unavailable — level only."));
   }catch(e){
+    gum.then(s=>dropStream(s)).catch(()=>{});
     if(opts.fallbackPreview){
       micState="off";
       syncVoice();
       showErr("");
-      // The OS error cue still marks a blocked microphone. The preview plays after it.
       if(productIsOne()) playSound("error");
-      startPreview(opts.gen||voiceGen);
       return;
     }
     micState="denied";
@@ -756,17 +763,7 @@ function chromeEvent(e){
 function previewRequested(){
   try{ return new URLSearchParams(location.search).get("preview")==="1"; }catch(e){ return false; }
 }
-function previewOrder(){
-  let el=null;
-  try{ el=document.createElement("audio"); }catch(e){}
-  const known=[], rest=[];
-  for(const row of PREVIEW_AUDIO){
-    let r="";
-    try{ r=el&&el.canPlayType?el.canPlayType(row[1]):"maybe"; }catch(e){ r="maybe"; }
-    if(r==="probably"||r==="maybe") known.push(row); else rest.push(row);
-  }
-  return known.concat(rest);
-}
+function previewEl(){ return document.getElementById("voice-preview"); }
 function parsePreviewScript(j){
   if(!j||typeof j!=="object"||Array.isArray(j)) return null;
   const text=typeof j.text==="string"?j.text:"";
@@ -781,44 +778,63 @@ function parsePreviewScript(j){
   }
   return {text:text,segments:segments};
 }
-function prefetchPreviewFiles(){
-  if(previewCache) return previewCache;
-  previewCache=(async()=>{
-    let script=null;
-    try{
-      const r=await fetch("preview/voice-preview.json",{cache:"default",headers:{"ngrok-skip-browser-warning":"1"}});
-      if(r.ok) script=parsePreviewScript(await r.json());
-    }catch(e){}
-    const audios=[];
-    for(const row of previewOrder()){
-      try{
-        const r=await fetch(row[0],{cache:"default",headers:{"ngrok-skip-browser-warning":"1"}});
-        if(!r.ok) continue;
-        const bytes=await r.arrayBuffer();
-        if(bytes&&bytes.byteLength) audios.push(bytes);
-      }catch(e){}
-    }
-    return {script:script,audios:audios};
-  })();
-  return previewCache;
+function loadPreviewScript(){
+  if(previewScriptTried) return;
+  previewScriptTried=true;
+  fetch(assetUrl("/preview/voice-preview.json"),{cache:"default",headers:{"ngrok-skip-browser-warning":"1"}})
+    .then(r=>r.ok?r.json():null)
+    .then(j=>{ previewScript=parsePreviewScript(j); })
+    .catch(()=>{});
 }
-function fallbackCaption(script){
-  if(script&&script.text) return script.text;
-  if(script&&script.segments&&script.segments.length) return script.segments.map(s=>s.text).join(" ");
-  return AI_DISCLOSURE.hr+" "+AI_DISCLOSURE.en;
+function playPreviewNow(){
+  const el=previewEl();
+  if(!el) return false;
+  try{ el.muted=false; el.volume=1; }catch(e){}
+  previewOn=true;
+  previewSeg=-1;
+  arming=false;
+  playId="preview";
+  playing=true;
+  // play() is called in this turn of the click handler, before any await.
+  let started=false;
+  try{
+    const p=el.play();
+    started=true;
+    if(p&&p.then) p.then(()=>{ if(previewOn) tickPreviewCaption(); }).catch(err=>{
+      if(playId==="preview"){ playing=false; }
+      try{ cv.dataset.previewErr=String(err&&(err.name||err.message)||err); }catch(e){}
+    });
+  }catch(e){
+    playing=false;
+    return false;
+  }
+  tickPreviewCaption();
+  return started;
+}
+function startPreview(gen){
+  if(gen!==voiceGen) return;
+  if(micState==="on"){ arming=false; return; }
+  playPreviewNow();
+  loadPreviewScript();
 }
 function stopPreview(){
   previewOn=false;
   previewSeg=-1;
   arming=false;
   if(previewRaf){ cancelAnimationFrame(previewRaf); previewRaf=0; }
-  stopPlayback();
+  const el=previewEl();
+  if(el){ try{ el.pause(); }catch(e){} try{ el.currentTime=0; }catch(e){} }
+  if(playId==="preview"){ playSrc=null; playing=false; playId=null; }
+  else stopPlayback();
   showCaption("");
 }
 function tickPreviewCaption(){
-  if(!previewOn||!playing) return;
+  if(!previewOn) return;
+  const el=previewEl();
+  if(!el||el.paused) return;
+  playing=true;
   const script=previewScript;
-  const t=(micCtx?micCtx.currentTime:0)-previewT0;
+  const t=el.currentTime||0;
   let line="", idx=-1;
   if(script&&script.segments&&script.segments.length){
     for(let i=0;i<script.segments.length;i++){
@@ -829,66 +845,14 @@ function tickPreviewCaption(){
   if(idx!==previewSeg){ previewSeg=idx; showCaption(line); }
   previewRaf=requestAnimationFrame(tickPreviewCaption);
 }
-async function decodePreview(audios){
-  if(!micCtx||!audios) return null;
-  for(const bytes of audios){
-    try{
-      const buf=await decode(bytes.slice(0));
-      if(buf&&buf.duration>0) return buf;
-    }catch(e){}
-  }
-  return null;
-}
-async function startPreview(gen){
-  let packed=null;
-  try{ packed=await prefetchPreviewFiles(); }catch(e){ packed=null; }
-  if(gen!==voiceGen) return;
-  try{ if(micCtx&&micCtx.state==="suspended") await micCtx.resume(); }catch(e){}
-  let buf=null;
-  try{ buf=await decodePreview(packed&&packed.audios); }catch(e){ buf=null; }
-  if(gen!==voiceGen) return;
-  if(micState==="on"||micState==="pending"){ arming=false; return; }
-  const script=packed&&packed.script;
-  previewScript=script||null;
-  if(!buf||!ensureAudio()||!ensurePlayTap()){
-    previewOn=true;
-    arming=false;
-    aiDisclosed=true;
-    showCaption(fallbackCaption(script));
-    return;
-  }
-  try{ if(micCtx.state==="suspended") await micCtx.resume(); }catch(e){}
-  if(gen!==voiceGen) return;
-  stopPlayback();
-  const src=micCtx.createBufferSource();
-  src.buffer=buf;
-  try{ src.connect(playAn); }catch(e){
-    previewOn=true; arming=false; aiDisclosed=true; showCaption(fallbackCaption(script)); return;
-  }
-  previewOn=true;
-  previewSeg=-1;
-  arming=false;
-  aiDisclosed=true;
-  src.onended=()=>{ if(playSrc===src) stopPreview(); };
-  playSrc=src; playId="preview"; playing=true;
-  previewT0=micCtx.currentTime;
-  try{ src.start(0); }catch(e){
-    stopPreview();
-    previewOn=true;
-    showCaption(fallbackCaption(script));
-    return;
-  }
-  tickPreviewCaption();
-}
 let lastOrbGesture=0;
 function onOrbGesture(e){
   // A double-click is one tap: the second half must not undo the first.
   const now=performance.now();
   if(now-lastOrbGesture<450) return;
   lastOrbGesture=now;
-  // Unlock inside the user gesture, before any await. iOS Safari, Android Chrome, desktop.
+  // Unlock and play inside the user gesture, before any await.
   ensureAudio();
-  prefetchPreviewFiles();
   if(previewOn||arming){
     voiceGen++;
     arming=false;
@@ -898,16 +862,15 @@ function onOrbGesture(e){
   if(micState==="on"){ stopMic(); return; }
   if(micState==="pending") return;
   const gen=++voiceGen;
+  playPreviewNow();
+  loadPreviewScript();
+  if(previewRequested()) return;
   arming=true;
-  if(previewRequested()){ startPreview(gen); return; }
   openLiveSession().then(live=>{
     if(gen!==voiceGen){ arming=false; return; }
-    if(live){
-      arming=false;
-      enableMic({fallbackPreview:true,gen:gen});
-      return;
-    }
-    startPreview(gen);
+    arming=false;
+    if(!live) return;
+    enableMic({fallbackPreview:true,gen:gen});
   });
 }
 let lastOrbTouch=0;
@@ -944,7 +907,6 @@ async function sendText(text){
   if(!ensureAudio()){ showErr("This browser cannot play audio."); return false; }
   const barge=playing;
   if(previewOn||playing) stopPreview();
-  discloseAi();
   await ensureSession();
   turnsInFlight++;
   const watch=turnsInFlight;
@@ -1173,6 +1135,14 @@ addEventListener("pagehide",()=>{ if(productIsOne()) playSound("shutdown"); });
     postIfComplete();
   });
 })();
-prefetchPreviewFiles();
+(function prepPreview(){
+  const el=previewEl();
+  if(!el) return;
+  el.preload="auto";
+  try{ el.setAttribute("playsinline",""); el.setAttribute("webkit-playsinline",""); }catch(e){}
+  try{ el.load(); }catch(e){}
+  el.addEventListener("ended",()=>{ if(previewOn||playId==="preview") stopPreview(); });
+})();
+loadPreviewScript();
 pollOnce(); requestAnimationFrame(draw);
 </script></body></html>
