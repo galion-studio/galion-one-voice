@@ -171,6 +171,22 @@ mod tests {
         assert_eq!(b.name(), "student-stub");
     }
 
+    fn teacher_block(text: &str) -> String {
+        let mut out = String::new();
+        let mut inside = false;
+        for line in text.lines() {
+            let trimmed = line.trim();
+            if trimmed.starts_with('[') && trimmed.ends_with(']') {
+                if inside { break; }
+                inside = trimmed == "[teacher]";
+                if inside { out.push_str(line); out.push('\n'); }
+                continue;
+            }
+            if inside { out.push_str(line); out.push('\n'); }
+        }
+        out
+    }
+
     /// Owner decision 2026-11-15. The teacher block is local Hermes on CPU.
     /// This test reads the config. It does not open a socket.
     #[test]
@@ -205,28 +221,4 @@ mod tests {
             }
         }
     }
-}
-
-fn teacher_block(text: &str) -> String {
-    let mut out = String::new();
-    let mut inside = false;
-    for line in text.lines() {
-        let trimmed = line.trim();
-        if trimmed.starts_with('[') && trimmed.ends_with(']') {
-            if inside {
-                break;
-            }
-            inside = trimmed == "[teacher]";
-            if inside {
-                out.push_str(line);
-                out.push('\n');
-            }
-            continue;
-        }
-        if inside {
-            out.push_str(line);
-            out.push('\n');
-        }
-    }
-    out
 }

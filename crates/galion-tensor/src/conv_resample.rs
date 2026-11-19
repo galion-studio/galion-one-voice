@@ -143,10 +143,10 @@ impl StridedConv1dStream {
                 for ic in 0..self.cpg {
                     let row = &self.buf[(g * self.cpg + ic) * cap..];
                     let wr = &self.w[(oc * self.cpg + ic) * self.k..];
-                    for kk in 0..self.k {
+                    for (kk, &w_k) in wr.iter().enumerate().take(self.k) {
                         let pos = ws + (kk * self.dilation) as isize;
                         if pos >= 0 {
-                            acc += row[pos as usize - self.base] * wr[kk];
+                            acc += row[pos as usize - self.base] * w_k;
                         }
                     }
                 }
@@ -257,12 +257,12 @@ impl ConvTranspose1dStream {
                     let xc = g * self.cpg + ic;
                     let row = &self.buf[xc * row_len..];
                     let wr = &self.w[(xc * self.opg + ol) * self.k..];
-                    for kk in 0..self.k {
+                    for (kk, &w_k) in wr.iter().enumerate().take(self.k) {
                         let kd = kk * self.dilation;
                         if kd <= jh && (jh - kd) % s == 0 {
                             let idx = (jh - kd) / s;
                             if idx >= first_valid {
-                                acc += row[idx] * wr[kk];
+                                acc += row[idx] * w_k;
                             }
                         }
                     }
@@ -316,6 +316,7 @@ mod tests {
     }
 
     // ---------- strided conv ----------
+    #[allow(clippy::too_many_arguments)]
     fn strided_ref(x: &[f32], c_in: usize, len: usize, w: &Tensor, b: Option<&Tensor>, s: usize, d: usize, g: usize, pad: usize) -> Vec<f32> {
         let span = (w.dims()[2] - 1) * d + 1;
         if len + pad < span { return vec![]; }
@@ -327,6 +328,7 @@ mod tests {
         (0..w.dims()[0]).flat_map(|oc| yv[oc * ol..oc * ol + valid].to_vec()).collect()
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn run_strided(c_in: usize, c_out: usize, k: usize, s: usize, d: usize, g: usize, pad: Option<usize>, chunks: &[usize], bias: bool) {
         let len: usize = chunks.iter().sum();
         let w = Tensor::from_vec(lcg(c_out * (c_in / g) * k, 11), [c_out, c_in / g, k]).unwrap();
@@ -393,6 +395,7 @@ mod tests {
     }
 
     // ---------- transposed conv ----------
+    #[allow(clippy::too_many_arguments)]
     fn run_tr(c_in: usize, opg: usize, k: usize, s: usize, d: usize, g: usize, chunks: &[usize], bias: bool) {
         let len: usize = chunks.iter().sum();
         let c_out = opg * g;

@@ -130,7 +130,7 @@ struct Parser<'a> {
     i: usize,
 }
 
-impl<'a> Parser<'a> {
+impl Parser<'_> {
     fn err(&self, msg: &'static str) -> ParseError {
         ParseError { pos: self.i, msg }
     }

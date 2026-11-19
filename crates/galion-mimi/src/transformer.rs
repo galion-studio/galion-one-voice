@@ -244,15 +244,15 @@ impl StreamingTransformer {
         let mut tok = std::mem::take(&mut self.tok);
         let mut r = Ok(());
         for t in 0..n {
-            for c in 0..d {
-                tok[c] = x.data[c * n + t];
+            for (c, slot) in tok[..d].iter_mut().enumerate() {
+                *slot = x.data[c * n + t];
             }
             r = self.step_token(&mut tok);
             if r.is_err() {
                 break;
             }
-            for c in 0..d {
-                x.data[c * n + t] = tok[c];
+            for (c, &slot) in tok[..d].iter().enumerate() {
+                x.data[c * n + t] = slot;
             }
         }
         self.tok = tok;

@@ -19,7 +19,8 @@ fn frame_is_80ms_1920_samples_12_5hz() {
 
 #[test]
 fn encode_decode_one_second_stream() {
-    assert!(IS_STUB);
+    #[allow(clippy::assertions_on_constants)]
+    const _: () = assert!(IS_STUB);
     let mut m = MimiStub::new(MimiConfig::default()).unwrap();
     let n = m.frame_samples();
     let k = m.codes_per_frame();
@@ -44,7 +45,7 @@ fn wrong_sizes_rejected() {
     let mut m = MimiStub::new(MimiConfig::default()).unwrap();
     let mut codes = vec![0u16; 8];
     assert!(m.encode_frame(&vec![0.0; 1919], &mut codes).is_err());
-    assert!(m.encode_frame(&vec![0.0; 1920], &mut vec![0u16; 7]).is_err());
+    assert!(m.encode_frame(&[0.0; 1920], &mut [0u16; 7]).is_err());
     let mut out = vec![0.0; 1920];
     assert!(m.decode_frame(&[2048, 0, 0, 0, 0, 0, 0, 0], &mut out).is_err(), "code out of range");
     assert!(m.decode_frame(&codes, &mut vec![0.0; 960]).is_err());
@@ -52,8 +53,8 @@ fn wrong_sizes_rejected() {
 
 #[test]
 fn non_80ms_config_refused() {
-    let mut cfg = MimiConfig::default();
-    cfg.frame_downsample = 1; // 40 ms
+    // 40 ms, which the stub must refuse.
+    let cfg = MimiConfig { frame_downsample: 1, ..MimiConfig::default() };
     assert!(MimiStub::new(cfg).is_err());
 }
 

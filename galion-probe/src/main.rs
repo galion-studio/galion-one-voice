@@ -12,9 +12,9 @@ fn cpuinfo() -> (String, usize, String) {
     for l in t.lines() {
         if l.starts_with("processor") { n += 1; }
         if model.is_empty() && (l.starts_with("model name") || l.starts_with("Model")) {
-            model = l.splitn(2, ':').nth(1).unwrap_or("").trim().into(); }
+            model = l.split_once(':').map(|(_, v)| v).unwrap_or("").trim().into(); }
         if flags.is_empty() && (l.starts_with("flags") || l.starts_with("Features")) {
-            flags = l.splitn(2, ':').nth(1).unwrap_or("").trim().into(); }
+            flags = l.split_once(':').map(|(_, v)| v).unwrap_or("").trim().into(); }
     }
     (model, n, flags)
 }

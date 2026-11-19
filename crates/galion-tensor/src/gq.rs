@@ -18,7 +18,7 @@
 
 use crate::{Tensor, TensorError};
 use std::collections::HashMap;
-use std::fmt;
+use std::fmt::{self, Write};
 use std::path::Path;
 
 pub const MAGIC: [u8; 8] = *b"GALIONGQ";
@@ -474,7 +474,13 @@ pub fn sha256(data: &[u8]) -> [u8; 32] {
     out
 }
 
-pub fn to_hex(b: &[u8]) -> String { b.iter().map(|x| format!("{x:02x}")).collect() }
+pub fn to_hex(b: &[u8]) -> String {
+    let mut out = String::with_capacity(b.len() * 2);
+    for x in b {
+        let _ = write!(out, "{x:02x}");
+    }
+    out
+}
 
 // ---------------------------------------------------------------------------------------------
 // SHA256SUMS manifest (coreutils `sha256sum` format: "<64 hex>  <path>", '*' = binary mode)
@@ -702,7 +708,7 @@ mod tests {
             }
             if let Ok(g) = GqFile::from_bytes(&b) {
                 ok += 1;
-                for e in g.entries().to_vec() {
+                for e in g.entries().iter().cloned() {
                     let _ = g.tensor(&e.name);
                     let _ = g.verify(&e.name);
                     let _ = g.f32_view(&e.name);
