@@ -732,6 +732,8 @@ async function enableMic(opts){
       micState="off";
       syncVoice();
       showErr("");
+      // The OS error cue still marks a blocked microphone. The preview plays after it.
+      if(productIsOne()) playSound("error");
       startPreview(opts.gen||voiceGen);
       return;
     }
