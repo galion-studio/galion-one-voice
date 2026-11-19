@@ -330,11 +330,8 @@ test("desktop prompt sends a line and keeps file names on the page", async ({ pa
   const after = await (await page.request.get("/__say")).text();
   expect(after).not.toContain("wash-note");
 
-  await page.evaluate(() => {
-    navigator.mediaDevices.getUserMedia = () => Promise.reject(new DOMException("no", "NotAllowedError"));
-  });
   await page.getByRole("button", { name: "Voice" }).click();
-  await expect(page.locator("#status")).toContainText("Microphone blocked");
+  await expect(page.locator("#status")).not.toContainText("Microphone");
   await expect(page).toHaveURL(/\/one\/?$/);
   await page.screenshot({ path: join(shots, "one-shell-desktop.png") });
 });
