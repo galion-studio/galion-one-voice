@@ -525,7 +525,7 @@ mod tests {
         }
         assert!(!SCREEN_HTML.contains("fillText"), "the canvas draws no text");
         assert!(!SCREEN_HTML.contains("fetch(\"v2/cc0\""));
-        assert!(SCREEN_HTML.contains("document.addEventListener(\"click\",onActivate)"), "a tap anywhere starts the mic");
+        assert!(SCREEN_HTML.contains("document.addEventListener(\"click\",onActivate)"), "a tap anywhere starts the preview");
         assert!(SCREEN_HTML.contains("data-mouth=\"piper\""));
         assert!(SCREEN_HTML.contains("data-film-voice=\"false\""));
         assert!(SCREEN_HTML.contains("data-rights=\"hold\""));
@@ -560,6 +560,24 @@ mod tests {
         assert!(!SCREEN_HTML.contains("id=\"ai-note\""));
         assert!(!SCREEN_HTML.contains("speechSynthesis"), "the robotic browser voice is gone");
         assert!(!SCREEN_HTML.contains("SpeechSynthesisUtterance"));
+        assert!(SCREEN_HTML.contains("const PREVIEW_ONLY=true"));
+        assert!(SCREEN_HTML.contains("if(PREVIEW_ONLY) return"));
+        assert!(SCREEN_HTML.contains("dataset.previewOnly"));
+        assert!(SCREEN_HTML.contains("dataset.liveVoice"));
+        let enable_mic = SCREEN_HTML
+            .split_once("async function enableMic")
+            .expect("enableMic")
+            .1;
+        let preview_gate = enable_mic.find("if(PREVIEW_ONLY) return").expect("PREVIEW_ONLY gate");
+        let gum = enable_mic.find("getUserMedia").expect("getUserMedia");
+        assert!(preview_gate < gum, "preview must skip getUserMedia");
+        let orb = SCREEN_HTML
+            .split_once("function onOrbGesture")
+            .expect("onOrbGesture")
+            .1;
+        let preview_tap = orb.find("if(PREVIEW_ONLY){").expect("PREVIEW_ONLY tap");
+        let live_mic = orb.find("enableMic({fallbackPreview:true").expect("live enableMic");
+        assert!(preview_tap < live_mic, "preview tap must return before live voice");
         assert!(SCREEN_HTML.contains("LIVE_SESSION_MS=1500"));
         assert!(SCREEN_HTML.contains("id=\"voice-preview\""));
         assert!(SCREEN_HTML.contains("function playPreviewNow"));

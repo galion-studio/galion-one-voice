@@ -23,10 +23,9 @@
                     (hub_texture:true = the Jarvis hub bed is mixed into that WAV; body[data-hub-texture]),
                     the AudioContext unlocked by the tap. User speech during playback = barge-in:
                     playback stops at once and the new utterance is captured.
-     The page does not use the browser speech engine. A tap on the mark plays the
-     pre-rendered preview from the audio element immediately (play() in the click
-     handler). Live voice is tried after that; if it is missing, fails, times out
-     in 1.5 s, or the microphone cannot open, the preview keeps playing.
+     The page does not use the browser speech engine. PREVIEW_ONLY is the default:
+     a tap on the mark plays /preview/voice-preview from start to end. Live voice,
+     getUserMedia, VAD, and barge-in stay off until that flag is flipped.
      Owner t653u: the voice surface is still one dot. The canvas draws no text,
      persona names, or transcript. Preview captions are the HTML line in the shell.
      The Galion One shell (hero, prompt, footer) sits over that dot. It is the
@@ -200,8 +199,10 @@ let capNode=null, capSink=null, capRatio=1, capPos=0, capFrame=new Float32Array(
 let vadFloor=0.003, vadOn=false, vadRun=0, vadQuiet=0, vadSpeechMs=0, uttMs=0, uttBarge=false;
 let preroll=[], utt=[], turnSeq=0;
 let playSrc=null, playId=null, playing=false, seenReplies=new Set();
-// Pre-rendered preview. The <audio> element is in the document from the start so
-// play() can run inside the tap, before any await. arming is the 1.5 s live wait.
+// Pre-rendered preview. PREVIEW_ONLY keeps live voice, the mic, VAD, and barge-in
+// off. The <audio> element is in the document from the start so play() runs inside
+// the tap. Flip this when a live session is ready to open.
+const PREVIEW_ONLY=true;
 const LIVE_SESSION_MS=1500;
 function assetUrl(path){
   const join=path.indexOf("?")>=0?"&":"?";
@@ -655,6 +656,7 @@ function stopMic(){
 }
 function onVoice(e){
   if(e){ e.preventDefault(); e.stopPropagation(); }
+  if(PREVIEW_ONLY){ onOrbGesture(e); return; }
   if(micState==="pending") return;
   if(micState==="on") stopMic();
   else enableMic();
@@ -697,6 +699,7 @@ function dropStream(stream){
   stream.getTracks().forEach(t=>{ try{t.stop();}catch(e){} });
 }
 async function enableMic(opts){
+  if(PREVIEW_ONLY) return;
   opts=opts||{};
   if(micState==="on"||micState==="pending") return;
   const gen=opts.gen||voiceGen;
@@ -818,6 +821,7 @@ function startPreview(gen){
   loadPreviewScript();
 }
 function stopPreview(){
+  if(PREVIEW_ONLY) return;
   previewOn=false;
   previewSeg=-1;
   arming=false;
@@ -851,6 +855,18 @@ function onOrbGesture(e){
   const now=performance.now();
   if(now-lastOrbGesture<450) return;
   lastOrbGesture=now;
+  if(PREVIEW_ONLY){
+    const el=previewEl();
+    if(el&&previewOn&&!el.paused&&!el.ended){
+      try{ el.pause(); }catch(err){}
+      playing=false;
+      return;
+    }
+    if(el&&el.ended){ try{ el.currentTime=0; }catch(err){} }
+    playPreviewNow();
+    loadPreviewScript();
+    return;
+  }
   // Unlock and play inside the user gesture, before any await.
   ensureAudio();
   if(previewOn||arming){
@@ -887,7 +903,7 @@ function onActivate(e){
   if(e.type==="click"&&performance.now()-lastOrbTouch<700) return;
   onOrbGesture(e);
 }
-// A tap on the mark starts the live session, or the preview when that session is not available.
+// A tap on the mark plays the preview. Live voice stays behind PREVIEW_ONLY.
 document.addEventListener("touchend",onActivate,{passive:false});
 document.addEventListener("click",onActivate);
 addEventListener("keydown",e=>{
@@ -906,7 +922,7 @@ async function sendText(text){
   // Same gesture as Send: unlock playback before any await, mic or not.
   if(!ensureAudio()){ showErr("This browser cannot play audio."); return false; }
   const barge=playing;
-  if(previewOn||playing) stopPreview();
+  if(!PREVIEW_ONLY && (previewOn||playing)) stopPreview();
   await ensureSession();
   turnsInFlight++;
   const watch=turnsInFlight;
@@ -956,6 +972,7 @@ const WORKLET_SRC=`class GvCap extends AudioWorkletProcessor{
 registerProcessor("gv-cap",GvCap);`;
 
 async function startCapture(src){
+  if(PREVIEW_ONLY) return;
   const ctx=micCtx; capRatio=ctx.sampleRate/CAP_SR; capPos=0;
   capSink=ctx.createGain(); capSink.gain.value=0; capSink.connect(ctx.destination); // keeps graph pulled, silent
   if(ctx.audioWorklet&&window.AudioWorkletNode&&window.Blob&&window.URL){
@@ -989,6 +1006,7 @@ function onCapChunk(x){
 // Energy VAD with adaptive floor. Start after 80 ms of speech (200 ms + higher bar while our reply
 // plays, so echo leaking past AEC does not self-barge). End of turn = 640 ms quiet after speech.
 function vadFrame(f){
+  if(PREVIEW_ONLY) return;
   let s=0; for(let i=0;i<f.length;i++) s+=f[i]*f[i];
   const rms=Math.sqrt(s/f.length), ms=1000*VAD_FRAME/CAP_SR;
   const thr=Math.max(VAD_ABS, vadFloor*VAD_FLOOR_X)*(playing?VAD_PLAY_X:1);
@@ -1063,6 +1081,7 @@ function decode(ab){
 }
 
 async function playReply(id,url){
+  if(PREVIEW_ONLY) return;
   try{
     const r=await fetch(url,{cache:"no-store",headers:sessionHeaders()});
     if(!r.ok) return;
@@ -1107,6 +1126,8 @@ addEventListener("pagehide",()=>{ if(productIsOne()) playSound("shutdown"); });
   const one=productIsOne();
   document.body.dataset.product=one?"one":"samantha";
   document.body.dataset.session=one?"one":"samantha";
+  document.body.dataset.previewOnly=PREVIEW_ONLY?"1":"0";
+  document.body.dataset.liveVoice=PREVIEW_ONLY?"off":"on";
   setSilence(silenceRequested());
   const quiet=document.getElementById("silence");
   if(quiet) quiet.addEventListener("click",e=>{ e.preventDefault(); e.stopPropagation(); setSilence(!silence); });
@@ -1141,7 +1162,9 @@ addEventListener("pagehide",()=>{ if(productIsOne()) playSound("shutdown"); });
   el.preload="auto";
   try{ el.setAttribute("playsinline",""); el.setAttribute("webkit-playsinline",""); }catch(e){}
   try{ el.load(); }catch(e){}
-  el.addEventListener("ended",()=>{ if(previewOn||playId==="preview") stopPreview(); });
+  el.addEventListener("ended",()=>{
+    if(playId==="preview"){ playing=false; playId=null; }
+  });
 })();
 loadPreviewScript();
 pollOnce(); requestAnimationFrame(draw);

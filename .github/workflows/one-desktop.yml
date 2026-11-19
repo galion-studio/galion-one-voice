@@ -21,7 +21,7 @@ jobs:
           node-version: 22
       - name: Install
         run: npm ci
-      - name: Chromium
-        run: npx playwright install --with-deps chromium
+      - name: Chromium and WebKit
+        run: npx playwright install --with-deps chromium webkit
       - name: Desktop /one
         run: npx playwright test

@@ -79,7 +79,7 @@ function dotBody() {
   return JSON.stringify(body);
 }
 
-function toneWav(seconds = 12, sr = 24000) {
+function toneWav(seconds = 29, sr = 24000) {
   const n = Math.floor(sr * seconds);
   const buf = Buffer.alloc(44 + n * 2);
   buf.write("RIFF", 0);
@@ -102,7 +102,7 @@ function toneWav(seconds = 12, sr = 24000) {
   return buf;
 }
 
-const previewWav = toneWav(12, 24000);
+const previewWav = toneWav(29, 24000);
 const previewJson = Buffer.from(JSON.stringify({ text: "", segments: [] }));
 
 const port = Number(process.env.PORT || 4173);
