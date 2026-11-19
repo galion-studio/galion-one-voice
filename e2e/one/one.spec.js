@@ -174,7 +174,7 @@ test("desktop /one is one dot in idle and listening", async ({ page }) => {
   await expect(page.locator("#s")).toHaveAttribute("data-persona", "samantha");
   await expect(page.locator("#decide")).toBeHidden();
   const bg = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
-  expect(bg).toBe("rgb(10, 10, 12)");
+  expect(bg).toBe("rgb(11, 15, 20)");
 
   await page.waitForTimeout(600);
   const idle = await probe(page);
@@ -268,4 +268,94 @@ test("dot against the ground meets WCAG AA contrast", async ({ page }) => {
   expect(dotOnGround).toBeGreaterThanOrEqual(4.5);
   expect(dotOnWash).toBeGreaterThanOrEqual(3);
   await page.screenshot({ path: join(shots, "one-contrast-desktop.png") });
+});
+
+test("desktop prompt sends a line and keeps file names on the page", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await openOne(page);
+  await expect(page.getByRole("heading", { name: "Galion One for live users is coming very soon." })).toBeVisible();
+  const download = page.getByRole("link", { name: /Download alpha on GitHub/ });
+  await expect(download).toBeVisible();
+  await expect(download).toHaveAttribute(
+    "href",
+    "https://github.com/galion-studio/obsidian-open-mind/actions/workflows/openmind-desktop.yml",
+  );
+  await expect(page.locator("footer")).toContainText("Developed by Galion Labs");
+  await expect(page.locator("footer")).toContainText("MIT License");
+  const bodyText = await page.locator("#one").innerText();
+  expect(bodyText).toContain("Galion Research");
+  expect(bodyText.toLowerCase()).not.toContain("hermes");
+  expect(bodyText).toContain("Windows");
+  expect(bodyText).toContain("macOS");
+  expect(bodyText).toContain("Linux");
+  expect(bodyText).toContain("built in Rust");
+
+  const ink = await page.evaluate(() => {
+    const parse = (c) => c.match(/\d+/g).slice(0, 3).map(Number);
+    const h1 = getComputedStyle(document.querySelector("#soon"));
+    const hero = getComputedStyle(document.querySelector(".hero"));
+    const btn = getComputedStyle(document.querySelector(".download"));
+    return {
+      title: { fg: parse(h1.color), bg: parse(hero.backgroundColor) },
+      download: { fg: parse(btn.color), bg: parse(btn.backgroundColor) },
+    };
+  });
+  expect(contrast(ink.title.fg, ink.title.bg)).toBeGreaterThanOrEqual(4.5);
+  expect(contrast(ink.download.fg, ink.download.bg)).toBeGreaterThanOrEqual(4.5);
+
+  const field = page.getByLabel("Ask anything");
+  await expect(field).toHaveAttribute("placeholder", "Ask anything…");
+  const plus = await page.locator("#files").boundingBox();
+  const typed = await field.boundingBox();
+  const voice = await page.getByRole("button", { name: "Voice" }).boundingBox();
+  expect(plus.x).toBeLessThan(typed.x);
+  expect(typed.x).toBeLessThan(voice.x);
+  expect(plus.width).toBeGreaterThanOrEqual(44);
+  expect(plus.height).toBeGreaterThanOrEqual(44);
+  expect(voice.width).toBeGreaterThanOrEqual(44);
+  expect(voice.height).toBeGreaterThanOrEqual(44);
+
+  await field.fill("Where is the wash");
+  await field.press("Enter");
+  await expect.poll(async () => (await page.request.get("/__say")).text()).toContain("Where is the wash");
+  await expect(field).toHaveValue("");
+
+  await page.locator("#files").setInputFiles({
+    name: "wash-note.txt",
+    mimeType: "text/plain",
+    buffer: Buffer.from("amber"),
+  });
+  await expect(page.locator("#picked")).toContainText("wash-note.txt");
+  await expect(page.locator("#files-note")).toHaveText("Names stay on this page.");
+  const after = await (await page.request.get("/__say")).text();
+  expect(after).not.toContain("wash-note");
+
+  await page.evaluate(() => {
+    navigator.mediaDevices.getUserMedia = () => Promise.reject(new DOMException("no", "NotAllowedError"));
+  });
+  await page.getByRole("button", { name: "Voice" }).click();
+  await expect(page.locator("#status")).toContainText("Microphone blocked");
+  await expect(page).toHaveURL(/\/one\/?$/);
+  await page.screenshot({ path: join(shots, "one-shell-desktop.png") });
+});
+
+test("the shell fits a phone", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await openOne(page);
+  const download = page.getByRole("link", { name: /Download alpha on GitHub/ });
+  const voice = page.getByRole("button", { name: "Voice" });
+  const field = page.getByLabel("Ask anything");
+  await expect(download).toBeVisible();
+  await expect(voice).toBeVisible();
+  await expect(field).toBeVisible();
+  const d = await download.boundingBox();
+  const v = await voice.boundingBox();
+  const f = await field.boundingBox();
+  expect(d.x).toBeGreaterThanOrEqual(0);
+  expect(d.x + d.width).toBeLessThanOrEqual(390);
+  expect(d.y).toBeGreaterThanOrEqual(0);
+  expect(f.y + f.height).toBeLessThanOrEqual(844);
+  expect(v.y + v.height).toBeLessThanOrEqual(844);
+  expect(v.width).toBeGreaterThanOrEqual(44);
+  await page.screenshot({ path: join(shots, "one-shell-mobile.png") });
 });

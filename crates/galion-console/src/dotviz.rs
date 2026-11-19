@@ -484,12 +484,42 @@ mod tests {
         assert!(SCREEN_HTML.contains("<!-- /decide -->"));
         assert!(SCREEN_HTML.contains("id=\"silence\""));
         assert!(SCREEN_HTML.contains("<!-- /silence -->"));
+        assert!(SCREEN_HTML.contains("<!-- one-shell -->"));
+        assert!(SCREEN_HTML.contains("<!-- /one-shell -->"));
+        let shell = SCREEN_HTML
+            .split_once("<!-- one-shell -->")
+            .expect("shell")
+            .1
+            .split_once("<!-- /one-shell -->")
+            .expect("shell end")
+            .0;
+        let plus = shell.find("id=\"files\"").expect("plus");
+        let field = shell.find("id=\"command\"").expect("field");
+        let voice_btn = shell.find("id=\"voice\"").expect("voice");
+        assert!(plus < field && field < voice_btn, "prompt is plus, then the field, then voice");
+        assert!(shell.contains("placeholder=\"Ask anything…\""));
+        assert!(shell.contains("aria-label=\"Add files\""));
+        assert!(shell.contains("aria-label=\"Voice\""));
+        assert!(shell.contains("Galion One for live users is coming very soon."));
+        assert!(shell.contains("Download alpha on GitHub"));
+        assert!(shell.contains(
+            "https://github.com/galion-studio/obsidian-open-mind/actions/workflows/openmind-desktop.yml"
+        ));
+        assert!(shell.contains("Galion Research"));
+        assert!(shell.contains("Windows") && shell.contains("macOS") && shell.contains("Linux"));
+        assert!(shell.contains("MIT License"));
+        assert!(shell.contains("Developed by Galion Labs"));
+        assert!(shell.contains("built in Rust"));
+        assert!(!shell.to_ascii_lowercase().contains("hermes"));
         let (head, tail) = SCREEN_HTML.split_once("<div id=\"decide\">").expect("decide");
         let (_, after) = tail.split_once("<!-- /decide -->").expect("decide end");
         let voice = format!("{head}{after}");
         let (pre, post) = voice.split_once("<button id=\"silence\"").expect("silence");
         let (_, rest) = post.split_once("<!-- /silence -->").expect("silence end");
         let voice = format!("{pre}{rest}");
+        let (before_shell, shell_tail) = voice.split_once("<!-- one-shell -->").expect("shell");
+        let (_, after_shell) = shell_tail.split_once("<!-- /one-shell -->").expect("shell end");
+        let voice = format!("{before_shell}{after_shell}");
         for tag in ["<div", "<form", "<input", "<button", "<label", "<span", "<p>", "<a "] {
             assert!(!voice.contains(tag), "{tag} is on the voice screen");
         }

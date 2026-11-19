@@ -28,6 +28,7 @@ const state = {
   nebula: neutral,
   persona: "samantha",
   approval: false,
+  lastSay: "",
 };
 let tMs = 1000;
 let holdDot = false;
@@ -124,6 +125,17 @@ const server = createServer((req, res) => {
   if (req.method === "POST" && url.pathname === "/session") {
     res.writeHead(200, { "content-type": "application/json" });
     res.end('{"token":"desktop-e2e"}');
+    return;
+  }
+  if (req.method === "POST" && url.pathname === "/v2/say") {
+    readBody(req).then((raw) => {
+      state.lastSay = raw;
+      sendJson(res, 200, { ok: true, silence: true });
+    });
+    return;
+  }
+  if (req.method === "GET" && url.pathname === "/__say") {
+    sendJson(res, 200, { body: state.lastSay || "" });
     return;
   }
   if (req.method === "GET" && (url.pathname === "/research" || url.pathname === "/research/")) {

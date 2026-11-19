@@ -24,22 +24,24 @@
                     the AudioContext unlocked by the tap. User speech during playback = barge-in:
                     playback stops at once and the new utterance is captured.
      V2-S3: AI Act Art. 50 disclosure (HR+EN) is spoken on the first tap (audio only).
-     Owner t653u: pure voice-to-voice. The screen is one dot in the centre and one
-     full-screen object (the canvas wash). No text, labels, buttons, captions,
-     persona names or transcript. A tap anywhere starts the mic, invisibly.
+     Owner t653u: the voice surface is still one dot. The canvas draws no text,
+     captions, persona names, or transcript. A tap on the mark starts the mic.
+     The Galion One shell (hero, prompt, footer) sits over that dot. It is the
+     same prompt as the desktop app: plus, one field, voice. Typed lines use
+     the existing POST /v2/say path. File names stay on the page.
      CC0 consent is enforced at clone time in Rust, so the call shows no CC0 UI.
      The session token comes from POST /session's body and is never put in the URL. -->
 <html lang="en"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
-<meta name="theme-color" content="#0A0A0C" media="(prefers-color-scheme: dark)">
-<meta name="theme-color" content="#0A0A0C">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0B0F14" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#0B0F14">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="format-detection" content="telephone=no">
-<title>Galion Voice</title>
+<title>Galion One</title>
 <style>
-html,body{margin:0;width:100%;height:100%;height:100dvh;background:#0A0A0C;overflow:hidden;
+html,body{margin:0;width:100%;height:100%;height:100dvh;background:#0B0F14;color-scheme:dark;overflow:hidden;
   touch-action:manipulation;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;
   overscroll-behavior:none;cursor:default}
 canvas{display:block;position:fixed;inset:0;width:100%;height:100%;width:100dvw;height:100dvh;
@@ -58,6 +60,53 @@ canvas{display:block;position:fixed;inset:0;width:100%;height:100%;width:100dvw;
 #silence{position:fixed;left:0;bottom:0;z-index:3;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;
   clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;border:0;
   background:#0A0A0C;color:#F5F5F7;font:16px/1.2 system-ui,sans-serif}
+#one{
+  --bg:#0B0F14;--panel:#131A22;--line:#24303C;--fg:#E6EDF3;--muted:#A7B6C4;
+  --accent:#58C4FF;--accent-fg:#0B0F14;--focus:#58C4FF;
+  position:fixed;inset:0;z-index:4;display:flex;flex-direction:column;align-items:center;gap:12px;
+  box-sizing:border-box;
+  padding:calc(16px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right)) calc(16px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left));
+  pointer-events:none;overflow:auto;color:var(--fg);
+  font:16px/1.45 "IBM Plex Sans",system-ui,sans-serif;
+  -webkit-user-select:text;user-select:text}
+#one>*{pointer-events:auto;width:min(42rem,100%);box-sizing:border-box}
+#one .stage{pointer-events:none;flex:1 1 auto;min-height:22vh;width:100%}
+#one header{display:flex;align-items:center}
+.kicker{margin:0;color:var(--muted);font:600 12px/1 "IBM Plex Sans",system-ui,sans-serif;letter-spacing:.16em;text-transform:uppercase}
+.hero{display:flex;flex-direction:column;align-items:flex-start;gap:12px;padding:18px 18px 16px;background:var(--panel);border:1px solid var(--line);border-radius:20px}
+.hero h1{margin:0;font:600 1.35rem/1.25 "IBM Plex Sans",system-ui,sans-serif;letter-spacing:-0.02em;color:var(--fg)}
+.about{display:flex;flex-direction:column;gap:6px}
+.lede,.artifact{margin:0;color:var(--muted);font-size:.95rem;line-height:1.45}
+.download{display:inline-flex;align-items:center;justify-content:center;min-height:48px;padding:0 18px;background:var(--accent);color:var(--accent-fg);border-radius:11px;font-weight:600;text-decoration:none}
+.download:hover{filter:brightness(1.06)}
+#one :focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.download:focus-visible{outline-color:var(--fg)}
+.prompt{display:flex;align-items:center;gap:8px;width:100%;margin:0;padding:6px;background:var(--panel);border:1px solid var(--line);border-radius:11px}
+.plus,.voice{position:relative;display:grid;place-items:center;width:44px;height:44px;flex:none;border-radius:11px;border:1px solid var(--line);background:transparent;color:var(--fg);cursor:pointer;padding:0}
+.plus svg,.voice svg{width:22px;height:22px;display:block;pointer-events:none}
+.plus input{position:absolute;inset:0;z-index:1;margin:0;opacity:0;cursor:pointer;font-size:16px}
+.voice[aria-pressed="true"]{color:var(--accent);border-color:var(--accent)}
+#command{flex:1;min-width:0;height:44px;border:0;background:transparent;color:var(--fg);font:inherit;padding:0 4px}
+#command::placeholder{color:var(--muted);opacity:1}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:0;padding:0;list-style:none}
+.chips:empty{display:none}
+.chip{max-width:100%;padding:4px 10px;border-radius:999px;background:var(--panel);border:1px solid var(--line);color:var(--fg);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.note,.status{margin:0;min-height:0;color:var(--muted);font-size:13px}
+.note:empty,.status:empty{display:none}
+#one footer{padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:11px}
+#one footer p{margin:0;color:var(--muted);font-size:13px}
+#one footer a{color:var(--fg)}
+.sr{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;border:0}
+@media (max-width:720px){
+  #one{gap:10px;padding:calc(12px + env(safe-area-inset-top)) calc(12px + env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom)) calc(12px + env(safe-area-inset-left))}
+  .hero{padding:14px}
+  .hero h1{font-size:1.15rem}
+}
+@media (max-height:720px){
+  #one{gap:8px;padding-bottom:calc(8px + env(safe-area-inset-bottom))}
+  .about{gap:4px}
+  .lede,.artifact{font-size:.8125rem;line-height:1.35}
+}
 </style>
 <script type="module">
 import { drawNebula } from "/nebula/vocabulary.mjs";
@@ -74,9 +123,38 @@ window.drawNebula = drawNebula;
 <!-- /decide -->
 <button id="silence" type="button" aria-pressed="false">Silence</button>
 <!-- /silence -->
+<!-- one-shell -->
+<div id="one">
+  <header><p class="kicker">Galion One</p></header>
+  <section class="hero" aria-labelledby="soon">
+    <h1 id="soon">Galion One for live users is coming very soon.</h1>
+    <a class="download" href="https://github.com/galion-studio/obsidian-open-mind/actions/workflows/openmind-desktop.yml" target="_blank" rel="noopener noreferrer">Download alpha on GitHub<span class="sr"> (opens in a new tab)</span></a>
+  </section>
+  <div class="stage"></div>
+  <section class="about" aria-label="About Galion One">
+    <p class="lede">Galion One is the assistant you talk to. Speak, or type. The mark in the middle is the voice. Galion Research is the research engine for the deeper questions.</p>
+    <p class="artifact">An alpha test build for Windows, macOS and Linux. Open source under the MIT License. Developed by Galion Labs, built in Rust. A GitHub Release is not published yet, so this button opens the desktop workflow artifacts.</p>
+  </section>
+  <p class="sr" id="mark-help">The circle in the middle is Galion. Tap it to talk. The field below is for typing.</p>
+  <form id="ask" class="prompt" action="#ask" method="post" aria-describedby="mark-help">
+    <label class="plus">
+      <input id="files" type="file" multiple aria-label="Add files">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+    </label>
+    <input id="command" type="text" name="ask" autocomplete="off" enterkeyhint="send" placeholder="Ask anything…" aria-label="Ask anything">
+    <button id="voice" class="voice" type="button" aria-pressed="false" aria-label="Voice">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4a3 3 0 0 0-3 3v4a3 3 0 0 0 6 0V7a3 3 0 0 0-3-3M8 18a4 4 0 0 0 8 0M12 18v2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+    </button>
+  </form>
+  <ul id="picked" class="chips" aria-label="Attached files"></ul>
+  <p id="files-note" class="note"></p>
+  <p id="status" class="status" role="status" aria-live="polite"></p>
+  <footer><p>Developed by Galion Labs, <a href="https://github.com/galion-studio/obsidian-open-mind/blob/main/LICENSE">MIT License</a>.</p></footer>
+</div>
+<!-- /one-shell -->
 <script>
 "use strict";
-const TOK={dot:"#F5F5F7",base:"#0A0A0C",from:"#F5A524",to:"#7C3AED"};
+const TOK={dot:"#F5F5F7",base:"#0B0F14",from:"#F5A524",to:"#7C3AED"};
 // Body of the mark is the locked token. Edge is a whisper darker, still the same pigment.
 // Stroke is a 1-device-pixel hairline. Brightness never scales these channels.
 const MARK={core:"#F5F5F7",edge:"#E8E8ED",stroke:"rgba(255,255,255,0.55)",strokePx:1};
@@ -95,7 +173,7 @@ const clamp=(x,a,b)=>Math.min(b,Math.max(a,x));
 const cv=document.getElementById("s"), cx=cv.getContext("2d",{alpha:false});
 const bg=document.createElement("canvas"); bg.width=BW; bg.height=BH;
 const bx=bg.getContext("2d"), img=bx.createImageData(BW,BH);
-// No on-screen text (owner t653u): errors go to the console only.
+// The canvas draws no text. The shell status line shows the same message the tone marks.
 const AI_DISCLOSURE={hr:"Razgovarate s umjetnom inteligencijom. Galion je AI asistent, a ne osoba.",en:"You are talking to an AI. Galion is an AI assistant, not a person."};
 let aiDisclosed=false;
 const t0=performance.now();
@@ -220,7 +298,11 @@ function clearFeed(){
   if(!latest) latest={radius:R.idle,t_ms:0};
   latest.nebula={schema:FEED_SCHEMA,estimate:"none",present:false,distribution:false,reason:"disconnected",origin:"client",weights:null};
 }
-function productIsOne(){ const p=location.pathname; return p==="/one"||p==="/one/"; }
+function productIsOne(){
+  const p=location.pathname;
+  if(p==="/one"||p==="/one/") return true;
+  return location.hostname==="one.galion.app";
+}
 // Galion OS tones. 432 Hz just intonation: 2:1, 3:2, 5:4. Warm hum at 216 and 108.
 // boot, shutdown, notification, wake (Galion One wake), done (task done),
 // approval (approval needed), error. Oscillators only. No audio files.
@@ -495,6 +577,8 @@ setInterval(pollOnce,POLL_MS);
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible") pollOnce();});
 
 function showErr(msg){
+  const line=document.getElementById("status");
+  if(line) line.textContent=msg||"";
   if(!msg) return;
   try{console.warn("[galion]",msg);}catch(e){}
   if(productIsOne()) playSound("error");
@@ -520,6 +604,57 @@ function tickMic(){
   setTimeout(tickMic,80);
 }
 
+function syncVoice(){
+  const b=document.getElementById("voice");
+  if(!b) return;
+  const on=micState==="on"||micState==="pending";
+  b.setAttribute("aria-pressed",on?"true":"false");
+}
+function stopMic(){
+  micState="off";
+  if(micStream){
+    micStream.getTracks().forEach(t=>{ try{t.stop();}catch(e){} });
+    micStream=null;
+  }
+  if(capNode){ try{capNode.disconnect();}catch(e){} capNode=null; }
+  syncVoice();
+}
+function onVoice(e){
+  if(e){ e.preventDefault(); e.stopPropagation(); }
+  if(micState==="pending") return;
+  if(micState==="on") stopMic();
+  else enableMic();
+}
+function mountPrompt(){
+  const form=document.getElementById("ask");
+  const field=document.getElementById("command");
+  const files=document.getElementById("files");
+  const picked=document.getElementById("picked");
+  const note=document.getElementById("files-note");
+  const voice=document.getElementById("voice");
+  if(form&&field){
+    form.addEventListener("submit",e=>{
+      e.preventDefault();
+      e.stopPropagation();
+      const text=field.value;
+      sendText(text).then(ok=>{ if(ok) field.value=""; });
+    });
+  }
+  if(files&&picked){
+    files.addEventListener("change",()=>{
+      picked.replaceChildren();
+      const list=files.files?Array.from(files.files):[];
+      for(const f of list){
+        const li=document.createElement("li");
+        li.className="chip";
+        li.textContent=f.name;
+        picked.appendChild(li);
+      }
+      if(note) note.textContent=list.length?"Names stay on this page.":"";
+    });
+  }
+  if(voice) voice.addEventListener("click",onVoice);
+}
 async function enableMic(){
   if(micState==="on"||micState==="pending") return;
   discloseAi();
@@ -530,7 +665,7 @@ async function enableMic(){
   if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
     showErr("This browser cannot open the microphone."); return;
   }
-  micState="pending"; showErr("");
+  micState="pending"; syncVoice(); showErr("");
   // Create + unlock the AudioContext synchronously inside the tap (before any await) so that
   // mobile Safari/Chrome let us play reply audio later. Reused for capture and playback.
   ensureAudio();
@@ -547,12 +682,14 @@ async function enableMic(){
     src.connect(micAnalyser);
     micData=new Uint8Array(micAnalyser.fftSize);
     micState="on";
+    syncVoice();
     hideHint();
     showErr("");
     tickMic();
     startCapture(src).catch(()=>showErr("Speech capture unavailable — level only."));
   }catch(e){
     micState="denied";
+    syncVoice();
     const name=e&&(e.name||"");
     if(name==="NotAllowedError"||name==="PermissionDeniedError")
       showErr("Microphone blocked — allow it in browser settings, then tap again.");
@@ -563,25 +700,35 @@ async function enableMic(){
   }
 }
 
+function chromeEvent(e){
+  const t=e.target;
+  return !!(t&&t.closest&&t.closest("#one"));
+}
 function onActivate(e){
-  // First intentional tap: mic. Avoid synthetic click-after-touch double fire.
+  // First intentional tap on the mark: mic. The shell handles its own controls.
+  // Avoid synthetic click-after-touch double fire.
+  if(chromeEvent(e)) return;
   if(e.type==="touchend"){ e.preventDefault(); enableMic(); return; }
   if(e.type==="click"){ enableMic(); }
 }
-// A tap anywhere on the screen starts the mic (the canvas spans the whole screen).
+// A tap on the mark starts the mic (the canvas spans the whole screen; the shell passes the centre through).
 document.addEventListener("touchend",onActivate,{passive:false});
 document.addEventListener("click",onActivate);
 addEventListener("keydown",e=>{
-  if((e.key==="s"||e.key==="S")&&productIsOne()&&!e.metaKey&&!e.ctrlKey&&!e.altKey){
+  const tag=e.target&&e.target.tagName;
+  const typing=tag==="INPUT"||tag==="TEXTAREA"||(e.target&&e.target.isContentEditable);
+  const control=tag==="BUTTON"||tag==="A"||tag==="SELECT";
+  if((e.key==="s"||e.key==="S")&&productIsOne()&&!e.metaKey&&!e.ctrlKey&&!e.altKey&&!typing){
     e.preventDefault(); setSilence(!silence); return;
   }
+  if(typing||control) return;
   if(e.key==="Enter"||e.key===" "){e.preventDefault();enableMic();}
 });
 async function sendText(text){
   const t=(text||"").trim();
-  if(!t) return;
+  if(!t) return false;
   // Same gesture as Send: unlock playback before any await, mic or not.
-  if(!ensureAudio()){ showErr("This browser cannot play audio."); return; }
+  if(!ensureAudio()){ showErr("This browser cannot play audio."); return false; }
   const barge=playing;
   if(playing) stopPlayback();
   discloseAi();
@@ -591,7 +738,7 @@ async function sendText(text){
   try{
     const r=await fetch("v2/say",{method:"POST",cache:"no-store",headers:sessionHeaders({"Content-Type":"application/json"}),
       body:JSON.stringify({text:t,barge:!!barge,e:0,sense:false})});
-    if(!r.ok){ turnsInFlight=Math.max(0,turnsInFlight-1); showErr("Message failed ("+r.status+")."); return; }
+    if(!r.ok){ turnsInFlight=Math.max(0,turnsInFlight-1); showErr("Message failed ("+r.status+")."); return false; }
     const j=await r.json();
     showErr("");
     if(j&&j.persona) cv.dataset.persona=j.persona;
@@ -601,9 +748,10 @@ async function sendText(text){
       latest.emotion={sense:true,label:j.mood,valence:0,arousal:0.3,lean:(latest.emotion&&latest.emotion.lean)||0};
     }
     hideHint();
-    if(j&&(j.silence||!j.reply)){ turnsInFlight=Math.max(0,turnsInFlight-1); return; }
-  }catch(e){ turnsInFlight=Math.max(0,turnsInFlight-1); showErr("Could not send that."); }
+    if(j&&(j.silence||!j.reply)){ turnsInFlight=Math.max(0,turnsInFlight-1); return true; }
+  }catch(e){ turnsInFlight=Math.max(0,turnsInFlight-1); showErr("Could not send that."); return false; }
   setTimeout(()=>{ if(!playing&&turnsInFlight>=watch) turnsInFlight=Math.max(0,turnsInFlight-1); }, 20000);
+  return true;
 }
 
 // ───────────────────────── Voice pipeline: capture → VAD → /turn, reply playback ─────────────────
@@ -771,6 +919,7 @@ document.addEventListener("visibilitychange",()=>{
 addEventListener("pagehide",()=>{ if(productIsOne()) playSound("shutdown"); });
 
 (function mountSession(){
+  mountPrompt();
   const one=productIsOne();
   document.body.dataset.product=one?"one":"samantha";
   document.body.dataset.session=one?"one":"samantha";
