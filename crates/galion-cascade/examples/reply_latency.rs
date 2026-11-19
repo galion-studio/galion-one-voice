@@ -46,6 +46,7 @@ fn main() {
         .as_mut()
         .and_then(|session| e2e_buffered(&llm, session));
     let stream_audio = piper.as_mut().and_then(|session| e2e_stream(&llm, session));
+    let phone_first_audio = measure_phone(&url);
 
     let measured = buffered_ok && stream_ok && stream_first_ms + 100.0 < buffered_llm_ms;
     let root = repo_root();
@@ -64,13 +65,14 @@ fn main() {
 The stub holds the second sentence for stub_gap_ms. buffered_llm_ms waits for that hold. \
 stream_first_sentence_ms is the first sentence mark. Piper fields are this process. null means that stage was not run.";
     println!(
-        "{{\n  \"measured\": {measured},\n  \"paid\": false,\n  \"persona\": \"samantha\",\n  \"host\": {host},\n  \"repo\": {repo},\n  \"asr\": {asr},\n  \"hermes\": {{\n    \"transport\": \"loopback-stub\",\n    \"stub_gap_ms\": {STUB_GAP_MS},\n    \"buffered_llm_ms\": {buffered_llm_ms:.3},\n    \"stream_first_sentence_ms\": {stream_first_ms:.3},\n    \"stream_done_ms\": {stream_done_ms:.3},\n    \"buffered_text_ok\": {buffered_ok},\n    \"stream_text_ok\": {stream_ok}\n  }},\n  \"piper\": {piper_block},\n  \"reply\": {{\n    \"buffered_first_audio_ms\": {buf_a},\n    \"stream_first_audio_ms\": {str_a},\n    \"note\": \"One clock each: stub then warm Piper first PCM. null when Piper was not measured.\"\n  }},\n  \"note\": {note_json}\n}}",
+        "{{\n  \"measured\": {measured},\n  \"paid\": false,\n  \"persona\": \"samantha\",\n  \"host\": {host},\n  \"repo\": {repo},\n  \"asr\": {asr},\n  \"hermes\": {{\n    \"transport\": \"loopback-stub\",\n    \"stub_gap_ms\": {STUB_GAP_MS},\n    \"buffered_llm_ms\": {buffered_llm_ms:.3},\n    \"stream_first_sentence_ms\": {stream_first_ms:.3},\n    \"stream_done_ms\": {stream_done_ms:.3},\n    \"buffered_text_ok\": {buffered_ok},\n    \"stream_text_ok\": {stream_ok}\n  }},\n  \"piper\": {piper_block},\n  \"reply\": {{\n    \"buffered_first_audio_ms\": {buf_a},\n    \"stream_first_audio_ms\": {str_a},\n    \"phone_first_audio_ms\": {phone_a},\n    \"note\": \"buffered and stream are one clock each on the harness Piper. phone_first_audio_ms is PhoneLane on a warmed worker: turn start to first clause PCM. null when that stage was not run.\"\n  }},\n  \"note\": {note_json}\n}}",
         measured = measured,
         host = json_str(&host_line()),
         repo = json_str(&root.display().to_string()),
         asr = asr,
         buf_a = num_or_null(buffered_audio),
         str_a = num_or_null(stream_audio),
+        phone_a = num_or_null(phone_first_audio),
         note_json = json_str(note),
     );
     if !measured {
@@ -280,6 +282,23 @@ fn wait_pcm(pcm_at: &Mutex<Vec<(usize, Instant)>>, g: usize) -> Option<Instant> 
         }
         std::thread::sleep(Duration::from_millis(2));
     }
+}
+
+fn measure_phone(url: &str) -> Option<f64> {
+    std::env::set_var("GALION_LLM", "hermes");
+    std::env::set_var("GALION_LLM_URL", url);
+    std::env::set_var("GALION_LLM_TIMEOUT_MS", "5000");
+    std::env::remove_var("GALION_LLM_KEY");
+    std::env::remove_var("GALION_LLM_KEY_FILE");
+    let mut lane = galion_cascade::PhoneLane::from_env().ok()?;
+    if !lane.can_speak() {
+        return None;
+    }
+    let turn = lane.turn_text("My mother died this morning.").ok()?;
+    if !turn.reply_text.contains("She died") {
+        return None;
+    }
+    Some(turn.stage_ms.first_audio_ms as f64)
 }
 
 fn measure_asr() -> String {
