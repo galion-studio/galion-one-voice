@@ -5,14 +5,16 @@ Set-StrictMode -Version 2.0
 $ErrorActionPreference = 'Stop'
 
 $root = Split-Path -Path $PSScriptRoot -Parent
-if (-not (Get-Module -ListAvailable -Name Pester)) {
+# windows-latest already ships an older Pester. ListAvailable is true, but 5.6.1 is not there.
+$pester561 = @(Get-Module -ListAvailable -Name Pester | Where-Object { $_.Version -eq [version]'5.6.1' })
+if ($pester561.Count -eq 0) {
     if ($null -eq (Get-PackageProvider -Name NuGet -ErrorAction SilentlyContinue)) {
         Install-PackageProvider -Name NuGet -Force -Scope CurrentUser | Out-Null
     }
     Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
-    Install-Module -Name Pester -RequiredVersion 5.6.1 -Force -Scope CurrentUser -SkipPublisherCheck
+    Install-Module -Name Pester -RequiredVersion 5.6.1 -Force -Scope CurrentUser -SkipPublisherCheck -AllowClobber
 }
-Import-Module -Name Pester -RequiredVersion 5.6.1
+Import-Module -Name Pester -RequiredVersion 5.6.1 -Force
 
 $config = New-PesterConfiguration
 $config.Run.Path = Join-Path -Path $root -ChildPath 'tests'
