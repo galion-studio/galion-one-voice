@@ -1,0 +1,28 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Galion Labs
+# Shellcheck and offline install tests for voice-stack/linux-package.
+# No model download. No deploy.
+
+name: voice-stack linux-package
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  package:
+    name: shellcheck, unit, install tests
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: shellcheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+          voice-stack/linux-package/ci/shellcheck.sh
+      - name: systemd user unit
+        run: voice-stack/linux-package/ci/verify-unit.sh
+      - uses: dtolnay/rust-toolchain@1.85.0
+      - name: cargo tests and install tests
+        run: make -C voice-stack/linux-package test

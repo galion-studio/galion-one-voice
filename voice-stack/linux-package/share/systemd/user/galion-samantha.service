@@ -1,0 +1,58 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Galion Labs
+# User unit. install.sh copies this to ~/.config/systemd/user/.
+# Not a system unit. No User=. No sudo. No deploy.
+# Sandbox keys reused from:
+#   deploy/systemd/templates/galion-voice-stage.service
+#   deploy/systemd/galion-clone-cbx.service
+# MemoryMax is 2G. The stage template's 256M cap is the Titanaxe demo,
+# and that cap does not fit the public Vosk plus Piper packs.
+# GALION_SAMANTHA_REF is not set here. A human drop-in may add it.
+# The reference file is never copied by this unit.
+# Companion socket is 127.0.0.1:7881 (GALION_SAMANTHA_WS).
+# 7878 is the one-dot screen, 7879 is GALION_HARD_ADDR, 7880 is the clone worker.
+
+[Unit]
+Description=Galion Samantha local voice companion
+After=network.target
+
+[Service]
+Type=simple
+Environment=GALION_SAMANTHA_HOME=%h/.local/share/galion/samantha
+Environment=GALION_SAMANTHA_WS=127.0.0.1:7881
+Environment=GALION_VOSK_MODEL=%h/.local/share/galion/samantha/models/asr/vosk-model-small-en-us-0.15
+Environment=GALION_VOSK_LIB=%h/.local/share/galion/samantha/models/asr/libvosk/libvosk.so
+Environment=GALION_A21_MODEL=%h/.local/share/galion/samantha/models/tts/en_US-ljspeech-medium.onnx
+Environment=GALION_A21_RUNTIME=%h/.local/share/galion/samantha/models/runtime/piper/piper
+Environment=GALION_ASR=vosk
+Environment=GALION_SPEECH=a21
+ExecStart=%h/.local/bin/galion-samantha serve
+WorkingDirectory=%h/.local/share/galion/samantha
+Restart=on-failure
+RestartSec=2
+MemoryMax=2G
+NoNewPrivileges=yes
+PrivateTmp=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+ProtectSystem=strict
+ProtectHome=yes
+ReadOnlyPaths=%h/.local/share/galion/samantha
+ReadOnlyPaths=%h/.local/bin/galion-samantha
+IPAddressDeny=any
+IPAddressAllow=localhost
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+SystemCallArchitectures=native
+UMask=0077
+
+[Install]
+WantedBy=default.target

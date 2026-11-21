@@ -1,0 +1,28 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Galion Labs
+# Template only. Nothing installs this unit. Nothing in this tree starts it.
+# Sandbox shape follows deploy/systemd/templates/galion-voice-stage.service.
+# ExecStart is /usr/bin/false so a copied unit does not open a microphone.
+# Put the real command in a drop-in on the machine. Do not put a key, a token,
+# or a server address in that drop-in. Loopback only.
+
+[Unit]
+Description=Galion emotion-in template (not installed)
+After=sound.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/false
+WorkingDirectory=/tmp
+Restart=no
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+IPAddressDeny=any
+IPAddressAllow=localhost
+MemoryMax=64M
+
+[Install]
+WantedBy=multi-user.target
