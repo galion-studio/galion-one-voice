@@ -1,0 +1,19 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Galion Labs
+# Galion Voice — Perpetual Open MIT License
+
+[package]
+name = "galion-sam-contract"
+description = "Swarm 16 shared types for the local Samantha path. No I/O, no model, no audio."
+version = "0.0.1"
+edition = "2021"
+license = "MIT"
+publish = false
+rust-version = "1.85"
+
+# Own workspace so the root `cargo test --workspace` does not pick this up
+# until INTEGRATION.md's follow-up says so. Same shape as crates/galion-v2-live.
+[workspace]
+
+[dependencies]
+galion-emotion = { path = "../../galion-emotion" }
