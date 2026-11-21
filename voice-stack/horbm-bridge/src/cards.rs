@@ -4,8 +4,9 @@
 //!
 //! `open` reads `.md` and `.json` files. It does not create the directory,
 //! write a card, or open the memory database. A query that shares no word
-//! with a card is [`UNKNOWN_REPLY`]. The layer 5 router is asked first, in
-//! [`crate::research::route`], and a `None` from that call stays on this path.
+//! with a card is [`UNKNOWN_REPLY`]. [`crate::research::route`] is the
+//! `ReasoningRouter` seam. It returns `None` until that router is on `main`,
+//! and this engine then reads the cards. It does not dial the gateway.
 
 use std::fs::File;
 use std::io::Read;
@@ -145,7 +146,9 @@ impl CardBrain {
     }
 }
 
-/// HORBM reply engine. Asks the layer 5 router, then the card bridge.
+/// HORBM reply engine. Uses `ReasoningRouter` when [`crate::research::route`]
+/// returns a line. Until that router is on `main`, the cards answer, and a
+/// miss is [`UNKNOWN_REPLY`].
 /// Memory and case paths are accepted so the `Brain::open` shape stays, and
 /// they are not opened.
 pub struct CardEngine {
