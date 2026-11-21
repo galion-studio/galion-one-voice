@@ -1,0 +1,30 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Galion Labs
+
+[package]
+name = "galion-sam-asr"
+description = "Swarm 16 S03 streaming CPU speech-to-text. Vosk partials and finals."
+version = "0.0.1"
+edition = "2021"
+license = "MIT"
+publish = false
+rust-version = "1.85"
+
+[workspace]
+resolver = "2"
+
+[[bin]]
+name = "s03-asr"
+path = "src/bin/transcribe.rs"
+
+[[bin]]
+name = "s03-asr-eval"
+path = "src/bin/eval.rs"
+
+# Test peer for the galion-asr-vosk/1 NDJSON handshake. Not a recognizer.
+[[bin]]
+name = "s03-asr-protocol-double"
+path = "src/bin/protocol_double.rs"
+
+[profile.release]
+opt-level = 3
