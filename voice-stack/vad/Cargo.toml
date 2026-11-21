@@ -1,0 +1,32 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Galion Labs
+
+[package]
+name = "galion-sam-vad"
+description = "Samantha voice stack S02 (voice-stack/vad): CPU voice activity and end-of-turn detection. Silero VAD ONNX on the CPU, energy fallback, 20 ms frames."
+version = "0.0.1"
+edition = "2021"
+license = "MIT"
+publish = false
+rust-version = "1.92"
+
+# Own workspace. Not a member of the repo root workspace, same pattern as
+# runtimes/galion-piper-rt and crates/galion-v2-live.
+[workspace]
+
+[dependencies]
+# Same ort pin as runtimes/galion-piper-rt (ONNX Runtime 1.31, CPU build).
+# No CUDA / TensorRT / DirectML features.
+ort = { version = "=2.0.0-rc.15", default-features = false, features = ["std", "download-binaries", "copy-dylibs", "tls-rustls", "api-31"] }
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[[bin]]
+name = "vad-bench"
+path = "src/bin/vad_bench.rs"
+
+[profile.release]
+opt-level = 3
+lto = false
+codegen-units = 1
