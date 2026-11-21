@@ -110,40 +110,6 @@ pub fn find_vosk_bin() -> Option<PathBuf> {
     names.into_iter().find(|p| p.is_file())
 }
 
-/// `which` is `tiny`, `base`, or a file name such as `ggml-tiny.en.bin`.
-pub fn find_whisper_model(which: &str) -> Result<PathBuf, AsrError> {
-    if let Ok(explicit) = std::env::var("GALION_WHISPER_MODEL") {
-        let path = PathBuf::from(&explicit);
-        if path.is_file() {
-            return Ok(path);
-        }
-        return Err(AsrError::new(format!(
-            "GALION_WHISPER_MODEL={explicit} is not a file. No transcript was invented."
-        )));
-    }
-    let file = match which {
-        "tiny" | "tiny.en" => "ggml-tiny.en.bin",
-        "base" | "base.en" => "ggml-base.en.bin",
-        other => other,
-    };
-    let direct = PathBuf::from(file);
-    if direct.is_file() {
-        return Ok(direct);
-    }
-    let mut tried = Vec::new();
-    for root in roots() {
-        let path = root.join("weights/whisper").join(file);
-        tried.push(path.display().to_string());
-        if path.is_file() {
-            return Ok(path);
-        }
-    }
-    Err(AsrError::new(format!(
-        "whisper model {file} not found. Looked in {}. Run voice-stack/asr/scripts/fetch-models.sh --whisper. No transcript was invented.",
-        tried.join(", ")
-    )))
-}
-
 pub fn cpu_model() -> String {
     #[cfg(target_os = "linux")]
     {

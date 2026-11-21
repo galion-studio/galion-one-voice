@@ -10,9 +10,6 @@ use crate::paths::{self, env_u32};
 use crate::vosk::{VoskAsr, VoskConfig};
 use crate::worker::VoskWorkerAsr;
 
-#[cfg(feature = "whisper")]
-use crate::whisper::{WhisperAsr, WhisperConfig};
-
 pub struct EngineOpts {
     pub backend: String,
     pub model: Option<PathBuf>,
@@ -83,44 +80,8 @@ pub fn open_engine(opts: &EngineOpts) -> Result<(Box<dyn Asr>, String, u32), Asr
             let engine = VoskWorkerAsr::open(&bin, &model, lib.as_deref())?;
             Ok((Box::new(engine), label, threads))
         }
-        "whisper" => open_whisper(opts),
         other => Err(AsrError::new(format!(
-            "unknown backend {other}. Use vosk, vosk-worker, whisper, or fake. No transcript was invented."
+            "unknown backend {other}. Use vosk, vosk-worker, or fake. No transcript was invented."
         ))),
     }
-}
-
-#[cfg(feature = "whisper")]
-fn open_whisper(opts: &EngineOpts) -> Result<(Box<dyn Asr>, String, u32), AsrError> {
-    let which = opts
-        .model
-        .as_ref()
-        .and_then(|p| p.to_str().map(str::to_string))
-        .unwrap_or_else(|| "tiny".into());
-    let mut config = if opts.model.as_ref().is_some_and(|p| p.is_file()) {
-        WhisperConfig {
-            model_path: opts.model.clone().unwrap(),
-            threads: opts
-                .threads
-                .map(Ok)
-                .unwrap_or_else(|| env_u32("GALION_WHISPER_THREADS", 4))?,
-            partial_every_samples: None,
-        }
-    } else {
-        WhisperConfig::from_env(&which)?
-    };
-    if let Some(threads) = opts.threads {
-        config.threads = threads;
-    }
-    let model = config.model_path.display().to_string();
-    let threads = config.threads;
-    let engine = WhisperAsr::open(config)?;
-    Ok((Box::new(engine), model, threads))
-}
-
-#[cfg(not(feature = "whisper"))]
-fn open_whisper(_opts: &EngineOpts) -> Result<(Box<dyn Asr>, String, u32), AsrError> {
-    Err(AsrError::new(
-        "whisper backend needs `cargo build --features whisper`. The default build does not compile whisper.cpp. No transcript was invented.",
-    ))
 }

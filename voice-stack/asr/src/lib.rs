@@ -8,9 +8,8 @@
 //! partials glued on after it.
 //!
 //! The Vosk engine follows `galion-asr-vosk` (PR #26): same small-en model,
-//! same libvosk symbols, 20 ms frames, `[unk]` dropped, no GPU init. The
-//! optional `whisper` feature builds whisper.cpp through whisper-rs and stays
-//! out of the default build.
+//! same libvosk symbols, 20 ms frames, `[unk]` dropped, no GPU init. Vosk is
+//! the only backend.
 
 #[allow(dead_code)]
 mod b64;
@@ -32,9 +31,6 @@ mod wav;
 mod wer;
 mod worker;
 
-#[cfg(feature = "whisper")]
-mod whisper;
-
 pub use engine::Asr;
 pub use error::AsrError;
 pub use event::{
@@ -44,7 +40,7 @@ pub use event::{
 pub use fake::FakeAsr;
 pub use manifest::{parse_manifest, ClipRef};
 pub use open::{open_engine, EngineOpts};
-pub use paths::{cpu_model, find_vosk_lib, find_vosk_model, find_whisper_model};
+pub use paths::{cpu_model, find_vosk_lib, find_vosk_model};
 pub use score::{percentile_us, ClipScore, HostInfo, RunScore};
 pub use stream::{final_text, run_stream, StreamReport};
 pub use text::clean_transcript;
@@ -53,9 +49,6 @@ pub use vosk::{VoskAsr, VoskConfig};
 pub use wav::{read_wav, read_wav_bytes, wav_to_16k_mono, PcmWav};
 pub use wer::{corpus_counts, normalize_words, word_error, Wer};
 pub use worker::VoskWorkerAsr;
-
-#[cfg(feature = "whisper")]
-pub use whisper::{WhisperAsr, WhisperConfig};
 
 /// Compiler that built this crate, captured by `build.rs`.
 pub fn compiled_with() -> &'static str {

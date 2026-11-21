@@ -168,11 +168,10 @@ fn run() -> Result<(), String> {
 
 fn print_help() {
     eprintln!(
-        "s03-asr-eval [--backend vosk|vosk-worker|whisper] [--manifest FILE] [--audio DIR]\n\
+        "s03-asr-eval [--backend vosk|vosk-worker] [--manifest FILE] [--audio DIR]\n\
          [--model PATH] [--lib PATH] [--bin PATH] [--chunk-ms 80] [--threads N] [--out FILE.json]\n\
          \n\
          Scores a local clip list. Missing audio or a missing model is an error.\n\
-         This program does not invent a word-error rate.\n\
-         whisper requires a build with --features whisper."
+         This program does not invent a word-error rate. The backend is Vosk."
     );
 }

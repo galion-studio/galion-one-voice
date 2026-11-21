@@ -1,10 +1,7 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 Galion Labs
-# Download Vosk small-en, the Windows libvosk zip, and optionally whisper.cpp ggml files.
+# Download Vosk small-en and the Windows libvosk zip.
 #   powershell -ExecutionPolicy Bypass -File scripts\fetch-models.ps1
-#   powershell -ExecutionPolicy Bypass -File scripts\fetch-models.ps1 -Whisper
-
-param([switch]$Whisper)
 
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
@@ -13,10 +10,6 @@ $ModelUrl = "https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip
 $ModelSha = "30f26242c4eb449f948e42cb302dd7a686cb29a3423a8367f99ff41780942498"
 $WinUrl = "https://github.com/alphacep/vosk-api/releases/download/v0.3.45/vosk-win64-0.3.45.zip"
 $WinSha = "f1dcc9cca460630f81ea8f71794f69c80bed6556d2a4e6237b5785e1d2dff34b"
-$TinyUrl = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.en.bin?download=true"
-$TinySha = "921e4cf8686fdd993dcd081a5da5b6c365bfde1162e72b08d75ac75289920b1f"
-$BaseUrl = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin?download=true"
-$BaseSha = "a03779c86df3323075f5e796cb2ce5029f00ec8869eee3fdfb897afe36c6d002"
 $ModelDir = Join-Path $W "asr\vosk-model-small-en-us-0.15"
 $LibDir = Join-Path $W "asr\libvosk"
 
@@ -42,7 +35,6 @@ function Save-Checked([string]$Url, [string]$Dest, [string]$Sha) {
 }
 
 New-Item -ItemType Directory -Force -Path (Join-Path $W "asr") | Out-Null
-New-Item -ItemType Directory -Force -Path (Join-Path $W "whisper") | Out-Null
 $ignore = Join-Path $W ".gitignore"
 if (-not (Test-Path $ignore)) { Set-Content -Path $ignore -Value "*`n!.gitignore`n" }
 
@@ -67,9 +59,4 @@ if (-not (Test-Path (Join-Path $LibDir "libvosk.dll"))) {
     Remove-Item -Force $zip
 }
 Write-Host "ok   $(Join-Path $LibDir 'libvosk.dll')"
-
-if ($Whisper) {
-    Save-Checked $TinyUrl (Join-Path $W "whisper\ggml-tiny.en.bin") $TinySha
-    Save-Checked $BaseUrl (Join-Path $W "whisper\ggml-base.en.bin") $BaseSha
-}
 Write-Host "fetch-models: done"

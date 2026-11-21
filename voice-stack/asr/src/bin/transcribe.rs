@@ -30,7 +30,7 @@ fn run() -> Result<(), String> {
         match arg.as_str() {
             "-h" | "--help" => {
                 eprintln!(
-                    "s03-asr --wav FILE [--backend vosk|vosk-worker|whisper] [--model PATH]\n\
+                    "s03-asr --wav FILE [--backend vosk|vosk-worker] [--model PATH]\n\
                      [--lib PATH] [--bin PATH] [--chunk-ms 80] [--threads N]\n\
                      \n\
                      Prints one JSON object per partial or final on stdout.\n\

@@ -3,7 +3,7 @@
 
 [package]
 name = "galion-sam-asr"
-description = "Swarm 16 S03 streaming CPU speech-to-text. Vosk partials and finals, optional whisper.cpp."
+description = "Swarm 16 S03 streaming CPU speech-to-text. Vosk partials and finals."
 version = "0.0.1"
 edition = "2021"
 license = "MIT"
@@ -12,14 +12,6 @@ rust-version = "1.85"
 
 [workspace]
 resolver = "2"
-
-[features]
-default = []
-# Off unless requested. CPU only: do not enable cuda, metal, vulkan, hipblas, or intel-sycl.
-whisper = ["dep:whisper-rs"]
-
-[dependencies]
-whisper-rs = { version = "0.16.0", optional = true, default-features = false }
 
 [[bin]]
 name = "s03-asr"

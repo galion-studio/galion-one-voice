@@ -3,11 +3,9 @@
 # Copyright (c) 2026 Galion Labs
 #
 # Download Vosk small-en and libvosk into weights/ (not committed).
-# Pass --whisper to also download whisper.cpp ggml-tiny.en and ggml-base.en.
 # CPU only. A sha256 mismatch deletes the partial file and exits 1.
 #
 #   scripts/fetch-models.sh
-#   scripts/fetch-models.sh --whisper
 set -euo pipefail
 cd "$(dirname "$0")/.."
 W="$PWD/weights"
@@ -17,18 +15,12 @@ LINUX_URL="https://github.com/alphacep/vosk-api/releases/download/v0.3.45/vosk-l
 LINUX_SHA="bbdc8ed85c43979f6443142889770ea95cbfbc56cffb5c5dcd73afa875c5fbb2"
 WIN_URL="https://github.com/alphacep/vosk-api/releases/download/v0.3.45/vosk-win64-0.3.45.zip"
 WIN_SHA="f1dcc9cca460630f81ea8f71794f69c80bed6556d2a4e6237b5785e1d2dff34b"
-TINY_URL="https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.en.bin?download=true"
-TINY_SHA="921e4cf8686fdd993dcd081a5da5b6c365bfde1162e72b08d75ac75289920b1f"
-BASE_URL="https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin?download=true"
-BASE_SHA="a03779c86df3323075f5e796cb2ce5029f00ec8869eee3fdfb897afe36c6d002"
 MODEL_DIR="$W/asr/vosk-model-small-en-us-0.15"
 LIB_DIR="$W/asr/libvosk"
-WHISPER=0
 for arg in "$@"; do
   case "$arg" in
-    --whisper) WHISPER=1 ;;
     -h|--help)
-      echo "usage: scripts/fetch-models.sh [--whisper]"
+      echo "usage: scripts/fetch-models.sh"
       exit 0
       ;;
     *) echo "fetch-models: unknown argument $arg"; exit 2 ;;
@@ -46,7 +38,7 @@ get() { # url dest sha
   if ok "$2.part" "$3"; then mv "$2.part" "$2"; echo "ok   $2"; else rm -f "$2.part"; echo "fetch-models: sha256 mismatch for $1"; exit 1; fi
 }
 
-mkdir -p "$W/asr" "$W/whisper"
+mkdir -p "$W/asr"
 [ -f "$W/.gitignore" ] || printf '*\n!.gitignore\n' > "$W/.gitignore"
 
 if ! model_ready; then
@@ -91,8 +83,4 @@ case "$os" in
     ;;
 esac
 
-if [ "$WHISPER" = 1 ]; then
-  get "$TINY_URL" "$W/whisper/ggml-tiny.en.bin" "$TINY_SHA"
-  get "$BASE_URL" "$W/whisper/ggml-base.en.bin" "$BASE_SHA"
-fi
 echo "fetch-models: done"
