@@ -1,0 +1,56 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Galion Labs
+# User unit for Galion One Voice inside WSL. install.sh copies this to
+# ~/.config/systemd/user/. Not a system unit. No User=. No sudo. No deploy.
+# Sandbox keys reused from:
+#   deploy/systemd/templates/galion-voice-stage.service
+#   deploy/systemd/galion-clone-cbx.service
+#   voice-stack/linux-package/share/systemd/user/galion-samantha.service
+# MemoryMax is 2G so the public Vosk and Piper packs fit.
+# Companion socket is 127.0.0.1:7881 (GALION_SAMANTHA_WS).
+# 7878 is the one-dot screen, 7879 is GALION_HARD_ADDR, 7880 is the clone worker.
+# Model paths and the WSLg Pulse socket live in the paths.conf drop-in.
+# GALION_SAMANTHA_REF is not set here. A reference clip is never copied.
+
+[Unit]
+Description=Galion One Voice local server (WSL)
+After=network.target
+
+[Service]
+Type=simple
+EnvironmentFile=-%h/.config/galion/one-voice.env
+Environment=GALION_SAMANTHA_WS=127.0.0.1:7881
+Environment=GALION_CPU=1
+Environment=GALION_ASR=vosk
+Environment=GALION_SPEECH=a21
+ExecStart=%h/.local/bin/galion-one-voice
+WorkingDirectory=%h/.local/share/galion/one-voice
+Restart=on-failure
+RestartSec=2
+MemoryMax=2G
+NoNewPrivileges=yes
+PrivateTmp=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+ProtectSystem=strict
+ProtectHome=yes
+ReadOnlyPaths=%h/.local/bin/galion-one-voice
+ReadOnlyPaths=%h/.local/share/galion/one-voice
+ReadOnlyPaths=%h/.config/galion
+IPAddressDeny=any
+IPAddressAllow=localhost
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+SystemCallArchitectures=native
+UMask=0077
+
+[Install]
+WantedBy=default.target

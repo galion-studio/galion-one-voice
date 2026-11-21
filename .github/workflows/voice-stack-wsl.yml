@@ -1,0 +1,38 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Galion Labs
+# WSL installer inside ubuntu:24.04. No sound device. No model download. No deploy.
+
+name: voice-stack wsl
+
+on:
+  pull_request:
+    paths:
+      - 'voice-stack/linux-package/wsl/**'
+      - 'voice-stack/linux-package/ci/shellcheck.sh'
+      - 'voice-stack/linux-package/lib/**'
+      - 'voice-stack/linux-package/Makefile'
+      - 'voice-stack/linux-package/README.md'
+      - '.github/workflows/voice-stack-wsl.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'voice-stack/linux-package/wsl/**'
+      - 'voice-stack/linux-package/ci/shellcheck.sh'
+      - 'voice-stack/linux-package/lib/**'
+      - 'voice-stack/linux-package/Makefile'
+      - 'voice-stack/linux-package/README.md'
+      - '.github/workflows/voice-stack-wsl.yml'
+
+jobs:
+  ubuntu-2404:
+    name: ubuntu:24.04 container
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: WSL installer with no audio device
+        run: |
+          docker run --rm \
+            -v "$GITHUB_WORKSPACE:/work" \
+            -w /work \
+            ubuntu:24.04 \
+            bash voice-stack/linux-package/wsl/ci/container.sh
