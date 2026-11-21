@@ -26,12 +26,46 @@ pub use engine::{FakeReplyEngine, ReplyEngine, TurnOut};
 pub use map::{
     giggle_open, inhale_open, is_whisper_token, map, SpeakingParams, Tag, BASE_ENERGY, BASE_LENGTH,
     BASE_NOISE, BASE_NOISE_W, BASE_PITCH_ST, BASE_PRE_PAUSE_MS, BASE_SENTENCE_SILENCE_S,
-    ENERGY_MAX, ENERGY_MIN, EXAGGERATION_MAX, EXAGGERATION_MIN, EXAGGERATION_REST, LENGTH_MAX,
-    LENGTH_MIN, NOISE_MAX, NOISE_MIN, NOISE_W_MAX, NOISE_W_MIN, PAUSE_CEILING_MS, PAUSE_MIN_MS,
-    PERSONA_ALLOWED_TAGS, PITCH_BOUND_ST, SILENCE_MAX_S, SILENCE_MIN_S, WHISPER_TOKENS,
-    WORKER_RATE_MAX, WORKER_RATE_MIN,
+    E0_PITCH_RANGE, E0_WARMTH, ENERGY_MAX, ENERGY_MIN, EXAGGERATION_MAX, EXAGGERATION_MIN,
+    EXAGGERATION_REST, LENGTH_MAX, LENGTH_MIN, NOISE_MAX, NOISE_MIN, NOISE_W_MAX, NOISE_W_MIN,
+    PAUSE_CEILING_MS, PAUSE_MIN_MS, PERSONA_ALLOWED_TAGS, PITCH_BOUND_ST, SILENCE_MAX_S,
+    SILENCE_MIN_S, WHISPER_TOKENS, WORKER_RATE_MAX, WORKER_RATE_MIN,
 };
-pub use pad::Pad;
+pub use pad::{Pad, ASSUMED_AROUSAL, ASSUMED_DOMINANCE, ASSUMED_VALENCE};
+
+/// Default Samantha map. [`ProsodyMap::map_with_caller`] ignores the caller.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct SamanthaProsody;
+
+/// S07's map. The default ignores the caller. An override that reads the
+/// caller must ignore it when `sense` is false or `adapt` is false.
+pub trait ProsodyMap {
+    fn map(&self, mood: Pad) -> SpeakingParams;
+    fn map_with_caller(
+        &self,
+        mood: Pad,
+        caller: Option<Pad>,
+        sense: bool,
+        adapt: bool,
+    ) -> SpeakingParams;
+}
+
+impl ProsodyMap for SamanthaProsody {
+    fn map(&self, mood: Pad) -> SpeakingParams {
+        map(mood)
+    }
+
+    fn map_with_caller(
+        &self,
+        mood: Pad,
+        caller: Option<Pad>,
+        sense: bool,
+        adapt: bool,
+    ) -> SpeakingParams {
+        let _ = (caller, sense, adapt);
+        self.map(mood)
+    }
+}
 
 /// Heartbeat period. `crates/galion-heartbeat` `FRAME_MS`, LOCKS `frame_ms`.
 pub const TICK_MS: u32 = 80;
@@ -77,5 +111,20 @@ mod tests {
         assert_eq!(SAMPLE_RATE_HZ, 24_000);
         assert_eq!(TICK_SAMPLES, 1_920);
         assert!((TICK_S - 0.08).abs() < 1e-6);
+    }
+
+    #[test]
+    fn the_default_map_ignores_the_caller() {
+        let mood = Pad::RESTING;
+        let caller = Some(Pad {
+            arousal: 0.95,
+            valence: -0.8,
+            dominance: 0.1,
+        });
+        let alone = SamanthaProsody.map(mood);
+        let with = SamanthaProsody.map_with_caller(mood, caller, true, true);
+        let denied = SamanthaProsody.map_with_caller(mood, caller, false, false);
+        assert_eq!(alone, with);
+        assert_eq!(alone, denied);
     }
 }

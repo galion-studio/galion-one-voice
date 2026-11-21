@@ -3,5 +3,12 @@
 version = 4
 
 [[package]]
-name = "samantha-emotion-prosody"
+name = "galion-emotion"
 version = "0.1.0"
+
+[[package]]
+name = "galion-sam-prosody"
+version = "0.0.1"
+dependencies = [
+ "galion-emotion",
+]

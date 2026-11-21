@@ -13,8 +13,9 @@
 //!   energy, noise and sentence-silence gains, and the hard bounds.
 //! * Chatterbox worker clamps in `scripts/clone/chatterbox_worker.py`
 //!   (`controls_of`, `speaking_rate_of`): energy 0.6..=1.2, pause 0..=400 ms,
-//!   rate 0.8..=1.2. Exaggeration on that worker is 0..=2. This sector uses
-//!   the narrower s711 band 0.48..=0.65.
+//!   rate 0.8..=1.2, exaggeration 0..=2. The narrower 0.48..=0.65 band below
+//!   is this sector's choice. The s711 plan text is not in this checkout, so
+//!   those endpoints are not copied from a file in the tree.
 //!
 //! `da`, `dv` and `dd` are deltas from [`Pad::RESTING`], not from the older
 //! persona rest arousal of 0.35. At the HORBM rest point the voice is the
@@ -25,49 +26,56 @@
 //! the published Samantha `e1` pause (250 ms) is the ceiling, scaled by how
 //! far arousal sits below rest and by how far dominance sits below rest.
 
+use galion_emotion::express::ProsodyControl;
+use galion_emotion::persona_mood::SAMANTHA;
+
 use crate::pad::Pad;
 
-/// s711 Chatterbox exaggeration band. The worker itself allows 0..=2.
+/// Chatterbox exaggeration band chosen by this sector.
+///
+/// `controls_of` in `scripts/clone/chatterbox_worker.py` clamps exaggeration
+/// to 0..=2 and does not name 0.48 or 0.65. The s711 plan is not in this
+/// checkout. These constants are not a limit already written down there.
 pub const EXAGGERATION_MIN: f32 = 0.48;
 pub const EXAGGERATION_MAX: f32 = 0.65;
-/// Inside the band, near the Chatterbox conventional default of 0.5.
+/// Inside the sector band, near the Chatterbox conventional default of 0.5.
 pub const EXAGGERATION_REST: f32 = 0.52;
 
-/// Samantha `e0` / `SAMANTHA.voice` baselines.
-pub const BASE_LENGTH: f32 = 1.0;
-pub const BASE_NOISE: f32 = 0.667;
-pub const BASE_NOISE_W: f32 = 0.8;
-pub const BASE_PITCH_ST: f32 = 0.0;
-pub const BASE_ENERGY: f32 = 1.0;
-pub const BASE_PRE_PAUSE_MS: f32 = 0.0;
-pub const BASE_SENTENCE_SILENCE_S: f32 = 0.20;
+/// Samantha `e0` baselines, taken from [`SAMANTHA`].
+pub const BASE_LENGTH: f32 = SAMANTHA.voice.base_length_scale;
+pub const BASE_NOISE: f32 = SAMANTHA.voice.base_noise_scale;
+pub const BASE_NOISE_W: f32 = SAMANTHA.voice.base_noise_w;
+pub const BASE_PITCH_ST: f32 = SAMANTHA.voice.base_pitch_st;
+pub const BASE_ENERGY: f32 = SAMANTHA.voice.base_energy;
+pub const BASE_PRE_PAUSE_MS: f32 = SAMANTHA.voice.base_pre_pause_ms;
+pub const BASE_SENTENCE_SILENCE_S: f32 = SAMANTHA.voice.base_sentence_silence_s;
 
-/// Gains from the Samantha column. `pace_per_arousal` is negative: higher
-/// arousal shortens `length_scale` (Piper: larger length is slower).
-pub const PACE_PER_AROUSAL: f32 = -0.40;
-pub const PITCH_PER_VALENCE: f32 = 1.6;
-pub const PITCH_PER_AROUSAL: f32 = 2.2;
-pub const ENERGY_PER_AROUSAL: f32 = 0.45;
-pub const NOISE_PER_AROUSAL: f32 = 0.30;
-pub const NOISE_W_PER_AROUSAL: f32 = 0.30;
-/// Published sentence-silence slope: `base − 0.25·da`.
+/// Gains from [`SAMANTHA`]. `pace_per_arousal` is negative: higher arousal
+/// shortens `length_scale` (Piper: larger length is slower).
+pub const PACE_PER_AROUSAL: f32 = SAMANTHA.voice.pace_per_arousal;
+pub const PITCH_PER_VALENCE: f32 = SAMANTHA.voice.pitch_per_valence;
+pub const PITCH_PER_AROUSAL: f32 = SAMANTHA.voice.pitch_per_arousal;
+pub const ENERGY_PER_AROUSAL: f32 = SAMANTHA.voice.energy_per_arousal;
+pub const NOISE_PER_AROUSAL: f32 = SAMANTHA.voice.noise_per_arousal;
+pub const NOISE_W_PER_AROUSAL: f32 = SAMANTHA.voice.noise_w_per_arousal;
+/// Published sentence-silence slope: `base − 0.25·da` (`PERSONA-MOOD.md`).
 pub const SILENCE_PER_AROUSAL: f32 = 0.25;
-/// Samantha `e1` pre-pause minus `e0` (`samantha.toml` 250 − 0).
-pub const PAUSE_CEILING_MS: f32 = 250.0;
+/// Samantha `e1` pre-pause minus `e0`. `SAMANTHA.voice.empathy_pause_ms`.
+pub const PAUSE_CEILING_MS: f32 = SAMANTHA.voice.empathy_pause_ms;
 
-pub const LENGTH_MIN: f32 = 0.80;
-pub const LENGTH_MAX: f32 = 1.30;
+pub const LENGTH_MIN: f32 = SAMANTHA.voice.length_bounds.0;
+pub const LENGTH_MAX: f32 = SAMANTHA.voice.length_bounds.1;
 pub const NOISE_MIN: f32 = 0.2;
 pub const NOISE_MAX: f32 = 0.9;
 pub const NOISE_W_MIN: f32 = 0.2;
 pub const NOISE_W_MAX: f32 = 1.0;
 pub const SILENCE_MIN_S: f32 = 0.08;
 pub const SILENCE_MAX_S: f32 = 0.45;
-pub const PITCH_BOUND_ST: f32 = 3.0;
-/// Same floor and ceiling the Chatterbox worker applies to energy.
+pub const PITCH_BOUND_ST: f32 = SAMANTHA.voice.pitch_bound_st;
+/// Same floor and ceiling `ProsodyControl::clamped` and the Samantha profile use.
 /// The floor is the whisper guard: this sector never asks for a quieter voice.
-pub const ENERGY_MIN: f32 = 0.60;
-pub const ENERGY_MAX: f32 = 1.20;
+pub const ENERGY_MIN: f32 = SAMANTHA.voice.energy_bounds.0;
+pub const ENERGY_MAX: f32 = SAMANTHA.voice.energy_bounds.1;
 pub const PAUSE_MIN_MS: f32 = 0.0;
 /// Worker cap. The persona ceiling ([`PAUSE_CEILING_MS`]) is tighter.
 pub const PAUSE_WORKER_MAX_MS: f32 = 400.0;
@@ -75,34 +83,39 @@ pub const PAUSE_WORKER_MAX_MS: f32 = 400.0;
 pub const WORKER_RATE_MIN: f32 = 0.8;
 pub const WORKER_RATE_MAX: f32 = 1.2;
 
-/// Tokens named in `samantha.toml` `[tags].allowed`. `[inhale]` and `[giggle]`
-/// are not on that list (`unknown_tags = "off"`). This sector still emits
-/// them as mood hints. A strict reader of the persona file drops them.
+/// Tokens named in `samantha.toml` `[tags].allowed`. `unknown_tags = "off"`.
+/// `[inhale]` and `[giggle]` are not on this list, so this sector does not
+/// put them on a packet.
 pub const PERSONA_ALLOWED_TAGS: &[&str] = &["[laugh]", "[chuckle]"];
 
-/// Mood hint for the clone worker. Never written into the reply string.
+/// `samantha.toml` `[register.prosody.e0]` warmth and pitch range.
+/// Not a function of the caller's mood.
+pub const E0_WARMTH: f32 = 0.62;
+pub const E0_PITCH_RANGE: f32 = 1.0;
+
+/// A clone-worker hint that the persona file allows. Never written into the reply.
+/// The giggle mood uses `[chuckle]` because `[giggle]` would be dropped.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Tag {
-    Inhale,
-    Giggle,
+    Chuckle,
 }
 
 impl Tag {
     pub fn token(self) -> &'static str {
         match self {
-            Tag::Inhale => "[inhale]",
-            Tag::Giggle => "[giggle]",
+            Tag::Chuckle => "[chuckle]",
         }
     }
 
-    /// `samantha.toml` `[tags].on_piper`. Piper would speak the token.
+    /// `samantha.toml` `[tags].on_piper`. Piper must not receive a bracket tag.
     pub fn on_piper(self) -> bool {
         false
     }
 
-    /// `samantha.toml` `[tags].on_clone`.
+    /// True only when [`Self::token`] is on the persona allow-list.
+    /// The file's `on_clone = true` does not extend to unknown tokens.
     pub fn on_clone(self) -> bool {
-        true
+        self.persona_allows()
     }
 
     pub fn persona_allows(self) -> bool {
@@ -133,7 +146,11 @@ pub struct SpeakingParams {
     pub rate: f32,
     /// `rate` after the worker's 0.8..=1.2 clamp.
     pub worker_rate: f32,
+    /// Allow-listed clone hint. `None` on Piper and whenever the token would
+    /// not be in [`PERSONA_ALLOWED_TAGS`].
     pub tag: Option<Tag>,
+    /// The inhale gate opened. There is no bracket token for it.
+    pub breath: bool,
 }
 
 impl SpeakingParams {
@@ -162,7 +179,31 @@ impl SpeakingParams {
         false
     }
 
+    /// Knobs the live mouth already clamps. Warmth and pitch range stay on
+    /// the `e0` row. Propensity is not an input.
+    pub fn prosody_control(self) -> ProsodyControl {
+        ProsodyControl {
+            pitch_shift_st: self.pitch_shift_st,
+            pitch_range: E0_PITCH_RANGE,
+            rate: self.worker_rate,
+            energy: self.energy,
+            warmth: E0_WARMTH,
+            pre_pause_ms: self.pre_pause_ms_i().min(u32::from(u16::MAX)) as u16,
+        }
+        .clamped()
+    }
+
     pub fn in_bounds(self) -> bool {
+        let tag_ok = match self.tag {
+            Some(tag) => {
+                tag.on_clone()
+                    && !tag.on_piper()
+                    && tag.persona_allows()
+                    && !is_whisper_token(tag.token())
+                    && PERSONA_ALLOWED_TAGS.contains(&tag.token())
+            }
+            None => true,
+        };
         in_range(self.exaggeration, EXAGGERATION_MIN, EXAGGERATION_MAX)
             && in_range(self.length_scale, LENGTH_MIN, LENGTH_MAX)
             && in_range(self.noise_scale, NOISE_MIN, NOISE_MAX)
@@ -174,11 +215,9 @@ impl SpeakingParams {
             && self.rate.is_finite()
             && self.rate > 0.0
             && in_range(self.worker_rate, WORKER_RATE_MIN, WORKER_RATE_MAX)
-            && self
-                .tag
-                .map(|t| !is_whisper_token(t.token()))
-                .unwrap_or(true)
+            && tag_ok
             && !self.whisper()
+            && self.prosody_control().energy >= ENERGY_MIN
     }
 }
 
@@ -226,6 +265,7 @@ pub fn map(pad: Pad) -> SpeakingParams {
         rate,
         worker_rate,
         tag: None,
+        breath: false,
     }
 }
 
@@ -372,7 +412,7 @@ mod tests {
     }
 
     #[test]
-    fn exaggeration_stays_in_the_s711_band() {
+    fn exaggeration_stays_in_the_sector_band() {
         let samples = [
             Pad::RESTING,
             Pad {
@@ -429,14 +469,15 @@ mod tests {
     }
 
     #[test]
-    fn tags_are_not_whisper_and_not_on_piper() {
-        for tag in [Tag::Inhale, Tag::Giggle] {
-            assert!(!tag.on_piper());
-            assert!(tag.on_clone());
-            assert!(!tag.persona_allows());
-            assert!(!is_whisper_token(tag.token()));
-            assert!(tag.token().starts_with('[') && tag.token().ends_with(']'));
-        }
+    fn the_only_tag_is_an_allow_listed_chuckle() {
+        let tag = Tag::Chuckle;
+        assert!(!tag.on_piper());
+        assert!(tag.on_clone());
+        assert!(tag.persona_allows());
+        assert_eq!(tag.token(), "[chuckle]");
+        assert!(!is_whisper_token(tag.token()));
+        assert!(!PERSONA_ALLOWED_TAGS.contains(&"[giggle]"));
+        assert!(!PERSONA_ALLOWED_TAGS.contains(&"[inhale]"));
         assert!(is_whisper_token("[whisper]"));
         assert!(is_whisper_token("[Whispering]"));
     }

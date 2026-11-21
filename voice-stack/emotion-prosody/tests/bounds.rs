@@ -3,7 +3,7 @@
 
 //! Bounds, slew, tags, and the persona file this crate reuses.
 
-use samantha_emotion_prosody::*;
+use galion_sam_prosody::*;
 use std::path::PathBuf;
 
 fn assert_bounds(params: &SpeakingParams) {
@@ -79,8 +79,10 @@ fn sustained_play_can_giggle_and_then_waits() {
         let params = clock.tick();
         assert_bounds(&params);
         if let Some(tag) = params.tag {
-            assert_eq!(tag, Tag::Giggle);
-            assert_eq!(tag.token(), "[giggle]");
+            assert_eq!(tag, Tag::Chuckle);
+            assert_eq!(tag.token(), "[chuckle]");
+            assert!(tag.on_clone());
+            assert!(!tag.on_piper());
             fires.push(i);
         }
     }
@@ -126,13 +128,9 @@ fn a_warm_unhurried_mood_can_inhale() {
     for _ in 0..80 {
         let params = clock.tick();
         assert_bounds(&params);
-        match params.tag {
-            Some(Tag::Inhale) => {
-                assert_eq!(params.tag.unwrap().token(), "[inhale]");
-                inhales += 1;
-            }
-            Some(Tag::Giggle) => panic!("this mood is not a giggle"),
-            None => {}
+        assert!(params.tag.is_none(), "an inhale is not a bracket tag");
+        if params.breath {
+            inhales += 1;
         }
     }
     assert!(inhales >= 1);

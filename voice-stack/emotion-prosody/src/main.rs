@@ -5,7 +5,7 @@
 //!
 //! No audio. `GALION_SAMANTHA_REF` is not opened.
 
-use samantha_emotion_prosody::{measure_ticks, Pad, ProsodyClock, TICK_MS};
+use galion_sam_prosody::{measure_ticks, Pad, ProsodyClock, TICK_MS};
 use std::env;
 use std::process::ExitCode;
 
@@ -14,8 +14,8 @@ fn main() -> ExitCode {
     match run(&args) {
         Ok(()) => ExitCode::SUCCESS,
         Err(err) => {
-            eprintln!("samantha-prosody: {err}");
-            eprintln!("usage: samantha-prosody [--json] [--ticks N] [--from A,V,D] [--target A,V,D] [--bench N]");
+            eprintln!("galion-sam-prosody: {err}");
+            eprintln!("usage: galion-sam-prosody [--json] [--ticks N] [--from A,V,D] [--target A,V,D] [--bench N]");
             ExitCode::from(2)
         }
     }
@@ -33,7 +33,7 @@ fn run(args: &[String]) -> Result<(), String> {
         match arg {
             "--help" | "-h" => {
                 println!(
-                    "samantha-prosody [--json] [--ticks N] [--from A,V,D] [--target A,V,D] [--bench N]\n\
+                     "galion-sam-prosody [--json] [--ticks N] [--from A,V,D] [--target A,V,D] [--bench N]\n\
                      \n\
                      Prints one line per {TICK_MS} ms tick while the voice slews from --from to --target.\n\
                      Default is one tick at HORBM rest (arousal 0.3, valence 0.25, dominance 0.5).\n\
@@ -118,10 +118,11 @@ fn parse_pad(text: &str) -> Result<Pad, String> {
     })
 }
 
-fn plain_line(n: u32, pad: Pad, params: samantha_emotion_prosody::SpeakingParams) -> String {
+fn plain_line(n: u32, pad: Pad, params: galion_sam_prosody::SpeakingParams) -> String {
     let tag = params.tag.map(|t| t.token()).unwrap_or("-");
+    let breath = if params.breath { "yes" } else { "no" };
     format!(
-        "t={n} ms={} a={:.3} v={:.3} d={:.3} ex={:.4} ls={:.4} ns={:.4} nw={:.4} sil={:.4} pause_ms={:.1} pitch_st={:.3} energy={:.4} rate={:.4} worker_rate={:.4} tag={tag}",
+        "t={n} ms={} a={:.3} v={:.3} d={:.3} ex={:.4} ls={:.4} ns={:.4} nw={:.4} sil={:.4} pause_ms={:.1} pitch_st={:.3} energy={:.4} rate={:.4} worker_rate={:.4} tag={tag} breath={breath}",
         u64::from(n) * u64::from(TICK_MS),
         pad.arousal,
         pad.valence,
@@ -139,14 +140,16 @@ fn plain_line(n: u32, pad: Pad, params: samantha_emotion_prosody::SpeakingParams
     )
 }
 
-fn json_line(n: u32, pad: Pad, params: samantha_emotion_prosody::SpeakingParams) -> String {
+fn json_line(n: u32, pad: Pad, params: galion_sam_prosody::SpeakingParams) -> String {
     let tag = match params.tag {
         Some(t) => format!("\"{}\"", t.token()),
         None => "null".to_string(),
     };
+    let on_clone = params.tag.map(|t| t.on_clone()).unwrap_or(false);
     format!(
         "{{\"t_ms\":{},\"pad\":{{\"arousal\":{:.4},\"valence\":{:.4},\"dominance\":{:.4}}},\
-         \"exaggeration\":{:.4},\"tag\":{tag},\"tag_on_piper\":false,\"tag_on_clone\":{},\
+         \"exaggeration\":{:.4},\"tag\":{tag},\"tag_on_piper\":false,\"tag_on_clone\":{on_clone},\
+         \"breath\":{},\
          \"prosody\":{{\"length_scale\":{:.4},\"noise_scale\":{:.4},\"noise_w\":{:.4},\
          \"sentence_silence_s\":{:.4},\"pre_pause_ms\":{},\"pitch_st\":{:.4},\"energy\":{:.4},\
          \"rate\":{:.4},\"worker_rate\":{:.4}}}}}",
@@ -155,7 +158,7 @@ fn json_line(n: u32, pad: Pad, params: samantha_emotion_prosody::SpeakingParams)
         pad.valence,
         pad.dominance,
         params.exaggeration,
-        params.tag.is_some(),
+        params.breath,
         params.length_scale,
         params.noise_scale,
         params.noise_w,

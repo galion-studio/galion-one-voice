@@ -10,13 +10,14 @@
 
 use crate::pad::Pad;
 
-/// What a reply engine returns. Field names match the HORBM `TurnOut` the
-/// stack will consume. This struct is not a brain.
+/// What a reply engine returns. Field names match the HORBM `TurnOut`.
+/// `Intent` and `Arm` stay generic: this crate does not invent their variants.
+/// `propensity` is forwarded and is not a pitch curve.
 #[derive(Clone, Debug, PartialEq)]
-pub struct TurnOut {
+pub struct TurnOut<Intent = (), Arm = ()> {
     pub reply: String,
-    pub intent: String,
-    pub arm: String,
+    pub intent: Intent,
+    pub arm: Arm,
     pub propensity: f32,
     pub evidence: Vec<String>,
     pub sources: Vec<String>,
@@ -51,8 +52,8 @@ impl ReplyEngine for FakeReplyEngine {
     fn turn(&mut self, _heard: &str) -> TurnOut {
         TurnOut {
             reply: self.reply.clone(),
-            intent: "fake".to_string(),
-            arm: "none".to_string(),
+            intent: (),
+            arm: (),
             propensity: 0.0,
             evidence: Vec::new(),
             sources: Vec::new(),
@@ -104,6 +105,44 @@ mod tests {
         let mut engine = FakeReplyEngine::resting();
         let turn = engine.turn("hi");
         assert_eq!(turn.mood, Pad::RESTING);
-        assert!(turn.violations == 0);
+        assert_eq!(turn.violations, 0);
+        assert_eq!(turn.propensity, 0.0);
+    }
+
+    #[test]
+    fn propensity_does_not_change_pitch() {
+        let mood = Pad {
+            arousal: 0.7,
+            valence: 0.4,
+            dominance: 0.5,
+        };
+        let low = speak(mood, 0.05);
+        let high = speak(mood, 0.95);
+        assert_eq!(low.pitch_shift_st, high.pitch_shift_st);
+        assert_eq!(low.exaggeration, high.exaggeration);
+        assert_eq!(low, high);
+    }
+
+    fn speak(mood: Pad, propensity: f32) -> crate::SpeakingParams {
+        let turn = TurnOut {
+            reply: "The fence is loose.".to_string(),
+            intent: (),
+            arm: (),
+            propensity,
+            evidence: Vec::new(),
+            sources: Vec::new(),
+            violations: 0,
+            lookup_us: 0,
+            took_us: 0,
+            mood,
+        };
+        let mut clock = ProsodyClock::new();
+        clock.follow(turn.mood);
+        let mut params = clock.tick();
+        for _ in 0..40 {
+            params = clock.tick();
+        }
+        let _ = turn.propensity;
+        params
     }
 }

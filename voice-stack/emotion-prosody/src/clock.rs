@@ -13,7 +13,7 @@
 //! stops the same hint landing on every line. The reply string is never read.
 
 use crate::map::{giggle_open, inhale_open, map, SpeakingParams, Tag};
-use crate::pad::{finite_clamp, Pad};
+use crate::pad::{finite_clamp, Pad, ASSUMED_AROUSAL, ASSUMED_DOMINANCE, ASSUMED_VALENCE};
 use crate::TICK_S;
 
 /// Approach time, seconds. Pipeline constant from the voice-v2 fluid core.
@@ -105,9 +105,24 @@ impl ProsodyClock {
     /// component. The applied voice does not move until [`Self::tick`].
     pub fn set_target(&mut self, pad: Pad) {
         self.target = Pad {
-            arousal: finite_clamp(pad.arousal, 0.0, 1.0, self.target.arousal),
-            valence: finite_clamp(pad.valence, -1.0, 1.0, self.target.valence),
-            dominance: finite_clamp(pad.dominance, 0.0, 1.0, self.target.dominance),
+            arousal: finite_clamp(
+                pad.arousal,
+                ASSUMED_AROUSAL.0,
+                ASSUMED_AROUSAL.1,
+                self.target.arousal,
+            ),
+            valence: finite_clamp(
+                pad.valence,
+                ASSUMED_VALENCE.0,
+                ASSUMED_VALENCE.1,
+                self.target.valence,
+            ),
+            dominance: finite_clamp(
+                pad.dominance,
+                ASSUMED_DOMINANCE.0,
+                ASSUMED_DOMINANCE.1,
+                self.target.dominance,
+            ),
         };
     }
 
@@ -131,13 +146,15 @@ impl ProsodyClock {
             INHALE_HOLD_TICKS,
             INHALE_COOLDOWN_TICKS,
         );
-        params.tag = if giggle {
-            Some(Tag::Giggle)
-        } else if inhale {
-            Some(Tag::Inhale)
+        // `[giggle]` and `[inhale]` are not on the persona allow-list.
+        // A held giggle becomes `[chuckle]`. A held inhale is `breath` and no token.
+        let chuckle = Tag::Chuckle;
+        params.tag = if giggle && chuckle.on_clone() && !chuckle.on_piper() {
+            Some(chuckle)
         } else {
             None
         };
+        params.breath = inhale;
         self.ticks = self.ticks.saturating_add(1);
         params
     }

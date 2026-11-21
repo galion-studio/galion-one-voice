@@ -3,7 +3,7 @@
 
 //! The 80 ms tick must not touch the heap.
 
-use samantha_emotion_prosody::{Pad, ProsodyClock};
+use galion_sam_prosody::{Pad, ProsodyClock};
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::hint::black_box;
 use std::sync::atomic::{AtomicUsize, Ordering};

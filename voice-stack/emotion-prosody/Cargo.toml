@@ -1,0 +1,23 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Galion Labs
+# Galion Voice — Perpetual Open MIT License
+
+[package]
+name = "galion-sam-prosody"
+version = "0.0.1"
+edition = "2021"
+license = "MIT"
+publish = false
+rust-version = "1.85"
+description = "Map a live HORBM Pad onto Samantha's speaking parameters. One 80 ms tick slews the voice. No audio, no model calls."
+
+[[bin]]
+name = "galion-sam-prosody"
+path = "src/main.rs"
+
+[dependencies]
+galion-emotion = { path = "../../galion-emotion" }
+
+# Own workspace, same shape as voice-stack/contract.
+# Not a member of the root voice workspace.
+[workspace]
