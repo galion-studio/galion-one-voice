@@ -79,6 +79,7 @@ fn self_check_and_repo_stub_match_the_s711_knobs() {
     assert_eq!(check.consent, "local-zero-shot-conditioning");
     assert!(check.wall_us > 0, "self-check wall time was 0");
     assert!(check.device_probe == "cpu" || check.device_probe == "cuda");
+    assert_eq!(check.auto_device, "cpu");
 
     let repo = run_repo_stub_probe().expect("repo stub");
     assert_eq!(repo.exit_code, 0);

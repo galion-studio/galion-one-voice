@@ -19,8 +19,9 @@ The reference path is the one in the request. Its sha256 must start with
 ``GALION_SAMANTHA_STUB=1`` emits protocol PCM and does not import torch.
 A real utterance needs ``GALION_SAMANTHA_WEIGHTS`` pointing at a local
 Chatterbox expressive checkpoint. This file never calls a download loader.
-CUDA is used only when torch reports it and the device request allows it.
-CPU is the path when CUDA is absent. Neither path is timed as 80 ms here.
+The default device is CPU, including ``auto``. CUDA is used only when
+``GALION_SAMANTHA_DEVICE=cuda`` and torch reports it. Neither path is timed
+as 80 ms here.
 """
 
 from __future__ import annotations
@@ -262,14 +263,9 @@ def apply_thread_cap() -> str:
 
 
 def resolve_device(asked: str) -> str:
+    """``auto`` stays on CPU. CUDA is opt-in and still requires torch."""
     asked = (asked or "auto").strip().lower()
-    if asked in ("", "auto"):
-        try:
-            import torch
-        except Exception:
-            return "cpu"
-        return "cuda" if torch.cuda.is_available() else "cpu"
-    if asked == "cpu":
+    if asked in ("", "auto", "cpu"):
         return "cpu"
     if asked == "cuda":
         try:
@@ -376,8 +372,8 @@ def tensor_to_s16(wav) -> bytes:
 
 def run_real(pcm_fd: int) -> None:
     asked = os.environ.get("GALION_SAMANTHA_DEVICE", "auto").strip().lower() or "auto"
-    thread_note = apply_thread_cap() if asked == "cpu" else "unset"
     device = resolve_device(asked)
+    thread_note = apply_thread_cap() if device == "cpu" else "unset"
     sys.stderr.write(f"galion-s711-cpu: device={device} threads={thread_note}\n")
     sys.stderr.flush()
     model = None
@@ -493,6 +489,7 @@ def self_check() -> int:
             f"consent={CONSENT}",
             f"device_probe={device}",
             f"device_note={note}",
+            f"auto_device={resolve_device('auto')}",
         ]
     )
     sys.stdout.write("\n".join(lines) + "\n")
@@ -504,6 +501,8 @@ def self_check() -> int:
     if len(pcm) != FRAME * 2 or len(resampled) // 2 != 2:
         return 1
     if not prefix_ok(good) or prefix_ok(bad):
+        return 1
+    if resolve_device("auto") != "cpu" or resolve_device("") != "cpu":
         return 1
     return 0
 

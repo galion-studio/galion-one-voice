@@ -46,7 +46,7 @@ fn main() -> ExitCode {
         match run_self_check() {
             Ok(check) => {
                 println!(
-                    "self-check reuse={} mode={} exaggeration={} cfg={} seed0={} seed1={} stub_samples={} stub_ttfa_us={} wall_us={} device_probe={} device_note={} resample_out={}",
+                    "self-check reuse={} mode={} exaggeration={} cfg={} seed0={} seed1={} stub_samples={} stub_ttfa_us={} wall_us={} device_probe={} device_note={} auto_device={} resample_out={}",
                     check.reuse,
                     check.mode,
                     check.exaggeration,
@@ -58,6 +58,7 @@ fn main() -> ExitCode {
                     check.wall_us,
                     check.device_probe,
                     one_line(&check.device_note),
+                    check.auto_device,
                     check.resample_out
                 );
             }

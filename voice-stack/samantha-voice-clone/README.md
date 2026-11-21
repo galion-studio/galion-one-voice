@@ -27,7 +27,7 @@ The reference wav is not in git. Set `GALION_SAMANTHA_REF` to a local file. The 
 
 `python/s711_worker.py` imports `scripts/clone/chatterbox_worker.py` and uses its sha256, PCM write, and stdout/stderr split. A protocol check also starts that script directly with `GALION_CLONE_STUB_PCM=1` and sends exaggeration 0.5 and cfg 0.5.
 
-The repo worker cannot speak this clip by itself. Its allowlist is `scripts/clone/REFS.sha256` (a different Samantha pin), and `pin_cpu()` exits if the device is not `cpu`. Seed is not a field that worker reads. This crate therefore keeps the expressive generate path in the sector worker: same library call (`ChatterboxTTS.from_local` plus `generate` with the reference path, exaggeration, and cfg), with `torch.manual_seed(711 + index)` before every sentence. CUDA is used only when torch reports it. CPU is the path when it does not.
+The repo worker cannot speak this clip by itself. Its allowlist is `scripts/clone/REFS.sha256` (a different Samantha pin), and `pin_cpu()` exits if the device is not `cpu`. Seed is not a field that worker reads. This crate therefore keeps the expressive generate path in the sector worker: same library call (`ChatterboxTTS.from_local` plus `generate` with the reference path, exaggeration, and cfg), with `torch.manual_seed(711 + index)` before every sentence. `auto` stays on CPU, the same landing as the repo clone child. `GALION_SAMANTHA_DEVICE=cuda` is the opt-in, and it is refused when the probe does not see CUDA.
 
 `GALION_SAMANTHA_WEIGHTS` must already be a local checkpoint directory. There is no `from_pretrained` call in this tree.
 
@@ -47,7 +47,7 @@ cargo run --manifest-path voice-stack/samantha-voice-clone/Cargo.toml --example 
 
 `--self-check` prints the interpreter probe, the in-process stub pack time, and one round trip through the repo Chatterbox stub. It does not need the reference wav and it does not load a model.
 
-To speak, point at the local reference and a local checkpoint. CPU is the honest default when CUDA is not visible:
+To speak, point at the local reference and a local checkpoint. `auto` stays on CPU:
 
 ```bash
 export GALION_SAMANTHA_REF="$HOME/samantha-ref.wav"
@@ -57,7 +57,7 @@ export GALION_SAMANTHA_CACHE="${TMPDIR:-/tmp}/galion-samantha-s711"
 cargo run --manifest-path voice-stack/samantha-voice-clone/Cargo.toml --example speak -- "Hello."
 ```
 
-`GALION_SAMANTHA_DEVICE=cpu` forces CPU. `cuda` is refused when the probe does not see CUDA. `GALION_SAMANTHA_STUB=1` is protocol PCM for a pipe test. It is not a voice. `GALION_SAMANTHA_THREADS` caps CPU thread pools only when the device is `cpu`. Unset, CPU mode uses the interpreter default.
+`auto` and `cpu` stay on CPU. The probe still reports whether torch can see CUDA, and that report does not change `auto`. `cuda` is opt-in and is refused when the probe does not see CUDA. `GALION_SAMANTHA_STUB=1` is protocol PCM for a pipe test. It is not a voice. `GALION_SAMANTHA_THREADS` caps CPU thread pools when the selected device is CPU. Unset, CPU mode uses the interpreter default.
 
 Python is `python3` unless `GALION_SAMANTHA_PYTHON` is set. A real utterance needs `torch` and `chatterbox.tts` installed locally. This crate does not install them.
 

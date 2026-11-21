@@ -343,6 +343,7 @@ pub struct SelfCheck {
     pub resample_out: usize,
     pub device_probe: String,
     pub device_note: String,
+    pub auto_device: String,
     pub consent: String,
     pub wall_us: u128,
 }
@@ -391,6 +392,7 @@ pub fn parse_self_check(text: &str, wall_us: u128) -> Result<SelfCheck, TtsError
         resample_out: parse_usize("resample_out")?,
         device_probe: need("device_probe")?,
         device_note: need("device_note")?,
+        auto_device: need("auto_device")?,
         consent: need("consent")?,
         wall_us,
     })

@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Galion Labs
-//! CUDA when torch says it is available. Otherwise CPU.
-//! A missing torch install is CPU, and it is not a CUDA measurement.
+//! The probe reports whether torch can see CUDA.
+//! `auto` and `cpu` stay on CPU, which is the clone landing.
+//! `cuda` runs only when that device was requested and the probe says it is present.
+//! A missing torch install is a CPU probe, and it is not a CUDA measurement.
 
 use crate::error::TtsError;
 use std::path::PathBuf;
@@ -96,8 +98,8 @@ sys.stderr.write('torch\\n')
 
 pub fn resolve_device(requested: &str, probe: &ComputeProbe) -> Result<String, TtsError> {
     match requested.trim().to_ascii_lowercase().as_str() {
-        "" | "auto" => Ok(probe.kind.as_str().to_string()),
-        "cpu" => Ok("cpu".to_string()),
+        // The clone landing is CPU. A visible GPU does not move `auto` onto CUDA.
+        "" | "auto" | "cpu" => Ok("cpu".to_string()),
         "cuda" => {
             if probe.kind == ComputeKind::Cuda {
                 Ok("cuda".to_string())
@@ -150,6 +152,7 @@ mod tests {
             elapsed_us: 1,
         };
         assert_eq!(resolve_device("cuda", &cuda).unwrap(), "cuda");
-        assert_eq!(resolve_device("auto", &cuda).unwrap(), "cuda");
+        assert_eq!(resolve_device("auto", &cuda).unwrap(), "cpu");
+        assert_eq!(resolve_device("", &cuda).unwrap(), "cpu");
     }
 }
