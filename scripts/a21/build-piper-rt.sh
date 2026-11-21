@@ -7,7 +7,10 @@
 # run on onnxruntime 1.31.1 (MIT) out of process, with thread/spin/core-pinning control.
 #   1. fetch onnxruntime-linux-x64-1.31.1 (sha256-pinned) -> weights/runtime/ort/ (not vendored)
 #   2. cargo build --release runtimes/galion-piper-rt (its own cargo workspace; never a member of
-#      the main workspace, so `cargo tree --workspace` stays ort-free)
+#      the main workspace, so `cargo tree --workspace` stays ort-free). The crate enables
+#      ort's cuda feature so the binary can ask for CUDAExecutionProvider. The default
+#      device is still CPU. GALION_TTS_DEVICE=cuda is the opt-in, and a missing GPU
+#      library logs a fallback instead of failing the build.
 #   3. install -> weights/runtime/piper-rt/galion-piper-rt  (picked by speech::weights::piper_runtime)
 #   4. smoke: one line of PCM
 # Needs scripts/a21/fetch-a21.sh first (voice pack + espeak-ng from the Piper tarball).

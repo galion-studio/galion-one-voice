@@ -163,6 +163,10 @@ The installer adds that line to `~/.bashrc` between `# BEGIN galion-one-voice` a
 
 `galion-samantha.service` binds the same port. Enable one of the two units.
 
+### GPU mouth (optional)
+
+The WSL unit above stays on CPU (`GALION_CPU=1`, no `GALION_TTS_DEVICE`). A separate Piper mouth can use the laptop GPU. It binds `127.0.0.1:8002` only, and it falls back to CPU when CUDA is not actually there. Caches and the bench log stay on `G:`. The steps are in [`voice-stack/mouth/README.md`](../mouth/README.md). This install does not start that process and does not download a CUDA library.
+
 The sandbox matches the Samantha unit: `NoNewPrivileges`, `ProtectSystem=strict`, `ProtectHome`, `IPAddressDeny=any`, `IPAddressAllow=localhost`. A drop-in adds read-only paths for `var/` and the WSLg socket directory.
 
 ### CI
