@@ -1,0 +1,70 @@
+<!-- SPDX-License-Identifier: MIT -->
+<!-- Copyright (c) 2026 Galion Labs -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Samantha</title>
+  <style>
+    html, body {
+      margin: 0;
+      height: 100%;
+      background: #140e09;
+      color: #f3e6d4;
+      font: 15px/1.4 system-ui, sans-serif;
+    }
+    body {
+      display: grid;
+      place-items: center;
+    }
+    .dot {
+      width: 28vmin;
+      height: 28vmin;
+      min-width: 140px;
+      min-height: 140px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 40% 35%, #ffd7a1, #e08a3c 55%, #8a3d12);
+      box-shadow: 0 0 40px rgba(224, 138, 60, 0.45);
+      opacity: 0.92;
+      transform: scale(0.86);
+      transition: transform 80ms linear, opacity 80ms linear;
+    }
+    .dot[data-phase="listening"] { transform: scale(0.94); opacity: 1; }
+    .dot[data-phase="thinking"] { transform: scale(0.9); animation: pulse 800ms ease-in-out infinite; }
+    .dot[data-phase="speaking"] { transform: scale(1); opacity: 1; }
+    .dot[data-phase="offline"] { opacity: 0.85; filter: grayscale(0.4); }
+    @keyframes pulse {
+      50% { transform: scale(0.96); }
+    }
+    .name {
+      position: absolute;
+      bottom: 8vh;
+      letter-spacing: 0.08em;
+      opacity: 0.85;
+    }
+  </style>
+</head>
+<body>
+  <div id="dot" class="dot" data-phase="idle" role="img" aria-label="idle"></div>
+  <div class="name">Samantha</div>
+  <script>
+    const dot = document.getElementById("dot");
+    async function tick() {
+      try {
+        const res = await fetch("/state", { cache: "no-store" });
+        if (!res.ok) throw new Error("state");
+        const body = await res.json();
+        const phase = body.phase || "idle";
+        dot.dataset.phase = phase;
+        dot.setAttribute("aria-label", phase);
+      } catch (err) {
+        dot.dataset.phase = "offline";
+        dot.setAttribute("aria-label", "offline");
+      }
+    }
+    tick();
+    setInterval(tick, 80);
+  </script>
+</body>
+</html>

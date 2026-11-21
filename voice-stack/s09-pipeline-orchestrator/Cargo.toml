@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Galion Labs
+
+[package]
+name = "samantha-core"
+description = "Samantha conversation loop: listen, end of turn, think, speak, barge-in. Standalone crate, not a member of the Galion Voice workspace."
+version = "0.0.1"
+edition = "2021"
+license = "MIT"
+publish = false
+rust-version = "1.75"
+
+[dependencies]
+# 1.43 keeps rustc 1.83 (this sandbox). 1.54+ asks for rustc 1.85.
+tokio = { version = "=1.43.1", features = ["macros", "rt-multi-thread", "sync", "time"] }
+
+# Own workspace so this tree is not pulled into the repo workspace.
+[workspace]
