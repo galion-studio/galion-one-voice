@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Galion Labs
-//! Local HORBM mind. Cards are read through [`galion_sam_horbm::CardEngine`].
-//! Memory and case files are not opened.
+//! Local HORBM mind. A turn goes through [`galion_sam_horbm::CardEngine`]
+//! into `ReasoningRouter::turn`. Cards answer first. Memory and case files
+//! are not opened.
 //!
 //! `Brain::open` in `voice-stack/pipeline-orchestrator` returns
 //! `horbm is not linked`. The card index crate is `horbm-memory` in
@@ -104,7 +105,7 @@ mod tests {
         let miss = mind.turn("who won the match").unwrap();
         assert_eq!(miss.reply, "I don't know.");
         assert_eq!(miss.reply, BRIDGE_UNKNOWN);
-        assert_eq!(miss.sources, vec!["horbm:none".to_string()]);
+        assert_eq!(miss.sources, vec!["honest:unknown".to_string()]);
         assert_eq!(names(&dir), names_before);
         assert!(!dir.join("memory").exists());
     }

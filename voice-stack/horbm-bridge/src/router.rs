@@ -11,8 +11,8 @@
 //!    [`galion_research_gateway::RESEARCH_CAP`] (3 seconds). On timeout the
 //!    spoken line is still [`UNKNOWN_REPLY`].
 //!
-//! The 7881 UI should call [`ReasoningRouter::turn`] or [`ReasoningRouter::route`].
-//! It should not call the gateway before the cards.
+//! The 7881 UI calls [`ReasoningRouter::turn`] or [`ReasoningRouter::route`]
+//! from [`crate::research::route`]. It does not call the gateway before the cards.
 
 use std::time::{Duration, Instant};
 

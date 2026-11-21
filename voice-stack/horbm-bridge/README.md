@@ -24,9 +24,9 @@ and does not call a model API.
 
 ## Layer 5 router
 
-`ReasoningRouter` is the reasoning router. The 7881 UI calls
-`ReasoningRouter::turn` or `ReasoningRouter::route`. It does not call the
-research gateway first.
+`ReasoningRouter` is the reasoning router. The 7881 server calls
+`ReasoningRouter::turn` through [`research::route`](src/research.rs). Cards
+answer first. It does not call the research gateway first.
 
 Crate `horbm` does not exist. `Brain::open` in `galion-sam-orch` returns
 `horbm is not linked; Brain::open stays in crate horbm`. The layer 5 router
@@ -146,7 +146,7 @@ cargo run --features horbm -- say hello
 
 Those three variables are optional. Unset, `say` stays on `FakeEngine`.
 
-`CardEngine` reads `.md` and `.json` knowledge cards and does not write them. A query that matches no card is `I don't know.` [`research::route`](src/research.rs) stays empty so this bridge keeps answering from those cards and does not dial the gateway. The 7881 server calls `ReasoningRouter::turn` or `ReasoningRouter::route` when it wants the layer 5 order, and it passes the knowledge directory it already opened. The card index crate is `horbm-memory` in `galion-studio/galion-knowledge` `v2/memory` at `761a7f225304fc010379219e5b88c6669dd48f40`. This tree does not fetch it and does not open its sqlite file. `Brain::open` in `voice-stack/pipeline-orchestrator` still returns `horbm is not linked`.
+`CardEngine` reads `.md` and `.json` knowledge cards and does not write them. [`research::route`](src/research.rs) calls `ReasoningRouter::turn`. JSON cards use the layer 5 token rule. A markdown card answers when JSON has no hit. A miss is `I don't know.` `GALION_RESEARCH_BIND` is used only when it is `127.0.0.1` and the port is not 8787, 8642, 11434, 7881, or 7878. Unset, the router stays on cards. This process does not bind a port. The card index crate is `horbm-memory` in `galion-studio/galion-knowledge` `v2/memory` at `761a7f225304fc010379219e5b88c6669dd48f40`. This tree does not fetch it and does not open its sqlite file. `Brain::open` in `voice-stack/pipeline-orchestrator` still returns `horbm is not linked`.
 
 The landing line, relative to this `Cargo.toml`, is:
 
