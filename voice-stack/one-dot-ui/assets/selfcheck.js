@@ -53,48 +53,58 @@ close(mood0.dominance, 0.5, "mood d");
 const stepped = D.spring(0.1, 0, 0.2, 1000 / 60, 1.8, 0.92);
 assert(stepped[0] > 0.1 && stepped[0] < 0.2, "spring");
 
-const packed = D.packPcm(Int16Array.of(-2), 16000, 1);
+const packed = D.packPcm(Int16Array.of(-2), 1);
 const hex = Array.from(packed).map(function (b) { return b.toString(16).padStart(2, "0"); }).join("");
-assert(hex === "4756504301010100803e00000100000001000000feff", hex);
+assert(hex === "4753010001000100feff", hex);
 const parsed = D.parsePcm(packed);
 assert(parsed.sampleRate === 16000 && parsed.seq === 1 && parsed.samples[0] === -2, "parse pcm");
 
-const ev = D.parseEvent('{"schema":"galion-samantha-dot/1","kind":"tick","state":"speaking","level":0.5,"t_ms":640,"mood":{"arousal":0.3,"valence":0.25,"dominance":0.5},"caption":{"text":"Hi. I\'m here.","sources":["fake:reply-engine"],"final":true}}');
-assert(ev && ev.state === "speaking" && ev.caption.text === "Hi. I'm here.", "event");
-assert(D.parseEvent('{"schema":"nope"}') === null, "bad schema");
+const ev = D.parseEvent('{"schema":"galion-samantha-ws/1","type":"turn","reply":"Hi. I\'m here.","intent":null,"arm":null,"sources":["fake:reply-engine"],"mood":{"arousal":0.3,"valence":0.25,"dominance":0.5}}');
+assert(ev && ev.type === "turn" && ev.reply === "Hi. I'm here.", "event");
+assert(D.parseEvent('{"schema":"nope","type":"pong"}') === null, "bad schema");
 
-const talk = JSON.parse(D.controlJson("talk"));
-assert(talk.schema === D.SCHEMA && talk.kind === "control" && talk.action === "talk", "control");
-assert(D.allowedWs("ws://127.0.0.1:8788/v1") === true, "ws ok");
-assert(D.allowedWs("ws://localhost:8788/v1") === true, "ws local");
-assert(D.allowedWs("wss://example.com/v1") === false, "ws remote");
+const helloMsg = JSON.parse(D.helloJson());
+assert(helloMsg.schema === D.SCHEMA && helloMsg.type === "hello" && helloMsg.session === null, "hello");
+assert(JSON.parse(D.stopJson()).type === "stop", "stop");
+assert(D.allowedWs("ws://127.0.0.1:7881/v1/samantha") === true, "ws ok");
+assert(D.allowedWs("ws://localhost:7881/v1/samantha") === true, "ws local");
+assert(D.allowedWs("wss://example.com/v1/samantha") === false, "ws remote");
+
+function dotOf(list) {
+  for (let i = 0; i < list.length; i++) if (list[i].type === "dot") return list[i];
+  return null;
+}
+function turnOf(list) {
+  for (let i = 0; i < list.length; i++) if (list[i].type === "turn") return list[i];
+  return null;
+}
 
 const eng = D.createEngine("mock");
 const hello = eng.hello();
-assert(hello.state === "idle" && hello.t_ms === 0, "hello");
-const started = eng.onControl("talk");
-assert(started.state === "listening" && started.caption === null, "talk");
+assert(hello[0].type === "welcome", "hello");
+const started = eng.start();
+assert(dotOf(started).state === "listening", "talk");
 for (let i = 1; i <= 19; i++) {
   const tick = eng.onTick();
-  assert(tick.state === "listening", "tick " + i + " " + tick.state);
+  assert(dotOf(tick).state === "listening", "tick " + i + " " + dotOf(tick).state);
 }
-assert(eng.onTick().state === "thinking", "tick 20");
+assert(dotOf(eng.onTick()).state === "thinking", "tick 20");
 for (let i = 21; i <= 27; i++) {
   const tick = eng.onTick();
-  assert(tick.state === "thinking", "tick " + i);
+  assert(dotOf(tick).state === "thinking", "tick " + i);
 }
 const spoke = eng.onTick();
-assert(spoke.state === "speaking", "tick 28 " + spoke.state);
-assert(spoke.caption && spoke.caption.text === "Hi. I'm here.", "greeting");
-assert(spoke.caption.sources[0] === "fake:reply-engine", "source");
+assert(dotOf(spoke).state === "speaking", "tick 28");
+assert(turnOf(spoke) && turnOf(spoke).reply === "Hi. I'm here.", "greeting");
+assert(turnOf(spoke).sources[0] === "fake:reply-engine", "source");
 
 const quiet = D.createEngine("passive");
-quiet.onControl("talk");
-quiet.onControl("end");
+quiet.start();
 for (let i = 0; i < 40; i++) {
   const tick = quiet.onTick();
-  assert(tick.state !== "speaking", "passive spoke");
-  assert(!tick.caption, "passive caption");
+  assert(!turnOf(tick), "passive caption");
+  const dot = dotOf(tick);
+  if (dot) assert(dot.state !== "speaking", "passive spoke");
 }
 
 console.log("selfcheck ok");

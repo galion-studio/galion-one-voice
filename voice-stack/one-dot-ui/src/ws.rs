@@ -61,7 +61,9 @@ pub fn accept_key(client_key: &str) -> String {
 }
 
 pub fn origin_allowed(origin: &str, port: u16) -> bool {
-    origin == format!("http://127.0.0.1:{port}") || origin == format!("http://localhost:{port}")
+    origin == "http://127.0.0.1:7881"
+        || origin == "http://127.0.0.1:7878"
+        || origin == format!("http://127.0.0.1:{port}")
 }
 
 /// `None` when the buffer is still short a frame.
@@ -152,7 +154,7 @@ impl WsConn {
         stream.set_nodelay(true)?;
         let key = "dGhlIHNhbXBsZSBub25jZQ==";
         let req = format!(
-            "GET /v1 HTTP/1.1\r\nHost: {}:{}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: {key}\r\nSec-WebSocket-Version: 13\r\nOrigin: http://127.0.0.1:{}\r\n\r\n",
+            "GET /v1/samantha HTTP/1.1\r\nHost: {}:{}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: {key}\r\nSec-WebSocket-Version: 13\r\nOrigin: http://127.0.0.1:{}\r\n\r\n",
             addr.ip(),
             addr.port(),
             addr.port()
@@ -354,11 +356,11 @@ mod tests {
 
     #[test]
     fn origin_is_only_this_loopback_port() {
-        assert!(origin_allowed("http://127.0.0.1:8788", 8788));
-        assert!(origin_allowed("http://localhost:8788", 8788));
-        assert!(!origin_allowed("http://127.0.0.1:8788", 8789));
-        assert!(!origin_allowed("https://example.com", 8788));
-        assert!(!origin_allowed("null", 8788));
+        assert!(origin_allowed("http://127.0.0.1:7881", 7881));
+        assert!(origin_allowed("http://127.0.0.1:7878", 9000));
+        assert!(origin_allowed("http://127.0.0.1:9000", 9000));
+        assert!(!origin_allowed("http://localhost:7881", 7881));
+        assert!(!origin_allowed("https://example.com", 7881));
     }
 
     fn hex(bytes: &[u8]) -> String {

@@ -18,8 +18,8 @@ pub mod ws;
 pub use engine::{FakeReplyEngine, MockEngine, PassiveEngine, ReplyEngine, SessionEngine};
 pub use look::{background_at, geometry, look_of, spring_step, DotGeom, DotLook};
 pub use protocol::{
-    Action, Caption, CaptionSlot, Control, EventKind, Pad, PcmFrame, ProtocolError, ServerEvent,
-    TurnOut, VoiceState, SCHEMA, TICK_MS,
+    ClientMsg, Pad, PcmFrame, ProtocolError, ServerMsg, TurnOut, VoiceState, DEFAULT_ADDR, SCHEMA,
+    TICK_MS, WS_PATH,
 };
 pub use serve::{measure, Measure, ServeError, Server};
 

@@ -1,36 +1,38 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Galion Labs
 
-//! Wire types for the Samantha dot.
+//! `galion-samantha-ws/1`, the socket in swarm 16 architecture (#220).
 //!
-//! Text frames are JSON objects with `schema` [`SCHEMA`].
-//! Binary frames are [`PcmFrame`] (`GVPC`). The layout is
-//! `PROTOCOL-ASSUMED.md`. HORBM is not in this crate. [`crate::engine::ReplyEngine`]
-//! is the seam a later `Brain::turn` can fill.
+//! Text frames are JSON. Binary frames are an 8-byte `GS` header plus
+//! little-endian s16 mono PCM. HORBM is not in this crate.
+//! [`crate::engine::ReplyEngine`] is the seam a later `Brain::turn` can fill.
 
 use std::fmt;
 
-/// Schema on every JSON frame this sector speaks.
-pub const SCHEMA: &str = "galion-samantha-dot/1";
+/// Schema on every JSON frame. Same string as `voice-stack/contract`.
+pub const SCHEMA: &str = "galion-samantha-ws/1";
 
-/// Mood and state clock. Same period as `galion-heartbeat` `FRAME_MS`.
+/// Loopback port from the architecture. Not 7878, 7879, 7880, 8642, or 8766.
+pub const DEFAULT_ADDR: &str = "127.0.0.1:7881";
+
+/// WebSocket path. The page itself is `GET /`.
+pub const WS_PATH: &str = "/v1/samantha";
+
+/// Mood clock. Same period as `galion-heartbeat` `FRAME_MS`.
 pub const TICK_MS: u32 = 80;
 
-/// Preferred capture rate on the page. 24 kHz is the heartbeat rate.
+/// Page capture rate. The header marks it as 16 kHz. The speaker path is 24 kHz.
 pub const PCM_RATE_HZ: u32 = 16_000;
 
 /// Samples in one 80 ms frame at [`PCM_RATE_HZ`].
 pub const PCM_FRAME_SAMPLES: usize = 1_280;
 
-const PCM_MAGIC: &[u8; 4] = b"GVPC";
 const MAX_SAMPLES: usize = 48_000;
 const MAX_JSON: usize = 65_536;
 
-/// Pleasure / arousal / dominance. Field order matches the HORBM `Pad`.
-///
-/// [`Pad::RESTING`] is the brain's rest pose. Valence follows the emotion
-/// crate (about -1..=1). Arousal and dominance are clamped to 0..=1 for the
-/// mark. Non-finite channels fall back to rest.
+/// Pleasure / arousal / dominance. [`Pad::RESTING`] is the HORBM rest pose.
+/// Valence is about -1..=1. Arousal and dominance are clamped to 0..=1.
+/// Non-finite channels fall back to rest.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Pad {
     pub arousal: f32,
@@ -62,10 +64,8 @@ fn finite_unit(x: f32, fallback: f32, lo: f32, hi: f32) -> f32 {
     }
 }
 
-/// What the dot is doing. Thinking is a motion of the same mark.
-/// `LOCKS.toml` `dot_states` on the Galion One page is still
-/// idle / listening / speaking. This sector names thinking because the
-/// existing phone page already draws it (`ORB.md`).
+/// Local motion includes thinking. The wire `dot` frame does not.
+/// `wire` maps thinking back to idle so the socket stays inside the architecture.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum VoiceState {
     Idle,
@@ -84,144 +84,22 @@ impl VoiceState {
         }
     }
 
-    pub fn parse(s: &str) -> Option<Self> {
+    /// `dot` frames from the architecture: idle, listening, speaking.
+    pub fn wire(self) -> &'static str {
+        match self {
+            VoiceState::Listening => "listening",
+            VoiceState::Speaking => "speaking",
+            VoiceState::Idle | VoiceState::Thinking => "idle",
+        }
+    }
+
+    pub fn parse_wire(s: &str) -> Option<Self> {
         match s {
             "idle" => Some(VoiceState::Idle),
             "listening" => Some(VoiceState::Listening),
-            "thinking" => Some(VoiceState::Thinking),
             "speaking" => Some(VoiceState::Speaking),
             _ => None,
         }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum EventKind {
-    /// First frame on a connection. Does not advance the clock.
-    State,
-    /// One 80 ms tick.
-    Tick,
-}
-
-impl EventKind {
-    pub fn as_str(self) -> &'static str {
-        match self {
-            EventKind::State => "state",
-            EventKind::Tick => "tick",
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct Caption {
-    pub text: String,
-    pub sources: Vec<String>,
-    pub final_: bool,
-}
-
-/// Absent keeps the caption the page already has.
-/// `Clear` is JSON `null`. `Set` replaces it.
-#[derive(Debug, Clone, PartialEq)]
-pub enum CaptionSlot {
-    Hold,
-    Clear,
-    Set(Caption),
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct ServerEvent {
-    pub kind: EventKind,
-    pub state: VoiceState,
-    pub mood: Pad,
-    pub level: f32,
-    pub t_ms: u32,
-    pub caption: CaptionSlot,
-}
-
-impl ServerEvent {
-    pub fn to_json(&self) -> String {
-        let mut s = String::with_capacity(192);
-        s.push_str("{\"schema\":");
-        push_str(&mut s, SCHEMA);
-        s.push_str(",\"kind\":");
-        push_str(&mut s, self.kind.as_str());
-        s.push_str(",\"state\":");
-        push_str(&mut s, self.state.as_str());
-        s.push_str(",\"level\":");
-        push_num(&mut s, self.level);
-        s.push_str(",\"t_ms\":");
-        s.push_str(&self.t_ms.to_string());
-        s.push_str(",\"mood\":{\"arousal\":");
-        push_num(&mut s, self.mood.arousal);
-        s.push_str(",\"valence\":");
-        push_num(&mut s, self.mood.valence);
-        s.push_str(",\"dominance\":");
-        push_num(&mut s, self.mood.dominance);
-        s.push('}');
-        match &self.caption {
-            CaptionSlot::Hold => {}
-            CaptionSlot::Clear => s.push_str(",\"caption\":null"),
-            CaptionSlot::Set(c) => {
-                s.push_str(",\"caption\":{\"text\":");
-                push_str(&mut s, &c.text);
-                s.push_str(",\"sources\":[");
-                for (i, src) in c.sources.iter().enumerate() {
-                    if i > 0 {
-                        s.push(',');
-                    }
-                    push_str(&mut s, src);
-                }
-                s.push_str("],\"final\":");
-                s.push_str(if c.final_ { "true" } else { "false" });
-                s.push('}');
-            }
-        }
-        s.push('}');
-        s
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Action {
-    Talk,
-    Stop,
-    End,
-    Barge,
-}
-
-impl Action {
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Action::Talk => "talk",
-            Action::Stop => "stop",
-            Action::End => "end",
-            Action::Barge => "barge",
-        }
-    }
-
-    fn parse(s: &str) -> Option<Self> {
-        match s {
-            "talk" => Some(Action::Talk),
-            "stop" => Some(Action::Stop),
-            "end" => Some(Action::End),
-            "barge" => Some(Action::Barge),
-            _ => None,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Control {
-    pub action: Action,
-}
-
-impl Control {
-    pub fn to_json(self) -> String {
-        format!(
-            "{{\"schema\":{},\"kind\":\"control\",\"action\":{}}}",
-            json_string(SCHEMA),
-            json_string(self.action.as_str())
-        )
     }
 }
 
@@ -240,11 +118,33 @@ pub struct TurnOut {
     pub mood: Pad,
 }
 
-/// Little-endian s16 mono PCM with a 20-byte header.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AudioDir {
+    Mic = 0,
+    Speaker = 1,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RateCode {
+    Hz24k = 0,
+    Hz16k = 1,
+}
+
+impl RateCode {
+    pub fn hz(self) -> u32 {
+        match self {
+            RateCode::Hz24k => 24_000,
+            RateCode::Hz16k => 16_000,
+        }
+    }
+}
+
+/// Eight-byte `GS` header, then s16le mono. Same layout as `contract::ws`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct PcmFrame {
-    pub sample_rate: u32,
-    pub seq: u32,
+    pub dir: AudioDir,
+    pub rate: RateCode,
+    pub seq: u16,
     pub samples: Vec<i16>,
 }
 
@@ -253,18 +153,9 @@ impl PcmFrame {
         if self.samples.is_empty() || self.samples.len() > MAX_SAMPLES {
             return Err(ProtocolError::Length);
         }
-        if !matches!(self.sample_rate, 8_000 | 16_000 | 24_000 | 48_000) {
-            return Err(ProtocolError::Length);
-        }
-        let mut out = Vec::with_capacity(20 + self.samples.len() * 2);
-        out.extend_from_slice(PCM_MAGIC);
-        out.push(1); // version
-        out.push(1); // s16le
-        out.push(1); // mono
-        out.push(0);
-        out.extend_from_slice(&self.sample_rate.to_le_bytes());
+        let mut out = Vec::with_capacity(8 + self.samples.len() * 2);
+        out.extend_from_slice(&[b'G', b'S', 1, self.dir as u8, self.rate as u8, 0]);
         out.extend_from_slice(&self.seq.to_le_bytes());
-        out.extend_from_slice(&(self.samples.len() as u32).to_le_bytes());
         for s in &self.samples {
             out.extend_from_slice(&s.to_le_bytes());
         }
@@ -272,37 +163,44 @@ impl PcmFrame {
     }
 
     pub fn decode(buf: &[u8]) -> Result<Self, ProtocolError> {
-        if buf.len() < 20 {
+        if buf.len() < 8 {
             return Err(ProtocolError::Truncated);
         }
-        if &buf[0..4] != PCM_MAGIC {
+        if buf[0] != b'G' || buf[1] != b'S' {
             return Err(ProtocolError::Magic);
         }
-        if buf[4] != 1 || buf[5] != 1 || buf[6] != 1 {
+        if buf[2] != 1 {
             return Err(ProtocolError::Version);
         }
-        let sample_rate = u32::from_le_bytes(buf[8..12].try_into().unwrap());
-        let seq = u32::from_le_bytes(buf[12..16].try_into().unwrap());
-        let n = u32::from_le_bytes(buf[16..20].try_into().unwrap()) as usize;
-        if n == 0 || n > MAX_SAMPLES || !matches!(sample_rate, 8_000 | 16_000 | 24_000 | 48_000) {
+        let dir = match buf[3] {
+            0 => AudioDir::Mic,
+            1 => AudioDir::Speaker,
+            _ => return Err(ProtocolError::Length),
+        };
+        let rate = match buf[4] {
+            0 => RateCode::Hz24k,
+            1 => RateCode::Hz16k,
+            _ => return Err(ProtocolError::Length),
+        };
+        if buf.len() % 2 != 0 {
             return Err(ProtocolError::Length);
         }
-        if buf.len() != 20 + n * 2 {
-            return Err(ProtocolError::Length);
+        let seq = u16::from_le_bytes([buf[6], buf[7]]);
+        let mut samples = Vec::with_capacity((buf.len() - 8) / 2);
+        for chunk in buf[8..].chunks_exact(2) {
+            samples.push(i16::from_le_bytes([chunk[0], chunk[1]]));
         }
-        let mut samples = Vec::with_capacity(n);
-        for i in 0..n {
-            let o = 20 + i * 2;
-            samples.push(i16::from_le_bytes([buf[o], buf[o + 1]]));
+        if samples.is_empty() || samples.len() > MAX_SAMPLES {
+            return Err(ProtocolError::Length);
         }
         Ok(PcmFrame {
-            sample_rate,
+            dir,
+            rate,
             seq,
             samples,
         })
     }
 
-    /// RMS in 0..=1, full scale at 32768.
     pub fn rms(&self) -> f32 {
         if self.samples.is_empty() {
             return 0.0;
@@ -345,7 +243,142 @@ impl fmt::Display for ProtocolError {
 
 impl std::error::Error for ProtocolError {}
 
-pub fn decode_server(text: &str) -> Result<ServerEvent, ProtocolError> {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MoodSource {
+    Brain,
+    Resting,
+}
+
+impl MoodSource {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            MoodSource::Brain => "brain",
+            MoodSource::Resting => "resting",
+        }
+    }
+}
+
+/// One text frame from the server. The page paints these.
+#[derive(Debug, Clone, PartialEq)]
+pub enum ServerMsg {
+    Welcome,
+    Mood {
+        t_ms: u32,
+        source: MoodSource,
+        pad: Pad,
+    },
+    Dot {
+        state: VoiceState,
+        level: f32,
+    },
+    Turn {
+        reply: String,
+        sources: Vec<String>,
+        pad: Pad,
+    },
+    Pong,
+    Error {
+        error: String,
+    },
+}
+
+impl ServerMsg {
+    pub fn to_json(&self) -> String {
+        match self {
+            ServerMsg::Welcome => format!(
+                "{{\"schema\":{schema},\"type\":\"welcome\",\"frame_ms\":{TICK_MS},\"sample_rate\":24000,\"dot\":\"idle\"}}",
+                schema = json_string(SCHEMA)
+            ),
+            ServerMsg::Mood { t_ms, source, pad } => format!(
+                "{{\"schema\":{schema},\"type\":\"mood\",\"t_ms\":{t_ms},\"source\":{source},\"pad\":{pad}}}",
+                schema = json_string(SCHEMA),
+                source = json_string(source.as_str()),
+                pad = pad_json(*pad)
+            ),
+            ServerMsg::Dot { state, level } => format!(
+                "{{\"schema\":{schema},\"type\":\"dot\",\"state\":{state},\"level\":{level}}}",
+                schema = json_string(SCHEMA),
+                state = json_string(state.wire()),
+                level = num(*level)
+            ),
+            ServerMsg::Turn { reply, sources, pad } => {
+                let mut s = format!(
+                    "{{\"schema\":{schema},\"type\":\"turn\",\"reply\":{reply},\"intent\":null,\"arm\":null,\"propensity\":0,\"evidence\":[],\"sources\":[",
+                    schema = json_string(SCHEMA),
+                    reply = json_string(reply)
+                );
+                for (i, src) in sources.iter().enumerate() {
+                    if i > 0 {
+                        s.push(',');
+                    }
+                    s.push_str(&json_string(src));
+                }
+                s.push_str("],\"violations\":0,\"lookup_us\":0,\"took_us\":0,\"mood\":");
+                s.push_str(&pad_json(*pad));
+                s.push('}');
+                s
+            }
+            ServerMsg::Pong => format!(
+                "{{\"schema\":{schema},\"type\":\"pong\"}}",
+                schema = json_string(SCHEMA)
+            ),
+            ServerMsg::Error { error } => format!(
+                "{{\"schema\":{schema},\"type\":\"error\",\"error\":{error}}}",
+                schema = json_string(SCHEMA),
+                error = json_string(error)
+            ),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ClientMsg {
+    Hello,
+    Stop,
+    Ping,
+    Text(String),
+}
+
+pub fn hello_json() -> String {
+    format!(
+        "{{\"schema\":{schema},\"type\":\"hello\",\"session\":null}}",
+        schema = json_string(SCHEMA)
+    )
+}
+
+pub fn stop_json() -> String {
+    format!(
+        "{{\"schema\":{schema},\"type\":\"stop\"}}",
+        schema = json_string(SCHEMA)
+    )
+}
+
+pub fn text_json(text: &str) -> String {
+    format!(
+        "{{\"schema\":{schema},\"type\":\"text\",\"text\":{text}}}",
+        schema = json_string(SCHEMA),
+        text = json_string(text)
+    )
+}
+
+fn pad_json(pad: Pad) -> String {
+    format!(
+        "{{\"arousal\":{},\"valence\":{},\"dominance\":{}}}",
+        num(pad.arousal),
+        num(pad.valence),
+        num(pad.dominance)
+    )
+}
+
+fn num(n: f32) -> String {
+    if n.is_finite() {
+        format!("{n}")
+    } else {
+        "0".to_string()
+    }
+}
+
+pub fn decode_server(text: &str) -> Result<ServerMsg, ProtocolError> {
     if text.len() > MAX_JSON {
         return Err(ProtocolError::TooLarge);
     }
@@ -355,66 +388,83 @@ pub fn decode_server(text: &str) -> Result<ServerEvent, ProtocolError> {
     if schema != SCHEMA {
         return Err(ProtocolError::Schema);
     }
-    let kind = match obj_str(obj, "kind") {
-        Some("state") => EventKind::State,
-        Some("tick") | None => EventKind::Tick,
-        Some(_) => return Err(ProtocolError::Json),
-    };
-    let state = VoiceState::parse(obj_str(obj, "state").ok_or(ProtocolError::State)?)
-        .ok_or(ProtocolError::State)?;
-    let level = obj_f32(obj, "level").unwrap_or(0.0).clamp(0.0, 1.0);
-    let t_ms = obj_u32(obj, "t_ms").ok_or(ProtocolError::Json)?;
-    let mood = match obj_get(obj, "mood") {
-        Some(Val::Obj(m)) => Pad {
-            arousal: obj_f32(m, "arousal").unwrap_or(Pad::RESTING.arousal),
-            valence: obj_f32(m, "valence").unwrap_or(Pad::RESTING.valence),
-            dominance: obj_f32(m, "dominance").unwrap_or(Pad::RESTING.dominance),
+    match obj_str(obj, "type").ok_or(ProtocolError::Json)? {
+        "welcome" => Ok(ServerMsg::Welcome),
+        "pong" => Ok(ServerMsg::Pong),
+        "error" => Ok(ServerMsg::Error {
+            error: obj_str(obj, "error").unwrap_or("error").to_string(),
+        }),
+        "dot" => {
+            let state = VoiceState::parse_wire(obj_str(obj, "state").unwrap_or("idle"))
+                .ok_or(ProtocolError::State)?;
+            let level = obj_f32(obj, "level").unwrap_or(0.0).clamp(0.0, 1.0);
+            Ok(ServerMsg::Dot { state, level })
         }
-        .sane(),
-        _ => Pad::RESTING,
-    };
-    let caption = match obj_get(obj, "caption") {
-        None => CaptionSlot::Hold,
-        Some(Val::Null) => CaptionSlot::Clear,
-        Some(Val::Obj(c)) => {
-            let text = obj_str(c, "text").unwrap_or("").to_string();
-            if text.len() > 4_000 {
+        "mood" => {
+            let t_ms = obj_u32(obj, "t_ms").unwrap_or(0);
+            let source = match obj_str(obj, "source") {
+                Some("brain") => MoodSource::Brain,
+                _ => MoodSource::Resting,
+            };
+            let pad = match obj_get(obj, "pad") {
+                Some(Val::Obj(m)) => read_pad(m),
+                _ => Pad::RESTING,
+            };
+            Ok(ServerMsg::Mood { t_ms, source, pad })
+        }
+        "turn" => {
+            let reply = obj_str(obj, "reply").unwrap_or("").to_string();
+            if reply.len() > 4_000 {
                 return Err(ProtocolError::TooLarge);
             }
-            let mut sources = Vec::new();
-            if let Some(Val::Arr(items)) = obj_get(c, "sources") {
-                for item in items.iter().take(32) {
-                    if let Some(s) = item.as_str() {
-                        if s.len() > 200 {
-                            return Err(ProtocolError::TooLarge);
-                        }
-                        sources.push(s.to_string());
-                    }
-                }
-            }
-            let final_ = match obj_get(c, "final") {
-                Some(Val::Bool(b)) => *b,
-                _ => true,
+            let sources = read_sources(obj)?;
+            let pad = match obj_get(obj, "mood") {
+                Some(Val::Obj(m)) => read_pad(m),
+                _ => Pad::RESTING,
             };
-            CaptionSlot::Set(Caption {
-                text,
+            Ok(ServerMsg::Turn {
+                reply,
                 sources,
-                final_,
+                pad,
             })
         }
-        _ => return Err(ProtocolError::Json),
-    };
-    Ok(ServerEvent {
-        kind,
-        state,
-        mood,
-        level,
-        t_ms,
-        caption,
-    })
+        "vad" => Ok(ServerMsg::Dot {
+            state: if obj_str(obj, "event") == Some("start") {
+                VoiceState::Listening
+            } else {
+                VoiceState::Idle
+            },
+            level: 0.0,
+        }),
+        _ => Err(ProtocolError::Json),
+    }
 }
 
-pub fn decode_control(text: &str) -> Result<Control, ProtocolError> {
+fn read_pad(m: &[(String, Val)]) -> Pad {
+    Pad {
+        arousal: obj_f32(m, "arousal").unwrap_or(Pad::RESTING.arousal),
+        valence: obj_f32(m, "valence").unwrap_or(Pad::RESTING.valence),
+        dominance: obj_f32(m, "dominance").unwrap_or(Pad::RESTING.dominance),
+    }
+    .sane()
+}
+
+fn read_sources(obj: &[(String, Val)]) -> Result<Vec<String>, ProtocolError> {
+    let mut sources = Vec::new();
+    if let Some(Val::Arr(items)) = obj_get(obj, "sources") {
+        for item in items.iter().take(32) {
+            if let Some(s) = item.as_str() {
+                if s.len() > 200 {
+                    return Err(ProtocolError::TooLarge);
+                }
+                sources.push(s.to_string());
+            }
+        }
+    }
+    Ok(sources)
+}
+
+pub fn decode_client(text: &str) -> Result<ClientMsg, ProtocolError> {
     if text.len() > MAX_JSON {
         return Err(ProtocolError::TooLarge);
     }
@@ -424,24 +474,14 @@ pub fn decode_control(text: &str) -> Result<Control, ProtocolError> {
     if schema != SCHEMA {
         return Err(ProtocolError::Schema);
     }
-    match obj_str(obj, "kind") {
-        Some("control") => {}
-        _ => return Err(ProtocolError::Json),
-    }
-    let action = Action::parse(obj_str(obj, "action").ok_or(ProtocolError::Json)?)
-        .ok_or(ProtocolError::Json)?;
-    Ok(Control { action })
-}
-
-fn push_str(out: &mut String, s: &str) {
-    out.push_str(&json_string(s));
-}
-
-fn push_num(out: &mut String, n: f32) {
-    if n.is_finite() {
-        out.push_str(&format!("{n}"));
-    } else {
-        out.push('0');
+    match obj_str(obj, "type").ok_or(ProtocolError::Json)? {
+        "hello" => Ok(ClientMsg::Hello),
+        "stop" => Ok(ClientMsg::Stop),
+        "ping" => Ok(ClientMsg::Ping),
+        "text" => Ok(ClientMsg::Text(
+            obj_str(obj, "text").unwrap_or("").to_string(),
+        )),
+        _ => Err(ProtocolError::Json),
     }
 }
 
@@ -464,6 +504,7 @@ fn json_string(s: &str) -> String {
 }
 
 #[derive(Debug)]
+#[allow(dead_code)]
 enum Val {
     Null,
     Bool(bool),
@@ -725,70 +766,64 @@ mod tests {
     }
 
     #[test]
-    fn server_event_roundtrip_keeps_caption_and_mood() {
-        let ev = ServerEvent {
-            kind: EventKind::Tick,
-            state: VoiceState::Speaking,
-            mood: Pad::RESTING,
-            level: 0.5,
-            t_ms: 640,
-            caption: CaptionSlot::Set(Caption {
-                text: "Hi. I'm here.".into(),
-                sources: vec!["fake:reply-engine".into()],
-                final_: true,
-            }),
+    fn welcome_mood_and_turn_roundtrip() {
+        let welcome = decode_server(&ServerMsg::Welcome.to_json()).unwrap();
+        assert_eq!(welcome, ServerMsg::Welcome);
+        let mood = ServerMsg::Mood {
+            t_ms: 80,
+            source: MoodSource::Resting,
+            pad: Pad::RESTING,
         };
-        let back = decode_server(&ev.to_json()).unwrap();
-        assert_eq!(back, ev);
+        assert_eq!(decode_server(&mood.to_json()).unwrap(), mood);
+        let turn = ServerMsg::Turn {
+            reply: "Hi. I'm here.".into(),
+            sources: vec!["fake:reply-engine".into()],
+            pad: Pad::RESTING,
+        };
+        assert_eq!(decode_server(&turn.to_json()).unwrap(), turn);
+        assert!(decode_server(r#"{"schema":"nope","type":"pong"}"#).is_err());
     }
 
     #[test]
-    fn caption_null_clears_and_absent_holds() {
-        let clear = r#"{"schema":"galion-samantha-dot/1","kind":"state","state":"idle","level":0,"t_ms":0,"mood":{"arousal":0.3,"valence":0.25,"dominance":0.5},"caption":null}"#;
-        let ev = decode_server(clear).unwrap();
-        assert_eq!(ev.caption, CaptionSlot::Clear);
-        assert_eq!(ev.mood, Pad::RESTING);
-        let hold = r#"{"schema":"galion-samantha-dot/1","kind":"tick","state":"listening","level":0.25,"t_ms":80,"mood":{"arousal":0.3,"valence":0.25,"dominance":0.5}}"#;
-        assert_eq!(decode_server(hold).unwrap().caption, CaptionSlot::Hold);
+    fn client_frames_are_hello_stop_and_text() {
+        assert_eq!(decode_client(&hello_json()).unwrap(), ClientMsg::Hello);
+        assert_eq!(decode_client(&stop_json()).unwrap(), ClientMsg::Stop);
+        assert_eq!(
+            decode_client(&text_json("")).unwrap(),
+            ClientMsg::Text(String::new())
+        );
+        assert!(decode_client(r#"{"schema":"galion-samantha-ws/1","type":"sing"}"#).is_err());
     }
 
     #[test]
-    fn control_json_parses() {
-        for action in [Action::Talk, Action::Stop, Action::End, Action::Barge] {
-            let c = Control { action };
-            assert_eq!(decode_control(&c.to_json()).unwrap().action, action);
-        }
-        assert!(decode_control(r#"{"schema":"nope","kind":"control","action":"talk"}"#).is_err());
-        assert!(decode_control(
-            r#"{"schema":"galion-samantha-dot/1","kind":"control","action":"sing"}"#
-        )
-        .is_err());
-    }
-
-    #[test]
-    fn pcm_header_matches_the_known_bytes() {
+    fn pcm_header_is_the_gs_layout() {
         let frame = PcmFrame {
-            sample_rate: 16_000,
+            dir: AudioDir::Mic,
+            rate: RateCode::Hz16k,
             seq: 1,
             samples: vec![-2],
         };
         let bytes = frame.encode().unwrap();
-        assert_eq!(
-            bytes,
-            [
-                0x47, 0x56, 0x50, 0x43, 0x01, 0x01, 0x01, 0x00, 0x80, 0x3e, 0x00, 0x00, 0x01, 0x00,
-                0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0xfe, 0xff,
-            ]
-        );
+        assert_eq!(bytes, [b'G', b'S', 1, 0, 1, 0, 1, 0, 0xfe, 0xff]);
         assert_eq!(PcmFrame::decode(&bytes).unwrap(), frame);
         assert!(PcmFrame::decode(b"XXXX").is_err());
-        assert!(PcmFrame::decode(&[0x47, 0x56, 0x50, 0x43]).is_err());
+        let speaker = PcmFrame {
+            dir: AudioDir::Speaker,
+            rate: RateCode::Hz24k,
+            seq: 7,
+            samples: vec![0, 1, -1, 32767],
+        };
+        let back = PcmFrame::decode(&speaker.encode().unwrap()).unwrap();
+        assert_eq!(back.rate.hz(), 24_000);
+        assert_eq!(back.seq, 7);
+        assert_eq!(back.samples, speaker.samples);
     }
 
     #[test]
     fn rms_of_half_scale_is_one_half() {
         let frame = PcmFrame {
-            sample_rate: 16_000,
+            dir: AudioDir::Mic,
+            rate: RateCode::Hz16k,
             seq: 0,
             samples: vec![16384; 8],
         };
@@ -800,5 +835,8 @@ mod tests {
     fn eighty_ms_frame_is_1280_samples() {
         assert_eq!(PCM_FRAME_SAMPLES, 1_280);
         assert_eq!(TICK_MS, 80);
+        assert_eq!(SCHEMA, "galion-samantha-ws/1");
+        assert_eq!(DEFAULT_ADDR, "127.0.0.1:7881");
+        assert_eq!(WS_PATH, "/v1/samantha");
     }
 }

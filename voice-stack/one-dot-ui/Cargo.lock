@@ -3,5 +3,5 @@
 version = 4
 
 [[package]]
-name = "s11-one-dot-ui"
+name = "one-dot-ui"
 version = "0.1.0"

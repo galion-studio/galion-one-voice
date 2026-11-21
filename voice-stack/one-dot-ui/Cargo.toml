@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 Galion Labs
 [package]
-name = "s11-one-dot-ui"
+name = "one-dot-ui"
 version = "0.1.0"
 edition = "2021"
 license = "MIT"

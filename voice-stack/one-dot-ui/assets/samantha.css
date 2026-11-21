@@ -39,58 +39,21 @@ html, body {
   cursor: pointer;
 }
 
-#talk:focus-visible,
-#stop:focus-visible,
-#captions:focus-visible {
+#talk:focus-visible {
   outline: 2px solid #C4B5FD;
-  outline-offset: 4px;
-}
-
-.bar {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: max(16px, env(safe-area-inset-bottom));
-  z-index: 3;
-  display: flex;
-  justify-content: center;
-  gap: 12px;
-  padding: 0 16px;
-}
-
-#stop, #captions {
-  min-height: 44px;
-  min-width: 44px;
-  padding: 0 18px;
-  border-radius: 999px;
-  border: 1px solid rgba(124, 58, 237, 0.75);
-  background: rgba(10, 10, 12, 0.72);
-  color: #F5F5F7;
-  font: 600 15px/1 system-ui, "Segoe UI", sans-serif;
-  cursor: pointer;
-}
-
-#captions[aria-pressed="true"] {
-  background: rgba(124, 58, 237, 0.45);
-}
-
-#caption-panel {
-  position: fixed;
-  left: 50%;
-  top: 64%;
-  transform: translateX(-50%);
-  width: min(36rem, calc(100% - 32px));
-  z-index: 2;
-  text-align: center;
-  pointer-events: none;
-}
-
-#caption-panel[hidden] {
-  display: none;
+  outline-offset: 8px;
 }
 
 #caption {
+  position: fixed;
+  left: 50%;
+  top: 62%;
+  transform: translateX(-50%);
+  width: min(36rem, calc(100% - 32px));
   margin: 0;
+  z-index: 2;
+  text-align: center;
+  pointer-events: none;
   color: #F5F5F7;
   font-weight: 560;
   font-size: 1.15rem;
@@ -98,37 +61,15 @@ html, body {
   text-shadow: 0 2px 16px #0A0A0C;
 }
 
-#sources-label {
-  margin: 10px 0 0;
-  color: #C9D4E0;
-  font: 600 11px/1 system-ui, "Segoe UI", sans-serif;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-}
-
-#sources {
-  margin: 6px 0 0;
-  padding: 0;
-  list-style: none;
-  color: #C9D4E0;
-  font-size: 0.85rem;
-}
-
-#notice {
-  position: fixed;
-  left: 50%;
-  bottom: calc(72px + env(safe-area-inset-bottom));
-  transform: translateX(-50%);
-  width: min(36rem, calc(100% - 32px));
-  margin: 0;
-  z-index: 3;
-  text-align: center;
-  color: #C9D4E0;
-  font-size: 0.9rem;
-}
-
-#notice:empty {
+#caption:empty {
   display: none;
+}
+
+#caption .src {
+  display: block;
+  margin-top: 8px;
+  color: #C9D4E0;
+  font: 400 0.85rem/1.3 system-ui, "Segoe UI", sans-serif;
 }
 
 .sr {
@@ -152,9 +93,7 @@ html, body {
 }
 
 @media (forced-colors: active) {
-  #stop, #captions {
-    border: 1px solid ButtonText;
-    background: Canvas;
-    color: ButtonText;
+  #talk:focus-visible {
+    outline: 2px solid Highlight;
   }
 }

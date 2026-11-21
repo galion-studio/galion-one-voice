@@ -37,25 +37,25 @@ the mouth, not this page.
 From the repository root:
 
 ```bash
-cargo test --manifest-path voice-stack/s11-one-dot-ui/Cargo.toml
-cargo run --manifest-path voice-stack/s11-one-dot-ui/Cargo.toml -- serve --mock
+cargo test --manifest-path voice-stack/one-dot-ui/Cargo.toml
+cargo run --manifest-path voice-stack/one-dot-ui/Cargo.toml -- serve --mock
 ```
 
-Open `http://127.0.0.1:8788/`. The dot talks to `ws://127.0.0.1:8788/v1`.
+Open `http://127.0.0.1:7881/`. The dot talks to `ws://127.0.0.1:7881/v1/samantha` (`galion-samantha-ws/1`). `GALION_SAMANTHA_WS` overrides the bind, and it still has to be loopback.
 
 Preview with no server at all:
 
 ```bash
-cargo run --manifest-path voice-stack/s11-one-dot-ui/Cargo.toml -- serve
+cargo run --manifest-path voice-stack/one-dot-ui/Cargo.toml -- serve
 ```
 
-Then open `http://127.0.0.1:8788/?mock=1`. The page does not open a socket.
+Then open `http://127.0.0.1:7881/?mock=1`. The page does not open a socket.
 `file://` also forces that preview.
 
 Clock check (prints the measured tick gaps):
 
 ```bash
-cargo run --manifest-path voice-stack/s11-one-dot-ui/Cargo.toml -- check
+cargo run --manifest-path voice-stack/one-dot-ui/Cargo.toml -- check
 ```
 
 ## Run on Windows
@@ -64,25 +64,24 @@ From the repository root, in `cmd` or PowerShell. If the tree lives under
 `G:\galion`, `cd` there first. The commands are the same either way.
 
 ```bat
-cargo test --manifest-path voice-stack\s11-one-dot-ui\Cargo.toml
-cargo run --manifest-path voice-stack\s11-one-dot-ui\Cargo.toml -- serve --mock
+cargo test --manifest-path voice-stack\one-dot-ui\Cargo.toml
+cargo run --manifest-path voice-stack\one-dot-ui\Cargo.toml -- serve --mock
 ```
 
-Open `http://127.0.0.1:8788/` in the browser. The microphone works on
+Open `http://127.0.0.1:7881/` in the browser. The microphone works on
 `localhost` / `127.0.0.1`. A `file://` open is preview only and does not
 ask for the mic until you tap, and the tap may still be refused by the
 browser off localhost.
 
-`SAMANTHA_DOT_ADDR` overrides the bind. Anything other than a loopback
+`GALION_SAMANTHA_WS` overrides the bind. Anything other than a loopback
 address is refused.
 
 ## The page
 
-- One violet dot. Tap it, or press Enter, to talk.
-- Stop is always on screen. Escape stops too.
+- One violet dot. It is the only visible control. Tap it, or press Enter or Space, to talk. Tap it again, or press Escape, to stop and drop the microphone.
 - The microphone is requested inside that tap, not on load.
-- Captions is a toggle. On, it shows her reply and the source labels.
-- `C` toggles captions. The state is also announced to a screen reader.
+- Her reply shows as text near the dot while she is speaking, then goes away. There is no captions button.
+- The dot's accessible name follows the state, and a screen reader hears that state.
 - `prefers-reduced-motion: reduce` drops the breath and the spring. The
   dot still changes size when the state changes.
 - Mood (arousal, valence, dominance) changes the breath, the violet, and
@@ -92,39 +91,31 @@ address is refused.
 ## Measured on this workspace
 
 These numbers are from this cloud VM (Linux, rustc 1.83, debug build),
-not from the owner's laptop. `samantha-dot check` on the final binary:
+not from the owner's laptop. `samantha-dot check`:
 
 ```
-tick_samples=10
-tick_min_ms=75.872
-tick_median_ms=80.013
-tick_max_ms=84.089
-http_us=309
-index_bytes=1301
-caption_ms=645.857
+tick_samples=9
+tick_min_ms=79.952
+tick_median_ms=79.981
+tick_max_ms=83.957
+http_us=393
+index_bytes=1059
+caption_ms=645.245
 ```
 
-The tick target is 80 ms. The median landed on it. `caption_ms` is the
-preview think window after `end` (the constant is 640 ms), not a brain
-latency.
+The tick target is 80 ms. `caption_ms` is the preview think window after a
+typed `text` frame (the constant is 640 ms), not a brain latency.
 
-Headless Chrome on the same VM, page at `http://127.0.0.1:8788/` with
-`--mock`:
+Headless Chrome on the same VM, `http://127.0.0.1:7881/?mock=1`:
 
-- Paint interval over 120 frames: min 16.6 ms, median 16.7 ms, max 16.8 ms.
-  That is the display clock, about 60 fps, not the 80 ms tick.
-- `getUserMedia` count before any tap: 0. Stop was visible, 44 px tall.
-- Enter with Talk focused asked for the mic and the state became listening.
-  Escape returned to idle and the mic flag to off.
-- A click then walked idle → listening → thinking → speaking. The caption
-  `Hi. I'm here.` and source `fake:reply-engine` were on screen 2257 ms
-  after the click. That wait is the 1600 ms quiet cap plus the 640 ms
-  think, because the headless mic was denied and the preview treated the
-  turn as silence.
+- The only button is the dot. Paint interval over 120 frames, median 16.7 ms.
+- `getUserMedia` count before any tap: 0.
+- A click walked idle → listening → thinking → speaking. The line
+  `Hi. I'm here.` was on screen 2247 ms after the click, then a second
+  click returned to idle and cleared it.
+- Enter started listening. Escape returned to idle and the mic flag to off.
 - With Chrome's fake microphone, the mic flag stayed off until the click,
-  then `on`, then `off` after Stop.
-- `prefers-reduced-motion: reduce` set `data-motion="reduced"` and did not
-  ask for the mic.
+  then `on`, then `off` after the second tap.
 
 No Samantha audio was played. The page said "No voice on this preview."
 

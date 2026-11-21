@@ -2,7 +2,7 @@
 // Copyright (c) 2026 Galion Labs
 
 // Pure helpers for the Samantha dot. No DOM.
-// Numbers match voice-stack/s11-one-dot-ui/src/look.rs and src/engine.rs.
+// Numbers match voice-stack/one-dot-ui/src/look.rs and src/engine.rs.
 // Radii: galion-render DotParams. Springs: v1-screen.html function spring.
 // Luti: galion-render OrbMotion::radius_gain.
 (function (root, factory) {
@@ -12,7 +12,9 @@
 })(typeof globalThis !== "undefined" ? globalThis : this, function () {
   "use strict";
 
-  const SCHEMA = "galion-samantha-dot/1";
+  const SCHEMA = "galion-samantha-ws/1";
+  const WS_PATH = "/v1/samantha";
+  const DEFAULT_PORT = 7881;
   const TICK_MS = 80;
   const QUIET_MS = 640;
   const THINK_MS = 640;
@@ -151,42 +153,39 @@
     return [p, v];
   }
 
-  function packPcm(samples, sampleRate, seq) {
+  function packPcm(samples, seq) {
     const n = samples.length;
-    const buf = new ArrayBuffer(20 + n * 2);
+    const buf = new ArrayBuffer(8 + n * 2);
     const view = new DataView(buf);
     view.setUint8(0, 0x47);
-    view.setUint8(1, 0x56);
-    view.setUint8(2, 0x50);
-    view.setUint8(3, 0x43);
+    view.setUint8(1, 0x53);
+    view.setUint8(2, 1);
+    view.setUint8(3, 0);
     view.setUint8(4, 1);
-    view.setUint8(5, 1);
-    view.setUint8(6, 1);
-    view.setUint8(7, 0);
-    view.setUint32(8, sampleRate, true);
-    view.setUint32(12, seq >>> 0, true);
-    view.setUint32(16, n, true);
+    view.setUint8(5, 0);
+    view.setUint16(6, seq & 0xffff, true);
     for (let i = 0; i < n; i++) {
       let s = samples[i] | 0;
       if (s > 32767) s = 32767;
       if (s < -32768) s = -32768;
-      view.setInt16(20 + i * 2, s, true);
+      view.setInt16(8 + i * 2, s, true);
     }
     return new Uint8Array(buf);
   }
 
   function parsePcm(bytes) {
-    if (!bytes || bytes.length < 20) return null;
+    if (!bytes || bytes.length < 8 || bytes.length % 2 !== 0) return null;
     const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-    if (view.getUint8(0) !== 0x47 || view.getUint8(1) !== 0x56 || view.getUint8(2) !== 0x50 || view.getUint8(3) !== 0x43) return null;
-    if (view.getUint8(4) !== 1 || view.getUint8(5) !== 1 || view.getUint8(6) !== 1) return null;
-    const sampleRate = view.getUint32(8, true);
-    const seq = view.getUint32(12, true);
-    const n = view.getUint32(16, true);
-    if (n === 0 || bytes.length !== 20 + n * 2) return null;
+    if (view.getUint8(0) !== 0x47 || view.getUint8(1) !== 0x53 || view.getUint8(2) !== 1) return null;
+    const dir = view.getUint8(3);
+    const rateCode = view.getUint8(4);
+    if (dir > 1 || rateCode > 1) return null;
+    const seq = view.getUint16(6, true);
+    const n = (bytes.length - 8) / 2;
+    if (!n) return null;
     const samples = new Int16Array(n);
-    for (let i = 0; i < n; i++) samples[i] = view.getInt16(20 + i * 2, true);
-    return { sampleRate: sampleRate, seq: seq, samples: samples };
+    for (let i = 0; i < n; i++) samples[i] = view.getInt16(8 + i * 2, true);
+    return { dir: dir, sampleRate: rateCode === 0 ? 24000 : 16000, seq: seq, samples: samples };
   }
 
   function rmsInt16(samples) {
@@ -199,30 +198,39 @@
     return Math.sqrt(acc / samples.length);
   }
 
-  function controlJson(action) {
-    return JSON.stringify({ schema: SCHEMA, kind: "control", action: action });
+  function helloJson() {
+    return JSON.stringify({ schema: SCHEMA, type: "hello", session: null });
+  }
+
+  function stopJson() {
+    return JSON.stringify({ schema: SCHEMA, type: "stop" });
   }
 
   function parseEvent(text) {
     let msg;
     try { msg = JSON.parse(text); }
     catch (e) { return null; }
-    if (!msg || msg.schema !== SCHEMA) return null;
-    if (msg.kind && msg.kind !== "state" && msg.kind !== "tick" && msg.kind !== "caption") return null;
-    if (typeof msg.state === "string" && ["idle", "listening", "thinking", "speaking"].indexOf(msg.state) < 0) return null;
-    const out = { kind: msg.kind || "tick" };
-    if (typeof msg.state === "string") out.state = msg.state;
-    if (typeof msg.level === "number" && isFinite(msg.level)) out.level = clamp(msg.level, 0, 1);
-    if (typeof msg.t_ms === "number" && isFinite(msg.t_ms)) out.t_ms = msg.t_ms;
-    if (msg.mood && typeof msg.mood === "object") out.mood = sanePad(msg.mood);
-    if (msg.caption === null) out.caption = null;
-    else if (msg.caption && typeof msg.caption.text === "string") {
-      const sources = Array.isArray(msg.caption.sources)
-        ? msg.caption.sources.filter(function (s) { return typeof s === "string"; }).slice(0, 32)
-        : [];
-      out.caption = { text: msg.caption.text.slice(0, 4000), sources: sources, final: msg.caption.final !== false };
+    if (!msg || msg.schema !== SCHEMA || typeof msg.type !== "string") return null;
+    if (msg.type === "welcome") return { type: "welcome" };
+    if (msg.type === "pong") return { type: "pong" };
+    if (msg.type === "error") return { type: "error", error: String(msg.error || "error") };
+    if (msg.type === "dot") {
+      const state = msg.state === "listening" || msg.state === "speaking" ? msg.state : "idle";
+      return { type: "dot", state: state, level: clamp(+msg.level || 0, 0, 1) };
     }
-    return out;
+    if (msg.type === "mood") {
+      const pad = msg.pad && typeof msg.pad === "object" ? sanePad(msg.pad) : RESTING;
+      return { type: "mood", t_ms: +msg.t_ms || 0, source: msg.source === "brain" ? "brain" : "resting", pad: pad };
+    }
+    if (msg.type === "turn") {
+      const sources = Array.isArray(msg.sources) ? msg.sources.filter(function (s) { return typeof s === "string"; }).slice(0, 32) : [];
+      const pad = msg.mood && typeof msg.mood === "object" ? sanePad(msg.mood) : RESTING;
+      return { type: "turn", reply: String(msg.reply || "").slice(0, 4000), sources: sources, pad: pad };
+    }
+    if (msg.type === "vad") {
+      return { type: "dot", state: msg.event === "start" ? "listening" : "idle", level: 0 };
+    }
+    return null;
   }
 
   function allowedWs(url) {
@@ -244,18 +252,20 @@
     const mock = kind !== "passive";
     const eng = {
       tMs: 0, phase: "idle", left: 0, level: 0, quiet: 0, listen: 0, think: 0,
-      voice: false, pcm: false, pending: undefined
+      voice: false, pcm: false, pending: null
     };
-    function mood() {
-      return mock ? previewMood(eng.tMs) : { arousal: RESTING.arousal, valence: RESTING.valence, dominance: RESTING.dominance };
+    function moodMsg() {
+      return { type: "mood", t_ms: eng.tMs, source: "resting", pad: { arousal: RESTING.arousal, valence: RESTING.valence, dominance: RESTING.dominance } };
     }
-    function snapshot(kindName) {
-      const caption = eng.pending;
-      eng.pending = undefined;
-      const ev = { kind: kindName, state: eng.phase, mood: mood(), level: eng.level, t_ms: eng.tMs };
-      if (caption === null) ev.caption = null;
-      else if (caption) ev.caption = caption;
-      return ev;
+    function outbound(includeDot) {
+      const out = [moodMsg()];
+      if (includeDot) out.push({ type: "dot", state: eng.phase === "thinking" ? "idle" : eng.phase, level: eng.level });
+      if (eng.phase === "thinking") out[out.length - 1] = { type: "dot", state: "thinking", level: 0 };
+      if (eng.pending) {
+        out.push(eng.pending);
+        eng.pending = null;
+      }
+      return out;
     }
     function beginThink() {
       if (eng.phase === "thinking" || eng.phase === "speaking") return;
@@ -265,7 +275,7 @@
     }
     function beginSpeak() {
       if (!mock) { eng.level = 0; return; }
-      eng.pending = { text: "Hi. I'm here.", sources: ["fake:reply-engine"], final: true };
+      eng.pending = { type: "turn", reply: "Hi. I'm here.", sources: ["fake:reply-engine"], pad: { arousal: RESTING.arousal, valence: RESTING.valence, dominance: RESTING.dominance } };
       eng.level = speakEnv(0);
       eng.left = SPEAK_MS;
       eng.phase = "speaking";
@@ -273,16 +283,14 @@
     function advance() {
       if (eng.phase === "listening") {
         eng.listen += TICK_MS;
-        if (eng.listen >= MAX_UTTERANCE_MS) { beginThink(); return; }
         if (eng.voice) {
           if (eng.level >= VOICE_RMS) eng.quiet = 0;
           else {
             eng.quiet += TICK_MS;
-            if (eng.quiet >= QUIET_MS) beginThink();
+            if (eng.quiet >= QUIET_MS || eng.listen >= MAX_UTTERANCE_MS) beginThink();
           }
-        } else {
-          eng.quiet += TICK_MS;
-          if (eng.quiet >= LISTEN_CAP_MS) beginThink();
+        } else if (eng.level === 0 && eng.listen >= LISTEN_CAP_MS) {
+          beginThink();
         }
       } else if (eng.phase === "thinking") {
         eng.think += TICK_MS;
@@ -300,25 +308,26 @@
       }
     }
     return {
-      hello: function () { return snapshot("state"); },
-      onControl: function (action) {
-        if (action === "talk" || action === "barge") {
-          eng.phase = "listening";
-          eng.quiet = 0;
-          eng.listen = 0;
-          eng.think = 0;
-          eng.voice = false;
-          eng.level = 0;
-          eng.pending = null;
-        } else if (action === "stop") {
-          eng.phase = "idle";
-          eng.level = 0;
-          eng.voice = false;
-          eng.pending = null;
-        } else if (action === "end") beginThink();
-        return snapshot("state");
+      hello: function () { return [{ type: "welcome" }]; },
+      start: function () {
+        eng.phase = "listening";
+        eng.quiet = 0;
+        eng.listen = 0;
+        eng.think = 0;
+        eng.voice = false;
+        eng.level = 0;
+        eng.pending = null;
+        return [{ type: "dot", state: "listening", level: 0 }];
+      },
+      stop: function () {
+        eng.phase = "idle";
+        eng.level = 0;
+        eng.voice = false;
+        eng.pending = null;
+        return [{ type: "dot", state: "idle", level: 0 }];
       },
       noteLevel: function (rms) {
+        if (eng.phase === "idle") eng.phase = "listening";
         eng.level = clamp(+rms || 0, 0, 1);
         eng.pcm = true;
         if (eng.level >= VOICE_RMS) eng.voice = true;
@@ -328,13 +337,15 @@
         if (!eng.pcm && eng.phase === "listening") eng.level = 0;
         eng.pcm = false;
         advance();
-        return snapshot("tick");
+        return outbound(true);
       }
     };
   }
 
   return {
     SCHEMA: SCHEMA,
+    WS_PATH: WS_PATH,
+    DEFAULT_PORT: DEFAULT_PORT,
     TICK_MS: TICK_MS,
     QUIET_MS: QUIET_MS,
     THINK_MS: THINK_MS,
@@ -360,7 +371,8 @@
     packPcm: packPcm,
     parsePcm: parsePcm,
     rmsInt16: rmsInt16,
-    controlJson: controlJson,
+    helloJson: helloJson,
+    stopJson: stopJson,
     parseEvent: parseEvent,
     allowedWs: allowedWs,
     createEngine: createEngine

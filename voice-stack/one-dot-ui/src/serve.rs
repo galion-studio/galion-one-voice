@@ -14,7 +14,10 @@ use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
 use crate::engine::{MockEngine, PassiveEngine, ReplyEngine, SessionEngine};
-use crate::protocol::{decode_control, decode_server, CaptionSlot, Control, PcmFrame, TICK_MS};
+use crate::protocol::{
+    decode_client, decode_server, hello_json, text_json, ClientMsg, PcmFrame, ServerMsg, TICK_MS,
+    WS_PATH,
+};
 use crate::ws::{
     self, decode_frame, encode_frame, header, origin_allowed, read_headers, WsConn, WsError,
     OP_BIN, OP_CLOSE, OP_PING, OP_PONG, OP_TEXT,
@@ -172,7 +175,7 @@ fn session<E: ReplyEngine>(
         Err(_) => return,
     };
     let path = req_path(&req);
-    if path != "/v1" {
+    if path != WS_PATH {
         let _ = write_http(&mut stream, path);
         return;
     }
@@ -184,17 +187,20 @@ fn session<E: ReplyEngine>(
         }
         Err(_) => return,
     }
-    if write_text(&mut stream, &engine.hello().to_json()).is_err() {
+    let mut buf = Vec::new();
+    if !wait_hello(&mut stream, &mut buf, stop) {
+        return;
+    }
+    if !write_msgs(&mut stream, &engine.on_hello()) {
         return;
     }
     let mut next = Instant::now() + Duration::from_millis(u64::from(TICK_MS));
-    let mut buf = Vec::new();
     loop {
         if stop.load(Ordering::Relaxed) {
             return;
         }
         if Instant::now() >= next {
-            if write_text(&mut stream, &engine.on_tick().to_json()).is_err() {
+            if !write_msgs(&mut stream, &engine.on_tick()) {
                 return;
             }
             next += Duration::from_millis(u64::from(TICK_MS));
@@ -234,6 +240,49 @@ fn session<E: ReplyEngine>(
     }
 }
 
+fn wait_hello(stream: &mut TcpStream, buf: &mut Vec<u8>, stop: &AtomicBool) -> bool {
+    let deadline = Instant::now() + Duration::from_secs(5);
+    let _ = stream.set_read_timeout(Some(Duration::from_millis(200)));
+    loop {
+        if stop.load(Ordering::Relaxed) || Instant::now() > deadline {
+            return false;
+        }
+        if let Some(text) = pop_text(buf) {
+            return matches!(decode_client(&text), Ok(ClientMsg::Hello));
+        }
+        let mut tmp = [0u8; 8192];
+        match stream.read(&mut tmp) {
+            Ok(0) => return false,
+            Ok(n) => buf.extend_from_slice(&tmp[..n]),
+            Err(e) if timed_out(&e) => {}
+            Err(_) => return false,
+        }
+    }
+}
+
+fn pop_text(buf: &mut Vec<u8>) -> Option<String> {
+    match decode_frame(buf) {
+        Ok(Some((frame, used))) => {
+            buf.drain(..used);
+            if frame.opcode == OP_TEXT {
+                String::from_utf8(frame.payload).ok()
+            } else {
+                None
+            }
+        }
+        _ => None,
+    }
+}
+
+fn write_msgs(stream: &mut TcpStream, msgs: &[ServerMsg]) -> bool {
+    for msg in msgs {
+        if write_text(stream, &msg.to_json()).is_err() {
+            return false;
+        }
+    }
+    true
+}
+
 fn on_frame<E: ReplyEngine>(
     stream: &mut TcpStream,
     engine: &mut SessionEngine<E>,
@@ -247,16 +296,20 @@ fn on_frame<E: ReplyEngine>(
             let Ok(text) = std::str::from_utf8(payload) else {
                 return true;
             };
-            if let Ok(control) = decode_control(text) {
-                let ev = engine.on_control(control);
-                return write_text(stream, &ev.to_json()).is_ok();
-            }
-            true
+            let Ok(msg) = decode_client(text) else {
+                return true;
+            };
+            let out = match msg {
+                ClientMsg::Hello => Vec::new(),
+                ClientMsg::Stop => engine.on_stop(),
+                ClientMsg::Ping => vec![ServerMsg::Pong],
+                ClientMsg::Text(_) => engine.on_text(),
+            };
+            write_msgs(stream, &out)
         }
         OP_BIN => {
             if let Ok(frame) = PcmFrame::decode(payload) {
-                let ev = engine.on_pcm(&frame);
-                return write_text(stream, &ev.to_json()).is_ok();
+                return write_msgs(stream, &engine.on_pcm(&frame));
             }
             true
         }
@@ -379,21 +432,20 @@ fn connect_ws(addr: SocketAddr) -> Result<WsConn, ServeError> {
 
 fn tick_intervals(addr: &SocketAddr) -> Result<Vec<f64>, ServeError> {
     let mut ws = connect_ws(*addr)?;
+    ws.send(OP_TEXT, hello_json().as_bytes())
+        .map_err(ServeError::Ws)?;
+    let welcome = read_event(&mut ws)?;
+    if !matches!(welcome, ServerMsg::Welcome) {
+        return Err(ServeError::Protocol("missing welcome".into()));
+    }
     let mut times = Vec::new();
     let mut stamps = Vec::new();
-    for _ in 0..11 {
-        let frame = ws.next_frame().map_err(ServeError::Ws)?;
-        if frame.opcode != OP_TEXT {
-            return Err(ServeError::Protocol("tick was not text".into()));
+    while stamps.len() < 10 {
+        let ev = read_event(&mut ws)?;
+        if let ServerMsg::Mood { t_ms, .. } = ev {
+            times.push(Instant::now());
+            stamps.push(t_ms);
         }
-        let text = std::str::from_utf8(&frame.payload)
-            .map_err(|_| ServeError::Protocol("tick utf8".into()))?;
-        let ev = decode_server(text).map_err(|e| ServeError::Protocol(e.to_string()))?;
-        times.push(Instant::now());
-        stamps.push(ev.t_ms);
-    }
-    if stamps.first().copied() != Some(0) {
-        return Err(ServeError::Protocol(format!("hello t_ms {stamps:?}")));
     }
     for pair in stamps.windows(2) {
         if pair[1] != pair[0].saturating_add(TICK_MS) {
@@ -412,38 +464,27 @@ fn tick_intervals(addr: &SocketAddr) -> Result<Vec<f64>, ServeError> {
 
 fn caption_wait(addr: &SocketAddr) -> Result<f64, ServeError> {
     let mut ws = connect_ws(*addr)?;
-    let _ = read_event(&mut ws)?;
-    send_control(&mut ws, "talk")?;
+    ws.send(OP_TEXT, hello_json().as_bytes())
+        .map_err(ServeError::Ws)?;
     let _ = read_event(&mut ws)?;
     let started = Instant::now();
-    send_control(&mut ws, "end")?;
+    ws.send(OP_TEXT, text_json("").as_bytes())
+        .map_err(ServeError::Ws)?;
     let deadline = started + Duration::from_secs(3);
     loop {
         if Instant::now() > deadline {
             return Err(ServeError::Protocol("no caption".into()));
         }
         let ev = read_event(&mut ws)?;
-        if let CaptionSlot::Set(c) = ev.caption {
-            if c.text == "Hi. I'm here." {
+        if let ServerMsg::Turn { reply, .. } = ev {
+            if reply == "Hi. I'm here." {
                 return Ok(started.elapsed().as_secs_f64() * 1000.0);
             }
         }
     }
 }
 
-fn send_control(ws: &mut WsConn, action: &str) -> Result<(), ServeError> {
-    let control = decode_control(&format!(
-        "{{\"schema\":\"galion-samantha-dot/1\",\"kind\":\"control\",\"action\":\"{action}\"}}"
-    ))
-    .map_err(|e| ServeError::Protocol(e.to_string()))?;
-    let json = Control {
-        action: control.action,
-    }
-    .to_json();
-    ws.send(OP_TEXT, json.as_bytes()).map_err(ServeError::Ws)
-}
-
-fn read_event(ws: &mut WsConn) -> Result<crate::protocol::ServerEvent, ServeError> {
+fn read_event(ws: &mut WsConn) -> Result<ServerMsg, ServeError> {
     let frame = ws.next_frame().map_err(ServeError::Ws)?;
     if frame.opcode != OP_TEXT {
         return Err(ServeError::Protocol("expected text".into()));
@@ -473,15 +514,16 @@ mod tests {
 
     #[test]
     fn refuses_a_public_bind() {
-        let err = bind_loopback("0.0.0.0:8788").unwrap_err();
+        let err = bind_loopback("0.0.0.0:7881").unwrap_err();
         assert!(matches!(err, ServeError::NotLoopback(_)), "{err}");
     }
 
     #[test]
     fn page_contract() {
         assert!(INDEX_HTML.contains("id=\"talk\""));
-        assert!(INDEX_HTML.contains("id=\"stop\""));
-        assert!(INDEX_HTML.contains("id=\"captions\""));
+        assert!(!INDEX_HTML.contains("id=\"stop\""));
+        assert!(!INDEX_HTML.contains("id=\"captions\""));
+        assert!(INDEX_HTML.contains("id=\"caption\""));
         assert!(INDEX_HTML.contains("aria-live=\"polite\""));
         assert!(CSS.contains("prefers-reduced-motion"));
         assert!(LOGIC_JS.contains("const TICK_MS = 80;"));
@@ -511,7 +553,7 @@ mod tests {
     fn foreign_origin_is_forbidden() {
         let server = Server::spawn("127.0.0.1:0", false).unwrap();
         let mut stream = TcpStream::connect(server.addr()).unwrap();
-        let req = "GET /v1 HTTP/1.1\r\nHost: 127.0.0.1\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\nOrigin: https://example.com\r\n\r\n";
+        let req = "GET /v1/samantha HTTP/1.1\r\nHost: 127.0.0.1\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\nOrigin: https://example.com\r\n\r\n";
         stream.write_all(req.as_bytes()).unwrap();
         let resp = read_headers(&mut stream).unwrap();
         assert!(resp.starts_with("HTTP/1.1 403"), "{resp}");

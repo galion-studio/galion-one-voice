@@ -6,7 +6,7 @@
 use std::env;
 use std::process::ExitCode;
 
-use s11_one_dot_ui::{measure, ServeError, Server};
+use one_dot_ui::{measure, ServeError, Server, DEFAULT_ADDR};
 
 fn main() -> ExitCode {
     let mut args = env::args().skip(1);
@@ -48,7 +48,7 @@ fn main() -> ExitCode {
 
 fn serve(args: Vec<String>) -> ExitCode {
     let mut mock = false;
-    let mut addr = env::var("SAMANTHA_DOT_ADDR").unwrap_or_else(|_| "127.0.0.1:8788".to_string());
+    let mut addr = env::var("GALION_SAMANTHA_WS").unwrap_or_else(|_| DEFAULT_ADDR.to_string());
     let mut i = 0;
     while i < args.len() {
         match args[i].as_str() {
@@ -81,7 +81,7 @@ fn serve(args: Vec<String>) -> ExitCode {
     };
     let bound = server.addr();
     println!("Samantha dot  http://{bound}/");
-    println!("WebSocket     ws://{bound}/v1");
+    println!("WebSocket     ws://{bound}/v1/samantha");
     if mock {
         println!("mock brain    on (preview reply, no voice audio)");
     } else {
@@ -95,10 +95,10 @@ fn serve(args: Vec<String>) -> ExitCode {
 }
 
 const HELP: &str = "\
-samantha-dot serve [--addr 127.0.0.1:8788] [--mock]
+samantha-dot serve [--addr 127.0.0.1:7881] [--mock]
 samantha-dot check
 
-Loopback only. The page is one violet dot.
---mock answers the preview line. Without it the socket keeps the 80 ms clock
-and does not invent a reply.
+Loopback only. GALION_SAMANTHA_WS overrides the bind. The page is one violet dot.
+--mock answers the preview line on galion-samantha-ws/1. Without it the socket
+keeps the 80 ms resting mood and does not invent a reply.
 ";

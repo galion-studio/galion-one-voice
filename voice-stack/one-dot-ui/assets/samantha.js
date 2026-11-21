@@ -11,11 +11,7 @@
   const fileMode = location.protocol === "file:";
   const mock = fileMode || params.get("mock") === "1";
   const talk = document.getElementById("talk");
-  const stopBtn = document.getElementById("stop");
-  const captionsBtn = document.getElementById("captions");
-  const panel = document.getElementById("caption-panel");
   const captionEl = document.getElementById("caption");
-  const sourcesEl = document.getElementById("sources");
   const live = document.getElementById("live");
   const notice = document.getElementById("notice");
   const canvas = document.getElementById("field");
@@ -41,8 +37,6 @@
   let optimistic = false;
   let arming = false;
   let talkGen = 0;
-  let captionsOn = false;
-  let lastCaption = null;
   let gotPcm = false;
   let mic = null;
   let audioCtx = null;
@@ -99,45 +93,56 @@
     if (live.textContent !== said) live.textContent = said;
   }
 
-  function renderCaption() {
-    if (!captionsOn || !lastCaption) {
-      panel.hidden = true;
-      captionEl.textContent = "";
-      sourcesEl.replaceChildren();
-      return;
-    }
-    panel.hidden = false;
-    captionEl.textContent = lastCaption.text || "";
-    sourcesEl.replaceChildren();
-    const list = lastCaption.sources || [];
-    for (let i = 0; i < list.length; i++) {
-      const li = document.createElement("li");
-      li.textContent = list[i];
-      sourcesEl.appendChild(li);
+  function applyMany(list) {
+    if (!list) return;
+    const arr = Array.isArray(list) ? list : [list];
+    for (let i = 0; i < arr.length; i++) onEvent(arr[i]);
+  }
+
+  function showCaption(reply, sources) {
+    captionEl.replaceChildren();
+    if (!reply) return;
+    captionEl.appendChild(document.createTextNode(reply));
+    if (sources && sources.length) {
+      const src = document.createElement("span");
+      src.className = "src";
+      src.textContent = sources.join(", ");
+      captionEl.appendChild(src);
     }
   }
 
   function onEvent(ev) {
-    if (!ev) return;
-    if (ev.state) {
+    if (!ev || !ev.type) return;
+    if (ev.type === "welcome") {
+      if (!mock) {
+        link = "open";
+        document.body.dataset.link = link;
+      }
+      return;
+    }
+    if (ev.type === "mood" && ev.pad) {
+      mood = ev.pad;
+      return;
+    }
+    if (ev.type === "dot") {
       if (ev.state === "idle" && session && seenActive) {
         session = false;
         optimistic = false;
         releaseMic();
+        showCaption("");
       }
-      if (ev.state !== "idle") seenActive = true;
+      if (ev.state && ev.state !== "idle") seenActive = true;
       if (ev.state === "speaking" && !gotPcm) setNotice("No voice on this preview.");
-      setState(ev.state);
+      if (typeof ev.level === "number") level = ev.level;
+      setState(ev.state || "idle");
+      return;
     }
-    if (ev.mood) mood = ev.mood;
-    if (typeof ev.level === "number") level = ev.level;
-    if (ev.caption === null) {
-      lastCaption = null;
-      renderCaption();
-    } else if (ev.caption) {
-      lastCaption = ev.caption;
-      renderCaption();
+    if (ev.type === "turn") {
+      if (ev.pad) mood = ev.pad;
+      showCaption(ev.reply, ev.sources);
+      return;
     }
+    if (ev.type === "error") setNotice(ev.error || "");
   }
 
   function visualNow() {
@@ -214,7 +219,7 @@
           viewLevel = rms;
           if (engine) engine.noteLevel(rms);
           if (ws && ws.readyState === 1 && ws.bufferedAmount < 256000) {
-            ws.send(D.packPcm(frame, 16000, seq));
+            ws.send(D.packPcm(frame, seq));
             seq = (seq + 1) >>> 0;
           }
         }
@@ -274,22 +279,22 @@
 
   async function onTalk() {
     if (arming) return;
-    if (session && visualNow() === "speaking") {
-      optimistic = true;
-      sendControl("barge");
+    if (session) {
+      onStop();
       return;
     }
-    if (session) return;
     const gen = ++talkGen;
     arming = true;
     session = true;
     seenActive = false;
     gotPcm = false;
     unlockAudio();
+    let micOk = false;
     try {
       await openMic();
+      micOk = true;
     } catch (e) {
-      document.body.dataset.mic = "denied";
+      document.body.dataset.mic = "off";
       setNotice("Microphone stayed off.");
     }
     arming = false;
@@ -298,8 +303,12 @@
       document.body.dataset.mic = "off";
       return;
     }
+    if (!micOk && !engine) {
+      session = false;
+      return;
+    }
     optimistic = true;
-    sendControl("talk");
+    if (engine) applyMany(engine.start());
   }
 
   function onStop() {
@@ -307,30 +316,21 @@
     session = false;
     seenActive = false;
     optimistic = false;
-    sendControl("stop");
+    if (engine) applyMany(engine.stop());
+    else if (ws && ws.readyState === 1) ws.send(D.stopJson());
     releaseMic();
     document.body.dataset.mic = "off";
     stopPlayback();
+    showCaption("");
     setState("idle");
     setNotice("");
   }
 
-  function onCaptions() {
-    captionsOn = !captionsOn;
-    captionsBtn.setAttribute("aria-pressed", captionsOn ? "true" : "false");
-    renderCaption();
-  }
-
   talk.addEventListener("click", function () { onTalk(); });
-  stopBtn.addEventListener("click", onStop);
-  captionsBtn.addEventListener("click", onCaptions);
   document.addEventListener("keydown", function (e) {
     if (e.key === "Escape") {
       e.preventDefault();
       onStop();
-    } else if ((e.key === "c" || e.key === "C") && !e.metaKey && !e.ctrlKey && !e.altKey) {
-      e.preventDefault();
-      onCaptions();
     } else if ((e.key === "Enter" || e.key === " ") && (e.target === document.body || e.target === talk)) {
       e.preventDefault();
       onTalk();
@@ -342,7 +342,7 @@
     if (q) return q;
     if (!location.host) return "";
     const proto = location.protocol === "https:" ? "wss:" : "ws:";
-    return proto + "//" + location.host + "/v1";
+    return proto + "//" + location.host + D.WS_PATH;
   }
 
   function schedule() {
@@ -368,6 +368,7 @@
       link = "open";
       document.body.dataset.link = link;
       ws = sock;
+      sock.send(D.helloJson());
       if (notice.textContent === "The voice link is down.") setNotice("");
     };
     sock.onmessage = function (ev) {
@@ -513,12 +514,12 @@
   }
 
   if (engine) {
-    onEvent(engine.hello());
+    applyMany(engine.hello());
     const clock0 = performance.now();
     let n = 0;
     const clock = function () {
       n += 1;
-      onEvent(engine.onTick());
+      applyMany(engine.onTick());
       const wait = Math.max(0, clock0 + n * D.TICK_MS - performance.now());
       setTimeout(clock, wait);
     };

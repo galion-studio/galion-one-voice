@@ -12,11 +12,7 @@
 
 use std::time::Instant;
 
-use crate::look::preview_mood;
-use crate::protocol::{
-    Action, Caption, CaptionSlot, Control, EventKind, Pad, PcmFrame, ServerEvent, TurnOut,
-    VoiceState, TICK_MS,
-};
+use crate::protocol::{MoodSource, Pad, PcmFrame, ServerMsg, TurnOut, VoiceState, TICK_MS};
 
 /// Quiet after speech, same window as the phone page (`VAD_END_MS`).
 pub const QUIET_MS: u32 = 640;
@@ -73,8 +69,9 @@ enum Phase {
     Speaking { left_ms: u32 },
 }
 
-/// Shared by the mock (drifting mood, fake reply) and the passive wire
-/// (resting mood, no reply).
+/// Shared by the mock (a resting preview reply) and the passive wire
+/// (resting mood, no reply). Mood on this clock is `source: "resting"`.
+/// It does not drift.
 pub struct SessionEngine<E> {
     brain: E,
     mock: bool,
@@ -86,7 +83,7 @@ pub struct SessionEngine<E> {
     think_ms: u32,
     voice: bool,
     pcm_since_tick: bool,
-    pending: CaptionSlot,
+    pending_reply: Option<TurnOut>,
 }
 
 pub type MockEngine = SessionEngine<FakeReplyEngine>;
@@ -117,39 +114,47 @@ impl<E: ReplyEngine> SessionEngine<E> {
             think_ms: 0,
             voice: false,
             pcm_since_tick: false,
-            pending: CaptionSlot::Hold,
+            pending_reply: None,
         }
     }
 
-    pub fn hello(&mut self) -> ServerEvent {
-        self.snapshot(EventKind::State)
+    pub fn on_hello(&mut self) -> Vec<ServerMsg> {
+        vec![ServerMsg::Welcome]
     }
 
-    pub fn on_control(&mut self, control: Control) -> ServerEvent {
-        match control.action {
-            Action::Talk | Action::Barge => {
-                self.phase = Phase::Listening;
-                self.quiet_ms = 0;
-                self.listen_ms = 0;
-                self.think_ms = 0;
-                self.voice = false;
-                self.level = 0.0;
-                self.pending = CaptionSlot::Clear;
-            }
-            Action::Stop => {
-                self.phase = Phase::Idle;
-                self.level = 0.0;
-                self.voice = false;
-                self.pending = CaptionSlot::Clear;
-            }
-            Action::End => self.begin_think(),
+    pub fn on_stop(&mut self) -> Vec<ServerMsg> {
+        self.phase = Phase::Idle;
+        self.level = 0.0;
+        self.voice = false;
+        self.pending_reply = None;
+        vec![ServerMsg::Dot {
+            state: VoiceState::Idle,
+            level: 0.0,
+        }]
+    }
+
+    /// A typed line. The architecture calls this `text`, not recognition.
+    pub fn on_text(&mut self) -> Vec<ServerMsg> {
+        self.begin_think();
+        self.outbound(false)
+    }
+
+    pub fn on_pcm(&mut self, frame: &PcmFrame) -> Vec<ServerMsg> {
+        if matches!(self.phase, Phase::Idle) {
+            self.phase = Phase::Listening;
+            self.quiet_ms = 0;
+            self.listen_ms = 0;
+            self.voice = false;
         }
-        self.snapshot(EventKind::State)
-    }
-
-    pub fn on_pcm(&mut self, frame: &PcmFrame) -> ServerEvent {
         self.note_level(frame.rms());
-        self.snapshot(EventKind::State)
+        if matches!(self.phase, Phase::Listening) {
+            vec![ServerMsg::Dot {
+                state: VoiceState::Listening,
+                level: self.level,
+            }]
+        } else {
+            Vec::new()
+        }
     }
 
     pub fn note_level(&mut self, rms: f32) {
@@ -164,14 +169,15 @@ impl<E: ReplyEngine> SessionEngine<E> {
         }
     }
 
-    pub fn on_tick(&mut self) -> ServerEvent {
+    pub fn on_tick(&mut self) -> Vec<ServerMsg> {
         self.t_ms = self.t_ms.saturating_add(TICK_MS);
         if !self.pcm_since_tick && matches!(self.phase, Phase::Listening) {
             self.level = 0.0;
         }
         self.pcm_since_tick = false;
         self.advance();
-        self.snapshot(EventKind::Tick)
+        let dot = !matches!(self.phase, Phase::Thinking);
+        self.outbound(dot)
     }
 
     fn advance(&mut self) {
@@ -187,15 +193,13 @@ impl<E: ReplyEngine> SessionEngine<E> {
                         self.quiet_ms = 0;
                     } else {
                         self.quiet_ms = self.quiet_ms.saturating_add(TICK_MS);
-                        if self.quiet_ms >= QUIET_MS {
+                        if self.quiet_ms >= QUIET_MS || self.listen_ms >= MAX_UTTERANCE_MS {
                             self.begin_think();
                         }
                     }
-                } else {
-                    self.quiet_ms = self.quiet_ms.saturating_add(TICK_MS);
-                    if self.quiet_ms >= LISTEN_CAP_MS {
-                        self.begin_think();
-                    }
+                } else if self.level == 0.0 && self.listen_ms >= LISTEN_CAP_MS {
+                    self.phase = Phase::Idle;
+                    self.level = 0.0;
                 }
             }
             Phase::Thinking => {
@@ -235,11 +239,7 @@ impl<E: ReplyEngine> SessionEngine<E> {
             return;
         }
         let out = self.brain.turn("");
-        self.pending = CaptionSlot::Set(Caption {
-            text: out.reply,
-            sources: out.sources,
-            final_: true,
-        });
+        self.pending_reply = Some(out);
         self.level = speak_env(0);
         self.phase = Phase::Speaking { left_ms: SPEAK_MS };
     }
@@ -253,21 +253,26 @@ impl<E: ReplyEngine> SessionEngine<E> {
         }
     }
 
-    fn snapshot(&mut self, kind: EventKind) -> ServerEvent {
-        let caption = std::mem::replace(&mut self.pending, CaptionSlot::Hold);
-        let mood = if self.mock {
-            preview_mood(self.t_ms)
-        } else {
-            Pad::RESTING
-        };
-        ServerEvent {
-            kind,
-            state: self.state(),
-            mood,
-            level: self.level,
+    fn outbound(&mut self, include_dot: bool) -> Vec<ServerMsg> {
+        let mut out = vec![ServerMsg::Mood {
             t_ms: self.t_ms,
-            caption,
+            source: MoodSource::Resting,
+            pad: Pad::RESTING,
+        }];
+        if include_dot {
+            out.push(ServerMsg::Dot {
+                state: self.state(),
+                level: self.level,
+            });
         }
+        if let Some(turn) = self.pending_reply.take() {
+            out.push(ServerMsg::Turn {
+                reply: turn.reply,
+                sources: turn.sources,
+                pad: Pad::RESTING,
+            });
+        }
+        out
     }
 }
 
@@ -279,6 +284,7 @@ fn speak_env(elapsed_ms: u32) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::protocol::{AudioDir, RateCode};
 
     #[test]
     fn fake_greeting_is_short_and_timed() {
@@ -294,95 +300,98 @@ mod tests {
         assert!(named.reply.len() < 80);
     }
 
-    #[test]
-    fn silence_reaches_the_greeting_on_tick_28() {
-        let mut eng = MockEngine::mock();
-        let hello = eng.hello();
-        assert_eq!(hello.state, VoiceState::Idle);
-        assert_eq!(hello.t_ms, 0);
-        assert_eq!(hello.mood, Pad::RESTING);
-        let talk = eng.on_control(Control {
-            action: Action::Talk,
-        });
-        assert_eq!(talk.state, VoiceState::Listening);
-        assert_eq!(talk.caption, CaptionSlot::Clear);
-        for i in 1..=19 {
-            let ev = eng.on_tick();
-            assert_eq!(ev.state, VoiceState::Listening, "tick {i}");
+    fn loud() -> PcmFrame {
+        PcmFrame {
+            dir: AudioDir::Mic,
+            rate: RateCode::Hz16k,
+            seq: 0,
+            samples: vec![16_000; 16],
         }
-        assert_eq!(eng.on_tick().state, VoiceState::Thinking);
-        for i in 21..=27 {
-            let ev = eng.on_tick();
-            assert_eq!(ev.state, VoiceState::Thinking, "tick {i}");
+    }
+
+    fn has_turn(msgs: &[ServerMsg]) -> Option<&str> {
+        msgs.iter().find_map(|m| match m {
+            ServerMsg::Turn { reply, .. } => Some(reply.as_str()),
+            _ => None,
+        })
+    }
+
+    #[test]
+    fn text_reaches_the_greeting_after_the_think_window() {
+        let mut eng = MockEngine::mock();
+        assert!(matches!(eng.on_hello()[0], ServerMsg::Welcome));
+        eng.on_text();
+        assert!(matches!(eng.phase, Phase::Thinking));
+        for i in 1..=7 {
+            let msgs = eng.on_tick();
+            assert!(
+                matches!(eng.phase, Phase::Thinking),
+                "tick {i} {:?}",
+                eng.phase
+            );
+            assert!(has_turn(&msgs).is_none(), "tick {i}");
         }
         let spoke = eng.on_tick();
-        assert_eq!(spoke.state, VoiceState::Speaking);
-        match spoke.caption {
-            CaptionSlot::Set(c) => {
-                assert_eq!(c.text, "Hi. I'm here.");
-                assert_eq!(c.sources, vec!["fake:reply-engine".to_string()]);
-            }
-            other => panic!("caption {other:?}"),
-        }
+        assert!(matches!(eng.phase, Phase::Speaking { .. }));
+        assert_eq!(has_turn(&spoke), Some("Hi. I'm here."));
     }
 
     #[test]
     fn voice_then_quiet_uses_the_640_ms_window() {
         let mut eng = MockEngine::mock();
-        eng.on_control(Control {
-            action: Action::Talk,
-        });
         for _ in 0..30 {
-            eng.note_level(0.4);
-            assert_eq!(eng.on_tick().state, VoiceState::Listening);
+            eng.on_pcm(&loud());
+            eng.on_tick();
+            assert!(matches!(eng.phase, Phase::Listening));
         }
         for _ in 0..7 {
             eng.note_level(0.0);
-            assert_eq!(eng.on_tick().state, VoiceState::Listening);
+            eng.on_tick();
+            assert!(matches!(eng.phase, Phase::Listening));
         }
-        assert_eq!(eng.on_tick().state, VoiceState::Thinking);
+        eng.on_tick();
+        assert!(matches!(eng.phase, Phase::Thinking));
     }
 
     #[test]
-    fn end_control_enters_thinking_without_waiting() {
+    fn text_enters_thinking_without_waiting() {
         let mut eng = MockEngine::mock();
-        eng.on_control(Control {
-            action: Action::Talk,
-        });
-        let ev = eng.on_control(Control {
-            action: Action::End,
-        });
-        assert_eq!(ev.state, VoiceState::Thinking);
+        eng.on_text();
+        assert!(matches!(eng.phase, Phase::Thinking));
     }
 
     #[test]
     fn passive_engine_never_writes_a_reply() {
         let mut eng = PassiveEngine::passive();
-        eng.on_control(Control {
-            action: Action::Talk,
-        });
-        let end = eng.on_control(Control {
-            action: Action::End,
-        });
-        assert_eq!(end.state, VoiceState::Thinking);
+        eng.on_text();
+        assert!(matches!(eng.phase, Phase::Thinking));
         for _ in 0..40 {
-            let ev = eng.on_tick();
-            assert_eq!(ev.caption, CaptionSlot::Hold);
-            assert_ne!(ev.state, VoiceState::Speaking);
-            assert_eq!(ev.mood, Pad::RESTING);
+            let msgs = eng.on_tick();
+            assert!(has_turn(&msgs).is_none());
+            assert!(!matches!(eng.phase, Phase::Speaking { .. }));
+            assert!(msgs.iter().any(|m| matches!(
+                m,
+                ServerMsg::Mood {
+                    source: MoodSource::Resting,
+                    pad: Pad::RESTING,
+                    ..
+                }
+            )));
         }
     }
 
     #[test]
-    fn stop_returns_to_idle_and_clears() {
+    fn stop_returns_to_idle() {
         let mut eng = MockEngine::mock();
-        eng.on_control(Control {
-            action: Action::Talk,
-        });
-        let ev = eng.on_control(Control {
-            action: Action::Stop,
-        });
-        assert_eq!(ev.state, VoiceState::Idle);
-        assert_eq!(ev.caption, CaptionSlot::Clear);
+        eng.on_pcm(&loud());
+        let ev = eng.on_stop();
+        assert!(matches!(eng.phase, Phase::Idle));
+        assert!(ev.iter().any(|m| matches!(
+            m,
+            ServerMsg::Dot {
+                state: VoiceState::Idle,
+                ..
+            }
+        )));
     }
 }
