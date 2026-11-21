@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Galion Labs
+# Galion Voice — Perpetual Open MIT License
+
+[package]
+name = "galion-sam-empathy"
+description = "HORBM layer 3. Empathy is a weight on tone and prosody, updated every 80 ms. No LLM, no paid API, no spoken line."
+version = "0.0.1"
+edition = "2021"
+license = "MIT"
+publish = false
+rust-version = "1.85"
+
+[dependencies]
+galion-emotion = { path = "../../galion-emotion" }
+galion-emotion-in = { path = "../emotion-in" }
+galion-sam-prosody = { path = "../emotion-prosody" }

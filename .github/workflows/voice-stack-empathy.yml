@@ -1,0 +1,20 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Galion Labs
+# HORBM layer 3. Tests only. No deploy, no model download, no audio.
+name: voice-stack empathy
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  empathy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.85.0
+      - name: Empathy layer and the prosody weight it feeds
+        run: |
+          cargo test --manifest-path voice-stack/Cargo.toml -p galion-sam-empathy -- --nocapture
+          cargo test --manifest-path voice-stack/Cargo.toml -p galion-sam-prosody -- --nocapture

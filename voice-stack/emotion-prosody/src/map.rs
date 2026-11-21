@@ -21,12 +21,14 @@
 //! persona rest arousal of 0.35. At the HORBM rest point the voice is the
 //! `e0` line.
 //!
-//! The persona formula's `e` term is the user's empathy weight. This sector
-//! does not invent `e` from the brain's own valence. Pre-pause still moves:
+//! The persona formula's `e` term is the user's empathy weight. [`map`] does
+//! not invent `e` from the brain's own valence. [`apply_empathy`] receives
+//! that weight from HORBM layer 3 and blends toward [`EMPATHY_PROSODY`].
+//! It does not read or write a sentence. Pre-pause still moves on [`map`]:
 //! the published Samantha `e1` pause (250 ms) is the ceiling, scaled by how
 //! far arousal sits below rest and by how far dominance sits below rest.
 
-use galion_emotion::express::ProsodyControl;
+use galion_emotion::express::{ProsodyControl, EMPATHY_PROSODY};
 use galion_emotion::persona_mood::SAMANTHA;
 
 use crate::pad::Pad;
@@ -269,6 +271,86 @@ pub fn map(pad: Pad) -> SpeakingParams {
     }
 }
 
+/// Speaking packet after the empathy weight is applied, plus the control
+/// the mouth already clamps. `e == 0` is [`map`] with the e0 warmth and
+/// pitch range. There is no reply text on this value.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct EmpathyProsody {
+    pub speaking: SpeakingParams,
+    pub control: ProsodyControl,
+    pub e: f32,
+}
+
+/// Blend [`map`] toward [`EMPATHY_PROSODY`] by `e`.
+///
+/// Layer 3 computes `e`. This function does not invent it from valence and
+/// does not read a transcript. A non-finite `e` is 0. At 1 the shared knobs
+/// sit on the empathy profile: pitch −0.5 st, pitch range 0.88, rate 0.92,
+/// energy 0.80, warmth 0.75, pre-pause 250 ms, then the existing clamps.
+/// Exaggeration, noise, and sentence silence stay on the mood map. No tag
+/// is added.
+pub fn apply_empathy(mood: Pad, e: f32) -> EmpathyProsody {
+    let base = map(mood);
+    let e = if e.is_finite() {
+        e.clamp(0.0, 1.0)
+    } else {
+        0.0
+    };
+    if e == 0.0 {
+        return EmpathyProsody {
+            speaking: base,
+            control: base.prosody_control(),
+            e: 0.0,
+        };
+    }
+    let pitch = lerp(base.pitch_shift_st, EMPATHY_PROSODY.pitch_shift_st, e)
+        .clamp(-PITCH_BOUND_ST, PITCH_BOUND_ST);
+    let rate_goal = lerp(base.rate, EMPATHY_PROSODY.rate, e);
+    let worker_goal = rate_goal.clamp(WORKER_RATE_MIN, WORKER_RATE_MAX);
+    let length_scale = (1.0 / worker_goal).clamp(LENGTH_MIN, LENGTH_MAX);
+    let rate = 1.0 / length_scale;
+    let worker_rate = rate.clamp(WORKER_RATE_MIN, WORKER_RATE_MAX);
+    let energy = lerp(base.energy, EMPATHY_PROSODY.energy, e).clamp(ENERGY_MIN, ENERGY_MAX);
+    let pre_pause_ms = lerp(
+        base.pre_pause_ms,
+        f32::from(EMPATHY_PROSODY.pre_pause_ms),
+        e,
+    )
+    .clamp(PAUSE_MIN_MS, PAUSE_CEILING_MS);
+    let speaking = SpeakingParams {
+        exaggeration: base.exaggeration,
+        length_scale,
+        noise_scale: base.noise_scale,
+        noise_w: base.noise_w,
+        sentence_silence_s: base.sentence_silence_s,
+        pre_pause_ms,
+        pitch_shift_st: pitch,
+        energy,
+        rate,
+        worker_rate,
+        tag: None,
+        breath: false,
+    };
+    let control = ProsodyControl {
+        pitch_shift_st: pitch,
+        pitch_range: lerp(E0_PITCH_RANGE, EMPATHY_PROSODY.pitch_range, e),
+        rate: worker_rate,
+        energy,
+        warmth: lerp(E0_WARMTH, EMPATHY_PROSODY.warmth, e),
+        pre_pause_ms: pre_pause_ms.round().clamp(0.0, 400.0) as u16,
+    }
+    .clamped();
+    EmpathyProsody {
+        speaking,
+        control,
+        e,
+    }
+}
+
+fn lerp(a: f32, b: f32, t: f32) -> f32 {
+    a + (b - a) * t
+}
+
 /// Rest dominance is unity. Lower dominance softens, higher dominance is
 /// more present. The result is clamped to [`ENERGY_MIN`]..=[`ENERGY_MAX`]
 /// by the caller, which is also the worker's energy clamp.
@@ -466,6 +548,45 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn empathy_weight_zero_matches_the_map_and_one_is_the_profile() {
+        let mood = Pad {
+            arousal: 0.62,
+            valence: 0.4,
+            dominance: 0.55,
+        };
+        let base = map(mood);
+        let plain = apply_empathy(mood, 0.0);
+        assert_eq!(plain.speaking, base);
+        assert_eq!(plain.control, base.prosody_control());
+        assert_eq!(plain.e, 0.0);
+        let poison = apply_empathy(mood, f32::NAN);
+        assert_eq!(poison.speaking, base);
+
+        let full = apply_empathy(Pad::RESTING, 1.0);
+        assert!((full.speaking.pitch_shift_st - EMPATHY_PROSODY.pitch_shift_st).abs() < 1e-4);
+        assert!((full.speaking.worker_rate - EMPATHY_PROSODY.rate).abs() < 1e-4);
+        assert!((full.speaking.energy - EMPATHY_PROSODY.energy).abs() < 1e-4);
+        assert!(
+            (full.speaking.pre_pause_ms - f32::from(EMPATHY_PROSODY.pre_pause_ms)).abs() < 1e-3
+        );
+        assert!((full.control.warmth - EMPATHY_PROSODY.warmth).abs() < 1e-4);
+        assert!((full.control.pitch_range - EMPATHY_PROSODY.pitch_range).abs() < 1e-4);
+        assert!(full.speaking.pitch_shift_st < 0.0);
+        assert!(full.speaking.worker_rate < 1.0);
+        assert!(full.speaking.energy < BASE_ENERGY);
+        assert!(full.speaking.energy >= ENERGY_MIN);
+        assert!(full.speaking.tag.is_none());
+        assert!(!full.speaking.whisper());
+        assert!(full.speaking.in_bounds());
+
+        let mid = apply_empathy(Pad::RESTING, 0.5);
+        assert!(mid.speaking.pitch_shift_st < 0.0);
+        assert!(mid.speaking.pitch_shift_st > full.speaking.pitch_shift_st);
+        assert!(mid.control.warmth > E0_WARMTH);
+        assert!(mid.control.warmth < full.control.warmth);
     }
 
     #[test]
