@@ -32,6 +32,10 @@ libc = "0.2"
 name = "vad-bench"
 path = "src/bin/vad_bench.rs"
 
+[[bin]]
+name = "vad-ear"
+path = "src/bin/vad_ear.rs"
+
 [profile.release]
 opt-level = 3
 lto = false

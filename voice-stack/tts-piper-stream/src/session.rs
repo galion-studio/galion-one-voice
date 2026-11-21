@@ -766,6 +766,11 @@ struct Peek {
     handle: *mut std::ffi::c_void,
 }
 
+// SAFETY: the duplicated pipe HANDLE is owned by this Peek only and is used
+// from one thread at a time; Windows HANDLEs may be moved between threads.
+#[cfg(windows)]
+unsafe impl Send for Peek {}
+
 impl Peek {
     fn from_stdout(stdout: &std::process::ChildStdout) -> Result<Self, TtsError> {
         #[cfg(target_os = "linux")]
