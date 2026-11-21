@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Galion Labs
+[package]
+name = "galion-tts-piper"
+description = "Streaming CPU Piper fallback for Samantha. One warm process, clause by clause. Stock en_US-ljspeech-medium. Not a voice clone."
+version = "0.0.1"
+edition = "2021"
+license = "MIT"
+publish = false
+
+[dependencies]
+sha2 = "0.10"
+
+[[bin]]
+name = "fake-piper"
+path = "src/bin/fake-piper.rs"
+
+[[bin]]
+name = "piper-ttfa"
+path = "src/bin/piper-ttfa.rs"
+
+# Own workspace. Not a member of the repo root workspace.
+[workspace]
+resolver = "2"
