@@ -49,14 +49,16 @@ do
   fi
 done
 
-if grep -Eq '0\.0\.0\.0|GALION_LLM|GALION_SAMANTHA_REF=' "$unit"; then
-  echo "FAIL: unit binds a public address, sets an LLM, or stores a reference path" >&2
+if grep -Eq '^Environment=.*0\.0\.0\.0|^Environment=GALION_LLM|^Environment=GALION_NERVE_URL|^Environment=.*[Oo]llama|^Environment=.*11434|GALION_SAMANTHA_REF=' "$unit"; then
+  echo "FAIL: unit binds a public address, sets an LLM or nerve URL, names Ollama, or stores a reference path" >&2
   exit 1
 fi
-if grep -Eq '^Environment=.*7879' "$unit"; then
-  echo "FAIL: unit binds 7879, which is GALION_HARD_ADDR" >&2
-  exit 1
-fi
+for port in 7878 7879 7880 8642 8670; do
+  if grep -Eq "^Environment=.*:${port}$" "$unit"; then
+    echo "FAIL: unit binds ${port}, which is a neighbour of 7881" >&2
+    exit 1
+  fi
+done
 
 command -v systemd-analyze >/dev/null 2>&1 || {
   echo "FAIL: systemd-analyze is not installed" >&2

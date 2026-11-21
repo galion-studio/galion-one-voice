@@ -82,6 +82,10 @@ GALION_WSL_CHECKOUT=G:\galion\src\galion-one-voice
 
 Exit 0 means the user unit for `127.0.0.1:7881` is in place. A second run leaves matching files unchanged. The distro disk is `G:\galion\wsl\Galion-Ubuntu\ext4.vhdx`. The checkout and the gitignored model directory stay on `G:`. A model directory or prefix on another Windows drive is refused.
 
+The script builds the nested `voice-stack` workspace with `cargo build --manifest-path voice-stack/Cargo.toml`. Root `cargo test` does not build that workspace. The `vad` crate stays out of the build because it depends on `ort`.
+
+The unit listens on `127.0.0.1:7881` only. It does not bind one-dot `127.0.0.1:7878`, the hard loop `127.0.0.1:7879`, the clone worker `127.0.0.1:7880`, Hermes `127.0.0.1:8642`, or nerve `127.0.0.1:8670`. A nerve address is that numeric loopback. The hostname `localhost` is refused. This step does not start Ollama, an LLM, Hermes, nerve, or the Research gateway. The reply stays with HORBM. Until that brain is linked, the server does not invent an answer.
+
 Galion OS desktop and the Obsidian desktop are separate installs. This script is the voice step.
 
 `systemctl --user` needs systemd. Add this to `/etc/wsl.conf` inside the distro, then run `wsl --shutdown` from Windows and open `Galion-Ubuntu` again. The installer does not edit that file.
@@ -155,7 +159,7 @@ The installer adds that line to `~/.bashrc` between `# BEGIN galion-one-voice` a
 
 ### Service
 
-`~/.config/systemd/user/galion-one-voice.service` runs `~/.local/bin/galion-one-voice` on `127.0.0.1:7881`. The launcher execs `voice-stack/target/release/samantha-local` when that binary exists, and otherwise `galion-samantha serve`. `GALION_ONE_VOICE_BIN` selects another executable. It is exec'd with no extra arguments and inherits `GALION_SAMANTHA_WS`. The one-dot page and the VAD, ASR, brain, and Piper wiring stay in the voice-stack crates.
+`~/.config/systemd/user/galion-one-voice.service` runs `~/.local/bin/galion-one-voice` on `127.0.0.1:7881`. The launcher execs `voice-stack/target/release/samantha-local` when that binary exists, and otherwise `galion-samantha serve`. `GALION_ONE_VOICE_BIN` selects another executable. It is exec'd with no extra arguments and inherits `GALION_SAMANTHA_WS`. The unit sets no `GALION_LLM` and no nerve URL.
 
 `galion-samantha.service` binds the same port. Enable one of the two units.
 

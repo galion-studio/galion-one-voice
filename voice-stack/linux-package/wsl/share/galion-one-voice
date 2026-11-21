@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 Galion Labs
 # Launcher for the WSL user unit. Loopback only.
-# The UI and the VAD, ASR, brain, and Piper wiring live in the voice-stack
-# crates. This script selects the binary the workspace already built.
+# This script selects the binary the nested voice-stack workspace built.
+# It does not start an LLM, Ollama, Hermes, nerve, or the Research gateway.
 # GALION_ONE_VOICE_BIN, when set, is exec'd with no extra arguments and
 # inherits GALION_SAMANTHA_WS.
 

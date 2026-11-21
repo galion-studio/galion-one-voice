@@ -8,7 +8,9 @@
 #   voice-stack/linux-package/share/systemd/user/galion-samantha.service
 # MemoryMax is 2G so the public Vosk and Piper packs fit.
 # Companion socket is 127.0.0.1:7881 (GALION_SAMANTHA_WS).
-# 7878 is the one-dot screen, 7879 is GALION_HARD_ADDR, 7880 is the clone worker.
+# Left alone: 7878 one-dot, 7879 hard loop, 7880 clone, 8642 Hermes, 8670 nerve.
+# Nerve stays numeric 127.0.0.1:8670. No Ollama. No GALION_LLM.
+# HORBM answers. Until it is linked, this unit does not invent a reply.
 # Model paths and the WSLg Pulse socket live in the paths.conf drop-in.
 # GALION_SAMANTHA_REF is not set here. A reference clip is never copied.
 
