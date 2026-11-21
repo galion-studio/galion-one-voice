@@ -56,16 +56,33 @@ Those binaries are pinned for linux x86_64, the same limit as the existing fetch
 
 ## WSL (Ubuntu 24.04)
 
-Galion One Voice runs inside the `Galion-Ubuntu` WSL2 distro. Store that distro on `G:\WSL\Galion-Ubuntu`. Galion OS desktop and the Obsidian desktop are separate installs beside it. This script installs the voice service.
+### Entry point
 
-From Windows, import Ubuntu 24.04 onto that path:
+The Galion OS installer calls one script. The checkout is `G:\galion\src\galion-one-voice`. Inside the guest that path is `/mnt/g/galion/src/galion-one-voice`.
+
+```bash
+voice-stack/linux-package/wsl/install.sh
+```
+
+From Windows, after the `Galion-Ubuntu` distro is registered:
 
 ```powershell
-wsl --install -d Ubuntu-24.04
-wsl --export Ubuntu-24.04 G:\WSL\ubuntu-24.04.tar
-wsl --unregister Ubuntu-24.04
-wsl --import Galion-Ubuntu G:\WSL\Galion-Ubuntu G:\WSL\ubuntu-24.04.tar --version 2
+wsl -d Galion-Ubuntu -- bash /mnt/g/galion/src/galion-one-voice/voice-stack/linux-package/wsl/install.sh
 ```
+
+The script prints these lines when the paths are on G::
+
+```text
+GALION_WSL_ENTRY=voice-stack/linux-package/wsl/install.sh
+GALION_WSL_BIND=127.0.0.1:7881
+GALION_WSL_DISTRO=Galion-Ubuntu
+GALION_WSL_DISTRO_PATH=G:\galion\wsl\Galion-Ubuntu
+GALION_WSL_CHECKOUT=G:\galion\src\galion-one-voice
+```
+
+Exit 0 means the user unit for `127.0.0.1:7881` is in place. A second run leaves matching files unchanged. The distro disk is `G:\galion\wsl\Galion-Ubuntu\ext4.vhdx`. The checkout and the gitignored model directory stay on `G:`. A model directory or prefix on another Windows drive is refused.
+
+Galion OS desktop and the Obsidian desktop are separate installs. This script is the voice step.
 
 `systemctl --user` needs systemd. Add this to `/etc/wsl.conf` inside the distro, then run `wsl --shutdown` from Windows and open `Galion-Ubuntu` again. The installer does not edit that file.
 

@@ -1,10 +1,14 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 Galion Labs
-# Idempotent WSL install for Galion One Voice.
-# Builds the voice-stack workspace on CPU, fetches the public models into
-# gitignored var/, points ALSA at the WSLg PulseAudio server, and installs a
-# user unit on 127.0.0.1:7881.
+# Entry point for the Galion OS installer.
+# Checkout: G:\galion\src\galion-one-voice
+# Distro:   Galion-Ubuntu at G:\galion\wsl\Galion-Ubuntu
+# Bind:     127.0.0.1:7881
+#
+# Idempotent. Builds the voice-stack workspace on CPU, fetches the public
+# models into gitignored var/, points ALSA at the WSLg PulseAudio server,
+# and installs a user unit on 127.0.0.1:7881. Files stay on G:.
 #
 #   ./install.sh
 #   ./install.sh --dry-run
@@ -125,6 +129,9 @@ fi
 refuse_plain_path "$VAR" "model directory"
 refuse_plain_path "$REPO" "repository path"
 refuse_plain_path "$layout_home" "home"
+refuse_off_g "$VAR" "model directory"
+refuse_off_g "$REPO" "repository"
+refuse_off_g "$layout_home" "home"
 
 bin_dir="$layout_home/.local/bin"
 unit_dir="$layout_home/.config/systemd/user"
@@ -528,6 +535,12 @@ enable_user_unit() {
     echo "wsl: unit enabled. The server binary is not built yet, so it was not started."
   fi
 }
+
+echo "GALION_WSL_ENTRY=voice-stack/linux-package/wsl/install.sh"
+echo "GALION_WSL_BIND=127.0.0.1:7881"
+echo "GALION_WSL_DISTRO=Galion-Ubuntu"
+echo "GALION_WSL_DISTRO_PATH=G:\\galion\\wsl\\Galion-Ubuntu"
+echo "GALION_WSL_CHECKOUT=G:\\galion\\src\\galion-one-voice"
 
 rc=0
 note_wsl || rc=1

@@ -64,6 +64,9 @@ PATH="$fake:$PATH" \
 [[ ! -e "$WORK/curl.log" ]] || fail "dry-run invoked curl"
 [[ ! -e "$ROOT/var" ]] || fail "dry-run created the repo var directory"
 grep -q 'GALION_WSL_INSTALL=DRY_RUN' "$WORK/dry.out" || fail "dry-run summary missing"
+grep -q 'GALION_WSL_ENTRY=voice-stack/linux-package/wsl/install.sh' "$WORK/dry.out" || fail "dry-run omitted the entry point"
+grep -q 'GALION_WSL_BIND=127.0.0.1:7881' "$WORK/dry.out" || fail "dry-run omitted the bind"
+grep -q 'GALION_WSL_CHECKOUT=G:\\galion\\src\\galion-one-voice' "$WORK/dry.out" || fail "dry-run omitted the G: checkout"
 grep -q 'WSL_AUDIO=SKIPPED' "$WORK/dry.out" || fail "dry-run did not skip audio"
 grep -q 'https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip' "$WORK/dry.out" || fail "dry-run omitted Vosk"
 grep -q "$vosk_sha" "$WORK/dry.out" || fail "dry-run omitted the Vosk sha256"
@@ -86,6 +89,29 @@ GALION_VOICE_VAR="$REPO/not-the-wsl-var" \
 badvar_rc=$?
 set -e
 [[ "$badvar_rc" -eq 2 ]] || fail "repo model dir should exit 2, got $badvar_rc"
+
+set +e
+GALION_VOICE_VAR=/mnt/c/galion/var \
+  "$ROOT/install.sh" --dry-run --prefix "$WORK/offg" >"$WORK/offg.out" 2>"$WORK/offg.err"
+offg_rc=$?
+set -e
+[[ "$offg_rc" -eq 2 ]] || fail "C: model dir should exit 2, got $offg_rc"
+grep -q 'stay on G:' "$WORK/offg.err" || fail "C: refusal omitted the G: message"
+[[ ! -e "$WORK/offg" ]] || fail "C: refusal created a prefix"
+
+set +e
+GALION_VOICE_VAR="$WORK/g-var" \
+  "$ROOT/install.sh" --dry-run --prefix /mnt/c/Users/galion >"$WORK/offg-prefix.out" 2>"$WORK/offg-prefix.err"
+offg_prefix_rc=$?
+set -e
+[[ "$offg_prefix_rc" -eq 2 ]] || fail "C: prefix should exit 2, got $offg_prefix_rc"
+
+g_var=/mnt/g/galion/src/voice-var-test
+g_home=/mnt/g/galion/home-test
+GALION_WSLG_PULSE=skip GALION_VOICE_VAR="$g_var" \
+  "$ROOT/install.sh" --dry-run --prefix "$g_home" --skip-build --skip-models >"$WORK/g.out"
+grep -q 'GALION_WSL_INSTALL=DRY_RUN' "$WORK/g.out" || fail "G: dry-run failed"
+[[ ! -e "$g_var" && ! -e "$g_home" ]] || fail "G: dry-run wrote files"
 
 set +e
 GALION_WSLG_PULSE=skip GALION_VOICE_VAR="$WORK/req-var" \

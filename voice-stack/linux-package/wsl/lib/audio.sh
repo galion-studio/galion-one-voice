@@ -8,6 +8,22 @@ _audio_lib=$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 # shellcheck source=../../lib/common.sh
 source "$_audio_lib/../../lib/common.sh"
 
+# A Windows drive mount is /mnt/<letter>. Voice files stay on G:.
+# Paths inside the Galion-Ubuntu disk are already on G:\galion\wsl.
+refuse_off_g() {
+  local path=$1 label=$2 letter
+  case "$path" in
+    /mnt/[a-zA-Z] | /mnt/[a-zA-Z]/*) ;;
+    *) return 0 ;;
+  esac
+  letter=${path#/mnt/}
+  letter=${letter%%/*}
+  letter=${letter,,}
+  if [[ "$letter" != "g" ]]; then
+    die "$label is on ${letter^^}:. Voice files stay on G:." 2
+  fi
+}
+
 # Characters this installer will not write into a unit, an env file, or asoundrc.
 refuse_plain_path() {
   local value=$1 label=$2
