@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Galion Labs
+#
+# dest	url	sha256	license	note
+# Audio lines are CC0 speech. The onnx line is the MIT Silero VAD model, not a voice.
+# Nothing here is Samantha, Jarvis, s711, or the owner's reference clip.
+models/silero_vad.onnx	https://raw.githubusercontent.com/snakers4/silero-vad/v5.1.2/src/silero_vad/data/silero_vad.onnx	2623a2953f6ff3d2c1e61740c6cdb7168133479b267dfef114a4a3cc5bdd788f	MIT	Silero VAD v5.1.2 ONNX from snakers4/silero-vad tag v5.1.2. CPU inference only.
+samples/so.wav	https://upload.wikimedia.org/wikipedia/commons/0/03/LL-Q1860_%28eng%29-Arlo_Barnes-%27so.wav	f147656da2950c1d073682ab3a5417e0194d686e16ba3bc11cdd92787cac7d38	CC0-1.0	Lingua Libre, Arlo Barnes, 2021-05-08. Wikimedia Commons File:LL-Q1860 (eng)-Arlo Barnes-'so.wav. The word "so".
+samples/just.wav	https://upload.wikimedia.org/wikipedia/commons/7/7f/LL-Q1860_%28eng%29-Robust_Footman-just_%28adverb%29.wav	39377d391ea8c3f0f8d3eab642a1409e7ac5badbba0d8c918d6c10744abee13f	CC0-1.0	Lingua Libre, Robust Footman. Wikimedia Commons File:LL-Q1860 (eng)-Robust Footman-just (adverb).wav. The word "just".
+samples/sleepwalker.wav	https://upload.wikimedia.org/wikipedia/commons/2/25/LL-Q1860_%28eng%29-Pink_Bee-sleepwalker.wav	93b08e2458ae3fc6135417d1149ad376c03e2ee3ed03d3b4c38416d528a969b0	CC0-1.0	Lingua Libre, Pink Bee. Wikimedia Commons File:LL-Q1860 (eng)-Pink Bee-sleepwalker.wav.
+samples/numerically.wav	https://upload.wikimedia.org/wikipedia/commons/2/25/LL-Q1860_%28eng%29-Pink_Bee-numerically.wav	604488168599641d4ac443dec8908c4ce52f6d37daff392e4913b59cd11088fe	CC0-1.0	Lingua Libre, Pink Bee. Wikimedia Commons File:LL-Q1860 (eng)-Pink Bee-numerically.wav.
+samples/mistreatment.wav	https://upload.wikimedia.org/wikipedia/commons/4/42/LL-Q1860_%28eng%29-Flame%2C_not_lame-mistreatment.wav	d37b6f8f66c3d0f7804b13210daa321431661e13672f1000dbcffbd8673261c6	CC0-1.0	Lingua Libre, Flame not lame. Wikimedia Commons File:LL-Q1860 (eng)-Flame, not lame-mistreatment.wav.

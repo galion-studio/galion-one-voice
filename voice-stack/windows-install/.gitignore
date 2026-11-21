@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Galion Labs
+# Backstop. The installer writes under G:\galion\samantha, not in this folder.
+# Reference audio, model files, and binaries must not be committed.
+*.wav
+*.wave
+*.mp3
+*.flac
+*.ogg
+*.opus
+*.onnx
+*.zip
+*.tar.gz
+*.tgz
+*.exe
+*.dll
+*.sha256

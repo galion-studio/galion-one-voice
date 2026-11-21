@@ -1,0 +1,27 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Galion Labs
+# PSScriptAnalyzer and Pester for voice-stack/windows-install. No deploy.
+name: s14-windows-install
+
+on:
+  pull_request:
+    paths:
+      - 'voice-stack/windows-install/**'
+      - '.github/workflows/s14-windows-install.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'voice-stack/windows-install/**'
+      - '.github/workflows/s14-windows-install.yml'
+
+jobs:
+  lint-and-test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: PSScriptAnalyzer
+        shell: pwsh
+        run: ./voice-stack/windows-install/ci/Invoke-PSScriptAnalyzer.ps1
+      - name: Pester
+        shell: pwsh
+        run: ./voice-stack/windows-install/ci/Invoke-Pester.ps1
