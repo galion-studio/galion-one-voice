@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Galion Labs
+# Launcher for the WSL user unit. Loopback only.
+# This script selects the binary the nested voice-stack workspace built.
+# It does not start an LLM, Ollama, Hermes, nerve, or the Research gateway.
+# GALION_ONE_VOICE_BIN, when set, is exec'd with no extra arguments and
+# inherits GALION_SAMANTHA_WS.
+
+set -euo pipefail
+
+env_file=${GALION_ONE_VOICE_ENV:-${HOME:-}/.config/galion/one-voice.env}
+if [[ -n "$env_file" && -f "$env_file" ]]; then
+  set -a
+  # shellcheck disable=SC1090
+  source "$env_file"
+  set +a
+fi
+
+bind=${GALION_SAMANTHA_WS:-127.0.0.1:7881}
+case "$bind" in
+  127.0.0.1:[0-9]* | "[::1]":[0-9]*) ;;
+  *)
+    echo "galion-one-voice: refusing bind ${bind} (numeric loopback only)" >&2
+    exit 2
+    ;;
+esac
+export GALION_SAMANTHA_WS="$bind"
+export GALION_CPU="${GALION_CPU:-1}"
+
+if [[ -n "${GALION_ONE_VOICE_BIN:-}" ]]; then
+  if [[ ! -x "$GALION_ONE_VOICE_BIN" ]]; then
+    echo "galion-one-voice: GALION_ONE_VOICE_BIN is not executable" >&2
+    exit 1
+  fi
+  exec "$GALION_ONE_VOICE_BIN"
+fi
+
+target=${GALION_VOICE_TARGET:-}
+ui=${GALION_VOICE_UI:-}
+if [[ -z "$target" || -z "$ui" ]]; then
+  echo "galion-one-voice: GALION_VOICE_TARGET is unset. Re-run wsl/install.sh." >&2
+  exit 1
+fi
+
+if [[ -x "$target/samantha-local" ]]; then
+  exec "$target/samantha-local" --addr "$bind" --ui "$ui"
+fi
+if [[ -x "$target/galion-samantha" ]]; then
+  exec "$target/galion-samantha" serve
+fi
+if [[ -n "${GALION_PACKAGE_BIN:-}" && -x "$GALION_PACKAGE_BIN" ]]; then
+  exec "$GALION_PACKAGE_BIN" serve
+fi
+
+echo "galion-one-voice: no server binary in ${target}. Re-run wsl/install.sh." >&2
+exit 1

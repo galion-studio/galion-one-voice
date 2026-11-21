@@ -27,6 +27,12 @@ dist:
 	cp -a $(SECTOR)/ci/. $(STAGE)/ci/
 	cp -a $(SECTOR)/tests/. $(STAGE)/tests/
 	cp -a $(SECTOR)/src/. $(STAGE)/src/
+	mkdir -p $(STAGE)/wsl/lib $(STAGE)/wsl/share $(STAGE)/wsl/ci $(STAGE)/wsl/tests
+	cp $(SECTOR)/wsl/install.sh $(SECTOR)/wsl/.gitignore $(STAGE)/wsl/
+	cp -a $(SECTOR)/wsl/lib/. $(STAGE)/wsl/lib/
+	cp -a $(SECTOR)/wsl/share/. $(STAGE)/wsl/share/
+	cp -a $(SECTOR)/wsl/ci/. $(STAGE)/wsl/ci/
+	cp -a $(SECTOR)/wsl/tests/. $(STAGE)/wsl/tests/
 	tar -C $(SECTOR)/dist -cJf $(SECTOR)/dist/$(NAME).tar.xz $(NAME)
 	cd $(SECTOR)/dist && sha256sum $(NAME).tar.xz > SHA256SUMS
 	@echo "release $(SECTOR)/dist/$(NAME).tar.xz"
@@ -37,6 +43,7 @@ debug:
 test: debug
 	$(CARGO) test --manifest-path $(SECTOR)/Cargo.toml
 	$(SECTOR)/tests/install_test.sh
+	$(SECTOR)/wsl/tests/install_test.sh
 
 shellcheck:
 	$(SECTOR)/ci/shellcheck.sh
