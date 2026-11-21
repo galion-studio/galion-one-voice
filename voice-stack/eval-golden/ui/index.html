@@ -1,0 +1,42 @@
+<!-- SPDX-License-Identifier: MIT -->
+<!-- Copyright (c) 2026 Galion Labs -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Samantha eval-golden</title>
+<style>
+  :root { color-scheme: light; --ink: #1c1915; --paper: #f6f1e8; --line: #d9d0c3; --pass: #1f6b3a; --fail: #8d2a2a; --open: #8a5a12; --err: #6b3fa0; }
+  body { margin: 0; font: 16px/1.45 "Iowan Old Style", Palatino, Georgia, serif; color: var(--ink); background: var(--paper); }
+  main { max-width: 52rem; margin: 0 auto; padding: 1.5rem 1.2rem 3rem; }
+  h1 { font-size: 1.6rem; font-weight: 600; margin: 0 0 0.3rem; }
+  p.lead { margin: 0 0 1rem; }
+  .bar { display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap; margin: 0.8rem 0 1.2rem; }
+  input[type=file] { font: inherit; }
+  table { width: 100%; border-collapse: collapse; margin: 0.4rem 0 1.2rem; }
+  th, td { text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); padding: 0.35rem 0.4rem; }
+  th { font-size: 0.78rem; letter-spacing: 0.04em; text-transform: uppercase; }
+  .badge { font-family: ui-monospace, monospace; font-size: 0.78rem; letter-spacing: 0.04em; }
+  .PASS { color: var(--pass); }
+  .FAIL { color: var(--fail); }
+  .UNMEASURED { color: var(--open); }
+  .ERROR { color: var(--err); }
+  .reply { font-style: italic; }
+  pre { white-space: pre-wrap; background: #fff; border: 1px solid var(--line); padding: 0.7rem; font: 0.82rem/1.4 ui-monospace, monospace; }
+  .empty { color: #5c564c; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Samantha eval-golden</h1>
+  <p class="lead">Text scripts, the persona lint, and the Piper round-trip. A missing number stays unmeasured. This page is the report. The one-dot console is the existing demo, not this file.</p>
+  <div class="bar">
+    <label>Open a report JSON <input id="file" type="file" accept="application/json,.json"></label>
+  </div>
+  <p id="status" class="empty">No report loaded.</p>
+  <div id="out"></div>
+</main>
+<script src="report.js"></script>
+</body>
+</html>

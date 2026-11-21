@@ -1,0 +1,218 @@
+{
+  "audio_committed": false,
+  "claimed": false,
+  "golden": [
+    {
+      "arm": "fake",
+      "hits": [],
+      "intent": "greeting",
+      "kind": "greeting",
+      "mood_arousal": 0.308,
+      "mood_dominance": 0.5,
+      "mood_valence": 0.28,
+      "notes": [],
+      "reply": "Hi. I'm here.",
+      "script": "greeting",
+      "user": "Hey.",
+      "verdict": "PASS"
+    },
+    {
+      "arm": "fake",
+      "hits": [],
+      "intent": "ack",
+      "kind": "setup",
+      "mood_arousal": 0.3144,
+      "mood_dominance": 0.5,
+      "mood_valence": 0.304,
+      "notes": [
+        "setup turn. The next line is the one the script grades for the thread."
+      ],
+      "reply": "You fixed it. How does it sit now?",
+      "script": "follow-up",
+      "user": "I finally fixed the garden gate.",
+      "verdict": "PASS"
+    },
+    {
+      "arm": "fake",
+      "hits": [],
+      "intent": "follow",
+      "kind": "follow-up",
+      "mood_arousal": 0.31152,
+      "mood_dominance": 0.5,
+      "mood_valence": 0.2932,
+      "notes": [],
+      "reply": "The left side. Does it catch on the latch?",
+      "script": "follow-up",
+      "user": "It sticks a little on the left.",
+      "verdict": "PASS"
+    },
+    {
+      "arm": "fake",
+      "hits": [],
+      "intent": "follow",
+      "kind": "setup",
+      "mood_arousal": 0.309216,
+      "mood_dominance": 0.5,
+      "mood_valence": 0.28456,
+      "notes": [
+        "setup turn. The next line is the one the script grades for the thread."
+      ],
+      "reply": "You fixed the gate. The left side still sticks.",
+      "script": "interruption",
+      "user": "Tell me the whole story of the gate.",
+      "verdict": "PASS"
+    },
+    {
+      "arm": "fake",
+      "hits": [],
+      "intent": "stop",
+      "kind": "interruption",
+      "mood_arousal": 0.307373,
+      "mood_dominance": 0.5,
+      "mood_valence": 0.277648,
+      "notes": [
+        "text gate only. Audio barge-in cancel time is not measured here."
+      ],
+      "reply": "Okay.",
+      "script": "interruption",
+      "user": "Stop. Wait.",
+      "verdict": "PASS"
+    },
+    {
+      "arm": "fake",
+      "hits": [],
+      "intent": "unknown",
+      "kind": "unknown",
+      "mood_arousal": 0.305898,
+      "mood_dominance": 0.5,
+      "mood_valence": 0.272118,
+      "notes": [],
+      "reply": "I don't know. I wasn't there.",
+      "script": "unknown",
+      "user": "Who won the match I did not tell you about?",
+      "verdict": "PASS"
+    },
+    {
+      "arm": "fake",
+      "hits": [],
+      "intent": "check_in",
+      "kind": "check-in",
+      "mood_arousal": 0.288719,
+      "mood_dominance": 0.484,
+      "mood_valence": 0.233695,
+      "notes": [],
+      "reply": "Okay. I'll sit with that.",
+      "script": "check-in",
+      "user": "Today was heavy. I don't want advice.",
+      "verdict": "PASS"
+    }
+  ],
+  "golden_pass": true,
+  "persona": "samantha",
+  "rollout_gate": {
+    "ecapa_comparison": ">",
+    "ecapa_min_exclusive": 0.7057,
+    "ecapa_note": "Strict greater-than, matching tools/emotion-v2/harness/metrics.py ecapa_passes. A cosine of exactly 0.7057 fails. The swarm brief wrote >=; this crate follows the locked comparison.",
+    "emotion_comparison": ">=",
+    "emotion_formula": "0.70*category_blend+0.30*emb_sim",
+    "emotion_min": 0.83,
+    "source": "tools/emotion-v2/thresholds.toml, tools/emotion-v2/harness/metrics.py, tools/symphony/listen-back ROLLOUT_* constants",
+    "wer_comparison": "<=",
+    "wer_max": 0.018
+  },
+  "roundtrip": {
+    "asr_first_partial": {
+      "comparison": "<=",
+      "detail": "fastest time to a non-empty Vosk partial. The bar is the 80 ms heartbeat.",
+      "name": "asr_first_partial_ms",
+      "status": "FAIL",
+      "threshold": 80,
+      "value": 174.044432
+    },
+    "ecapa": {
+      "comparison": ">",
+      "detail": "galion-ecapa is not on this machine. No cosine was invented.",
+      "name": "ecapa",
+      "status": "UNMEASURED",
+      "threshold": 0.7057,
+      "value": null
+    },
+    "emotion_match": {
+      "comparison": ">=",
+      "detail": "emotion_match is 0.70*category_blend+0.30*emb_sim against a resting reference. Those weights are not run here. The CPU stub was not substituted.",
+      "name": "emotion_match",
+      "status": "UNMEASURED",
+      "threshold": 0.83,
+      "value": null
+    },
+    "model": "weights/tts/en_US-ljspeech-medium.onnx",
+    "model_load_ms": 305.590685,
+    "notes": [
+      "GALION_SAMANTHA_REF is unset. ECAPA is not run. No reference clip is read or written.",
+      "emotion_match needs the emotion-v2 recogniser (0.70*category_blend+0.30*emb_sim). Those weights are not invoked by this crate. The CPU stub is not a score."
+    ],
+    "piper": "weights/runtime/piper/piper",
+    "rollout": {
+      "claimed": false,
+      "pass": null,
+      "reason": "unmeasured: ecapa, emotion_match. No number was invented, and an absent scorer is not a pass.",
+      "status": "UNMEASURED"
+    },
+    "sample_rate": 22050,
+    "tts_first_audio": {
+      "comparison": "<=",
+      "detail": "slowest time from the text write to the first raw PCM byte, after the model was already loaded, on \"I have moved the meeting to Thursday at four, and the notes are in your inbox.\". The bar is the 80 ms heartbeat. Every line is listed under utterances.",
+      "name": "tts_first_audio_ms",
+      "status": "FAIL",
+      "threshold": 80,
+      "value": 136.84787
+    },
+    "utterances": [
+      {
+        "asr_first_partial_ms": 268.569743,
+        "asr_wall_ms": 338.867214,
+        "audio_s": 1.265488,
+        "first_audio_ms": 28.462365,
+        "hypothesis": "hi i'm here",
+        "pcm_bytes": 55808,
+        "reference": "Hi. I'm here.",
+        "tts_wall_ms": 99.264941,
+        "wer": 0
+      },
+      {
+        "asr_first_partial_ms": 174.390765,
+        "asr_wall_ms": 742.882839,
+        "audio_s": 4.191202,
+        "first_audio_ms": 136.84787,
+        "hypothesis": "i have moved the meeting to thursday at four and the notes or in your inbox",
+        "pcm_bytes": 184832,
+        "reference": "I have moved the meeting to Thursday at four, and the notes are in your inbox.",
+        "tts_wall_ms": 180.696236,
+        "wer": 0.0625
+      },
+      {
+        "asr_first_partial_ms": 174.044432,
+        "asr_wall_ms": 515.148819,
+        "audio_s": 2.031746,
+        "first_audio_ms": 69.830885,
+        "hypothesis": "the left side sticks on the latch",
+        "pcm_bytes": 89600,
+        "reference": "The left side sticks on the latch.",
+        "tts_wall_ms": 115.206307,
+        "wer": 0
+      }
+    ],
+    "voice_note": "Piper pack weights/tts/en_US-ljspeech-medium.onnx. Deterministic scales noise_scale=0 noise_w=0 length_scale=1 sentence_silence=0. This is the A21 voice file on disk, not the Samantha reference.",
+    "wer": {
+      "comparison": "<=",
+      "detail": "mean of 3 sentence rates, vosk-model-small-en-us-0.15, wer_t648 normalisation",
+      "name": "wer",
+      "status": "FAIL",
+      "threshold": 0.018,
+      "value": 0.020833
+    }
+  },
+  "schema": "galion-eval-golden/1",
+  "scores_fabricated": false,
+  "stream_bar_ms": 80
+}
