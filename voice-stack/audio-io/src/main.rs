@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Galion Labs
-//! `galion-audio-io list | measure | play <wav>`
+//! `galion-sam-audio-io list | measure | play <wav>`
 //!
 //! `list` prints the host and the devices cpal can see.
 //! `measure` prints JSON. The software block always runs. The live block
@@ -8,7 +8,7 @@
 //! `play` writes a WAV the caller already has to the default output.
 //! It does not look for a voice reference.
 
-use galion_audio_io::{
+use galion_sam_audio_io::{
     host_report, measure_all, open, read_wav, Direction, SessionConfig, PLAYBACK_HZ,
 };
 use std::path::PathBuf;
@@ -23,7 +23,7 @@ fn main() -> ExitCode {
         Some("measure") => cmd_measure(),
         Some("play") => cmd_play(args.next()),
         _ => {
-            eprintln!("usage: galion-audio-io <list|measure|play <wav>>");
+            eprintln!("usage: galion-sam-audio-io <list|measure|play <wav>>");
             ExitCode::from(2)
         }
     }
@@ -70,13 +70,13 @@ fn cmd_list() -> ExitCode {
 
 fn cmd_measure() -> ExitCode {
     let report = measure_all();
-    println!("{}", galion_audio_io::full_json(&report));
+    println!("{}", galion_sam_audio_io::full_json(&report));
     ExitCode::SUCCESS
 }
 
 fn cmd_play(path: Option<String>) -> ExitCode {
     let Some(path) = path else {
-        eprintln!("usage: galion-audio-io play <wav>");
+        eprintln!("usage: galion-sam-audio-io play <wav>");
         return ExitCode::from(2);
     };
     let path = PathBuf::from(path);

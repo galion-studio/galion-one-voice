@@ -121,7 +121,8 @@ mod tests {
 
     #[test]
     fn round_trip_preserves_pcm16() {
-        let dir = std::env::temp_dir().join(format!("galion-audio-io-wav-{}", std::process::id()));
+        let dir =
+            std::env::temp_dir().join(format!("galion-sam-audio-io-wav-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         let path = dir.join("tone.wav");

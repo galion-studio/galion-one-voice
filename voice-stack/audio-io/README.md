@@ -3,17 +3,18 @@
 
 # S01 audio I/O
 
-Mic capture and speaker playback for the Samantha voice stack. CPU only.
+Package `galion-sam-audio-io`, directory `voice-stack/audio-io`. CPU only.
 This directory is its own Cargo workspace. It is not a member of the repo
-root workspace.
+root workspace. The binary is `galion-sam-audio-io`.
 
 The crate does not run VAD, ASR, TTS, or HORBM. It feeds the rates those
 parts already use:
 
 | Path | Rate | Frame | Same as |
 | --- | --- | --- | --- |
-| Capture | 16 kHz mono PCM16 | 20 ms, 320 samples | `galion-asr-vosk` `FRAME_SAMPLES`, one-dot page `VAD_FRAME` |
-| Playback ring | 24 kHz mono f32 | 80 ms, 1920 samples | `galion-heartbeat` `SAMPLE_RATE` / `FRAME_SAMPLES` |
+| Capture for VAD/ASR | 16 kHz mono PCM16 | 20 ms, 320 samples | `galion-asr-vosk` `FRAME_SAMPLES`, one-dot page `VAD_FRAME` |
+| Heartbeat mic (`AudioIn::fill`) | 24 kHz mono f32 | 80 ms, 1920 samples | `MicSource` and the contract `AudioIn` |
+| Playback ring (`AudioOut`) | 24 kHz mono f32 | 80 ms, 1920 samples | `galion-heartbeat` `SAMPLE_RATE` / `FRAME_SAMPLES` |
 | Piper blocks | 22050 Hz PCM16 | resampled on push | `galion-v2-live` `PIPER_HZ` |
 
 Downmix is an average across channels, as in `galion-v2-live`'s `to_mono`.
@@ -43,7 +44,7 @@ Install the ALSA headers once (Debian/Ubuntu names):
 
 ```bash
 sudo apt install build-essential pkg-config libasound2-dev
-cd voice-stack/s01-audio-io
+cd voice-stack/audio-io
 cargo test
 cargo run --release -- list
 cargo run --release -- measure
@@ -61,7 +62,7 @@ cargo run --release -- play /path/to/pcm16.wav
 
 ## Windows
 
-From a Visual Studio or GNU Rust toolchain, in `voice-stack\s01-audio-io`:
+From a Visual Studio or GNU Rust toolchain, in `voice-stack\audio-io`:
 
 ```bat
 cargo test
@@ -74,11 +75,11 @@ compiled on the Linux machine that produced the numbers below.
 
 ## Measured on this build
 
-One Linux machine, `rustc 1.83.0`, release build, no `/dev/snd`, cpal host
+One Linux machine, `rustc 1.85.0`, release build, no `/dev/snd`, cpal host
 `ALSA`, `list` reported 0 devices, no Pulse/PipeWire plugin file. Three
-runs of `cargo run --release -- measure`. Live capture-to-callback was not
-measured: open failed with `The requested device is no longer available. For
-example, it has been unplugged.`
+runs of `cargo +1.85.0 run --release -- measure`. Live capture-to-callback
+was not measured: open failed with `The requested device is no longer
+available. For example, it has been unplugged.`
 
 Software loopback, fake 48 kHz card, 480-sample (10 ms) period. The impulse
 was capture sample 0 of the first 16 kHz frame. That frame's virtual ready
@@ -90,11 +91,11 @@ Wall time, one shot per run, not a percentile:
 
 | Run | 1 s capture | 1 s playback | one 80 ms frame | flush honor |
 | --- | --- | --- | --- | --- |
-| 1 | 81 µs | 182 µs | 16 µs | 348 ns |
-| 2 | 81 µs | 181 µs | 14 µs | 315 ns |
-| 3 | 81 µs | 180 µs | 14 µs | 305 ns |
+| 1 | 91 µs | 166 µs | 14 µs | 365 ns |
+| 2 | 87 µs | 163 µs | 13 µs | 538 ns |
+| 3 | 88 µs | 170 µs | 13 µs | 322 ns |
 
-`cargo test` and `cargo test --release`: 26 passed, 0 failed.
+`cargo +1.85.0 test` and `cargo +1.85.0 test --release`: 28 passed, 0 failed.
 
 ## What this crate does not do
 

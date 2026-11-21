@@ -30,6 +30,7 @@
 #[allow(unsafe_code)]
 mod ring;
 
+mod bus;
 mod capture;
 mod convert;
 mod device;
@@ -39,6 +40,7 @@ mod playback;
 mod resample;
 mod wav;
 
+pub use bus::{AudioIn, AudioOut, HeartbeatIn, PcmFrame};
 pub use capture::{CaptureFrame, CaptureQueue, FileCapture};
 pub use convert::{f32_to_i16, i16_to_f32};
 pub use device::{

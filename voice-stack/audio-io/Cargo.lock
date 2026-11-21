@@ -235,8 +235,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "galion-audio-io"
-version = "0.1.0"
+name = "galion-sam-audio-io"
+version = "0.0.1"
 dependencies = [
  "cpal",
 ]

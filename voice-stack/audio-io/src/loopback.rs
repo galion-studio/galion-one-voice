@@ -7,7 +7,7 @@
 //! No device is opened. The clock is virtual. `period` samples at
 //! `device_hz` advance time by that many samples.
 //!
-//! This is the path the tests and `galion-audio-io measure` use when
+//! This is the path the tests and `galion-sam-audio-io measure` use when
 //! `/dev/snd` is missing. It is not an acoustic round trip.
 
 use crate::capture::{CaptureAssembler, CaptureFrame, CaptureQueue};

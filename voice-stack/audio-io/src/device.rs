@@ -13,8 +13,10 @@
 //! callback reuses its scratch buffers. A period larger than 4096 frames
 //! is rendered in chunks so the scratch buffer does not grow.
 
+use crate::bus::HeartbeatIn;
 use crate::capture::{CaptureAssembler, CaptureQueue};
 use crate::playback::{Playback, Renderer};
+use crate::resample::LinearResampler;
 use crate::{AudioError, CAPTURE_HZ, PLAYBACK_HZ};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{
@@ -95,6 +97,7 @@ pub struct AudioSession {
     output: Option<cpal::Stream>,
     playback: Playback,
     capture: CaptureQueue,
+    heartbeat: HeartbeatIn,
     info: SessionInfo,
     errors: Arc<Mutex<Option<String>>>,
 }
@@ -106,6 +109,11 @@ impl AudioSession {
 
     pub fn capture(&self) -> CaptureQueue {
         self.capture.clone()
+    }
+
+    /// 24 kHz frames for `AudioIn::fill`. The capture callback fills this.
+    pub fn heartbeat(&self) -> HeartbeatIn {
+        self.heartbeat.clone()
     }
 
     pub fn info(&self) -> &SessionInfo {
@@ -215,6 +223,7 @@ pub fn open(config: &SessionConfig) -> Result<AudioSession, AudioError> {
     let host = platform_host()?;
     let playback = Playback::default();
     let capture = CaptureQueue::new(32);
+    let heartbeat = HeartbeatIn::new("mic");
     let errors = Arc::new(Mutex::new(None));
     let mut info = SessionInfo {
         host: compiled_host(),
@@ -232,6 +241,7 @@ pub fn open(config: &SessionConfig) -> Result<AudioSession, AudioError> {
             &host,
             config.input_name.as_deref(),
             capture.clone(),
+            heartbeat.clone(),
             Arc::clone(&errors),
         )?;
         info.input_name = Some(opened.name);
@@ -262,6 +272,7 @@ pub fn open(config: &SessionConfig) -> Result<AudioSession, AudioError> {
         output,
         playback,
         capture,
+        heartbeat,
         info,
         errors,
     })
@@ -279,6 +290,7 @@ fn open_input(
     host: &cpal::Host,
     want: Option<&str>,
     queue: CaptureQueue,
+    heartbeat: HeartbeatIn,
     errors: Arc<Mutex<Option<String>>>,
 ) -> Result<OpenedStream, AudioError> {
     let device = find_device(host, want, false)?;
@@ -290,9 +302,15 @@ fn open_input(
     let channels = config.channels;
     let rate = config.sample_rate.0;
     let stream = match format {
-        SampleFormat::F32 => build_input::<f32>(&device, &config, rate, channels, queue, errors)?,
-        SampleFormat::I16 => build_input::<i16>(&device, &config, rate, channels, queue, errors)?,
-        SampleFormat::U16 => build_input::<u16>(&device, &config, rate, channels, queue, errors)?,
+        SampleFormat::F32 => {
+            build_input::<f32>(&device, &config, rate, channels, queue, heartbeat, errors)?
+        }
+        SampleFormat::I16 => {
+            build_input::<i16>(&device, &config, rate, channels, queue, heartbeat, errors)?
+        }
+        SampleFormat::U16 => {
+            build_input::<u16>(&device, &config, rate, channels, queue, heartbeat, errors)?
+        }
         other => {
             return Err(AudioError::Device(format!(
                 "{name}: unsupported input format {other}"
@@ -359,14 +377,17 @@ fn build_input<T>(
     rate: u32,
     channels: u16,
     queue: CaptureQueue,
+    heartbeat: HeartbeatIn,
     errors: Arc<Mutex<Option<String>>>,
 ) -> Result<cpal::Stream, AudioError>
 where
     T: SampleWord + cpal::SizedSample,
 {
     let mut assembler = CaptureAssembler::new(rate)?;
+    let mut to_bus = LinearResampler::new(rate, PLAYBACK_HZ)?;
     let channels = channels.max(1) as usize;
     let mut scratch = Vec::with_capacity(8_192);
+    let mut bus_buf = vec![0.0f32; 8_192];
     let origin = Instant::now();
     let err = error_callback(errors);
     device
@@ -378,6 +399,14 @@ where
                 let latency = device_latency_us(info);
                 for_chunks(data, channels, &mut scratch, |mono| {
                     assembler.push_mono(mono, now_ns, latency, &queue);
+                    to_bus.push(mono);
+                    loop {
+                        let n = to_bus.pull(&mut bus_buf);
+                        if n == 0 {
+                            break;
+                        }
+                        heartbeat.push(&bus_buf[..n]);
+                    }
                 });
             },
             err,
