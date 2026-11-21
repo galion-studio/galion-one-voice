@@ -1,0 +1,35 @@
+measured_at_utc: 2026-11-21T02:54:07Z
+host: linux x86_64 cpus=4 cpu=Intel(R) Xeon(R) Processor
+rustc: rustc 1.100.0 (0ef1bc386 2026-11-09)
+test_set: LJ Speech 1.1 clips LJ001-0001 through LJ001-0012, in dataset order. Not the full 24 hours.
+license: Public domain (Keith Ito / LibriVox, Linda Johnson). Mozilla Data Collective catalogs the same set as CC0-1.0.
+backend: whisper:ggml-base.en.bin
+model: weights/whisper/ggml-base.en.bin
+threads: 4
+chunk_ms: 80
+load_ms: 198.113
+clips: 12
+reference_words: 200 errors: 12 (sub 7 del 3 ins 2)
+micro_wer: 0.060000
+audio_s: 79.451
+wall_s: 10.484
+rtf: 0.131955
+chunks: 999
+chunk_wall_ms_p50: 0.000
+chunk_wall_ms_p95: 0.001
+chunks_over_80ms: 0
+finish_ms_p50: 869.036
+first_partial_wall_ms_p50: none
+first_partial_audio_ms_p50: none
+LJ001-0001 wer=0.000000 (0/27) audio_ms=9655 wall_ms=903.7 rtf=0.093604 first_partial_wall_ms=none first_partial_audio_ms=none hyp=Printing, in the only sense with which we are at present concerned, differs from most if not from all the arts and crafts represented in the exhibition
+LJ001-0002 wer=0.000000 (0/4) audio_ms=1899 wall_ms=825.8 rtf=0.434761 first_partial_wall_ms=none first_partial_audio_ms=none hyp=in being comparatively modern.
+LJ001-0003 wer=0.083333 (2/24) audio_ms=9666 wall_ms=881.7 rtf=0.091213 first_partial_wall_ms=none first_partial_audio_ms=none hyp=For although the Chinese took impressions from wood blocks engraved in relief for centuries before the wood cutters of the Netherlands by a similar process,
+LJ001-0004 wer=0.000000 (0/14) audio_ms=5138 wall_ms=925.7 rtf=0.180142 first_partial_wall_ms=none first_partial_audio_ms=none hyp=produced the block books, which were the immediate predecessors of the true printed book,
+LJ001-0005 wer=0.040000 (1/25) audio_ms=8110 wall_ms=894.0 rtf=0.110228 first_partial_wall_ms=none first_partial_audio_ms=none hyp=The invention of movable metal letters in the middle of the 15th century may justly be considered as the invention of the art of printing.
+LJ001-0006 wer=0.071429 (1/14) audio_ms=5684 wall_ms=865.0 rtf=0.152171 first_partial_wall_ms=none first_partial_audio_ms=none hyp=And it is worth mentioning in passing that as an example of fine typography
+LJ001-0007 wer=0.263158 (5/19) audio_ms=8389 wall_ms=903.5 rtf=0.107700 first_partial_wall_ms=none first_partial_audio_ms=none hyp=The earliest book, printed with movable types, the Gutenberg, or 42-line Bible of about 1455,
+LJ001-0008 wer=0.000000 (0/4) audio_ms=1783 wall_ms=818.5 rtf=0.458969 first_partial_wall_ms=none first_partial_audio_ms=none hyp=has never been surpassed.
+LJ001-0009 wer=0.000000 (0/19) audio_ms=7553 wall_ms=869.1 rtf=0.115057 first_partial_wall_ms=none first_partial_audio_ms=none hyp=Printing then, for our purpose, may be considered as the art of making books by means of movable types.
+LJ001-0010 wer=0.111111 (2/18) audio_ms=8819 wall_ms=881.4 rtf=0.099938 first_partial_wall_ms=none first_partial_audio_ms=none hyp=Now, as all books, not primarily intended as picture books, consist principally of types composed to form letter press,
+LJ001-0011 wer=0.066667 (1/15) audio_ms=4511 wall_ms=848.7 rtf=0.188118 first_partial_wall_ms=none first_partial_audio_ms=none hyp=It is of the first importance that the letter used should be fine and form.
+LJ001-0012 wer=0.000000 (0/17) audio_ms=8238 wall_ms=866.6 rtf=0.105191 first_partial_wall_ms=none first_partial_audio_ms=none hyp=especially as no more time is occupied or cost incurred in casting, setting or printing beautiful letters.

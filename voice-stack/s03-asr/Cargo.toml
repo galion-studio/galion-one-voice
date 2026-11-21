@@ -1,0 +1,38 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Galion Labs
+
+[package]
+name = "galion-s03-asr"
+description = "Swarm 16 S03 streaming CPU speech-to-text. Vosk partials and finals, optional whisper.cpp."
+version = "0.0.1"
+edition = "2021"
+license = "MIT"
+publish = false
+rust-version = "1.83"
+
+[workspace]
+resolver = "2"
+
+[features]
+default = []
+# Off unless requested. CPU only: do not enable cuda, metal, vulkan, hipblas, or intel-sycl.
+whisper = ["dep:whisper-rs"]
+
+[dependencies]
+whisper-rs = { version = "0.16.0", optional = true, default-features = false }
+
+[[bin]]
+name = "s03-asr"
+path = "src/bin/transcribe.rs"
+
+[[bin]]
+name = "s03-asr-eval"
+path = "src/bin/eval.rs"
+
+# Test peer for the galion-asr-vosk/1 NDJSON handshake. Not a recognizer.
+[[bin]]
+name = "s03-asr-protocol-double"
+path = "src/bin/protocol_double.rs"
+
+[profile.release]
+opt-level = 3
