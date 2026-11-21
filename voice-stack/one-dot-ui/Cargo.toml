@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Galion Labs
+[package]
+name = "one-dot-ui"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+publish = false
+description = "Samantha one-dot page. Standalone crate, not a member of the root workspace."
+
+# Own workspace so the root Cargo.toml does not pick this crate up.
+[workspace]
+
+[[bin]]
+name = "samantha-dot"
+path = "src/main.rs"
