@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Galion Labs
+# Public model pins. Hashes match scripts/asr/fetch-vosk.sh and scripts/a21/fetch-a21.sh.
+# No reference audio. Samantha's clip is GALION_SAMANTHA_REF at runtime, never a pin.
+
+VOSK_MODEL_URL=https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip
+VOSK_MODEL_SHA256=30f26242c4eb449f948e42cb302dd7a686cb29a3423a8367f99ff41780942498
+VOSK_LIB_URL=https://github.com/alphacep/vosk-api/releases/download/v0.3.45/vosk-linux-x86_64-0.3.45.zip
+VOSK_LIB_SHA256=bbdc8ed85c43979f6443142889770ea95cbfbc56cffb5c5dcd73afa875c5fbb2
+PIPER_RT_URL=https://github.com/rhasspy/piper/releases/download/2023.11.14-2/piper_linux_x86_64.tar.gz
+PIPER_RT_SHA256=a50cb45f355b7af1f6d758c1b360717877ba0a398cc8cbe6d2a7a3a26e225992
+PIPER_VOICE_BASE=https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/ljspeech/medium
+PIPER_ONNX_NAME=en_US-ljspeech-medium.onnx
+PIPER_ONNX_SHA256=6f52a751e2349abe7a76735eb09dc1875298c77ea2342ffd2fef79ff81b87f22
+PIPER_JSON_SHA256=141d612cc0a95ed7efc1ca936b845c2364967f2e9217c5dbfcf69fc4d6c65860
