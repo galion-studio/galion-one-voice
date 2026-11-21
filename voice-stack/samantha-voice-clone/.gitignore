@@ -1,0 +1,22 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Galion Labs
+#
+# Samantha, Jarvis, s711, the owner's reference, and any voice clone stay
+# off this tree. The reference is loaded at runtime from GALION_SAMANTHA_REF.
+
+/target/
+__pycache__/
+*.pyc
+/cache/
+
+*.wav
+*.wave
+*.mp3
+*.flac
+*.ogg
+*.opus
+*.onnx
+*.safetensors
+*.pt
+*.pcm
+*.s16le
