@@ -473,6 +473,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "galion-sam-empathy"
+version = "0.0.1"
+dependencies = [
+ "galion-emotion",
+ "galion-emotion-in",
+ "galion-sam-prosody",
+]
+
+[[package]]
 name = "galion-sam-horbm"
 version = "0.0.1"
 dependencies = [

@@ -14,6 +14,7 @@ members = [
     "audio-io",
     "emotion-in",
     "emotion-prosody",
+    "empathy",
     "eval-golden",
     "horbm-bridge",
     "latency-harness",
