@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Galion Labs
+
+[package]
+name = "horbm"
+description = "Type seam for the Samantha HORBM adapter. Not the retrieval brain."
+version = "0.0.0"
+edition = "2021"
+license = "MIT"
+publish = false
+rust-version = "1.83"
+
+[dependencies]
+
+# Own workspace so the seam stays out of the root workspace and out of the parent package.
+[workspace]

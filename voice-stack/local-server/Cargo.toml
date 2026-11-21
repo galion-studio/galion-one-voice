@@ -1,0 +1,32 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Galion Labs
+
+[workspace]
+
+[package]
+name = "samantha-local-server"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+publish = false
+description = "Loopback WebSocket server for the Samantha voice UI (swarm 16, sector S10)"
+readme = "README.md"
+
+[[bin]]
+name = "samantha-local"
+path = "src/main.rs"
+
+# Pinned for rustc 1.83. Newer tokio / hyper-util manifests need edition 2024.
+[dependencies]
+axum = { version = "=0.7.9", features = ["ws"] }
+futures-util = "=0.3.31"
+hyper = "=1.5.2"
+hyper-util = "=0.1.10"
+serde = { version = "=1.0.217", features = ["derive"] }
+serde_json = "=1.0.134"
+tokio = { version = "=1.42.0", features = ["macros", "net", "rt-multi-thread", "signal", "sync", "time"] }
+tower = "=0.5.2"
+tower-http = { version = "=0.5.2", features = ["fs"] }
+
+[dev-dependencies]
+tokio-tungstenite = "=0.24.0"
