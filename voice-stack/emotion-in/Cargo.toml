@@ -4,8 +4,6 @@
 # Standalone workspace. Not a member of the Galion Voice workspace, and not
 # listed in the root Cargo.toml. `cargo test` here does not build the voice
 # workspace, and the voice workspace does not build this crate.
-[workspace]
-
 [package]
 name = "galion-emotion-in"
 version = "0.1.0"

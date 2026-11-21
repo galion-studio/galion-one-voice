@@ -10,8 +10,8 @@ license = "MIT"
 publish = false
 rust-version = "1.92"
 
-# Own workspace. Not a member of the repo root workspace, same pattern as
-# runtimes/galion-piper-rt and crates/galion-v2-live.
+# Own workspace. Excluded from voice-stack/Cargo.toml because this crate
+# depends on `ort`. Not a member of the repo root workspace.
 [workspace]
 
 [dependencies]

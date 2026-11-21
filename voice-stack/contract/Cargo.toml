@@ -13,7 +13,5 @@ rust-version = "1.85"
 
 # Own workspace so the root `cargo test --workspace` does not pick this up
 # until INTEGRATION.md's follow-up says so. Same shape as crates/galion-v2-live.
-[workspace]
-
 [dependencies]
 galion-emotion = { path = "../../galion-emotion" }

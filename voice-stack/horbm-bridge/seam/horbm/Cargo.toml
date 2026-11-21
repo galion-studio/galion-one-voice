@@ -13,4 +13,3 @@ rust-version = "1.83"
 [dependencies]
 
 # Own workspace so the seam stays out of the root workspace and out of the parent package.
-[workspace]

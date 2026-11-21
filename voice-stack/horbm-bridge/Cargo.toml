@@ -34,7 +34,5 @@ path = "src/bin/galion-sam-horbm.rs"
 name = "galion_sam_horbm"
 path = "src/lib.rs"
 
-# Own workspace so this sector stays out of the root workspace.
-# The type seam is a separate package with its own `[workspace]`.
-[workspace]
-exclude = ["seam/horbm"]
+# Member of voice-stack/Cargo.toml, not of the root workspace.
+# The type seam in seam/horbm is a path dependency. It is not the retrieval brain.

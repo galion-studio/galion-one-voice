@@ -1,0 +1,37 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Galion Labs
+# Galion Voice — Perpetual Open MIT License
+#
+# Nested workspace for the Samantha companion. Not a member of the root
+# workspace, so `cargo test --workspace` at the repo root does not build it
+# and does not pull `ort` through `voice-stack/vad`.
+
+[workspace]
+resolver = "2"
+members = [
+    "contract",
+    "asr",
+    "audio-io",
+    "emotion-in",
+    "emotion-prosody",
+    "eval-golden",
+    "horbm-bridge",
+    "latency-harness",
+    "linux-package",
+    "local-server",
+    "one-dot-ui",
+    "pipeline-orchestrator",
+    "tts-piper-stream",
+]
+# `vad` depends on the `ort` crate. LOCKS.toml keeps `ort` out of a Galion
+# workspace `cargo tree`, so this workspace does not build it.
+exclude = [
+    "vad",
+]
+
+[workspace.package]
+version = "0.0.1"
+edition = "2021"
+license = "MIT"
+publish = false
+rust-version = "1.85"
