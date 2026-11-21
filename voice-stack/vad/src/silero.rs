@@ -263,7 +263,7 @@ fn environment() -> Result<&'static ort::environment::Environment, VadError> {
         return Ok(env);
     }
     let env = ort::init()
-        .with_name("galion-s02-vad")
+        .with_name("galion-sam-vad")
         .build()
         .map_err(|e| VadError::new(e.to_string()))?;
     Ok(ENV.get_or_init(|| env))

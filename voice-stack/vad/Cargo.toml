@@ -2,8 +2,8 @@
 # Copyright (c) 2026 Galion Labs
 
 [package]
-name = "galion-s02-vad"
-description = "Samantha voice stack S02: CPU voice activity and end-of-turn detection. Silero VAD ONNX on the CPU, energy fallback, 20 ms frames."
+name = "galion-sam-vad"
+description = "Samantha voice stack S02 (voice-stack/vad): CPU voice activity and end-of-turn detection. Silero VAD ONNX on the CPU, energy fallback, 20 ms frames."
 version = "0.0.1"
 edition = "2021"
 license = "MIT"

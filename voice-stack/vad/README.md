@@ -5,9 +5,9 @@
 
 Perpetual Open MIT License. (c) 2026 Galion Labs.
 
-CPU voice activity detection for Samantha. Twenty millisecond frames go in. Speech start, speech end, and barge-in come out. The score is Silero VAD v5 on the CPU, through the same `ort` 2.0.0-rc.15 pin as `runtimes/galion-piper-rt`. If that model is missing or will not load, the score is the energy gate from `crates/galion-v2-live/src/vad.rs`.
+CPU voice activity detection for Samantha. Package `galion-sam-vad`, directory `voice-stack/vad`, the path in `voice-stack/INTEGRATION.md` on the architecture branch. Twenty millisecond frames go in. Speech start, speech end, and barge-in come out. The score is Silero VAD v5 on the CPU, through the same `ort` 2.0.0-rc.15 pin as `runtimes/galion-piper-rt`. If that model is missing or will not load, the score is the energy gate from `crates/galion-v2-live/src/vad.rs`.
 
-This crate is its own Cargo workspace. It is not a member of the repo root workspace.
+This crate is its own Cargo workspace. It is not a member of the repo root workspace. `ort` stays inside this workspace, the same way the Piper runtime keeps it out of the root. `rust-version` is 1.92 because that `ort` pin will not compile on 1.85.
 
 ## What it reuses
 
@@ -47,7 +47,7 @@ OMP_WAIT_POLICY=PASSIVE
 From the repo root:
 
 ```bash
-cd voice-stack/s02-vad
+cd voice-stack/vad
 bash scripts/fetch-cc0.sh
 export OMP_NUM_THREADS=1 OMP_WAIT_POLICY=PASSIVE
 cargo test
@@ -63,7 +63,7 @@ Ubuntu needs the libstdc++ linker input (`libstdc++.so`), which the `libstdc++-1
 The checkout on the owner's laptop lives under `G:\galion`. From the repo root:
 
 ```powershell
-cd voice-stack\s02-vad
+cd voice-stack\vad
 powershell -ExecutionPolicy Bypass -File scripts\fetch-cc0.ps1
 $env:OMP_NUM_THREADS = "1"
 $env:OMP_WAIT_POLICY = "PASSIVE"
@@ -93,11 +93,11 @@ Use Rust 1.92 or newer (`rustup toolchain install stable`). The first build down
 ## Library
 
 ```rust
-let mut ear = galion_s02_vad::Listen::from_env();
+let mut ear = galion_sam_vad::Listen::from_env();
 let report = ear.push(&frame_320, me_speaking, transcript)?;
 ```
 
-`frame_320` is 20 ms of mono s16 at 16 kHz. `frame_from_24k` converts the 480-sample frame the live call already uses. `report.event` is `SpeechStart`, `SpeechEnd`, `Speculate`, `Resume`, `Hold`, or `None`. `report.barge_in` is independent, so it can share a frame with speech start. `report.level()` is the dot level. `report.cpu_ns` is thread CPU time for that frame.
+`frame_320` is 20 ms of mono s16 at 16 kHz. `frame_from_24k` converts the 480-sample frame the live call already uses. `report.event` is `SpeechStart`, `SpeechEnd`, `Speculate`, `Resume`, `Hold`, or `None`. `Event::endpoint_name` is the `EndpointEvent` spelling in `galion-sam-contract`: start, commit, speculate, resume, hold. `SpeechEnd` is that contract's `Commit`. `report.barge_in` is independent, so it can share a frame with speech start. `report.level()` is the dot level. `report.cpu_ns` is thread CPU time for that frame.
 
 ## Samples
 

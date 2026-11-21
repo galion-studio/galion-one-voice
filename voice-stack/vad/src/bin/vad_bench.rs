@@ -7,7 +7,7 @@
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
-use galion_s02_vad::{
+use galion_sam_vad::{
     summarize_ns, Backend, Event, FrameReport, Listen, TimeStats, TurnCfg, FRAME_SAMPLES,
     SAMPLE_RATE,
 };
@@ -35,14 +35,14 @@ fn main() {
 
     let cfg = TurnCfg::from_env();
     let dir = samples.unwrap_or_else(|| {
-        galion_s02_vad::samples_dir()
+        galion_sam_vad::samples_dir()
             .unwrap_or_else(|| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("samples"))
     });
     let model = model.unwrap_or_else(|| {
         std::env::var_os("GALION_SILERO_VAD")
             .map(PathBuf::from)
             .filter(|p| !p.as_os_str().is_empty())
-            .unwrap_or_else(galion_s02_vad::bundled_model_path)
+            .unwrap_or_else(galion_sam_vad::bundled_model_path)
     });
 
     let clips = load_clips(&dir).unwrap_or_else(|e| {
@@ -120,12 +120,12 @@ fn load_clips(dir: &Path) -> Result<Vec<Clip>, String> {
     paths.sort();
     let mut clips = Vec::new();
     for path in paths {
-        let wav = galion_s02_vad::read_wav(&path).map_err(|e| e.to_string())?;
-        let mono = galion_s02_vad::to_mono(&wav);
+        let wav = galion_sam_vad::read_wav(&path).map_err(|e| e.to_string())?;
+        let mono = galion_sam_vad::to_mono(&wav);
         let pcm = if wav.rate == SAMPLE_RATE {
             mono
         } else {
-            galion_s02_vad::resample(&mono, wav.rate, SAMPLE_RATE)
+            galion_sam_vad::resample(&mono, wav.rate, SAMPLE_RATE)
         };
         let mut frames = Vec::new();
         let mut i = 0;
@@ -290,7 +290,7 @@ fn render(
     }
     clips_json.push(']');
     format!(
-        "{{\n  \"sector\": \"s02-vad\",\n  \"os\": \"{}\",\n  \"arch\": \"{}\",\n  \"frame_ms\": 20,\n  \"sample_rate\": 16000,\n  \"heartbeat_ms\": 80,\n  \"samples_dir\": {},\n  \"model\": {},\n  \"cfg\": {{\"onset_ms\":{},\"hangover_ms\":{},\"spec_ms\":{},\"commit_ms\":{},\"hold_ms\":{},\"barge_ms\":{},\"start_threshold\":{},\"keep_threshold\":{}}},\n  \"clips\": {clips_json},\n  \"energy\": {},\n  \"silero\": {}\n}}\n",
+        "{{\n  \"sector\": \"vad\",\n  \"os\": \"{}\",\n  \"arch\": \"{}\",\n  \"frame_ms\": 20,\n  \"sample_rate\": 16000,\n  \"heartbeat_ms\": 80,\n  \"samples_dir\": {},\n  \"model\": {},\n  \"cfg\": {{\"onset_ms\":{},\"hangover_ms\":{},\"spec_ms\":{},\"commit_ms\":{},\"hold_ms\":{},\"barge_ms\":{},\"start_threshold\":{},\"keep_threshold\":{}}},\n  \"clips\": {clips_json},\n  \"energy\": {},\n  \"silero\": {}\n}}\n",
         std::env::consts::OS,
         std::env::consts::ARCH,
         jstr(&dir.display().to_string()),

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Galion Labs
 
-//! S02 — voice activity and end of turn for Samantha.
+//! S02 — voice activity and end of turn for Samantha (`galion-sam-vad`).
 //!
 //! Mic audio arrives as 20 ms frames at 16 kHz (320 samples), the same ear
 //! the live call already uses (`crates/galion-v2-live/src/bin/call.rs` resamples

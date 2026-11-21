@@ -142,6 +142,19 @@ impl Event {
             Event::Hold => "hold",
         }
     }
+
+    /// The `EndpointEvent` name in `galion-sam-contract` (`voice-stack/contract`).
+    /// `SpeechEnd` is that contract's `Commit`: the hangover closed and the turn may be spoken.
+    pub fn endpoint_name(self) -> &'static str {
+        match self {
+            Event::None => "none",
+            Event::SpeechStart => "start",
+            Event::SpeechEnd => "commit",
+            Event::Speculate => "speculate",
+            Event::Resume => "resume",
+            Event::Hold => "hold",
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -465,5 +478,15 @@ mod tests {
         assert!(sounds_unfinished("i went to the"));
         assert!(!sounds_unfinished("that was great"));
         assert!(!sounds_unfinished(""));
+    }
+
+    #[test]
+    fn endpoint_names_match_the_contract() {
+        assert_eq!(Event::None.endpoint_name(), "none");
+        assert_eq!(Event::SpeechStart.endpoint_name(), "start");
+        assert_eq!(Event::SpeechEnd.endpoint_name(), "commit");
+        assert_eq!(Event::Speculate.endpoint_name(), "speculate");
+        assert_eq!(Event::Resume.endpoint_name(), "resume");
+        assert_eq!(Event::Hold.endpoint_name(), "hold");
     }
 }

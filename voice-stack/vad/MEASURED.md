@@ -9,7 +9,7 @@ One Linux machine. Not the owner's Windows laptop. Windows was not run.
 - rustc 1.100.0 (0ef1bc386 2026-11-09), crate built `--release`.
 - Process environment for the bench: `OMP_NUM_THREADS=1`, `OMP_WAIT_POLICY=PASSIVE`.
 - Clock: `CLOCK_THREAD_CPUTIME_ID` for `cpu_ns`, `Instant` for `wall_ns`.
-- Command: `cargo run --release --bin vad-bench` in `voice-stack/s02-vad`, after `scripts/fetch-cc0.sh`.
+- Command: `cargo run --release --bin vad-bench` in `voice-stack/vad` (the tree was `voice-stack/s02-vad` when these numbers were taken; the rename did not change the bench). After `scripts/fetch-cc0.sh`.
 - Model sha256 `2623a2953f6ff3d2c1e61740c6cdb7168133479b267dfef114a4a3cc5bdd788f` (Silero VAD v5.1.2). Inputs observed at load: `input` f32, `state` f32 `[2, batch, 128]`, `sr` i64 scalar. Outputs: `output`, `stateN`.
 - Clips: the five CC0 wavs in `scripts/sources.tsv`. Timing repeated them until 2272 frames (2272 × 20 ms = 45.44 s of audio).
 

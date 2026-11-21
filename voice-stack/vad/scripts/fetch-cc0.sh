@@ -5,7 +5,7 @@
 set -eu
 cd "$(dirname "$0")/.."
 src="scripts/sources.tsv"
-ua="galion-s02-vad/0.1 (local VAD research; CC0 speech)"
+ua="galion-sam-vad/0.1 (local VAD research; CC0 speech)"
 while IFS="$(printf '\t')" read -r dest url sha lic note; do
     case "$dest" in
         ""|\#*) continue ;;

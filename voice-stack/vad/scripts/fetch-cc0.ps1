@@ -5,7 +5,7 @@ $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
 $src = Join-Path $PSScriptRoot "sources.tsv"
-$ua = "galion-s02-vad/0.1 (local VAD research; CC0 speech)"
+$ua = "galion-sam-vad/0.1 (local VAD research; CC0 speech)"
 Get-Content -LiteralPath $src | ForEach-Object {
     $line = $_
     if ($line -match '^\s*$' -or $line.StartsWith("#")) { return }
