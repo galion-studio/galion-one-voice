@@ -3,7 +3,7 @@
 
 # S03 ASR measurements
 
-These blocks are the stdout of `s03-asr-eval` on this machine. The JSON files next to them keep every chunk time. The stdout was not retyped.
+These blocks are the stdout of `s03-asr-eval` on this machine. The JSON files next to them keep every chunk time. The stdout was not retyped. The crate later moved to `voice-stack/asr` (`galion-sam-asr`). The model path in the Vosk block is the directory that run loaded.
 
 Host string from the runs: Linux x86_64, 4 CPUs, `Intel(R) Xeon(R) Processor` (the name this VM publishes). Vosk was a release build with rustc 1.83.0. Whisper was a release build with rustc 1.100.0 and `use gpu = 0`.
 

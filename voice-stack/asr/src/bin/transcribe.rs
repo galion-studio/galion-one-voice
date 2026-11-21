@@ -3,7 +3,7 @@
 
 use std::path::PathBuf;
 
-use galion_s03_asr::{
+use galion_sam_asr::{
     open_engine, read_wav, run_stream, wav_to_16k_mono, EngineOpts, HEARTBEAT_MS, SAMPLE_RATE,
 };
 

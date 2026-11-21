@@ -4,7 +4,7 @@
 use std::path::PathBuf;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
-use galion_s03_asr::{
+use galion_sam_asr::{
     compiled_with, cpu_model, final_text, open_engine, parse_manifest, read_wav, run_stream,
     unix_to_utc, wav_to_16k_mono, word_error, AsrKind, ClipScore, EngineOpts, HostInfo, RunScore,
     HEARTBEAT_MS, HEARTBEAT_SAMPLES, SAMPLE_RATE,
@@ -83,7 +83,7 @@ fn run() -> Result<(), String> {
         let path = audio_dir.join(format!("{}.wav", clip.id));
         if !path.is_file() {
             return Err(format!(
-                "missing {}. Run voice-stack/s03-asr/scripts/fetch-cc0.sh. No score was invented.",
+                "missing {}. Run voice-stack/asr/scripts/fetch-cc0.sh. No score was invented.",
                 path.display()
             ));
         }

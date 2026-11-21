@@ -42,7 +42,7 @@ get() { # url dest sha
   ok "$2" "$3" && { echo "ok   $2"; return 0; }
   command -v curl >/dev/null || { echo "fetch-models: curl required"; exit 2; }
   echo "get  $1"
-  curl -fL --retry 3 -A "galion-s03-asr" -o "$2.part" "$1"
+  curl -fL --retry 3 -A "galion-sam-asr" -o "$2.part" "$1"
   if ok "$2.part" "$3"; then mv "$2.part" "$2"; echo "ok   $2"; else rm -f "$2.part"; echo "fetch-models: sha256 mismatch for $1"; exit 1; fi
 }
 

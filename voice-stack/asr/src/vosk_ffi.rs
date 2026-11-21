@@ -58,7 +58,7 @@ impl Ffi {
             Err(err) => errors.push(format!("{fallback}: {}", err.message())),
         }
         Err(AsrError::new(format!(
-            "libvosk could not be loaded ({}). Run voice-stack/s03-asr/scripts/fetch-models.sh or set GALION_VOSK_LIB. No transcript was invented.",
+            "libvosk could not be loaded ({}). Run voice-stack/asr/scripts/fetch-models.sh or set GALION_VOSK_LIB. No transcript was invented.",
             errors.join("; ")
         )))
     }

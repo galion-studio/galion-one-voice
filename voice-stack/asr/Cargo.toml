@@ -2,13 +2,13 @@
 # Copyright (c) 2026 Galion Labs
 
 [package]
-name = "galion-s03-asr"
+name = "galion-sam-asr"
 description = "Swarm 16 S03 streaming CPU speech-to-text. Vosk partials and finals, optional whisper.cpp."
 version = "0.0.1"
 edition = "2021"
 license = "MIT"
 publish = false
-rust-version = "1.83"
+rust-version = "1.85"
 
 [workspace]
 resolver = "2"

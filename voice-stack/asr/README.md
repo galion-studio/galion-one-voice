@@ -30,7 +30,7 @@ whisper.cpp is not a 20 ms decoder. `push_pcm` only buffers unless `GALION_WHISP
 
 ## Linux
 
-From this directory (`voice-stack/s03-asr`):
+From this directory (`voice-stack/asr`):
 
 ```bash
 ./scripts/fetch-models.sh
@@ -71,7 +71,7 @@ cargo run --release --bin s03-asr-eval -- --backend vosk-worker --bin ../../targ
 
 ## Windows
 
-PowerShell, from `voice-stack\s03-asr`. These commands were not run on the machine that produced `eval/MEASURED.md` (that machine is Linux).
+PowerShell, from `voice-stack\asr`. These commands were not run on the machine that produced `eval/MEASURED.md` (that machine is Linux).
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\fetch-models.ps1

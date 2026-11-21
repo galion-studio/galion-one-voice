@@ -55,7 +55,7 @@ pub fn find_vosk_model() -> Result<PathBuf, AsrError> {
             return Ok(path);
         }
         return Err(AsrError::new(format!(
-            "GALION_VOSK_MODEL={explicit} is missing am/final.mdl or conf/model.conf. Run voice-stack/s03-asr/scripts/fetch-models.sh. No transcript was invented."
+            "GALION_VOSK_MODEL={explicit} is missing am/final.mdl or conf/model.conf. Run voice-stack/asr/scripts/fetch-models.sh. No transcript was invented."
         )));
     }
     let mut tried = Vec::new();
@@ -67,7 +67,7 @@ pub fn find_vosk_model() -> Result<PathBuf, AsrError> {
         }
     }
     Err(AsrError::new(format!(
-        "Vosk model not found (need am/final.mdl and conf/model.conf). Looked in {}. Run voice-stack/s03-asr/scripts/fetch-models.sh. No transcript was invented.",
+        "Vosk model not found (need am/final.mdl and conf/model.conf). Looked in {}. Run voice-stack/asr/scripts/fetch-models.sh. No transcript was invented.",
         tried.join(", ")
     )))
 }
@@ -139,7 +139,7 @@ pub fn find_whisper_model(which: &str) -> Result<PathBuf, AsrError> {
         }
     }
     Err(AsrError::new(format!(
-        "whisper model {file} not found. Looked in {}. Run voice-stack/s03-asr/scripts/fetch-models.sh --whisper. No transcript was invented.",
+        "whisper model {file} not found. Looked in {}. Run voice-stack/asr/scripts/fetch-models.sh --whisper. No transcript was invented.",
         tried.join(", ")
     )))
 }

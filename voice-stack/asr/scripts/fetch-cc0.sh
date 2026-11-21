@@ -23,7 +23,7 @@ while read -r sum name; do
   id="${name%.wav}"
   url="$BASE/${id}.wav?download=true"
   echo "get  $url"
-  curl -fL --retry 3 -A "galion-s03-asr" -o "$dest.part" "$url"
+  curl -fL --retry 3 -A "galion-sam-asr" -o "$dest.part" "$url"
   if [ "$(sha "$dest.part")" = "$sum" ]; then
     mv "$dest.part" "$dest"
     echo "ok   $dest"

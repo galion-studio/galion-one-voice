@@ -3,19 +3,26 @@
 
 use std::process::Command;
 
-use galion_s03_asr::{final_text, Asr, AsrKind, VoskWorkerAsr};
+use galion_sam_asr::{final_text, Asr, AsrKind, VoskWorkerAsr};
 
 #[test]
 fn worker_adapter_reads_partial_then_final() {
-    let mut bin = std::env::current_exe().expect("test executable");
-    bin.pop();
-    bin.pop();
     let name = if cfg!(windows) {
         "s03-asr-protocol-double.exe"
     } else {
         "s03-asr-protocol-double"
     };
-    bin.push(name);
+    let exe = std::env::current_exe().expect("test executable");
+    let mut dir = exe.clone();
+    let bin = loop {
+        if !dir.pop() {
+            panic!("protocol double not found above {}", exe.display());
+        }
+        let candidate = dir.join(name);
+        if candidate.is_file() {
+            break candidate;
+        }
+    };
     let mut engine = VoskWorkerAsr::from_command(Command::new(&bin)).unwrap();
     assert_eq!(engine.name(), "vosk-worker:double");
     assert!(engine.push_pcm(&[0, 1, -1, 2]).unwrap().is_empty());

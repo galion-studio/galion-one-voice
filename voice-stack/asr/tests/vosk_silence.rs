@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Galion Labs
 
-use galion_s03_asr::{final_text, run_stream, VoskAsr, HEARTBEAT_SAMPLES};
+use galion_sam_asr::{final_text, run_stream, VoskAsr, HEARTBEAT_SAMPLES};
 
 #[test]
 #[ignore = "needs libvosk and vosk-model-small-en-us-0.15"]
