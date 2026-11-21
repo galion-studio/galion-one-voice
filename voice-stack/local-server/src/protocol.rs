@@ -217,7 +217,7 @@ pub fn pong_json() -> String {
 
 pub fn turn_json(turn: &crate::reply::TurnOut) -> String {
     format!(
-        "{{\"schema\":\"{SCHEMA}\",\"type\":\"turn\",\"reply\":\"{}\",\"intent\":{},\"arm\":{},\"propensity\":{},\"evidence\":{},\"sources\":{},\"violations\":{},\"lookup_us\":{},\"took_us\":{},\"mood\":{}}}",
+        "{{\"schema\":\"{SCHEMA}\",\"type\":\"turn\",\"reply\":\"{}\",\"intent\":{},\"arm\":{},\"propensity\":{},\"evidence\":{},\"sources\":{},\"violations\":{},\"lookup_us\":{},\"took_us\":{},\"mood\":{},\"empathy_e\":{},\"prosody\":{{\"rate\":{},\"energy\":{},\"pitch_st\":{},\"pause_ms\":{}}}}}",
         escape(&turn.reply),
         json_or_null(&turn.intent_json),
         json_or_null(&turn.arm_json),
@@ -227,7 +227,12 @@ pub fn turn_json(turn: &crate::reply::TurnOut) -> String {
         turn.violations,
         turn.lookup_us,
         turn.took_us,
-        pad_json(turn.mood)
+        pad_json(turn.mood),
+        fmt_f32(turn.empathy_e),
+        fmt_f32(turn.prosody_rate),
+        fmt_f32(turn.prosody_energy),
+        fmt_f32(turn.prosody_pitch_st),
+        fmt_f32(turn.prosody_pause_ms)
     )
 }
 
@@ -379,10 +384,7 @@ mod tests {
     fn error_does_not_carry_audio_or_a_transcript() {
         assert_eq!(redact_error("pcm dump"), "redacted");
         assert_eq!(redact_error("see transcript"), "redacted");
-        assert_eq!(
-            error_json("brain-unlinked").contains("brain-unlinked"),
-            true
-        );
+        assert!(error_json("brain-unlinked").contains("brain-unlinked"));
     }
 
     #[test]

@@ -392,7 +392,10 @@ impl Pipeline for LivePipeline {
     }
 
     fn tick_mood(&mut self) -> (crate::reply::Pad, &'static str) {
-        (crate::reply::Pad::RESTING, "resting")
+        match self.mind.tick() {
+            Some(pad) => (pad.finite_or_resting(), "brain"),
+            None => (crate::reply::Pad::RESTING, "resting"),
+        }
     }
 
     fn phase(&self) -> &'static str {

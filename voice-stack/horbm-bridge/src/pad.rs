@@ -5,10 +5,10 @@
 //! [`Pad::RESTING`] is the HORBM rest state from the sector brief:
 //! arousal `0.3`, valence `0.25`, dominance `0.5`.
 //!
-//! [`FRAME_MS`] is `galion-heartbeat`'s `FRAME_MS` (`LOCKS.toml` `[clock]
-//! frame_ms = 80`). The brief gives `horbm` no `tick` method, so this
-//! wrapper's tick is empty. It does not synthesize a mood trajectory.
-//! The next `turn` is what replaces the pad.
+//! [`FRAME_MS`] is 80, the voice heartbeat. This type stores one sample.
+//! It does not step a trajectory by itself. [`crate::CardEngine`] writes
+//! the sample from the empathy frame. [`crate::FakeEngine`] keeps
+//! [`Pad::RESTING`] until a turn.
 
 /// Heartbeat period. Locked to `galion-heartbeat::FRAME_MS`.
 pub const FRAME_MS: u32 = 80;

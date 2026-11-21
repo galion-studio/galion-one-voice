@@ -23,6 +23,8 @@ use tokio_tungstenite::tungstenite::client::IntoClientRequest;
 use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::{connect_async, MaybeTlsStream, WebSocketStream};
 
+type PcmFrame = (AudioDir, RateCode, u16, Vec<i16>);
+
 struct Fixed;
 
 impl ReplyEngine for Fixed {
@@ -42,6 +44,11 @@ impl ReplyEngine for Fixed {
             lookup_us: 7,
             took_us: u32::try_from(started.elapsed().as_micros()).unwrap_or(0),
             mood: Pad::RESTING,
+            empathy_e: 0.0,
+            prosody_rate: 1.0,
+            prosody_energy: 1.0,
+            prosody_pitch_st: 0.0,
+            prosody_pause_ms: 0.0,
         })
     }
 }
@@ -291,7 +298,7 @@ async fn companion_socket() {
     let mut turns = Vec::new();
     let mut turn_at = None;
     let mut moods: Vec<(Instant, Value)> = Vec::new();
-    let mut pcm: Vec<(Instant, (AudioDir, RateCode, u16, Vec<i16>))> = Vec::new();
+    let mut pcm: Vec<(Instant, PcmFrame)> = Vec::new();
     let mut errors = Vec::new();
     let deadline = Instant::now() + Duration::from_secs(3);
     while Instant::now() < deadline && (pcm.len() < 4 || turns.is_empty()) {

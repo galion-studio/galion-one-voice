@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Galion Labs
 
-//! Reply engine. The real brain is `horbm::Brain::open(memory_db, knowledge_dir, cases)`
-//! and `turn` / `tick`. That crate is not linked. [`UnlinkedBrain`] is what the
-//! process runs: `turn` is an error, and `tick` does not invent a mood.
-//! [`FakeReply`] exists so tests can drop a brain in without speaking a comfort script.
+//! Reply engine. The 7881 process runs `HorbmMind`, which calls
+//! `horbm::Brain::turn`. [`UnlinkedBrain`] is the stand-in used by
+//! [`crate::pipeline::FakePipeline`]: `turn` is an error, and `tick` does
+//! not invent a mood. [`FakeReply`] exists so tests can drop a brain in
+//! without speaking a comfort script.
 
 use std::path::Path;
 use std::time::Instant;
@@ -51,6 +52,13 @@ pub struct TurnOut {
     pub lookup_us: u32,
     pub took_us: u32,
     pub mood: Pad,
+    /// Empathy weight from the HORBM turn. `0` is rest.
+    pub empathy_e: f32,
+    /// Prosody knobs for the voice. They follow `mood` and `empathy_e`.
+    pub prosody_rate: f32,
+    pub prosody_energy: f32,
+    pub prosody_pitch_st: f32,
+    pub prosody_pause_ms: f32,
 }
 
 pub trait ReplyEngine: Send {
@@ -149,6 +157,11 @@ impl ReplyEngine for FakeReply {
             lookup_us: 0,
             took_us,
             mood: Pad::RESTING,
+            empathy_e: 0.0,
+            prosody_rate: 1.0,
+            prosody_energy: 1.0,
+            prosody_pitch_st: 0.0,
+            prosody_pause_ms: 0.0,
         })
     }
 }
@@ -196,6 +209,11 @@ mod tests {
                 lookup_us: 40,
                 took_us: 80,
                 mood: Pad::RESTING,
+                empathy_e: 0.0,
+                prosody_rate: 1.0,
+                prosody_energy: 1.0,
+                prosody_pitch_st: 0.0,
+                prosody_pause_ms: 0.0,
             })
         }
         fn tick(&mut self) {}
