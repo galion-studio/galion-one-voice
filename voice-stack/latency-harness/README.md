@@ -3,7 +3,9 @@
 
 # S12 latency harness
 
-Per-stage clocks for the local Samantha voice path. This crate is its own Cargo workspace. It is not a member of the repository root workspace.
+Per-stage clocks for the local Samantha voice path. The package is `galion-sam-latency`. The directory is `voice-stack/latency-harness`, which is the S12 sector path. This crate is its own Cargo workspace. It is not a member of the repository root workspace.
+
+The release numbers below were measured before this directory rename, with rustc 1.83.0, and were not run again. The JSON still names that compiler and the commit `f0b39b38f42f016fe620fe3ac1a4a096745f10eb`.
 
 The path is mic-shaped, but this program does not open a microphone or a speaker. It times five marks on a buffer that is already in memory:
 
@@ -37,7 +39,7 @@ From the repository root, fetch the pinned Piper pack once (Linux x86_64). The f
 
 ```bash
 scripts/a21/fetch-a21.sh
-cd voice-stack/s12-latency-harness
+cd voice-stack/latency-harness
 cargo test
 cargo run --release -- run --backend all --reps 100 --out-dir results
 ```
@@ -49,7 +51,7 @@ cargo run --release -- run --backend all --reps 100 --out-dir results
 The owner's tree lives under `G:\galion`. From the repository root:
 
 ```bat
-cd /d G:\galion\voice-stack\s12-latency-harness
+cd /d G:\galion\voice-stack\latency-harness
 cargo test
 cargo run --release -- run --backend fake --reps 100 --out-dir results
 ```
@@ -67,7 +69,7 @@ The `.onnx.json` must sit beside the model (`en_US-ljspeech-medium.onnx.json`).
 ## CLI
 
 ```text
-s12-latency-harness run [--backend fake|piper|all] [--reps N] [--warmup N] [--out-dir DIR]
+galion-sam-latency run [--backend fake|piper|all] [--reps N] [--warmup N] [--out-dir DIR]
 ```
 
 The default is `--backend all --reps 100 --warmup 1 --out-dir results`.

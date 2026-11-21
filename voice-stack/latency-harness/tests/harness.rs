@@ -5,8 +5,8 @@
 //! and, when the A21 pack is on disk, two warm Piper reps. They do not write
 //! audio.
 
-use s12_latency_harness::traits::{AsrStage, AudioOut, ReplyEngine, SpeechEnd};
-use s12_latency_harness::{
+use galion_sam_latency::traits::{AsrStage, AudioOut, ReplyEngine, SpeechEnd};
+use galion_sam_latency::{
     fixture_pcm, heartbeat_play_us, ms_text, percentile, rank, resample_to_frame, run_fake,
     run_piper, EnergyVad, FakeAsr, FakeReply, FrameSink, HarnessError, Machine, Pad, Rep, Report,
     StageNames, TurnOut, BAR_US, FRAME_SAMPLES, PHRASE, PIPER_HZ, SAMPLE_RATE_HZ,
@@ -201,7 +201,7 @@ fn mood_advances_on_heartbeat_ticks_and_the_sentence_does_not() {
 
 #[test]
 fn resample_of_a_full_scale_piper_frame_stays_finite() {
-    let n = s12_latency_harness::input_samples_for_one_frame(PIPER_HZ);
+    let n = galion_sam_latency::input_samples_for_one_frame(PIPER_HZ);
     let src = vec![32767i16; n];
     let mut out = vec![0.0f32; FRAME_SAMPLES];
     resample_to_frame(&src, PIPER_HZ, &mut out);

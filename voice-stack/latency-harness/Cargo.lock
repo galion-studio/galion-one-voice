@@ -3,5 +3,5 @@
 version = 4
 
 [[package]]
-name = "s12-latency-harness"
+name = "galion-sam-latency"
 version = "0.0.1"

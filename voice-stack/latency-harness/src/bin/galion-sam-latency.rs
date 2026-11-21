@@ -4,7 +4,7 @@
 //! CLI for the S12 latency harness.
 //!
 //! ```text
-//! s12-latency-harness run [--backend fake|piper|all] [--reps N] [--warmup N] [--out-dir DIR]
+//! galion-sam-latency run [--backend fake|piper|all] [--reps N] [--warmup N] [--out-dir DIR]
 //! ```
 //!
 //! Exit 0 when every requested backend measured. Exit 2 when a requested
@@ -14,7 +14,7 @@
 //! Publish numbers from `cargo run --release`. The results file records
 //! `profile`.
 
-use s12_latency_harness::{probe_machine, repo_root, run_fake, run_piper, HarnessError, Report};
+use galion_sam_latency::{probe_machine, repo_root, run_fake, run_piper, HarnessError, Report};
 use std::env;
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -169,10 +169,10 @@ fn write_unmeasured(backend: &str, reason: &str, dir: &PathBuf) -> Result<(), ()
 fn print_help() {
     eprintln!(
         "\
-s12-latency-harness — per-stage clocks for the local voice path
+galion-sam-latency — per-stage clocks for the local voice path
 
 USAGE
-  s12-latency-harness run [--backend fake|piper|all] [--reps N] [--warmup N] [--out-dir DIR]
+  galion-sam-latency run [--backend fake|piper|all] [--reps N] [--warmup N] [--out-dir DIR]
 
 The default is --backend all --reps 100 --warmup 1 --out-dir results.
 Measure with cargo run --release. The file records profile, CPU, date, and commit.
