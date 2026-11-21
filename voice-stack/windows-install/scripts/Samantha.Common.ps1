@@ -96,6 +96,59 @@ function Test-SamanthaLoopbackAddr {
     return ($port -ge 1 -and $port -le 65535)
 }
 
+function Get-SamanthaScreenAddr {
+    return '127.0.0.1:7878'
+}
+
+function Get-SamanthaCompanionAddr {
+    return '127.0.0.1:7881'
+}
+
+function Test-SamanthaCompanionAddr {
+    param(
+        [string]$Addr,
+        [string]$ScreenAddr
+    )
+    if ([string]::IsNullOrWhiteSpace($Addr) -or [string]::IsNullOrWhiteSpace($ScreenAddr)) {
+        return $false
+    }
+    $port = 0
+    $matched = $false
+    if ($Addr -match '^(?i)127\.0\.0\.1:(\d+)$') {
+        $matched = $true
+        $port = [int]$Matches[1]
+    }
+    elseif ($Addr -match '^\[::1\]:(\d+)$') {
+        $matched = $true
+        $port = [int]$Matches[1]
+    }
+    if (-not $matched) {
+        return $false
+    }
+    if ($port -lt 1 -or $port -gt 65535) {
+        return $false
+    }
+    if ($Addr -eq $ScreenAddr) {
+        return $false
+    }
+    return $true
+}
+
+function Test-SamanthaHealthBody {
+    param([string]$Body)
+    if ([string]::IsNullOrWhiteSpace($Body)) {
+        return $false
+    }
+    $trim = $Body.Trim()
+    if ($trim -match '^(?i)ok$') {
+        return $true
+    }
+    if ($trim -match '(?i)"ok"\s*:\s*true') {
+        return $true
+    }
+    return $false
+}
+
 function Get-SamanthaFileSha256 {
     param([Parameter(Mandatory = $true)][string]$Path)
     $sha = [System.Security.Cryptography.SHA256]::Create()
@@ -215,6 +268,7 @@ function Get-SamanthaEnvDocument {
         [Parameter(Mandatory = $true)][string]$InstallRoot,
         [AllowEmptyString()][string]$SamanthaRef,
         [Parameter(Mandatory = $true)][string]$Addr,
+        [string]$CompanionAddr = '127.0.0.1:7881',
         [Parameter(Mandatory = $true)][int]$Seconds
     )
     $lines = New-Object System.Collections.Generic.List[string]
@@ -241,6 +295,7 @@ function Get-SamanthaEnvDocument {
     [void]$lines.Add((Format-SamanthaEnvLine -Key 'GALION_CLONE_THREADS' -Value '1'))
     [void]$lines.Add((Format-SamanthaEnvLine -Key 'CUDA_VISIBLE_DEVICES' -Value ''))
     [void]$lines.Add((Format-SamanthaEnvLine -Key 'V1_SCREEN_ADDR' -Value $Addr))
+    [void]$lines.Add((Format-SamanthaEnvLine -Key 'GALION_SAMANTHA_WS' -Value $CompanionAddr))
     [void]$lines.Add((Format-SamanthaEnvLine -Key 'SAMANTHA_SECONDS' -Value ([string]$Seconds)))
     return (($lines.ToArray()) -join "`r`n") + "`r`n"
 }
@@ -589,13 +644,19 @@ function Import-SamanthaEnvFile {
 function Wait-SamanthaHealth {
     param(
         [Parameter(Mandatory = $true)][string]$Url,
-        [int]$Tries = 50
+        [int]$Tries = 50,
+        [switch]$RequireOk
     )
     for ($i = 0; $i -lt $Tries; $i++) {
         try {
             $response = Invoke-WebRequest -Uri $Url -UseBasicParsing -TimeoutSec 2
             if ($response.StatusCode -eq 200) {
-                return $true
+                if (-not $RequireOk) {
+                    return $true
+                }
+                if (Test-SamanthaHealthBody -Body ([string]$response.Content)) {
+                    return $true
+                }
             }
         }
         catch {
@@ -625,7 +686,11 @@ function Invoke-SamanthaInstall {
         $RepoRoot = Get-SamanthaRepoRoot -CommonRoot $CommonRoot
     }
     $config = Get-SamanthaConfig -CommonRoot $CommonRoot
+    if ($Port -eq [int]$config.CompanionPort) {
+        throw "port $Port is the companion socket. The one-dot screen stays on $($config.ScreenPort)."
+    }
     $addr = Get-SamanthaWebAddr -Port $Port
+    $companion = Get-SamanthaWebAddr -Port ([int]$config.CompanionPort)
     if ($Seconds -lt 1 -or $Seconds -gt 86400) {
         throw "SAMANTHA_SECONDS must be 1..86400. Got: $Seconds"
     }
@@ -637,7 +702,8 @@ function Invoke-SamanthaInstall {
     Write-Output 'Samantha Windows install'
     Write-Output ('home: ' + $resolvedHome)
     Write-Output ('repo: ' + $RepoRoot)
-    Write-Output ('ui:   http://' + $addr + '/')
+    Write-Output ('ui:   http://' + $addr + '/  (one-dot screen)')
+    Write-Output ('ws:   http://' + $companion + '/health  (' + $config.CompanionSchema + ')')
     Write-Output 'heartbeat: galion-heartbeat FRAME_MS is 80. This installer does not change that clock.'
     Write-Output 'mouth: stock Piper en_US-ljspeech-medium via piper.exe. Not a film voice and not a clone.'
     $protected = @($config.ProtectedScheduledTasks) -join ', '
@@ -708,7 +774,7 @@ function Invoke-SamanthaInstall {
         Invoke-SamanthaPin -InstallRoot $resolvedHome -Pin $pin -PlanOnly:$PlanOnly
     }
 
-    $envText = Get-SamanthaEnvDocument -InstallRoot $resolvedHome -SamanthaRef $SamanthaRef -Addr $addr -Seconds $Seconds
+    $envText = Get-SamanthaEnvDocument -InstallRoot $resolvedHome -SamanthaRef $SamanthaRef -Addr $addr -CompanionAddr $companion -Seconds $Seconds
     $envPath = Join-WinPath -Base $resolvedHome -Child 'env\samantha.env'
     $startScript = Join-Path -Path $CommonRoot -ChildPath 'Start-Samantha.ps1'
     $launcherPath = Join-WinPath -Base $resolvedHome -Child 'START-SAMANTHA.cmd'
@@ -764,13 +830,18 @@ function Invoke-SamanthaStart {
     )
     $script:SamanthaExitCode = 0
     $resolvedHome = Get-SamanthaHome -InstallRoot $InstallRoot
-    $addr = '127.0.0.1:7878'
+    $addr = Get-SamanthaScreenAddr
+    $companion = Get-SamanthaCompanionAddr
     $seconds = 3600
     $exe = Join-WinPath -Base $resolvedHome -Child 'bin\dot_console_demo.exe'
+    $socketExe = Join-WinPath -Base $resolvedHome -Child 'bin\samantha-local.exe'
     Write-Output 'Samantha local server. Loopback only.'
-    Write-Output 'The one-dot page is crates/galion-console dot_console_demo. Heartbeat FRAME_MS is 80.'
+    Write-Output 'The one-dot page stays on 127.0.0.1:7878. The companion socket is galion-samantha-ws/1 on 127.0.0.1:7881.'
+    Write-Output 'Heartbeat FRAME_MS is 80.'
     if ($PlanOnly) {
         Write-Output ('dry-run: start ' + $exe + ' --headless --realtime --no-png --web ' + $addr + ' --seconds ' + $seconds)
+        Write-Output ('dry-run: start ' + $socketExe + ' --addr ' + $companion)
+        Write-Output ('dry-run: GET http://' + $companion + '/health  (galion-samantha-ws/1, 200 and ok)')
         Write-Output ('dry-run: open http://' + $addr + '/')
         Write-Output 'dry-run: no process started and no browser opened'
         Write-Output 'dry-run: scheduled tasks, services, drivers, and Windows system files are not modified'
@@ -790,9 +861,15 @@ function Invoke-SamanthaStart {
     }
     Import-SamanthaEnvFile -Path $envFile
     if (-not (Test-SamanthaLoopbackAddr -Addr $env:V1_SCREEN_ADDR)) {
-        throw ('refusing listen address ' + $env:V1_SCREEN_ADDR + '. Only 127.0.0.1:port is accepted.')
+        throw ('refusing one-dot address ' + $env:V1_SCREEN_ADDR + '. Only 127.0.0.1:port is accepted.')
     }
     $addr = $env:V1_SCREEN_ADDR
+    if (-not [string]::IsNullOrWhiteSpace([string]$env:GALION_SAMANTHA_WS)) {
+        $companion = [string]$env:GALION_SAMANTHA_WS
+    }
+    if (-not (Test-SamanthaCompanionAddr -Addr $companion -ScreenAddr $addr)) {
+        throw ('refusing companion address ' + $companion + '. galion-samantha-ws/1 stays on 127.0.0.1 or [::1], and it is not the one-dot screen.')
+    }
     $parsedSeconds = 0
     if (-not [int]::TryParse($env:SAMANTHA_SECONDS, [ref]$parsedSeconds)) {
         throw 'SAMANTHA_SECONDS is not an integer'
@@ -878,17 +955,28 @@ function Invoke-SamanthaStart {
     )
     Write-Output ('start ' + $exe + ' ' + ($argList -join ' '))
     Write-Output 'GALION_LLM=canned uses the existing offline rule table. It is not HORBM and it does not call a paid API.'
-    $stdoutLog = Join-WinPath -Base $resolvedHome -Child 'logs\server.out.log'
-    $stderrLog = Join-WinPath -Base $resolvedHome -Child 'logs\server.err.log'
-    $proc = $null
+    if (-not (Test-Path -LiteralPath $socketExe)) {
+        Write-Output ('missing ' + $socketExe + '. The companion health check is GET http://' + $companion + '/health (galion-samantha-ws/1). This checkout does not build that binary.')
+        $script:SamanthaExitCode = 1
+        return
+    }
+    $screenOut = Join-WinPath -Base $resolvedHome -Child 'logs\screen.out.log'
+    $screenErr = Join-WinPath -Base $resolvedHome -Child 'logs\screen.err.log'
+    $socketOut = Join-WinPath -Base $resolvedHome -Child 'logs\companion.out.log'
+    $socketErr = Join-WinPath -Base $resolvedHome -Child 'logs\companion.err.log'
+    $env:GALION_SAMANTHA_WS = $companion
+    $screen = $null
+    $socket = $null
     try {
-        $proc = Start-Process -FilePath $exe -ArgumentList $argList -WorkingDirectory $resolvedHome -RedirectStandardOutput $stdoutLog -RedirectStandardError $stderrLog -PassThru
-        $health = 'http://' + $addr + '/health'
-        $healthy = Wait-SamanthaHealth -Url $health
+        $screen = Start-Process -FilePath $exe -ArgumentList $argList -WorkingDirectory $resolvedHome -RedirectStandardOutput $screenOut -RedirectStandardError $screenErr -PassThru
+        Write-Output ('start ' + $socketExe + ' --addr ' + $companion)
+        $socket = Start-Process -FilePath $socketExe -ArgumentList @('--addr', $companion) -WorkingDirectory $resolvedHome -RedirectStandardOutput $socketOut -RedirectStandardError $socketErr -PassThru
+        $health = 'http://' + $companion + '/health'
+        $healthy = Wait-SamanthaHealth -Url $health -RequireOk
         if (-not $healthy) {
-            Write-Output ('server did not answer ' + $health)
-            if (Test-Path -LiteralPath $stderrLog) {
-                Get-Content -LiteralPath $stderrLog -Tail 40 | ForEach-Object { Write-Output $_ }
+            Write-Output ('companion did not answer ' + $health + ' with 200 and ok (galion-samantha-ws/1)')
+            if (Test-Path -LiteralPath $socketErr) {
+                Get-Content -LiteralPath $socketErr -Tail 40 | ForEach-Object { Write-Output $_ }
             }
             $script:SamanthaExitCode = 1
             return
@@ -901,13 +989,17 @@ function Invoke-SamanthaStart {
             Write-Output ('browser did not open: ' + $_.Exception.Message)
             Write-Output ('open ' + $page + ' yourself')
         }
-        Write-Output ('Samantha UI: ' + $page)
-        Wait-Process -Id $proc.Id
+        Write-Output ('one-dot screen: ' + $page)
+        Write-Output ('companion health: ' + $health)
+        Wait-Process -Id $screen.Id
         $script:SamanthaExitCode = 0
     }
     finally {
-        if ($null -ne $proc -and -not $proc.HasExited) {
-            Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+        if ($null -ne $socket -and -not $socket.HasExited) {
+            Stop-Process -Id $socket.Id -Force -ErrorAction SilentlyContinue
+        }
+        if ($null -ne $screen -and -not $screen.HasExited) {
+            Stop-Process -Id $screen.Id -Force -ErrorAction SilentlyContinue
         }
     }
 }

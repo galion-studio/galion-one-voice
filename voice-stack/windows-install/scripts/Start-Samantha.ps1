@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 Galion Labs
-# Start the local one-dot server and open http://127.0.0.1:7878/ .
+# Start the one-dot screen on http://127.0.0.1:7878/ and the companion on 127.0.0.1:7881.
+# Health is GET http://127.0.0.1:7881/health (galion-samantha-ws/1, 200 and ok).
 # Dry-run: powershell -NoProfile -File Start-Samantha.ps1 -DryRun
 [CmdletBinding(SupportsShouldProcess = $true)]
 param(
@@ -14,7 +15,7 @@ $ErrorActionPreference = 'Stop'
 
 $planOnly = [bool]$DryRun
 if (-not $planOnly) {
-    if (-not $PSCmdlet.ShouldProcess('127.0.0.1:7878', 'Start Samantha')) {
+    if (-not $PSCmdlet.ShouldProcess('127.0.0.1:7881', 'Start Samantha companion')) {
         $planOnly = $true
     }
 }

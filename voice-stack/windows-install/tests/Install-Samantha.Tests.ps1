@@ -34,10 +34,21 @@ Describe 'home and paths' {
 
     It 'binds the UI to 127.0.0.1 only' {
         Get-SamanthaWebAddr -Port 7878 | Should -Be '127.0.0.1:7878'
+        Get-SamanthaScreenAddr | Should -Be '127.0.0.1:7878'
+        Get-SamanthaCompanionAddr | Should -Be '127.0.0.1:7881'
         Test-SamanthaLoopbackAddr -Addr '127.0.0.1:7878' | Should -BeTrue
         Test-SamanthaLoopbackAddr -Addr '0.0.0.0:7878' | Should -BeFalse
         Test-SamanthaLoopbackAddr -Addr 'localhost:7878' | Should -BeFalse
         Test-SamanthaLoopbackAddr -Addr '192.168.1.20:7878' | Should -BeFalse
+        Test-SamanthaCompanionAddr -Addr '127.0.0.1:7881' -ScreenAddr '127.0.0.1:7878' | Should -BeTrue
+        Test-SamanthaCompanionAddr -Addr '[::1]:7881' -ScreenAddr '127.0.0.1:7878' | Should -BeTrue
+        Test-SamanthaCompanionAddr -Addr '127.0.0.1:7878' -ScreenAddr '127.0.0.1:7878' | Should -BeFalse
+        Test-SamanthaCompanionAddr -Addr '0.0.0.0:7881' -ScreenAddr '127.0.0.1:7878' | Should -BeFalse
+        Test-SamanthaHealthBody -Body 'ok' | Should -BeTrue
+        Test-SamanthaHealthBody -Body '{"ok":true}' | Should -BeTrue
+        Test-SamanthaHealthBody -Body '{"ok": true, "schema":"galion-samantha-ws/1"}' | Should -BeTrue
+        Test-SamanthaHealthBody -Body '{"ok":false}' | Should -BeFalse
+        Test-SamanthaHealthBody -Body '' | Should -BeFalse
         { Get-SamanthaWebAddr -Port 0 } | Should -Throw '*port*'
     }
 }
@@ -94,6 +105,7 @@ Describe 'env file' {
         $text | Should -Match 'GALION_PIPER_LEGACY=1'
         $text | Should -Match 'GALION_SILERO_VAD=G:\\galion\\samantha\\weights\\vad\\silero_vad\.onnx'
         $text | Should -Match 'V1_SCREEN_ADDR=127\.0\.0\.1:7878'
+        $text | Should -Match 'GALION_SAMANTHA_WS=127\.0\.0\.1:7881'
         $text | Should -Not -Match 'https://'
         $text | Should -Not -Match 'GALION_LLM_KEY'
         $text | Should -Not -Match 'GALION_LLM_URL'
@@ -170,6 +182,8 @@ Describe 'dry-run' {
         $script:SamanthaExitCode | Should -Be 0
         $text | Should -Match 'G:\\galion\\samantha'
         $text | Should -Match '127\.0\.0\.1:7878'
+        $text | Should -Match '127\.0\.0\.1:7881/health'
+        $text | Should -Match 'galion-samantha-ws/1'
         $text | Should -Match 'dry-run: no download, no build, no write'
         $text | Should -Match 'GalionLaptopLink'
         $text | Should -Match 'GalionShellLink'
@@ -195,6 +209,8 @@ Describe 'dry-run' {
         $out = @(Invoke-SamanthaStart -PlanOnly)
         $text = $out -join "`n"
         $text | Should -Match 'dry-run: start G:\\galion\\samantha\\bin\\dot_console_demo.exe --headless --realtime --no-png --web 127\.0\.0\.1:7878 --seconds 3600'
+        $text | Should -Match 'dry-run: start G:\\galion\\samantha\\bin\\samantha-local.exe --addr 127\.0\.0\.1:7881'
+        $text | Should -Match 'dry-run: GET http://127\.0\.0\.1:7881/health  \(galion-samantha-ws/1, 200 and ok\)'
         $text | Should -Match 'dry-run: open http://127\.0\.0\.1:7878/'
         $text | Should -Match 'no process started'
         $script:SamanthaExitCode | Should -Be 0
@@ -259,8 +275,11 @@ Describe 'source guards' {
     It 'stops only the server process this script started' {
         $start = Get-Content -LiteralPath (Join-Path -Path $script:Scripts -ChildPath 'Samantha.Common.ps1') -Raw
         $hits = [regex]::Matches($start, 'Stop-Process[^\r\n]*')
-        $hits.Count | Should -Be 1
-        $hits[0].Value | Should -Match '-Id \$proc\.Id'
+        $hits.Count | Should -Be 2
+        foreach ($hit in $hits) {
+            $hit.Value | Should -Match '-Id \$'
+            $hit.Value | Should -Not -Match '-Name'
+        }
     }
 
     It 'keeps https URLs in the pin file rather than the scripts' {

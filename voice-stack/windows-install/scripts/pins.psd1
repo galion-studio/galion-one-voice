@@ -7,7 +7,11 @@
 @{
     Home = 'G:\galion\samantha'
     ListenHost = '127.0.0.1'
-    ListenPort = 7878
+    # One-dot HTTP screen. scripts/run-v1-screen.sh. Not the companion socket.
+    ScreenPort = 7878
+    # galion-samantha-ws/1. PR #220. GET /health on this port.
+    CompanionPort = 7881
+    CompanionSchema = 'galion-samantha-ws/1'
     RustMin = '1.85.0'
     RustHost = 'x86_64-pc-windows-msvc'
     HeartbeatMs = 80

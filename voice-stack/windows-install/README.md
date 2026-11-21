@@ -12,6 +12,7 @@ The scripts reuse the stack that is already in this repo:
 | Piece | What the scripts use |
 |---|---|
 | One-dot UI | `crates/galion-console` example `dot_console_demo`, same flags as `scripts/run-v1-screen.sh`. Page at `http://127.0.0.1:7878/`. `galion-render` still refuses a public bind. |
+| Companion socket | `galion-samantha-ws/1` on `127.0.0.1:7881` (`GALION_SAMANTHA_WS`). `GET /health` must answer 200 and `ok` (plain text or JSON `"ok": true`). Port 7878 is not this socket. |
 | 80 ms heartbeat | `crates/galion-heartbeat` `FRAME_MS` is 80. These scripts do not change it. |
 | Vosk ASR | Model pin from `scripts/asr/fetch-vosk.sh`, plus the Windows libvosk 0.3.45 zip. Worker binary `galion-asr-vosk`. |
 | Piper TTS | Voice pin from `scripts/a21/fetch-a21.sh` (`en_US-ljspeech-medium`). Mouth is the Windows piper 2023.11.14-2 CLI, because `runtimes/galion-piper-rt` calls `libc::dlopen` and `sched_setaffinity`. |
@@ -60,15 +61,19 @@ Release binaries copied to `G:\galion\samantha\bin`:
 
 `START-SAMANTHA.cmd` in this folder calls `scripts\Start-Samantha.ps1`. The install also writes `G:\galion\samantha\START-SAMANTHA.cmd` with the same job.
 
-The server command matches the existing screen script:
+The one-dot command matches the existing screen script and stays on port 7878:
 
 ```text
 dot_console_demo.exe --headless --realtime --no-png --web 127.0.0.1:7878 --seconds 3600
 ```
 
-`SAMANTHA_SECONDS` in the env file changes the lifetime (1 through 86400). The listen address has to be `127.0.0.1` with a port. Anything else is refused. After `/health` answers, the default browser opens `http://127.0.0.1:7878/`. Closing the window stops the server process this script started. It does not stop any other process.
+The companion is a separate process, `samantha-local.exe --addr 127.0.0.1:7881`. Readiness is `GET http://127.0.0.1:7881/health` (`galion-samantha-ws/1`): HTTP 200 and a body of `ok` or JSON with `"ok": true`. The browser then opens `http://127.0.0.1:7878/`. `GALION_SAMANTHA_WS` may be another `127.0.0.1` or `[::1]` port, and it may not be the one-dot address. `0.0.0.0` is refused.
 
-Logs: `G:\galion\samantha\logs\server.out.log` and `server.err.log`.
+`SAMANTHA_SECONDS` in the env file changes the one-dot lifetime (1 through 86400). Closing the window stops the screen process and the companion process this script started. It does not stop any other process.
+
+`samantha-local.exe` is the S10 binary (`voice-stack/local-server`). This checkout does not contain that crate, so the install does not build it. Until that exe is in `G:\galion\samantha\bin`, start exits 1 and does not open the browser.
+
+Logs: `G:\galion\samantha\logs\screen.out.log`, `screen.err.log`, `companion.out.log`, and `companion.err.log`.
 
 If the Vosk model directory is missing, mic ASR stays `stub`, as in `scripts/run-v1-screen.sh`. Typed text still works. A mic turn does not invent a transcript.
 
