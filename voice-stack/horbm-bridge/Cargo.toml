@@ -2,8 +2,8 @@
 # Copyright (c) 2026 Galion Labs
 
 [package]
-name = "samantha-brain"
-description = "Samantha reply bridge: ReplyEngine, a fake brain, speakable sentence chunks, and the 80 ms mood tick."
+name = "galion-sam-horbm"
+description = "Samantha HORBM bridge: ReplyEngine, a fake brain, speakable sentence chunks, and an empty 80 ms tick."
 version = "0.0.1"
 edition = "2021"
 license = "MIT"
@@ -27,11 +27,11 @@ horbm = ["dep:horbm"]
 horbm = { path = "seam/horbm", optional = true }
 
 [[bin]]
-name = "samantha-brain"
-path = "src/bin/samantha-brain.rs"
+name = "galion-sam-horbm"
+path = "src/bin/galion-sam-horbm.rs"
 
 [lib]
-name = "samantha_brain"
+name = "galion_sam_horbm"
 path = "src/lib.rs"
 
 # Own workspace so this sector stays out of the root workspace.

@@ -68,7 +68,6 @@ impl ReplyEngine for FakeEngine {
     }
 
     fn tick(&mut self) -> Pad {
-        self.pad = self.pad.advance_frame();
         self.pad
     }
 

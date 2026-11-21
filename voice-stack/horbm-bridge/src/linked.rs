@@ -9,9 +9,9 @@
 //! and returns `Brain`, and `turn` returns the documented `TurnOut`.
 //!
 //! `intent` and `arm` are read so a missing field fails here. Their types
-//! stay on the `horbm` crate. Between turns, [`HorbmEngine::tick`] decays the
-//! last Pad toward [`crate::Pad::RESTING`]. The next `turn` replaces that
-//! with the brain's Pad.
+//! stay on the `horbm` crate. `horbm` has no `tick` in the brief, so
+//! [`HorbmEngine::tick`] is empty. It does not synthesize a mood trajectory.
+//! The next `turn` replaces the pad with the brain's Pad.
 
 use std::path::Path;
 
@@ -55,7 +55,6 @@ impl ReplyEngine for HorbmEngine {
     }
 
     fn tick(&mut self) -> Pad {
-        self.pad = self.pad.advance_frame();
         self.pad
     }
 
@@ -100,9 +99,8 @@ mod tests {
             assert_eq!(probe.lookup_us, 11);
             assert_eq!(probe.took_us, 22);
             assert_eq!(probe.mood, Pad::new(0.7, 0.4, 0.6));
-            let decayed = engine.tick();
-            assert!(decayed.arousal < 0.7);
-            assert!(decayed.arousal > Pad::RESTING.arousal);
+            let held = engine.tick();
+            assert_eq!(held, Pad::new(0.7, 0.4, 0.6));
         }
     }
 }

@@ -5,7 +5,7 @@
 //! [`Session::tick`] is the call a host already inside `galion-heartbeat`
 //! makes once per frame, beside `Heartbeat::step`, not inside it. The
 //! heartbeat step does not allocate and does not lock. This tick is the
-//! same shape: one [`Pad`] update, no I/O.
+//! same shape: one call, no I/O, and no mood change.
 //!
 //! [`MoodTick`] is the clock for a host that has no heartbeat thread yet.
 //! It sleeps until the next frame, ticks once, and if it wakes late it does
@@ -88,7 +88,7 @@ impl<E: ReplyEngine + Send + 'static> MoodTick<E> {
         let shared_thread = std::sync::Arc::clone(&shared);
         let stop_thread = std::sync::Arc::clone(&stop);
         let join = thread::Builder::new()
-            .name("samantha-mood-80ms".into())
+            .name("galion-sam-mood-80ms".into())
             .spawn(move || mood_loop(shared_thread, stop_thread))?;
         Ok(Self {
             shared,
@@ -159,25 +159,24 @@ mod tests {
     use crate::pad::Pad;
 
     #[test]
-    fn ticks_between_turns_decay_toward_rest_and_a_turn_does_not_consume_a_frame() {
+    fn ticks_between_turns_hold_the_pad_and_a_turn_does_not_consume_a_frame() {
         let mut session = Session::new(FakeEngine::new());
         let loud = session.turn("hey!");
         assert_eq!(loud.reply.mood, Pad::new(0.7, 0.55, 0.5));
         assert_eq!(loud.chunks.len(), 1);
         assert_eq!(loud.chunks[0].text, "hey!");
         assert_eq!(session.frames(), 0);
-        let before = session.mood().arousal;
+        let before = session.mood();
         for _ in 0..125 {
             session.tick();
         }
         assert_eq!(session.frames(), 125);
-        assert!(session.mood().arousal < before);
-        assert!(session.mood().arousal > Pad::RESTING.arousal);
+        assert_eq!(session.mood(), before);
         let quiet = session.turn("the kettle is on");
         assert_eq!(session.frames(), 125);
         assert_eq!(quiet.reply.text, "the kettle is on.");
         assert_eq!(quiet.chunks.len(), 1);
-        assert_eq!(quiet.reply.mood.arousal, session.mood().arousal);
+        assert_eq!(quiet.reply.mood, before);
     }
 
     #[test]
@@ -208,7 +207,7 @@ mod tests {
             later > frames,
             "tick stopped between turns: {frames} -> {later}"
         );
-        assert!(tick.mood().arousal < 0.7);
+        assert_eq!(tick.mood().arousal, 0.7);
         assert!(
             (2u64..40).contains(&later),
             "frame count left the 80 ms band: {later}"

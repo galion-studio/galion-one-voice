@@ -3,12 +3,12 @@
 version = 4
 
 [[package]]
-name = "horbm"
-version = "0.0.0"
-
-[[package]]
-name = "samantha-brain"
+name = "galion-sam-horbm"
 version = "0.0.1"
 dependencies = [
  "horbm",
 ]
+
+[[package]]
+name = "horbm"
+version = "0.0.0"

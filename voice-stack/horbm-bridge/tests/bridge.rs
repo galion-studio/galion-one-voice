@@ -3,7 +3,7 @@
 
 use std::time::{Duration, Instant};
 
-use samantha_brain::{
+use galion_sam_horbm::{
     horbm_linked, speakable_chunks, FakeEngine, Session, FRAME_MS, HORBM_LANDING_PATH,
 };
 
@@ -14,11 +14,11 @@ fn license_matches_the_repo_and_this_crate_is_not_a_workspace_member() {
     assert_eq!(ours, repo);
     let root = include_str!("../../../Cargo.toml");
     assert!(
-        !root.contains("samantha-brain"),
-        "samantha-brain must stay out of the root workspace"
+        !root.contains("galion-sam-horbm"),
+        "galion-sam-horbm must stay out of the root workspace"
     );
     assert!(
-        !root.contains("s04-horbm-bridge"),
+        !root.contains("voice-stack/horbm-bridge"),
         "this sector must stay out of the root workspace"
     );
 }
@@ -58,7 +58,7 @@ fn the_feature_build_links_horbm() {
 
 #[test]
 fn dropping_the_mood_thread_joins() {
-    let tick = samantha_brain::MoodTick::spawn(FakeEngine::new()).expect("spawn");
+    let tick = galion_sam_horbm::MoodTick::spawn(FakeEngine::new()).expect("spawn");
     let started = Instant::now();
     drop(tick);
     let waited = started.elapsed();

@@ -45,17 +45,19 @@ pub fn time_ns(n: usize, mut op: impl FnMut()) -> SampleNs {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::pad::Pad;
+    use crate::fake::FakeEngine;
+    use crate::ReplyEngine;
 
     #[test]
     fn one_mood_tick_stays_inside_the_80ms_frame() {
+        let mut engine = FakeEngine::new();
+        let _ = engine.turn("hey!");
         let sample = time_ns(200, || {
-            let pad = std::hint::black_box(Pad::new(0.8, 0.6, 0.7));
-            let next = std::hint::black_box(pad.advance_frame());
-            std::hint::black_box(next);
+            let pad = std::hint::black_box(engine.tick());
+            std::hint::black_box(pad);
         });
         eprintln!(
-            "pad.advance_frame n={} min_ns={} p50_ns={} p95_ns={} max_ns={}",
+            "empty_tick n={} min_ns={} p50_ns={} p95_ns={} max_ns={}",
             sample.n, sample.min_ns, sample.p50_ns, sample.p95_ns, sample.max_ns
         );
         assert!(

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Galion Labs
-//! Compile seam for `samantha-brain`'s `horbm` feature.
+//! Compile seam for `galion-sam-horbm`'s `horbm` feature.
 //!
 //! This is the documented `Brain::open` / `Brain::turn` surface so the adapter
 //! type-checks before the real crate is in the tree. It does not open a

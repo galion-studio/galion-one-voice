@@ -3,10 +3,10 @@
 //! Local driver for the reply bridge. No audio, no network.
 //!
 //! ```text
-//! samantha-brain tick
-//! samantha-brain chunks The kettle is on. It can wait.
-//! samantha-brain say the kettle is on
-//! samantha-brain pace
+//! galion-sam-horbm tick
+//! galion-sam-horbm chunks The kettle is on. It can wait.
+//! galion-sam-horbm say the kettle is on
+//! galion-sam-horbm pace
 //! ```
 //!
 //! `say` and `chunks` read stdin when no words are given.
@@ -18,8 +18,8 @@ use std::io::{self, Read};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use samantha_brain::{
-    speakable_chunks, time_ns, FakeEngine, MoodTick, Pad, ReplyEngine, Session, FRAME_MS,
+use galion_sam_horbm::{
+    speakable_chunks, time_ns, FakeEngine, MoodTick, ReplyEngine, Session, FRAME_MS,
 };
 
 fn main() {
@@ -48,7 +48,7 @@ fn main() {
 
 fn usage() {
     eprintln!(
-        "samantha-brain {{tick|chunks|say|pace}}\n\
+        "galion-sam-horbm {{tick|chunks|say|pace}}\n\
          tick    time one mood frame, one chunk split, and one fake turn\n\
          chunks  split reply text into speakable sentences\n\
          say     one turn on the fake engine, or on horbm when the feature and paths are set\n\
@@ -69,11 +69,11 @@ fn words_or_stdin(args: &[String]) -> String {
 fn tick() {
     let host = format!("{}-{}", std::env::consts::OS, std::env::consts::ARCH);
     let frame = time_ns(2_000, || {
-        let pad = std::hint::black_box(Pad::new(0.8, 0.6, 0.7));
-        let next = std::hint::black_box(pad.advance_frame());
-        std::hint::black_box(next);
+        let mut engine = FakeEngine::new();
+        let pad = std::hint::black_box(engine.tick());
+        std::hint::black_box(pad);
     });
-    print_sample(&host, "pad.advance_frame", &frame);
+    print_sample(&host, "empty_tick", &frame);
 
     let line = "The kettle is on. It can wait while the water cools.";
     let chunks = time_ns(2_000, || {
@@ -93,7 +93,7 @@ fn tick() {
     );
 }
 
-fn print_sample(host: &str, op: &str, sample: &samantha_brain::SampleNs) {
+fn print_sample(host: &str, op: &str, sample: &galion_sam_horbm::SampleNs) {
     println!(
         "{{\"host\":{host:?},\"op\":{op:?},\"n\":{},\"warmup\":64,\"min_ns\":{},\"p50_ns\":{},\"p95_ns\":{},\"max_ns\":{}}}",
         sample.n, sample.min_ns, sample.p50_ns, sample.p95_ns, sample.max_ns
@@ -189,7 +189,7 @@ fn pace() {
 }
 
 #[cfg(feature = "horbm")]
-fn horbm_from_env() -> Option<samantha_brain::HorbmEngine> {
+fn horbm_from_env() -> Option<galion_sam_horbm::HorbmEngine> {
     use std::path::Path;
     let memory = std::env::var("GALION_HORBM_MEMORY").ok()?;
     let knowledge = std::env::var("GALION_HORBM_KNOWLEDGE").ok()?;
@@ -200,7 +200,7 @@ fn horbm_from_env() -> Option<samantha_brain::HorbmEngine> {
     println!("horbm_memory: {memory}");
     println!("horbm_knowledge: {knowledge}");
     println!("horbm_cases: {cases}");
-    Some(samantha_brain::HorbmEngine::open(
+    Some(galion_sam_horbm::HorbmEngine::open(
         Path::new(&memory),
         Path::new(&knowledge),
         Path::new(&cases),

@@ -3,9 +3,9 @@
 //! The reply contract the rest of the voice stack calls.
 //!
 //! A turn is text in, reply text plus mood plus sources out. [`ReplyEngine::tick`]
-//! is one 80 ms frame and does not ask the brain a new question. The host
-//! calls it on the heartbeat between turns so the mood the mouth is using
-//! does not freeze on the last sentence.
+//! is one 80 ms frame and does not ask the brain a new question. `horbm` has
+//! no `tick` in the brief, so this tick is empty. It does not synthesize a
+//! mood trajectory. The host still calls it on the heartbeat between turns.
 
 use crate::pad::Pad;
 
@@ -34,7 +34,7 @@ pub struct Reply {
 /// file, no socket, no model call. [`Self::turn`] may do the brain lookup.
 pub trait ReplyEngine {
     fn turn(&mut self, text: &str) -> Reply;
-    /// Advance the live mood by one 80 ms frame.
+    /// One 80 ms frame. Does not move the mood. `horbm` has no `tick` in the brief, so this tick is empty.
     fn tick(&mut self) -> Pad;
     fn mood(&self) -> Pad;
 }

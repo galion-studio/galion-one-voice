@@ -2,10 +2,12 @@
 // Copyright (c) 2026 Galion Labs
 //! Samantha's reply bridge (sector S04).
 //!
+//! Package `galion-sam-horbm`, directory `voice-stack/horbm-bridge`.
 //! ASR text comes in. A [`ReplyEngine`] returns reply text, a [`Pad`] mood,
 //! and source ids. [`speakable_chunks`] cuts that reply into sentences the
-//! streaming TTS path can speak. [`Session::tick`] advances the mood one
-//! heartbeat frame between turns.
+//! streaming TTS path can speak. [`Session::tick`] runs once per 80 ms frame
+//! between turns. `horbm` has no `tick` in the brief, so this tick is empty.
+//! It does not synthesize a mood trajectory.
 //!
 //! The real brain is the `horbm` crate (`Brain::open`, `Brain::turn`). It is
 //! not in this tree yet. [`FakeEngine`] is the test double. Feature `horbm`
@@ -32,7 +34,7 @@ pub use chunks::{
 pub use engine::{Reply, ReplyEngine};
 pub use fake::FakeEngine;
 pub use measure::{time_ns, SampleNs};
-pub use pad::{Pad, FRAME_MS, MOOD_HALF_LIFE_MS};
+pub use pad::{Pad, FRAME_MS};
 pub use session::{MoodTick, Session, SpokenTurn};
 
 #[cfg(feature = "horbm")]
