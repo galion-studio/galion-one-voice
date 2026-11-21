@@ -7,7 +7,7 @@
 //! flush on `.` `!` `?` `,` `;` or a dash, or after [`CLAUSE_WORDS`] closed
 //! words. Decimal points and thousands separators are not boundaries.
 //! Piper speaks one of these chunks at a time. This copy lives here because
-//! `samantha-core` is not a workspace member and does not link that crate.
+//! `galion-sam-orch` is not a workspace member and does not link that crate.
 
 /// Flush here when no punctuation has arrived yet.
 pub const CLAUSE_WORDS: usize = 8;

@@ -11,7 +11,7 @@
 //!
 //! Barge-in does not wait on the chunk channel. On voice start during
 //! thinking or speaking, the listen task bumps the epoch, sets the cancel
-//! flag, and calls [`AudioOut::cancel`] before it returns to the mic.
+//! flag, and calls [`AudioOut::stop`] before it returns to the mic.
 //!
 //! Phases match `galion_console::bus::OrbMode`: idle, listening, thinking,
 //! speaking. Subscribe with [`Handle::subscribe`].
@@ -320,7 +320,7 @@ impl Floor {
                 self.phases.lock().expect("phases").push(Phase::Listening);
             }
         }
-        speaker.cancel();
+        speaker.stop();
         let elapsed = us(started.elapsed());
         self.last_barge_us.store(elapsed, Ordering::Relaxed);
         self.notify.notify_waiters();
@@ -345,9 +345,9 @@ impl<O> Clone for SharedSpeaker<O> {
 }
 
 impl<O: AudioOut> SharedSpeaker<O> {
-    fn cancel(&self) {
+    fn stop(&self) {
         self.stop.store(true, Ordering::SeqCst);
-        self.inner.lock().expect("speaker").cancel();
+        self.inner.lock().expect("speaker").stop();
     }
 
     fn begin_turn(&self, epoch: u64) {

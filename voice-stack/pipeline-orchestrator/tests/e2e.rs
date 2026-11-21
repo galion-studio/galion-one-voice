@@ -7,11 +7,11 @@ use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpStream};
 use std::time::Duration;
 
-use samantha_core::clause::clauses;
-use samantha_core::clock::{STAGE_BAR_US, VAD_HANG_MS};
-use samantha_core::demo::{self, MOOD, REPLY};
-use samantha_core::samantha_traits::SAMANTHA_REF_ENV;
-use samantha_core::{Phase, HEARTBEAT_MS};
+use galion_sam_orch::clause::clauses;
+use galion_sam_orch::clock::{STAGE_BAR_US, VAD_HANG_MS};
+use galion_sam_orch::demo::{self, MOOD, REPLY};
+use galion_sam_orch::samantha_traits::SAMANTHA_REF_ENV;
+use galion_sam_orch::{Phase, HEARTBEAT_MS};
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn scripted_turn_reports_each_stage() {
@@ -88,8 +88,8 @@ async fn barge_in_during_think_does_not_speak() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn silence_does_not_invent_a_turn() {
     let running = demo::spawn_fake(
-        samantha_core::FakeReply::new(REPLY, MOOD),
-        samantha_core::FakeTts::pcm(vec![1, 2, 3, 4]),
+        galion_sam_orch::FakeReply::new(REPLY, MOOD),
+        galion_sam_orch::FakeTts::pcm(vec![1, 2, 3, 4]),
     );
     demo::send_frames(&running.tx, 0, 12).await;
     tokio::time::sleep(Duration::from_millis(80)).await;
@@ -122,12 +122,12 @@ async fn mood_tick_is_one_heartbeat() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn dot_page_follows_the_phase() {
-    let gate = samantha_core::samantha_traits::WaitGate::new();
+    let gate = galion_sam_orch::samantha_traits::WaitGate::new();
     let running = demo::spawn_fake(
-        samantha_core::FakeReply::new(REPLY, MOOD),
-        samantha_core::FakeTts::gated(vec![7, 7], gate.clone()),
+        galion_sam_orch::FakeReply::new(REPLY, MOOD),
+        galion_sam_orch::FakeTts::gated(vec![7, 7], gate.clone()),
     );
-    let server = samantha_core::ui::DotServer::bind(
+    let server = galion_sam_orch::ui::DotServer::bind(
         "127.0.0.1:0".parse().unwrap(),
         running.handle.subscribe(),
     )
@@ -158,10 +158,10 @@ fn reference_env_points_at_a_local_file() {
     let path = std::env::temp_dir().join("samantha-core-s09-not-audio.txt");
     std::fs::write(&path, b"not audio").unwrap();
     std::env::set_var(SAMANTHA_REF_ENV, &path);
-    let got = samantha_core::samantha_ref_from_env().expect("path");
+    let got = galion_sam_orch::samantha_ref_from_env().expect("path");
     assert_eq!(got, path);
     std::env::remove_var(SAMANTHA_REF_ENV);
-    assert!(samantha_core::samantha_ref_from_env().is_none());
+    assert!(galion_sam_orch::samantha_ref_from_env().is_none());
     let _ = std::fs::remove_file(path);
 }
 

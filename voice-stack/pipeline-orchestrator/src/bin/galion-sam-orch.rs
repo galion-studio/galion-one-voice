@@ -7,9 +7,9 @@
 use std::net::SocketAddr;
 use std::time::Duration;
 
-use samantha_core::demo::{self, MOOD, REPLY};
-use samantha_core::samantha_traits::{FakeReply, FakeTts, WaitGate};
-use samantha_core::ui::DotServer;
+use galion_sam_orch::demo::{self, MOOD, REPLY};
+use galion_sam_orch::samantha_traits::{FakeReply, FakeTts, WaitGate};
+use galion_sam_orch::ui::DotServer;
 
 fn main() {
     let ui = std::env::args().any(|arg| arg == "--ui");
@@ -21,7 +21,7 @@ fn main() {
     runtime.block_on(async move {
         println!(
             "reference_present={}",
-            samantha_core::samantha_ref_from_env().is_some()
+            galion_sam_orch::samantha_ref_from_env().is_some()
         );
         if ui {
             run_ui().await;
@@ -53,7 +53,7 @@ async fn run_ui() {
     println!("ui=http://{}/", server.addr());
     demo::send_frames(&running.tx, 6, 10).await;
     let _ = tokio::time::timeout(Duration::from_secs(3), async {
-        while running.handle.phase() != samantha_core::Phase::Speaking {
+        while running.handle.phase() != galion_sam_orch::Phase::Speaking {
             tokio::time::sleep(Duration::from_millis(10)).await;
         }
     })

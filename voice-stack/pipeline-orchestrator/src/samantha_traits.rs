@@ -280,10 +280,11 @@ pub trait Tts: Send + 'static {
     );
 }
 
-/// Speaker. [`AudioOut::cancel`] drops queued PCM and returns.
+/// Speaker. [`AudioOut::stop`] drops queued PCM and returns. Same name as
+/// `galion-sam-contract` `AudioOut::stop`.
 pub trait AudioOut: Send + 'static {
     fn write(&mut self, pcm: &[i16]);
-    fn cancel(&mut self);
+    fn stop(&mut self);
 }
 
 /// RMS in dB, same formula as `galion-v2-live` `audio::rms_db`.
@@ -584,7 +585,7 @@ impl AudioOut for MemorySpeaker {
         g.queued.extend_from_slice(pcm);
     }
 
-    fn cancel(&mut self) {
+    fn stop(&mut self) {
         let mut g = self.inner.lock().expect("speaker");
         g.queued.clear();
         g.cancels = g.cancels.saturating_add(1);

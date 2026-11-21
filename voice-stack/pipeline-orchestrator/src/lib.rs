@@ -8,8 +8,10 @@
 //! [`samantha_traits`]. `horbm::Brain` is not linked; [`samantha_traits::ReplyEngine`]
 //! is the seam, and [`samantha_traits::HorbmReply`] is the adapter.
 //!
+//! Package `galion-sam-orch`, directory `voice-stack/pipeline-orchestrator`.
 //! This crate is its own Cargo workspace. It is not a member of the Galion
-//! Voice workspace, and it does not call `Heartbeat::step`.
+//! Voice workspace, and it does not call `Heartbeat::step`. A missing `horbm`
+//! crate stays an error on [`BrainOpen`]; this loop does not call Hermes.
 
 #![forbid(unsafe_code)]
 
