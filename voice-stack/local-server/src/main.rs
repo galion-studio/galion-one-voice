@@ -7,7 +7,7 @@ use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use samantha_local_server::{serve_until_ctrl_c, session_ttl_from_env, unlinked_factory, RefState};
+use samantha_local_server::{live_factory, serve_until_ctrl_c, session_ttl_from_env, RefState};
 
 fn main() -> ExitCode {
     match real_main() {
@@ -66,7 +66,7 @@ fn real_main() -> Result<(), String> {
         .block_on(serve_until_ctrl_c(
             addr,
             ui_dir,
-            unlinked_factory(),
+            live_factory(),
             RefState::from_env(),
             require_session,
             session_ttl_from_env(),

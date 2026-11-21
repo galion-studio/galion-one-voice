@@ -10,8 +10,10 @@
 //! stream with no overlap, which is what the recurrent state expects.
 //! A 20 ms frame that does not complete a window repeats the last probability.
 //!
-//! ort is the same 2.0.0-rc.15 pin as `runtimes/galion-piper-rt`. This crate
-//! downloads the CPU ONNX Runtime build. It does not load a GPU provider.
+//! ort is the same 2.0.0-rc.15 pin as `runtimes/galion-piper-rt`. Unix
+//! downloads the CPU ONNX Runtime build. Windows uses the `load-dynamic`
+//! feature and `ORT_DYLIB_PATH` (ONNX Runtime 1.31). It does not load a GPU
+//! provider.
 
 use std::path::Path;
 use std::sync::{Mutex, OnceLock};

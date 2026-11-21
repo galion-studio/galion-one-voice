@@ -43,6 +43,7 @@ function draw() {
 draw();
 
 function connect() {
+  if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
   const url = (location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/v1/samantha";
   ws = new WebSocket(url);
   ws.binaryType = "arraybuffer";
@@ -53,13 +54,20 @@ function connect() {
     if (typeof ev.data === "string") onJson(ev.data);
     else onBinary(ev.data);
   };
-  ws.onclose = () => setTimeout(connect, 1000);
+  ws.onclose = () => {
+    ws = null;
+    setTimeout(connect, 1000);
+  };
 }
 
 function onJson(text) {
   let msg;
   try { msg = JSON.parse(text); } catch (_) { return; }
-  if (msg.type === "dot" && typeof msg.level === "number") level = msg.level;
+  if (msg.type === "vad" && msg.event === "start") level = Math.max(level, 0.55);
+  if (msg.type === "vad" && msg.event === "end") level = Math.max(0.12, level * 0.6);
+  if (msg.type === "dot" && msg.state === "listening") level = Math.max(level, 0.5);
+  if (msg.type === "dot" && msg.state === "speaking") level = Math.max(level, 0.7);
+  if (msg.type === "dot" && typeof msg.level === "number") level = Math.max(level * 0.5, msg.level);
   if (msg.type === "dot" && msg.state === "idle") stopPlayback();
   if (msg.type === "mood" && msg.pad && typeof msg.pad.arousal === "number") {
     level = Math.max(level * 0.9, msg.pad.arousal * 0.15);
@@ -189,19 +197,21 @@ async function toggleMic() {
   });
   const ctx = ensureAudio();
   const source = ctx.createMediaStreamSource(stream);
-  const proc = ctx.createScriptProcessor(2048, 1, 1);
   const mute = ctx.createGain();
   mute.gain.value = 0;
-  proc.onaudioprocess = (ev) => {
-    const raw = ev.inputBuffer.getChannelData(0);
+  await ctx.audioWorklet.addModule("/dot/capture-worklet.js");
+  const node = new AudioWorkletNode(ctx, "galion-mic");
+  node.port.onmessage = (ev) => {
+    const raw = ev.data;
+    if (!(raw instanceof Float32Array)) return;
     pushMic(f32ToI16(downsample(raw, ctx.sampleRate, MIC_RATE)));
   };
-  source.connect(proc);
-  proc.connect(mute);
+  source.connect(node);
+  node.connect(mute);
   mute.connect(ctx.destination);
   mic = {
     stop() {
-      proc.disconnect();
+      node.disconnect();
       source.disconnect();
       mute.disconnect();
       for (const track of stream.getTracks()) track.stop();

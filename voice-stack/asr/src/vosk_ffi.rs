@@ -190,8 +190,10 @@ fn prepend_lib_dir(dir: &Path) {
     {
         let old = std::env::var("PATH").unwrap_or_default();
         if !old.split(';').any(|part| part == dir) {
+            // `dir` is still needed for SetDllDirectory after PATH is set.
+            // Moving it into `joined` fails the Windows build (use after move).
             let joined = if old.is_empty() {
-                dir
+                dir.clone()
             } else {
                 format!("{dir};{old}")
             };
