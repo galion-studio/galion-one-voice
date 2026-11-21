@@ -1,0 +1,99 @@
+/* SPDX-License-Identifier: MIT */
+/* Copyright (c) 2026 Galion Labs */
+
+/* One mark. The wash is the background. Controls stay out of the disc. */
+
+html, body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  background: #0A0A0C;
+  color: #F5F5F7;
+  color-scheme: dark;
+  overflow: hidden;
+  font: 16px/1.4 system-ui, "Segoe UI", sans-serif;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#field {
+  display: block;
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+#talk {
+  position: fixed;
+  left: 50%;
+  top: 42%;
+  width: max(96px, min(28vmin, 200px));
+  height: max(96px, min(28vmin, 200px));
+  transform: translate(-50%, -50%);
+  border: 0;
+  border-radius: 50%;
+  padding: 0;
+  background: transparent;
+  color: transparent;
+  cursor: pointer;
+}
+
+#talk:focus-visible {
+  outline: 2px solid #C4B5FD;
+  outline-offset: 8px;
+}
+
+#caption {
+  position: fixed;
+  left: 50%;
+  top: 62%;
+  transform: translateX(-50%);
+  width: min(36rem, calc(100% - 32px));
+  margin: 0;
+  z-index: 2;
+  text-align: center;
+  pointer-events: none;
+  color: #F5F5F7;
+  font-weight: 560;
+  font-size: 1.15rem;
+  letter-spacing: 0.01em;
+  text-shadow: 0 2px 16px #0A0A0C;
+}
+
+#caption:empty {
+  display: none;
+}
+
+#caption .src {
+  display: block;
+  margin-top: 8px;
+  color: #C9D4E0;
+  font: 400 0.85rem/1.3 system-ui, "Segoe UI", sans-serif;
+}
+
+.sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+@media (forced-colors: active) {
+  #talk:focus-visible {
+    outline: 2px solid Highlight;
+  }
+}
