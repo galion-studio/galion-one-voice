@@ -115,7 +115,8 @@ fn check_pin(path: &Path, name: &str, expected: &str) -> Result<(), TtsError> {
 fn sha256_file(path: &Path) -> Result<String, TtsError> {
     let mut f = File::open(path).map_err(|e| TtsError::Io(format!("{}: {e}", path.display())))?;
     let mut hasher = Sha256::new();
-    let mut buf = [0u8; 1 << 20];
+    // A 1 MiB array on the stack overflows the Windows main thread.
+    let mut buf = vec![0u8; 1 << 20];
     loop {
         let n = f
             .read(&mut buf)

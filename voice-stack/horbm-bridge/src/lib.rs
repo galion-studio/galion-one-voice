@@ -17,16 +17,19 @@
 //! This crate does not synthesize audio, does not read `GALION_SAMANTHA_REF`,
 //! and does not call a model API. It is not a member of the root workspace.
 
+mod cards;
 mod chunks;
 mod engine;
 mod fake;
 mod measure;
 mod pad;
+mod research;
 mod session;
 
 #[cfg(feature = "horbm")]
 mod linked;
 
+pub use cards::{CardBrain, CardEngine, UNKNOWN_REPLY};
 pub use chunks::{
     contains_forbidden, speakable_chunks, Chunker, SpeakChunk, FIRST_SENTENCE_WORDS, FORBIDDEN,
     SPOKEN_CAP,

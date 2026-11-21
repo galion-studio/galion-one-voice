@@ -5,9 +5,13 @@
 
 # S10 local server
 
-Loopback UI process for Samantha. The directory is `voice-stack/local-server`, matching `voice-stack/ARCHITECTURE.md`. The socket is `galion-samantha-ws/1` on `127.0.0.1:7881`.
+Loopback UI process for Galion One. The directory is `voice-stack/local-server`. The socket is `galion-samantha-ws/1` on `127.0.0.1:7881`.
 
-Mic PCM comes in on the WebSocket. Speaker PCM, dot, and mood go out. The page is one dot, `#F5F5F7` on `#0A0A0C`. The brain is not linked. A turn is an error code, and the mood tick stays `source: resting`. This crate does not spawn Piper or Vosk and does not read a reference clip.
+`GET /` and `GET /one` serve the Galion One page copied from `crates/galion-console/assets/v1-screen.html` (the `galion.app/one` front end, last updated in `8ee81f6` on 2026-11-19). The old one-dot page stays at `/dot/`.
+
+The talk button posts a finished take to `POST /v1/turn`. A typed line uses `POST /v2/say`. The page polls `GET /v1/dot` and plays `GET /v1/reply/:id`. Silero VAD is the `vad-ear` process (`GALION_VAD_BIN`), kept out of this crate so `ort` stays out of the workspace. Vosk recognises speech when the model and library are on disk. The brain is the HORBM card bridge: cards are read-only, a miss is `I don't know.`, and the layer 5 research router is called only when that crate has landed. Piper speaks the line when the LJ Speech pack is present. No model API is called.
+
+The tracked example card is `knowledge/kettle.md`. `GALION_HORBM_KNOWLEDGE` selects another directory and is only read.
 
 It is a standalone package. It is not a member of the repo workspace. `cargo test` at the repo root does not build it. Dependencies are pinned for rustc 1.83 (`tokio` 1.42.0, `hyper-util` 0.1.10).
 
@@ -30,6 +34,28 @@ It is a standalone package. It is not a member of the repo workspace. `cargo tes
 
 The wire format is [PROTOCOL.md](PROTOCOL.md).
 
+## Windows
+
+The laptop keeps Galion on `G:` only. `scripts/windows/Start-GalionOne.ps1` (or `START-GALION-ONE.cmd`) checks that `G:` exists, then sets:
+
+| Variable | Path |
+| --- | --- |
+| repo | `G:\galion\work\galion-one-voice` |
+| `CARGO_HOME` | `G:\galion\ci\toolchains\cargo` |
+| `RUSTUP_HOME` | `G:\galion\ci\toolchains\rustup` |
+| `CARGO_TARGET_DIR` | `G:\galion\work\target-voice` |
+| models | `G:\galion\work\galion-one-voice\var` (git-ignored) |
+| `TEMP` and `TMP` | `G:\galion\tmp\win` |
+| npm, pip, and Hugging Face caches | `G:\galion\tmp\npm`, `G:\galion\tmp\pip`, `G:\galion\tmp\hf` |
+| `APPDATA`, `LOCALAPPDATA`, `USERPROFILE` | `G:\galion\tmp\appdata`, `G:\galion\tmp\localappdata`, `G:\galion\tmp\profile` |
+| logs | `G:\galion\work\logs` |
+
+It downloads Silero VAD, Vosk small English, and Piper LJ Speech into `var\`, builds `vad-ear.exe` and `samantha-local.exe`, and listens on `127.0.0.1:7881`. Open `http://127.0.0.1:7881/`. `-DryRun` prints the paths and does not download. A missing `G:` stops the script before it creates a directory.
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File G:\galion\work\galion-one-voice\scripts\windows\Start-GalionOne.ps1
+```
+
 ## Linux
 
 ```bash
@@ -51,20 +77,7 @@ cargo test
 
 ## Windows
 
-From the crate directory. The owner's home on that laptop is `G:\galion`. This binary does not read `G:\galion`. It only checks whether `GALION_SAMANTHA_REF` names a file.
-
-```bat
-cd voice-stack\local-server
-cargo run --release -- --ui ui
-```
-
-```powershell
-$env:GALION_SAMANTHA_WS = "127.0.0.1:7881"
-$env:GALION_SAMANTHA_REF = "G:\galion\voices\samantha-ref.wav"
-cargo run --release -- --ui ui
-```
-
-Then open `http://127.0.0.1:7881/`. Microphone capture needs that loopback origin. Playback is full gain.
+Use `scripts/windows/Start-GalionOne.ps1` from the section above. It is the start path on the laptop. The table there is the set of directories the script creates. `GALION_SAMANTHA_REF` is still only reported on `/health` as set, missing, or unset. The file is not read and it is not downloaded.
 
 The unit file under `deploy/` is a template. This crate does not install it and does not start it.
 

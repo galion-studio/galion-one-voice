@@ -98,6 +98,8 @@ cargo run --features horbm -- say hello
 
 Those three variables are optional. Unset, `say` stays on `FakeEngine`.
 
+`CardEngine` reads `.md` and `.json` knowledge cards and does not write them. A query that matches no card is `I don't know.` [`research::route`](src/research.rs) is the layer 5 call. It returns nothing until the Research gateway crate is linked, and the card bridge answers instead. This crate does not call a model.
+
 The landing line, relative to this `Cargo.toml`, is:
 
 ```toml
