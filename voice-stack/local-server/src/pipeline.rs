@@ -15,7 +15,8 @@ use crate::reply::{may_speak_piper, Pad, ReplyEngine, UnlinkedBrain};
 
 const SPEECH_RMS: f32 = 0.02;
 const START_FRAMES: u32 = 2;
-const END_FRAMES: u32 = 8;
+/// 32 × 20 ms = 640 ms. Eight frames (160 ms) cut one question into two turns.
+const END_FRAMES: u32 = 32;
 const MAX_CARRY: usize = 48_000;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -376,6 +377,19 @@ mod tests {
         let (pad, source) = pipe.tick_mood();
         assert_eq!(source, "resting");
         assert_eq!(pad, Pad::RESTING);
+    }
+
+    #[test]
+    fn a_160_ms_pause_does_not_end_the_turn() {
+        let mut pipe = FakePipeline::scripted("hello from the mic", Fixed);
+        pipe.push_mic(&loud(), 16_000, 0);
+        pipe.push_mic(&loud(), 16_000, 20);
+        for _ in 0..8 {
+            let mid = pipe.push_mic(&quiet(), 16_000, 40);
+            assert!(mid.pcm.is_empty());
+            assert!(mid.events.iter().all(|e| !e.contains("\"event\":\"end\"")));
+        }
+        assert_eq!(pipe.phase(), "listening");
     }
 
     #[test]

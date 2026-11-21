@@ -35,7 +35,7 @@
      the existing POST /v2/say path. File names stay on the page.
      CC0 consent is enforced at clone time in Rust, so the call shows no CC0 UI.
      The session token comes from POST /session's body and is never put in the URL. -->
-<html lang="en"><head><meta charset="utf-8">
+<html lang="en"><head><meta charset="utf-8"><link rel="icon" href="/favicon.ico" type="image/x-icon">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0B0F14" media="(prefers-color-scheme: dark)">
 <meta name="theme-color" content="#0B0F14">
@@ -972,8 +972,7 @@ function unlockAudio(ctx){
        s.buffer=b; s.connect(ctx.destination); s.start(0); }catch(e){}
 }
 
-// AudioWorklet (inline module via Blob URL; page is one include_str! file) batching 128-frame
-// quanta into ~2048-sample chunks. Falls back to ScriptProcessor where worklets are missing.
+// AudioWorklet batches 128-frame quanta into ~2048-sample chunks.
 const WORKLET_SRC=`class GvCap extends AudioWorkletProcessor{
   constructor(){super();this.b=new Float32Array(2048);this.n=0;}
   process(ins){const c=ins[0]&&ins[0][0];if(c){for(let i=0;i<c.length;i++){this.b[this.n++]=c[i];
@@ -982,20 +981,17 @@ registerProcessor("gv-cap",GvCap);`;
 
 async function startCapture(src){
   if(PREVIEW_ONLY) return;
-  const ctx=micCtx; capRatio=ctx.sampleRate/CAP_SR; capPos=0;
+  const ctx=micCtx;
+  if(!(ctx.audioWorklet&&window.AudioWorkletNode&&window.Blob&&window.URL)) return;
+  capRatio=ctx.sampleRate/CAP_SR; capPos=0;
   capSink=ctx.createGain(); capSink.gain.value=0; capSink.connect(ctx.destination); // keeps graph pulled, silent
-  if(ctx.audioWorklet&&window.AudioWorkletNode&&window.Blob&&window.URL){
-    try{
-      const url=URL.createObjectURL(new Blob([WORKLET_SRC],{type:"application/javascript"}));
-      await ctx.audioWorklet.addModule(url); URL.revokeObjectURL(url);
-      capNode=new AudioWorkletNode(ctx,"gv-cap",{numberOfInputs:1,numberOfOutputs:1,channelCount:1,channelCountMode:"explicit"});
-      capNode.port.onmessage=e=>onCapChunk(e.data);
-      src.connect(capNode); capNode.connect(capSink); return;
-    }catch(e){ capNode=null; }
-  }
-  const sp=(ctx.createScriptProcessor||ctx.createJavaScriptNode).call(ctx,2048,1,1);
-  sp.onaudioprocess=e=>onCapChunk(new Float32Array(e.inputBuffer.getChannelData(0)));
-  src.connect(sp); sp.connect(capSink); capNode=sp;
+  try{
+    const url=URL.createObjectURL(new Blob([WORKLET_SRC],{type:"application/javascript"}));
+    await ctx.audioWorklet.addModule(url); URL.revokeObjectURL(url);
+    capNode=new AudioWorkletNode(ctx,"gv-cap",{numberOfInputs:1,numberOfOutputs:1,channelCount:1,channelCountMode:"explicit"});
+    capNode.port.onmessage=e=>onCapChunk(e.data);
+    src.connect(capNode); capNode.connect(capSink);
+  }catch(e){ capNode=null; }
 }
 
 // Device rate → 16 kHz by box-averaging over each output sample's span (cheap anti-alias).

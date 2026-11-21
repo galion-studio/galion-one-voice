@@ -173,16 +173,50 @@ $Server = Join-Path $TargetDir "release\samantha-local.exe"
 if (-not (Test-Path $VadBin)) { throw "missing $VadBin" }
 if (-not (Test-Path $Server)) { throw "missing $Server" }
 
-$env:GALION_SILERO_VAD = $Silero
+$LaptopVosk = "G:\galion\models\asr\vosk-model-small-en-us-0.15"
+$LaptopLibDir = "G:\galion\models\asr\vosk-win64-0.3.45"
+$LaptopSilero = Join-Path $Repo "voice-stack\vad\models\silero_vad.onnx"
+$PiperVar = Join-Path $Repo "voice-stack\tts-piper-stream\var"
+$OrtRoot = "G:\galion\toolchains\onnxruntime\onnxruntime-win-x64-cpu-1.31.1"
+$OrtCache = "G:\galion\tmp\cache\ort.pyke.io"
+if (-not $OrtCache.StartsWith("G:\")) { throw "refusing ORT cache $OrtCache" }
+New-Item -ItemType Directory -Force -Path $OrtCache | Out-Null
+$OrtDll = Join-Path $OrtRoot "lib\onnxruntime.dll"
+if (-not (Test-Path -LiteralPath $OrtDll)) { $OrtDll = Join-Path $OrtRoot "onnxruntime.dll" }
+if (Test-Path -LiteralPath $OrtDll) { $env:ORT_DYLIB_PATH = $OrtDll } else { $env:ORT_DYLIB_PATH = $OrtRoot }
+$env:ORT_CACHE_DIR = $OrtCache
+$env:GALION_VAD_HANG_MS = "640"
+$env:GALION_VAD_COMMIT_MS = "640"
+if (Test-Path -LiteralPath $LaptopSilero) { $env:GALION_SILERO_VAD = $LaptopSilero } else { $env:GALION_SILERO_VAD = $Silero }
 $env:GALION_VAD_BIN = $VadBin
 $env:GALION_VAD_REQUIRE = "silero"
-$env:GALION_VOSK_MODEL = $ModelDir
-$env:GALION_VOSK_LIB = Join-Path $LibDir "libvosk.dll"
-$env:GALION_PIPER_MODEL = $Onnx
-$env:GALION_PIPER_CONFIG = $Json
-$env:GALION_A21_RUNTIME = $Piper
+if (Test-Path -LiteralPath (Join-Path $LaptopVosk "am\final.mdl")) { $env:GALION_VOSK_MODEL = $LaptopVosk } else { $env:GALION_VOSK_MODEL = $ModelDir }
+$LaptopLib = Join-Path $LaptopLibDir "libvosk.dll"
+if (Test-Path -LiteralPath $LaptopLib) {
+    $env:GALION_VOSK_LIB = $LaptopLib
+    $env:PATH = "$LaptopLibDir;$env:PATH"
+} else {
+    $env:GALION_VOSK_LIB = Join-Path $LibDir "libvosk.dll"
+}
+$PiperOnnx = Join-Path $PiperVar "voices\en_US-ljspeech-medium.onnx"
+if (-not (Test-Path -LiteralPath $PiperOnnx)) { $PiperOnnx = Join-Path $PiperVar "en_US-ljspeech-medium.onnx" }
+if (Test-Path -LiteralPath $PiperOnnx) {
+    $env:GALION_PIPER_MODEL = $PiperOnnx
+    $env:GALION_PIPER_CONFIG = "$PiperOnnx.json"
+} else {
+    $env:GALION_PIPER_MODEL = $Onnx
+    $env:GALION_PIPER_CONFIG = $Json
+}
+$PiperExe = Join-Path $PiperVar "piper\piper.exe"
+if (-not (Test-Path -LiteralPath $PiperExe)) { $PiperExe = Join-Path $PiperVar "piper.exe" }
+if (-not (Test-Path -LiteralPath $PiperExe)) { $PiperExe = $Piper }
+$env:GALION_A21_RUNTIME = $PiperExe
 $env:GALION_SAMANTHA_WS = "127.0.0.1:7881"
-$env:GALION_HORBM_KNOWLEDGE = Join-Path $Repo "voice-stack\local-server\knowledge"
+$Knowledge = "G:\galion\horbm\knowledge"
+if (-not (Test-Path -LiteralPath $Knowledge)) {
+    $Knowledge = Join-Path $Repo "voice-stack\local-server\knowledge"
+}
+$env:GALION_HORBM_KNOWLEDGE = $Knowledge
 
 $Ui = Join-Path $Repo "voice-stack\local-server\ui"
 $OutLog = Join-Path $LogDir "samantha-local.out.log"

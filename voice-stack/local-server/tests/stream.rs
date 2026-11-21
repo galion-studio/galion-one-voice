@@ -217,6 +217,11 @@ async fn companion_socket() {
     assert!(js.body.contains("#F5F5F7"));
     let css = http(addr, "GET", "/dot/dot.css", "").await;
     assert!(css.body.contains("#0A0A0C"));
+    let icon = http(addr, "GET", "/favicon.ico", "").await;
+    assert_eq!(icon.status, 200, "{}", icon.head);
+    assert!(icon.head.to_ascii_lowercase().contains("image/x-icon"));
+    assert!(js.body.contains("audioWorklet"));
+    assert!(!js.body.contains("createScriptProcessor"));
 
     let session = http(addr, "POST", "/session", "{\"op\":\"open\"}").await;
     assert_eq!(session.status, 200, "{}", session.body);
@@ -248,6 +253,23 @@ async fn companion_socket() {
     assert_eq!(welcome["dot"], "idle");
 
     ws.send(Message::Text(format!(
+        r#"{{"schema":"{SCHEMA}","type":"hello","session":null}}"#
+    )))
+    .await
+    .unwrap();
+    let again = Instant::now() + Duration::from_millis(400);
+    while Instant::now() < again {
+        if let Some(Message::Text(text)) = recv(&mut ws, Duration::from_millis(100)).await {
+            let v: Value = serde_json::from_str(&text).unwrap();
+            assert_ne!(
+                v["type"].as_str(),
+                Some("welcome"),
+                "a second hello is not a second welcome"
+            );
+        }
+    }
+
+    ws.send(Message::Text(format!(
         r#"{{"schema":"{SCHEMA}","type":"ping"}}"#
     )))
     .await
@@ -261,7 +283,7 @@ async fn companion_socket() {
     for n in 0..4u16 {
         ws.send(Message::Binary(mic_bytes(8000, n))).await.unwrap();
     }
-    for n in 4..14u16 {
+    for n in 4..36u16 {
         ws.send(Message::Binary(mic_bytes(0, n))).await.unwrap();
     }
     let sent_end = Instant::now();

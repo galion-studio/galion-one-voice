@@ -1,17 +1,21 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Galion Labs
-//! Mic to ear to HORBM to Piper.
+//! Mic to ear to HORBM cards to Piper.
 //!
 //! Silero runs in `vad-ear` (its own workspace, so `ort` stays out of this
-//! one). Vosk stays on a worker thread because its handles are not `Send`.
-//! The mouth is Piper when the LJ Speech pack is on disk. The brain is
-//! [`crate::brain::HorbmMind`].
+//! one). A quiet gap of 640 ms ends one turn. Vosk stays on a worker thread
+//! because its handles are not `Send`. The mouth is Piper when the LJ Speech
+//! pack is on disk. The brain is [`crate::brain::HorbmMind`]: read-only cards,
+//! and `I don't know.` when none match. `Brain::open` in the orchestrator
+//! stays unlinked. This path does not open `horbm-memory`'s sqlite file.
 
 use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStdin, Command, Stdio};
 use std::sync::mpsc::{self, Sender};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+#[cfg(test)]
+use std::sync::Mutex;
 use std::thread::JoinHandle;
 use std::time::Duration;
 
@@ -28,6 +32,9 @@ use crate::reply::{may_speak_piper, ReplyEngine};
 
 const FRAME: usize = 320;
 const SPEECH_RMS: f32 = 0.02;
+/// Silence that ends one question. 160 ms split a sentence into two turns.
+const HANG_MS: f64 = 640.0;
+const UTTERANCE_CAP: usize = 16_000 * 16;
 
 pub fn live_factory() -> Arc<dyn Fn() -> Box<dyn crate::pipeline::Pipeline> + Send + Sync> {
     Arc::new(|| Box::new(LivePipeline::from_env()))
@@ -134,6 +141,8 @@ pub struct LivePipeline {
     phase: &'static str,
     level: f32,
     speech: Vec<i16>,
+    in_speech: bool,
+    utterance: Vec<i16>,
     _worker: Option<JoinHandle<()>>,
 }
 
@@ -153,6 +162,8 @@ impl LivePipeline {
             phase: "idle",
             level: 0.0,
             speech: Vec::new(),
+            in_speech: false,
+            utterance: Vec::new(),
             _worker: worker,
         }
     }
@@ -178,6 +189,8 @@ impl LivePipeline {
             phase: "idle",
             level: 0.0,
             speech: Vec::new(),
+            in_speech: false,
+            utterance: Vec::new(),
             _worker: None,
         }
     }
@@ -243,7 +256,11 @@ impl LivePipeline {
                     VadEvent::None => None,
                 }
             }
-            Front::Child(child) => child.push(frame),
+            Front::Child(child) => match child.push(frame) {
+                Some("start") => Some("start"),
+                Some("end") => Some("end"),
+                _ => None,
+            },
         }
     }
 }
@@ -262,11 +279,50 @@ impl Pipeline for LivePipeline {
         let mut buf = std::mem::take(&mut self.speech);
         while buf.len() >= frame_n {
             let frame: Vec<i16> = buf.drain(..frame_n).collect();
-            if let Some(kind) = self.push_frame(&frame) {
-                events.push(vad_json(kind, t_ms));
-                let dot = if kind == "start" { "listening" } else { "idle" };
-                self.phase = if kind == "start" { "listening" } else { "idle" };
-                events.push(dot_json(dot, self.level));
+            let kind = self.push_frame(&frame);
+            let piece = frame_16k(&frame, rate);
+            match kind {
+                Some("start") => {
+                    self.in_speech = true;
+                    self.utterance.clear();
+                    self.utterance.extend_from_slice(&piece);
+                    self.phase = "listening";
+                    events.push(vad_json("start", t_ms));
+                    events.push(dot_json("listening", self.level));
+                }
+                Some("end") => {
+                    if self.in_speech {
+                        self.utterance.extend_from_slice(&piece);
+                    }
+                    self.in_speech = false;
+                    events.push(vad_json("end", t_ms));
+                    let heard_pcm = std::mem::take(&mut self.utterance);
+                    self.speech = buf;
+                    if heard_pcm.is_empty() {
+                        self.phase = "idle";
+                        events.push(dot_json("idle", self.level));
+                        return TurnProduct::events(events);
+                    }
+                    let heard = match self.recognise(&heard_pcm) {
+                        Ok(text) => text,
+                        Err(code) => {
+                            let mut fail = self.fail(&code);
+                            events.append(&mut fail.events);
+                            fail.events = events;
+                            return fail;
+                        }
+                    };
+                    return self.hear(&heard, t_ms, events);
+                }
+                _ => {
+                    if self.in_speech {
+                        self.utterance.extend_from_slice(&piece);
+                        if self.utterance.len() > UTTERANCE_CAP {
+                            let drop_n = self.utterance.len() - UTTERANCE_CAP;
+                            self.utterance.drain(..drop_n);
+                        }
+                    }
+                }
             }
         }
         self.speech = buf;
@@ -324,6 +380,8 @@ impl Pipeline for LivePipeline {
 
     fn stop(&mut self) {
         self.speech.clear();
+        self.utterance.clear();
+        self.in_speech = false;
         self.phase = "idle";
         if let Front::Energy(vad) = &mut self.front {
             vad.reset_turn();
@@ -397,7 +455,7 @@ fn open_vad() -> (Front, &'static str, bool) {
         }
     }
     let ready = !require;
-    (Front::Energy(EnergyVad::new(160.0)), "energy", ready)
+    (Front::Energy(EnergyVad::new(HANG_MS)), "energy", ready)
 }
 
 fn open_ear() -> (Ear, &'static str, Option<JoinHandle<()>>) {
@@ -457,7 +515,11 @@ impl ChildVad {
         } else {
             Command::new(bin)
         };
-        cmd.stdin(Stdio::piped())
+        let hang = std::env::var("GALION_VAD_HANG_MS").unwrap_or_else(|_| "640".into());
+        let commit = std::env::var("GALION_VAD_COMMIT_MS").unwrap_or_else(|_| "640".into());
+        cmd.env("GALION_VAD_HANG_MS", hang)
+            .env("GALION_VAD_COMMIT_MS", commit)
+            .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::null());
         let mut child = cmd.spawn().map_err(|_| ())?;
@@ -544,6 +606,14 @@ fn parse_score(line: &str) -> Option<Score> {
     Some(Score { event: event? })
 }
 
+fn frame_16k(frame: &[i16], rate: u32) -> Vec<i16> {
+    if rate == 24_000 {
+        downsample_24_to_16(frame)
+    } else {
+        frame.to_vec()
+    }
+}
+
 fn downsample_24_to_16(pcm: &[i16]) -> Vec<i16> {
     if pcm.is_empty() {
         return Vec::new();
@@ -618,6 +688,36 @@ mod tests {
     }
 
     #[test]
+    fn streaming_mic_waits_640_ms_then_speaks() {
+        let heard = Arc::new(Mutex::new(Vec::new()));
+        let mut pipe = test_pipe(
+            heard.clone(),
+            Ear::Script("where is the kettle".into()),
+            "script",
+        );
+        let loud = vec![8_000i16; FRAME];
+        let quiet = vec![0i16; FRAME];
+        for _ in 0..4 {
+            let out = pipe.push_mic(&loud, 16_000, 0);
+            assert!(out.pcm.is_empty());
+        }
+        for _ in 0..31 {
+            let mid = pipe.push_mic(&quiet, 16_000, 0);
+            assert!(mid.pcm.is_empty(), "{}", mid.events.join("\n"));
+            assert!(mid.events.iter().all(|e| !e.contains("\"event\":\"end\"")));
+        }
+        let end = pipe.push_mic(&quiet, 16_000, 0);
+        assert!(end.events.iter().any(|e| e.contains("\"event\":\"end\"")));
+        assert_eq!(end.reply, "The kettle is on the stove.");
+        assert!(!end.pcm.is_empty());
+        assert!(end.events.iter().all(|e| !e.contains("brain-unlinked")));
+        assert_eq!(
+            heard.lock().unwrap().as_slice(),
+            ["The kettle is on the stove."]
+        );
+    }
+
+    #[test]
     fn missing_vosk_does_not_invent_a_line() {
         let heard = Arc::new(Mutex::new(Vec::new()));
         let mut pipe = test_pipe(heard.clone(), Ear::Missing, "missing");
@@ -660,6 +760,16 @@ mod tests {
             "silero_vad.onnx",
             "vosk-model-small-en-us-0.15",
             "en_US-ljspeech-medium",
+            r"G:\galion\models\asr\vosk-model-small-en-us-0.15",
+            r"G:\galion\models\asr\vosk-win64-0.3.45",
+            r"voice-stack\vad\models\silero_vad.onnx",
+            r"voice-stack\tts-piper-stream\var",
+            r"G:\galion\toolchains\onnxruntime\onnxruntime-win-x64-cpu-1.31.1",
+            r"G:\galion\tmp\cache\ort.pyke.io",
+            "ORT_DYLIB_PATH",
+            "ORT_CACHE_DIR",
+            "GALION_VAD_HANG_MS",
+            "640",
         ] {
             assert!(text.contains(needle), "missing {needle}");
         }
@@ -670,11 +780,33 @@ mod tests {
         assert!(!text.contains("C:\\Users"));
         assert!(!text.to_ascii_lowercase().contains("ollama"));
         assert!(!text.to_ascii_lowercase().contains("openai"));
+        let cmd = include_str!("../../../scripts/windows/START-SAMANTHA-7881.cmd");
+        for needle in [
+            r"G:\galion\models\asr\vosk-model-small-en-us-0.15",
+            r"G:\galion\models\asr\vosk-win64-0.3.45",
+            r"voice-stack\vad\models\silero_vad.onnx",
+            r"voice-stack\tts-piper-stream\var",
+            r"onnxruntime-win-x64-cpu-1.31.1",
+            r"G:\galion\tmp\cache\ort.pyke.io",
+            "ORT_DYLIB_PATH",
+            "GALION_VAD_HANG_MS=640",
+            "127.0.0.1:7881",
+            "I don't know.",
+        ] {
+            assert!(cmd.contains(needle), "cmd missing {needle}");
+        }
+        assert!(!cmd.contains("%USERPROFILE%"));
+        assert!(!cmd.contains("%APPDATA%"));
+        assert!(!cmd.contains("%LOCALAPPDATA%"));
+        assert!(!cmd.contains("%TEMP%"));
+        assert!(!cmd.contains("C:\\Users"));
+        assert!(!cmd.to_ascii_lowercase().contains("ollama"));
+        assert!(!cmd.to_ascii_lowercase().contains("openai"));
     }
 
     fn test_pipe(heard: Arc<Mutex<Vec<String>>>, ear: Ear, ear_name: &'static str) -> LivePipeline {
         LivePipeline::for_test(
-            Front::Energy(EnergyVad::new(160.0)),
+            Front::Energy(EnergyVad::new(HANG_MS)),
             "energy",
             true,
             ear,

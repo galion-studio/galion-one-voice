@@ -28,27 +28,34 @@ pub fn require_loopback(addr: SocketAddr) -> Result<(), NotLoopback> {
     }
 }
 
-/// An `Origin` header, when the browser sends one, must be this process or the
-/// existing one-dot page on port 7878. A missing header is allowed for a
+/// An `Origin` header, when the browser sends one, must be this process, the
+/// one-dot page on port 7878, or Samantha on port 7881. `localhost` and
+/// `127.0.0.1` are the same loopback host. A missing header is allowed for a
 /// same-machine client. `https` and any other host are refused.
 pub fn origin_allowed(origin: Option<&str>, bound: SocketAddr) -> bool {
     let Some(origin) = origin.map(str::trim).filter(|s| !s.is_empty()) else {
         return true;
     };
-    if origin == crate::protocol::ONE_DOT_ORIGIN
-        || origin == format!("http://127.0.0.1:{}", crate::protocol::DEFAULT_PORT)
-    {
-        return true;
-    }
-    let Some(rest) = origin.strip_prefix("http://") else {
+    let Some(hostport) = origin
+        .strip_prefix("http://")
+        .and_then(|rest| rest.split('/').next())
+        .filter(|s| !s.is_empty())
+    else {
         return false;
     };
-    let hostport = rest.split('/').next().unwrap_or("");
-    match bound.ip() {
-        IpAddr::V4(ip) => hostport == format!("{ip}:{}", bound.port()),
-        IpAddr::V6(ip) if ip.is_loopback() => hostport == format!("[::1]:{}", bound.port()),
-        _ => false,
-    }
+    let port = bound.port();
+    hostport == format!("127.0.0.1:{port}")
+        || hostport == format!("localhost:{port}")
+        || hostport == format!("[::1]:{port}")
+        || matches!(
+            hostport,
+            "127.0.0.1:7878"
+                | "localhost:7878"
+                | "[::1]:7878"
+                | "127.0.0.1:7881"
+                | "localhost:7881"
+                | "[::1]:7881"
+        )
 }
 
 #[cfg(test)]
@@ -74,8 +81,11 @@ mod tests {
         let bound = addr("127.0.0.1:7881");
         assert!(origin_allowed(None, bound));
         assert!(origin_allowed(Some("http://127.0.0.1:7881"), bound));
+        assert!(origin_allowed(Some("http://localhost:7881"), bound));
         assert!(origin_allowed(Some("http://127.0.0.1:7878"), bound));
+        assert!(origin_allowed(Some("http://localhost:7878"), bound));
         assert!(!origin_allowed(Some("https://127.0.0.1:7881"), bound));
+        assert!(!origin_allowed(Some("https://localhost:7881"), bound));
         assert!(!origin_allowed(Some("http://evil.example"), bound));
         assert!(!origin_allowed(Some("null"), bound));
         let moved = addr("127.0.0.1:9000");

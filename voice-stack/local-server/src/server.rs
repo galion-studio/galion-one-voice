@@ -263,6 +263,7 @@ fn app_state(
 fn router(state: AppState, ui_dir: PathBuf) -> Router {
     Router::new()
         .route("/health", get(health))
+        .route("/favicon.ico", get(favicon))
         .route("/session", post(open_session))
         .route(WS_PATH, get(stream))
         .route("/", get(one_page))
@@ -289,6 +290,17 @@ async fn dot_page(State(app): State<AppState>) -> Response {
 
 async fn dot_redirect() -> Redirect {
     Redirect::permanent("/dot/")
+}
+
+async fn favicon() -> impl IntoResponse {
+    (
+        StatusCode::OK,
+        [
+            (header::CONTENT_TYPE, "image/x-icon"),
+            (header::CACHE_CONTROL, "public, max-age=86400"),
+        ],
+        Bytes::from_static(include_bytes!("../ui/favicon.ico")),
+    )
 }
 
 async fn health(State(app): State<AppState>) -> impl IntoResponse {
@@ -524,7 +536,9 @@ async fn handle_text(
 ) -> bool {
     match parse_client(text) {
         Err(code) => send_line(tx, error_json(&code)).await,
-        Ok(ClientControl::Hello { .. }) => send_line(tx, welcome_json()).await,
+        // The socket already welcomed this session. A second hello within the
+        // same connection is not another session and does not send welcome again.
+        Ok(ClientControl::Hello { .. }) => true,
         Ok(ClientControl::Ping) => send_line(tx, pong_json()).await,
         Ok(ClientControl::Unknown { .. }) => send_line(tx, error_json("unknown-type")).await,
         Ok(ClientControl::Consent { .. }) => true,

@@ -108,7 +108,7 @@ scripts/eval/virtual-user.sh
 
 The screen script sets `GALION_LLM=canned`. It sets `GALION_ASR=vosk` when the small English model is present, and `stub` when it is not. A missing model does not invent a transcript.
 
-On the Windows laptop, Galion stays on `G:\galion`. `scripts/windows/Start-GalionOne.ps1` fetches Silero, Vosk small English, and Piper LJ Speech into the git-ignored `var\` folder and serves the Galion One page on `127.0.0.1:7881`. The paths and the `G:` check are in [`voice-stack/local-server/README.md`](voice-stack/local-server/README.md).
+On the Windows laptop, Galion stays on `G:\galion`. `scripts/windows/START-SAMANTHA-7881.cmd` (laptop path `G:\galion\work\START-SAMANTHA-7881.cmd`) starts the Galion One page on `127.0.0.1:7881`. `scripts/windows/Start-GalionOne.ps1` fetches Silero, Vosk small English, and Piper LJ Speech into the git-ignored `var\` folder when the laptop copies are missing. The paths and the `G:` check are in [`voice-stack/local-server/README.md`](voice-stack/local-server/README.md).
 
 Before you call a change done:
 

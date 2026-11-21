@@ -2,6 +2,12 @@
 // Copyright (c) 2026 Galion Labs
 //! Local HORBM mind. Cards are read through [`galion_sam_horbm::CardEngine`].
 //! Memory and case files are not opened.
+//!
+//! `Brain::open` in `voice-stack/pipeline-orchestrator` returns
+//! `horbm is not linked`. The card index crate is `horbm-memory` in
+//! `galion-knowledge` `v2/memory` (revision `761a7f22`). This process does
+//! not fetch that crate and does not create its sqlite file. A query that
+//! matches no card is `I don't know.`
 
 use std::path::{Path, PathBuf};
 
