@@ -16,4 +16,3 @@ cpal = "0.15.3"
 
 # Own workspace. The repo root must not build this crate (same pattern as
 # tools/symphony/sound-out).
-[workspace]

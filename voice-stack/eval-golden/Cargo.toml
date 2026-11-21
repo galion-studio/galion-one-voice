@@ -10,8 +10,6 @@ license = "MIT"
 publish = false
 rust-version = "1.83"
 
-[workspace]
-
 [[bin]]
 name = "eval-golden"
 path = "src/main.rs"

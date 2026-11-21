@@ -70,7 +70,7 @@ set -e
 [[ "$etc_rc" -eq 2 ]] || fail "prefix /etc should exit 2, got $etc_rc"
 
 if [[ ! -x "$ROOT/target/debug/galion-samantha" ]]; then
-  cargo build --manifest-path "$ROOT/Cargo.toml"
+  CARGO_TARGET_DIR="$ROOT/target" cargo build --manifest-path "$ROOT/Cargo.toml"
 fi
 bin_src="$ROOT/target/debug/galion-samantha"
 [[ -x "$bin_src" ]] || fail "debug binary missing"

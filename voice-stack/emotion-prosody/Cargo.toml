@@ -20,4 +20,3 @@ galion-emotion = { path = "../../galion-emotion" }
 
 # Own workspace, same shape as voice-stack/contract.
 # Not a member of the root voice workspace.
-[workspace]

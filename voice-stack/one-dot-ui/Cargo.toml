@@ -9,8 +9,6 @@ publish = false
 description = "Samantha one-dot page. Standalone crate, not a member of the root workspace."
 
 # Own workspace so the root Cargo.toml does not pick this crate up.
-[workspace]
-
 [[bin]]
 name = "samantha-dot"
 path = "src/main.rs"

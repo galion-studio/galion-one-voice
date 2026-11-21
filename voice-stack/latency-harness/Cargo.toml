@@ -15,8 +15,6 @@ name = "galion-sam-latency"
 path = "src/bin/galion-sam-latency.rs"
 
 # Own workspace so this crate stays out of the root workspace members list.
-[workspace]
-
 [profile.release]
 lto = false
 codegen-units = 1

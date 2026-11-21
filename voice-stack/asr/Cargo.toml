@@ -10,9 +10,6 @@ license = "MIT"
 publish = false
 rust-version = "1.85"
 
-[workspace]
-resolver = "2"
-
 [[bin]]
 name = "s03-asr"
 path = "src/bin/transcribe.rs"

@@ -16,8 +16,6 @@ path = "src/main.rs"
 
 # Own workspace on purpose, same shape as runtimes/galion-piper-rt.
 # Not a member of the repository workspace. Do not add it there.
-[workspace]
-
 [profile.release]
 opt-level = 3
 lto = false
