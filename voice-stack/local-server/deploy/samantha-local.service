@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 Galion Labs
 # Template only. Nothing in this tree installs it or starts it.
+# Default socket is 127.0.0.1:7881 (galion-samantha-ws/1). Do not point this at 7878.
 # Sandbox matches deploy/systemd/templates/galion-voice-stage.service:
 # loopback bind, no new privileges, private tmp, strict filesystem, localhost only.
 # Do not put GALION_SAMANTHA_REF, a key, or a public address in this file.
@@ -13,8 +14,9 @@ After=network.target
 [Service]
 Type=simple
 User=galion
-ExecStart=/opt/galion/voice/s10/samantha-local --addr 127.0.0.1:8790 --ui /opt/galion/voice/s10/ui
-WorkingDirectory=/opt/galion/voice/s10
+ExecStart=/opt/galion/voice/local-server/samantha-local --ui /opt/galion/voice/local-server/ui
+WorkingDirectory=/opt/galion/voice/local-server
+Environment=GALION_SAMANTHA_WS=127.0.0.1:7881
 Restart=on-failure
 RestartSec=2
 MemoryMax=128M

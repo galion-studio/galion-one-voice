@@ -5,7 +5,8 @@
 //!
 //! * [`FRAME_MS`] is `galion_heartbeat::FRAME_MS` (LOCKS `[clock] frame_ms = 80`).
 //! * [`MIC_RATE`] and [`MIC_FRAME_SAMPLES`] are `galion_asr_vosk` (16 kHz, 20 ms).
-//! * [`TTS_RATE`] is `galion_v2_live::piper::PIPER_HZ` (Piper raw s16le).
+//! * [`SPEAKER_RATE`] is the architecture speaker path, 24 kHz. Piper's 22050 Hz
+//!   stream is resampled by S05 before it reaches this socket.
 
 /// Heartbeat period. Mood ticks and TTS slices use this.
 pub const FRAME_MS: u32 = 80;
@@ -13,15 +14,15 @@ pub const FRAME_MS: u32 = 80;
 pub const MIC_RATE: u32 = 16_000;
 /// One Vosk frame: 20 ms at 16 kHz.
 pub const MIC_FRAME_SAMPLES: usize = 320;
-/// Piper raw output rate (`PIPER_HZ`).
-pub const TTS_RATE: u32 = 22_050;
-/// One 80 ms slice at [`TTS_RATE`]. 22050 * 80 / 1000 = 1764.
-pub const TTS_FRAME_SAMPLES: usize = 1_764;
+/// Speaker path on this socket. 24 kHz, one 80 ms heartbeat frame (1920 samples).
+pub const SPEAKER_RATE: u32 = 24_000;
+/// One 80 ms slice at [`SPEAKER_RATE`].
+pub const SPEAKER_FRAME_SAMPLES: usize = 1_920;
 /// How many 80 ms slices the unwired mouth emits so the socket can pace them.
 pub const HOLD_SLICES: usize = 4;
 
 const _: () = assert!(MIC_RATE * 20 / 1000 == MIC_FRAME_SAMPLES as u32);
-const _: () = assert!(TTS_RATE * FRAME_MS / 1000 == TTS_FRAME_SAMPLES as u32);
+const _: () = assert!(SPEAKER_RATE * FRAME_MS / 1000 == SPEAKER_FRAME_SAMPLES as u32);
 
 /// Samples in one `frame_ms` slice at `rate`. Truncates, matching the integer
 /// sizes above (both pairs divide evenly).
@@ -97,7 +98,7 @@ fn edge_fade(i: usize, n: usize, fade_n: usize) -> f32 {
 /// This is the hold mouth: Piper is not in this process.
 pub fn hold_tone(valence: f32) -> Vec<i16> {
     let hz = 196.0 + valence.clamp(0.0, 1.0) * 80.0;
-    tone(TTS_FRAME_SAMPLES * HOLD_SLICES, TTS_RATE, hz, 0.45)
+    tone(SPEAKER_FRAME_SAMPLES * HOLD_SLICES, SPEAKER_RATE, hz, 0.45)
 }
 
 #[cfg(test)]
@@ -106,10 +107,10 @@ mod tests {
 
     #[test]
     fn slice_matches_piper_frame() {
-        let pcm = vec![1i16; TTS_FRAME_SAMPLES * HOLD_SLICES];
-        let slices = slice_pcm(&pcm, TTS_RATE, FRAME_MS);
+        let pcm = vec![1i16; SPEAKER_FRAME_SAMPLES * HOLD_SLICES];
+        let slices = slice_pcm(&pcm, SPEAKER_RATE, FRAME_MS);
         assert_eq!(slices.len(), 4);
-        assert!(slices.iter().all(|s| s.len() == TTS_FRAME_SAMPLES));
+        assert!(slices.iter().all(|s| s.len() == SPEAKER_FRAME_SAMPLES));
     }
 
     #[test]
@@ -122,7 +123,7 @@ mod tests {
     #[test]
     fn tone_is_audible_in_the_middle() {
         let pcm = hold_tone(0.25);
-        assert_eq!(pcm.len(), TTS_FRAME_SAMPLES * HOLD_SLICES);
+        assert_eq!(pcm.len(), SPEAKER_FRAME_SAMPLES * HOLD_SLICES);
         let mid = pcm[pcm.len() / 2].unsigned_abs();
         assert!(mid > 1000, "mid sample {mid} is silent");
         assert_eq!(pcm[0], 0, "fade starts at zero");

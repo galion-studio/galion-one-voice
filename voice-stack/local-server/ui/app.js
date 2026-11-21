@@ -1,28 +1,17 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Galion Labs
 
-// One dot for the loopback server. Mood moves the mark. The page does not
-// pick a sentence for how she feels. Audio plays at full gain.
+// One dot. No caption, no second control. Tap the mark to listen.
+// The socket is galion-samantha-ws/1.
 
-const PROTOCOL = "galion-samantha-local/1";
-const HEADER = 20;
-const MIC_RATE = 16000;
-const MIC_FRAME = 320;
-const KIND_MIC = 1;
-const KIND_TTS = 2;
-const FLAG_START = 1;
-const FLAG_END = 2;
+const SCHEMA = "galion-samantha-ws/1";
+const HEADER = 8;
+const MIC_RATE = 24000;
+const MIC_FRAME = 480;
 
 const canvas = document.getElementById("s");
-const caption = document.getElementById("caption");
-const live = document.getElementById("live");
-const listenBtn = document.getElementById("listen");
-const form = document.getElementById("line");
-const say = document.getElementById("say");
 const ctx2d = canvas.getContext("2d");
-
-const mood = { arousal: 0.3, valence: 0.25, dominance: 0.5 };
-let state = "idle";
+let level = 0;
 let ws = null;
 let seq = 0;
 let audioCtx = null;
@@ -42,107 +31,70 @@ resize();
 function draw() {
   const w = canvas.width;
   const h = canvas.height;
-  ctx2d.fillStyle = "#0B0F14";
+  ctx2d.fillStyle = "#0A0A0C";
   ctx2d.fillRect(0, 0, w, h);
-  const radius = Math.min(w, h) * (0.07 + mood.arousal * 0.035);
-  const warm = Math.round(236 + mood.valence * 16);
+  const radius = Math.min(w, h) * (0.07 + Math.min(1, level) * 0.03);
   ctx2d.beginPath();
   ctx2d.arc(w / 2, h / 2, radius, 0, Math.PI * 2);
-  ctx2d.fillStyle = "rgb(" + warm + ",241,234)";
+  ctx2d.fillStyle = "#F5F5F7";
   ctx2d.fill();
   requestAnimationFrame(draw);
 }
 draw();
 
-function setState(next) {
-  state = next;
-  live.textContent = next;
-  listenBtn.setAttribute("aria-pressed", mic ? "true" : "false");
-}
-
 function connect() {
-  const url = (location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/v1/stream";
+  const url = (location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/v1/samantha";
   ws = new WebSocket(url);
   ws.binaryType = "arraybuffer";
+  ws.onopen = () => {
+    ws.send(JSON.stringify({ schema: SCHEMA, type: "hello", session: null }));
+  };
   ws.onmessage = (ev) => {
     if (typeof ev.data === "string") onJson(ev.data);
     else onBinary(ev.data);
   };
-  ws.onclose = () => {
-    setState("offline");
-    setTimeout(connect, 1000);
-  };
+  ws.onclose = () => setTimeout(connect, 1000);
 }
 
 function onJson(text) {
   let msg;
   try { msg = JSON.parse(text); } catch (_) { return; }
-  if (msg.type === "ready" && msg.protocol !== PROTOCOL) {
-    caption.textContent = "Protocol mismatch.";
-    return;
+  if (msg.type === "dot" && typeof msg.level === "number") level = msg.level;
+  if (msg.type === "dot" && msg.state === "idle") stopPlayback();
+  if (msg.type === "mood" && msg.pad && typeof msg.pad.arousal === "number") {
+    level = Math.max(level * 0.9, msg.pad.arousal * 0.15);
   }
-  if (msg.type === "mood") {
-    mood.arousal = num(msg.arousal, mood.arousal);
-    mood.valence = num(msg.valence, mood.valence);
-    mood.dominance = num(msg.dominance, mood.dominance);
-    if (msg.state) setState(msg.state);
-  } else if (msg.type === "state" && msg.state) {
-    setState(msg.state);
-    if (msg.reason === "barge" || msg.reason === "end") stopPlayback();
-  } else if (msg.type === "reply" && msg.text) {
-    caption.textContent = msg.text;
-    if (msg.mood) {
-      mood.arousal = num(msg.mood.arousal, mood.arousal);
-      mood.valence = num(msg.mood.valence, mood.valence);
-      mood.dominance = num(msg.mood.dominance, mood.dominance);
-    }
-  } else if (msg.type === "error" && msg.error) {
-    caption.textContent = msg.error;
-  }
-}
-
-function num(v, fallback) {
-  return typeof v === "number" && Number.isFinite(v) ? v : fallback;
 }
 
 function onBinary(buf) {
   const frame = decodeFrame(buf);
-  if (!frame || frame.kind !== KIND_TTS) return;
-  if (frame.flags & FLAG_START) stopPlayback();
+  if (!frame || frame.dir !== 1) return;
   playPcm(frame.pcm, frame.rate);
-  if (frame.flags & FLAG_END) setState("idle");
 }
 
 function decodeFrame(buf) {
   if (!(buf instanceof ArrayBuffer) || buf.byteLength < HEADER) return null;
   const view = new DataView(buf);
-  if (view.getUint8(0) !== 0x47 || view.getUint8(1) !== 0x31 || view.getUint8(2) !== 0x50 || view.getUint8(3) !== 0x43) {
-    return null;
-  }
-  const kind = view.getUint8(5);
-  const flags = view.getUint16(6, true);
-  const rate = view.getUint32(8, true);
+  if (view.getUint8(0) !== 0x47 || view.getUint8(1) !== 0x53 || view.getUint8(2) !== 1) return null;
+  const dir = view.getUint8(3);
+  const rate = view.getUint8(4) === 0 ? 24000 : 16000;
   const n = (buf.byteLength - HEADER) / 2;
   const pcm = new Int16Array(n);
   for (let i = 0; i < n; i++) pcm[i] = view.getInt16(HEADER + i * 2, true);
-  return { kind, flags, rate, pcm };
+  return { dir, rate, pcm };
 }
 
 function encodeMic(pcm) {
   const buf = new ArrayBuffer(HEADER + pcm.length * 2);
   const view = new DataView(buf);
   view.setUint8(0, 0x47);
-  view.setUint8(1, 0x31);
-  view.setUint8(2, 0x50);
-  view.setUint8(3, 0x43);
-  view.setUint8(4, 1);
-  view.setUint8(5, KIND_MIC);
-  view.setUint16(6, 0, true);
-  view.setUint32(8, MIC_RATE, true);
-  view.setUint32(12, seq >>> 0, true);
-  seq = (seq + 1) >>> 0;
-  view.setUint16(16, 1, true);
-  view.setUint16(18, 0, true);
+  view.setUint8(1, 0x53);
+  view.setUint8(2, 1);
+  view.setUint8(3, 0);
+  view.setUint8(4, 0);
+  view.setUint8(5, 0);
+  view.setUint16(6, seq & 0xffff, true);
+  seq = (seq + 1) & 0xffff;
   for (let i = 0; i < pcm.length; i++) view.setInt16(HEADER + i * 2, pcm[i], true);
   return buf;
 }
@@ -175,7 +127,7 @@ function playPcm(pcm, rate) {
 
 function stopPlayback() {
   for (const src of playing) {
-    try { src.stop(); } catch (_) { /* already stopped */ }
+    try { src.stop(); } catch (_) { /* already ended */ }
   }
   playing.length = 0;
   playAt = 0;
@@ -226,15 +178,11 @@ async function toggleMic() {
     mic.stop();
     mic = null;
     pendingMic = new Int16Array(0);
-    setState(state === "speaking" ? state : "idle");
     if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ type: "barge" }));
+      ws.send(JSON.stringify({ schema: SCHEMA, type: "stop" }));
     }
-    return;
-  }
-  if (state === "speaking" && ws && ws.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify({ type: "barge" }));
     stopPlayback();
+    return;
   }
   const stream = await navigator.mediaDevices.getUserMedia({
     audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true },
@@ -246,8 +194,7 @@ async function toggleMic() {
   mute.gain.value = 0;
   proc.onaudioprocess = (ev) => {
     const raw = ev.inputBuffer.getChannelData(0);
-    const down = downsample(raw, ctx.sampleRate, MIC_RATE);
-    pushMic(f32ToI16(down));
+    pushMic(f32ToI16(downsample(raw, ctx.sampleRate, MIC_RATE)));
   };
   source.connect(proc);
   proc.connect(mute);
@@ -260,19 +207,10 @@ async function toggleMic() {
       for (const track of stream.getTracks()) track.stop();
     },
   };
-  setState("listening");
 }
 
-canvas.addEventListener("click", () => { toggleMic().catch((err) => { caption.textContent = String(err.message || err); }); });
-listenBtn.addEventListener("click", () => { toggleMic().catch((err) => { caption.textContent = String(err.message || err); }); });
-
-form.addEventListener("submit", (ev) => {
-  ev.preventDefault();
-  ensureAudio();
-  const text = say.value.trim();
-  if (!text || !ws || ws.readyState !== WebSocket.OPEN) return;
-  ws.send(JSON.stringify({ type: "text", text }));
-  say.value = "";
+canvas.addEventListener("click", () => {
+  toggleMic().catch(() => {});
 });
 
 connect();
