@@ -1,0 +1,23 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Galion Labs
+# S06: fail if voice audio or an onnx weight is committed under voice-stack/.
+# No deploy. No model download.
+name: voice-stack-s06-guard
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  samantha-voice-clone:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.85.0
+      - name: Refuse tracked voice files under voice-stack
+        run: bash voice-stack/samantha-voice-clone/ci/check-no-voice-files.sh
+      - name: Guard script self-test
+        run: bash voice-stack/samantha-voice-clone/ci/check-no-voice-files.sh --self-test
+      - name: Samantha s711 crate tests
+        run: cargo test --manifest-path voice-stack/samantha-voice-clone/Cargo.toml

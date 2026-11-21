@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Galion Labs
+
+[package]
+name = "samantha-voice-clone"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+publish = false
+description = "Samantha s711 voice backend. Local zero-shot Chatterbox, raw 24 kHz mono."
+
+[dependencies]
+serde_json = "1"
+sha2 = "0.10"
+
+# Standalone workspace. Not a member of the Galion Voice workspace.
+[workspace]
