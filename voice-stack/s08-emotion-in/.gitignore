@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Galion Labs
+
+# User audio stays on the machine that recorded it.
+*.wav
+*.wave
+*.flac
+*.ogg
+*.mp3
+*.raw
+*.pcm
+/target

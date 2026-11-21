@@ -1,0 +1,26 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Galion Labs
+
+# Standalone workspace. Not a member of the Galion Voice workspace, and not
+# listed in the root Cargo.toml. `cargo test` here does not build the voice
+# workspace, and the voice workspace does not build this crate.
+[workspace]
+
+[package]
+name = "galion-emotion-in"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+publish = false
+description = "CPU prosody from mic frames to a HORBM Pad mood target. Raw audio is not retained."
+
+[[bin]]
+name = "emotion-in"
+path = "src/bin/emotion-in.rs"
+
+[features]
+default = []
+# Tiny Gemm-only ONNX head. Off unless requested. No download, no ort.
+onnx = []
+
+[dependencies]
