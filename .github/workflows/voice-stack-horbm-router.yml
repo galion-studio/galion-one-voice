@@ -1,0 +1,20 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Galion Labs
+# Layer 5 router and the localhost research gateway. No model download.
+
+name: voice-stack horbm router
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    name: router, gateway, pipeline
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.85.0
+      - name: cargo test
+        run: cargo test --manifest-path voice-stack/Cargo.toml -p galion-research-gateway -p galion-sam-horbm -p galion-sam-orch

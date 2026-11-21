@@ -1,0 +1,23 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Galion Labs
+
+[package]
+name = "galion-research-gateway"
+description = "Layer 11 Galion Research gateway. A localhost Rust service. No remote hosts and no paid APIs."
+version = "0.0.1"
+edition = "2021"
+license = "MIT"
+publish = false
+rust-version = "1.83"
+readme = "README.md"
+
+[dependencies]
+serde_json = "1"
+
+[[bin]]
+name = "galion-research-gateway"
+path = "src/bin/galion-research-gateway.rs"
+
+[lib]
+name = "galion_research_gateway"
+path = "src/lib.rs"

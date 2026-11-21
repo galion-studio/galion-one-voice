@@ -4,9 +4,10 @@
 //!
 //! `open` reads `.md` and `.json` files. It does not create the directory,
 //! write a card, or open the memory database. A query that shares no word
-//! with a card is [`UNKNOWN_REPLY`]. [`crate::research::route`] is the
-//! `ReasoningRouter` seam. It returns `None` until that router is on `main`,
-//! and this engine then reads the cards. It does not dial the gateway.
+//! with a card is [`UNKNOWN_REPLY`]. [`crate::research::route`] stays `None`,
+//! so this engine reads the cards. [`crate::ReasoningRouter`] is the layer 5
+//! call for a caller that passes a knowledge directory. This engine does not
+//! dial the gateway.
 
 use std::fs::File;
 use std::io::Read;

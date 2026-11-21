@@ -21,6 +21,7 @@ members = [
     "local-server",
     "one-dot-ui",
     "pipeline-orchestrator",
+    "research-gateway",
     "tts-piper-stream",
 ]
 # `vad` depends on the `ort` crate. LOCKS.toml keeps `ort` out of a Galion

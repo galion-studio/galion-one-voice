@@ -147,7 +147,8 @@ Children, all on loopback or stdio, all CPU:
 - `galion-asr-vosk` on core 1, spawned the way the phone lane already spawns it.
 - Piper on core 6, the `galion-piper-rt` binary when it is on disk, legacy CLI only when `GALION_PIPER_LEGACY=1`. Missing binary is an error, not Flite pretending to be Samantha, unless the operator set the existing `GALION_SPEECH` fallback and the UI's backend label says `flite`.
 - No clone child while a turn is live.
-- No HTTP client to port 8642.
+- The orchestrator does not dial Hermes. The layer 11 gateway is the only voice-stack client of Hermes, and only at `127.0.0.1:8642` (`/v1/chat/completions`). It does not dial 8787, a remote host, or a paid API.
+- Galion Research, layer 11, listens on `127.0.0.1:7911` (`GALION_RESEARCH_BIND`). That is not 8787, which is the Node desk and clashes with the HORBM preview. The layer 5 router in `galion-sam-horbm` calls 7911 only after a card miss, and only for a deep question, with a 3 second cap.
 
 The one-dot page can stay on `127.0.0.1:7878` and open this socket as a second connection, or S11 can be a static page served only as an asset. It does not add a control beside the dot. Dot state arrives as a `dot` text frame. The page already knows `idle`, `listening`, `speaking` from `galion_render::dot::DotState`.
 

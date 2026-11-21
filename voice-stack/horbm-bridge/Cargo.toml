@@ -24,7 +24,9 @@ default = []
 horbm = ["dep:horbm"]
 
 [dependencies]
+galion-research-gateway = { path = "../research-gateway" }
 horbm = { path = "seam/horbm", optional = true }
+serde_json = "1"
 
 [[bin]]
 name = "galion-sam-horbm"

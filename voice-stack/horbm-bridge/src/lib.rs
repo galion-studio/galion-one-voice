@@ -9,10 +9,11 @@
 //! between turns. `horbm` has no `tick` in the brief, so this tick is empty.
 //! It does not synthesize a mood trajectory.
 //!
-//! The real brain is the `horbm` crate (`Brain::open`, `Brain::turn`). It is
-//! not in this tree yet. [`FakeEngine`] is the test double. Feature `horbm`
-//! compiles [`HorbmEngine`] against whatever crate the `horbm` path dependency
-//! points at. That is `seam/horbm` until `../../horbm/crates/horbm` lands.
+//! Crate `horbm` does not exist. `Brain::open` in `galion-sam-orch` still
+//! returns `horbm is not linked; Brain::open stays in crate horbm`.
+//! [`FakeEngine`] is the test double. Feature `horbm` compiles [`HorbmEngine`]
+//! against `seam/horbm`, whose `turn` returns an empty line. The layer 5
+//! path is [`ReasoningRouter`], which reads cards and does not call that seam.
 //!
 //! This crate does not synthesize audio, does not read `GALION_SAMANTHA_REF`,
 //! and does not call a model API. It is not a member of the root workspace.
@@ -21,9 +22,11 @@ mod cards;
 mod chunks;
 mod engine;
 mod fake;
+mod index;
 mod measure;
 mod pad;
 mod research;
+mod router;
 mod session;
 
 #[cfg(feature = "horbm")]
@@ -36,8 +39,16 @@ pub use chunks::{
 };
 pub use engine::{Reply, ReplyEngine};
 pub use fake::FakeEngine;
+pub use galion_research_gateway::{
+    ResearchClient, DEFAULT_BIND as RESEARCH_BIND, DEFAULT_PORT as RESEARCH_PORT, RESEARCH_CAP,
+};
+pub use index::{CardError, CardLoader, CardMatch, LoadedCard, MemoryCards, GAP_ADVICE, MAX_HITS};
 pub use measure::{time_ns, SampleNs};
 pub use pad::{Pad, FRAME_MS};
+pub use router::{
+    is_deep_question, GapEntry, GapReason, ReasoningRouter, ResearchAnswer, ResearchPort,
+    RouteKind, RouteOutcome,
+};
 pub use session::{MoodTick, Session, SpokenTurn};
 
 #[cfg(feature = "horbm")]

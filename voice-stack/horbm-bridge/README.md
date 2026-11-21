@@ -22,6 +22,54 @@ This directory is its own Cargo package. It is not a member of the root
 workspace. It does not synthesize audio, does not read `GALION_SAMANTHA_REF`,
 and does not call a model API.
 
+## Layer 5 router
+
+`ReasoningRouter` is the reasoning router. The 7881 UI calls
+`ReasoningRouter::turn` or `ReasoningRouter::route`. It does not call the
+research gateway first.
+
+Crate `horbm` does not exist. `Brain::open` in `galion-sam-orch` returns
+`horbm is not linked; Brain::open stays in crate horbm`. The layer 5 router
+does not call that function. The card index crate is `horbm-memory` in
+`galion-knowledge` `v2/memory` at `761a7f225304fc010379219e5b88c6669dd48f40`.
+That crate uses rusqlite, returns at most 4 hits, answers a miss with
+`I don't know`, and queues the gap advice `ask_galion_research`. This loader
+does not open it: `Stack::open` creates a directory and a sqlite file.
+Knowledge-base development is paused. The JSON cards in that revision are
+`v2/data/cards/horbm` (90 files) and `v2/data/cards/world` (1416 files).
+They are read-only and they are not copied into this repo.
+
+1. HORBM cards answer first. `MemoryCards` reads `*.json` with `File::open`
+   and `read_dir` only. It does not create or write the knowledge directory.
+   A card matches when every content token of the line is in that card, the
+   same rule as `horbm-memory` `Stack::query` at that revision. Two equally
+   specific cards are not a match. `covering` returns at most 4 hits and
+   does not pick one.
+2. No card, and the line is not a deep question: the spoken line is
+   `I don't know.` The miss is appended to the in-memory gap queue with
+   advice `ask_galion_research`. There is no S0, no LLM, and no Ollama.
+3. A deep question (a `?`, and either eight words or the word why, how, or
+   explain) may go to the Galion Research gateway on `127.0.0.1:7911`, with
+   a 3 second cap. That gateway dials Hermes at `127.0.0.1:8642` and no
+   other host. It does not use 8787. On timeout, or when Hermes has no
+   answer, the spoken line is still `I don't know.`
+
+`speakable_chunks` is the reply builder. The orchestrator sends those
+sentences to the mouth. `RouterMouth` in `galion-sam-orch` is that path:
+finished ASR, router, chunks, then `Tts` (Piper when the host plugs it in).
+
+```bat
+cd /d G:\galion\galion-one-voice\voice-stack\horbm-bridge
+cargo test
+```
+
+`ReasoningRouter::from_env` reads `GALION_HORBM_KNOWLEDGE`. On the laptop
+that directory is `G:\galion\knowledge\v2\data\cards` (the `horbm` and `world`
+trees) or `G:\galion\horbm\knowledge` when a local copy is already there.
+The loader does not create it and does not write `C:`.
+`GALION_RESEARCH_BIND` defaults to off when unset. Set it to `127.0.0.1:7911`
+to allow deep questions to reach the gateway. The router does not dial 8642.
+
 ## What it reuses
 
 - **80 ms frame.** `FRAME_MS` is `galion-heartbeat`'s `FRAME_MS`, the lock
@@ -98,7 +146,7 @@ cargo run --features horbm -- say hello
 
 Those three variables are optional. Unset, `say` stays on `FakeEngine`.
 
-`CardEngine` reads `.md` and `.json` knowledge cards and does not write them. A query that matches no card is `I don't know.` [`research::route`](src/research.rs) is the seam for `ReasoningRouter::turn` / `ReasoningRouter::route`. That type is not on `main` yet (pull request 239), so the seam returns nothing and this bridge answers from cards. The 7881 server does not dial the Research gateway and does not call a model. The card index crate is `horbm-memory` in `galion-studio/galion-knowledge` `v2/memory` at `761a7f225304fc010379219e5b88c6669dd48f40`. This tree does not fetch it and does not open its sqlite file. `Brain::open` in `voice-stack/pipeline-orchestrator` still returns `horbm is not linked`.
+`CardEngine` reads `.md` and `.json` knowledge cards and does not write them. A query that matches no card is `I don't know.` [`research::route`](src/research.rs) stays empty so this bridge keeps answering from those cards and does not dial the gateway. The 7881 server calls `ReasoningRouter::turn` or `ReasoningRouter::route` when it wants the layer 5 order, and it passes the knowledge directory it already opened. The card index crate is `horbm-memory` in `galion-studio/galion-knowledge` `v2/memory` at `761a7f225304fc010379219e5b88c6669dd48f40`. This tree does not fetch it and does not open its sqlite file. `Brain::open` in `voice-stack/pipeline-orchestrator` still returns `horbm is not linked`.
 
 The landing line, relative to this `Cargo.toml`, is:
 
