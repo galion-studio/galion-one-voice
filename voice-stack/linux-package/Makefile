@@ -1,11 +1,12 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 Galion Labs
 # Release build for the Samantha user package.
-# This directory is its own Cargo workspace. It is not a member of the
-# repository workspace.
+# The crate is a member of voice-stack/Cargo.toml, not of the repository
+# workspace. Artifacts stay in this directory so the install scripts find them.
 
 SECTOR := $(abspath $(dir $(lastword $(MAKEFILE_LIST))))
 CARGO ?= cargo
+export CARGO_TARGET_DIR := $(SECTOR)/target
 VERSION := 0.1.0
 HOST := $(shell rustc -vV | awk '/^host:/{print $$2}')
 NAME := galion-samantha-$(VERSION)-$(HOST)
