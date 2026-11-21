@@ -6,25 +6,22 @@
 //!
 //! 1. HORBM cards answer first.
 //! 2. When no card matches there is no gap filler. No S0, no LLM, no Ollama.
-//! 3. The spoken line is [`UNKNOWN_REPLY`] and the miss joins the gap queue.
+//! 3. The spoken line is [`crate::UNKNOWN_REPLY`] and the miss joins the gap queue.
 //! 4. A deep question may then go to the Galion Research gateway, with
 //!    [`galion_research_gateway::RESEARCH_CAP`] (3 seconds). On timeout the
-//!    spoken line is still [`UNKNOWN_REPLY`].
+//!    spoken line is still [`crate::UNKNOWN_REPLY`].
 //!
-//! The 7881 UI calls [`ReasoningRouter::turn`] or [`ReasoningRouter::route`]
-//! from [`crate::research::route`]. It does not call the gateway before the cards.
+//! The 7881 UI calls `horbm::Brain::turn`, which uses this same order after
+//! the empathy rewrite. It does not call the gateway before the cards.
 
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
-use galion_research_gateway::{ClientReply, ResearchClient, RESEARCH_CAP};
+use galion_research_gateway::{ClientReply, ResearchClient};
 
 use crate::chunks::{contains_forbidden, speakable_chunks};
 use crate::engine::{Reply, ReplyEngine};
 use crate::index::{CardLoader, MemoryCards};
 use crate::pad::Pad;
-
-/// Spoken when the cards and, if asked, research have no answer.
-pub const UNKNOWN_REPLY: &str = "I don't know.";
 
 /// What produced the spoken line.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -153,96 +150,19 @@ impl ReasoningRouter {
     }
 
     pub fn route(&mut self, heard: &str) -> RouteOutcome {
-        let started = Instant::now();
-        let trimmed = heard.trim();
-        if trimmed.is_empty() {
-            return RouteOutcome {
-                kind: RouteKind::Unknown,
-                spoken: String::new(),
-                sources: Vec::new(),
-                evidence: Vec::new(),
-                gap: None,
-                lookup_us: 0,
-                took_us: elapsed_us(started.elapsed()),
-            };
-        }
-        let lookup_started = Instant::now();
-        let hit = self.cards.lookup(trimmed);
-        let lookup_us = elapsed_us(lookup_started.elapsed());
-        if let Some(hit) = hit {
-            if let Some(spoken) = speakable_line(&hit.gist) {
-                let source = format!("card:{}", hit.id);
-                return RouteOutcome {
-                    kind: RouteKind::Card,
-                    spoken,
-                    evidence: vec![source.clone()],
-                    sources: vec![source],
-                    gap: None,
-                    lookup_us,
-                    took_us: elapsed_us(started.elapsed()),
-                };
+        let cards = LookupAdapt(self.cards.as_ref());
+        let routed = match self.research.as_mut() {
+            Some(port) => {
+                let mut ask = AskAdapt(port.as_mut());
+                horbm::route_heard(heard, &cards, Some(&mut ask), speakable_line)
             }
-            return self.finish_miss(trimmed, GapReason::CardUnspeakable, lookup_us, started);
-        }
-        if !is_deep_question(trimmed) {
-            return self.finish_miss(trimmed, GapReason::NoCard, lookup_us, started);
-        }
-        let reason = match self.research.as_mut() {
-            None => GapReason::ResearchOff,
-            Some(port) => match port.ask(trimmed, RESEARCH_CAP) {
-                ResearchAnswer::Answer { text, source } => {
-                    if galion_research_gateway::clean_source(&source).is_some() {
-                        if let Some(spoken) = speakable_line(&text) {
-                            let label = format!("research:{source}");
-                            let gap = GapEntry {
-                                heard: trimmed.to_string(),
-                                reason: GapReason::ResearchAnswered,
-                                advice: crate::index::GAP_ADVICE,
-                            };
-                            self.gaps.push(gap.clone());
-                            return RouteOutcome {
-                                kind: RouteKind::Research,
-                                spoken,
-                                sources: vec![label.clone()],
-                                evidence: vec![label],
-                                gap: Some(gap),
-                                lookup_us,
-                                took_us: elapsed_us(started.elapsed()),
-                            };
-                        }
-                    }
-                    GapReason::ResearchMiss
-                }
-                ResearchAnswer::Miss => GapReason::ResearchMiss,
-                ResearchAnswer::Timeout => GapReason::ResearchTimeout,
-                ResearchAnswer::Unreachable => GapReason::ResearchUnreachable,
-            },
+            None => horbm::route_heard(heard, &cards, None, speakable_line),
         };
-        self.finish_miss(trimmed, reason, lookup_us, started)
-    }
-
-    fn finish_miss(
-        &mut self,
-        heard: &str,
-        reason: GapReason,
-        lookup_us: u32,
-        started: Instant,
-    ) -> RouteOutcome {
-        let gap = GapEntry {
-            heard: heard.to_string(),
-            reason,
-            advice: crate::index::GAP_ADVICE,
-        };
-        self.gaps.push(gap.clone());
-        RouteOutcome {
-            kind: RouteKind::Unknown,
-            spoken: UNKNOWN_REPLY.to_string(),
-            sources: vec!["honest:unknown".into()],
-            evidence: Vec::new(),
-            gap: Some(gap),
-            lookup_us,
-            took_us: elapsed_us(started.elapsed()),
+        let outcome = map_route(routed);
+        if let Some(gap) = outcome.gap.clone() {
+            self.gaps.push(gap);
         }
+        outcome
     }
 }
 
@@ -273,37 +193,10 @@ impl ReplyEngine for ReasoningRouter {
 /// A question mark, and either eight words or the word why, how, or explain.
 /// Lexical. No model.
 pub fn is_deep_question(text: &str) -> bool {
-    let trimmed = text.trim();
-    if !trimmed.contains('?') {
-        return false;
-    }
-    if trimmed.split_whitespace().count() >= 8 {
-        return true;
-    }
-    raw_words(trimmed)
-        .iter()
-        .any(|word| word == "why" || word == "how" || word == "explain")
+    horbm::is_deep_question(text)
 }
 
-fn raw_words(text: &str) -> Vec<String> {
-    let mut out = Vec::new();
-    let mut cur = String::new();
-    for ch in text.chars() {
-        if ch.is_alphanumeric() {
-            for c in ch.to_lowercase() {
-                cur.push(c);
-            }
-        } else if !cur.is_empty() {
-            out.push(std::mem::take(&mut cur));
-        }
-    }
-    if !cur.is_empty() {
-        out.push(cur);
-    }
-    out
-}
-
-fn speakable_line(text: &str) -> Option<String> {
+pub(crate) fn speakable_line(text: &str) -> Option<String> {
     if contains_forbidden(text) {
         return None;
     }
@@ -320,14 +213,76 @@ fn speakable_line(text: &str) -> Option<String> {
     )
 }
 
-fn elapsed_us(elapsed: Duration) -> u32 {
-    u32::try_from(elapsed.as_micros()).unwrap_or(u32::MAX)
+struct LookupAdapt<'a>(&'a dyn CardLoader);
+
+impl horbm::CardLookup for LookupAdapt<'_> {
+    fn lookup(&self, query: &str) -> Option<horbm::CardHit> {
+        CardLoader::lookup(self.0, query).map(|hit| horbm::CardHit {
+            id: hit.id,
+            gist: hit.gist,
+        })
+    }
+}
+
+struct AskAdapt<'a>(&'a mut dyn ResearchPort);
+
+impl horbm::ResearchAsk for AskAdapt<'_> {
+    fn ask(&mut self, question: &str, cap: Duration) -> horbm::AskOutcome {
+        match self.0.ask(question, cap) {
+            ResearchAnswer::Answer { text, source } => horbm::AskOutcome::Answer { text, source },
+            ResearchAnswer::Miss => horbm::AskOutcome::Miss,
+            ResearchAnswer::Timeout => horbm::AskOutcome::Timeout,
+            ResearchAnswer::Unreachable => horbm::AskOutcome::Unreachable,
+        }
+    }
+}
+
+fn map_route(out: horbm::RouteOut) -> RouteOutcome {
+    RouteOutcome {
+        kind: map_kind(out.kind),
+        spoken: out.spoken,
+        sources: out.sources,
+        evidence: out.evidence,
+        gap: out.gap.map(map_gap),
+        lookup_us: out.lookup_us,
+        took_us: out.took_us,
+    }
+}
+
+fn map_kind(kind: horbm::RouteKind) -> RouteKind {
+    match kind {
+        horbm::RouteKind::Card => RouteKind::Card,
+        horbm::RouteKind::Research => RouteKind::Research,
+        horbm::RouteKind::Unknown => RouteKind::Unknown,
+    }
+}
+
+fn map_gap(gap: horbm::Gap) -> GapEntry {
+    GapEntry {
+        heard: gap.heard,
+        reason: map_reason(gap.reason),
+        advice: gap.advice,
+    }
+}
+
+fn map_reason(reason: horbm::GapReason) -> GapReason {
+    match reason {
+        horbm::GapReason::NoCard => GapReason::NoCard,
+        horbm::GapReason::CardUnspeakable => GapReason::CardUnspeakable,
+        horbm::GapReason::ResearchOff => GapReason::ResearchOff,
+        horbm::GapReason::ResearchMiss => GapReason::ResearchMiss,
+        horbm::GapReason::ResearchTimeout => GapReason::ResearchTimeout,
+        horbm::GapReason::ResearchUnreachable => GapReason::ResearchUnreachable,
+        horbm::GapReason::ResearchAnswered => GapReason::ResearchAnswered,
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::index::{LoadedCard, MemoryCards};
+    use crate::UNKNOWN_REPLY;
+    use galion_research_gateway::RESEARCH_CAP;
     use std::sync::atomic::{AtomicU32, Ordering};
     use std::sync::Arc;
 

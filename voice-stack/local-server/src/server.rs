@@ -524,6 +524,7 @@ fn elapsed_ms(started: Wall) -> u64 {
     u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX)
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn handle_text(
     text: &str,
     pipe: &mut Box<dyn Pipeline>,
@@ -550,6 +551,7 @@ async fn handle_text(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn handle_binary(
     bytes: &[u8],
     pipe: &mut Box<dyn Pipeline>,

@@ -1,14 +1,16 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Galion Labs
-//! Local HORBM mind. A turn goes through [`galion_sam_horbm::CardEngine`]
-//! into `ReasoningRouter::turn`. Cards answer first. Memory and case files
-//! are not opened.
+//! Local HORBM mind. A turn is [`galion_sam_horbm::CardEngine`], which calls
+//! `horbm::Brain::turn`. Empathy sets the mood, cards answer first, a deep
+//! miss may ask the research gateway, and any other miss is `I don't know.`
+//! Memory and case files are not opened.
 //!
-//! `Brain::open` in `voice-stack/pipeline-orchestrator` returns
-//! `horbm is not linked`. The card index crate is `horbm-memory` in
-//! `galion-knowledge` `v2/memory` (revision `761a7f22`). This process does
-//! not fetch that crate and does not create its sqlite file. A query that
-//! matches no card is `I don't know.`
+//! `Brain::open` in `voice-stack/pipeline-orchestrator` still returns
+//! `horbm is not linked`. That is not this process. The card index crate is
+//! `horbm-memory` in `galion-knowledge` `v2/memory` (revision `761a7f22`).
+//! This process does not fetch that crate and does not create its sqlite
+//! file. Cards stay read-only. There is no knowledge-ro listener on
+//! 127.0.0.1:7900 in this repository.
 
 use std::path::{Path, PathBuf};
 
@@ -69,9 +71,10 @@ impl ReplyEngine for HorbmMind {
 
     fn turn(&mut self, heard: &str) -> Result<TurnOut, String> {
         let out = self.engine.turn(heard);
+        let meta = self.engine.mood_meta();
         Ok(TurnOut {
             reply: out.text,
-            intent_json: "null".into(),
+            intent_json: format!("\"{}\"", meta.intent),
             arm_json: "null".into(),
             propensity: out.propensity,
             evidence: out.evidence,
@@ -84,6 +87,20 @@ impl ReplyEngine for HorbmMind {
                 valence: out.mood.valence,
                 dominance: out.mood.dominance,
             },
+            empathy_e: meta.e,
+            prosody_rate: meta.rate,
+            prosody_energy: meta.energy,
+            prosody_pitch_st: meta.pitch_st,
+            prosody_pause_ms: meta.pause_ms,
+        })
+    }
+
+    fn tick(&mut self) -> Option<Pad> {
+        let pad = self.engine.tick();
+        Some(Pad {
+            arousal: pad.arousal,
+            valence: pad.valence,
+            dominance: pad.dominance,
         })
     }
 }
@@ -106,6 +123,12 @@ mod tests {
         assert_eq!(miss.reply, "I don't know.");
         assert_eq!(miss.reply, BRIDGE_UNKNOWN);
         assert_eq!(miss.sources, vec!["honest:unknown".to_string()]);
+        let tired = mind.turn("I am so tired").unwrap();
+        assert_eq!(tired.reply, "I don't know.");
+        assert!(tired.empathy_e > 0.0);
+        assert!(tired.mood.valence > 0.0);
+        assert!(tired.prosody_rate.is_finite());
+        assert!(!tired.reply.to_ascii_lowercase().contains("sorry"));
         assert_eq!(names(&dir), names_before);
         assert!(!dir.join("memory").exists());
     }

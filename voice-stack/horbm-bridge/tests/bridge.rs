@@ -46,8 +46,14 @@ fn a_session_speaks_the_echo_in_sentence_chunks() {
 
 #[cfg(not(feature = "horbm"))]
 #[test]
-fn the_default_build_does_not_link_horbm() {
-    assert!(!horbm_linked());
+fn the_default_build_links_horbm_and_a_miss_is_exact() {
+    assert!(horbm_linked());
+    let missing = std::env::temp_dir().join(format!("horbm-bridge-missing-{}", std::process::id()));
+    assert!(!missing.exists());
+    let mut brain = galion_sam_horbm::Brain::open(&missing, &missing, &missing);
+    let out = brain.turn("where is the spare fuse");
+    assert_eq!(out.reply, "I don't know.");
+    assert!(!missing.exists());
 }
 
 #[cfg(feature = "horbm")]

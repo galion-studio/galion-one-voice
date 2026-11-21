@@ -12,11 +12,10 @@ ASR text → ReplyEngine → reply text + Pad mood + sources
          → speakable sentence chunks → streaming TTS
 ```
 
-The mood keeps moving on the 80 ms voice heartbeat between turns. The real
-HORBM brain is not in this tree. `FakeEngine` is the stand-in tests and the
-`say` command use. Feature `horbm` compiles `HorbmEngine` against the `horbm`
-crate. That dependency is the type seam in `seam/horbm` until the real crate
-is at `../../horbm/crates/horbm`.
+The mood keeps moving on the 80 ms voice heartbeat between turns. The `horbm` crate is at `../../horbm/crates/horbm`. `FakeEngine` is the
+stand-in the `say` command uses when the feature is off. Feature `horbm`
+compiles `HorbmEngine` against that crate. The live turn is
+`horbm::Brain::turn`.
 
 This directory is its own Cargo package. It is not a member of the root
 workspace. It does not synthesize audio, does not read `GALION_SAMANTHA_REF`,
@@ -25,10 +24,11 @@ and does not call a model API.
 ## Layer 5 router
 
 `ReasoningRouter` is the reasoning router. The 7881 server calls
-`ReasoningRouter::turn` through [`research::route`](src/research.rs). Cards
+`horbm::Brain::turn`, which uses the same card-then-gateway order as
+[`ReasoningRouter::route`](src/router.rs) after the empathy rewrite. Cards
 answer first. It does not call the research gateway first.
 
-Crate `horbm` does not exist. `Brain::open` in `galion-sam-orch` returns
+`Brain::open` in `galion-sam-orch` returns
 `horbm is not linked; Brain::open stays in crate horbm`. The layer 5 router
 does not call that function. The card index crate is `horbm-memory` in
 `galion-knowledge` `v2/memory` at `761a7f225304fc010379219e5b88c6669dd48f40`.
@@ -146,25 +146,19 @@ cargo run --features horbm -- say hello
 
 Those three variables are optional. Unset, `say` stays on `FakeEngine`.
 
-`CardEngine` reads `.md` and `.json` knowledge cards and does not write them. [`research::route`](src/research.rs) calls `ReasoningRouter::turn`. JSON cards use the layer 5 token rule. A markdown card answers when JSON has no hit. A miss is `I don't know.` `GALION_RESEARCH_BIND` is used only when it is `127.0.0.1` and the port is not 8787, 8642, 11434, 7881, or 7878. Unset, the router stays on cards. This process does not bind a port. The card index crate is `horbm-memory` in `galion-studio/galion-knowledge` `v2/memory` at `761a7f225304fc010379219e5b88c6669dd48f40`. This tree does not fetch it and does not open its sqlite file. `Brain::open` in `voice-stack/pipeline-orchestrator` still returns `horbm is not linked`.
+`CardEngine` reads `.md` and `.json` knowledge cards and does not write them. A turn is `horbm::Brain::turn`: empathy mood, then cards, then the gateway. JSON cards use the layer 5 token rule. A markdown card answers when JSON has no hit. A miss is `I don't know.` `GALION_RESEARCH_BIND` is used only when it is `127.0.0.1` and the port is not 8787, 8642, 11434, 7881, or 7878. Unset, the router stays on cards. This process does not bind a port. The card index crate is `horbm-memory` in `galion-studio/galion-knowledge` `v2/memory` at `761a7f225304fc010379219e5b88c6669dd48f40`. This tree does not fetch it and does not open its sqlite file. `Brain::open` in `voice-stack/pipeline-orchestrator` still returns `horbm is not linked`.
 
-The landing line, relative to this `Cargo.toml`, is:
+The dependency, relative to this `Cargo.toml`, is:
 
 ```toml
-horbm = { path = "../../horbm/crates/horbm", optional = true }
+horbm = { path = "../../horbm/crates/horbm" }
 ```
 
-Cargo 1.83.0 resolves an optional path dependency even when the feature is
-off. A missing directory fails `cargo test` before any test runs (measured:
-`failed to read .../horbm/crates/horbm/Cargo.toml`). Until that directory
-exists, the feature links `seam/horbm`, which has the `Brain::open` /
-`Brain::turn` types and does not answer. `build.rs` prints a warning when
-the landing `Cargo.toml` appears so the path can be swapped. The seam's
-source id is `seam:horbm-not-landed`.
+`seam/horbm` is the old type seam. It is not the dependency.
 
 ## Mood between turns
 
-`horbm` has no `tick` in the brief, so this wrapper's tick is empty. It does not synthesize a mood trajectory. `Session::tick` still runs once per heartbeat frame, and `MoodTick::spawn` is that same empty call on its own thread for a host that is not inside `galion-heartbeat` yet. The pad stays where the last `turn` left it. Do not run both clocks for one session.
+`Session::tick` on `FakeEngine` does not move the pad. The live `horbm::Brain::tick_frame` is one empathy frame and does not speak. Do not run both clocks for one session.
 
 ## Measured
 
@@ -206,4 +200,5 @@ build still finished.
 | `src/pad.rs` | `Pad`, resting triple, 80 ms frame |
 | `src/session.rs` | `Session`, `MoodTick` |
 | `src/linked.rs` | `HorbmEngine` (`--features horbm`) |
-| `seam/horbm` | type seam, not the brain |
+| `seam/horbm` | old type seam, not the linked brain |
+| `../../horbm/crates/horbm` | linked `horbm` crate |

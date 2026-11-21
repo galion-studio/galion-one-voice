@@ -4,7 +4,9 @@
 //!
 //! Cards stay on disk. This module opens them with `File::open` and `read_dir`.
 //! It does not create a directory, write a card, or rebuild an index. Knowledge
-//! base development is paused. Crate `horbm` is not in this repository.
+//! base development is paused. Crate `horbm` calls this loader and does not
+//! write it. There is no knowledge-ro server on 127.0.0.1:7900 in this
+//! repository, and this loader does not bind that port.
 //! Crate `horbm-memory` (`galion-knowledge` `v2/memory` at
 //! `761a7f225304fc010379219e5b88c6669dd48f40`) is the index: it uses rusqlite,
 //! `Stack::open` creates the knowledge directory, and a query returns at most

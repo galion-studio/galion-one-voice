@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Galion Labs
-//! Layer 5 call used by the 7881 card bridge.
+//! Direct layer 5 call. The live 7881 turn is [`horbm::Brain::turn`], which
+//! runs empathy and then this same order.
 //!
 //! [`route`] calls [`crate::ReasoningRouter::turn`], which calls
 //! [`crate::ReasoningRouter::route`]. Cards answer first. A miss is

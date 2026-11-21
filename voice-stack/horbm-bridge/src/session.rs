@@ -4,8 +4,10 @@
 //!
 //! [`Session::tick`] is the call a host already inside `galion-heartbeat`
 //! makes once per frame, beside `Heartbeat::step`, not inside it. The
-//! heartbeat step does not allocate and does not lock. This tick is the
-//! same shape: one call, no I/O, and no mood change.
+//! heartbeat step does not allocate and does not lock. This tick is one
+//! call. It does not start a turn, read a card, or open a socket.
+//! [`crate::CardEngine`] may ease the pad toward rest. [`crate::FakeEngine`]
+//! holds the pad.
 //!
 //! [`MoodTick`] is the clock for a host that has no heartbeat thread yet.
 //! It sleeps until the next frame, ticks once, and if it wakes late it does

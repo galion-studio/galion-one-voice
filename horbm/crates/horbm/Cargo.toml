@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Galion Labs
+
+[package]
+name = "horbm"
+description = "One HORBM turn: empathy mood, then cards, then the localhost research gateway, then an honest miss."
+version = "0.0.1"
+edition = "2021"
+license = "MIT"
+publish = false
+rust-version = "1.85"
+
+[dependencies]
+galion-research-gateway = { path = "../../../voice-stack/research-gateway" }
+galion-sam-empathy = { path = "../../../voice-stack/empathy" }

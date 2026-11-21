@@ -3,29 +3,25 @@
 
 [package]
 name = "galion-sam-horbm"
-description = "Samantha HORBM bridge: ReplyEngine, a fake brain, speakable sentence chunks, and an empty 80 ms tick."
+description = "Samantha HORBM bridge: ReplyEngine, read-only cards, and the linked horbm turn."
 version = "0.0.1"
 edition = "2021"
 license = "MIT"
 repository = "https://github.com/galion-studio/galion-one-voice"
-rust-version = "1.83"
+rust-version = "1.85"
 publish = false
 readme = "README.md"
 autobins = false
 
 [features]
 default = []
-# Links the `horbm` crate. Today that is the type seam in seam/horbm.
-# Cargo 1.83 resolves an optional path dependency even when its feature is
-# off, so this cannot point at a directory that is not in the tree yet.
-# When the real crate lands, change the path below to the landing path
-# (kept here so the swap is one line):
-#   horbm = { path = "../../horbm/crates/horbm", optional = true }
-horbm = ["dep:horbm"]
+# Compiles `HorbmEngine`, the `Brain::open` / `turn` adapter. The `horbm`
+# crate is a normal dependency either way. The live 7881 turn uses it.
+horbm = []
 
 [dependencies]
 galion-research-gateway = { path = "../research-gateway" }
-horbm = { path = "seam/horbm", optional = true }
+horbm = { path = "../../horbm/crates/horbm" }
 serde_json = "1"
 
 [[bin]]
@@ -37,4 +33,4 @@ name = "galion_sam_horbm"
 path = "src/lib.rs"
 
 # Member of voice-stack/Cargo.toml, not of the root workspace.
-# The type seam in seam/horbm is a path dependency. It is not the retrieval brain.
+# Crate `horbm` is the path dependency above. seam/horbm is the old type seam and is not linked.

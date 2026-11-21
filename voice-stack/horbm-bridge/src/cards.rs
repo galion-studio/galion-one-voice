@@ -4,24 +4,24 @@
 //!
 //! `open` reads `.md` and `.json` files. It does not create the directory,
 //! write a card, or open the memory database. A query that shares no word
-//! with a card is [`UNKNOWN_REPLY`]. [`crate::research::route`] sends the
-//! turn through [`crate::ReasoningRouter`], which reads these cards first.
-//! This engine does not bind a socket and does not dial the Node desk.
+//! with a card is [`UNKNOWN_REPLY`]. [`CardEngine`] asks [`horbm::Brain`],
+//! which reads these cards first. This engine does not bind a socket and
+//! does not dial the Node desk.
 
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use crate::chunks::contains_forbidden;
 use crate::engine::{Reply, ReplyEngine};
 use crate::index::{CardLoader, CardMatch, MemoryCards};
 use crate::pad::Pad;
 use crate::research;
-use crate::router::ReasoningRouter;
+use crate::router::{speakable_line, ResearchAnswer, ResearchPort};
 
 /// Spoken when no card matches. Not a guess and not a model completion.
-pub const UNKNOWN_REPLY: &str = "I don't know.";
+pub use horbm::UNKNOWN_REPLY;
 
 const MAX_CARD_BYTES: u64 = 64 * 1024;
 
@@ -157,31 +157,66 @@ struct LocalCards {
 
 impl CardLoader for LocalCards {
     fn lookup(&self, query: &str) -> Option<CardMatch> {
-        if let Some(hit) = self.json.lookup(query) {
-            return Some(hit);
-        }
-        let reply = self.prose.answer(query);
-        let id = reply
-            .sources
-            .iter()
-            .find_map(|source| source.strip_prefix("card:"))?;
-        if reply.text.trim().is_empty() {
-            return None;
-        }
-        Some(CardMatch {
-            id: id.to_string(),
-            gist: reply.text,
+        card_match(self, query)
+    }
+}
+
+impl horbm::CardLookup for LocalCards {
+    fn lookup(&self, query: &str) -> Option<horbm::CardHit> {
+        card_match(self, query).map(|hit| horbm::CardHit {
+            id: hit.id,
+            gist: hit.gist,
         })
     }
 }
 
-/// HORBM reply engine. [`crate::research::route`] calls
-/// [`ReasoningRouter::turn`]. Cards answer first, and a miss is
-/// [`UNKNOWN_REPLY`]. Memory and case paths are accepted so the
-/// `Brain::open` shape stays, and they are not opened.
+fn card_match(cards: &LocalCards, query: &str) -> Option<CardMatch> {
+    if let Some(hit) = cards.json.lookup(query) {
+        return Some(hit);
+    }
+    let reply = cards.prose.answer(query);
+    let id = reply
+        .sources
+        .iter()
+        .find_map(|source| source.strip_prefix("card:"))?;
+    if reply.text.trim().is_empty() {
+        return None;
+    }
+    Some(CardMatch {
+        id: id.to_string(),
+        gist: reply.text,
+    })
+}
+
+struct PortAsk(Box<dyn ResearchPort>);
+
+impl horbm::ResearchAsk for PortAsk {
+    fn ask(&mut self, question: &str, cap: Duration) -> horbm::AskOutcome {
+        match self.0.ask(question, cap) {
+            ResearchAnswer::Answer { text, source } => horbm::AskOutcome::Answer { text, source },
+            ResearchAnswer::Miss => horbm::AskOutcome::Miss,
+            ResearchAnswer::Timeout => horbm::AskOutcome::Timeout,
+            ResearchAnswer::Unreachable => horbm::AskOutcome::Unreachable,
+        }
+    }
+}
+
+/// Read-only cards plus the optional research port, as one `horbm` brain.
+pub(crate) fn brain_from_dir(knowledge_dir: &Path, bind: Option<&str>) -> horbm::Brain {
+    let json = MemoryCards::load_dir(knowledge_dir).unwrap_or_default();
+    let prose = CardBrain::open_readonly(knowledge_dir);
+    let research = research::research_port(bind)
+        .map(|port| Box::new(PortAsk(port)) as Box<dyn horbm::ResearchAsk + Send>);
+    let mut brain = horbm::Brain::with_cards(LocalCards { json, prose }, research);
+    brain.set_speakable(speakable_line);
+    brain
+}
+
+/// HORBM reply engine. A turn is [`horbm::Brain::turn`]: empathy mood, then
+/// cards, then the gateway, then [`UNKNOWN_REPLY`]. Memory and case paths
+/// are accepted so the `Brain::open` shape stays, and they are not opened.
 pub struct CardEngine {
-    router: ReasoningRouter,
-    pad: Pad,
+    brain: horbm::Brain,
 }
 
 impl CardEngine {
@@ -201,28 +236,39 @@ impl CardEngine {
         bind: Option<&str>,
     ) -> Self {
         let _ = (memory_db, cases);
-        let json = MemoryCards::load_dir(knowledge_dir).unwrap_or_default();
-        let prose = CardBrain::open_readonly(knowledge_dir);
         Self {
-            router: ReasoningRouter::new(LocalCards { json, prose }, research::research_port(bind)),
-            pad: Pad::RESTING,
+            brain: brain_from_dir(knowledge_dir, bind),
         }
+    }
+
+    pub fn mood_meta(&self) -> horbm::MoodMeta {
+        self.brain.mood_meta()
     }
 }
 
 impl ReplyEngine for CardEngine {
     fn turn(&mut self, text: &str) -> Reply {
-        let reply = research::route(&mut self.router, text);
-        self.pad = reply.mood;
-        reply
+        let out = self.brain.turn(text);
+        Reply {
+            text: out.reply,
+            mood: Pad::new(out.mood.arousal, out.mood.valence, out.mood.dominance),
+            sources: out.sources,
+            evidence: out.evidence,
+            propensity: out.propensity,
+            violations: out.violations,
+            lookup_us: out.lookup_us,
+            took_us: out.took_us,
+        }
     }
 
     fn tick(&mut self) -> Pad {
-        self.pad
+        let meta = self.brain.tick_frame();
+        Pad::new(meta.arousal, meta.valence, meta.dominance)
     }
 
     fn mood(&self) -> Pad {
-        self.pad
+        let meta = self.brain.mood_meta();
+        Pad::new(meta.arousal, meta.valence, meta.dominance)
     }
 }
 

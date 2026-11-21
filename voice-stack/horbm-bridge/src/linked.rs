@@ -2,16 +2,13 @@
 // Copyright (c) 2026 Galion Labs
 //! Adapter from `horbm::Brain` to [`crate::ReplyEngine`].
 //!
-//! Compiled only with `--features horbm`. The path dependency is whatever
-//! `Cargo.toml` names as `horbm`. Today that is the type seam. When the real
-//! crate is at [`crate::HORBM_LANDING_PATH`], point the dependency there.
-//! This file should not need an edit if `Brain::open` takes three `&Path`s
-//! and returns `Brain`, and `turn` returns the documented `TurnOut`.
+//! Compiled only with `--features horbm`. The dependency is crate `horbm`
+//! at [`crate::HORBM_LANDING_PATH`]. `open` reads the knowledge directory
+//! through the read-only card loader and does not create it. Memory and
+//! case paths are not opened.
 //!
-//! `intent` and `arm` are read so a missing field fails here. Their types
-//! stay on the `horbm` crate. `horbm` has no `tick` in the brief, so
-//! [`HorbmEngine::tick`] is empty. It does not synthesize a mood trajectory.
-//! The next `turn` replaces the pad with the brain's Pad.
+//! `intent` and `arm` are read so a missing field fails here. `tick` is one
+//! empathy frame. It does not add a sentence.
 
 use std::path::Path;
 
@@ -24,10 +21,14 @@ pub struct HorbmEngine {
 }
 
 impl HorbmEngine {
-    /// Open the brain. Paths are the memory database, the knowledge directory,
-    /// and the cases directory from `Brain::open`.
+    /// Open the brain. The knowledge directory is read when it already exists.
+    /// The memory database and the cases directory are not opened.
     pub fn open(memory_db: &Path, knowledge_dir: &Path, cases: &Path) -> Self {
-        let brain = horbm::Brain::open(memory_db, knowledge_dir, cases);
+        let _ = (memory_db, cases);
+        let brain = crate::cards::brain_from_dir(
+            knowledge_dir,
+            crate::research::bind_from_env().as_deref(),
+        );
         Self {
             brain,
             pad: Pad::RESTING,
@@ -55,6 +56,8 @@ impl ReplyEngine for HorbmEngine {
     }
 
     fn tick(&mut self) -> Pad {
+        let meta = self.brain.tick_frame();
+        self.pad = Pad::new(meta.arousal, meta.valence, meta.dominance);
         self.pad
     }
 
@@ -80,27 +83,23 @@ mod tests {
     }
 
     #[test]
-    fn adapter_copies_a_turn_and_then_ticks_toward_rest() {
-        let mut engine = HorbmEngine::open(
-            Path::new("memory-db"),
-            Path::new("knowledge"),
-            Path::new("cases"),
-        );
+    fn adapter_miss_is_exact_and_the_pad_stays_finite() {
+        let memory = Path::new("memory-db");
+        let knowledge = Path::new("knowledge");
+        let cases = Path::new("cases");
+        let memory_before = memory.exists();
+        let knowledge_before = knowledge.exists();
+        let cases_before = cases.exists();
+        let mut engine = HorbmEngine::open(memory, knowledge, cases);
         let quiet = engine.turn("hello");
+        assert_eq!(quiet.text, "I don't know.");
+        assert_eq!(quiet.sources, vec!["honest:unknown".to_string()]);
         assert!(quiet.mood.arousal.is_finite());
-        if quiet.sources.iter().any(|s| s == "seam:horbm-not-landed") {
-            assert!(quiet.text.is_empty());
-            let probe = engine.turn("::s04-probe::");
-            assert_eq!(probe.text, "Probe reply. Second sentence.");
-            assert_eq!(probe.sources, vec!["src:probe".to_string()]);
-            assert_eq!(probe.evidence, vec!["card:probe".to_string()]);
-            assert!((probe.propensity - 0.42).abs() < 1e-6);
-            assert_eq!(probe.violations, 2);
-            assert_eq!(probe.lookup_us, 11);
-            assert_eq!(probe.took_us, 22);
-            assert_eq!(probe.mood, Pad::new(0.7, 0.4, 0.6));
-            let held = engine.tick();
-            assert_eq!(held, Pad::new(0.7, 0.4, 0.6));
-        }
+        assert!(!quiet.sources.iter().any(|s| s.contains("seam")));
+        let held = engine.tick();
+        assert!(held.arousal.is_finite());
+        assert_eq!(memory.exists(), memory_before);
+        assert_eq!(knowledge.exists(), knowledge_before);
+        assert_eq!(cases.exists(), cases_before);
     }
 }
