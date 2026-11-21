@@ -37,7 +37,7 @@ for key in \
   '^ProtectKernelModules=yes$' \
   '^ProtectControlGroups=yes$' \
   '^MemoryMax=2G$' \
-  '^Environment=GALION_SAMANTHA_BIND=127\.0\.0\.1:7879$'
+  '^Environment=GALION_SAMANTHA_WS=127\.0\.0\.1:7881$'
 do
   if ! grep -Eq "$key" "$unit"; then
     echo "FAIL: $unit is missing $key" >&2
@@ -47,6 +47,10 @@ done
 
 if grep -Eq '0\.0\.0\.0|GALION_LLM|GALION_SAMANTHA_REF=' "$unit"; then
   echo "FAIL: unit binds a public address, sets an LLM, or stores a reference path" >&2
+  exit 1
+fi
+if grep -Eq '^Environment=.*7879' "$unit"; then
+  echo "FAIL: unit binds 7879, which is GALION_HARD_ADDR" >&2
   exit 1
 fi
 

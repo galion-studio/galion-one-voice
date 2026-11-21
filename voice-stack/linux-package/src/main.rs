@@ -8,8 +8,8 @@ use std::process::Command;
 use std::time::Duration;
 
 use galion_samantha::{
-    default_home, health_json, parse_bind, reference_state, serve_blocking, ModelReport, Paths,
-    TickClock, DEFAULT_BIND, TICK_MS, VERSION,
+    default_home, health_json, parse_bind, reference_state, resolve_bind, serve_blocking,
+    ModelReport, Paths, TickClock, DEFAULT_BIND, TICK_MS, VERSION,
 };
 
 fn main() {
@@ -45,7 +45,7 @@ fn print_help() {
          local loopback supervisor. HORBM is not linked.\n\
          \n\
          commands:\n\
-           serve     bind GALION_SAMANTHA_BIND (default {DEFAULT_BIND})\n\
+           serve     bind GALION_SAMANTHA_WS (default {DEFAULT_BIND})\n\
            check     report public model files (--allow-missing exits 0 if absent)\n\
            open      start the user service if needed and print the one-dot URL\n\
            version   print the version\n\
@@ -54,8 +54,15 @@ fn print_help() {
     );
 }
 
+fn configured_bind() -> String {
+    resolve_bind(
+        env::var("GALION_SAMANTHA_WS").ok().as_deref(),
+        env::var("GALION_SAMANTHA_BIND").ok().as_deref(),
+    )
+}
+
 fn cmd_serve() -> i32 {
-    let bind_raw = env::var("GALION_SAMANTHA_BIND").unwrap_or_else(|_| DEFAULT_BIND.to_string());
+    let bind_raw = configured_bind();
     let bind = match parse_bind(&bind_raw) {
         Ok(addr) => addr,
         Err(err) => {
@@ -112,7 +119,7 @@ fn cmd_check(allow_missing: bool) -> i32 {
 }
 
 fn cmd_open() -> i32 {
-    let bind_raw = env::var("GALION_SAMANTHA_BIND").unwrap_or_else(|_| DEFAULT_BIND.to_string());
+    let bind_raw = configured_bind();
     let bind = match parse_bind(&bind_raw) {
         Ok(addr) => addr,
         Err(err) => {

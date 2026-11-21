@@ -9,6 +9,8 @@
 # and that cap does not fit the public Vosk plus Piper packs.
 # GALION_SAMANTHA_REF is not set here. A human drop-in may add it.
 # The reference file is never copied by this unit.
+# Companion socket is 127.0.0.1:7881 (GALION_SAMANTHA_WS).
+# 7878 is the one-dot screen, 7879 is GALION_HARD_ADDR, 7880 is the clone worker.
 
 [Unit]
 Description=Galion Samantha local voice companion
@@ -17,7 +19,7 @@ After=network.target
 [Service]
 Type=simple
 Environment=GALION_SAMANTHA_HOME=%h/.local/share/galion/samantha
-Environment=GALION_SAMANTHA_BIND=127.0.0.1:7879
+Environment=GALION_SAMANTHA_WS=127.0.0.1:7881
 Environment=GALION_VOSK_MODEL=%h/.local/share/galion/samantha/models/asr/vosk-model-small-en-us-0.15
 Environment=GALION_VOSK_LIB=%h/.local/share/galion/samantha/models/asr/libvosk/libvosk.so
 Environment=GALION_A21_MODEL=%h/.local/share/galion/samantha/models/tts/en_US-ljspeech-medium.onnx

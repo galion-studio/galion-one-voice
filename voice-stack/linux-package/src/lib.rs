@@ -22,7 +22,8 @@ use std::os::unix::fs::PermissionsExt;
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 pub const TICK_MS: u64 = 80;
-pub const DEFAULT_BIND: &str = "127.0.0.1:7879";
+/// Companion socket. 7879 is `GALION_HARD_ADDR` and stays free.
+pub const DEFAULT_BIND: &str = "127.0.0.1:7881";
 
 /// Resting pad from the HORBM contract. Not a live mood.
 pub const RESTING_AROUSAL: f32 = 0.3;
@@ -169,6 +170,17 @@ pub fn reference_state(value: Option<&str>) -> &'static str {
             Err(_) => "missing",
         },
     }
+}
+
+/// `GALION_SAMANTHA_WS` wins. `GALION_SAMANTHA_BIND` is the older name.
+/// An empty value is ignored. The fallback is [`DEFAULT_BIND`] (`127.0.0.1:7881`).
+pub fn resolve_bind(ws: Option<&str>, bind: Option<&str>) -> String {
+    for value in [ws, bind] {
+        if let Some(text) = value.map(str::trim).filter(|text| !text.is_empty()) {
+            return text.to_string();
+        }
+    }
+    DEFAULT_BIND.to_string()
 }
 
 pub fn parse_bind(raw: &str) -> Result<SocketAddr, String> {
@@ -573,15 +585,27 @@ mod tests {
 
     #[test]
     fn bind_rejects_public_and_unspecified() {
-        assert!(parse_bind("127.0.0.1:7879").is_ok());
-        assert!(parse_bind("[::1]:7879").is_ok());
+        assert!(parse_bind("127.0.0.1:7881").is_ok());
+        assert!(parse_bind("[::1]:7881").is_ok());
         assert!(parse_bind("127.0.0.1:0").is_ok());
-        assert!(parse_bind("0.0.0.0:7879").is_err());
-        assert!(parse_bind("[::]:7879").is_err());
+        assert!(parse_bind("0.0.0.0:7881").is_err());
+        assert!(parse_bind("[::]:7881").is_err());
         assert!(parse_bind("8.8.8.8:80").is_err());
-        assert!(parse_bind("192.168.1.10:7879").is_err());
-        assert!(parse_bind("localhost:7879").is_err());
-        assert!(parse_bind("http://127.0.0.1:7879").is_err());
+        assert!(parse_bind("192.168.1.10:7881").is_err());
+        assert!(parse_bind("localhost:7881").is_err());
+        assert!(parse_bind("http://127.0.0.1:7881").is_err());
+    }
+
+    #[test]
+    fn default_bind_leaves_the_hard_loop_port_free() {
+        assert_eq!(DEFAULT_BIND, "127.0.0.1:7881");
+        assert!(!DEFAULT_BIND.contains("7879"));
+        assert_eq!(
+            resolve_bind(Some("127.0.0.1:7882"), Some("127.0.0.1:9")),
+            "127.0.0.1:7882"
+        );
+        assert_eq!(resolve_bind(Some("  "), Some("127.0.0.1:9")), "127.0.0.1:9");
+        assert_eq!(resolve_bind(None, None), DEFAULT_BIND);
     }
 
     #[test]

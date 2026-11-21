@@ -45,7 +45,7 @@ WSL needs systemd enabled in `/etc/wsl.conf` before `systemctl --user` works. Th
 | `~/.config/systemd/user/galion-samantha.service` | user unit |
 | `~/.local/share/applications/galion-samantha.desktop` | launcher |
 
-The desktop entry runs `galion-samantha open`, which starts the user service and opens `http://127.0.0.1:7879/`. The bind is numeric loopback. `0.0.0.0` and public addresses are refused.
+The desktop entry runs `galion-samantha open`, which starts the user service and opens `http://127.0.0.1:7881/`. That is the companion socket (`GALION_SAMANTHA_WS`). Port 7879 stays with the hard loop (`GALION_HARD_ADDR`). The bind is numeric loopback. `0.0.0.0` and public addresses are refused.
 
 Public models, when the download finishes on x86_64:
 

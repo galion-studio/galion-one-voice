@@ -127,7 +127,7 @@ set -e
 [[ "$bad_rc" -eq 2 ]] || fail "dangerous reference path should exit 2, got $bad_rc"
 
 log="$WORK/serve.log"
-GALION_SAMANTHA_HOME=$data GALION_SAMANTHA_BIND=127.0.0.1:0 GALION_SAMANTHA_REF=$ref \
+GALION_SAMANTHA_HOME=$data GALION_SAMANTHA_WS=127.0.0.1:0 GALION_SAMANTHA_REF=$ref \
   "$prefix/.local/bin/galion-samantha" serve >"$log" 2>&1 &
 SERVER_PID=$!
 addr=""
@@ -159,7 +159,7 @@ wait "$SERVER_PID" || true
 SERVER_PID=""
 
 set +e
-GALION_SAMANTHA_HOME=$data GALION_SAMANTHA_BIND=0.0.0.0:7879 \
+GALION_SAMANTHA_HOME=$data GALION_SAMANTHA_WS=0.0.0.0:7881 \
   "$prefix/.local/bin/galion-samantha" serve >"$WORK/public.out" 2>"$WORK/public.err"
 pub_rc=$?
 set -e
