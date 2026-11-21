@@ -75,6 +75,6 @@ The speaker path is 24 kHz, sliced on the 80 ms heartbeat (1920 samples). The fi
 | `dot` | `idle`, `listening`, or `speaking`, plus `level` 0..1 |
 | `error` | A short code. No PCM and no transcript in the string. |
 
-With no `horbm` crate linked, `turn` is the error code `brain-unlinked` and mood stays `source: resting` at `Pad::RESTING` (0.3, 0.25, 0.5). The tick does not ease toward another pad. A test brain may return a speakable line. The PCM for that line is a 24 kHz tone, not Piper and not Samantha's voice. Stock comfort and a bracket tag are not spoken.
+`GET /health` is HTTP 200 and JSON whose `ok` field is `true`. `Brain::open` in the orchestrator returns `horbm is not linked` because crate `horbm` is not in this tree. The unlinked test brain still answers a turn with `brain-unlinked`, and the mood source stays `resting` at `Pad::RESTING` (0.3, 0.25, 0.5). The live binary reads knowledge cards instead. A card that matches is spoken. A miss is `I don't know.` The tick does not ease toward another pad. A test brain may return a speakable line. The PCM for that line is a 24 kHz tone, not Piper and not Samantha's voice. Stock comfort and a bracket tag are not spoken. A second `hello` on an open socket is ignored. Silence of about 640 ms ends one mic turn. Port 7878 is the one-dot page. Port 7881 is this server.
 
 `partial` and `final` are the ASR sector's frames. This process does not invent them.

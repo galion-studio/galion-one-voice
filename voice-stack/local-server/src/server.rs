@@ -17,7 +17,7 @@ use axum::body::Bytes;
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::extract::State;
 use axum::http::{header, HeaderMap, StatusCode, Uri};
-use axum::response::{IntoResponse, Response};
+use axum::response::{IntoResponse, Redirect, Response};
 use axum::routing::{get, post};
 use axum::Router;
 use futures_util::{SinkExt, StreamExt};
@@ -102,6 +102,9 @@ pub struct AppState {
     pub sessions: Arc<SessionStore>,
     pub require_session: bool,
     pub live: Arc<AtomicUsize>,
+    pub ui: PathBuf,
+    pub http_pipe: Arc<Mutex<Box<dyn crate::pipeline::Pipeline>>>,
+    pub stage: crate::voice_http::SharedStage,
 }
 
 #[derive(Clone)]
@@ -185,14 +188,14 @@ pub async fn start(
     ttl: Duration,
 ) -> Result<Running, ServeError> {
     let (listener, bound) = bind_listener(addr).await?;
-    let state = AppState {
+    let state = app_state(
         bound,
         factory,
         samantha_ref,
-        sessions: Arc::new(SessionStore::new(ttl)),
         require_session,
-        live: Arc::new(AtomicUsize::new(0)),
-    };
+        ttl,
+        ui_dir.clone(),
+    );
     let app = router(state, ui_dir);
     let join = tokio::spawn(async move {
         let _ = axum::serve(listener, app).await;
@@ -210,14 +213,14 @@ pub async fn serve_until_ctrl_c(
 ) -> Result<(), ServeError> {
     let (listener, bound) = bind_listener(addr).await?;
     eprintln!("samantha-local listening on http://{bound}/  (loopback only, {SCHEMA} {WS_PATH})");
-    let state = AppState {
+    let state = app_state(
         bound,
         factory,
         samantha_ref,
-        sessions: Arc::new(SessionStore::new(ttl)),
         require_session,
-        live: Arc::new(AtomicUsize::new(0)),
-    };
+        ttl,
+        ui_dir.clone(),
+    );
     let app = router(state, ui_dir);
     axum::serve(listener, app)
         .with_graceful_shutdown(async {
@@ -235,28 +238,96 @@ async fn bind_listener(addr: SocketAddr) -> Result<(TcpListener, SocketAddr), Se
     Ok((listener, bound))
 }
 
+fn app_state(
+    bound: SocketAddr,
+    factory: PipelineFactory,
+    samantha_ref: RefState,
+    require_session: bool,
+    ttl: Duration,
+    ui: PathBuf,
+) -> AppState {
+    let http_pipe = Arc::new(Mutex::new((factory)()));
+    AppState {
+        bound,
+        factory,
+        samantha_ref,
+        sessions: Arc::new(SessionStore::new(ttl)),
+        require_session,
+        live: Arc::new(AtomicUsize::new(0)),
+        ui,
+        http_pipe,
+        stage: crate::voice_http::new_stage(),
+    }
+}
+
 fn router(state: AppState, ui_dir: PathBuf) -> Router {
     Router::new()
         .route("/health", get(health))
+        .route("/favicon.ico", get(favicon))
         .route("/session", post(open_session))
         .route(WS_PATH, get(stream))
+        .route("/", get(one_page))
+        .route("/one", get(one_page))
+        .route("/one/", get(one_page))
+        .route("/dot", get(dot_redirect))
+        .route("/dot/", get(dot_page))
+        .route("/v1/dot", get(crate::voice_http::dot_state))
+        .route("/v1/mic", post(crate::voice_http::mic_level))
+        .route("/v1/turn", post(crate::voice_http::voice_turn))
+        .route("/v2/say", post(crate::voice_http::say_text))
+        .route("/v1/reply/:id", get(crate::voice_http::reply_audio))
         .with_state(state)
         .fallback_service(ServeDir::new(ui_dir))
 }
 
+async fn one_page(State(app): State<AppState>) -> Response {
+    crate::voice_http::html_file(&app.ui.join("index.html"))
+}
+
+async fn dot_page(State(app): State<AppState>) -> Response {
+    crate::voice_http::html_file(&app.ui.join("dot/index.html"))
+}
+
+async fn dot_redirect() -> Redirect {
+    Redirect::permanent("/dot/")
+}
+
+async fn favicon() -> impl IntoResponse {
+    (
+        StatusCode::OK,
+        [
+            (header::CONTENT_TYPE, "image/x-icon"),
+            (header::CACHE_CONTROL, "public, max-age=86400"),
+        ],
+        Bytes::from_static(include_bytes!("../ui/favicon.ico")),
+    )
+}
+
 async fn health(State(app): State<AppState>) -> impl IntoResponse {
-    let body = format!(
-        "{{\"ok\":true,\"schema\":\"{SCHEMA}\",\"bind\":\"{}\",\"loopback\":true,\"samantha_ref\":\"{}\"}}",
-        app.bound,
-        app.samantha_ref.as_str()
-    );
+    let info = app
+        .http_pipe
+        .lock()
+        .map(|pipe| pipe.info())
+        .unwrap_or_else(|err| err.into_inner().info());
+    let body = serde_json::json!({
+        "ok": true,
+        "schema": SCHEMA,
+        "bind": app.bound.to_string(),
+        "loopback": true,
+        "samantha_ref": app.samantha_ref.as_str(),
+        "vad": info.vad_backend,
+        "vad_ready": info.vad_ready,
+        "asr": info.ear,
+        "mouth": info.mouth,
+        "mind": info.mind,
+    });
     (
         StatusCode::OK,
         [
             (header::CONTENT_TYPE, "application/json"),
             (header::CACHE_CONTROL, "no-store"),
         ],
-        body,
+        body.to_string(),
     )
 }
 
@@ -465,7 +536,9 @@ async fn handle_text(
 ) -> bool {
     match parse_client(text) {
         Err(code) => send_line(tx, error_json(&code)).await,
-        Ok(ClientControl::Hello { .. }) => send_line(tx, welcome_json()).await,
+        // The socket already welcomed this session. A second hello within the
+        // same connection is not another session and does not send welcome again.
+        Ok(ClientControl::Hello { .. }) => true,
         Ok(ClientControl::Ping) => send_line(tx, pong_json()).await,
         Ok(ClientControl::Unknown { .. }) => send_line(tx, error_json("unknown-type")).await,
         Ok(ClientControl::Consent { .. }) => true,

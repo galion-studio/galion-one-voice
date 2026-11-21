@@ -204,12 +204,24 @@ async fn companion_socket() {
     }
     let index = http(addr, "GET", "/", "").await;
     assert_eq!(index.status, 200);
+    assert!(index.body.contains("Galion One"));
+    assert!(index.body.contains("Ask anything"));
     assert!(index.body.contains("data-mark=\"orb\""));
-    let js = http(addr, "GET", "/app.js", "").await;
+    assert!(index.body.contains("/v1/dot"));
+    assert!(index.body.contains("PREVIEW_ONLY=false"));
+    let dot_page = http(addr, "GET", "/dot/", "").await;
+    assert_eq!(dot_page.status, 200, "{}", dot_page.body);
+    assert!(dot_page.body.contains("app.js"));
+    let js = http(addr, "GET", "/dot/app.js", "").await;
     assert!(js.body.contains("/v1/samantha"));
     assert!(js.body.contains("#F5F5F7"));
-    let css = http(addr, "GET", "/dot.css", "").await;
+    let css = http(addr, "GET", "/dot/dot.css", "").await;
     assert!(css.body.contains("#0A0A0C"));
+    let icon = http(addr, "GET", "/favicon.ico", "").await;
+    assert_eq!(icon.status, 200, "{}", icon.head);
+    assert!(icon.head.to_ascii_lowercase().contains("image/x-icon"));
+    assert!(js.body.contains("audioWorklet"));
+    assert!(!js.body.contains("createScriptProcessor"));
 
     let session = http(addr, "POST", "/session", "{\"op\":\"open\"}").await;
     assert_eq!(session.status, 200, "{}", session.body);
@@ -241,6 +253,23 @@ async fn companion_socket() {
     assert_eq!(welcome["dot"], "idle");
 
     ws.send(Message::Text(format!(
+        r#"{{"schema":"{SCHEMA}","type":"hello","session":null}}"#
+    )))
+    .await
+    .unwrap();
+    let again = Instant::now() + Duration::from_millis(400);
+    while Instant::now() < again {
+        if let Some(Message::Text(text)) = recv(&mut ws, Duration::from_millis(100)).await {
+            let v: Value = serde_json::from_str(&text).unwrap();
+            assert_ne!(
+                v["type"].as_str(),
+                Some("welcome"),
+                "a second hello is not a second welcome"
+            );
+        }
+    }
+
+    ws.send(Message::Text(format!(
         r#"{{"schema":"{SCHEMA}","type":"ping"}}"#
     )))
     .await
@@ -254,7 +283,7 @@ async fn companion_socket() {
     for n in 0..4u16 {
         ws.send(Message::Binary(mic_bytes(8000, n))).await.unwrap();
     }
-    for n in 4..14u16 {
+    for n in 4..36u16 {
         ws.send(Message::Binary(mic_bytes(0, n))).await.unwrap();
     }
     let sent_end = Instant::now();
@@ -413,6 +442,30 @@ async fn companion_socket() {
     eprintln!("{line}");
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target/s10-measure.txt");
     let _ = std::fs::write(path, line);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn galion_one_text_returns_speaker_audio() {
+    let running = boot("127.0.0.1:0").await;
+    let said = http(
+        running.addr,
+        "POST",
+        "/v2/say",
+        "{\"text\":\"hello from the page\"}",
+    )
+    .await;
+    assert_eq!(said.status, 200, "{}", said.body);
+    assert!(said.body.contains("The fence is loose."));
+    assert!(!said.body.contains("brain-unlinked"));
+    let dot = http(running.addr, "GET", "/v1/dot", "").await;
+    assert_eq!(dot.status, 200, "{}", dot.body);
+    let state: Value = serde_json::from_str(&dot.body).expect("dot json");
+    assert!(state["radius"].as_f64().is_some());
+    assert_eq!(state["vad"]["ready"], true);
+    let url = state["reply"]["url"].as_str().expect("reply url");
+    let wav = http(running.addr, "GET", url, "").await;
+    assert_eq!(wav.status, 200, "{}", wav.head);
+    assert!(wav.body.starts_with("RIFF"), "speaker body was not a wav");
 }
 
 async fn next_text(ws: &mut Sock, timeout: Duration) -> Option<Value> {

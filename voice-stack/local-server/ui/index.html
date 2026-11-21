@@ -1,18 +1,1176 @@
-<!DOCTYPE html>
-<!--
-// SPDX-License-Identifier: MIT
-// Copyright (c) 2026 Galion Labs
--->
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#0A0A0C">
-  <title>Samantha</title>
-  <link rel="stylesheet" href="dot.css">
+<!doctype html>
+<!-- Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
+     Local copy of crates/galion-console/assets/v1-screen.html (galion.app/one).
+     Served by samantha-local at / and /one. The old one-dot page stays at /dot/.
+     One screen: one dot. Mobile-safe. Tap anywhere → mic. Replies are Piper audio on /reply.
+     UX-01: the page animates on its own 60 fps clock from /dot {mode,level} (no 80 ms stutter),
+     listening = larger + full bright + still; speaking = smaller base, pulsing; idle = slow breath;
+     server unreachable = small dim still dot (never mistaken for idle).
+     V2 orb: the same one mark, a calm circle on a soft spring (idle / listen / think / speak).
+     Fill is the locked near-white #F5F5F7 (a quiet gradient around that pigment, 1px hairline).
+     Brightness is glow and a little size — it does not multiply the fill.
+     Aspect stays 1. Speak radius follows a low-passed reply envelope, not an ellipse.
+     Interior warmth follows GET /dot "emotion" (live heartbeat AffectFeed), via StubExpressor.
+     Around the mark, /dot "nebula" may lay faint arcs in the amber→violet wash.
+     present !== true, or emotion.sense === false, holds: no arcs, no invented blend.
+     Arc periods are the 432 Hz just lattice slowed into a breath (2:1, 3:2, 5:4).
+     The arcs never tint the #F5F5F7 disc.
+     V1 voice pipeline (supersedes the UX-01 "no raw audio leaves the page" note, per Maciej):
+       mic level  → POST /mic  {rms,t[,playing]} every ~80 ms (drives the dot, unchanged)
+       utterance  → POST /turn  audio/wav (16 kHz mono 16-bit PCM), cut on-device by VAD
+                    (~640 ms quiet after speech). That end is the auto-record. proceedTurn
+                    posts the same /turn with X-Galion-Proceed: auto. No second page.
+                    Headers: X-Turn-Id, X-Sample-Rate, X-Barge-In, X-Galion-Proceed.
+       reply      ← /dot JSON gains reply:{id,url,ms[,hub_texture]}; page fetches the WAV and plays it through
+                    (hub_texture:true = the Jarvis hub bed is mixed into that WAV; body[data-hub-texture]),
+                    the AudioContext unlocked by the tap. User speech during playback = barge-in:
+                    playback stops at once and the new utterance is captured.
+     The page does not use the browser speech engine. PREVIEW_ONLY is the default:
+     a tap on the mark plays /preview/voice-preview from start to end. Live voice,
+     getUserMedia, VAD, and barge-in stay off until that flag is flipped.
+     Owner t653u: the voice surface is still one dot. The canvas draws no text,
+     persona names, or transcript. Preview captions are the HTML line in the shell.
+     The Galion One shell (hero, prompt, footer) sits over that dot. It is the
+     same prompt as the desktop app: plus, one field, voice. Typed lines use
+     the existing POST /v2/say path. File names stay on the page.
+     CC0 consent is enforced at clone time in Rust, so the call shows no CC0 UI.
+     The session token comes from POST /session's body and is never put in the URL. -->
+<html lang="en"><head><meta charset="utf-8"><link rel="icon" href="/favicon.ico" type="image/x-icon">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0B0F14" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#0B0F14">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="format-detection" content="telephone=no">
+<title>Galion One</title>
+<style>
+html,body{margin:0;width:100%;height:100%;height:100dvh;background:#0B0F14;color-scheme:dark;overflow:hidden;
+  touch-action:manipulation;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;
+  overscroll-behavior:none;cursor:default}
+canvas{display:block;position:fixed;inset:0;width:100%;height:100%;width:100dvw;height:100dvh;
+  padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  box-sizing:border-box}
+#decide{display:none}
+@media (min-width:1100px){
+  body[data-session="samantha"] #decide{display:flex;flex-direction:column;gap:14px;position:fixed;top:28px;right:28px;width:300px;z-index:2;
+    color:#F5F5F7;font:15px/1.35 system-ui,sans-serif}
+  #decide .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  #decide .q{flex:1 1 140px}
+  #decide button{appearance:none;border:1px solid rgba(245,165,36,.55);background:transparent;color:#F5F5F7;
+    border-radius:999px;padding:6px 14px;font:inherit;cursor:pointer}
+  #decide button[aria-pressed="true"]{background:#F5A524;color:#0A0A0C;border-color:#F5A524}
+}
+#silence{position:fixed;left:0;bottom:0;z-index:3;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;
+  clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;border:0;
+  background:#0A0A0C;color:#F5F5F7;font:16px/1.2 system-ui,sans-serif}
+#one{
+  --bg:#0B0F14;--panel:#131A22;--line:#24303C;--fg:#E6EDF3;--muted:#A7B6C4;
+  --accent:#58C4FF;--accent-fg:#0B0F14;--focus:#58C4FF;
+  position:fixed;inset:0;z-index:4;display:flex;flex-direction:column;align-items:center;gap:12px;
+  box-sizing:border-box;
+  padding:calc(16px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right)) calc(16px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left));
+  pointer-events:none;overflow:auto;color:var(--fg);
+  font:16px/1.45 "IBM Plex Sans",system-ui,sans-serif;
+  -webkit-user-select:text;user-select:text}
+#one>*{pointer-events:auto;width:min(42rem,100%);box-sizing:border-box}
+#one .stage{pointer-events:none;flex:1 1 auto;min-height:22vh;width:100%;position:relative}
+#caption{position:fixed;left:50%;top:62%;transform:translateX(-50%);z-index:6;width:min(36rem,calc(100% - 32px));margin:0;pointer-events:none;text-align:center;color:#E6EDF3;font:600 1.12rem/1.35 "IBM Plex Sans",system-ui,sans-serif;text-shadow:0 2px 18px #0B0F14,0 0 2px #0B0F14}
+#caption:empty{display:none}
+#one header{display:flex;align-items:center}
+.kicker{margin:0;color:var(--muted);font:600 12px/1 "IBM Plex Sans",system-ui,sans-serif;letter-spacing:.16em;text-transform:uppercase}
+.hero{display:flex;flex-direction:column;align-items:flex-start;gap:12px;padding:18px 18px 16px;background:var(--panel);border:1px solid var(--line);border-radius:20px}
+.hero h1{margin:0;font:600 1.35rem/1.25 "IBM Plex Sans",system-ui,sans-serif;letter-spacing:-0.02em;color:var(--fg)}
+.about{display:flex;flex-direction:column;gap:6px}
+.lede,.artifact{margin:0;color:var(--muted);font-size:.95rem;line-height:1.45}
+.download{display:inline-flex;align-items:center;justify-content:center;min-height:48px;padding:0 18px;background:var(--accent);color:var(--accent-fg);border-radius:11px;font-weight:600;text-decoration:none}
+.download:hover{filter:brightness(1.06)}
+#one :focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.download:focus-visible{outline-color:var(--fg)}
+.prompt{display:flex;align-items:center;gap:8px;width:100%;margin:0;padding:6px;background:var(--panel);border:1px solid var(--line);border-radius:11px}
+.plus,.voice{position:relative;display:grid;place-items:center;width:44px;height:44px;flex:none;border-radius:11px;border:1px solid var(--line);background:transparent;color:var(--fg);cursor:pointer;padding:0}
+.plus svg,.voice svg{width:22px;height:22px;display:block;pointer-events:none}
+.plus input{position:absolute;inset:0;z-index:1;margin:0;opacity:0;cursor:pointer;font-size:16px}
+.voice[aria-pressed="true"]{color:var(--accent);border-color:var(--accent)}
+#command{flex:1;min-width:0;height:44px;border:0;background:transparent;color:var(--fg);font:inherit;padding:0 4px}
+#command::placeholder{color:var(--muted);opacity:1}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:0;padding:0;list-style:none}
+.chips:empty{display:none}
+.chip{max-width:100%;padding:4px 10px;border-radius:999px;background:var(--panel);border:1px solid var(--line);color:var(--fg);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.note,.status{margin:0;min-height:0;color:var(--muted);font-size:13px}
+.note:empty,.status:empty{display:none}
+#one footer{padding:10px 14px;background:var(--bg);border:1px solid var(--line);border-radius:11px}
+#one footer p{margin:0;color:var(--muted);font-size:13px}
+#one footer a{color:var(--fg)}
+.sr{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;border:0}
+#voice-preview{pointer-events:none}
+@media (max-width:720px){
+  #one{gap:10px;padding:calc(12px + env(safe-area-inset-top)) calc(12px + env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom)) calc(12px + env(safe-area-inset-left))}
+  .hero{padding:14px}
+  .hero h1{font-size:1.15rem}
+}
+@media (max-height:720px){
+  #one{gap:8px;padding-bottom:calc(8px + env(safe-area-inset-bottom))}
+  .about{gap:4px}
+  .lede,.artifact{font-size:.8125rem;line-height:1.35}
+}
+</style>
+<script type="module">
+import { drawNebula } from "/nebula/vocabulary.mjs?v=__GALION_ASSET_V__";
+window.drawNebula = drawNebula;
+</script>
 </head>
 <body>
-  <canvas id="s" data-mark="orb" data-persona="samantha" data-mouth="hold" data-film-voice="false" aria-label="Listen"></canvas>
-  <script src="app.js"></script>
-</body>
-</html>
+<canvas id="s" data-mark="orb" data-profile="luti" data-persona="samantha" data-mouth="piper" data-film-voice="false" data-rights="hold"></canvas>
+<div id="decide">
+  <div class="row" data-id="here"><span class="q">Keep this session on this machine</span><button type="button" data-yes="yes">Yes</button><button type="button" data-yes="no">No</button></div>
+  <div class="row" data-id="quiet"><span class="q">Stay quiet when the turn ends</span><button type="button" data-yes="yes">Yes</button><button type="button" data-yes="no">No</button></div>
+  <div class="row" data-id="english"><span class="q">Keep replies in English</span><button type="button" data-yes="yes">Yes</button><button type="button" data-yes="no">No</button></div>
+</div>
+<!-- /decide -->
+<button id="silence" type="button" aria-pressed="false">Silence</button>
+<!-- /silence -->
+<!-- one-shell -->
+<div id="one">
+  <header><p class="kicker">Galion One</p></header>
+  <section class="hero" aria-labelledby="soon">
+    <h1 id="soon">Galion One for live users is coming very soon.</h1>
+    <a class="download" href="https://github.com/galion-studio/obsidian-open-mind/actions/workflows/openmind-desktop.yml" target="_blank" rel="noopener noreferrer">Download alpha on GitHub<span class="sr"> (opens in a new tab)</span></a>
+  </section>
+  <div class="stage"><p id="caption" aria-live="polite"></p></div>
+  <audio id="voice-preview" class="sr" preload="auto" playsinline webkit-playsinline>
+    <source src="/preview/voice-preview.mp3?v=__GALION_ASSET_V__" type="audio/mpeg">
+    <source src="/preview/voice-preview.opus?v=__GALION_ASSET_V__" type="audio/ogg; codecs=opus">
+    <source src="/preview/voice-preview.wav?v=__GALION_ASSET_V__" type="audio/wav">
+  </audio>
+  <section class="about" aria-label="About Galion One">
+    <p class="lede">Galion One is the assistant you talk to. Speak, or type. The mark in the middle is the voice. Galion Research is the research engine for the deeper questions.</p>
+    <p class="artifact">An alpha test build for Windows, macOS and Linux. Open source under the MIT License. Developed by Galion Labs, built in Rust.</p>
+  </section>
+  <p class="sr" id="mark-help">The circle in the middle is Galion. Tap it to talk. The field below is for typing.</p>
+  <form id="ask" class="prompt" action="#ask" method="post" aria-describedby="mark-help">
+    <label class="plus">
+      <input id="files" type="file" multiple aria-label="Add files">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+    </label>
+    <input id="command" type="text" name="ask" autocomplete="off" enterkeyhint="send" placeholder="Ask anything…" aria-label="Ask anything">
+    <button id="voice" class="voice" type="button" aria-pressed="false" aria-label="Voice">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4a3 3 0 0 0-3 3v4a3 3 0 0 0 6 0V7a3 3 0 0 0-3-3M8 18a4 4 0 0 0 8 0M12 18v2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+    </button>
+  </form>
+  <ul id="picked" class="chips" aria-label="Attached files"></ul>
+  <p id="files-note" class="note"></p>
+  <p id="status" class="status" role="status" aria-live="polite"></p>
+  <footer><p>Developed by Galion Labs, <a href="https://github.com/galion-studio/obsidian-open-mind/blob/main/LICENSE">MIT License</a>.</p></footer>
+</div>
+<!-- /one-shell -->
+<script>
+"use strict";
+const TOK={dot:"#F5F5F7",base:"#0B0F14",from:"#F5A524",to:"#7C3AED"};
+// Body of the mark is the locked token. Edge is a whisper darker, still the same pigment.
+// Stroke is a 1-device-pixel hairline. Brightness never scales these channels.
+const MARK={core:"#F5F5F7",edge:"#E8E8ED",stroke:"rgba(255,255,255,0.55)",strokePx:1};
+const WASH=0.38, WASH_MS=24000, IDLE_MS=1600, BW=96, BH=54;
+// Radius fractions mirror galion-render DotParams scale. Brightness here is glow (0..1), not pigment.
+const R={idle:0.100, listen:0.135, speak:0.105, speakDepth:0.028, off:0.060};
+const B={idle:0.48, listen:0.72, off:0.08};
+const POLL_MS=80, MAX_INFLIGHT=3, FETCH_TIMEOUT_MS=1200, OFFLINE_MS=1500;
+const HOLD_IDLE_MS=300, HOLD_LEAVE_SPEAK_MS=160, LOCAL_VOICE=0.02;
+// Soft springs. Same aims as OrbMotion::radius_gain. Eased — a mode change does not rebind in one frame.
+const GAIN_TAU=480, TARGET_TAU=140, ENV_ATTACK=200, ENV_RELEASE=380, EM_TAU=520;
+const hex=h=>[1,3,5].map(i=>parseInt(h.slice(i,i+2),16));
+const okHex=h=>typeof h==="string"&&/^#[0-9A-Fa-f]{6}$/.test(h);
+const lerp=(a,b,t)=>a.map((x,i)=>Math.round(x+(b[i]-x)*t));
+const clamp=(x,a,b)=>Math.min(b,Math.max(a,x));
+const cv=document.getElementById("s"), cx=cv.getContext("2d",{alpha:false});
+const bg=document.createElement("canvas"); bg.width=BW; bg.height=BH;
+const bx=bg.getContext("2d"), img=bx.createImageData(BW,BH);
+// The canvas draws no text. The shell status line shows the same message the tone marks.
+const ASSET_V="__GALION_ASSET_V__";
+const t0=performance.now();
+let latest=null, lastOk=0, lastT=-1, inflight=0, everOk=false;
+let shown="idle", cand="idle", candSince=0;          // displayed mode + hysteresis
+let lastFrame=performance.now();
+let micState="off"; // off | pending | on | denied
+let micStream=null, micCtx=null, micAnalyser=null, micData=null, micRms=0, micFloor=0.004, micPosting=false;
+// Capture / VAD / playback state (see voice pipeline section below).
+const CAP_SR=16000, VAD_FRAME=320;                     // 20 ms frames at 16 kHz
+const VAD_START_MS=80, VAD_BARGE_MS=200, VAD_END_MS=640, PREROLL_MS=300;
+const MIN_SPEECH_MS=240, MAX_UTT_MS=15000, VAD_ABS=0.012, VAD_FLOOR_X=3.0, VAD_PLAY_X=2.0;
+let capNode=null, capSink=null, capRatio=1, capPos=0, capFrame=new Float32Array(VAD_FRAME), capFill=0;
+let vadFloor=0.003, vadOn=false, vadRun=0, vadQuiet=0, vadSpeechMs=0, uttMs=0, uttBarge=false;
+let preroll=[], utt=[], turnSeq=0;
+let playSrc=null, playId=null, playing=false, seenReplies=new Set();
+// Pre-rendered preview. PREVIEW_ONLY keeps live voice, the mic, VAD, and barge-in
+// off. The <audio> element is in the document from the start so play() runs inside
+// the tap. Flip this when a live session is ready to open.
+const PREVIEW_ONLY=false;
+const LIVE_SESSION_MS=1500;
+function assetUrl(path){
+  const join=path.indexOf("?")>=0?"&":"?";
+  return path+join+"v="+encodeURIComponent(ASSET_V);
+}
+let arming=false, previewOn=false, previewScript=null, previewSeg=-1, previewRaf=0, voiceGen=0;
+let previewScriptTried=false;
+// V2 orb: spring state. Gains ease from the idle aim. No aspect — the mark is a circle.
+const LUTI={idle:{w:1.8,z:0.92},listening:{w:3.4,z:0.88},thinking:{w:2.4,z:0.90},speaking:{w:3.0,z:0.92},offline:{w:2.0,z:1.02}};
+const SPRING=LUTI;
+const LUTI_COST=48;
+let rP=R.idle, rV=0, bP=B.idle, bV=0, wS=SPRING.idle.w, zS=SPRING.idle.z;
+let trLp=R.idle, tbLp=B.idle, micEnv=0, playEnv=0, turnsInFlight=0;
+let emV=0.30, emA=0.35, emLean=0, liveLp=0;
+let playAn=null, playData=null;
+let sessionToken="";
+let hearReplies=false;
+
+function sessionHeaders(extra){
+  const h={"ngrok-skip-browser-warning":"1"};
+  if(extra) Object.assign(h, extra);
+  if(sessionToken) h["X-Galion-Session"]=sessionToken;
+  return h;
+}
+function postSession(ms){
+  if(sessionToken) return Promise.resolve(true);
+  const ac=(ms&&window.AbortController)?new AbortController():null;
+  let timer=0;
+  if(ac) timer=setTimeout(()=>{ try{ac.abort();}catch(e){} }, ms);
+  const opts={method:"POST",cache:"no-store",
+    headers:{"Content-Type":"application/json","ngrok-skip-browser-warning":"1"},
+    body:"{\"op\":\"open\"}"};
+  if(ac) opts.signal=ac.signal;
+  return fetch("/session",opts).then(r=>r.ok?r.json():null).then(j=>{
+    if(j&&typeof j.token==="string"&&j.token){ sessionToken=j.token; return true; }
+    return false;
+  }).catch(()=>false).finally(()=>{ if(timer) clearTimeout(timer); });
+}
+async function ensureSession(){
+  if(sessionToken) return;
+  await postSession(0);
+}
+function openLiveSession(){ return postSession(LIVE_SESSION_MS); }
+function showCaption(text){
+  const el=document.getElementById("caption");
+  if(el) el.textContent=text||"";
+}
+
+// Surround + interior targets. The disc body stays #F5F5F7. These only move the wash.
+const MOOD={
+  calm:{wash:0.38,amber:0.46,warm:0.30},
+  grief:{wash:0.58,amber:0.08,warm:0.14},
+  joy:{wash:0.66,amber:0.84,warm:0.62},
+  vulnerability:{wash:0.44,amber:0.22,warm:0.20},
+  quiet:{wash:0.20,amber:0.28,warm:0.24}
+};
+let moodWash=0.38, moodAmber=0.46;
+// Halo timing and colour live in /nebula/vocabulary.mjs (432 Hz, 2:1, 3:2, 5:4).
+const FEED_SCHEMA="galion-voice-v2-emotion-feed/1";
+// Demo 13 element ids for galion-nebula/1. A stated element that is not this
+// row's id is a bad line: the halo holds.
+const PICTURE_ELEMENT={
+  neutral:"HeII-541.2",calm:"H-beta",happy:"NII-575.5",amused:"HeI-587.6",
+  excited:"NeI-594.5",tender:"HeI-667.8",sad:"HeII-468.6",disappointed:"ClIII-551.7",
+  angry:"SIII-631.2",fearful:"H-delta",surprised:"OIII-495.9",disgusted:"ClIII-553.8",
+  seductive:"H-alpha"
+};
+function pictureLine(n){
+  const weights=Array.isArray(n.weights)?n.weights:[];
+  let best=null, w=-1;
+  for(const item of weights){
+    if(!item||typeof item.emotion!=="string") continue;
+    const weight=typeof item.weight==="number"?item.weight:0;
+    if(!(weight>w)) continue;
+    w=weight; best=item;
+  }
+  const hold={sense:false,label:"neutral",confidence:0,arousal:0,valence:0};
+  if(!best) return {sense:true,label:"neutral",confidence:1,arousal:0,valence:0};
+  const emotion=best.emotion.trim();
+  const element=typeof best.element==="string"?best.element:"";
+  const expected=PICTURE_ELEMENT[emotion];
+  if(element&&expected&&element!==expected) return hold;
+  if(element&&!expected){
+    const known=Object.keys(PICTURE_ELEMENT).some(k=>PICTURE_ELEMENT[k]===element);
+    if(!known) return hold;
+  }
+  return {
+    sense:true,
+    label:emotion,
+    confidence:w,
+    arousal:typeof n.arousal==="number"?n.arousal:0,
+    valence:typeof n.valence==="number"?n.valence:0
+  };
+}
+function isPicture(n){
+  if(!n||typeof n!=="object"||Array.isArray(n)) return false;
+  const schema=typeof n.schema==="string"?n.schema:"";
+  if(schema==="galion-nebula/1") return true;
+  return schema===""&&Array.isArray(n.weights);
+}
+// estimate none, a dropped feed, or sense denied: paint nothing. Not Neutral.
+// galion-nebula/1 (or a weights array with no schema) is the picture line.
+// drawNebula still returns false for neutral, a missing reading, and low confidence.
+function haloInput(){
+  const n=latest&&latest.nebula;
+  if(isPicture(n)) return pictureLine(n);
+  const em=latest&&latest.emotion;
+  if(n&&typeof n.schema==="string"&&n.schema){
+    if(n.estimate==="none"||n.present!==true||n.reason==="disconnected"||n.reason==="rejected") return null;
+    if(n.estimate!=="distribution"&&n.estimate!=="partial") return null;
+  }
+  return em||null;
+}
+function clearFeed(){
+  if(!latest) latest={radius:R.idle,t_ms:0};
+  latest.nebula={schema:FEED_SCHEMA,estimate:"none",present:false,distribution:false,reason:"disconnected",origin:"client",weights:null};
+}
+function productIsOne(){
+  const p=location.pathname;
+  if(p==="/one"||p==="/one/"||p==="/"||p==="") return true;
+  return location.hostname==="one.galion.app";
+}
+// Galion OS tones. 432 Hz just intonation: 2:1, 3:2, 5:4. Warm hum at 216 and 108.
+// boot, shutdown, notification, wake (Galion One wake), done (task done),
+// approval (approval needed), error. Oscillators only. No audio files.
+
+const FUND=432;
+const HUM=[FUND/4, FUND/2];
+const OS_SOUNDS=[
+  {id:"boot", notes:[FUND/4, FUND/2, FUND]},
+  {id:"shutdown", notes:[FUND, FUND/2, FUND/4]},
+  {id:"notification", notes:[FUND, FUND*(5/4)]},
+  {id:"wake", notes:[FUND/2, FUND, FUND*(3/2)]},
+  {id:"done", notes:[FUND*(5/4), FUND*(3/2), FUND*2]},
+  {id:"approval", notes:[FUND, FUND*(3/2)]},
+  {id:"error", notes:[FUND/2, FUND/4]}
+];
+window.GALION_OS=OS_SOUNDS.map(s=>({id:s.id, notes:s.notes.slice(), hum:HUM.slice()}));
+let silence=false, booted=false, approvalOn=false, haloHeard="", prevShown="";
+function silenceRequested(){
+  try{ if(localStorage.getItem("galion-one-silence")==="1") return true; }catch(e){}
+  return new URLSearchParams(location.search).get("silence")==="1";
+}
+function setSilence(on){
+  silence=!!on;
+  document.body.dataset.silence=silence?"on":"off";
+  document.body.dataset.resonance=silence?"off":"on";
+  const btn=document.getElementById("silence");
+  if(btn) btn.setAttribute("aria-pressed", silence?"true":"false");
+  try{ localStorage.setItem("galion-one-silence", silence?"1":"0"); }catch(e){}
+}
+function toneContext(){
+  try{
+    const AC=window.AudioContext||window.webkitAudioContext;
+    if(!AC) return null;
+    if(!micCtx) micCtx=new AC({latencyHint:"interactive"});
+    if(micCtx.state==="suspended") micCtx.resume().catch(()=>{});
+    return micCtx;
+  }catch(e){ return null; }
+}
+function scheduleSine(ctx,hz,start,dur,peak){
+  const o=ctx.createOscillator(), g=ctx.createGain();
+  o.type="sine"; o.frequency.value=hz;
+  g.gain.setValueAtTime(0.0001, start);
+  g.gain.exponentialRampToValueAtTime(peak, start+0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001, start+Math.max(0.05,dur));
+  o.connect(g); g.connect(ctx.destination);
+  o.start(start); o.stop(start+dur+0.02);
+}
+function playSound(id){
+  if(!productIsOne()||silence) return;
+  const tone=OS_SOUNDS.find(s=>s.id===id);
+  if(!tone) return;
+  const ctx=toneContext();
+  if(ctx){
+    try{
+      const t=ctx.currentTime, step=0.12;
+      tone.notes.forEach((hz,i)=>scheduleSine(ctx,hz,t+i*step,step+0.04,0.05));
+      const dur=tone.notes.length*step+0.36;
+      for(const hz of HUM) scheduleSine(ctx,hz,t,dur,0.016);
+    }catch(e){}
+  }
+  const log=(cv.dataset.cues||"").split(",").filter(Boolean);
+  log.push(id);
+  cv.dataset.cues=log.slice(-16).join(",");
+  cv.dataset.cue=id;
+  cv.dataset.resonance="on";
+}
+function paintHalo(tms,W,H,mark){
+  let input=haloInput();
+  let outer=mark*2.6;
+  if(previewOn&&playing){
+    const pulse=clamp(playEnv,0,1);
+    input={sense:true,label:"warm",confidence:1,valence:0.42,arousal:clamp(0.28+0.72*pulse,0,1)};
+    outer=mark*(2.2+0.85*pulse);
+  }
+  let drew=false;
+  if(typeof drawNebula==="function"){
+    drew=drawNebula(cx,input,tms/1000,{cx:W/2,cy:H/2,inner:mark,outer:outer})===true;
+  }
+  const state=drew?"gas":"hold";
+  cv.dataset.nebula=state;
+  cv.dataset.halo=input&&typeof input.label==="string"&&input.label?input.label:"hold";
+  if(productIsOne()&&state==="gas"&&haloHeard!=="gas") playSound("notification");
+  haloHeard=state;
+}
+function paintBg(tms,b){
+  const base=hex(b.base),A=hex(b.from),V=hex(b.to);
+  const ph=(tms%WASH_MS)/WASH_MS*2*Math.PI, drift=0.15*Math.sin(ph), d=img.data;
+  for(let y=0;y<BH;y++){const v=(y+.5)/BH;
+    for(let x=0;x<BW;x++){const u=(x+.5)/BW;
+      const ramp=Math.min(1,Math.max(0,.5*(u+v)+drift));
+      const hue=lerp(V,A,Math.min(1,Math.max(0,ramp*0.35+moodAmber*0.75)));
+      const du=u-.5,dv=v-.5, r=Math.sqrt(du*du+dv*dv)/Math.SQRT1_2, vg=Math.max(0,1-r);
+      const c=lerp(base,hue,moodWash*vg*vg), k=(y*BW+x)*4;
+      d[k]=c[0];d[k+1]=c[1];d[k+2]=c[2];d[k+3]=255;}}
+  bx.putImageData(img,0,0);
+}
+
+// Server mode → displayed mode with hysteresis, local mic preempt, offline state.
+function pickMode(now){
+  if(playing) return "speaking";
+  if(arming&&micState!=="on") return "thinking";
+  if(now-lastOk>OFFLINE_MS) return "offline";
+  let m=(latest&&latest.mode)||latest&&latest.state||"idle";
+  if(m==="rika") m="idle"; // lean-in stays idle motion; /dot "lean" carries the feeling
+  if(m!=="idle"&&m!=="listening"&&m!=="speaking"&&m!=="thinking") m="idle";
+  if(playing) m="speaking";                          // our own reply audio is audible right now
+  const localVoice=micState==="on"&&(micRms-micFloor*1.6)>LOCAL_VOICE;
+  if(localVoice&&m!=="speaking") m="listening";   // instant feedback, before the round trip
+  if(turnsInFlight>0&&!playing&&!vadOn&&micState==="on"&&m!=="listening"&&m!=="speaking") m="thinking";
+  if(m!==cand){cand=m;candSince=now;}
+  const held=now-candSince;
+  if(cand===shown) return shown;
+  if(shown==="offline"||cand==="speaking"||cand==="thinking"||cand==="listening"&&shown!=="speaking") return cand;
+  if(shown==="speaking"&&held<HOLD_LEAVE_SPEAK_MS) return shown;
+  if(cand==="idle"&&held<HOLD_IDLE_MS) return shown;
+  return cand;
+}
+
+// Semi-implicit Euler spring-damper. dt is milliseconds.
+function spring(p,v,target,dt,w,z){
+  const h=Math.min(0.05,Math.max(0.001,dt/1000));
+  const a=-w*w*(p-target)-2*z*w*v;
+  v+=a*h; p+=v*h;
+  if(!isFinite(p)||!isFinite(v)) return [target,0];
+  return [p,v];
+}
+// Low-passed envelope of the WAV in the speakers (0..1). Silence stays near rest.
+function samplePlayEnv(dt){
+  let e=0;
+  if(playing&&playAn&&playData){
+    playAn.getByteTimeDomainData(playData);
+    let sum=0;
+    for(let i=0;i<playData.length;i++){ const v=(playData[i]-128)/128; sum+=v*v; }
+    e=clamp(Math.sqrt(sum/playData.length)*3.2,0,1);
+  }
+  const tc=e>playEnv?ENV_ATTACK:ENV_RELEASE;
+  playEnv+=(e-playEnv)*(1-Math.exp(-Math.max(1,dt)/tc));
+  if(playEnv<1e-4) playEnv=0;
+  return playEnv;
+}
+// Galion's feeling, not a mirror. Same table as galion_emotion::StubExpressor
+// (dominance defaults to 0.5, so high-arousal negative reads as Angry → calm).
+// Valence near 0 is "no opinion" (loudness SENSE): stay neutral-warm, keep live arousal.
+function empathy(em){
+  if(!em||em.sense===false) return {v:0.30,a:0.35,live:0};
+  const v=clamp(+em.valence||0,-1,1), a=clamp(+em.arousal||0,0,1);
+  if(Math.abs(v)<0.05) return {v:0.30,a:0.35,live:a};
+  if(v>=0.25) return {v:Math.max(v*0.9,0.30), a:Math.max(a*0.85,0.35), live:a};
+  if(v<=-0.25&&a>=0.6) return {v:0.20,a:0.20,live:a};
+  if(v<=-0.25) return {v:0.25,a:0.20,live:a};
+  return {v:0.30,a:0.35,live:a};
+}
+// Inner highlight only. Stays inside 240..255 so the disc still reads as #F5F5F7.
+function markInner(warm){
+  const w=clamp(warm,0,1);
+  return [Math.round(246+9*w), Math.round(246+6*w), Math.round(252-12*w)];
+}
+function target(mode,now,dt){
+  const t=now-t0;
+  micEnv+=(clamp(micRms,0,1)-micEnv)*(1-Math.exp(-Math.max(1,dt)/200));
+  const env=samplePlayEnv(dt);
+  if(mode==="offline") return [R.off,B.off];
+  if(mode==="listening"){
+    const local=clamp((micRms-micFloor)*6,0,1);
+    const lv=Math.max(clamp(+(latest&&latest.level)||0,0,1), local, micEnv*2.5);
+    return [R.listen+0.028*lv+0.004*Math.sin(t/1100), B.listen+0.16*lv];
+  }
+  if(mode==="thinking"){
+    const s=0.5+0.5*Math.sin(t/1100);
+    return [0.108+0.008*s, 0.50+0.10*s];
+  }
+  if(mode==="speaking"){
+    const breath=Math.sin(t/1400);
+    if(playing){
+      const depth=previewOn?0.05:R.speakDepth;
+      const bright=previewOn?0.42+0.5*env:0.40+0.32*env;
+      return [R.speak+depth*env+0.006*breath, bright];
+    }
+    if(latest&&typeof latest.radius==="number"&&(latest.mode==="speaking"||latest.state==="speaking"))
+      return [clamp(+latest.radius,0,0.5), 0.40+0.28*clamp(+latest.brightness||0.8,0,1)];
+    const s=Math.sin(((t%2800)/2800)*2*Math.PI);
+    return [R.speak+0.012*s, 0.46+0.08*s];
+  }
+  const s=Math.sin(((t%IDLE_MS)/IDLE_MS)*2*Math.PI);
+  const lean=clamp(+(latest&&latest.lean)||0,0,1);
+  return [R.idle+0.010*s+0.016*lean, B.idle+0.08*s+0.12*lean];
+}
+
+function draw(){
+  const now=performance.now(), dt=Math.min(50,now-lastFrame); lastFrame=now;
+  shown=pickMode(now);
+  cv.dataset.mode=shown;
+  cv.dataset.preview=previewOn?(playing?"on":"text"):"off";
+  const [tr,tb]=target(shown,now,dt);
+  const aim=SPRING[shown]||SPRING.idle;
+  const gk=1-Math.exp(-dt/GAIN_TAU);
+  wS+=(aim.w-wS)*gk; zS+=(aim.z-zS)*gk;
+  const tk=1-Math.exp(-dt/TARGET_TAU);
+  trLp+=(tr-trLp)*tk; tbLp+=(tb-tbLp)*tk;
+  [rP,rV]=spring(rP,rV,trLp,dt,wS,zS);
+  [bP,bV]=spring(bP,bV,tbLp,dt,wS*0.85,Math.min(1.2,zS+0.08));
+  const feel=empathy(latest&&latest.emotion);
+  const moodName=(latest&&MOOD[latest.mood])?latest.mood:"calm";
+  const moodT=MOOD[moodName];
+  const mk=1-Math.exp(-dt/EM_TAU);
+  moodWash+=(moodT.wash-moodWash)*mk;
+  const amberTarget=(latest&&typeof latest.wash_amber==="number"&&isFinite(+latest.wash_amber))?clamp(+latest.wash_amber,0,1):moodT.amber;
+  moodAmber+=(amberTarget-moodAmber)*mk;
+  if(latest&&latest.mood){ feel.v=moodT.warm; feel.a=Math.min(1,moodT.wash); }
+  cv.dataset.mood=moodName;
+  const leanNow=clamp(+((latest&&latest.emotion&&latest.emotion.lean)!=null?latest.emotion.lean:(latest&&latest.lean)||0),0,1);
+  const ek=1-Math.exp(-dt/EM_TAU);
+  emV+=(feel.v-emV)*ek; emA+=(feel.a-emA)*ek; emLean+=(leanNow-emLean)*ek;
+  liveLp+=(feel.live-liveLp)*ek;
+  const dpr=Math.min(window.devicePixelRatio||1, 3);
+  const W=Math.round(innerWidth*dpr), H=Math.round(innerHeight*dpr);
+  if(cv.width!==W||cv.height!==H){cv.width=W;cv.height=H;}
+  const f=latest||{};
+  const b=(f.bg&&okHex(f.bg.base)&&okHex(f.bg.from)&&okHex(f.bg.to))?f.bg:TOK;
+  paintBg(now-t0,b);
+  cx.imageSmoothingEnabled=true; cx.imageSmoothingQuality="high"; cx.drawImage(bg,0,0,W,H);
+  const k=clamp(bP,0,1);
+  const side=Math.min(W,H);
+  const rad=Math.max(1, clamp(rP,0,0.5)*(0.97+0.03*k)*side);
+  if(shown==="offline") clearFeed();
+  if(productIsOne()){
+    if(prevShown&&prevShown!=="offline"&&shown==="offline") playSound("shutdown");
+    if(prevShown==="speaking"&&shown!=="speaking"&&shown!=="offline") playSound("done");
+  }
+  prevShown=shown;
+  paintHalo(now-t0,W,H,rad);
+  const presence=shown==="offline"?0.5:1;
+  cx.save(); cx.translate(W/2,H/2); cx.globalAlpha=presence;
+  if(shown!=="offline"&&k>0.02){
+    const reach=rad*(1.10+0.05*k);
+    const halo=cx.createRadialGradient(0,0,rad*0.94,0,0,reach);
+    halo.addColorStop(0,"rgba(245,245,247,"+(0.04+0.08*k).toFixed(3)+")");
+    halo.addColorStop(1,"rgba(245,245,247,0)");
+    cx.fillStyle=halo; cx.beginPath(); cx.arc(0,0,reach,0,2*Math.PI); cx.fill();
+  }
+  const drift=(0.05+0.04*liveLp+0.02*emLean)*(0.65+0.35*emA);
+  const ox=-rad*drift*(0.75+0.25*Math.sin((now-t0)/3200));
+  const oy=-rad*drift*(0.85+0.15*Math.cos((now-t0)/4100));
+  const [ir,ig,ib]=markInner(emV);
+  const fall=clamp(0.46+0.05*Math.sin((now-t0)/2400)*(0.4+liveLp)+0.04*emA,0.36,0.58);
+  const g=cx.createRadialGradient(ox,oy,Math.max(1,rad*0.04),0,0,rad);
+  g.addColorStop(0,"rgb("+ir+","+ig+","+ib+")");
+  g.addColorStop(fall,MARK.core);
+  g.addColorStop(0.90,MARK.core);
+  g.addColorStop(1,MARK.edge);
+  cx.fillStyle=g; cx.beginPath(); cx.arc(0,0,rad,0,2*Math.PI); cx.fill();
+  cx.strokeStyle=MARK.stroke; cx.lineWidth=MARK.strokePx; cx.stroke();
+  cx.restore();
+  requestAnimationFrame(draw);
+}
+
+// Pipelined polling: a new request every 80 ms, ≤3 in flight, each with a timeout;
+// out-of-order replies are dropped (t_ms), a restarted server (t_ms jumps back) is accepted.
+function pollOnce(){
+  if(inflight>=MAX_INFLIGHT) return;
+  inflight++;
+  const ac=window.AbortController?new AbortController():null;
+  const to=setTimeout(()=>{try{ac&&ac.abort();}catch(e){}},FETCH_TIMEOUT_MS);
+  fetch("/v1/dot",{cache:"no-store",signal:ac?ac.signal:undefined,headers:{"ngrok-skip-browser-warning":"1"}})
+    .then(r=>r.ok?r.json():null)
+    .then(j=>{
+      if(!j||typeof j.radius!=="number") return;
+      const t=+j.t_ms||0;
+      if(t<=lastT&&t>lastT-2000) return;   // stale/out-of-order
+      lastT=t; latest=j; lastOk=performance.now();
+      if(j.persona) cv.dataset.persona=j.persona;
+      if(j.vad&&typeof j.vad.backend==="string"){
+        cv.dataset.vad=j.vad.backend;
+        cv.dataset.vadReady=j.vad.ready?"1":"0";
+        const line=document.getElementById("status");
+        const label=j.vad.ready?("VAD "+j.vad.backend):"VAD not ready";
+        if(line&&(line.textContent===""||line.textContent.indexOf("VAD ")===0)) line.textContent=label;
+      }
+      if(!everOk){everOk=true;}
+      if(productIsOne()&&!booted){ booted=true; playSound("boot"); }
+      if(productIsOne()){
+        const want=j.approval===true;
+        if(want&&!approvalOn) playSound("approval");
+        approvalOn=want;
+      }
+      onReply(j.reply);
+    })
+    .catch(()=>{})
+    .finally(()=>{clearTimeout(to);inflight--;});
+}
+setInterval(pollOnce,POLL_MS);
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible") pollOnce();});
+
+function showErr(msg){
+  const line=document.getElementById("status");
+  if(line) line.textContent=msg||"";
+  if(!msg) return;
+  try{console.warn("[galion]",msg);}catch(e){}
+  if(productIsOne()) playSound("error");
+}
+function hideHint(){}
+
+function tickMic(){
+  if(micState!=="on"||!micAnalyser||!micData) return;
+  micAnalyser.getByteTimeDomainData(micData);
+  let sum=0;
+  for(let i=0;i<micData.length;i++){const v=(micData[i]-128)/128; sum+=v*v;}
+  micRms=Math.sqrt(sum/micData.length);
+  micFloor=micRms<micFloor?0.7*micFloor+0.3*micRms:micFloor+0.002*(micRms-micFloor);
+  // Level for the dot (audio itself goes to /turn). One POST at a time so a slow link never queues up.
+  if(!micPosting){
+    micPosting=true;
+    const lv={rms:+micRms.toFixed(4),t:Date.now()}; if(playing) lv.playing=playId;
+    if(sessionToken) lv.session=sessionToken;
+    try{fetch("/v1/mic",{method:"POST",headers:sessionHeaders({"Content-Type":"application/json"}),
+      body:JSON.stringify(lv)}).catch(()=>{}).finally(()=>{micPosting=false;});}
+    catch(e){micPosting=false;}
+  }
+  setTimeout(tickMic,80);
+}
+
+function syncVoice(){
+  const b=document.getElementById("voice");
+  if(!b) return;
+  const on=micState==="on"||micState==="pending";
+  b.setAttribute("aria-pressed",on?"true":"false");
+}
+function stopMic(){
+  micState="off";
+  if(micStream){
+    micStream.getTracks().forEach(t=>{ try{t.stop();}catch(e){} });
+    micStream=null;
+  }
+  if(capNode){ try{capNode.disconnect();}catch(e){} capNode=null; }
+  syncVoice();
+}
+function onVoice(e){
+  if(e){ e.preventDefault(); e.stopPropagation(); }
+  if(PREVIEW_ONLY){ onOrbGesture(e); return; }
+  if(micState==="pending") return;
+  if(micState==="on") stopMic();
+  else enableMic();
+}
+function mountPrompt(){
+  const form=document.getElementById("ask");
+  const field=document.getElementById("command");
+  const files=document.getElementById("files");
+  const picked=document.getElementById("picked");
+  const note=document.getElementById("files-note");
+  const voice=document.getElementById("voice");
+  if(form&&field){
+    form.addEventListener("submit",e=>{
+      e.preventDefault();
+      e.stopPropagation();
+      const text=field.value;
+      sendText(text).then(ok=>{ if(ok) field.value=""; });
+    });
+  }
+  if(files&&picked){
+    files.addEventListener("change",()=>{
+      picked.replaceChildren();
+      const list=files.files?Array.from(files.files):[];
+      for(const f of list){
+        const li=document.createElement("li");
+        li.className="chip";
+        li.textContent=f.name;
+        picked.appendChild(li);
+      }
+      if(note) note.textContent=list.length?"Names stay on this page.":"";
+    });
+  }
+  if(voice) voice.addEventListener("click",onVoice);
+}
+function timeoutError(ms){
+  return new Promise((_,rej)=>setTimeout(()=>rej(Object.assign(new Error("timeout"),{name:"TimeoutError"})), ms));
+}
+function dropStream(stream){
+  if(!stream||!stream.getTracks) return;
+  stream.getTracks().forEach(t=>{ try{t.stop();}catch(e){} });
+}
+async function enableMic(opts){
+  if(PREVIEW_ONLY) return;
+  opts=opts||{};
+  if(micState==="on"||micState==="pending") return;
+  const gen=opts.gen||voiceGen;
+  if(!opts.fallbackPreview) await ensureSession();
+  if(!window.isSecureContext && location.hostname!=="localhost" && location.hostname!=="127.0.0.1"){
+    if(opts.fallbackPreview) return;
+    showErr("Microphone needs HTTPS. Open the https:// link."); return;
+  }
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
+    if(opts.fallbackPreview) return;
+    showErr("This browser cannot open the microphone."); return;
+  }
+  micState="pending"; syncVoice(); showErr("");
+  // Unlock happened on the tap, before any await. This call resumes a context
+  // the gesture already created so iOS Safari, Android Chrome, and desktop can play later.
+  ensureAudio();
+  if(productIsOne()) playSound("wake");
+  const gum=navigator.mediaDevices.getUserMedia({
+    audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true,channelCount:1},
+    video:false
+  });
+  try{
+    const wait=opts.fallbackPreview?Promise.race([gum, timeoutError(LIVE_SESSION_MS)]):gum;
+    micStream=await wait;
+    if(gen!==voiceGen){ dropStream(micStream); micStream=null; if(micState==="pending"){ micState="off"; syncVoice(); } return; }
+    if(micCtx.state==="suspended") await micCtx.resume();
+    stopPreview();
+    const src=micCtx.createMediaStreamSource(micStream);
+    micAnalyser=micCtx.createAnalyser();
+    micAnalyser.fftSize=1024;
+    src.connect(micAnalyser);
+    micData=new Uint8Array(micAnalyser.fftSize);
+    micState="on";
+    syncVoice();
+    hideHint();
+    showErr("");
+    tickMic();
+    startCapture(src).catch(()=>showErr("Speech capture unavailable — level only."));
+  }catch(e){
+    gum.then(s=>dropStream(s)).catch(()=>{});
+    if(opts.fallbackPreview){
+      micState="off";
+      syncVoice();
+      showErr("");
+      if(productIsOne()) playSound("error");
+      return;
+    }
+    micState="denied";
+    syncVoice();
+    const name=e&&(e.name||"");
+    if(name==="NotAllowedError"||name==="PermissionDeniedError")
+      showErr("Microphone blocked — allow it in browser settings, then tap again.");
+    else if(name==="NotFoundError")
+      showErr("No microphone found on this device.");
+    else
+      showErr("Could not open the microphone.");
+  }
+}
+
+function chromeEvent(e){
+  const t=e.target;
+  return !!(t&&t.closest&&t.closest("#one"));
+}
+function previewRequested(){
+  try{ return new URLSearchParams(location.search).get("preview")==="1"; }catch(e){ return false; }
+}
+function previewEl(){ return document.getElementById("voice-preview"); }
+function parsePreviewScript(j){
+  if(!j||typeof j!=="object"||Array.isArray(j)) return null;
+  const text=typeof j.text==="string"?j.text:"";
+  const segments=[];
+  if(Array.isArray(j.segments)){
+    for(const s of j.segments){
+      if(!s||typeof s.text!=="string") continue;
+      const start=+s.start, end=+s.end;
+      if(!isFinite(start)||!isFinite(end)||end<start) continue;
+      segments.push({start:start,end:end,text:s.text});
+    }
+  }
+  return {text:text,segments:segments};
+}
+function loadPreviewScript(){
+  if(previewScriptTried) return;
+  previewScriptTried=true;
+  fetch(assetUrl("/preview/voice-preview.json"),{cache:"default",headers:{"ngrok-skip-browser-warning":"1"}})
+    .then(r=>r.ok?r.json():null)
+    .then(j=>{ previewScript=parsePreviewScript(j); })
+    .catch(()=>{});
+}
+function playPreviewNow(){
+  const el=previewEl();
+  if(!el) return false;
+  try{ el.muted=false; el.volume=1; }catch(e){}
+  previewOn=true;
+  previewSeg=-1;
+  arming=false;
+  playId="preview";
+  playing=true;
+  // play() is called in this turn of the click handler, before any await.
+  let started=false;
+  try{
+    const p=el.play();
+    started=true;
+    if(p&&p.then) p.then(()=>{ if(previewOn) tickPreviewCaption(); }).catch(err=>{
+      if(playId==="preview"){ playing=false; }
+      try{ cv.dataset.previewErr=String(err&&(err.name||err.message)||err); }catch(e){}
+    });
+  }catch(e){
+    playing=false;
+    return false;
+  }
+  tickPreviewCaption();
+  return started;
+}
+function startPreview(gen){
+  if(gen!==voiceGen) return;
+  if(micState==="on"){ arming=false; return; }
+  playPreviewNow();
+  loadPreviewScript();
+}
+function stopPreview(){
+  if(PREVIEW_ONLY) return;
+  previewOn=false;
+  previewSeg=-1;
+  arming=false;
+  if(previewRaf){ cancelAnimationFrame(previewRaf); previewRaf=0; }
+  const el=previewEl();
+  if(el){ try{ el.pause(); }catch(e){} try{ el.currentTime=0; }catch(e){} }
+  if(playId==="preview"){ playSrc=null; playing=false; playId=null; }
+  else stopPlayback();
+  showCaption("");
+}
+function tickPreviewCaption(){
+  if(!previewOn) return;
+  const el=previewEl();
+  if(!el||el.paused) return;
+  playing=true;
+  const script=previewScript;
+  const t=el.currentTime||0;
+  let line="", idx=-1;
+  if(script&&script.segments&&script.segments.length){
+    for(let i=0;i<script.segments.length;i++){
+      const s=script.segments[i];
+      if(t>=s.start&&t<s.end){ line=s.text; idx=i; break; }
+    }
+  }else if(script&&script.text){ line=script.text; idx=0; }
+  if(idx!==previewSeg){ previewSeg=idx; showCaption(line); }
+  previewRaf=requestAnimationFrame(tickPreviewCaption);
+}
+let lastOrbGesture=0;
+function onOrbGesture(e){
+  // A double-click is one tap: the second half must not undo the first.
+  const now=performance.now();
+  if(now-lastOrbGesture<450) return;
+  lastOrbGesture=now;
+  if(PREVIEW_ONLY){
+    const el=previewEl();
+    if(el&&previewOn&&!el.paused&&!el.ended){
+      try{ el.pause(); }catch(err){}
+      playing=false;
+      return;
+    }
+    if(el&&el.ended){ try{ el.currentTime=0; }catch(err){} }
+    playPreviewNow();
+    loadPreviewScript();
+    return;
+  }
+  // Unlock and play inside the user gesture, before any await.
+  ensureAudio();
+  if(previewOn||arming){
+    voiceGen++;
+    arming=false;
+    stopPreview();
+    return;
+  }
+  if(micState==="on"){ stopMic(); return; }
+  if(micState==="pending") return;
+  const gen=++voiceGen;
+  playPreviewNow();
+  loadPreviewScript();
+  if(previewRequested()) return;
+  arming=true;
+  openLiveSession().then(live=>{
+    if(gen!==voiceGen){ arming=false; return; }
+    arming=false;
+    if(!live) return;
+    enableMic({fallbackPreview:true,gen:gen});
+  });
+}
+let lastOrbTouch=0;
+function onActivate(e){
+  // Tap on the mark. The shell handles its own controls.
+  // touchend preventDefault avoids the synthetic click that would follow.
+  if(chromeEvent(e)) return;
+  if(e.type==="touchend"){
+    e.preventDefault();
+    lastOrbTouch=performance.now();
+    onOrbGesture(e);
+    return;
+  }
+  if(e.type==="click"&&performance.now()-lastOrbTouch<700) return;
+  onOrbGesture(e);
+}
+// A tap on the mark plays the preview. Live voice stays behind PREVIEW_ONLY.
+document.addEventListener("touchend",onActivate,{passive:false});
+document.addEventListener("click",onActivate);
+addEventListener("keydown",e=>{
+  const tag=e.target&&e.target.tagName;
+  const typing=tag==="INPUT"||tag==="TEXTAREA"||(e.target&&e.target.isContentEditable);
+  const control=tag==="BUTTON"||tag==="A"||tag==="SELECT";
+  if((e.key==="s"||e.key==="S")&&productIsOne()&&!e.metaKey&&!e.ctrlKey&&!e.altKey&&!typing){
+    e.preventDefault(); setSilence(!silence); return;
+  }
+  if(typing||control) return;
+  if(e.key==="Enter"||e.key===" "){e.preventDefault();onOrbGesture(e);}
+});
+async function sendText(text){
+  const t=(text||"").trim();
+  if(!t) return false;
+  // Same gesture as Send: unlock playback before any await, mic or not.
+  if(!ensureAudio()){ showErr("This browser cannot play audio."); return false; }
+  const barge=playing;
+  if(!PREVIEW_ONLY && (previewOn||playing)) stopPreview();
+  await ensureSession();
+  turnsInFlight++;
+  const watch=turnsInFlight;
+  try{
+    const r=await fetch("/v2/say",{method:"POST",cache:"no-store",headers:sessionHeaders({"Content-Type":"application/json"}),
+      body:JSON.stringify({text:t,barge:!!barge,e:0,sense:false})});
+    if(!r.ok){ turnsInFlight=Math.max(0,turnsInFlight-1); showErr("Message failed ("+r.status+")."); return false; }
+    const j=await r.json();
+    showErr("");
+    if(j&&j.persona) cv.dataset.persona=j.persona;
+    if(j&&j.mood&&MOOD[j.mood]){
+      if(!latest) latest={radius:R.idle,t_ms:0};
+      latest.mood=j.mood;
+      latest.emotion={sense:true,label:j.mood,valence:0,arousal:0.3,lean:(latest.emotion&&latest.emotion.lean)||0};
+    }
+    hideHint();
+    if(j&&(j.silence||!j.reply)){ turnsInFlight=Math.max(0,turnsInFlight-1); return true; }
+  }catch(e){ turnsInFlight=Math.max(0,turnsInFlight-1); showErr("Could not send that."); return false; }
+  setTimeout(()=>{ if(!playing&&turnsInFlight>=watch) turnsInFlight=Math.max(0,turnsInFlight-1); }, 20000);
+  return true;
+}
+
+// ───────────────────────── Voice pipeline: capture → VAD → /turn, reply playback ─────────────────
+// Silent one-sample buffer played inside the gesture: the classic iOS "unlock".
+function ensureAudio(){
+  try{
+    const AC=window.AudioContext||window.webkitAudioContext;
+    if(!AC) return false;
+    if(!micCtx) micCtx=new AC({latencyHint:"interactive"});
+    unlockAudio(micCtx);
+    hearReplies=true;
+    return true;
+  }catch(e){ return false; }
+}
+function unlockAudio(ctx){
+  try{ if(ctx.state==="suspended") ctx.resume().catch(()=>{}); }catch(e){}
+  try{ const b=ctx.createBuffer(1,1,ctx.sampleRate), s=ctx.createBufferSource();
+       s.buffer=b; s.connect(ctx.destination); s.start(0); }catch(e){}
+}
+
+// AudioWorklet batches 128-frame quanta into ~2048-sample chunks.
+const WORKLET_SRC=`class GvCap extends AudioWorkletProcessor{
+  constructor(){super();this.b=new Float32Array(2048);this.n=0;}
+  process(ins){const c=ins[0]&&ins[0][0];if(c){for(let i=0;i<c.length;i++){this.b[this.n++]=c[i];
+    if(this.n===this.b.length){this.port.postMessage(this.b.slice(0));this.n=0;}}}return true;}}
+registerProcessor("gv-cap",GvCap);`;
+
+async function startCapture(src){
+  if(PREVIEW_ONLY) return;
+  const ctx=micCtx;
+  if(!(ctx.audioWorklet&&window.AudioWorkletNode&&window.Blob&&window.URL)) return;
+  capRatio=ctx.sampleRate/CAP_SR; capPos=0;
+  capSink=ctx.createGain(); capSink.gain.value=0; capSink.connect(ctx.destination); // keeps graph pulled, silent
+  try{
+    const url=URL.createObjectURL(new Blob([WORKLET_SRC],{type:"application/javascript"}));
+    await ctx.audioWorklet.addModule(url); URL.revokeObjectURL(url);
+    capNode=new AudioWorkletNode(ctx,"gv-cap",{numberOfInputs:1,numberOfOutputs:1,channelCount:1,channelCountMode:"explicit"});
+    capNode.port.onmessage=e=>onCapChunk(e.data);
+    src.connect(capNode); capNode.connect(capSink);
+  }catch(e){ capNode=null; }
+}
+
+// Device rate → 16 kHz by box-averaging over each output sample's span (cheap anti-alias).
+function onCapChunk(x){
+  if(micState!=="on") return;
+  const r=capRatio; let p=capPos;
+  while(p+r<=x.length){
+    const a=Math.floor(p), b=Math.min(x.length,Math.floor(p+r)); let s=0;
+    for(let i=a;i<b;i++) s+=x[i];
+    capFrame[capFill++]=b>a?s/(b-a):x[a];
+    if(capFill===VAD_FRAME){ vadFrame(capFrame); capFrame=new Float32Array(VAD_FRAME); capFill=0; }
+    p+=r;
+  }
+  capPos=p-x.length; if(capPos<0) capPos=0;
+}
+
+// Energy VAD with adaptive floor. Start after 80 ms of speech (200 ms + higher bar while our reply
+// plays, so echo leaking past AEC does not self-barge). End of turn = 640 ms quiet after speech.
+function vadFrame(f){
+  if(PREVIEW_ONLY) return;
+  let s=0; for(let i=0;i<f.length;i++) s+=f[i]*f[i];
+  const rms=Math.sqrt(s/f.length), ms=1000*VAD_FRAME/CAP_SR;
+  const thr=Math.max(VAD_ABS, vadFloor*VAD_FLOOR_X)*(playing?VAD_PLAY_X:1);
+  const speech=rms>thr;
+  if(!vadOn&&!speech) vadFloor=rms<vadFloor?0.8*vadFloor+0.2*rms:vadFloor+0.01*(rms-vadFloor);
+  vadFloor=clamp(vadFloor,0.0005,0.05);
+  if(!vadOn){
+    preroll.push(f); while(preroll.length*ms>PREROLL_MS) preroll.shift();
+    vadRun=speech?vadRun+ms:0;
+    if(vadRun>=(playing?VAD_BARGE_MS:VAD_START_MS)){
+      vadOn=true; uttBarge=playing; if(playing) stopPlayback();
+      utt=preroll; preroll=[]; uttMs=utt.length*ms; vadSpeechMs=vadRun; vadQuiet=0;
+    }
+    return;
+  }
+  utt.push(f); uttMs+=ms;
+  if(speech){ vadSpeechMs+=ms; vadQuiet=0; } else vadQuiet+=ms;
+  if(vadQuiet>=VAD_END_MS||uttMs>=MAX_UTT_MS) endUtterance();
+}
+
+function endUtterance(){
+  const frames=utt, ok=vadSpeechMs>=MIN_SPEECH_MS, barge=uttBarge;
+  vadOn=false; vadRun=0; vadQuiet=0; vadSpeechMs=0; uttMs=0; utt=[]; uttBarge=false;
+  if(ok) proceedTurn(frames,barge);
+}
+
+// The take is already cut. Proceed on the same POST /turn. Nothing new is drawn.
+function proceedTurn(frames,barge){
+  cv.dataset.proceed="auto";
+  postTurn(frames,barge);
+}
+
+function encodeWav(frames,sr){
+  const n=frames.reduce((a,f)=>a+f.length,0), buf=new ArrayBuffer(44+n*2), v=new DataView(buf);
+  const str=(o,t)=>{for(let i=0;i<t.length;i++) v.setUint8(o+i,t.charCodeAt(i));};
+  str(0,"RIFF"); v.setUint32(4,36+n*2,true); str(8,"WAVE"); str(12,"fmt ");
+  v.setUint32(16,16,true); v.setUint16(20,1,true); v.setUint16(22,1,true);
+  v.setUint32(24,sr,true); v.setUint32(28,sr*2,true); v.setUint16(32,2,true); v.setUint16(34,16,true);
+  str(36,"data"); v.setUint32(40,n*2,true);
+  let o=44; for(const f of frames) for(let i=0;i<f.length;i++,o+=2){
+    const x=clamp(f[i],-1,1); v.setInt16(o,x<0?x*0x8000:x*0x7FFF,true); }
+  return buf;
+}
+
+// Body is an ArrayBuffer → the browser sets Content-Length itself (it is a forbidden header for JS).
+function postTurn(frames,barge){
+  const wav=encodeWav(frames,CAP_SR), id=Date.now().toString(36)+"-"+(++turnSeq);
+  turnsInFlight++;
+  const watch=turnsInFlight;
+  fetch("/v1/turn",{method:"POST",cache:"no-store",body:wav,headers:sessionHeaders({
+      "Content-Type":"audio/wav","X-Turn-Id":id,"X-Sample-Rate":String(CAP_SR),
+      "X-Barge-In":barge?"1":"0","X-Galion-Proceed":"auto"})})
+    .then(r=>{ if(!r.ok&&r.status!==404){ turnsInFlight=Math.max(0,turnsInFlight-1); showErr("Voice turn failed ("+r.status+")."); } else showErr(""); })
+    .catch(()=>{ turnsInFlight=Math.max(0,turnsInFlight-1); });
+  setTimeout(()=>{ if(!playing&&turnsInFlight>=watch) turnsInFlight=Math.max(0,turnsInFlight-1); }, 20000);
+}
+
+// /dot reply:{id,url,ms}. Replies already present before the tap are marked seen, never played.
+function onReply(rp){
+  if(!rp||rp.id==null||!rp.url) return;
+  const id=String(rp.id);
+  document.body.dataset.hubTexture = rp.hub_texture===true ? "on" : "off";
+  if(!hearReplies||!micCtx){ seenReplies.add(id); return; }
+  if(seenReplies.has(id)) return;
+  seenReplies.add(id); if(seenReplies.size>64) seenReplies=new Set([...seenReplies].slice(-32));
+  if(vadOn) return;                                  // user is mid-utterance: this reply is stale
+  playReply(id,String(rp.url));
+}
+
+function decode(ab){
+  return new Promise((res,rej)=>{ const p=micCtx.decodeAudioData(ab,res,rej); if(p&&p.then) p.then(res,rej); });
+}
+
+async function playReply(id,url){
+  if(PREVIEW_ONLY) return;
+  try{
+    const r=await fetch(url,{cache:"no-store",headers:sessionHeaders()});
+    if(!r.ok) return;
+    const buf=await decode(await r.arrayBuffer());
+    if(vadOn) return;                                // user is mid-utterance: this reply is stale
+    if(!hearReplies) return;
+    if(micCtx.state==="suspended") await micCtx.resume().catch(()=>{});
+    stopPreview();
+    if(!ensurePlayTap()) return;
+    const s=micCtx.createBufferSource(); s.buffer=buf; s.connect(playAn);
+    s.onended=()=>{ if(playSrc===s){ playSrc=null; playing=false; playId=null; turnsInFlight=0; } };
+    playSrc=s; playId=id; playing=true; turnsInFlight=0; s.start(0);
+  }catch(e){}
+}
+
+function ensurePlayTap(){
+  // AnalyserNode: the orb radius and the emotion halo follow this tap's amplitude.
+  if(!micCtx) return false;
+  if(!playAn){
+    playAn=micCtx.createAnalyser();
+    playAn.fftSize=1024;
+    playAn.smoothingTimeConstant=0.35;
+    playData=new Uint8Array(playAn.fftSize);
+    playAn.connect(micCtx.destination);
+  }
+  return true;
+}
+function stopPlayback(){
+  const s=playSrc; playSrc=null; playing=false; playId=null;
+  if(s){ try{s.onended=null; s.stop(0);}catch(e){} try{s.disconnect();}catch(e){} }
+}
+
+// iOS: resume audio after lock-screen return
+document.addEventListener("visibilitychange",()=>{
+  if(document.visibilityState==="visible"&&micCtx&&micCtx.state==="suspended") micCtx.resume().catch(()=>{});
+});
+
+addEventListener("pagehide",()=>{ if(productIsOne()) playSound("shutdown"); });
+
+(function mountSession(){
+  mountPrompt();
+  const one=productIsOne();
+  document.body.dataset.product=one?"one":"samantha";
+  document.body.dataset.session=one?"one":"samantha";
+  document.body.dataset.previewOnly=PREVIEW_ONLY?"1":"0";
+  document.body.dataset.liveVoice=PREVIEW_ONLY?"off":"on";
+  setSilence(silenceRequested());
+  const quiet=document.getElementById("silence");
+  if(quiet) quiet.addEventListener("click",e=>{ e.preventDefault(); e.stopPropagation(); setSilence(!silence); });
+  // /one keeps Samantha as the persona and the markup mouth (Piper) until a clone mouth is live.
+  // The page title stays Galion One. productIsOne() still owns the tones and skips the decide box.
+  if(one){ document.title="Galion One"; cv.dataset.persona="samantha"; return; }
+  const box=document.getElementById("decide");
+  if(!box) return;
+  const picks={};
+  const rows=[...box.querySelectorAll(".row")];
+  function postIfComplete(){
+    if(rows.some(row=>!(row.dataset.id in picks))) return;
+    const answers=rows.map(row=>({id:row.dataset.id,yes:picks[row.dataset.id]==="yes"}));
+    fetch("/v2/decide",{method:"POST",cache:"no-store",headers:sessionHeaders({"Content-Type":"application/json"}),
+      body:JSON.stringify({schema:"galion-session-decision/1",persona:"samantha",answers})})
+      .then(r=>r.ok?r.json():null).then(j=>{ if(j&&j.reply) box.dataset.posted="1"; }).catch(()=>{});
+  }
+  box.addEventListener("click",e=>{
+    e.stopPropagation();
+    const btn=e.target.closest("button");
+    if(!btn||!box.contains(btn)) return;
+    const row=btn.closest(".row");
+    if(!row) return;
+    picks[row.dataset.id]=btn.dataset.yes;
+    row.querySelectorAll("button").forEach(b=>b.setAttribute("aria-pressed", b===btn?"true":"false"));
+    postIfComplete();
+  });
+})();
+(function prepPreview(){
+  const el=previewEl();
+  if(!el) return;
+  el.preload="auto";
+  try{ el.setAttribute("playsinline",""); el.setAttribute("webkit-playsinline",""); }catch(e){}
+  try{ el.load(); }catch(e){}
+  el.addEventListener("ended",()=>{
+    if(playId==="preview"){ playing=false; playId=null; }
+  });
+})();
+loadPreviewScript();
+pollOnce(); requestAnimationFrame(draw);
+</script></body></html>

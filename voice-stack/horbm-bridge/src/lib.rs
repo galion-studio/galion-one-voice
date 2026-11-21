@@ -22,15 +22,17 @@ mod cards;
 mod chunks;
 mod engine;
 mod fake;
+mod index;
 mod measure;
 mod pad;
+mod research;
 mod router;
 mod session;
 
 #[cfg(feature = "horbm")]
 mod linked;
 
-pub use cards::{CardError, CardLoader, CardMatch, LoadedCard, MemoryCards, GAP_ADVICE, MAX_HITS};
+pub use cards::{CardBrain, CardEngine, UNKNOWN_REPLY};
 pub use chunks::{
     contains_forbidden, speakable_chunks, Chunker, SpeakChunk, FIRST_SENTENCE_WORDS, FORBIDDEN,
     SPOKEN_CAP,
@@ -40,11 +42,12 @@ pub use fake::FakeEngine;
 pub use galion_research_gateway::{
     ResearchClient, DEFAULT_BIND as RESEARCH_BIND, DEFAULT_PORT as RESEARCH_PORT, RESEARCH_CAP,
 };
+pub use index::{CardError, CardLoader, CardMatch, LoadedCard, MemoryCards, GAP_ADVICE, MAX_HITS};
 pub use measure::{time_ns, SampleNs};
 pub use pad::{Pad, FRAME_MS};
 pub use router::{
     is_deep_question, GapEntry, GapReason, ReasoningRouter, ResearchAnswer, ResearchPort,
-    RouteKind, RouteOutcome, UNKNOWN_REPLY,
+    RouteKind, RouteOutcome,
 };
 pub use session::{MoodTick, Session, SpokenTurn};
 

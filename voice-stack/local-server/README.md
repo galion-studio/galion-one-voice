@@ -5,9 +5,13 @@
 
 # S10 local server
 
-Loopback UI process for Samantha. The directory is `voice-stack/local-server`, matching `voice-stack/ARCHITECTURE.md`. The socket is `galion-samantha-ws/1` on `127.0.0.1:7881`.
+Loopback UI process for Galion One. The directory is `voice-stack/local-server`. The socket is `galion-samantha-ws/1` on `127.0.0.1:7881`.
 
-Mic PCM comes in on the WebSocket. Speaker PCM, dot, and mood go out. The page is one dot, `#F5F5F7` on `#0A0A0C`. The brain is not linked. A turn is an error code, and the mood tick stays `source: resting`. This crate does not spawn Piper or Vosk and does not read a reference clip.
+`GET /` and `GET /one` serve the Galion One page copied from `crates/galion-console/assets/v1-screen.html` (the `galion.app/one` front end, last updated in `8ee81f6` on 2026-11-19, and the same file at `c7179d1` on main). The canonical page keeps `PREVIEW_ONLY` true, which leaves the live mic off. The copy served here sets `PREVIEW_ONLY` false and calls `/session`, `/v1/dot`, `/v1/mic`, `/v1/turn`, `/v2/say`, and `/v2/decide`. It also loads `/nebula/vocabulary.mjs`. The old one-dot page stays at `/dot/`. Port 7878 is that one-dot screen. Port 7881 is this server.
+
+The talk button posts a finished take to `POST /v1/turn`. A typed line uses `POST /v2/say`. The page polls `GET /v1/dot` and plays `GET /v1/reply/:id`. The WebSocket path is `galion-samantha-ws/1` on `/v1/samantha`. A mic turn ends after 640 ms of silence, then Vosk, then the card brain, then Piper. Silero VAD is the `vad-ear` process (`GALION_VAD_BIN`), kept out of this crate so `ort` stays out of the workspace. On Windows that binary loads ONNX Runtime with the `load-dynamic` feature (`ORT_DYLIB_PATH`, cache `ORT_CACHE_DIR`). Vosk recognises speech when the model and library are on disk. `Brain::open` in the orchestrator returns `horbm is not linked`. The card index is `horbm-memory` in `galion-knowledge` `v2/memory`. This server does not fetch that crate and does not create its sqlite file. It reads cards, and a miss is `I don't know.` When `ReasoningRouter` from pull request 239 is on `main`, this server will call `ReasoningRouter::turn` or `ReasoningRouter::route` and will not dial the Research gateway itself. `GET /health` is HTTP 200 with `"ok": true`. The unlinked test brain still returns `brain-unlinked`. Piper speaks the line when the LJ Speech pack is present. No model API is called.
+
+The tracked example card is `knowledge/kettle.md`. `GALION_HORBM_KNOWLEDGE` selects another directory and is only read.
 
 It is a standalone package. It is not a member of the repo workspace. `cargo test` at the repo root does not build it. Dependencies are pinned for rustc 1.83 (`tokio` 1.42.0, `hyper-util` 0.1.10).
 
@@ -30,6 +34,34 @@ It is a standalone package. It is not a member of the repo workspace. `cargo tes
 
 The wire format is [PROTOCOL.md](PROTOCOL.md).
 
+## Windows
+
+The laptop keeps Galion on `G:` only. `scripts/windows/START-SAMANTHA-7881.cmd` is the start script (on the laptop, `G:\galion\work\START-SAMANTHA-7881.cmd`). `scripts/windows/Start-GalionOne.ps1` builds the binaries and fetches models when the laptop copies are missing. Both check that `G:` exists, then set:
+
+| Variable | Path |
+| --- | --- |
+| repo | `G:\galion\work\galion-one-voice` |
+| `CARGO_HOME` | `G:\galion\ci\toolchains\cargo` |
+| `RUSTUP_HOME` | `G:\galion\ci\toolchains\rustup` |
+| `CARGO_TARGET_DIR` | `G:\galion\work\target-voice` |
+| models | `G:\galion\work\galion-one-voice\var` (git-ignored) |
+| `TEMP` and `TMP` | `G:\galion\tmp\win` |
+| npm, pip, and Hugging Face caches | `G:\galion\tmp\npm`, `G:\galion\tmp\pip`, `G:\galion\tmp\hf` |
+| `APPDATA`, `LOCALAPPDATA`, `USERPROFILE` | `G:\galion\tmp\appdata`, `G:\galion\tmp\localappdata`, `G:\galion\tmp\profile` |
+| logs | `G:\galion\work\logs` |
+| Vosk model | `G:\galion\models\asr\vosk-model-small-en-us-0.15` |
+| libvosk and its `libstdc++` / `libgcc` / `winpthread` DLLs | `G:\galion\models\asr\vosk-win64-0.3.45\` |
+| Silero | `voice-stack\vad\models\silero_vad.onnx` |
+| Piper | `voice-stack\tts-piper-stream\var\` |
+| `ORT_DYLIB_PATH` | `G:\galion\toolchains\onnxruntime\onnxruntime-win-x64-cpu-1.31.1\` |
+| `ORT_CACHE_DIR` | `G:\galion\tmp\cache\ort.pyke.io` |
+
+`Start-GalionOne.ps1` downloads Silero VAD, Vosk small English, and Piper LJ Speech into `var\` when those laptop paths are empty, builds `vad-ear.exe` and `samantha-local.exe`, and listens on `127.0.0.1:7881`. The cmd file points at the paths above and starts the same binary. Open `http://127.0.0.1:7881/`. `-DryRun` prints the paths and does not download. A missing `G:` stops the script before it creates a directory. `GALION_VAD_HANG_MS` is `640`.
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File G:\galion\work\galion-one-voice\scripts\windows\Start-GalionOne.ps1
+```
+
 ## Linux
 
 ```bash
@@ -51,20 +83,7 @@ cargo test
 
 ## Windows
 
-From the crate directory. The owner's home on that laptop is `G:\galion`. This binary does not read `G:\galion`. It only checks whether `GALION_SAMANTHA_REF` names a file.
-
-```bat
-cd voice-stack\local-server
-cargo run --release -- --ui ui
-```
-
-```powershell
-$env:GALION_SAMANTHA_WS = "127.0.0.1:7881"
-$env:GALION_SAMANTHA_REF = "G:\galion\voices\samantha-ref.wav"
-cargo run --release -- --ui ui
-```
-
-Then open `http://127.0.0.1:7881/`. Microphone capture needs that loopback origin. Playback is full gain.
+Use `scripts/windows/Start-GalionOne.ps1` from the section above. It is the start path on the laptop. The table there is the set of directories the script creates. `GALION_SAMANTHA_REF` is still only reported on `/health` as set, missing, or unset. The file is not read and it is not downloaded.
 
 The unit file under `deploy/` is a template. This crate does not install it and does not start it.
 

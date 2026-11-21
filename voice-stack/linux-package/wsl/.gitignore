@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Galion Labs
+# Public models fetched by install.sh. Never commit weights, clips, or clones.
+
+/var/
+*.part
+*.wav
+*.wave
+*.onnx
+*.mp3
+*.flac
+*.ogg
+*.opus

@@ -19,3 +19,4 @@ shellcheck -x \
   "$ROOT/ci/shellcheck.sh" \
   "$ROOT/tests/install_test.sh"
 echo "OK: shellcheck"
+"$ROOT/wsl/ci/shellcheck.sh"

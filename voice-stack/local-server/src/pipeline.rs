@@ -15,7 +15,8 @@ use crate::reply::{may_speak_piper, Pad, ReplyEngine, UnlinkedBrain};
 
 const SPEECH_RMS: f32 = 0.02;
 const START_FRAMES: u32 = 2;
-const END_FRAMES: u32 = 8;
+/// 32 × 20 ms = 640 ms. Eight frames (160 ms) cut one question into two turns.
+const END_FRAMES: u32 = 32;
 const MAX_CARRY: usize = 48_000;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -23,6 +24,8 @@ pub struct PipeInfo {
     pub ear: &'static str,
     pub mouth: &'static str,
     pub mind: String,
+    pub vad_backend: &'static str,
+    pub vad_ready: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -30,14 +33,16 @@ pub struct TurnProduct {
     pub events: Vec<String>,
     pub pcm: Vec<i16>,
     pub rate: u32,
+    pub reply: String,
 }
 
 impl TurnProduct {
-    fn events(events: Vec<String>) -> Self {
+    pub(crate) fn events(events: Vec<String>) -> Self {
         Self {
             events,
             pcm: Vec::new(),
             rate: SPEAKER_RATE,
+            reply: String::new(),
         }
     }
 }
@@ -45,6 +50,32 @@ impl TurnProduct {
 pub trait Pipeline: Send {
     fn push_mic(&mut self, pcm: &[i16], rate: u32, t_ms: u64) -> TurnProduct;
     fn push_text(&mut self, text: &str, t_ms: u64) -> TurnProduct;
+    /// One finished take. The default ear still needs a quiet tail to close.
+    fn commit_pcm(&mut self, pcm: &[i16], rate: u32, t_ms: u64) -> TurnProduct {
+        let mut product = self.push_mic(pcm, rate, t_ms);
+        if !product.pcm.is_empty()
+            || product
+                .events
+                .iter()
+                .any(|e| e.contains("\"type\":\"error\""))
+        {
+            return product;
+        }
+        let quiet = vec![0i16; audio::samples_per_frame(rate, 20).max(1)];
+        for i in 0..END_FRAMES {
+            let next = self.push_mic(&quiet, rate, t_ms.saturating_add(u64::from(i) * 20));
+            if product.reply.is_empty() {
+                product.reply = next.reply.clone();
+            }
+            product.events.extend(next.events);
+            if !next.pcm.is_empty() {
+                product.pcm = next.pcm;
+                product.rate = next.rate;
+                product.reply = next.reply;
+            }
+        }
+        product
+    }
     fn stop(&mut self);
     fn tick_mood(&mut self) -> (Pad, &'static str);
     fn phase(&self) -> &'static str;
@@ -166,6 +197,7 @@ impl<R: ReplyEngine> FakePipeline<R> {
                     out.took_us = u32::try_from(started.elapsed().as_micros()).unwrap_or(u32::MAX);
                 }
                 out.mood = out.mood.finite_or_resting();
+                let reply = out.reply.clone();
                 let mut events = vec![turn_json(&out)];
                 let pcm = if may_speak_piper(&out.reply, out.violations) {
                     self.phase = "speaking";
@@ -180,6 +212,7 @@ impl<R: ReplyEngine> FakePipeline<R> {
                     events,
                     pcm,
                     rate: SPEAKER_RATE,
+                    reply,
                 }
             }
         }
@@ -273,6 +306,8 @@ impl<R: ReplyEngine> Pipeline for FakePipeline<R> {
             ear,
             mouth: "hold",
             mind: self.reply.name().to_string(),
+            vad_backend: "energy",
+            vad_ready: true,
         }
     }
 }
@@ -342,6 +377,19 @@ mod tests {
         let (pad, source) = pipe.tick_mood();
         assert_eq!(source, "resting");
         assert_eq!(pad, Pad::RESTING);
+    }
+
+    #[test]
+    fn a_160_ms_pause_does_not_end_the_turn() {
+        let mut pipe = FakePipeline::scripted("hello from the mic", Fixed);
+        pipe.push_mic(&loud(), 16_000, 0);
+        pipe.push_mic(&loud(), 16_000, 20);
+        for _ in 0..8 {
+            let mid = pipe.push_mic(&quiet(), 16_000, 40);
+            assert!(mid.pcm.is_empty());
+            assert!(mid.events.iter().all(|e| !e.contains("\"event\":\"end\"")));
+        }
+        assert_eq!(pipe.phase(), "listening");
     }
 
     #[test]

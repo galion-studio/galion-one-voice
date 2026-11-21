@@ -18,9 +18,9 @@ use std::time::{Duration, Instant};
 
 use galion_research_gateway::{ClientReply, ResearchClient, RESEARCH_CAP};
 
-use crate::cards::{CardLoader, MemoryCards};
 use crate::chunks::{contains_forbidden, speakable_chunks};
 use crate::engine::{Reply, ReplyEngine};
+use crate::index::{CardLoader, MemoryCards};
 use crate::pad::Pad;
 
 /// Spoken when the cards and, if asked, research have no answer.
@@ -50,7 +50,7 @@ pub enum GapReason {
 /// One miss. The knowledge files are not modified.
 ///
 /// `advice` is the `horbm-memory` string for a knowledge miss. It is
-/// [`crate::cards::GAP_ADVICE`] (`ask_galion_research`). The queue is in memory.
+/// [`crate::index::GAP_ADVICE`] (`ask_galion_research`). The queue is in memory.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct GapEntry {
     pub heard: String,
@@ -117,7 +117,7 @@ impl ReasoningRouter {
     pub fn open(
         knowledge_dir: &std::path::Path,
         research: Option<Box<dyn ResearchPort>>,
-    ) -> Result<Self, crate::cards::CardError> {
+    ) -> Result<Self, crate::index::CardError> {
         let cards = MemoryCards::load_dir(knowledge_dir)?;
         Ok(Self::new(cards, research))
     }
@@ -197,7 +197,7 @@ impl ReasoningRouter {
                             let gap = GapEntry {
                                 heard: trimmed.to_string(),
                                 reason: GapReason::ResearchAnswered,
-                                advice: crate::cards::GAP_ADVICE,
+                                advice: crate::index::GAP_ADVICE,
                             };
                             self.gaps.push(gap.clone());
                             return RouteOutcome {
@@ -231,7 +231,7 @@ impl ReasoningRouter {
         let gap = GapEntry {
             heard: heard.to_string(),
             reason,
-            advice: crate::cards::GAP_ADVICE,
+            advice: crate::index::GAP_ADVICE,
         };
         self.gaps.push(gap.clone());
         RouteOutcome {
@@ -327,7 +327,7 @@ fn elapsed_us(elapsed: Duration) -> u32 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cards::{LoadedCard, MemoryCards};
+    use crate::index::{LoadedCard, MemoryCards};
     use std::sync::atomic::{AtomicU32, Ordering};
     use std::sync::Arc;
 
@@ -405,7 +405,7 @@ mod tests {
         assert_eq!(calls.load(Ordering::SeqCst), 0);
         assert_eq!(router.gaps().len(), 1);
         assert_eq!(router.gaps()[0].reason, GapReason::NoCard);
-        assert_eq!(router.gaps()[0].advice, crate::cards::GAP_ADVICE);
+        assert_eq!(router.gaps()[0].advice, crate::index::GAP_ADVICE);
         assert!(!outcome.spoken.to_lowercase().contains("forty"));
         assert!(!outcome.sources.iter().any(|s| {
             let low = s.to_lowercase();

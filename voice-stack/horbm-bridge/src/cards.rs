@@ -1,517 +1,360 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Galion Labs
-//! Read-only HORBM card loader.
+//! Read-only HORBM knowledge cards.
 //!
-//! Cards stay on disk. This module opens them with `File::open` and `read_dir`.
-//! It does not create a directory, write a card, or rebuild an index. Knowledge
-//! base development is paused. Crate `horbm` is not in this repository.
-//! Crate `horbm-memory` (`galion-knowledge` `v2/memory` at
-//! `761a7f225304fc010379219e5b88c6669dd48f40`) is the index: it uses rusqlite,
-//! `Stack::open` creates the knowledge directory, and a query returns at most
-//! [`MAX_HITS`] covering hits. This loader does not open that crate, because
-//! opening it writes `revisions.sqlite`. The cards themselves are the JSON
-//! files under `v2/data/cards/horbm` (90) and `v2/data/cards/world` (1416) in
-//! that revision. They are not copied into this repo.
-//!
-//! The match rule is `Stack::query` at that revision: every content token of
-//! the query has to sit in the card. Stopwords match `v2/memory/src/text.rs`.
-//! A tie between two equally specific cards is not a spoken match. The
-//! knowledge crate's miss line is `I don't know`, and its gap advice string
-//! when nothing covers the query is `ask_galion_research`.
+//! `open` reads `.md` and `.json` files. It does not create the directory,
+//! write a card, or open the memory database. A query that shares no word
+//! with a card is [`UNKNOWN_REPLY`]. [`crate::research::route`] stays `None`,
+//! so this engine reads the cards. [`crate::ReasoningRouter`] is the layer 5
+//! call for a caller that passes a knowledge directory. This engine does not
+//! dial the gateway.
 
-use std::collections::BTreeSet;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
+use std::time::Instant;
 
-use serde_json::Value;
+use crate::chunks::contains_forbidden;
+use crate::engine::{Reply, ReplyEngine};
+use crate::pad::Pad;
+use crate::research;
 
-/// `horbm-memory` returns at most this many hits from one query.
-pub const MAX_HITS: usize = 4;
+/// Spoken when no card matches. Not a guess and not a model completion.
+pub const UNKNOWN_REPLY: &str = "I don't know.";
 
-/// Gap advice string from `horbm-memory` `advice_for` when no card covers the query.
-pub const GAP_ADVICE: &str = "ask_galion_research";
+const MAX_CARD_BYTES: u64 = 64 * 1024;
 
-/// One card the router is allowed to speak.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct CardMatch {
-    pub id: String,
-    pub gist: String,
-}
-
-/// A card kept in memory after a read. The loader does not write it back.
 #[derive(Clone, Debug)]
-pub struct LoadedCard {
-    pub id: String,
-    pub title: String,
-    pub summary: String,
-    pub body: String,
-    pub aliases: Vec<String>,
-    haystack: BTreeSet<String>,
+struct Card {
+    id: String,
+    text: String,
+    blob: String,
 }
 
-impl LoadedCard {
-    pub fn new(
-        id: impl Into<String>,
-        title: impl Into<String>,
-        summary: impl Into<String>,
-        body: impl Into<String>,
-        aliases: Vec<String>,
-    ) -> Result<Self, CardError> {
-        let id = id.into();
-        if id.trim().is_empty() {
-            return Err(CardError::Invalid("card id is empty".into()));
-        }
-        let title = title.into();
-        let summary = summary.into();
-        let body = body.into();
-        if summary.trim().is_empty() && body.trim().is_empty() && title.trim().is_empty() {
-            return Err(CardError::Invalid(format!("card {id} has no text")));
-        }
-        let mut card = Self {
-            id,
-            title,
-            summary,
-            body,
-            aliases,
-            haystack: BTreeSet::new(),
-        };
-        card.haystack = haystack_of(&card);
-        Ok(card)
-    }
-
-    fn gist(&self) -> String {
-        if !self.summary.trim().is_empty() {
-            self.summary.trim().to_string()
-        } else {
-            self.body.trim().to_string()
-        }
-    }
-}
-
-/// Read-only lookup. Implementors must not write the knowledge directory.
-pub trait CardLoader: Send + 'static {
-    fn lookup(&self, query: &str) -> Option<CardMatch>;
-}
-
-/// Cards read from JSON files, or built in a test.
+/// Cards loaded once. The directory is not opened for writing.
 #[derive(Clone, Debug, Default)]
-pub struct MemoryCards {
-    cards: Vec<LoadedCard>,
+pub struct CardBrain {
+    cards: Vec<Card>,
 }
 
-impl MemoryCards {
-    pub fn from_cards(cards: Vec<LoadedCard>) -> Self {
+impl CardBrain {
+    /// Read `dir` if it is already a directory. A missing path is an empty
+    /// set, not an error, and it is not created.
+    pub fn open_readonly(dir: &Path) -> Self {
+        let mut cards = Vec::new();
+        let Ok(entries) = std::fs::read_dir(dir) else {
+            return Self { cards };
+        };
+        let Ok(root) = dir.canonicalize() else {
+            return Self { cards };
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let Ok(meta) = entry.metadata() else {
+                continue;
+            };
+            if !meta.is_file() || meta.len() > MAX_CARD_BYTES {
+                continue;
+            }
+            let Ok(canon) = path.canonicalize() else {
+                continue;
+            };
+            if !canon.starts_with(&root) {
+                continue;
+            }
+            let Some(id_raw) = path.file_stem().and_then(|s| s.to_str()) else {
+                continue;
+            };
+            let ext = path
+                .extension()
+                .and_then(|s| s.to_str())
+                .unwrap_or("")
+                .to_ascii_lowercase();
+            let Ok(text) = read_to_string(&path) else {
+                continue;
+            };
+            let (id, body) = match ext.as_str() {
+                "md" => (clean_id(id_raw), markdown_body(&text)),
+                "json" => {
+                    let id = json_string(&text, "id").unwrap_or_else(|| clean_id(id_raw));
+                    let body = json_string(&text, "text")
+                        .or_else(|| json_string(&text, "body"))
+                        .unwrap_or_default();
+                    (clean_id(&id), body)
+                }
+                _ => continue,
+            };
+            let body = body.trim().to_string();
+            if body.is_empty() || id.is_empty() {
+                continue;
+            }
+            let blob = format!("{id} {body}").to_ascii_lowercase();
+            cards.push(Card {
+                id,
+                text: body,
+                blob,
+            });
+        }
+        cards.sort_by(|a, b| a.id.cmp(&b.id));
         Self { cards }
     }
 
-    pub fn len(&self) -> usize {
-        self.cards.len()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.cards.is_empty()
-    }
-
-    /// Read `*.json` under `dir`. Missing path is an error and is not created.
-    pub fn load_dir(dir: &Path) -> Result<Self, CardError> {
-        if !dir.is_dir() {
-            return Err(CardError::NotADirectory(dir.display().to_string()));
-        }
-        let mut files = Vec::new();
-        collect_json(dir, &mut files)?;
-        files.sort();
-        let mut cards = Vec::new();
-        for path in files {
-            let mut file = File::open(&path).map_err(|err| CardError::Io(err.to_string()))?;
-            let mut raw = String::new();
-            file.read_to_string(&mut raw)
-                .map_err(|err| CardError::Io(err.to_string()))?;
-            let value: Value = serde_json::from_str(&raw)
-                .map_err(|err| CardError::Invalid(format!("{}: {err}", path.display())))?;
-            cards.extend(cards_from_value(&value, &path.display().to_string())?);
-        }
-        Ok(Self { cards })
-    }
-}
-
-impl MemoryCards {
-    fn covering_cards(&self, query: &str) -> Vec<&LoadedCard> {
-        let terms = index_tokens(query);
-        if terms.is_empty() {
-            return Vec::new();
-        }
-        let mut hits: Vec<&LoadedCard> = self
-            .cards
-            .iter()
-            .filter(|card| terms.iter().all(|term| card.haystack.contains(term)))
-            .filter(|card| !card.gist().is_empty())
-            .collect();
-        hits.sort_by(|a, b| {
-            a.haystack
-                .len()
-                .cmp(&b.haystack.len())
-                .then_with(|| a.id.cmp(&b.id))
-        });
-        hits
-    }
-
-    /// At most [`MAX_HITS`] covering cards, most specific first.
-    /// This does not pick a winner. A tie stays a tie.
-    pub fn covering(&self, query: &str) -> Vec<CardMatch> {
-        self.covering_cards(query)
-            .into_iter()
-            .take(MAX_HITS)
-            .map(|card| CardMatch {
-                id: card.id.clone(),
-                gist: card.gist(),
-            })
-            .collect()
-    }
-}
-
-impl CardLoader for MemoryCards {
-    fn lookup(&self, query: &str) -> Option<CardMatch> {
-        let hits = self.covering_cards(query);
-        if hits.is_empty() {
-            return None;
-        }
-        if hits.len() >= 2 && hits[0].haystack.len() == hits[1].haystack.len() {
-            return None;
-        }
-        let card = hits[0];
-        Some(CardMatch {
-            id: card.id.clone(),
-            gist: card.gist(),
-        })
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum CardError {
-    NotADirectory(String),
-    Io(String),
-    Invalid(String),
-}
-
-impl std::fmt::Display for CardError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            CardError::NotADirectory(path) => write!(f, "knowledge dir is not a directory: {path}"),
-            CardError::Io(msg) => write!(f, "card read: {msg}"),
-            CardError::Invalid(msg) => write!(f, "card: {msg}"),
-        }
-    }
-}
-
-impl std::error::Error for CardError {}
-
-fn cards_from_value(value: &Value, path_hint: &str) -> Result<Vec<LoadedCard>, CardError> {
-    match value {
-        Value::Array(items) => {
-            let mut out = Vec::new();
-            for item in items {
-                if let Some(card) = one_card(item, path_hint)? {
-                    out.push(card);
+    pub fn answer(&self, query: &str) -> Reply {
+        let started = Instant::now();
+        let tokens = tokens(query);
+        let mut best: Option<(&Card, usize)> = None;
+        for card in &self.cards {
+            let score = tokens
+                .iter()
+                .filter(|t| card.blob.contains(t.as_str()))
+                .count();
+            if score == 0 {
+                continue;
+            }
+            let replace = match best {
+                None => true,
+                Some((prev, prev_score)) => {
+                    score > prev_score || (score == prev_score && card.id < prev.id)
                 }
+            };
+            if replace {
+                best = Some((card, score));
             }
-            Ok(out)
         }
-        Value::Object(map) => {
-            if let Some(cards) = map.get("cards") {
-                return cards_from_value(cards, path_hint);
-            }
-            Ok(one_card(value, path_hint)?.into_iter().collect())
+        let took_us = elapsed_us(started);
+        match best {
+            Some((card, _)) => Reply {
+                text: card.text.clone(),
+                mood: Pad::RESTING,
+                sources: vec![format!("card:{}", card.id)],
+                evidence: vec![format!("card:{}", card.id)],
+                propensity: 0.0,
+                violations: usize::from(contains_forbidden(&card.text)),
+                lookup_us: took_us,
+                took_us,
+            },
+            None => Reply {
+                text: UNKNOWN_REPLY.to_string(),
+                mood: Pad::RESTING,
+                sources: vec!["horbm:none".into()],
+                evidence: Vec::new(),
+                propensity: 0.0,
+                violations: 0,
+                lookup_us: took_us,
+                took_us,
+            },
         }
-        _ => Err(CardError::Invalid(format!(
-            "{path_hint}: card JSON must be an object or array"
-        ))),
     }
 }
 
-fn one_card(value: &Value, path_hint: &str) -> Result<Option<LoadedCard>, CardError> {
-    let Some(obj) = value.as_object() else {
-        return Err(CardError::Invalid(format!(
-            "{path_hint}: expected a card object"
-        )));
+/// HORBM reply engine. Uses `ReasoningRouter` when [`crate::research::route`]
+/// returns a line. Until that router is on `main`, the cards answer, and a
+/// miss is [`UNKNOWN_REPLY`].
+/// Memory and case paths are accepted so the `Brain::open` shape stays, and
+/// they are not opened.
+pub struct CardEngine {
+    cards: CardBrain,
+    pad: Pad,
+}
+
+impl CardEngine {
+    pub fn open(memory_db: &Path, knowledge_dir: &Path, cases: &Path) -> Self {
+        let _ = (memory_db, cases);
+        Self {
+            cards: CardBrain::open_readonly(knowledge_dir),
+            pad: Pad::RESTING,
+        }
+    }
+}
+
+impl ReplyEngine for CardEngine {
+    fn turn(&mut self, text: &str) -> Reply {
+        if let Some(routed) = research::route(text) {
+            self.pad = routed.mood;
+            return routed;
+        }
+        let reply = self.cards.answer(text);
+        self.pad = reply.mood;
+        reply
+    }
+
+    fn tick(&mut self) -> Pad {
+        self.pad
+    }
+
+    fn mood(&self) -> Pad {
+        self.pad
+    }
+}
+
+fn read_to_string(path: &Path) -> std::io::Result<String> {
+    let mut file = File::open(path)?;
+    let mut buf = String::new();
+    file.read_to_string(&mut buf)?;
+    Ok(buf)
+}
+
+fn markdown_body(text: &str) -> String {
+    let text = text.trim_start_matches('\u{feff}');
+    let mut lines = text.lines();
+    let Some(first) = lines.next() else {
+        return String::new();
     };
-    let Some(id) = first_str(obj, &["id", "card_id"]).filter(|s| !s.is_empty()) else {
-        return Ok(None);
-    };
-    let title = first_str(obj, &["title"]).unwrap_or_else(|| id.clone());
-    let summary = first_str(obj, &["summary", "gist"]).unwrap_or_default();
-    let body = first_str(obj, &["body", "text"]).unwrap_or_default();
-    if title.trim().is_empty() && summary.trim().is_empty() && body.trim().is_empty() {
-        return Err(CardError::Invalid(format!(
-            "{path_hint}: card {id} has no text"
-        )));
-    }
-    let aliases = match obj.get("aliases") {
-        Some(Value::Array(items)) => items
-            .iter()
-            .filter_map(|v| v.as_str().map(|s| s.trim().to_string()))
-            .filter(|s| !s.is_empty())
-            .collect(),
-        _ => Vec::new(),
-    };
-    Ok(Some(LoadedCard::new(id, title, summary, body, aliases)?))
-}
-
-fn first_str(obj: &serde_json::Map<String, Value>, keys: &[&str]) -> Option<String> {
-    for key in keys {
-        if let Some(Value::String(s)) = obj.get(*key) {
-            return Some(s.trim().to_string());
-        }
-    }
-    None
-}
-
-fn haystack_of(card: &LoadedCard) -> BTreeSet<String> {
-    let mut text = format!(
-        "{}\n{}\n{}\n{}",
-        card.id, card.title, card.summary, card.body
-    );
-    for alias in &card.aliases {
-        text.push('\n');
-        text.push_str(alias);
-    }
-    index_tokens(&text).into_iter().collect()
-}
-
-fn collect_json(dir: &Path, out: &mut Vec<std::path::PathBuf>) -> Result<(), CardError> {
-    let entries = std::fs::read_dir(dir).map_err(|err| CardError::Io(err.to_string()))?;
-    for entry in entries {
-        let path = entry.map_err(|err| CardError::Io(err.to_string()))?.path();
-        if path.is_dir() {
-            collect_json(&path, out)?;
-        } else if path.extension().and_then(|ext| ext.to_str()) == Some("json") {
-            out.push(path);
-        }
-    }
-    Ok(())
-}
-
-/// Lowercase alphanumeric tokens, stopwords removed. Same shape as
-/// `horbm-memory` `index_tokens`.
-pub fn index_tokens(raw: &str) -> Vec<String> {
-    let mut out = Vec::new();
-    let mut cur = String::new();
-    for ch in raw.chars() {
-        if ch.is_alphanumeric() {
-            for c in ch.to_lowercase() {
-                cur.push(c);
-            }
-        } else if !cur.is_empty() {
-            push_token(&mut out, &mut cur);
-        }
-    }
-    if !cur.is_empty() {
-        push_token(&mut out, &mut cur);
-    }
-    out.into_iter().filter(|t| !is_stopword(t)).collect()
-}
-
-fn push_token(out: &mut Vec<String>, cur: &mut String) {
-    if cur.len() <= 64 {
-        out.push(std::mem::take(cur));
+    if first.trim_start().starts_with("# ") {
+        lines.collect::<Vec<_>>().join("\n")
     } else {
-        cur.clear();
+        text.to_string()
     }
 }
 
-fn is_stopword(term: &str) -> bool {
-    matches!(
-        term,
-        "a" | "an"
-            | "the"
-            | "and"
-            | "or"
-            | "of"
-            | "to"
-            | "in"
-            | "on"
-            | "for"
-            | "with"
-            | "at"
-            | "by"
-            | "from"
-            | "as"
-            | "is"
-            | "are"
-            | "was"
-            | "were"
-            | "be"
-            | "been"
-            | "being"
-            | "it"
-            | "its"
-            | "this"
-            | "that"
-            | "these"
-            | "those"
-            | "not"
-            | "but"
-            | "if"
-            | "into"
-            | "than"
-            | "then"
-            | "so"
-            | "such"
-            | "no"
-            | "nor"
-            | "too"
-            | "very"
-            | "can"
-            | "will"
-            | "just"
-            | "about"
-            | "over"
-            | "after"
-            | "before"
-            | "between"
-            | "out"
-            | "up"
-            | "down"
-            | "off"
-            | "own"
-            | "same"
-            | "other"
-            | "which"
-            | "who"
-            | "whom"
-            | "what"
-            | "when"
-            | "where"
-            | "how"
-            | "all"
-            | "any"
-            | "both"
-            | "each"
-            | "few"
-            | "more"
-            | "most"
-            | "some"
-            | "only"
-            | "do"
-            | "does"
-            | "did"
-            | "doing"
-            | "have"
-            | "has"
-            | "had"
-            | "having"
-    )
+fn json_string(src: &str, key: &str) -> Option<String> {
+    let pattern = format!("\"{key}\"");
+    let start = src.find(&pattern)?;
+    let rest = src[start + pattern.len()..].trim_start();
+    let rest = rest.strip_prefix(':')?.trim_start();
+    let rest = rest.strip_prefix('"')?;
+    let mut out = String::new();
+    let mut chars = rest.chars();
+    while let Some(c) = chars.next() {
+        if c == '\\' {
+            match chars.next() {
+                Some('n') => out.push('\n'),
+                Some('t') => out.push('\t'),
+                Some('"') => out.push('"'),
+                Some('\\') => out.push('\\'),
+                Some(other) => out.push(other),
+                None => break,
+            }
+        } else if c == '"' {
+            break;
+        } else {
+            out.push(c);
+        }
+    }
+    let out = out.trim().to_string();
+    if out.is_empty() {
+        None
+    } else {
+        Some(out)
+    }
+}
+
+fn clean_id(raw: &str) -> String {
+    raw.chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '-' {
+                c.to_ascii_lowercase()
+            } else {
+                '-'
+            }
+        })
+        .collect::<String>()
+        .trim_matches('-')
+        .to_string()
+}
+
+fn tokens(query: &str) -> Vec<String> {
+    query
+        .split(|c: char| !c.is_ascii_alphanumeric())
+        .filter(|w| w.len() >= 3 && !STOP.contains(&w.to_ascii_lowercase().as_str()))
+        .map(|w| w.to_ascii_lowercase())
+        .collect()
+}
+
+const STOP: &[&str] = &[
+    "the", "and", "for", "are", "was", "not", "but", "with", "this", "that", "from", "have",
+    "what", "when", "where", "who", "how", "why", "about", "you", "your", "does", "did",
+];
+
+fn elapsed_us(started: Instant) -> u32 {
+    u32::try_from(started.elapsed().as_micros()).unwrap_or(u32::MAX)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::Write;
+    use std::fs;
 
-    fn kettle() -> LoadedCard {
-        LoadedCard::new(
-            "kettle",
-            "The kettle",
-            "The kettle is on the hob.",
-            "The kettle is on the hob.",
-            Vec::new(),
-        )
-        .unwrap()
+    fn write_card(dir: &Path, name: &str, body: &str) {
+        fs::write(dir.join(name), body).unwrap();
     }
 
     #[test]
-    fn a_card_answers_only_when_every_content_token_is_in_it() {
-        let cards = MemoryCards::from_cards(vec![kettle()]);
-        let hit = cards.lookup("the kettle").unwrap();
-        assert_eq!(hit.id, "kettle");
-        assert_eq!(hit.gist, "The kettle is on the hob.");
-        assert!(cards.lookup("the kettle fuse").is_none());
-    }
-
-    #[test]
-    fn a_tie_is_not_a_guess() {
-        // Ids must not be stopwords. "a" is a stopword and "b" is not, so
-        // those two haystacks are different sizes and the smaller one would win.
-        let a = LoadedCard::new(
-            "alpha-card",
-            "Alpha",
-            "Alpha marker.",
-            "Alpha marker.",
-            vec![],
-        )
-        .unwrap();
-        let b =
-            LoadedCard::new("beta-card", "Beta", "Beta marker.", "Beta marker.", vec![]).unwrap();
-        let cards = MemoryCards::from_cards(vec![a, b]);
-        assert!(cards.lookup("marker").is_none());
-        assert_eq!(cards.covering("marker").len(), 2);
-    }
-
-    #[test]
-    fn covering_keeps_at_most_four_and_a_unique_smallest_is_spoken() {
-        assert_eq!(MAX_HITS, 4);
-        assert_eq!(GAP_ADVICE, "ask_galion_research");
-        let mut cards = Vec::new();
-        for n in 0..5 {
-            let extra = (0..n)
-                .map(|i| format!("extra{i}"))
-                .collect::<Vec<_>>()
-                .join(" ");
-            cards.push(
-                LoadedCard::new(
-                    format!("card-{n}"),
-                    "Title",
-                    format!("Summary shared {extra}."),
-                    "Body shared.",
-                    vec![],
-                )
-                .unwrap(),
-            );
-        }
-        let loaded = MemoryCards::from_cards(cards);
-        let hits = loaded.covering("shared");
-        assert_eq!(hits.len(), MAX_HITS);
-        assert_eq!(hits[0].id, "card-0");
-        assert_eq!(loaded.lookup("shared").unwrap().id, "card-0");
-    }
-
-    #[test]
-    fn load_dir_reads_json_and_does_not_create_a_missing_dir() {
-        let root = std::env::temp_dir().join(format!(
+    fn matching_card_is_quoted_and_a_miss_is_i_dont_know() {
+        let dir = std::env::temp_dir().join(format!(
             "galion-cards-{}-{}",
             std::process::id(),
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_nanos()
+            elapsed_us(Instant::now())
         ));
-        let missing = root.join("missing");
-        let err = MemoryCards::load_dir(&missing).unwrap_err();
-        assert!(matches!(err, CardError::NotADirectory(_)));
-        assert!(!missing.exists());
-
-        std::fs::create_dir_all(root.join("horbm")).unwrap();
-        let path = root.join("horbm").join("kettle.json");
-        let mut file = File::create(&path).unwrap();
-        file.write_all(
-            br#"{"id":"kettle","title":"The kettle","section":"horbm","summary":"The kettle is on the hob.","body":"The kettle is on the hob."}"#,
-        )
-        .unwrap();
-        let before: Vec<_> = std::fs::read_dir(root.join("horbm"))
-            .unwrap()
-            .map(|e| e.unwrap().file_name())
-            .collect();
-        let loaded = MemoryCards::load_dir(&root).unwrap();
-        let after: Vec<_> = std::fs::read_dir(root.join("horbm"))
-            .unwrap()
-            .map(|e| e.unwrap().file_name())
-            .collect();
-        assert_eq!(before, after);
-        assert_eq!(loaded.len(), 1);
-        assert_eq!(
-            loaded.lookup("kettle").unwrap().gist,
-            "The kettle is on the hob."
+        fs::create_dir_all(&dir).unwrap();
+        write_card(&dir, "kettle.md", "# Kettle\nThe kettle is on the stove.\n");
+        write_card(
+            &dir,
+            "gate.json",
+            "{\"id\":\"gate\",\"text\":\"The gate sticks on the left.\"}\n",
         );
-        let _ = std::fs::remove_dir_all(&root);
+        let before = fs::read_dir(&dir)
+            .unwrap()
+            .map(|e| e.unwrap().file_name())
+            .collect::<Vec<_>>();
+        let brain = CardBrain::open_readonly(&dir);
+        let hit = brain.answer("where is the kettle");
+        assert_eq!(hit.text, "The kettle is on the stove.");
+        assert_eq!(hit.sources, vec!["card:kettle".to_string()]);
+        assert_eq!(hit.violations, 0);
+        assert!(!hit.text.contains("don't know"));
+        let other = brain.answer("what about the gate");
+        assert_eq!(other.text, "The gate sticks on the left.");
+        assert_eq!(other.sources, vec!["card:gate".to_string()]);
+        let miss = brain.answer("who won the match");
+        assert_eq!(miss.text, UNKNOWN_REPLY);
+        assert_eq!(miss.sources, vec!["horbm:none".to_string()]);
+        assert_eq!(miss.evidence.len(), 0);
+        let after = fs::read_dir(&dir)
+            .unwrap()
+            .map(|e| e.unwrap().file_name())
+            .collect::<Vec<_>>();
+        assert_eq!(before.len(), after.len());
+        let kettle = fs::read_to_string(dir.join("kettle.md")).unwrap();
+        assert!(kettle.contains("The kettle is on the stove."));
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn open_does_not_create_a_missing_directory() {
+        let dir = std::env::temp_dir().join(format!(
+            "galion-cards-missing-{}-{}",
+            std::process::id(),
+            elapsed_us(Instant::now())
+        ));
+        assert!(!dir.exists());
+        let brain = CardBrain::open_readonly(&dir);
+        let miss = brain.answer("hello there");
+        assert_eq!(miss.text, UNKNOWN_REPLY);
+        assert!(!dir.exists());
+    }
+
+    #[test]
+    fn engine_asks_the_router_then_the_cards() {
+        let dir = std::env::temp_dir().join(format!(
+            "galion-engine-{}-{}",
+            std::process::id(),
+            elapsed_us(Instant::now())
+        ));
+        fs::create_dir_all(&dir).unwrap();
+        write_card(&dir, "kettle.md", "The kettle is on the stove.\n");
+        let memory = dir.join("memory.db");
+        let cases = dir.join("cases");
+        let mut engine = CardEngine::open(&memory, &dir, &cases);
+        assert!(research::route("where is the kettle").is_none());
+        let hit = engine.turn("where is the kettle");
+        assert_eq!(hit.text, "The kettle is on the stove.");
+        assert!(!memory.exists());
+        assert!(!cases.exists());
+        assert_eq!(
+            engine.turn("unrelated question about mars").text,
+            UNKNOWN_REPLY
+        );
+        fs::remove_dir_all(&dir).unwrap();
     }
 }

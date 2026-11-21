@@ -14,10 +14,16 @@ rust-version = "1.92"
 # depends on `ort`. Not a member of the repo root workspace.
 [workspace]
 
-[dependencies]
+[target.'cfg(not(windows))'.dependencies]
 # Same ort pin as runtimes/galion-piper-rt (ONNX Runtime 1.31, CPU build).
-# No CUDA / TensorRT / DirectML features.
+# No CUDA / TensorRT / DirectML features. Unix links the downloaded CPU build.
 ort = { version = "=2.0.0-rc.15", default-features = false, features = ["std", "download-binaries", "copy-dylibs", "tls-rustls", "api-31"] }
+
+[target.'cfg(windows)'.dependencies]
+# VS2019 BuildTools fails to link the static ONNX Runtime import lib
+# (LNK2001 __std_find_trivial_8). load-dynamic loads onnxruntime.dll from
+# ORT_DYLIB_PATH. ORT_CACHE_DIR keeps the pyke cache off C:.
+ort = { version = "=2.0.0-rc.15", default-features = false, features = ["std", "load-dynamic", "api-31"] }
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"

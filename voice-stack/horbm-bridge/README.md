@@ -146,6 +146,8 @@ cargo run --features horbm -- say hello
 
 Those three variables are optional. Unset, `say` stays on `FakeEngine`.
 
+`CardEngine` reads `.md` and `.json` knowledge cards and does not write them. A query that matches no card is `I don't know.` [`research::route`](src/research.rs) stays empty so this bridge keeps answering from those cards and does not dial the gateway. The 7881 server calls `ReasoningRouter::turn` or `ReasoningRouter::route` when it wants the layer 5 order, and it passes the knowledge directory it already opened. The card index crate is `horbm-memory` in `galion-studio/galion-knowledge` `v2/memory` at `761a7f225304fc010379219e5b88c6669dd48f40`. This tree does not fetch it and does not open its sqlite file. `Brain::open` in `voice-stack/pipeline-orchestrator` still returns `horbm is not linked`.
+
 The landing line, relative to this `Cargo.toml`, is:
 
 ```toml

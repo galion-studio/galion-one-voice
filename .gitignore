@@ -117,3 +117,7 @@ tools/laptop-runbooks/**/*.ogg
 tools/symphony/articulation/target/
 tools/symphony/articulation/out/
 tools/symphony/articulation/.venv/
+
+# Free CPU models fetched by scripts/windows/Start-GalionOne.ps1. Not voice clones.
+/var/
+
