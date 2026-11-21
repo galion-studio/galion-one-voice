@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Galion Labs
+/target
+/var
+*.wav
+*.onnx
+*.mp3
+*.flac
+*.ogg
+*.opus
