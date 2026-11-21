@@ -20,3 +20,11 @@ jobs:
         run: |
           python3 voice-stack/mouth/test_mouth.py
           python3 scripts/test_bench_ttfa_gpu.py
+  piper-rt:
+    name: galion-piper-rt device policy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.92.0
+      - name: Compile the CUDA opt-in; do not run a GPU
+        run: cargo test --manifest-path runtimes/galion-piper-rt/Cargo.toml
