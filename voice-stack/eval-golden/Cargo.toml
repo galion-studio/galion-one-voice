@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Galion Labs
+# Standalone crate. Not a member of the repository workspace.
+[package]
+name = "galion-eval-golden"
+description = "Samantha end-to-end voice quality gates: rollout WER/ECAPA/emotion, golden scripts, persona lint, Piper round-trip."
+version = "0.0.1"
+edition = "2021"
+license = "MIT"
+publish = false
+rust-version = "1.83"
+
+[workspace]
+
+[[bin]]
+name = "eval-golden"
+path = "src/main.rs"
+
+[dependencies]
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
