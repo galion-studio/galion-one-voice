@@ -133,6 +133,8 @@ The development machine for this program is a WSL Ubuntu laptop with an NVIDIA G
 
 The **in-repo clone child does not use that GPU.** `docs/galion-voice-v2/symphony/CLONE-LANDING.md` sets `GALION_CLONE_DEVICE=cpu` and leaves `CUDA_VISIBLE_DEVICES` empty. A `cuda`, `gpu`, or `mps` request exits 3 and writes no PCM. `speech/clone_worker` says the same thing: no GPU, no GGUF, one thread. The planning note in that landing is about a 1 vCPU child, not a measured GPU score.
 
+The Piper mouth can. It stays on CPU unless `GALION_TTS_DEVICE=cuda` and a CUDA build of onnxruntime 1.31.1 actually loads. Otherwise it logs `falling back to CPU` and keeps the CPU provider. The HTTP mouth is `voice-stack/mouth/serve.py` on `127.0.0.1:8002`. Setup, G: cache paths, and the bench the laptop runs are in [`voice-stack/mouth/README.md`](voice-stack/mouth/README.md). This page does not publish a GPU time-to-first-audio. That number is whatever `scripts/bench-ttfa-gpu.sh` writes on the machine that ran it.
+
 `galion-clone-cbx` shells out to `cbx` for Chatterbox Turbo ONNX fp32. This repository does not ship the `cbx` binary, the ONNX weights, or a CUDA provider. Those stay outside git. Reference wavs for Samantha and Jarvis stay outside git. They are read-only local files. They are not Piper training data. The Jarvis reference keeps its hub texture. Do not replace the installed Jarvis voice from this README.
 
 Fetch clone weights only on purpose:

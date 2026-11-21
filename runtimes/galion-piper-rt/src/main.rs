@@ -12,6 +12,11 @@
 //! spinning and CPU-affinity control (the C++ CLI exposes none of these and
 //! always starts one intra-op thread per core), a pre-warm at spawn so the
 //! first caller line is not the cold one, and an optional idle keepalive.
+//!
+//! CPU is the default. `GALION_TTS_DEVICE=cuda` (or `--device cuda`) asks for
+//! the CUDA execution provider. That path runs only when a GPU is visible and
+//! a CUDA build of onnxruntime 1.31.1 loads. Otherwise one stderr line says
+//! `falling back to CPU` and the session stays on the CPU provider.
 //! The onnxruntime shared library is loaded at runtime (`--ort_lib`); nothing
 //! links ORT into the voice crates. This crate is its own cargo workspace and is
 //! excluded from the main one (owner approval t613s2992, 2026-11-04, LOCKS
@@ -21,6 +26,7 @@
 //! deployed Jarvis voice. See [`policy`].
 #![allow(unsafe_code)]
 
+mod device;
 mod espeak;
 mod policy;
 
@@ -28,6 +34,8 @@ mod policy;
 const _: () = assert!(policy::OWN_VOICE_CLIP_TRAINING_FORBIDDEN);
 const _: () = assert!(!policy::IS_DEPLOYED_JARVIS_VOICE);
 
+use device::{arena_bytes, cuda_lib_candidates, device_id, parse_request, plan, probe_hardware, resolve_cuda_lib, Plan};
+use ort::ep::ExecutionProvider;
 use ort::session::{builder::GraphOptimizationLevel, Session};
 use ort::value::Tensor;
 use std::collections::HashMap;
@@ -54,12 +62,14 @@ struct Args {
     keepalive_ms: u64,
     quiet: bool,
     debug: bool,
+    device: Option<String>,
 }
 
 fn usage() -> ! {
     eprintln!("usage: galion-piper-rt --model FILE [--config FILE] [--output_raw] [--json-input] \
 [--noise_scale N] [--length_scale N] [--noise_w N] [--sentence_silence S] [--espeak_data DIR] \
-[--espeak_lib FILE] [--ort_lib FILE] [--intra_threads N] [--spin 0|1] [--cpus 6-7] [--warmup N] [--keepalive_ms MS] [-q]");
+[--espeak_lib FILE] [--ort_lib FILE] [--device cpu|cuda] [--intra_threads N] [--spin 0|1] [--cpus 6-7] [--warmup N] [--keepalive_ms MS] [-q]");
+    eprintln!("device defaults to cpu. cuda uses the CUDA execution provider when GALION_ORT_CUDA_LIB (or a G: unpack) loads; otherwise the process logs a fallback and stays on CPU.");
     std::process::exit(2)
 }
 
@@ -83,7 +93,7 @@ fn parse_args() -> Args {
         spin: std::env::var("GALION_PIPER_SPIN").map(|v| v != "0").unwrap_or(true),
         cpus: std::env::var("GALION_PIPER_CPUS").ok().and_then(|v| parse_cpus(&v)),
         warmup: 2, keepalive_ms: std::env::var("GALION_PIPER_KEEPALIVE_MS").ok().and_then(|v| v.parse().ok()).unwrap_or(0),
-        quiet: false, debug: false,
+        quiet: false, debug: false, device: None,
     };
     while let Some(k) = it.next() {
         let mut val = || it.next().unwrap_or_else(|| usage());
@@ -100,6 +110,7 @@ fn parse_args() -> Args {
             "--espeak_data" => a.espeak_data = Some(val().into()),
             "--espeak_lib" => a.espeak_lib = Some(val().into()),
             "--ort_lib" => a.ort_lib = Some(val().into()),
+            "--device" => a.device = Some(val()),
             "--intra_threads" => a.intra_threads = val().parse().ok(),
             "--spin" => a.spin = val() != "0",
             "--cpus" => a.cpus = parse_cpus(&val()),
@@ -191,6 +202,109 @@ impl Voice {
     }
 }
 
+fn load_ort(path: &Path) -> Result<ort::environment::Environment, String> {
+    let builder = ort::init_from(path).map_err(|e| e.to_string())?;
+    builder.with_name("galion-piper-rt").build().map_err(|e| e.to_string())
+}
+
+fn cuda_library_or_cpu(cpu_lib: &Path, gpu_lib: Option<&Path>, plan: Plan) -> (PathBuf, Plan) {
+    if plan.try_cuda {
+        if let Some(gpu) = gpu_lib {
+            if gpu.is_file() {
+                return (gpu.to_path_buf(), plan);
+            }
+        }
+        return (
+            cpu_lib.to_path_buf(),
+            Plan {
+                try_cuda: false,
+                log: Some(
+                    "GALION_TTS_DEVICE=cuda but the CUDA onnxruntime library is not on disk; falling back to CPU"
+                        .into(),
+                ),
+            },
+        );
+    }
+    (cpu_lib.to_path_buf(), plan)
+}
+
+fn provider_available(plan: Plan) -> Plan {
+    if !plan.try_cuda {
+        return plan;
+    }
+    match ort::ep::CUDA::is_available() {
+        Ok(true) => plan,
+        Ok(false) => Plan {
+            try_cuda: false,
+            log: Some(
+                "GALION_TTS_DEVICE=cuda but the loaded onnxruntime reports no CUDAExecutionProvider; falling back to CPU"
+                    .into(),
+            ),
+        },
+        Err(e) => Plan {
+            try_cuda: false,
+            log: Some(format!(
+                "GALION_TTS_DEVICE=cuda but CUDAExecutionProvider could not be queried ({e}); falling back to CPU"
+            )),
+        },
+    }
+}
+
+fn build_session(
+    env: &ort::environment::Environment,
+    model: &Path,
+    threads: usize,
+    spin: bool,
+    cuda: bool,
+    cuda_device: i32,
+    arena: usize,
+) -> Result<Session, String> {
+    let b = Session::builder(env).map_err(|e| e.to_string())?;
+    let b = b.with_optimization_level(GraphOptimizationLevel::Level3).map_err(|e| e.to_string())?;
+    let b = b.with_intra_threads(threads).map_err(|e| e.to_string())?;
+    let b = b.with_inter_threads(1).map_err(|e| e.to_string())?;
+    let b = b.with_intra_op_spinning(spin).map_err(|e| e.to_string())?;
+    let mut b = if cuda {
+        let ep = ort::ep::CUDA::default()
+            .with_device_id(cuda_device)
+            .with_memory_limit(arena)
+            .with_conv_algorithm_search(ort::ep::cuda::ConvAlgorithmSearch::Heuristic)
+            .with_conv_max_workspace(false)
+            .with_cuda_graph(false)
+            .with_tf32(false)
+            .build()
+            .error_on_failure();
+        b.with_execution_providers([ep]).map_err(|e| e.to_string())?
+    } else {
+        b
+    };
+    b.commit_from_file(model).map_err(|e| e.to_string())
+}
+
+fn open_session(
+    env: &ort::environment::Environment,
+    model: &Path,
+    threads: usize,
+    spin: bool,
+    mut chosen: Plan,
+    cuda_device: i32,
+    arena: usize,
+) -> (Result<Session, String>, Plan) {
+    let built = build_session(env, model, threads, spin, chosen.try_cuda, cuda_device, arena);
+    if let Err(err) = &built {
+        if chosen.try_cuda {
+            chosen = Plan {
+                try_cuda: false,
+                log: Some(format!(
+                    "GALION_TTS_DEVICE=cuda but the CUDA execution provider did not load ({err}); falling back to CPU"
+                )),
+            };
+            return (build_session(env, model, threads, spin, false, cuda_device, arena), chosen);
+        }
+    }
+    (built, chosen)
+}
+
 fn main() {
     let a = parse_args();
     if let Some(c) = &a.cpus {
@@ -219,25 +333,50 @@ fn main() {
             }
         }
     }
-    let ort_lib = a.ort_lib.clone().unwrap_or_else(|| rt.join(format!("ort/onnxruntime-linux-x64-{ORT_VERSION}/lib/libonnxruntime.so.{ORT_VERSION}")));
+    let cpu_ort_lib = a.ort_lib.clone().unwrap_or_else(|| rt.join(format!("ort/onnxruntime-linux-x64-{ORT_VERSION}/lib/libonnxruntime.so.{ORT_VERSION}")));
     let espeak_lib = a.espeak_lib.clone().unwrap_or_else(|| rt.join("piper/libespeak-ng.so.1"));
     let espeak_data = a.espeak_data.clone().unwrap_or_else(|| rt.join("piper/espeak-ng-data"));
 
+    let requested_raw = a.device.clone().unwrap_or_else(|| std::env::var("GALION_TTS_DEVICE").unwrap_or_default());
+    let (request, unknown) = parse_request(&requested_raw);
+    let hardware = probe_hardware();
+    let explicit_cuda = std::env::var_os("GALION_ORT_CUDA_LIB").map(PathBuf::from);
+    let repo = std::env::var("GALION_REPO").ok().map(PathBuf::from);
+    let cuda_lib = resolve_cuda_lib(explicit_cuda.as_deref(), &cuda_lib_candidates(repo.as_deref()));
+    let chosen = plan(request, unknown, &hardware, cuda_lib.as_deref());
+    let (ort_lib, chosen) = cuda_library_or_cpu(&cpu_ort_lib, cuda_lib.as_deref(), chosen);
+
     let t_load = Instant::now();
     let fail = |what: &str, e: String| -> ! { eprintln!("[galion-piper-rt] {what}: {e}"); std::process::exit(1) };
-    let builder = match ort::init_from(&ort_lib) { Ok(b) => b, Err(e) => fail("load onnxruntime", e.to_string()) };
-    let env = match builder.with_name("galion-piper-rt").build() { Ok(e) => e, Err(e) => fail("ort env", e.to_string()) };
+    let (env, mut chosen) = if chosen.try_cuda && ort_lib != cpu_ort_lib {
+        match load_ort(&ort_lib) {
+            Ok(env) => (env, chosen),
+            Err(e) => {
+                let note = format!("GALION_TTS_DEVICE=cuda but the CUDA onnxruntime library failed to load ({e}); falling back to CPU");
+                match load_ort(&cpu_ort_lib) {
+                    Ok(env) => (env, Plan { try_cuda: false, log: Some(note) }),
+                    Err(e2) => fail("load onnxruntime", e2),
+                }
+            }
+        }
+    } else {
+        match load_ort(&ort_lib) {
+            Ok(env) => (env, chosen),
+            Err(e) => fail("load onnxruntime", e),
+        }
+    };
+    chosen = provider_available(chosen);
     let ncpu = a.cpus.as_ref().map(|c| c.len()).unwrap_or_else(|| std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4));
     let threads = a.intra_threads.unwrap_or(ncpu.min(DEFAULT_THREADS)).max(1);
-    let session = (|| -> Result<Session, String> {
-        let b = Session::builder(&env).map_err(|e| e.to_string())?;
-        let b = b.with_optimization_level(GraphOptimizationLevel::Level3).map_err(|e| e.to_string())?;
-        let b = b.with_intra_threads(threads).map_err(|e| e.to_string())?;
-        let b = b.with_inter_threads(1).map_err(|e| e.to_string())?;
-        let mut b = b.with_intra_op_spinning(a.spin).map_err(|e| e.to_string())?;
-        b.commit_from_file(&a.model).map_err(|e| e.to_string())
-    })();
+    let cuda_id = device_id(std::env::var("GALION_TTS_CUDA_DEVICE").ok().as_deref());
+    let arena = arena_bytes(std::env::var("GALION_TTS_CUDA_ARENA_BYTES").ok().as_deref());
+    let (session, chosen) = open_session(&env, &a.model, threads, a.spin, chosen, cuda_id, arena);
     let session = match session { Ok(s) => s, Err(e) => fail("load model", e) };
+    if let Some(note) = &chosen.log {
+        eprintln!("[galion-piper-rt] {note}");
+    }
+    let device_name = if chosen.try_cuda { "cuda" } else { "cpu" };
+    eprintln!("[galion-piper-rt] device={device_name}");
     let espeak = match espeak::Espeak::open(&espeak_lib, &espeak_data, &voice) { Ok(e) => e, Err(e) => fail("espeak", e) };
     let mut v = Voice { session, espeak, ids, scales };
     // Pre-warm inside the child: the first caller line must not pay first-run allocation.
@@ -246,7 +385,7 @@ fn main() {
         for p in &s { let ids = v.ids_for(p); let _ = v.infer(&ids); }
     }
     if !a.quiet {
-        eprintln!("[galion-piper-rt] loaded {} in {:.3}s (threads={threads} spin={} cpus={:?} warmup={})",
+        eprintln!("[galion-piper-rt] loaded {} in {:.3}s (device={device_name} threads={threads} spin={} cpus={:?} warmup={})",
             a.model.display(), t_load.elapsed().as_secs_f64(), a.spin as u8, a.cpus, a.warmup);
     }
 

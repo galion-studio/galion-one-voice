@@ -1,0 +1,30 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Galion Labs
+# Mouth device policy and the TTFA bench. No GPU result is claimed here.
+# Hosted runners have no CUDA device; the bench marks that section skipped.
+
+name: mouth gpu
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  honesty:
+    name: no invented GPU TTFA
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Device policy, loopback mouth, bench skip
+        run: |
+          python3 voice-stack/mouth/test_mouth.py
+          python3 scripts/test_bench_ttfa_gpu.py
+  piper-rt:
+    name: galion-piper-rt device policy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.92.0
+      - name: Compile the CUDA opt-in; do not run a GPU
+        run: cargo test --manifest-path runtimes/galion-piper-rt/Cargo.toml

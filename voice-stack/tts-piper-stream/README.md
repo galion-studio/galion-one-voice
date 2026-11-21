@@ -40,7 +40,7 @@ export GALION_PIPER_CONFIG=/path/to/en_US-ljspeech-medium.onnx.json
 cargo run --release --bin piper-ttfa
 ```
 
-Optional: `GALION_PIPER_CPUS=0-3` pins the child on Linux. Unset leaves the mask alone. `piper-ttfa --wav /tmp/out.s16` writes raw s16le of the two-clause line for listening. Do not commit that file.
+Optional: `GALION_PIPER_CPUS=0-3` pins the child on Linux. Unset leaves the mask alone. The child inherits `GALION_TTS_DEVICE`. `galion-piper-rt` reads it. CPU is the default. `cuda` uses the CUDA execution provider only when that provider loads, and otherwise logs `falling back to CPU`. The legacy Piper CLI ignores the variable and stays on CPU. See [`voice-stack/mouth/README.md`](../mouth/README.md). `piper-ttfa --wav /tmp/out.s16` writes raw s16le of the two-clause line for listening. Do not commit that file.
 
 Linux reads the pipes with `poll` (no extra drain wait). `GALION_PIPER_IO` is not a switch; tests also run the reader-thread path (`IoMode::Thread`).
 
