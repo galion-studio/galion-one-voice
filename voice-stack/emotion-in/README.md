@@ -5,7 +5,7 @@
 
 # galion-emotion-in
 
-S08 of the Samantha voice stack. This crate reads prosody from mic frames on the CPU and turns it into a PAD mood target for HORBM.
+S08 of the Samantha voice stack, at `voice-stack/emotion-in/`. This crate reads prosody from mic frames on the CPU and turns it into a PAD mood target for HORBM.
 
 It is its own Cargo workspace. It is not a member of the Galion Voice workspace, and the root `Cargo.toml` does not name it.
 
@@ -44,7 +44,9 @@ Anchors for the 0..1 normalisation, from `src/map.rs`:
 
 A framing buffer holds at most one input frame and is wiped after the frame is pushed, on finish, and on drop. Reports set `audio_retained_samples` to 0.
 
-The optional `onnx` feature loads `models/prosody-linear.onnx`, a single Gemm of those same coefficients (`tools/gen_linear_onnx.py`). It is not a speech-emotion model and it does not download anything. Any other graph is rejected and the Rust coefficients are used. The feature is off unless you pass `--features onnx`. The file is 286 bytes. The repo gitignores `*.onnx` so that downloaded networks stay out; this file is tracked anyway because it is that linear map. If you regenerate it, `git add -f models/prosody-linear.onnx` is what puts the replacement in the index.
+`Pad::RESTING` keeps the brain's triple (arousal 0.3, valence 0.25, dominance 0.5). This crate clamps valence to −1..1. That span is an assumption of this crate. `horbm` does not document a range here, and `EmotionFrame::neutral` uses valence 0.0.
+
+The optional `onnx` feature builds a one-node Gemm of the same coefficients in memory and parses those bytes. It is not a speech-emotion model, it does not download anything, and it does not add a `.onnx` file to the tree. The feature is off unless you pass `--features onnx`.
 
 ## Run
 
@@ -53,7 +55,7 @@ Rust 1.85 is what the voice repo asks for. This crate was built and tested with 
 ### Linux
 
 ```bash
-cd voice-stack/s08-emotion-in
+cd voice-stack/emotion-in
 cargo test --offline
 cargo test --offline --release
 cargo test --offline --features onnx
@@ -72,7 +74,7 @@ Sense stays denied until `--sense` or `GALION_EMOTION_SENSE=1`. Any other value 
 From the clone. On the owner's machine the home directory is `G:\galion`; the repo path under that home can differ.
 
 ```bat
-cd /d G:\galion\galion-one-voice\voice-stack\s08-emotion-in
+cd /d G:\galion\galion-one-voice\voice-stack\emotion-in
 cargo test --offline
 cargo test --offline --release
 cargo run --offline --release -- bench 200
@@ -87,7 +89,7 @@ CC0 clips are not in git. `*.wav` is ignored. Fetch them yourself. The three use
 
 ## Measurements
 
-Run on this cloud VM (Linux, rustc 1.83.0) on 21 Nov 2026. These are the commands that were actually run. Times are microseconds. The stage bar is 80 ms = 80000 µs.
+Run on this cloud VM (Linux, rustc 1.83.0) on 21 Nov 2026. These are the commands that were actually run. Times are microseconds. The swarm streaming bar used for the release assertion is 80 ms = 80000 µs. The architecture ceiling for this stage is 2.4 ms (3% of the frame). The push p95 below is under both.
 
 `cargo test --offline` passed: 26 library tests, 5 pipeline tests.
 

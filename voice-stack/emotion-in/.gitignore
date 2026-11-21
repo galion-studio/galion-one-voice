@@ -2,6 +2,7 @@
 # Copyright (c) 2026 Galion Labs
 
 # User audio stays on the machine that recorded it.
+# Weight files stay out. The linear ONNX head is built in memory.
 *.wav
 *.wave
 *.flac

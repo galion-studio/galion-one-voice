@@ -22,8 +22,9 @@
 //! Below 0.20 the mood target is [`Pad::RESTING`], the same cutoff
 //! `galion-emotion` uses before it will name an affect.
 //!
-//! The optional `onnx` feature loads these same weights from
-//! `models/prosody-linear.onnx` (one Gemm). The post-rule stays in Rust.
+//! The optional `onnx` feature builds a one-node Gemm of these same weights
+//! in memory and parses it. The post-rule stays in Rust. No weight file is
+//! committed.
 
 use crate::pad::Pad;
 use crate::prosody::Prosody;

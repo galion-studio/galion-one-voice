@@ -1,10 +1,15 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Galion Labs
 
-//! PAD mood point in the shape `horbm` publishes.
+//! PAD mood point handed to HORBM as a mood target.
 //!
-//! `Pad::RESTING` is `{ arousal: 0.3, valence: 0.25, dominance: 0.5 }`.
-//! Ranges match `galion-emotion`: valence −1..1, arousal 0..1, dominance 0..1.
+//! `Pad::RESTING` is the triple the brain publishes: arousal 0.3, valence 0.25,
+//! dominance 0.5. This crate clamps valence to −1..1, arousal to 0..1, and
+//! dominance to 0..1. That valence span is this crate's assumption. `horbm`
+//! does not document a range in this repository. `EmotionFrame::neutral` is
+//! valence 0.0 with the same arousal and dominance, so the two valence numbers
+//! are not one scale.
+//!
 //! The real brain advances mood on its own 80 ms tick. [`Pad::step_toward`] is
 //! the stand-in used by [`crate::engine::FakeBrain`], not a copy of that brain.
 

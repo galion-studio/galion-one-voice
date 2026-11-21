@@ -270,7 +270,7 @@ Linux mic (24 kHz mono s16le):
   arecord -f S16_LE -r 24000 -c 1 -t raw | emotion-in pcm --rate 24000 --sense --stream
 
 Windows, from the clone (this machine's home is often G:\\galion):
-  cargo run --release --manifest-path voice-stack\\s08-emotion-in\\Cargo.toml -- wav C:\\path\\clip.wav --sense
+  cargo run --release --manifest-path voice-stack\\emotion-in\\Cargo.toml -- wav C:\\path\\clip.wav --sense
   ffmpeg -f dshow -i audio=Microphone -ac 1 -ar 24000 -f s16le - | emotion-in.exe pcm --rate 24000 --sense --stream
 "
 }
