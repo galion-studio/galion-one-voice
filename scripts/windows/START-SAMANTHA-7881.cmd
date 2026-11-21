@@ -85,6 +85,8 @@ if exist "G:\galion\horbm\knowledge\" (
 ) else (
   set "GALION_HORBM_KNOWLEDGE=%REPO%\voice-stack\local-server\knowledge"
 )
+rem ReasoningRouter reads those cards first. Leave GALION_RESEARCH_BIND unset
+rem unless the gateway is already listening on 127.0.0.1:7911. Do not use 8787.
 
 set "SERVER=%CARGO_TARGET_DIR%\release\samantha-local.exe"
 set "UI=%REPO%\voice-stack\local-server\ui"

@@ -4,10 +4,9 @@
 //!
 //! `open` reads `.md` and `.json` files. It does not create the directory,
 //! write a card, or open the memory database. A query that shares no word
-//! with a card is [`UNKNOWN_REPLY`]. [`crate::research::route`] stays `None`,
-//! so this engine reads the cards. [`crate::ReasoningRouter`] is the layer 5
-//! call for a caller that passes a knowledge directory. This engine does not
-//! dial the gateway.
+//! with a card is [`UNKNOWN_REPLY`]. [`crate::research::route`] sends the
+//! turn through [`crate::ReasoningRouter`], which reads these cards first.
+//! This engine does not bind a socket and does not dial the Node desk.
 
 use std::fs::File;
 use std::io::Read;
@@ -16,8 +15,10 @@ use std::time::Instant;
 
 use crate::chunks::contains_forbidden;
 use crate::engine::{Reply, ReplyEngine};
+use crate::index::{CardLoader, CardMatch, MemoryCards};
 use crate::pad::Pad;
 use crate::research;
+use crate::router::ReasoningRouter;
 
 /// Spoken when no card matches. Not a guess and not a model completion.
 pub const UNKNOWN_REPLY: &str = "I don't know.";
@@ -147,21 +148,63 @@ impl CardBrain {
     }
 }
 
-/// HORBM reply engine. Uses `ReasoningRouter` when [`crate::research::route`]
-/// returns a line. Until that router is on `main`, the cards answer, and a
-/// miss is [`UNKNOWN_REPLY`].
-/// Memory and case paths are accepted so the `Brain::open` shape stays, and
-/// they are not opened.
+/// Cards the 7881 router reads. JSON uses the layer 5 token rule. Markdown
+/// cards, including the shipped kettle note, answer when JSON has no hit.
+struct LocalCards {
+    json: MemoryCards,
+    prose: CardBrain,
+}
+
+impl CardLoader for LocalCards {
+    fn lookup(&self, query: &str) -> Option<CardMatch> {
+        if let Some(hit) = self.json.lookup(query) {
+            return Some(hit);
+        }
+        let reply = self.prose.answer(query);
+        let id = reply
+            .sources
+            .iter()
+            .find_map(|source| source.strip_prefix("card:"))?;
+        if reply.text.trim().is_empty() {
+            return None;
+        }
+        Some(CardMatch {
+            id: id.to_string(),
+            gist: reply.text,
+        })
+    }
+}
+
+/// HORBM reply engine. [`crate::research::route`] calls
+/// [`ReasoningRouter::turn`]. Cards answer first, and a miss is
+/// [`UNKNOWN_REPLY`]. Memory and case paths are accepted so the
+/// `Brain::open` shape stays, and they are not opened.
 pub struct CardEngine {
-    cards: CardBrain,
+    router: ReasoningRouter,
     pad: Pad,
 }
 
 impl CardEngine {
     pub fn open(memory_db: &Path, knowledge_dir: &Path, cases: &Path) -> Self {
+        Self::open_bound(
+            memory_db,
+            knowledge_dir,
+            cases,
+            research::bind_from_env().as_deref(),
+        )
+    }
+
+    fn open_bound(
+        memory_db: &Path,
+        knowledge_dir: &Path,
+        cases: &Path,
+        bind: Option<&str>,
+    ) -> Self {
         let _ = (memory_db, cases);
+        let json = MemoryCards::load_dir(knowledge_dir).unwrap_or_default();
+        let prose = CardBrain::open_readonly(knowledge_dir);
         Self {
-            cards: CardBrain::open_readonly(knowledge_dir),
+            router: ReasoningRouter::new(LocalCards { json, prose }, research::research_port(bind)),
             pad: Pad::RESTING,
         }
     }
@@ -169,11 +212,7 @@ impl CardEngine {
 
 impl ReplyEngine for CardEngine {
     fn turn(&mut self, text: &str) -> Reply {
-        if let Some(routed) = research::route(text) {
-            self.pad = routed.mood;
-            return routed;
-        }
-        let reply = self.cards.answer(text);
+        let reply = research::route(&mut self.router, text);
         self.pad = reply.mood;
         reply
     }
@@ -345,16 +384,19 @@ mod tests {
         write_card(&dir, "kettle.md", "The kettle is on the stove.\n");
         let memory = dir.join("memory.db");
         let cases = dir.join("cases");
-        let mut engine = CardEngine::open(&memory, &dir, &cases);
-        assert!(research::route("where is the kettle").is_none());
+        let mut engine = CardEngine::open_bound(&memory, &dir, &cases, Some("127.0.0.1:8787"));
         let hit = engine.turn("where is the kettle");
         assert_eq!(hit.text, "The kettle is on the stove.");
+        assert_eq!(hit.sources, vec!["card:kettle".to_string()]);
         assert!(!memory.exists());
         assert!(!cases.exists());
-        assert_eq!(
-            engine.turn("unrelated question about mars").text,
-            UNKNOWN_REPLY
-        );
+        let started = Instant::now();
+        let miss = engine.turn("why is the spare fuse missing from the drawer?");
+        assert!(started.elapsed().as_millis() < 500);
+        assert_eq!(miss.text, UNKNOWN_REPLY);
+        assert_eq!(miss.sources, vec!["honest:unknown".to_string()]);
+        assert!(!miss.text.to_ascii_lowercase().contains("ollama"));
+        assert!(!dir.join("revisions.sqlite").exists());
         fs::remove_dir_all(&dir).unwrap();
     }
 }

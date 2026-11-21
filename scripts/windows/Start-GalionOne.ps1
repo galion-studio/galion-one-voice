@@ -217,6 +217,8 @@ if (-not (Test-Path -LiteralPath $Knowledge)) {
     $Knowledge = Join-Path $Repo "voice-stack\local-server\knowledge"
 }
 $env:GALION_HORBM_KNOWLEDGE = $Knowledge
+# ReasoningRouter reads those cards first. Set GALION_RESEARCH_BIND to
+# 127.0.0.1:7911 only when that gateway is already listening. Do not use 8787.
 
 $Ui = Join-Path $Repo "voice-stack\local-server\ui"
 $OutLog = Join-Path $LogDir "samantha-local.out.log"

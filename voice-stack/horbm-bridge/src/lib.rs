@@ -13,7 +13,8 @@
 //! returns `horbm is not linked; Brain::open stays in crate horbm`.
 //! [`FakeEngine`] is the test double. Feature `horbm` compiles [`HorbmEngine`]
 //! against `seam/horbm`, whose `turn` returns an empty line. The layer 5
-//! path is [`ReasoningRouter`], which reads cards and does not call that seam.
+//! path is [`ReasoningRouter`]. The 7881 card bridge calls it from
+//! [`research::route`].
 //!
 //! This crate does not synthesize audio, does not read `GALION_SAMANTHA_REF`,
 //! and does not call a model API. It is not a member of the root workspace.
