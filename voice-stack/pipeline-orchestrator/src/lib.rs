@@ -15,6 +15,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod brain_route;
 pub mod clause;
 pub mod clock;
 pub mod demo;
@@ -22,6 +23,7 @@ pub mod pipeline;
 pub mod samantha_traits;
 pub mod ui;
 
+pub use brain_route::{asr_to_piper_lines, RouterMouth};
 pub use clock::{
     BARGE_IN_MAX_MS, CAPTURE_FRAME_MS, CAPTURE_FRAME_SAMPLES, CAPTURE_RATE_HZ, CHUNK_CHANNEL_BOUND,
     FRAME_CHANNEL_BOUND, HEARTBEAT_MS, HEARTBEAT_PLAY_SAMPLES, PLAYBACK_RATE_HZ, STAGE_BAR_US,

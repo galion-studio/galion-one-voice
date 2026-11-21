@@ -166,8 +166,10 @@ Bind `127.0.0.1:7881` only (`SAMANTHA_WS_ADDR`). `GALION_SAMANTHA_WS` may set an
 | 7878 | One-dot HTTP (`scripts/run-v1-screen.sh`) |
 | 7879 | Hard loop (`GALION_HARD_ADDR`) |
 | 7880 | Clone worker (`GALION_CBX_ADDR`) |
-| 8642 | Hermes gateway |
+| 8642 | Hermes gateway. The layer 11 Rust gateway dials `127.0.0.1:8642` only. |
 | 8766 | Nebula emotion feed |
+| 8787 | Node Galion Research desk (`hermes-research`). Clashes with the HORBM preview. The Rust gateway does not bind it. |
+| 7911 | Galion Research gateway, layer 11 (`GALION_RESEARCH_BIND`, `127.0.0.1` only). Not 7881, 7878, 8787, 8642, or 11434. |
 
 One process. HTTP on the same port, only:
 

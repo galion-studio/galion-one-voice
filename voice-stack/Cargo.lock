@@ -448,6 +448,13 @@ name = "galion-eval-golden"
 version = "0.0.1"
 
 [[package]]
+name = "galion-research-gateway"
+version = "0.0.1"
+dependencies = [
+ "serde_json",
+]
+
+[[package]]
 name = "galion-sam-asr"
 version = "0.0.1"
 
@@ -469,7 +476,9 @@ dependencies = [
 name = "galion-sam-horbm"
 version = "0.0.1"
 dependencies = [
+ "galion-research-gateway",
  "horbm",
+ "serde_json",
 ]
 
 [[package]]
@@ -480,6 +489,7 @@ version = "0.0.1"
 name = "galion-sam-orch"
 version = "0.0.1"
 dependencies = [
+ "galion-sam-horbm",
  "tokio",
 ]
 
