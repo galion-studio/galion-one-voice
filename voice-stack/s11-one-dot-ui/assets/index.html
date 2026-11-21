@@ -1,0 +1,32 @@
+<!-- SPDX-License-Identifier: MIT -->
+<!-- Copyright (c) 2026 Galion Labs -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0A0A0C">
+<title>Samantha</title>
+<link rel="stylesheet" href="samantha.css">
+</head>
+<body data-state="idle" data-mic="off" data-link="starting" data-motion="full">
+<canvas id="field" aria-hidden="true"></canvas>
+<button id="talk" type="button" aria-pressed="false" aria-label="Talk to Samantha"></button>
+<p id="live" class="sr" aria-live="polite"></p>
+<p id="notice" role="status"></p>
+<div id="caption-panel" hidden>
+  <p id="caption" aria-live="polite"></p>
+  <h2 id="sources-label">Sources</h2>
+  <ul id="sources"></ul>
+</div>
+<div class="bar">
+  <button id="stop" type="button">Stop</button>
+  <button id="captions" type="button" aria-pressed="false" aria-controls="caption-panel">Captions</button>
+</div>
+<p id="help" class="sr">Samantha. Enter talks. Escape stops. C toggles captions. The microphone stays off until you talk.</p>
+<noscript><p>Samantha needs JavaScript for the dot.</p></noscript>
+<script src="dot-logic.js"></script>
+<script src="samantha.js"></script>
+</body>
+</html>

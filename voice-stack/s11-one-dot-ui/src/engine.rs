@@ -1,0 +1,388 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Galion Labs
+
+//! The seam in front of HORBM, and the two engines this sector can run
+//! without it.
+//!
+//! [`ReplyEngine::turn`] is the shape of `Brain::turn`. [`FakeReplyEngine`]
+//! does not read audio and does not invent a transcript. [`MockEngine`]
+//! walks the dot through idle, listening, thinking, and speaking so the
+//! page can be tried with no brain. [`PassiveEngine`] keeps the clock and
+//! the mic level and never writes a reply.
+
+use std::time::Instant;
+
+use crate::look::preview_mood;
+use crate::protocol::{
+    Action, Caption, CaptionSlot, Control, EventKind, Pad, PcmFrame, ServerEvent, TurnOut,
+    VoiceState, TICK_MS,
+};
+
+/// Quiet after speech, same window as the phone page (`VAD_END_MS`).
+pub const QUIET_MS: u32 = 640;
+/// How long thinking lasts in the preview before the fake reply.
+pub const THINK_MS: u32 = 640;
+/// How long the preview holds speaking. Not a measured mouth.
+pub const SPEAK_MS: u32 = 2_400;
+/// Phone page `MAX_UTT_MS`. A stuck tone cannot hold the preview open.
+pub const MAX_UTTERANCE_MS: u32 = 15_000;
+/// Level at or above this counts as voice. The page uses the same floor.
+pub const VOICE_RMS: f32 = 0.02;
+/// No speech yet: advance the preview after this much quiet.
+pub const LISTEN_CAP_MS: u32 = 1_600;
+
+pub trait ReplyEngine {
+    fn turn(&mut self, heard: &str) -> TurnOut;
+}
+
+/// A stand-in so tests and the preview have a `TurnOut`.
+/// The real `horbm::Brain` is not linked. Empty `heard` is the greeting
+/// from `docs/galion-voice-v2/personas/SAMANTHA.md`. Any other text is
+/// named as a preview, not answered as if it had been understood.
+pub struct FakeReplyEngine;
+
+impl ReplyEngine for FakeReplyEngine {
+    fn turn(&mut self, heard: &str) -> TurnOut {
+        let started = Instant::now();
+        let (reply, intent) = if heard.trim().is_empty() {
+            ("Hi. I'm here.", "greet")
+        } else {
+            ("This preview has no brain yet.", "preview")
+        };
+        let took_us = u32::try_from(started.elapsed().as_micros()).unwrap_or(u32::MAX);
+        TurnOut {
+            reply: reply.to_string(),
+            intent: intent.to_string(),
+            arm: "fake".to_string(),
+            propensity: 0.0,
+            evidence: Vec::new(),
+            sources: vec!["fake:reply-engine".to_string()],
+            violations: 0,
+            lookup_us: 0,
+            took_us,
+            mood: Pad::RESTING,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Phase {
+    Idle,
+    Listening,
+    Thinking,
+    Speaking { left_ms: u32 },
+}
+
+/// Shared by the mock (drifting mood, fake reply) and the passive wire
+/// (resting mood, no reply).
+pub struct SessionEngine<E> {
+    brain: E,
+    mock: bool,
+    t_ms: u32,
+    phase: Phase,
+    level: f32,
+    quiet_ms: u32,
+    listen_ms: u32,
+    think_ms: u32,
+    voice: bool,
+    pcm_since_tick: bool,
+    pending: CaptionSlot,
+}
+
+pub type MockEngine = SessionEngine<FakeReplyEngine>;
+pub type PassiveEngine = SessionEngine<FakeReplyEngine>;
+
+impl SessionEngine<FakeReplyEngine> {
+    pub fn mock() -> Self {
+        Self::with_brain(FakeReplyEngine, true)
+    }
+
+    pub fn passive() -> Self {
+        Self::with_brain(FakeReplyEngine, false)
+    }
+}
+
+impl<E: ReplyEngine> SessionEngine<E> {
+    /// `mock_replies` asks the brain for a line when thinking ends.
+    /// The passive wire passes `false` and stays in thinking.
+    pub fn with_brain(brain: E, mock_replies: bool) -> Self {
+        Self {
+            brain,
+            mock: mock_replies,
+            t_ms: 0,
+            phase: Phase::Idle,
+            level: 0.0,
+            quiet_ms: 0,
+            listen_ms: 0,
+            think_ms: 0,
+            voice: false,
+            pcm_since_tick: false,
+            pending: CaptionSlot::Hold,
+        }
+    }
+
+    pub fn hello(&mut self) -> ServerEvent {
+        self.snapshot(EventKind::State)
+    }
+
+    pub fn on_control(&mut self, control: Control) -> ServerEvent {
+        match control.action {
+            Action::Talk | Action::Barge => {
+                self.phase = Phase::Listening;
+                self.quiet_ms = 0;
+                self.listen_ms = 0;
+                self.think_ms = 0;
+                self.voice = false;
+                self.level = 0.0;
+                self.pending = CaptionSlot::Clear;
+            }
+            Action::Stop => {
+                self.phase = Phase::Idle;
+                self.level = 0.0;
+                self.voice = false;
+                self.pending = CaptionSlot::Clear;
+            }
+            Action::End => self.begin_think(),
+        }
+        self.snapshot(EventKind::State)
+    }
+
+    pub fn on_pcm(&mut self, frame: &PcmFrame) -> ServerEvent {
+        self.note_level(frame.rms());
+        self.snapshot(EventKind::State)
+    }
+
+    pub fn note_level(&mut self, rms: f32) {
+        self.level = if rms.is_finite() {
+            rms.clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
+        self.pcm_since_tick = true;
+        if self.level >= VOICE_RMS {
+            self.voice = true;
+        }
+    }
+
+    pub fn on_tick(&mut self) -> ServerEvent {
+        self.t_ms = self.t_ms.saturating_add(TICK_MS);
+        if !self.pcm_since_tick && matches!(self.phase, Phase::Listening) {
+            self.level = 0.0;
+        }
+        self.pcm_since_tick = false;
+        self.advance();
+        self.snapshot(EventKind::Tick)
+    }
+
+    fn advance(&mut self) {
+        match self.phase {
+            Phase::Listening => {
+                self.listen_ms = self.listen_ms.saturating_add(TICK_MS);
+                if self.listen_ms >= MAX_UTTERANCE_MS {
+                    self.begin_think();
+                    return;
+                }
+                if self.voice {
+                    if self.level >= VOICE_RMS {
+                        self.quiet_ms = 0;
+                    } else {
+                        self.quiet_ms = self.quiet_ms.saturating_add(TICK_MS);
+                        if self.quiet_ms >= QUIET_MS {
+                            self.begin_think();
+                        }
+                    }
+                } else {
+                    self.quiet_ms = self.quiet_ms.saturating_add(TICK_MS);
+                    if self.quiet_ms >= LISTEN_CAP_MS {
+                        self.begin_think();
+                    }
+                }
+            }
+            Phase::Thinking => {
+                self.think_ms = self.think_ms.saturating_add(TICK_MS);
+                if self.think_ms >= THINK_MS {
+                    self.begin_speak();
+                }
+            }
+            Phase::Speaking { left_ms } => {
+                if left_ms <= TICK_MS {
+                    self.phase = Phase::Idle;
+                    self.level = 0.0;
+                } else {
+                    let left = left_ms - TICK_MS;
+                    let elapsed = SPEAK_MS - left;
+                    self.level = speak_env(elapsed);
+                    self.phase = Phase::Speaking { left_ms: left };
+                }
+            }
+            Phase::Idle => self.level = 0.0,
+        }
+    }
+
+    fn begin_think(&mut self) {
+        if matches!(self.phase, Phase::Thinking | Phase::Speaking { .. }) {
+            return;
+        }
+        self.phase = Phase::Thinking;
+        self.think_ms = 0;
+        self.level = 0.0;
+    }
+
+    fn begin_speak(&mut self) {
+        if !self.mock {
+            // The brain is absent. Stay in thinking. Do not invent a line.
+            self.level = 0.0;
+            return;
+        }
+        let out = self.brain.turn("");
+        self.pending = CaptionSlot::Set(Caption {
+            text: out.reply,
+            sources: out.sources,
+            final_: true,
+        });
+        self.level = speak_env(0);
+        self.phase = Phase::Speaking { left_ms: SPEAK_MS };
+    }
+
+    fn state(&self) -> VoiceState {
+        match self.phase {
+            Phase::Idle => VoiceState::Idle,
+            Phase::Listening => VoiceState::Listening,
+            Phase::Thinking => VoiceState::Thinking,
+            Phase::Speaking { .. } => VoiceState::Speaking,
+        }
+    }
+
+    fn snapshot(&mut self, kind: EventKind) -> ServerEvent {
+        let caption = std::mem::replace(&mut self.pending, CaptionSlot::Hold);
+        let mood = if self.mock {
+            preview_mood(self.t_ms)
+        } else {
+            Pad::RESTING
+        };
+        ServerEvent {
+            kind,
+            state: self.state(),
+            mood,
+            level: self.level,
+            t_ms: self.t_ms,
+            caption,
+        }
+    }
+}
+
+fn speak_env(elapsed_ms: u32) -> f32 {
+    let k = (elapsed_ms as f32 / SPEAK_MS as f32).clamp(0.0, 1.0);
+    (k * std::f32::consts::PI).sin()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn fake_greeting_is_short_and_timed() {
+        let mut brain = FakeReplyEngine;
+        let out = brain.turn("");
+        assert_eq!(out.reply, "Hi. I'm here.");
+        assert_eq!(out.sources, vec!["fake:reply-engine".to_string()]);
+        assert_eq!(out.mood, Pad::RESTING);
+        assert_eq!(out.violations, 0);
+        assert!(out.took_us < 1_000_000, "{}", out.took_us);
+        let named = brain.turn("hello");
+        assert_eq!(named.reply, "This preview has no brain yet.");
+        assert!(named.reply.len() < 80);
+    }
+
+    #[test]
+    fn silence_reaches_the_greeting_on_tick_28() {
+        let mut eng = MockEngine::mock();
+        let hello = eng.hello();
+        assert_eq!(hello.state, VoiceState::Idle);
+        assert_eq!(hello.t_ms, 0);
+        assert_eq!(hello.mood, Pad::RESTING);
+        let talk = eng.on_control(Control {
+            action: Action::Talk,
+        });
+        assert_eq!(talk.state, VoiceState::Listening);
+        assert_eq!(talk.caption, CaptionSlot::Clear);
+        for i in 1..=19 {
+            let ev = eng.on_tick();
+            assert_eq!(ev.state, VoiceState::Listening, "tick {i}");
+        }
+        assert_eq!(eng.on_tick().state, VoiceState::Thinking);
+        for i in 21..=27 {
+            let ev = eng.on_tick();
+            assert_eq!(ev.state, VoiceState::Thinking, "tick {i}");
+        }
+        let spoke = eng.on_tick();
+        assert_eq!(spoke.state, VoiceState::Speaking);
+        match spoke.caption {
+            CaptionSlot::Set(c) => {
+                assert_eq!(c.text, "Hi. I'm here.");
+                assert_eq!(c.sources, vec!["fake:reply-engine".to_string()]);
+            }
+            other => panic!("caption {other:?}"),
+        }
+    }
+
+    #[test]
+    fn voice_then_quiet_uses_the_640_ms_window() {
+        let mut eng = MockEngine::mock();
+        eng.on_control(Control {
+            action: Action::Talk,
+        });
+        for _ in 0..30 {
+            eng.note_level(0.4);
+            assert_eq!(eng.on_tick().state, VoiceState::Listening);
+        }
+        for _ in 0..7 {
+            eng.note_level(0.0);
+            assert_eq!(eng.on_tick().state, VoiceState::Listening);
+        }
+        assert_eq!(eng.on_tick().state, VoiceState::Thinking);
+    }
+
+    #[test]
+    fn end_control_enters_thinking_without_waiting() {
+        let mut eng = MockEngine::mock();
+        eng.on_control(Control {
+            action: Action::Talk,
+        });
+        let ev = eng.on_control(Control {
+            action: Action::End,
+        });
+        assert_eq!(ev.state, VoiceState::Thinking);
+    }
+
+    #[test]
+    fn passive_engine_never_writes_a_reply() {
+        let mut eng = PassiveEngine::passive();
+        eng.on_control(Control {
+            action: Action::Talk,
+        });
+        let end = eng.on_control(Control {
+            action: Action::End,
+        });
+        assert_eq!(end.state, VoiceState::Thinking);
+        for _ in 0..40 {
+            let ev = eng.on_tick();
+            assert_eq!(ev.caption, CaptionSlot::Hold);
+            assert_ne!(ev.state, VoiceState::Speaking);
+            assert_eq!(ev.mood, Pad::RESTING);
+        }
+    }
+
+    #[test]
+    fn stop_returns_to_idle_and_clears() {
+        let mut eng = MockEngine::mock();
+        eng.on_control(Control {
+            action: Action::Talk,
+        });
+        let ev = eng.on_control(Control {
+            action: Action::Stop,
+        });
+        assert_eq!(ev.state, VoiceState::Idle);
+        assert_eq!(ev.caption, CaptionSlot::Clear);
+    }
+}
