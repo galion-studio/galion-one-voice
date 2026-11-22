@@ -18,10 +18,11 @@ $Repo = "https://github.com/galion-studio/galion-knowledge.git"
 $Tmp = Join-Path ([System.IO.Path]::GetTempPath()) ("galion-knowledge-" + [guid]::NewGuid().ToString("n"))
 New-Item -ItemType Directory -Force -Path $Tmp | Out-Null
 try {
+    # Disable autocrlf so card-bundle sha256 matches the Linux manifest on Windows.
     Write-Host "clone $Repo"
-    git clone --depth 1 --filter=blob:none --sparse $Repo (Join-Path $Tmp "src")
+    git clone -c core.autocrlf=false -c core.eol=lf --depth 1 --filter=blob:none --sparse $Repo (Join-Path $Tmp "src")
     if ($LASTEXITCODE -ne 0) { throw "git clone failed" }
-    git -C (Join-Path $Tmp "src") sparse-checkout set --skip-checks v2/data/cards v2/shards/manifest.json
+    git -c core.autocrlf=false -c core.eol=lf -C (Join-Path $Tmp "src") sparse-checkout set --skip-checks v2/data/cards v2/shards/manifest.json
     if ($LASTEXITCODE -ne 0) { throw "git sparse-checkout failed" }
     New-Item -ItemType Directory -Force -Path $Target | Out-Null
     foreach ($name in @("horbm", "world", "diary")) {
