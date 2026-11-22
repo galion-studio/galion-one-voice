@@ -30,7 +30,7 @@ It is a standalone package. It is not a member of the repo workspace. `cargo tes
 
 `Pad::RESTING` is arousal `0.3`, valence `0.25`, dominance `0.5`. `HorbmAdapter` and `OpenHorbm` match `Brain::open(memory_db, knowledge_dir, cases)` and `turn` / `tick`. The `horbm` crate is not a dependency. It needs `horbm-memory` from `galion-studio/galion-knowledge` at `761a7f225304fc010379219e5b88c6669dd48f40`. This tree does not fetch that revision.
 
-`GALION_SAMANTHA_REF` is reported on `/health` as `unset`, `set`, or `missing`. The path is not logged and the bytes are not read.
+`GALION_SAMANTHA_REF` is reported on `/health` as `unset`, `set`, or `missing`. The path is not put in `/health`. On CPU the server keeps Piper `ljspeech` and logs that s711 is not a measured realtime mouth. The wav is read only when the s711 mouth is selected (`GALION_SAMANTHA_WEIGHTS` plus `GALION_SAMANTHA_DEVICE=cuda`). It is not downloaded.
 
 The wire format is [PROTOCOL.md](PROTOCOL.md).
 
@@ -83,7 +83,7 @@ cargo test
 
 ## Windows
 
-Use `scripts/windows/Start-GalionOne.ps1` from the section above. It is the start path on the laptop. The table there is the set of directories the script creates. `GALION_SAMANTHA_REF` is still only reported on `/health` as set, missing, or unset. The file is not read and it is not downloaded.
+Use `scripts/windows/Start-GalionOne.ps1` from the section above. It is the start path on the laptop. The table there is the set of directories the script creates. `scripts/windows/START-SAMANTHA-7881.cmd` sets `GALION_SAMANTHA_REF` only when `G:\galion\samantha-ref.wav` is already there, and `GALION_SAMANTHA_WEIGHTS` only when `G:\galion\chatterbox-expr` is already there. Neither file is created or committed. `/health` still reports the ref as set, missing, or unset, and adds `mouth`, `voice`, and `clone`.
 
 The unit file under `deploy/` is a template. This crate does not install it and does not start it.
 
