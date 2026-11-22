@@ -577,6 +577,8 @@ version = "0.0.1"
 dependencies = [
  "galion-research-gateway",
  "galion-sam-empathy",
+ "serde_json",
+ "sha2",
 ]
 
 [[package]]

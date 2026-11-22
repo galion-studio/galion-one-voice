@@ -20,7 +20,7 @@ use galion_research_gateway::{ClientReply, ResearchClient};
 
 use crate::chunks::{contains_forbidden, speakable_chunks};
 use crate::engine::{Reply, ReplyEngine};
-use crate::index::{CardLoader, MemoryCards};
+use crate::index::CardLoader;
 use crate::pad::Pad;
 
 /// What produced the spoken line.
@@ -110,13 +110,15 @@ impl ReasoningRouter {
         }
     }
 
-    /// Read the knowledge directory. Does not create it.
+    /// Read the knowledge directory. Does not create it. Prints the card
+    /// count and load time when the directory is a pack.
     pub fn open(
         knowledge_dir: &std::path::Path,
         research: Option<Box<dyn ResearchPort>>,
     ) -> Result<Self, crate::index::CardError> {
-        let cards = MemoryCards::load_dir(knowledge_dir)?;
-        Ok(Self::new(cards, research))
+        let loaded = crate::index::load_knowledge(knowledge_dir)?;
+        eprintln!("{}", loaded.report.log_line());
+        Ok(Self::new(loaded.cards, research))
     }
 
     /// `GALION_HORBM_KNOWLEDGE` is the card directory. Unset is an error.

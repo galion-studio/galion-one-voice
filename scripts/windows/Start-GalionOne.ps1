@@ -214,6 +214,7 @@ $env:GALION_A21_RUNTIME = $PiperExe
 $env:GALION_SAMANTHA_WS = "127.0.0.1:7881"
 $Knowledge = "G:\galion\horbm\knowledge"
 if (-not (Test-Path -LiteralPath $Knowledge)) {
+    # scripts\windows\Sync-HorbmKnowledge.ps1 fills the pack. Until then, the example card.
     $Knowledge = Join-Path $Repo "voice-stack\local-server\knowledge"
 }
 $env:GALION_HORBM_KNOWLEDGE = $Knowledge
