@@ -7,7 +7,9 @@
 //! `galion-samantha-ws/1` on `127.0.0.1:7881`, or another loopback port from
 //! `GALION_SAMANTHA_WS` including `::1`. Typed and spoken turns use the HORBM
 //! card bridge. A miss is "I don't know." Silero runs out of process when
-//! `GALION_VAD_BIN` is set. Piper speaks when the LJ Speech pack is on disk.
+//! `GALION_VAD_BIN` is set. Piper LJ Speech is the mouth. The s711 clone is
+//! selected only when the local reference, the local checkpoint, and CUDA
+//! are all present. CPU keeps Piper and logs why.
 
 #![forbid(unsafe_code)]
 
@@ -15,6 +17,7 @@ pub mod audio;
 pub mod bind;
 mod brain;
 mod live;
+mod mouth;
 pub mod pipeline;
 pub mod protocol;
 pub mod reply;

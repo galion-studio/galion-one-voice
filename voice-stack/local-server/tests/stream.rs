@@ -200,6 +200,9 @@ async fn companion_socket() {
             assert!(resp.body.contains(SCHEMA));
             assert!(resp.body.contains("\"loopback\":true"));
             assert!(resp.body.contains("\"samantha_ref\":\"unset\""));
+            assert!(resp.body.contains("\"mouth\":\"hold\""));
+            assert!(resp.body.contains("\"voice\":\"none\""));
+            assert!(resp.body.contains("\"clone\":\"off\""));
             assert!(resp
                 .head
                 .to_ascii_lowercase()

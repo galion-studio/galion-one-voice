@@ -44,6 +44,10 @@ const MAX_CARRY: usize = 48_000;
 pub struct PipeInfo {
     pub ear: &'static str,
     pub mouth: &'static str,
+    /// `ljspeech` for stock Piper, `s711` when that mouth is selected, `none` for a hold tone.
+    pub voice: &'static str,
+    /// Why the clone is or is not the mouth. Not a timing measurement.
+    pub clone_status: &'static str,
     pub mind: String,
     pub vad_backend: &'static str,
     pub vad_ready: bool,
@@ -353,6 +357,8 @@ impl<R: ReplyEngine> Pipeline for FakePipeline<R> {
         PipeInfo {
             ear,
             mouth: "hold",
+            voice: "none",
+            clone_status: "off",
             mind: self.reply.name().to_string(),
             vad_backend: "energy",
             vad_ready: true,

@@ -20,7 +20,9 @@ Default bind is `127.0.0.1:7881`. `GALION_SAMANTHA_WS` may set another `127.0.0.
 
 A `token` or `session` query parameter is HTTP 400. The token travels in the `hello` frame body. TTL defaults to 120 seconds and clamps to 15…900 (`GALION_SESSION_TTL_SECS`). `GALION_REQUIRE_SESSION=1` closes a socket whose `hello.session` is missing or unknown. When that variable is unset, `session: null` is accepted.
 
-`samantha_ref` on `/health` is `unset`, `set`, or `missing`. The path in `GALION_SAMANTHA_REF` is not returned and the file is not read.
+`samantha_ref` on `/health` is `unset`, `set`, or `missing`. The path in `GALION_SAMANTHA_REF` is not returned.
+
+`mouth` and `voice` name what is speaking. Stock speech is `"mouth":"piper","voice":"ljspeech"`. The s711 clone is `"mouth":"s711","voice":"s711"` only when `GALION_SAMANTHA_REF` is a local wav, `GALION_SAMANTHA_WEIGHTS` is a local checkpoint directory, and `GALION_SAMANTHA_DEVICE=cuda` with CUDA visible to the probe. CPU keeps Piper. `clone` is `off`, `ref-missing`, `weights-missing`, `cpu-not-realtime`, `cuda-unavailable`, `device-unknown`, `selected`, or `open-failed`. `cpu-not-realtime` is not a new timing: this process has not measured an s711 CPU real-time factor. The wav is read only when the s711 mouth is selected. It is not downloaded.
 
 ## WebSocket `/v1/samantha`
 

@@ -15,7 +15,7 @@ use std::time::{Duration, Instant};
 
 use crate::chunks::contains_forbidden;
 use crate::engine::{Reply, ReplyEngine};
-use crate::index::{CardLoader, CardMatch, MemoryCards};
+use crate::index::{CardLoader, CardMatch};
 use crate::pad::Pad;
 use crate::research;
 use crate::router::{speakable_line, ResearchAnswer, ResearchPort};
@@ -39,6 +39,14 @@ pub struct CardBrain {
 }
 
 impl CardBrain {
+    pub fn len(&self) -> usize {
+        self.cards.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.cards.is_empty()
+    }
+
     /// Read `dir` if it is already a directory. A missing path is an empty
     /// set, not an error, and it is not created.
     pub fn open_readonly(dir: &Path) -> Self {
@@ -148,10 +156,11 @@ impl CardBrain {
     }
 }
 
-/// Cards the 7881 router reads. JSON uses the layer 5 token rule. Markdown
-/// cards, including the shipped kettle note, answer when JSON has no hit.
+/// Cards the 7881 router reads. JSON uses the galion-knowledge loader.
+/// Markdown cards, including the shipped kettle note, answer when JSON has
+/// no hit.
 struct LocalCards {
-    json: MemoryCards,
+    json: horbm::KnowledgeCards,
     prose: CardBrain,
 }
 
@@ -171,8 +180,11 @@ impl horbm::CardLookup for LocalCards {
 }
 
 fn card_match(cards: &LocalCards, query: &str) -> Option<CardMatch> {
-    if let Some(hit) = cards.json.lookup(query) {
-        return Some(hit);
+    if let Some(hit) = horbm::CardLookup::lookup(&cards.json, query) {
+        return Some(CardMatch {
+            id: hit.id,
+            gist: hit.gist,
+        });
     }
     let reply = cards.prose.answer(query);
     let id = reply
@@ -202,9 +214,27 @@ impl horbm::ResearchAsk for PortAsk {
 }
 
 /// Read-only cards plus the optional research port, as one `horbm` brain.
+/// Prints one startup line: card count, load time, and manifest state.
 pub(crate) fn brain_from_dir(knowledge_dir: &Path, bind: Option<&str>) -> horbm::Brain {
-    let json = MemoryCards::load_dir(knowledge_dir).unwrap_or_default();
+    let started = Instant::now();
+    let (json, manifest) = match horbm::KnowledgeCards::load(knowledge_dir) {
+        Ok(loaded) => (loaded.cards, loaded.report.manifest),
+        Err(horbm::CardError::NotADirectory(_)) => {
+            (horbm::KnowledgeCards::empty(), "absent".to_string())
+        }
+        Err(err) => {
+            eprintln!("horbm cards: {err}");
+            (horbm::KnowledgeCards::empty(), "rejected".to_string())
+        }
+    };
     let prose = CardBrain::open_readonly(knowledge_dir);
+    let report = horbm::LoadReport {
+        cards: json.len() + prose.len(),
+        elapsed: started.elapsed(),
+        path: knowledge_dir.to_path_buf(),
+        manifest,
+    };
+    eprintln!("{}", report.log_line());
     let research = research::research_port(bind)
         .map(|port| Box::new(PortAsk(port)) as Box<dyn horbm::ResearchAsk + Send>);
     let mut brain = horbm::Brain::with_cards(LocalCards { json, prose }, research);
@@ -442,6 +472,48 @@ mod tests {
         assert_eq!(miss.text, UNKNOWN_REPLY);
         assert_eq!(miss.sources, vec!["honest:unknown".to_string()]);
         assert!(!miss.text.to_ascii_lowercase().contains("ollama"));
+        assert!(!dir.join("revisions.sqlite").exists());
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn a_real_json_card_answers_with_its_id_and_a_miss_is_exact() {
+        let dir = std::env::temp_dir().join(format!(
+            "galion-json-pack-{}-{}",
+            std::process::id(),
+            elapsed_us(Instant::now())
+        ));
+        fs::create_dir_all(dir.join("horbm")).unwrap();
+        fs::write(
+            dir.join("horbm").join("fixture-kettle.json"),
+            r#"{
+  "id": "fixture-kettle",
+  "title": "The kettle",
+  "section": "horbm",
+  "category": "fixture",
+  "summary": "The kettle is on the hob.",
+  "body": "The kettle is on the hob.",
+  "claim_type": "fact",
+  "sources": [{"title": "Fixture", "url": "https://github.com/galion-studio/galion-knowledge", "author": "Galion Labs", "date": "2026-11-18", "accessed": "2026-11-22"}],
+  "evidence_strength": "strong",
+  "said_by": "Galion Labs",
+  "as_of_date": "2026-11-18",
+  "status": "draft",
+  "contested_views": [],
+  "related": []
+}
+"#,
+        )
+        .unwrap();
+        let memory = dir.join("memory.db");
+        let mut engine = CardEngine::open_bound(&memory, &dir, &dir.join("cases"), None);
+        let hit = engine.turn("where is the kettle");
+        assert_eq!(hit.text, "The kettle is on the hob.");
+        assert_eq!(hit.sources, vec!["card:fixture-kettle".to_string()]);
+        let miss = engine.turn("who won the match");
+        assert_eq!(miss.text, "I don't know.");
+        assert_eq!(miss.sources, vec!["honest:unknown".to_string()]);
+        assert!(!memory.exists());
         assert!(!dir.join("revisions.sqlite").exists());
         fs::remove_dir_all(&dir).unwrap();
     }

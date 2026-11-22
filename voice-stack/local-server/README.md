@@ -11,7 +11,7 @@ Loopback UI process for Galion One. The directory is `voice-stack/local-server`.
 
 The talk button posts a finished take to `POST /v1/turn`. A typed line uses `POST /v2/say`. The page polls `GET /v1/dot` and plays `GET /v1/reply/:id`. The WebSocket path is `galion-samantha-ws/1` on `/v1/samantha`. A mic turn ends after 640 ms of silence, then Vosk, then the card brain, then Piper. Silero VAD is the `vad-ear` process (`GALION_VAD_BIN`), kept out of this crate so `ort` stays out of the workspace. On Windows that binary loads ONNX Runtime with the `load-dynamic` feature (`ORT_DYLIB_PATH`, cache `ORT_CACHE_DIR`). Vosk recognises speech when the model and library are on disk. `Brain::open` in the orchestrator returns `horbm is not linked`. The card index is `horbm-memory` in `galion-knowledge` `v2/memory`. This server does not fetch that crate and does not create its sqlite file. It reads cards through `horbm::Brain::turn` (empathy mood, then cards, then the gateway). A miss is `I don't know.` The router does not dial the Research gateway unless `GALION_RESEARCH_BIND` is `127.0.0.1` and a port other than 8787. This process does not bind 8787. `GET /health` is HTTP 200 with `"ok": true`. The unlinked test brain still returns `brain-unlinked`. Piper speaks the line when the LJ Speech pack is present. No model API is called.
 
-The tracked example card is `knowledge/kettle.md`. `GALION_HORBM_KNOWLEDGE` selects another directory and is only read.
+The tracked example card is `knowledge/kettle.md`. `GALION_HORBM_KNOWLEDGE` selects another directory and is only read. On Windows the next choice is `G:\galion\horbm\knowledge` when that folder already exists. `scripts/windows/Sync-HorbmKnowledge.ps1` fills it from the public galion-knowledge pack. The cards are not committed. A missing directory uses the example card. Startup logs the card count and the load time.
 
 It is a standalone package. It is not a member of the repo workspace. `cargo test` at the repo root does not build it. Dependencies are pinned for rustc 1.83 (`tokio` 1.42.0, `hyper-util` 0.1.10).
 
@@ -30,7 +30,7 @@ It is a standalone package. It is not a member of the repo workspace. `cargo tes
 
 `Pad::RESTING` is arousal `0.3`, valence `0.25`, dominance `0.5`. `HorbmAdapter` and `OpenHorbm` match `Brain::open(memory_db, knowledge_dir, cases)` and `turn` / `tick`. The `horbm` crate is not a dependency. It needs `horbm-memory` from `galion-studio/galion-knowledge` at `761a7f225304fc010379219e5b88c6669dd48f40`. This tree does not fetch that revision.
 
-`GALION_SAMANTHA_REF` is reported on `/health` as `unset`, `set`, or `missing`. The path is not logged and the bytes are not read.
+`GALION_SAMANTHA_REF` is reported on `/health` as `unset`, `set`, or `missing`. The path is not put in `/health`. On CPU the server keeps Piper `ljspeech` and logs that s711 is not a measured realtime mouth. The wav is read only when the s711 mouth is selected (`GALION_SAMANTHA_WEIGHTS` plus `GALION_SAMANTHA_DEVICE=cuda`). It is not downloaded.
 
 The wire format is [PROTOCOL.md](PROTOCOL.md).
 
@@ -83,7 +83,7 @@ cargo test
 
 ## Windows
 
-Use `scripts/windows/Start-GalionOne.ps1` from the section above. It is the start path on the laptop. The table there is the set of directories the script creates. `GALION_SAMANTHA_REF` is still only reported on `/health` as set, missing, or unset. The file is not read and it is not downloaded.
+Use `scripts/windows/Start-GalionOne.ps1` from the section above. It is the start path on the laptop. The table there is the set of directories the script creates. `scripts/windows/START-SAMANTHA-7881.cmd` sets `GALION_SAMANTHA_REF` only when `G:\galion\samantha-ref.wav` is already there, and `GALION_SAMANTHA_WEIGHTS` only when `G:\galion\chatterbox-expr` is already there. Neither file is created or committed. `/health` still reports the ref as set, missing, or unset, and adds `mouth`, `voice`, and `clone`.
 
 The unit file under `deploy/` is a template. This crate does not install it and does not start it.
 

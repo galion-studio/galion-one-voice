@@ -15,6 +15,11 @@
 //! files under `v2/data/cards/horbm` (90) and `v2/data/cards/world` (1416) in
 //! that revision. They are not copied into this repo.
 //!
+//! Startup loads go through [`load_knowledge`], which is
+//! `horbm::KnowledgeCards`: the same covering rule, plus schema checks and
+//! the card-bundle manifest. `MemoryCards` remains the in-memory index the
+//! tests build by hand.
+//!
 //! The match rule is `Stack::query` at that revision: every content token of
 //! the query has to sit in the card. Stopwords match `v2/memory/src/text.rs`.
 //! A tie between two equally specific cards is not a spoken match. The
@@ -169,6 +174,24 @@ impl MemoryCards {
                 gist: card.gist(),
             })
             .collect()
+    }
+}
+
+/// Read a galion-knowledge directory. Does not create it.
+pub fn load_knowledge(dir: &Path) -> Result<horbm::LoadedPack, CardError> {
+    horbm::KnowledgeCards::load(dir).map_err(|err| match err {
+        horbm::CardError::NotADirectory(path) => CardError::NotADirectory(path),
+        horbm::CardError::Io(msg) => CardError::Io(msg),
+        horbm::CardError::Invalid(msg) => CardError::Invalid(msg),
+    })
+}
+
+impl CardLoader for horbm::KnowledgeCards {
+    fn lookup(&self, query: &str) -> Option<CardMatch> {
+        horbm::CardLookup::lookup(self, query).map(|hit| CardMatch {
+            id: hit.id,
+            gist: hit.gist,
+        })
     }
 }
 

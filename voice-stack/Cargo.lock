@@ -577,6 +577,8 @@ version = "0.0.1"
 dependencies = [
  "galion-research-gateway",
  "galion-sam-empathy",
+ "serde_json",
+ "sha2",
 ]
 
 [[package]]
@@ -1103,12 +1105,21 @@ dependencies = [
  "galion-tts-piper",
  "hyper",
  "hyper-util",
+ "samantha-voice-clone",
  "serde",
  "serde_json",
  "tokio",
  "tokio-tungstenite",
  "tower",
  "tower-http",
+]
+
+[[package]]
+name = "samantha-voice-clone"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
+ "sha2",
 ]
 
 [[package]]

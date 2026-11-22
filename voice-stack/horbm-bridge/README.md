@@ -64,9 +64,12 @@ cargo test
 ```
 
 `ReasoningRouter::from_env` reads `GALION_HORBM_KNOWLEDGE`. On the laptop
-that directory is `G:\galion\knowledge\v2\data\cards` (the `horbm` and `world`
-trees) or `G:\galion\horbm\knowledge` when a local copy is already there.
-The loader does not create it and does not write `C:`.
+the default directory is `G:\galion\horbm\knowledge` when that folder already
+exists. `scripts/sync-horbm-knowledge.sh` and
+`scripts/windows/Sync-HorbmKnowledge.ps1` clone the public core pack into
+that folder. The cards are not committed. The loader does not create the
+directory and does not write `C:`. A missing directory falls back to the
+example kettle card on the 7881 server.
 `GALION_RESEARCH_BIND` defaults to off when unset. Set it to `127.0.0.1:7911`
 to allow deep questions to reach the gateway. The router does not dial 8642.
 
@@ -146,7 +149,7 @@ cargo run --features horbm -- say hello
 
 Those three variables are optional. Unset, `say` stays on `FakeEngine`.
 
-`CardEngine` reads `.md` and `.json` knowledge cards and does not write them. A turn is `horbm::Brain::turn`: empathy mood, then cards, then the gateway. JSON cards use the layer 5 token rule. A markdown card answers when JSON has no hit. A miss is `I don't know.` `GALION_RESEARCH_BIND` is used only when it is `127.0.0.1` and the port is not 8787, 8642, 11434, 7881, or 7878. Unset, the router stays on cards. This process does not bind a port. The card index crate is `horbm-memory` in `galion-studio/galion-knowledge` `v2/memory` at `761a7f225304fc010379219e5b88c6669dd48f40`. This tree does not fetch it and does not open its sqlite file. `Brain::open` in `voice-stack/pipeline-orchestrator` still returns `horbm is not linked`.
+`CardEngine` reads `.md` and `.json` knowledge cards and does not write them. A turn is `horbm::Brain::turn`: empathy mood, then cards, then the gateway. JSON cards are galion-knowledge cards. The loader checks `schema.json` fields and, when `manifest.json` is present, the `card-bundle/1` sha256. It builds the covering lookup index and prints the card count and load time. A markdown card answers when JSON has no hit. A miss is `I don't know.` `GALION_RESEARCH_BIND` is used only when it is `127.0.0.1` and the port is not 8787, 8642, 11434, 7881, or 7878. Unset, the router stays on cards. This process does not bind a port. The card index crate is `horbm-memory` in `galion-studio/galion-knowledge` `v2/memory`. This loader does not open that crate and does not create its sqlite file. `Brain::open` in `voice-stack/pipeline-orchestrator` still returns `horbm is not linked`.
 
 The dependency, relative to this `Cargo.toml`, is:
 

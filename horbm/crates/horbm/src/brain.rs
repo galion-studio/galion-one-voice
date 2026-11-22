@@ -56,8 +56,9 @@ impl CardLookup for EmptyCards {
     }
 }
 
-/// The linked brain. `open` does not create a directory and does not open a
-/// memory file. The live server passes the read-only card loader.
+/// The linked brain. `open` reads the knowledge directory when it already
+/// exists and does not create it. Memory and case paths are not opened.
+/// The live server passes the same read-only loader.
 pub struct Brain {
     empathy: Empathy,
     cards: Box<dyn CardLookup + Send>,
@@ -82,10 +83,22 @@ impl Brain {
         }
     }
 
-    /// Recorded paths are not opened. A missing directory is not created.
+    /// Read `knowledge_dir` when it is already a directory. A missing path is
+    /// an empty card set. Nothing is created. Memory and case paths are not
+    /// opened.
     pub fn open(memory_db: &Path, knowledge_dir: &Path, cases: &Path) -> Self {
-        let _ = (memory_db, knowledge_dir, cases);
-        Self::with_cards(EmptyCards, None)
+        let _ = (memory_db, cases);
+        match crate::KnowledgeCards::load(knowledge_dir) {
+            Ok(loaded) => {
+                eprintln!("{}", loaded.report.log_line());
+                Self::with_cards(loaded.cards, None)
+            }
+            Err(crate::CardError::NotADirectory(_)) => Self::with_cards(EmptyCards, None),
+            Err(err) => {
+                eprintln!("horbm cards: {err}");
+                Self::with_cards(EmptyCards, None)
+            }
+        }
     }
 
     pub fn set_speakable(&mut self, speakable: Speakable) {

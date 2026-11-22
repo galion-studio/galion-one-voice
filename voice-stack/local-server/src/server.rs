@@ -303,31 +303,38 @@ async fn favicon() -> impl IntoResponse {
     )
 }
 
+fn health_json(bound: &str, samantha_ref: &str, info: &crate::pipeline::PipeInfo) -> String {
+    serde_json::json!({
+        "ok": true,
+        "schema": SCHEMA,
+        "bind": bound,
+        "loopback": true,
+        "samantha_ref": samantha_ref,
+        "vad": info.vad_backend,
+        "vad_ready": info.vad_ready,
+        "asr": info.ear,
+        "mouth": info.mouth,
+        "voice": info.voice,
+        "clone": info.clone_status,
+        "mind": info.mind,
+    })
+    .to_string()
+}
+
 async fn health(State(app): State<AppState>) -> impl IntoResponse {
     let info = app
         .http_pipe
         .lock()
         .map(|pipe| pipe.info())
         .unwrap_or_else(|err| err.into_inner().info());
-    let body = serde_json::json!({
-        "ok": true,
-        "schema": SCHEMA,
-        "bind": app.bound.to_string(),
-        "loopback": true,
-        "samantha_ref": app.samantha_ref.as_str(),
-        "vad": info.vad_backend,
-        "vad_ready": info.vad_ready,
-        "asr": info.ear,
-        "mouth": info.mouth,
-        "mind": info.mind,
-    });
+    let body = health_json(&app.bound.to_string(), app.samantha_ref.as_str(), &info);
     (
         StatusCode::OK,
         [
             (header::CONTENT_TYPE, "application/json"),
             (header::CACHE_CONTROL, "no-store"),
         ],
-        body.to_string(),
+        body,
     )
 }
 
@@ -795,5 +802,44 @@ mod tests {
         assert!(session_open_body(br#"{"op":"open"}"#));
         assert!(!session_open_body(br#"{"op":"close"}"#));
         assert!(!session_open_body(b"nope"));
+    }
+
+    #[test]
+    fn health_names_ljspeech_and_s711() {
+        use crate::pipeline::PipeInfo;
+        let piper = health_json(
+            "127.0.0.1:7881",
+            "set",
+            &PipeInfo {
+                ear: "vosk",
+                mouth: "piper",
+                voice: "ljspeech",
+                clone_status: "cpu-not-realtime",
+                mind: "horbm".into(),
+                vad_backend: "silero",
+                vad_ready: true,
+            },
+        );
+        assert!(piper.contains("\"mouth\":\"piper\""));
+        assert!(piper.contains("\"voice\":\"ljspeech\""));
+        assert!(piper.contains("\"clone\":\"cpu-not-realtime\""));
+        assert!(piper.contains("\"ok\":true"));
+        let s711 = health_json(
+            "127.0.0.1:7881",
+            "set",
+            &PipeInfo {
+                ear: "vosk",
+                mouth: "s711",
+                voice: "s711",
+                clone_status: "selected",
+                mind: "horbm".into(),
+                vad_backend: "silero",
+                vad_ready: true,
+            },
+        );
+        assert!(s711.contains("\"mouth\":\"s711\""));
+        assert!(s711.contains("\"voice\":\"s711\""));
+        assert!(s711.contains("\"clone\":\"selected\""));
+        assert!(!s711.contains("ljspeech"));
     }
 }

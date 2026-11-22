@@ -29,27 +29,44 @@ impl HorbmMind {
         }
     }
 
-    /// `GALION_HORBM_KNOWLEDGE` when it is set. Otherwise `var/knowledge`
-    /// under the repo when that directory already holds a card, otherwise
-    /// the tracked examples next to this crate. Nothing is created.
+    /// `GALION_HORBM_KNOWLEDGE` when that directory already exists. On the
+    /// laptop, `G:\galion\horbm\knowledge` is next. Then `var/knowledge` when
+    /// it already holds a card. Otherwise the tracked example card. Nothing
+    /// is created.
     pub fn from_env() -> Self {
         Self::open(&knowledge_dir())
     }
 }
 
 pub fn knowledge_dir() -> PathBuf {
-    if let Ok(raw) = std::env::var("GALION_HORBM_KNOWLEDGE") {
-        let trimmed = raw.trim();
-        if !trimmed.is_empty() {
-            return PathBuf::from(trimmed);
-        }
+    let example = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("knowledge");
+    let var_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../var/knowledge");
+    let windows = PathBuf::from(galion_sam_horbm::WINDOWS_KNOWLEDGE_DIR);
+    select_knowledge_dir(
+        std::env::var("GALION_HORBM_KNOWLEDGE").ok().as_deref(),
+        &windows,
+        &var_dir,
+        &example,
+    )
+}
+
+/// First directory that already exists, in the order the 7881 process uses.
+pub fn select_knowledge_dir(
+    env_value: Option<&str>,
+    windows: &Path,
+    var_dir: &Path,
+    example: &Path,
+) -> PathBuf {
+    if let Some(dir) = galion_sam_horbm::knowledge_dir_from_env(env_value) {
+        return dir;
     }
-    let repo = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let var_dir = repo.join("var/knowledge");
-    if has_card(&var_dir) {
-        return var_dir;
+    if windows.is_dir() {
+        return windows.to_path_buf();
     }
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("knowledge")
+    if has_card(var_dir) {
+        return var_dir.to_path_buf();
+    }
+    example.to_path_buf()
 }
 
 fn has_card(dir: &Path) -> bool {
@@ -131,6 +148,42 @@ mod tests {
         assert!(!tired.reply.to_ascii_lowercase().contains("sorry"));
         assert_eq!(names(&dir), names_before);
         assert!(!dir.join("memory").exists());
+    }
+
+    #[test]
+    fn knowledge_dir_falls_back_to_the_example_card() {
+        let root = std::env::temp_dir().join(format!(
+            "horbm-knowledge-pick-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos()
+        ));
+        let example = root.join("example");
+        let windows = root.join("windows");
+        let var_dir = root.join("var");
+        std::fs::create_dir_all(&example).unwrap();
+        let picked = select_knowledge_dir(None, &windows, &var_dir, &example);
+        assert_eq!(picked, example);
+        std::fs::create_dir_all(&windows).unwrap();
+        let picked = select_knowledge_dir(
+            Some("/no/such/horbm/knowledge"),
+            &windows,
+            &var_dir,
+            &example,
+        );
+        assert_eq!(picked, windows);
+        let env_dir = root.join("env");
+        std::fs::create_dir_all(&env_dir).unwrap();
+        let picked = select_knowledge_dir(
+            Some(env_dir.to_str().unwrap()),
+            &windows,
+            &var_dir,
+            &example,
+        );
+        assert_eq!(picked, env_dir);
+        let _ = std::fs::remove_dir_all(&root);
     }
 
     fn names(dir: &Path) -> Vec<String> {

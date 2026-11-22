@@ -7,11 +7,12 @@
 //! 1. Empathy (layer 3) steps the mood from the heard line and rewrites the
 //!    lookup. The feeling name, when one is invited, stays on the mood
 //!    metadata. It is not spoken.
-//! 2. Cards answer first, through [`CardLookup`]. This crate does not write
-//!    a card, does not open `horbm-memory`, and does not bind a socket.
+//! 2. Cards answer first, through [`CardLookup`]. [`KnowledgeCards`] reads a
+//!    directory of galion-knowledge cards, checks the card-bundle manifest
+//!    when one is present, and builds the covering lookup index. It does not
+//!    write a card, does not open `horbm-memory`, and does not bind a socket.
 //!    There is no knowledge-ro server in this repository. Port 7900 is not
-//!    used here. The live loader stays the read-only loader in
-//!    `galion-sam-horbm`.
+//!    used here. The 7881 bridge calls this loader.
 //! 3. A deep miss may ask the research gateway. The caller passes
 //!    [`RESEARCH_CAP`] (3 seconds). This crate dials nothing itself.
 //! 4. Anything still unanswered is exactly [`UNKNOWN_REPLY`]. No gap filler.
@@ -19,9 +20,14 @@
 #![forbid(unsafe_code)]
 
 mod brain;
+mod cards;
 mod route;
 
 pub use brain::{Brain, MoodMeta};
+pub use cards::{
+    knowledge_dir_from_env, CardError, KnowledgeCards, LoadReport, LoadedPack,
+    WINDOWS_KNOWLEDGE_DIR,
+};
 pub use galion_research_gateway::RESEARCH_CAP;
 pub use galion_sam_empathy::{Intent, PronounClass, FRAME_MS};
 pub use route::{

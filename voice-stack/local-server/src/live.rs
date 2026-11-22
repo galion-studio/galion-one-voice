@@ -4,8 +4,9 @@
 //!
 //! Silero runs in `vad-ear` (its own workspace, so `ort` stays out of this
 //! one). A quiet gap of 640 ms ends one turn. Vosk stays on a worker thread
-//! because its handles are not `Send`. The mouth is Piper when the LJ Speech
-//! pack is on disk. The brain is [`crate::brain::HorbmMind`]: read-only cards,
+//! because its handles are not `Send`. The mouth is chosen in [`crate::mouth`]:
+//! Piper LJ Speech, or s711 when CUDA and the local clone files are present.
+//! The brain is [`crate::brain::HorbmMind`]: read-only cards,
 //! and `I don't know.` when none match. `Brain::open` in the orchestrator
 //! stays unlinked. This path does not open `horbm-memory`'s sqlite file.
 
@@ -21,12 +22,11 @@ use std::thread::JoinHandle;
 use std::time::Duration;
 
 use galion_sam_asr::{final_text, open_engine, Asr, EngineOpts};
-use galion_sam_horbm::speakable_chunks;
 use galion_sam_orch::{AudioFrame, EnergyVad, Tts as OrchTts, Vad, VadEvent};
-use galion_tts_piper::{resample_linear, PiperTts, Tts};
 
 use crate::audio::{self, rms, SPEAKER_RATE};
 use crate::brain::HorbmMind;
+use crate::mouth::{self, Mouth, MouthCue};
 use crate::pipeline::{AudioFeed, FeedMsg, PipeInfo, Pipeline, TurnProduct};
 use crate::protocol::{dot_json, error_json, turn_json, vad_json};
 use crate::reply::{may_speak_piper, Pad, ReplyEngine, TurnOut};
@@ -58,168 +58,38 @@ struct Job {
     back: Sender<Result<String, String>>,
 }
 
-/// PCM handed to `on_pcm` is 24 kHz. Return `false` to stop the rest of the reply.
-/// `cancel` is the barge-in / shutdown flag. A wait must poll it; abort does not
-/// interrupt `thread::sleep` (see 8efedbe).
-trait Mouth: Send {
-    fn speak(
-        &mut self,
-        text: &str,
-        mood: Pad,
-        cancel: &AtomicBool,
-        on_pcm: &mut dyn FnMut(&[i16]) -> bool,
-    ) -> Result<(), String>;
-    fn name(&self) -> &'static str;
-}
-
-struct MissingMouth;
-
-impl Mouth for MissingMouth {
-    fn speak(
-        &mut self,
-        _: &str,
-        _: Pad,
-        _: &AtomicBool,
-        _: &mut dyn FnMut(&[i16]) -> bool,
-    ) -> Result<(), String> {
-        Err("piper-missing".into())
-    }
-    fn name(&self) -> &'static str {
-        "missing"
-    }
-}
-
-struct PiperMouth {
-    tts: PiperTts,
-}
-
-impl Mouth for PiperMouth {
-    fn speak(
-        &mut self,
-        text: &str,
-        mood: Pad,
-        cancel: &AtomicBool,
-        on_pcm: &mut dyn FnMut(&[i16]) -> bool,
-    ) -> Result<(), String> {
-        let pad = galion_tts_piper::Pad {
-            arousal: mood.arousal,
-            valence: mood.valence,
-            dominance: mood.dominance,
-        };
-        let mut any = false;
-        speak_pieces(
-            text,
-            cancel,
-            &mut |piece, emit| {
-                if cancel.load(Ordering::SeqCst) {
-                    return Ok(());
-                }
-                let mut stop = false;
-                self.tts
-                    .speak(piece, pad, &mut |chunk| {
-                        if stop || cancel.load(Ordering::SeqCst) {
-                            stop = true;
-                            return;
-                        }
-                        let pcm = resample_linear(chunk.samples, chunk.sample_rate, SPEAKER_RATE);
-                        if pcm.is_empty() {
-                            return;
-                        }
-                        any = true;
-                        if !emit(&pcm) {
-                            stop = true;
-                        }
-                    })
-                    .map_err(|_| "piper-missing".to_string())?;
-                if stop {
-                    return Ok(());
-                }
-                Ok(())
-            },
-            on_pcm,
-        )?;
-        if cancel.load(Ordering::SeqCst) {
-            return Ok(());
-        }
-        if !any {
-            return Err("piper-missing".into());
-        }
-        Ok(())
-    }
-    fn name(&self) -> &'static str {
-        "piper"
-    }
-}
-
-/// First sentence is synthesised and handed to `on_pcm` before the next sentence starts.
-#[allow(clippy::type_complexity)]
-fn speak_pieces(
-    text: &str,
-    cancel: &AtomicBool,
-    one: &mut dyn FnMut(&str, &mut dyn FnMut(&[i16]) -> bool) -> Result<(), String>,
-    on_pcm: &mut dyn FnMut(&[i16]) -> bool,
-) -> Result<(), String> {
-    let pieces = speakable_chunks(text);
-    let pieces: Vec<String> = if pieces.is_empty() {
-        vec![text.to_string()]
-    } else {
-        pieces.into_iter().map(|chunk| chunk.text).collect()
-    };
-    for piece in pieces {
-        if cancel.load(Ordering::SeqCst) {
-            return Ok(());
-        }
-        let mut stop = false;
-        one(&piece, &mut |pcm| {
-            if stop || cancel.load(Ordering::SeqCst) {
-                stop = true;
-                return false;
-            }
-            if !on_pcm(pcm) {
-                stop = true;
-                return false;
-            }
-            true
-        })?;
-        if stop {
-            return Ok(());
-        }
-    }
-    Ok(())
-}
-
 #[cfg(test)]
 struct RecMouth {
     heard: Arc<Mutex<Vec<String>>>,
+    cues: Arc<Mutex<Vec<MouthCue>>>,
 }
 
 #[cfg(test)]
 impl Mouth for RecMouth {
-    fn speak(
-        &mut self,
-        text: &str,
-        _: Pad,
-        cancel: &AtomicBool,
-        on_pcm: &mut dyn FnMut(&[i16]) -> bool,
-    ) -> Result<(), String> {
-        if cancel.load(Ordering::SeqCst) {
-            return Ok(());
-        }
+    fn speak(&mut self, text: &str, cue: &MouthCue) -> Result<(Vec<i16>, u32), String> {
         if let Ok(mut guard) = self.heard.lock() {
             guard.push(text.to_string());
         }
-        let _ = on_pcm(&[1000, -1000, 1000, -1000]);
-        Ok(())
+        if let Ok(mut guard) = self.cues.lock() {
+            guard.push(*cue);
+        }
+        Ok((vec![1000, -1000, 1000, -1000], crate::audio::SPEAKER_RATE))
     }
-    fn name(&self) -> &'static str {
+    fn mouth(&self) -> &'static str {
         "sample"
+    }
+    fn voice(&self) -> &'static str {
+        "sample"
+    }
+    fn clone_status(&self) -> &'static str {
+        "off"
     }
 }
 
 enum MouthJob {
     Speak {
         text: String,
-        mood: Pad,
+        cue: MouthCue,
         cancel: Arc<AtomicBool>,
         tx: tokio::sync::mpsc::UnboundedSender<FeedMsg>,
     },
@@ -233,24 +103,38 @@ struct SpeakWorker {
     tx: std::sync::mpsc::Sender<MouthJob>,
     cancel: Option<Arc<AtomicBool>>,
     join: Option<JoinHandle<()>>,
-    name: &'static str,
+    mouth: &'static str,
+    voice: &'static str,
+    clone_status: &'static str,
 }
 
 impl SpeakWorker {
     fn spawn(mut mouth: Box<dyn Mouth>) -> Self {
-        let name = mouth.name();
+        let label = mouth.mouth();
+        let voice = mouth.voice();
+        let clone_status = mouth.clone_status();
         let (tx, rx) = std::sync::mpsc::channel();
         let join = std::thread::spawn(move || worker_loop(&mut mouth, rx));
         Self {
             tx,
             cancel: None,
             join: Some(join),
-            name,
+            mouth: label,
+            voice,
+            clone_status,
         }
     }
 
-    fn name(&self) -> &'static str {
-        self.name
+    fn mouth(&self) -> &'static str {
+        self.mouth
+    }
+
+    fn voice(&self) -> &'static str {
+        self.voice
+    }
+
+    fn clone_status(&self) -> &'static str {
+        self.clone_status
     }
 
     fn cancel(&mut self) {
@@ -259,14 +143,14 @@ impl SpeakWorker {
         }
     }
 
-    fn start(&mut self, text: String, mood: Pad) -> AudioFeed {
+    fn start(&mut self, text: String, cue: MouthCue) -> AudioFeed {
         self.cancel();
         let cancel = Arc::new(AtomicBool::new(false));
         self.cancel = Some(Arc::clone(&cancel));
         let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
         let _ = self.tx.send(MouthJob::Speak {
             text,
-            mood,
+            cue,
             cancel,
             tx,
         });
@@ -288,7 +172,7 @@ fn worker_loop(mouth: &mut Box<dyn Mouth>, rx: std::sync::mpsc::Receiver<MouthJo
     while let Ok(job) = rx.recv() {
         let MouthJob::Speak {
             text,
-            mood,
+            cue,
             cancel,
             tx,
         } = job
@@ -300,7 +184,7 @@ fn worker_loop(mouth: &mut Box<dyn Mouth>, rx: std::sync::mpsc::Receiver<MouthJo
             continue;
         }
         let mut emitted = false;
-        let result = mouth.speak(&text, mood, &cancel, &mut |pcm| {
+        let result = mouth.speak_stream(&text, &cue, &cancel, &mut |pcm| {
             if cancel.load(Ordering::SeqCst) || pcm.is_empty() {
                 return !cancel.load(Ordering::SeqCst);
             }
@@ -353,7 +237,7 @@ impl LivePipeline {
     pub fn from_env() -> Self {
         let (front, backend, ready) = open_vad();
         let (ear, ear_name, worker) = open_ear();
-        let mouth = SpeakWorker::spawn(open_mouth());
+        let mouth = SpeakWorker::spawn(mouth::open());
         Self {
             front,
             ear,
@@ -429,7 +313,8 @@ impl LivePipeline {
         }
         let _ = t_ms;
         self.phase = "speaking";
-        let feed = self.mouth.start(reply.clone(), out.mood);
+        let cue = MouthCue::from_turn(&out);
+        let feed = self.mouth.start(reply.clone(), cue);
         events.push(dot_json("speaking", self.level));
         TurnProduct {
             events,
@@ -615,7 +500,9 @@ impl Pipeline for LivePipeline {
     fn info(&self) -> PipeInfo {
         PipeInfo {
             ear: self.ear_name,
-            mouth: self.mouth.name(),
+            mouth: self.mouth.mouth(),
+            voice: self.mouth.voice(),
+            clone_status: self.mouth.clone_status(),
             mind: "horbm".into(),
             vad_backend: self.vad_backend,
             vad_ready: self.vad_ready,
@@ -657,25 +544,42 @@ struct GatedMouth {
 }
 
 impl Mouth for GatedMouth {
-    fn speak(
+    fn speak(&mut self, text: &str, cue: &MouthCue) -> Result<(Vec<i16>, u32), String> {
+        let mut pcm = Vec::new();
+        let cancel = AtomicBool::new(false);
+        self.speak_stream(text, cue, &cancel, &mut |chunk| {
+            pcm.extend_from_slice(chunk);
+            true
+        })?;
+        Ok((pcm, SPEAKER_RATE))
+    }
+
+    fn speak_stream(
         &mut self,
         text: &str,
-        mood: Pad,
+        cue: &MouthCue,
         cancel: &AtomicBool,
         on_pcm: &mut dyn FnMut(&[i16]) -> bool,
     ) -> Result<(), String> {
         let pad = galion_sam_orch::Pad {
-            arousal: mood.arousal,
-            valence: mood.valence,
-            dominance: mood.dominance,
+            arousal: cue.mood.arousal,
+            valence: cue.mood.valence,
+            dominance: cue.mood.dominance,
         };
         OrchTts::speak(&mut self.inner, text, &pad, cancel, &mut |pcm| {
             let _ = on_pcm(pcm);
         });
         Ok(())
     }
-    fn name(&self) -> &'static str {
+
+    fn mouth(&self) -> &'static str {
         "fake"
+    }
+    fn voice(&self) -> &'static str {
+        "fake"
+    }
+    fn clone_status(&self) -> &'static str {
+        "off"
     }
 }
 
@@ -729,7 +633,16 @@ impl Pipeline for GatedPipeline {
             prosody_pause_ms: 0.0,
         };
         self.phase = "speaking";
-        let feed = self.mouth.start(self.reply.clone(), Pad::RESTING);
+        let feed = self.mouth.start(
+            self.reply.clone(),
+            MouthCue {
+                mood: Pad::RESTING,
+                rate: 1.0,
+                energy: 1.0,
+                pitch_st: 0.0,
+                pause_ms: 0.0,
+            },
+        );
         TurnProduct {
             events: vec![turn_json(&out), dot_json("speaking", 0.0)],
             pcm: Vec::new(),
@@ -765,7 +678,9 @@ impl Pipeline for GatedPipeline {
     fn info(&self) -> PipeInfo {
         PipeInfo {
             ear: "unwired",
-            mouth: self.mouth.name(),
+            mouth: self.mouth.mouth(),
+            voice: self.mouth.voice(),
+            clone_status: self.mouth.clone_status(),
             mind: "horbm".into(),
             vad_backend: "energy",
             vad_ready: true,
@@ -828,13 +743,6 @@ fn transcribe(engine: &mut dyn Asr, pcm: &[i16]) -> Result<String, String> {
         Err("asr-empty".into())
     } else {
         Ok(text.to_string())
-    }
-}
-
-fn open_mouth() -> Box<dyn Mouth> {
-    match PiperTts::open_resolved() {
-        Ok(tts) => Box::new(PiperMouth { tts }),
-        Err(_) => Box::new(MissingMouth),
     }
 }
 
@@ -1068,7 +976,7 @@ mod tests {
         let flag = Arc::clone(&second);
         let mut n = 0u32;
         let mut first_before_second = false;
-        speak_pieces(
+        crate::mouth::speak_pieces(
             "The kettle is on. It can wait.",
             &cancel,
             &mut |piece, emit| {
@@ -1265,8 +1173,48 @@ mod tests {
             ear,
             ear_name,
             HorbmMind::open(&PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("knowledge")),
-            Box::new(RecMouth { heard }),
+            Box::new(RecMouth {
+                heard,
+                cues: Arc::new(Mutex::new(Vec::new())),
+            }),
         )
+    }
+
+    #[test]
+    fn empathy_prosody_reaches_the_mouth() {
+        let heard = Arc::new(Mutex::new(Vec::new()));
+        let cues = Arc::new(Mutex::new(Vec::new()));
+        let mut pipe = LivePipeline::for_test(
+            Front::Energy(EnergyVad::new(HANG_MS)),
+            "energy",
+            true,
+            Ear::Script("unused".into()),
+            "script",
+            HorbmMind::open(&PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("knowledge")),
+            Box::new(RecMouth {
+                heard,
+                cues: cues.clone(),
+            }),
+        );
+        let mut out = pipe.push_text("I am so tired", 0);
+        out.drain_audio();
+        let turn = out
+            .events
+            .iter()
+            .find(|event| event.contains("\"type\":\"turn\""))
+            .expect("turn");
+        let parsed: serde_json::Value = serde_json::from_str(turn).unwrap();
+        let cue = cues.lock().unwrap()[0];
+        let prosody = &parsed["prosody"];
+        assert!((f64::from(cue.rate) - prosody["rate"].as_f64().unwrap()).abs() < 1e-4);
+        assert!((f64::from(cue.energy) - prosody["energy"].as_f64().unwrap()).abs() < 1e-4);
+        assert!((f64::from(cue.pitch_st) - prosody["pitch_st"].as_f64().unwrap()).abs() < 1e-4);
+        assert!((f64::from(cue.pause_ms) - prosody["pause_ms"].as_f64().unwrap()).abs() < 1e-4);
+        let mood = &parsed["mood"];
+        assert!((f64::from(cue.mood.arousal) - mood["arousal"].as_f64().unwrap()).abs() < 1e-4);
+        assert!((f64::from(cue.mood.valence) - mood["valence"].as_f64().unwrap()).abs() < 1e-4);
+        assert!((f64::from(cue.mood.dominance) - mood["dominance"].as_f64().unwrap()).abs() < 1e-4);
+        assert!(parsed["empathy_e"].as_f64().unwrap() > 0.0);
     }
 
     fn write_ear_script() -> PathBuf {
