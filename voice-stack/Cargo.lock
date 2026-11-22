@@ -493,6 +493,9 @@ dependencies = [
 [[package]]
 name = "galion-sam-latency"
 version = "0.0.1"
+dependencies = [
+ "galion-sam-horbm",
+]
 
 [[package]]
 name = "galion-sam-orch"

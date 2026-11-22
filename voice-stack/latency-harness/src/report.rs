@@ -71,7 +71,10 @@ pub struct Rep {
     pub asr_to_reply_us: u64,
     pub reply_to_tts_us: u64,
     /// Reply ready until one 80 ms slice of PCM has been produced.
+    /// The slice is the first speakable piece, not the rest of the reply.
     pub reply_to_first_slice_us: u64,
+    /// `clause` or `sentence`. Which unit produced [`Self::reply_to_first_slice_us`].
+    pub first_slice_grain: &'static str,
     pub tts_to_audio_out_us: u64,
     pub eos_to_audio_out_us: u64,
     pub eos_to_heartbeat_play_us: u64,
@@ -256,7 +259,23 @@ impl Report {
         s.push_str("  \"notes\": ");
         s.push_str(&string_array(&self.notes));
         if self.measured {
-            s.push_str(",\n  \"summary\": ");
+            let (clause, sentence) = grain_counts(&self.reps);
+            s.push_str(",\n");
+            field(
+                &mut s,
+                1,
+                "first_slice_clause_reps",
+                &clause.to_string(),
+                false,
+            );
+            field(
+                &mut s,
+                1,
+                "first_slice_sentence_reps",
+                &sentence.to_string(),
+                false,
+            );
+            s.push_str("  \"summary\": ");
             s.push_str(&summary_json(&self.summary));
             s.push_str(",\n  \"reps\": ");
             s.push_str(&reps_json(&self.reps));
@@ -345,6 +364,12 @@ impl Report {
             ));
         }
         s.push('\n');
+        if self.measured {
+            let (clause, sentence) = grain_counts(&self.reps);
+            s.push_str(&format!(
+                "Reply ready to first slice is the first speakable piece. Clause: {clause}. Sentence: {sentence}. A clause ends on a comma, semicolon, colon, dash, or conjunction once it has at least four words. A sentence is that first sentence when no earlier clause was ready. `I don't know.` stays a sentence.\n\n"
+            ));
+        }
         if let Some(names) = &self.names {
             s.push_str("## Stage engines\n\n");
             s.push_str(&format!("- VAD: `{n}`\n", n = names.vad));
@@ -610,16 +635,29 @@ fn summary_json(rows: &[StageStat]) -> String {
     s
 }
 
+fn grain_counts(reps: &[Rep]) -> (usize, usize) {
+    let clause = reps
+        .iter()
+        .filter(|rep| rep.first_slice_grain == "clause")
+        .count();
+    let sentence = reps
+        .iter()
+        .filter(|rep| rep.first_slice_grain == "sentence")
+        .count();
+    (clause, sentence)
+}
+
 fn reps_json(reps: &[Rep]) -> String {
     let mut s = String::from("[\n");
     for (i, r) in reps.iter().enumerate() {
         s.push_str(&format!(
-            "    {{\"vad_us\": {vad}, \"eos_to_asr_us\": {asr}, \"asr_to_reply_us\": {reply}, \"reply_to_tts_us\": {tts}, \"reply_to_first_slice_us\": {slice}, \"tts_to_audio_out_us\": {gap}, \"eos_to_audio_out_us\": {e2e}, \"eos_to_heartbeat_play_us\": {play}, \"heartbeat_play_derived\": true, \"mood_ticks\": {ticks}, \"sink_peak_milli\": {peak}}}",
+            "    {{\"vad_us\": {vad}, \"eos_to_asr_us\": {asr}, \"asr_to_reply_us\": {reply}, \"reply_to_tts_us\": {tts}, \"reply_to_first_slice_us\": {slice}, \"first_slice_grain\": {grain}, \"tts_to_audio_out_us\": {gap}, \"eos_to_audio_out_us\": {e2e}, \"eos_to_heartbeat_play_us\": {play}, \"heartbeat_play_derived\": true, \"mood_ticks\": {ticks}, \"sink_peak_milli\": {peak}}}",
             vad = r.vad_us,
             asr = r.eos_to_asr_us,
             reply = r.asr_to_reply_us,
             tts = r.reply_to_tts_us,
             slice = r.reply_to_first_slice_us,
+            grain = json_str(r.first_slice_grain),
             gap = r.tts_to_audio_out_us,
             e2e = r.eos_to_audio_out_us,
             play = r.eos_to_heartbeat_play_us,

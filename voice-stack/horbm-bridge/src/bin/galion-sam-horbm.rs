@@ -50,7 +50,7 @@ fn usage() {
     eprintln!(
         "galion-sam-horbm {{tick|chunks|say|pace}}\n\
          tick    time one mood frame, one chunk split, and one fake turn\n\
-         chunks  split reply text into speakable sentences\n\
+         chunks  split reply text into speakable clauses\n\
          say     one turn on the fake engine, or on horbm when the feature and paths are set\n\
          pace    run the 80 ms mood thread and print the gaps it actually woke on\n\
          This crate does not read GALION_SAMANTHA_REF and does not play audio."
@@ -104,7 +104,13 @@ fn print_chunks(text: &str) {
     let chunks = speakable_chunks(text);
     println!("chunks {}", chunks.len());
     for chunk in chunks {
-        println!("{}\t{}\t{}", chunk.index, chunk.words, chunk.text);
+        println!(
+            "{}\t{}\t{}\t{}",
+            chunk.index,
+            chunk.grain.as_str(),
+            chunk.words,
+            chunk.text
+        );
     }
 }
 

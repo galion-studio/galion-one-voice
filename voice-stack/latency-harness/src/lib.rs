@@ -22,6 +22,7 @@
 
 pub mod clock;
 pub mod fake;
+pub mod grain;
 pub mod machine;
 pub mod pipeline;
 pub mod piper;
@@ -36,6 +37,7 @@ pub use clock::{
     STEP_BUDGET_US,
 };
 pub use fake::{fixture_pcm, run_fake, EnergyVad, FakeAsr, FakeReply, FakeTts, FrameSink};
+pub use grain::{first_piece, FirstPiece};
 pub use machine::{format_unix_utc, probe_machine, redact_host, repo_root, Machine};
 pub use pipeline::{measure, HarnessError, MeasureIn};
 pub use piper::{locate_piper, run_piper, PiperInfo, PiperPaths};

@@ -86,6 +86,8 @@ The machine block has the CPU model, CPU MHz, nproc, OS, kernel, hostname (an IP
 
 Raw per-rep microseconds are in the JSON under `reps`. The Markdown table is the summary. `clock` is `measured` or `derived`.
 
+Each rep records `first_slice_grain` as `clause` or `sentence`. The report counts those in `first_slice_clause_reps` and `first_slice_sentence_reps`. Reply ready to first slice is that first piece, the same cut `galion-sam-horbm` gives the Piper mouth. A clause ends on a comma, semicolon, colon, dash, or conjunction once it has at least four words. A sentence is the first sentence when no earlier clause was ready. The published phrase `I am right here.` is one sentence. `I don't know.` stays one sentence and is not rewritten.
+
 ## Another implementation of the traits
 
 `measure` is generic over `SpeechEnd`, `AsrStage`, `ReplyEngine`, `TtsStage`, and `AudioOut`. A later crate implements `ReplyEngine` for `horbm::Brain` and passes it in. The CLI ships `fake` and `piper` only.
@@ -138,7 +140,7 @@ Load average at 2026-11-21T02:49:55Z: 0.37 0.12 0.03.
 
 ## What is not in this crate
 
-- HORBM is not linked. The reply stage is the fake slot.
+- The reply stage is the fake slot. It does not open a HORBM memory database and does not score cards. The first-slice cut is `galion_sam_horbm::speakable_chunks`, the same splitter the 7881 mouth uses.
 - Vosk is not called. The ASR stage is the fake scan.
 - There is no microphone and no sound device. End of speech is an offline VAD on a generated tone. First audio out is an in-memory sink.
 - The heartbeat play time is computed from measured arrivals. The process does not sleep until the next tick.

@@ -154,7 +154,16 @@ where
         return Err(StageError::new("reply", "empty reply"));
     }
 
-    tts.begin(&turn.reply, &turn.mood)?;
+    // The clock is the first clause or the first sentence, the same cut the
+    // 7881 mouth hands to Piper. Later pieces are outside this stamp.
+    let piece = crate::grain::first_piece(&turn.reply);
+    let spoken = if piece.text.trim().is_empty() {
+        turn.reply.clone()
+    } else {
+        piece.text
+    };
+    let first_slice_grain = piece.grain;
+    tts.begin(&spoken, &turn.mood)?;
     let mut buf: Vec<i16> = Vec::new();
     let mut rate = 0u32;
     let mut first_at = None;
@@ -223,6 +232,7 @@ where
             asr_to_reply_us,
             reply_to_tts_us,
             reply_to_first_slice_us,
+            first_slice_grain,
             tts_to_audio_out_us,
             eos_to_audio_out_us,
             eos_to_heartbeat_play_us,

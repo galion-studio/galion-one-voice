@@ -4,8 +4,9 @@
 //!
 //! Package `galion-sam-horbm`, directory `voice-stack/horbm-bridge`.
 //! ASR text comes in. A [`ReplyEngine`] returns reply text, a [`Pad`] mood,
-//! and source ids. [`speakable_chunks`] cuts that reply into sentences the
-//! streaming TTS path can speak. [`Session::tick`] runs once per 80 ms frame
+//! and source ids. [`speakable_chunks`] cuts that reply into clauses the
+//! streaming TTS path can speak. The first clause goes out before the rest
+//! of a long sentence. [`Session::tick`] runs once per 80 ms frame
 //! between turns and does not start a turn. [`CardEngine`] steps one empathy
 //! frame with no new words. [`FakeEngine`] holds its pad.
 //!
@@ -35,8 +36,8 @@ mod linked;
 
 pub use cards::{CardBrain, CardEngine, UNKNOWN_REPLY};
 pub use chunks::{
-    contains_forbidden, speakable_chunks, Chunker, SpeakChunk, FIRST_SENTENCE_WORDS, FORBIDDEN,
-    SPOKEN_CAP,
+    contains_forbidden, speakable_chunks, split_first_clause, Chunker, SliceGrain, SpeakChunk,
+    FIRST_SENTENCE_WORDS, FORBIDDEN, MIN_CLAUSE_WORDS, SPOKEN_CAP,
 };
 pub use engine::{Reply, ReplyEngine};
 pub use fake::FakeEngine;

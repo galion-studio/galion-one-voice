@@ -5,12 +5,14 @@
 //! and, when the A21 pack is on disk, two warm Piper reps. They do not write
 //! audio.
 
-use galion_sam_latency::traits::{AsrStage, AudioOut, ReplyEngine, SpeechEnd};
+use galion_sam_latency::traits::{AsrStage, AudioOut, ReplyEngine, SpeechEnd, TtsStage};
 use galion_sam_latency::{
-    fixture_pcm, heartbeat_play_us, ms_text, percentile, rank, resample_to_frame, run_fake,
-    run_piper, EnergyVad, FakeAsr, FakeReply, FrameSink, HarnessError, Machine, Pad, Rep, Report,
-    StageNames, TurnOut, BAR_US, FRAME_SAMPLES, PHRASE, PIPER_HZ, SAMPLE_RATE_HZ,
+    first_piece, fixture_pcm, heartbeat_play_us, measure, ms_text, percentile, rank,
+    resample_to_frame, run_fake, run_piper, EnergyVad, FakeAsr, FakeReply, FakeTts, FrameSink,
+    HarnessError, Machine, MeasureIn, Pad, PcmChunk, Rep, Report, StageError, StageNames, TurnOut,
+    BAR_US, FRAME_SAMPLES, PHRASE, PIPER_HZ, SAMPLE_RATE_HZ,
 };
+use std::time::Duration;
 
 fn names() -> StageNames {
     StageNames {
@@ -29,6 +31,7 @@ fn rep(asr: u64) -> Rep {
         asr_to_reply_us: 7,
         reply_to_tts_us: 11,
         reply_to_first_slice_us: 12,
+        first_slice_grain: "sentence",
         tts_to_audio_out_us: 13,
         eos_to_audio_out_us: asr + 7 + 11 + 13,
         eos_to_heartbeat_play_us: asr + 7 + 11,
@@ -133,6 +136,9 @@ fn fake_pipeline_stamps_are_ordered_and_recomputable() {
     assert!(json.contains("\"backend\": \"fake\""));
     assert!(json.contains("fake-horbm-slot"));
     assert!(json.contains("reply ready to first slice"));
+    assert!(json.contains("\"first_slice_grain\": \"sentence\""));
+    assert!(json.contains("\"first_slice_sentence_reps\": 8"));
+    assert!(json.contains("\"first_slice_clause_reps\": 0"));
     assert!(json.contains("fake-rms-scan"));
     for rep in &report.reps {
         // Each stamp is truncated to microseconds on its own, so the parts can
@@ -170,6 +176,10 @@ fn fake_pipeline_stamps_are_ordered_and_recomputable() {
     assert_eq!(row.n, 8);
     let md = report.to_markdown();
     assert!(md.contains("reply ready to first slice"));
+    assert!(md.contains("Clause: 0. Sentence: 8."));
+    for rep in &report.reps {
+        assert_eq!(rep.first_slice_grain, "sentence");
+    }
     assert!(md.contains(&ms_text(row.p50_us)));
     assert!(md.contains(&report.machine.cpu));
     assert!(md.contains(&report.machine.commit));
@@ -274,6 +284,126 @@ fn piper_warm_reps_when_the_pack_is_on_disk() {
             let md = report.to_markdown();
             assert!(md.contains(&report.machine.cpu));
             assert!(md.contains("derived"));
+            assert!(report
+                .reps
+                .iter()
+                .all(|rep| rep.first_slice_grain == "sentence"));
         }
     }
+}
+
+/// Records the text `begin` received. The sine is the fake mouth, not Piper.
+struct RecordingTts {
+    seen: Vec<String>,
+    inner: FakeTts,
+}
+
+impl TtsStage for RecordingTts {
+    fn name(&self) -> &str {
+        "recording-fake-sine"
+    }
+
+    fn begin(&mut self, text: &str, mood: &Pad) -> Result<(), StageError> {
+        self.seen.push(text.to_string());
+        self.inner.begin(text, mood)
+    }
+
+    fn pull(&mut self, timeout: Duration) -> Result<Option<PcmChunk>, StageError> {
+        self.inner.pull(timeout)
+    }
+
+    fn finish(&mut self) -> Result<(), StageError> {
+        self.inner.finish()
+    }
+}
+
+struct FixedReply {
+    text: &'static str,
+}
+
+impl ReplyEngine for FixedReply {
+    fn name(&self) -> &str {
+        "fixed-reply"
+    }
+
+    fn turn(&mut self, _utterance: &str) -> Result<TurnOut, StageError> {
+        Ok(TurnOut {
+            reply: self.text.to_string(),
+            intent: String::new(),
+            arm: String::new(),
+            propensity: 0.0,
+            evidence: Vec::new(),
+            sources: Vec::new(),
+            violations: 0,
+            lookup_us: 0,
+            took_us: 0,
+            mood: Pad::RESTING,
+        })
+    }
+}
+
+fn one_fake_turn(reply: &'static str) -> (galion_sam_latency::Report, Vec<String>) {
+    let pcm = fixture_pcm(16_000);
+    let mut tts = RecordingTts {
+        seen: Vec::new(),
+        inner: FakeTts::new(),
+    };
+    let report = measure(
+        &mut EnergyVad::default(),
+        &mut FakeAsr,
+        &mut FixedReply { text: reply },
+        &mut tts,
+        &mut FrameSink::default(),
+        MeasureIn {
+            pcm: &pcm,
+            pcm_rate: 16_000,
+            reps: 1,
+            warmup: 0,
+            backend: "fake",
+            claims_tts_measured: false,
+            voice: None,
+            cold: None,
+            piper: None,
+            notes: vec![
+                "Fake sine. The reply-to-first-slice grain is the splitter, not a Piper clock."
+                    .into(),
+            ],
+        },
+    )
+    .expect("fake turn");
+    (report, tts.seen)
+}
+
+#[test]
+fn reply_to_first_slice_reports_clause_or_sentence() {
+    let miss = first_piece("I don't know.");
+    assert_eq!(miss.text, "I don't know.");
+    assert_eq!(miss.grain, "sentence");
+
+    let card =
+        "AlphaFold predicts protein structure, and the twenty twenty one paper showed it at scale.";
+    let clause = first_piece(card);
+    assert_eq!(clause.grain, "clause");
+    assert_eq!(clause.text, "AlphaFold predicts protein structure,");
+    assert!(clause.text.split_whitespace().count() >= 4);
+    assert!(clause.text.len() < card.len());
+
+    let sentence = first_piece(PHRASE);
+    assert_eq!(sentence.grain, "sentence");
+    assert_eq!(sentence.text, PHRASE);
+
+    let (card_report, card_seen) = one_fake_turn(card);
+    assert_eq!(card_seen, vec![clause.text.clone()]);
+    assert_eq!(card_report.reps[0].first_slice_grain, "clause");
+    assert!(card_report
+        .to_json()
+        .contains("\"first_slice_clause_reps\": 1"));
+    assert!(card_report
+        .to_markdown()
+        .contains("Clause: 1. Sentence: 0."));
+    assert!(card_report.to_json().contains("\"product_claim\": false"));
+
+    let (miss_report, miss_seen) = one_fake_turn("I don't know.");
+    assert_eq!(miss_seen, vec!["I don't know.".to_string()]);
+    assert_eq!(miss_report.reps[0].first_slice_grain, "sentence");
 }
