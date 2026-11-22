@@ -13,6 +13,8 @@
 //! the 80 ms speaker clock. The log line says that. It is not a new timing.
 //! The 80 ms slice clock stays in the socket. This module returns PCM.
 
+use std::sync::atomic::{AtomicBool, Ordering};
+
 use galion_tts_piper::{resample_linear, PiperTts, Tts as PiperSpeak};
 use samantha_voice_clone::Tts as CloneSpeak;
 
@@ -54,6 +56,25 @@ impl MouthCue {
 
 pub(crate) trait Mouth: Send {
     fn speak(&mut self, text: &str, cue: &MouthCue) -> Result<(Vec<i16>, u32), String>;
+    /// Hand each ready sentence to `on_pcm` before the next sentence is synthesised.
+    /// Return `false` from `on_pcm` to stop. `cancel` is polled between sentences.
+    fn speak_stream(
+        &mut self,
+        text: &str,
+        cue: &MouthCue,
+        cancel: &AtomicBool,
+        on_pcm: &mut dyn FnMut(&[i16]) -> bool,
+    ) -> Result<(), String> {
+        if cancel.load(Ordering::SeqCst) {
+            return Ok(());
+        }
+        let (pcm, _) = self.speak(text, cue)?;
+        if cancel.load(Ordering::SeqCst) || pcm.is_empty() {
+            return Ok(());
+        }
+        let _ = on_pcm(&pcm);
+        Ok(())
+    }
     fn mouth(&self) -> &'static str;
     fn voice(&self) -> &'static str;
     fn clone_status(&self) -> &'static str;
@@ -198,6 +219,43 @@ pub(crate) fn open() -> Box<dyn Mouth> {
     }
 }
 
+/// First sentence is handed to `on_pcm` before the next sentence starts.
+#[allow(clippy::type_complexity)]
+pub(crate) fn speak_pieces(
+    text: &str,
+    cancel: &AtomicBool,
+    one: &mut dyn FnMut(&str, &mut dyn FnMut(&[i16]) -> bool) -> Result<(), String>,
+    on_pcm: &mut dyn FnMut(&[i16]) -> bool,
+) -> Result<(), String> {
+    let pieces = galion_sam_horbm::speakable_chunks(text);
+    let pieces: Vec<String> = if pieces.is_empty() {
+        vec![text.to_string()]
+    } else {
+        pieces.into_iter().map(|chunk| chunk.text).collect()
+    };
+    for piece in pieces {
+        if cancel.load(Ordering::SeqCst) {
+            return Ok(());
+        }
+        let mut stop = false;
+        one(&piece, &mut |pcm| {
+            if stop || cancel.load(Ordering::SeqCst) {
+                stop = true;
+                return false;
+            }
+            if !on_pcm(pcm) {
+                stop = true;
+                return false;
+            }
+            true
+        })?;
+        if stop {
+            return Ok(());
+        }
+    }
+    Ok(())
+}
+
 fn open_piper(clone_status: &'static str) -> Box<dyn Mouth> {
     match PiperTts::open_resolved() {
         Ok(tts) => Box::new(PiperMouth { tts, clone_status }),
@@ -231,30 +289,79 @@ struct PiperMouth {
 
 impl Mouth for PiperMouth {
     fn speak(&mut self, text: &str, cue: &MouthCue) -> Result<(Vec<i16>, u32), String> {
-        let pieces = galion_sam_horbm::speakable_chunks(text);
-        let pieces: Vec<String> = if pieces.is_empty() {
-            vec![text.to_string()]
-        } else {
-            pieces.into_iter().map(|c| c.text).collect()
-        };
         let mut pcm = Vec::new();
-        for piece in pieces {
-            let mut part = Vec::new();
-            let mut rate = SPEAKER_RATE;
-            // Resting pad keeps Piper's own shaper as a copy. The empathy cue
-            // is applied once below, so pitch and gain are not applied twice.
-            self.tts
-                .speak(&piece, galion_tts_piper::Pad::RESTING, &mut |chunk| {
-                    rate = chunk.sample_rate;
-                    part.extend_from_slice(chunk.samples);
-                })
-                .map_err(|_| "piper-missing".to_string())?;
-            pcm.extend(resample_linear(&part, rate, SPEAKER_RATE));
-        }
+        let cancel = AtomicBool::new(false);
+        self.speak_stream(text, cue, &cancel, &mut |chunk| {
+            pcm.extend_from_slice(chunk);
+            true
+        })?;
         if pcm.is_empty() {
             return Err("piper-missing".into());
         }
-        Ok((apply_empathy_prosody(&pcm, SPEAKER_RATE, cue), SPEAKER_RATE))
+        Ok((pcm, SPEAKER_RATE))
+    }
+
+    fn speak_stream(
+        &mut self,
+        text: &str,
+        cue: &MouthCue,
+        cancel: &AtomicBool,
+        on_pcm: &mut dyn FnMut(&[i16]) -> bool,
+    ) -> Result<(), String> {
+        let mut any = false;
+        let mut first = true;
+        speak_pieces(
+            text,
+            cancel,
+            &mut |piece, emit| {
+                if cancel.load(Ordering::SeqCst) {
+                    return Ok(());
+                }
+                let mut part = Vec::new();
+                let mut rate = SPEAKER_RATE;
+                let mut stop = false;
+                // Resting pad keeps Piper's own shaper as a copy. Empathy is applied
+                // once per sentence below, so pitch and gain are not applied twice.
+                self.tts
+                    .speak(piece, galion_tts_piper::Pad::RESTING, &mut |chunk| {
+                        if stop || cancel.load(Ordering::SeqCst) {
+                            stop = true;
+                            return;
+                        }
+                        rate = chunk.sample_rate;
+                        part.extend_from_slice(chunk.samples);
+                    })
+                    .map_err(|_| "piper-missing".to_string())?;
+                if stop || cancel.load(Ordering::SeqCst) {
+                    return Ok(());
+                }
+                let pcm = resample_linear(&part, rate, SPEAKER_RATE);
+                let shaped = if first {
+                    first = false;
+                    apply_empathy_prosody(&pcm, SPEAKER_RATE, cue)
+                } else {
+                    let mut later = *cue;
+                    later.pause_ms = 0.0;
+                    apply_empathy_prosody(&pcm, SPEAKER_RATE, &later)
+                };
+                if shaped.is_empty() {
+                    return Ok(());
+                }
+                any = true;
+                if !emit(&shaped) {
+                    return Ok(());
+                }
+                Ok(())
+            },
+            on_pcm,
+        )?;
+        if cancel.load(Ordering::SeqCst) {
+            return Ok(());
+        }
+        if !any {
+            return Err("piper-missing".into());
+        }
+        Ok(())
     }
     fn mouth(&self) -> &'static str {
         "piper"

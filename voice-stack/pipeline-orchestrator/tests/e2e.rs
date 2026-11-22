@@ -58,6 +58,41 @@ async fn scripted_turn_reports_each_stage() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn first_audio_is_out_before_the_gated_rest() {
+    let gate = galion_sam_orch::samantha_traits::WaitGate::new();
+    let first = vec![1000, -1000, 500, -500];
+    let running = demo::spawn_fake(
+        galion_sam_orch::FakeReply::new(REPLY, MOOD),
+        galion_sam_orch::FakeTts::gated(first.clone(), gate.clone()),
+    );
+    demo::send_frames(&running.tx, 6, 10).await;
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(3);
+    while running.speaker.played_len() < first.len() {
+        if tokio::time::Instant::now() > deadline {
+            panic!(
+                "first audio did not arrive; played {}",
+                running.speaker.played_len()
+            );
+        }
+        tokio::time::sleep(Duration::from_millis(5)).await;
+    }
+    assert!(
+        !gate.release.load(std::sync::atomic::Ordering::SeqCst),
+        "the rest of the reply was released"
+    );
+    assert_eq!(running.speaker.played_len(), first.len());
+    let texts = running.texts.lock().expect("texts").clone();
+    assert_eq!(
+        texts.len(),
+        1,
+        "the next sentence started before the first finished: {texts:?}"
+    );
+    gate.release
+        .store(true, std::sync::atomic::Ordering::SeqCst);
+    running.handle.shutdown().await;
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn barge_in_cancels_the_speaker() {
     let barge = demo::measure_barge().await;
     eprintln!("MEASURE {}", barge.to_json());

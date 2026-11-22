@@ -18,7 +18,8 @@
 
 use crate::clause::clauses;
 use crate::clock::{
-    CHUNK_CHANNEL_BOUND, FRAME_CHANNEL_BOUND, HEARTBEAT_MS, MAX_UTTERANCE_MS, TURN_CHANNEL_BOUND,
+    CHUNK_CHANNEL_BOUND, FRAME_CHANNEL_BOUND, HEARTBEAT_MS, HEARTBEAT_PLAY_SAMPLES,
+    MAX_UTTERANCE_MS, TURN_CHANNEL_BOUND,
 };
 use crate::samantha_traits::{
     Asr, AudioFrame, AudioIn, AudioOut, MoodTick, Pad, ReplyEngine, Tts, Vad, VadEvent,
@@ -777,12 +778,22 @@ async fn speak<T: Tts, O: AudioOut>(
                 let ready_at = meta.ready_at;
                 let ended_at = meta.ended_at;
                 tts.speak(&text, &mood, &stop, &mut |pcm| {
-                    if !speaker.write(epoch, pcm) {
-                        return;
-                    }
-                    if prog.first_audio_us.is_none() {
-                        prog.first_audio_us = Some(us(ready_at.elapsed()));
-                        prog.eot_to_audio_us = Some(us(ended_at.elapsed()));
+                    // 80 ms slices. The first write is the first slice, before the
+                    // rest of this clause. Cancel is the same flag the mouth polls.
+                    let mut off = 0;
+                    while off < pcm.len() {
+                        if stop.load(Ordering::SeqCst) {
+                            return;
+                        }
+                        let end = (off + HEARTBEAT_PLAY_SAMPLES).min(pcm.len());
+                        if !speaker.write(epoch, &pcm[off..end]) {
+                            return;
+                        }
+                        if prog.first_audio_us.is_none() {
+                            prog.first_audio_us = Some(us(ready_at.elapsed()));
+                            prog.eot_to_audio_us = Some(us(ended_at.elapsed()));
+                        }
+                        off = end;
                     }
                 });
             }

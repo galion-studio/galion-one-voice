@@ -26,7 +26,7 @@ mod voice_http;
 
 pub use audio::{FRAME_MS, MIC_FRAME_SAMPLES, MIC_RATE, SPEAKER_FRAME_SAMPLES, SPEAKER_RATE};
 pub use bind::{origin_allowed, require_loopback};
-pub use live::live_factory;
+pub use live::{gated_mouth_factory, live_factory};
 pub use pipeline::{unlinked_factory, FakePipeline, PipeInfo, Pipeline, TurnProduct};
 pub use reply::{
     FakeReply, HorbmAdapter, HorbmBrain, OpenHorbm, Pad, ReplyEngine, TurnOut, UnlinkedBrain,

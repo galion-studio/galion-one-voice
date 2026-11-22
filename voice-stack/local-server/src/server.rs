@@ -29,7 +29,7 @@ use tower_http::services::ServeDir;
 
 use crate::audio::{self, FRAME_MS};
 use crate::bind::{origin_allowed, require_loopback, NotLoopback};
-use crate::pipeline::{Pipeline, TurnProduct};
+use crate::pipeline::{AudioFeed, FeedMsg, Pipeline, TurnProduct};
 use crate::protocol::{
     self, decode_pcm, encode_pcm, error_json, mood_json, parse_client, pong_json,
     query_carries_token, welcome_json, AudioDir, ClientControl, RateCode, SCHEMA, WS_PATH,
@@ -473,13 +473,10 @@ async fn session(socket: WebSocket, app: AppState) {
         Duration::from_millis(u64::from(FRAME_MS)),
     );
     mood_tick.set_missed_tick_behavior(MissedTickBehavior::Delay);
-    let mut pending: VecDeque<Vec<u8>> = VecDeque::new();
-    let mut audio_deadline: Option<Tick> = None;
-    let mut seq: u16 = 0;
-    let mut speaking = false;
+    let mut pace = Pace::default();
 
     loop {
-        let deadline = audio_deadline;
+        let deadline = pace.deadline;
         tokio::select! {
             incoming = stream.next() => {
                 match incoming {
@@ -490,12 +487,12 @@ async fn session(socket: WebSocket, app: AppState) {
                     }
                     Some(Ok(Message::Pong(_))) => {}
                     Some(Ok(Message::Text(text))) => {
-                        if !handle_text(&text, &mut pipe, &tx, started, &mut pending, &mut audio_deadline, &mut seq, &mut speaking).await {
+                        if !handle_text(&text, &mut pipe, &tx, started, &mut pace).await {
                             break;
                         }
                     }
                     Some(Ok(Message::Binary(bytes))) => {
-                        if !handle_binary(&bytes, &mut pipe, &tx, started, &mut pending, &mut audio_deadline, &mut seq, &mut speaking).await {
+                        if !handle_binary(&bytes, &mut pipe, &tx, started, &mut pace).await {
                             break;
                         }
                     }
@@ -510,15 +507,13 @@ async fn session(socket: WebSocket, app: AppState) {
                 }
             }
             _ = sleep_until(deadline.unwrap_or_else(|| Tick::now() + Duration::from_secs(3600))), if deadline.is_some() => {
-                audio_deadline = None;
-                if let Some(frame) = pending.pop_front() {
-                    if tx.send(Down { msg: Message::Binary(frame) }).await.is_err() { break; }
-                    if pending.is_empty() {
-                        speaking = false;
-                        let _ = send_line(&tx, protocol::dot_json("idle", pipe.level())).await;
-                    } else {
-                        audio_deadline = Some(Tick::now() + Duration::from_millis(u64::from(FRAME_MS)));
-                    }
+                if !on_audio_deadline(&mut pipe, &tx, &mut pace).await {
+                    break;
+                }
+            }
+            msg = poll_feed(&mut pace.feed) => {
+                if !on_feed(&mut pipe, &tx, &mut pace, msg).await {
+                    break;
                 }
             }
         }
@@ -531,16 +526,44 @@ fn elapsed_ms(started: Wall) -> u64 {
     u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX)
 }
 
-#[allow(clippy::too_many_arguments)]
+struct Pace {
+    pending: VecDeque<Vec<u8>>,
+    deadline: Option<Tick>,
+    seq: u16,
+    speaking: bool,
+    /// When the previous slice was handed to the writer. `None` until the first.
+    last_sent: Option<Tick>,
+    feed: Option<AudioFeed>,
+    rate: u32,
+}
+
+impl Default for Pace {
+    fn default() -> Self {
+        Self {
+            pending: VecDeque::new(),
+            deadline: None,
+            seq: 0,
+            speaking: false,
+            last_sent: None,
+            feed: None,
+            rate: crate::audio::SPEAKER_RATE,
+        }
+    }
+}
+
+async fn poll_feed(feed: &mut Option<AudioFeed>) -> Option<FeedMsg> {
+    match feed.as_mut() {
+        Some(feed) => feed.rx.recv().await,
+        None => std::future::pending().await,
+    }
+}
+
 async fn handle_text(
     text: &str,
     pipe: &mut Box<dyn Pipeline>,
     tx: &mpsc::Sender<Down>,
     started: Wall,
-    pending: &mut VecDeque<Vec<u8>>,
-    audio_deadline: &mut Option<Tick>,
-    seq: &mut u16,
-    speaking: &mut bool,
+    pace: &mut Pace,
 ) -> bool {
     match parse_client(text) {
         Err(code) => send_line(tx, error_json(&code)).await,
@@ -550,24 +573,20 @@ async fn handle_text(
         Ok(ClientControl::Ping) => send_line(tx, pong_json()).await,
         Ok(ClientControl::Unknown { .. }) => send_line(tx, error_json("unknown-type")).await,
         Ok(ClientControl::Consent { .. }) => true,
-        Ok(ClientControl::Stop) => stop_audio(pipe, tx, pending, audio_deadline, speaking).await,
+        Ok(ClientControl::Stop) => stop_audio(pipe, tx, pace).await,
         Ok(ClientControl::Text { text }) => {
             let product = pipe.push_text(&text, elapsed_ms(started));
-            emit_turn(product, tx, pending, audio_deadline, seq, speaking).await
+            emit_turn(pipe, product, tx, pace).await
         }
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 async fn handle_binary(
     bytes: &[u8],
     pipe: &mut Box<dyn Pipeline>,
     tx: &mpsc::Sender<Down>,
     started: Wall,
-    pending: &mut VecDeque<Vec<u8>>,
-    audio_deadline: &mut Option<Tick>,
-    seq: &mut u16,
-    speaking: &mut bool,
+    pace: &mut Pace,
 ) -> bool {
     let (dir, rate, _seq, pcm) = match decode_pcm(bytes) {
         Ok(frame) => frame,
@@ -577,76 +596,171 @@ async fn handle_binary(
         return send_line(tx, error_json("mic-only")).await;
     }
     let product = pipe.push_mic(&pcm, rate.hz(), elapsed_ms(started));
-    emit_turn(product, tx, pending, audio_deadline, seq, speaking).await
+    emit_turn(pipe, product, tx, pace).await
 }
 
 async fn stop_audio(
     pipe: &mut Box<dyn Pipeline>,
     tx: &mpsc::Sender<Down>,
-    pending: &mut VecDeque<Vec<u8>>,
-    audio_deadline: &mut Option<Tick>,
-    speaking: &mut bool,
+    pace: &mut Pace,
 ) -> bool {
-    pending.clear();
-    *audio_deadline = None;
-    *speaking = false;
+    pace.pending.clear();
+    pace.deadline = None;
+    pace.speaking = false;
+    pace.last_sent = None;
+    pace.feed = None;
     pipe.stop();
     send_line(tx, protocol::dot_json("idle", 0.0)).await
 }
 
 async fn emit_turn(
-    product: TurnProduct,
+    pipe: &mut Box<dyn Pipeline>,
+    mut product: TurnProduct,
     tx: &mpsc::Sender<Down>,
-    pending: &mut VecDeque<Vec<u8>>,
-    audio_deadline: &mut Option<Tick>,
-    seq: &mut u16,
-    speaking: &mut bool,
+    pace: &mut Pace,
 ) -> bool {
-    if !product.pcm.is_empty() {
-        pending.clear();
-        *audio_deadline = None;
+    let streamed = product.feed.is_some();
+    let buffered = !product.pcm.is_empty();
+    if streamed || buffered {
+        pace.pending.clear();
+        pace.deadline = None;
+        pace.speaking = false;
+        pace.last_sent = None;
+        pace.feed = None;
+        pace.rate = product.rate;
     }
-    for event in product.events {
+    for event in product.events.drain(..) {
         if !send_line(tx, event).await {
             return false;
         }
     }
+    if let Some(feed) = product.feed.take() {
+        pace.feed = Some(feed);
+        return true;
+    }
     if product.pcm.is_empty() {
         return true;
     }
-    let mut frames = encode_slices(&product.pcm, product.rate, seq);
-    *speaking = true;
-    if let Some(first) = frames.pop_front() {
+    for slice in audio::slice_pcm(&product.pcm, pace.rate, FRAME_MS) {
+        if !accept_slice(tx, pace, &slice).await {
+            return false;
+        }
+    }
+    if pace.pending.is_empty() && pace.feed.is_none() {
+        pace.speaking = false;
+        pace.last_sent = None;
+        pipe.utterance_done();
+        return send_line(tx, protocol::dot_json("idle", 0.0)).await;
+    }
+    true
+}
+
+/// The first slice of an utterance goes out now. A later slice waits until
+/// 80 ms after the previous send, unless that wait has already elapsed.
+async fn accept_slice(tx: &mpsc::Sender<Down>, pace: &mut Pace, samples: &[i16]) -> bool {
+    let Some(frame) = encode_one(pace, samples) else {
+        return true;
+    };
+    let now = Tick::now();
+    let due = match pace.last_sent {
+        None => true,
+        Some(sent) => now >= sent + Duration::from_millis(u64::from(FRAME_MS)),
+    };
+    if due && pace.pending.is_empty() {
         if tx
             .send(Down {
-                msg: Message::Binary(first),
+                msg: Message::Binary(frame),
             })
             .await
             .is_err()
         {
             return false;
         }
+        pace.speaking = true;
+        pace.last_sent = Some(Tick::now());
+        pace.deadline = None;
+        return true;
     }
-    if frames.is_empty() {
-        *speaking = false;
-        return send_line(tx, protocol::dot_json("idle", 0.0)).await;
+    pace.pending.push_back(frame);
+    pace.speaking = true;
+    if pace.deadline.is_none() {
+        let sent = pace.last_sent.unwrap_or(now);
+        let when = sent + Duration::from_millis(u64::from(FRAME_MS));
+        pace.deadline = Some(if when <= now { now } else { when });
     }
-    *pending = frames;
-    *audio_deadline = Some(Tick::now() + Duration::from_millis(u64::from(FRAME_MS)));
     true
 }
 
-fn encode_slices(pcm: &[i16], rate: u32, seq: &mut u16) -> VecDeque<Vec<u8>> {
-    let code = RateCode::from_hz(rate).unwrap_or(RateCode::Hz24k);
-    let slices = audio::slice_pcm(pcm, code.hz(), FRAME_MS);
-    let mut out = VecDeque::with_capacity(slices.len());
-    for samples in slices {
-        *seq = seq.wrapping_add(1);
-        if let Ok(bytes) = encode_pcm(AudioDir::Speaker, code, *seq, &samples) {
-            out.push_back(bytes);
+fn encode_one(pace: &mut Pace, samples: &[i16]) -> Option<Vec<u8>> {
+    let code = RateCode::from_hz(pace.rate).unwrap_or(RateCode::Hz24k);
+    pace.seq = pace.seq.wrapping_add(1);
+    encode_pcm(AudioDir::Speaker, code, pace.seq, samples).ok()
+}
+
+async fn on_audio_deadline(
+    pipe: &mut Box<dyn Pipeline>,
+    tx: &mpsc::Sender<Down>,
+    pace: &mut Pace,
+) -> bool {
+    pace.deadline = None;
+    let Some(frame) = pace.pending.pop_front() else {
+        return true;
+    };
+    if tx
+        .send(Down {
+            msg: Message::Binary(frame),
+        })
+        .await
+        .is_err()
+    {
+        return false;
+    }
+    pace.last_sent = Some(Tick::now());
+    if !pace.pending.is_empty() {
+        pace.deadline = Some(Tick::now() + Duration::from_millis(u64::from(FRAME_MS)));
+        return true;
+    }
+    if pace.feed.is_some() {
+        return true;
+    }
+    pace.speaking = false;
+    pace.last_sent = None;
+    pipe.utterance_done();
+    send_line(tx, protocol::dot_json("idle", pipe.level())).await
+}
+
+async fn on_feed(
+    pipe: &mut Box<dyn Pipeline>,
+    tx: &mpsc::Sender<Down>,
+    pace: &mut Pace,
+    msg: Option<FeedMsg>,
+) -> bool {
+    match msg {
+        Some(FeedMsg::Slice(samples)) => accept_slice(tx, pace, &samples).await,
+        Some(FeedMsg::Failed(code)) => {
+            pace.pending.clear();
+            pace.deadline = None;
+            pace.feed = None;
+            pace.speaking = false;
+            pace.last_sent = None;
+            pipe.utterance_done();
+            send_line(tx, error_json(&code)).await
+                && send_line(tx, protocol::dot_json("idle", 0.0)).await
+        }
+        Some(FeedMsg::End) | None => {
+            pace.feed = None;
+            if pace.pending.is_empty() && pace.deadline.is_none() {
+                let was = pace.speaking;
+                pace.speaking = false;
+                pace.last_sent = None;
+                pipe.utterance_done();
+                if was {
+                    return send_line(tx, protocol::dot_json("idle", pipe.level())).await;
+                }
+            }
+            true
         }
     }
-    out
 }
 
 async fn send_line(tx: &mpsc::Sender<Down>, line: String) -> bool {

@@ -13,6 +13,27 @@ use crate::audio::{self, hold_tone, rms, MIC_RATE, SPEAKER_RATE};
 use crate::protocol::{dot_json, error_json, turn_json, vad_json};
 use crate::reply::{may_speak_piper, Pad, ReplyEngine, UnlinkedBrain};
 
+/// One piece of a spoken reply, produced before the rest of the utterance.
+#[derive(Debug)]
+pub(crate) enum FeedMsg {
+    /// One speaker slice. Full slices are 80 ms. A short tail is kept.
+    Slice(Vec<i16>),
+    End,
+    Failed(String),
+}
+
+/// Slices the mouth has already produced. The receiver is read while later
+/// sentences are still being synthesised.
+pub struct AudioFeed {
+    pub(crate) rx: tokio::sync::mpsc::UnboundedReceiver<FeedMsg>,
+}
+
+impl std::fmt::Debug for AudioFeed {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("AudioFeed")
+    }
+}
+
 const SPEECH_RMS: f32 = 0.02;
 const START_FRAMES: u32 = 2;
 /// 32 × 20 ms = 640 ms. Eight frames (160 ms) cut one question into two turns.
@@ -32,12 +53,15 @@ pub struct PipeInfo {
     pub vad_ready: bool,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct TurnProduct {
     pub events: Vec<String>,
     pub pcm: Vec<i16>,
     pub rate: u32,
     pub reply: String,
+    /// Set when audio arrives slice by slice. `pcm` stays empty until
+    /// [`TurnProduct::drain_audio`].
+    pub(crate) feed: Option<AudioFeed>,
 }
 
 impl TurnProduct {
@@ -47,6 +71,27 @@ impl TurnProduct {
             pcm: Vec::new(),
             rate: SPEAKER_RATE,
             reply: String::new(),
+            feed: None,
+        }
+    }
+
+    /// Block until the mouth finishes and fold every slice into `pcm`.
+    /// The websocket path does not call this: it forwards each slice as it arrives.
+    pub(crate) fn drain_audio(&mut self) {
+        let Some(feed) = self.feed.take() else {
+            return;
+        };
+        let mut rx = feed.rx;
+        while let Some(msg) = rx.blocking_recv() {
+            match msg {
+                FeedMsg::Slice(samples) => self.pcm.extend(samples),
+                FeedMsg::End => break,
+                FeedMsg::Failed(code) => {
+                    self.events.push(error_json(&code));
+                    self.pcm.clear();
+                    break;
+                }
+            }
         }
     }
 }
@@ -81,6 +126,8 @@ pub trait Pipeline: Send {
         product
     }
     fn stop(&mut self);
+    /// The streamed utterance has ended or been dropped.
+    fn utterance_done(&mut self) {}
     fn tick_mood(&mut self) -> (Pad, &'static str);
     fn phase(&self) -> &'static str;
     fn level(&self) -> f32;
@@ -217,6 +264,7 @@ impl<R: ReplyEngine> FakePipeline<R> {
                     pcm,
                     rate: SPEAKER_RATE,
                     reply,
+                    feed: None,
                 }
             }
         }

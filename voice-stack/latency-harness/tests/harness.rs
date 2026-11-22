@@ -28,6 +28,7 @@ fn rep(asr: u64) -> Rep {
         eos_to_asr_us: asr,
         asr_to_reply_us: 7,
         reply_to_tts_us: 11,
+        reply_to_first_slice_us: 12,
         tts_to_audio_out_us: 13,
         eos_to_audio_out_us: asr + 7 + 11 + 13,
         eos_to_heartbeat_play_us: asr + 7 + 11,
@@ -131,6 +132,7 @@ fn fake_pipeline_stamps_are_ordered_and_recomputable() {
     assert!(json.contains("\"product_claim\": false"));
     assert!(json.contains("\"backend\": \"fake\""));
     assert!(json.contains("fake-horbm-slot"));
+    assert!(json.contains("reply ready to first slice"));
     assert!(json.contains("fake-rms-scan"));
     for rep in &report.reps {
         // Each stamp is truncated to microseconds on its own, so the parts can
@@ -142,6 +144,13 @@ fn fake_pipeline_stamps_are_ordered_and_recomputable() {
             "chain {sum} e2e {}",
             rep.eos_to_audio_out_us
         );
+        assert!(
+            rep.reply_to_first_slice_us + 8 >= rep.reply_to_tts_us,
+            "first slice {} before first byte {}",
+            rep.reply_to_first_slice_us,
+            rep.reply_to_tts_us
+        );
+        assert!(rep.reply_to_first_slice_us <= rep.reply_to_tts_us + rep.tts_to_audio_out_us + 8);
         let first_tts = rep.eos_to_asr_us + rep.asr_to_reply_us + rep.reply_to_tts_us;
         assert!(rep.eos_to_heartbeat_play_us + 8 >= first_tts);
         assert!(rep.eos_to_audio_out_us + 8 >= first_tts);
@@ -160,6 +169,7 @@ fn fake_pipeline_stamps_are_ordered_and_recomputable() {
     assert_eq!(row.p99_us, percentile(&sorted, 99, 100));
     assert_eq!(row.n, 8);
     let md = report.to_markdown();
+    assert!(md.contains("reply ready to first slice"));
     assert!(md.contains(&ms_text(row.p50_us)));
     assert!(md.contains(&report.machine.cpu));
     assert!(md.contains(&report.machine.commit));

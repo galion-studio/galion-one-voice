@@ -15,7 +15,7 @@ use samantha_local_server::protocol::{
 };
 use samantha_local_server::reply::{Pad, ReplyEngine, TurnOut};
 use samantha_local_server::server::PipelineFactory;
-use samantha_local_server::{start, FakePipeline, RefState, SPEAKER_RATE};
+use samantha_local_server::{gated_mouth_factory, start, FakePipeline, RefState, SPEAKER_RATE};
 use serde_json::Value;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
@@ -476,6 +476,102 @@ async fn galion_one_text_returns_speaker_audio() {
     let wav = http(running.addr, "GET", url, "").await;
     assert_eq!(wav.status, 200, "{}", wav.head);
     assert!(wav.body.starts_with("RIFF"), "speaker body was not a wav");
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn first_slice_is_sent_before_the_fake_mouth_finishes() {
+    let gate = galion_sam_orch::samantha_traits::WaitGate::new();
+    let running = start(
+        "127.0.0.1:0".parse().unwrap(),
+        ui_dir(),
+        gated_mouth_factory(std::sync::Arc::clone(&gate)),
+        RefState::Unset,
+        false,
+        Duration::from_secs(30),
+    )
+    .await
+    .unwrap();
+    let mut ws = connect(running.addr, "http://127.0.0.1:7878")
+        .await
+        .expect("connect");
+    ws.send(Message::Text(format!(
+        r#"{{"schema":"{SCHEMA}","type":"hello","session":null}}"#
+    )))
+    .await
+    .unwrap();
+    let welcome = next_text(&mut ws, Duration::from_secs(2))
+        .await
+        .expect("welcome");
+    assert_eq!(welcome["type"], "welcome");
+
+    let sent = Instant::now();
+    ws.send(Message::Text(format!(
+        r#"{{"schema":"{SCHEMA}","type":"text","text":"where is the kettle"}}"#
+    )))
+    .await
+    .unwrap();
+
+    let mut turn_at = None;
+    let mut first_at = None;
+    let mut first_len = 0usize;
+    let deadline = Instant::now() + Duration::from_secs(3);
+    while Instant::now() < deadline && first_at.is_none() {
+        match recv(&mut ws, Duration::from_millis(100)).await {
+            Some(Message::Text(text)) => {
+                let v: Value = serde_json::from_str(&text).unwrap();
+                if v["type"] == "turn" && turn_at.is_none() {
+                    turn_at = Some(Instant::now());
+                    assert_eq!(v["reply"], "The kettle is on. It can wait.");
+                }
+            }
+            Some(Message::Binary(bytes)) => {
+                let (_, rate, _, samples) = decode_pcm(&bytes).unwrap();
+                assert_eq!(rate.hz(), SPEAKER_RATE);
+                first_len = samples.len();
+                first_at = Some(Instant::now());
+            }
+            _ => {}
+        }
+    }
+    let turn_at = turn_at.expect("turn event");
+    let first_at = first_at.expect("first slice");
+    assert_eq!(first_len, 24_000 * 80 / 1000, "slice was not 80 ms");
+    assert!(
+        !gate.release.load(std::sync::atomic::Ordering::SeqCst),
+        "the fake mouth had already finished the reply"
+    );
+    let hold = Instant::now() + Duration::from_millis(50);
+    while Instant::now() < hold {
+        if let Some(Message::Binary(_)) = recv(&mut ws, Duration::from_millis(10)).await {
+            panic!("a later slice arrived while the fake mouth was still held");
+        }
+    }
+    let reply_to_slice_us = first_at.saturating_duration_since(turn_at).as_micros();
+    let send_to_slice_us = first_at.saturating_duration_since(sent).as_micros();
+    eprintln!(
+        "MEASURE vm websocket fake-mouth send_to_first_slice_us={send_to_slice_us} turn_to_first_slice_us={reply_to_slice_us} first_slice_samples={first_len} rest_held=true"
+    );
+
+    gate.release
+        .store(true, std::sync::atomic::Ordering::SeqCst);
+    let mut tail = false;
+    let rest_deadline = Instant::now() + Duration::from_secs(2);
+    while Instant::now() < rest_deadline && !tail {
+        if let Some(Message::Binary(bytes)) = recv(&mut ws, Duration::from_millis(100)).await {
+            let (_, _, _, samples) = decode_pcm(&bytes).unwrap();
+            assert_eq!(samples, vec![9, 9, 9, 9]);
+            tail = true;
+        }
+    }
+    assert!(tail, "the held tail was not sent after the gate opened");
+
+    ws.send(Message::Text(format!(
+        r#"{{"schema":"{SCHEMA}","type":"stop"}}"#
+    )))
+    .await
+    .unwrap();
+    drop(ws);
+    drop(running);
 }
 
 async fn next_text(ws: &mut Sock, timeout: Duration) -> Option<Value> {
