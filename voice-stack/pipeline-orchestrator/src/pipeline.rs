@@ -112,6 +112,8 @@ pub struct Handle {
     phase_rx: watch::Receiver<Phase>,
     mood_rx: watch::Receiver<MoodSnap>,
     shutdown_tx: watch::Sender<bool>,
+    /// Same flag the mouth watches so a blocked `speak` can leave on shutdown.
+    stop: Arc<AtomicBool>,
     joins: Mutex<Vec<JoinHandle<()>>>,
     reports: Arc<Mutex<Vec<TurnReport>>>,
     phases: Arc<Mutex<Vec<Phase>>>,
@@ -142,6 +144,7 @@ impl Handle {
     }
 
     pub async fn shutdown(mut self) {
+        self.stop.store(true, Ordering::SeqCst);
         let _ = self.shutdown_tx.send(true);
         let joins: Vec<_> = self.joins.get_mut().expect("joins").drain(..).collect();
         for join in joins {
@@ -152,6 +155,10 @@ impl Handle {
 
 impl Drop for Handle {
     fn drop(&mut self) {
+        // A test that panics while the mouth is parked on its gate would
+        // otherwise pin a worker inside `thread::sleep`. Abort does not
+        // interrupt that loop; the cancel flag does.
+        self.stop.store(true, Ordering::SeqCst);
         let _ = self.shutdown_tx.send(true);
         if let Ok(joins) = self.joins.get_mut() {
             for join in joins.drain(..) {
@@ -259,6 +266,7 @@ where
             phase_rx,
             mood_rx,
             shutdown_tx,
+            stop: floor.stop.clone(),
             joins: Mutex::new(joins),
             reports,
             phases,

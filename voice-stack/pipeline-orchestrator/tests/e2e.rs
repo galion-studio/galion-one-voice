@@ -120,6 +120,26 @@ async fn mood_tick_is_one_heartbeat() {
     }
 }
 
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn dropping_a_gated_mouth_does_not_pin_the_runtime() {
+    let gate = galion_sam_orch::samantha_traits::WaitGate::new();
+    let running = demo::spawn_fake(
+        galion_sam_orch::FakeReply::new(REPLY, MOOD),
+        galion_sam_orch::FakeTts::gated(vec![7, 7], gate),
+    );
+    demo::send_frames(&running.tx, 6, 10).await;
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(3);
+    while running.handle.phase() != Phase::Speaking {
+        if tokio::time::Instant::now() > deadline {
+            panic!("did not reach speaking");
+        }
+        tokio::time::sleep(Duration::from_millis(5)).await;
+    }
+    // The gate stays closed. Drop has to cancel the parked mouth, or this
+    // runtime never finishes joining that worker.
+    drop(running);
+}
+
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn dot_page_follows_the_phase() {
     let gate = galion_sam_orch::samantha_traits::WaitGate::new();
@@ -179,13 +199,34 @@ fn contains_in_order(phases: &[Phase], want: &[Phase]) -> bool {
 }
 
 fn http_get(addr: SocketAddr, path: &str) -> String {
-    let mut stream = TcpStream::connect(addr).expect("connect");
-    stream
-        .set_read_timeout(Some(Duration::from_secs(2)))
-        .unwrap();
+    // Connect and each read are bounded. A reset or a slow accept used to
+    // unwind the test while the mouth was still parked, and the runtime then
+    // waited forever to join that worker.
+    let mut stream = match TcpStream::connect_timeout(&addr, Duration::from_millis(300)) {
+        Ok(stream) => stream,
+        Err(_) => return String::new(),
+    };
+    let _ = stream.set_read_timeout(Some(Duration::from_millis(300)));
+    let _ = stream.set_write_timeout(Some(Duration::from_millis(300)));
     let req = format!("GET {path} HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n");
-    stream.write_all(req.as_bytes()).unwrap();
-    let mut body = String::new();
-    let _ = stream.read_to_string(&mut body);
-    body
+    if stream.write_all(req.as_bytes()).is_err() {
+        return String::new();
+    }
+    let mut body = Vec::new();
+    let mut buf = [0u8; 2048];
+    let deadline = std::time::Instant::now() + Duration::from_millis(800);
+    while std::time::Instant::now() < deadline && body.len() < 65_536 {
+        match stream.read(&mut buf) {
+            Ok(0) => break,
+            Ok(n) => body.extend_from_slice(&buf[..n]),
+            Err(err)
+                if err.kind() == std::io::ErrorKind::WouldBlock
+                    || err.kind() == std::io::ErrorKind::TimedOut =>
+            {
+                continue;
+            }
+            Err(_) => break,
+        }
+    }
+    String::from_utf8_lossy(&body).into_owned()
 }
