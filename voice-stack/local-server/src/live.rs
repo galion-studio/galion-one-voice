@@ -12,6 +12,7 @@
 use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStdin, Command, Stdio};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Sender};
 use std::sync::Arc;
 #[cfg(test)]
@@ -21,14 +22,14 @@ use std::time::Duration;
 
 use galion_sam_asr::{final_text, open_engine, Asr, EngineOpts};
 use galion_sam_horbm::speakable_chunks;
-use galion_sam_orch::{AudioFrame, EnergyVad, Vad, VadEvent};
+use galion_sam_orch::{AudioFrame, EnergyVad, Tts as OrchTts, Vad, VadEvent};
 use galion_tts_piper::{resample_linear, PiperTts, Tts};
 
 use crate::audio::{self, rms, SPEAKER_RATE};
 use crate::brain::HorbmMind;
-use crate::pipeline::{PipeInfo, Pipeline, TurnProduct};
+use crate::pipeline::{AudioFeed, FeedMsg, PipeInfo, Pipeline, TurnProduct};
 use crate::protocol::{dot_json, error_json, turn_json, vad_json};
-use crate::reply::{may_speak_piper, ReplyEngine};
+use crate::reply::{may_speak_piper, Pad, ReplyEngine, TurnOut};
 
 const FRAME: usize = 320;
 const SPEECH_RMS: f32 = 0.02;
@@ -57,15 +58,30 @@ struct Job {
     back: Sender<Result<String, String>>,
 }
 
+/// PCM handed to `on_pcm` is 24 kHz. Return `false` to stop the rest of the reply.
+/// `cancel` is the barge-in / shutdown flag. A wait must poll it; abort does not
+/// interrupt `thread::sleep` (see 8efedbe).
 trait Mouth: Send {
-    fn speak(&mut self, text: &str, mood: crate::reply::Pad) -> Result<(Vec<i16>, u32), String>;
+    fn speak(
+        &mut self,
+        text: &str,
+        mood: Pad,
+        cancel: &AtomicBool,
+        on_pcm: &mut dyn FnMut(&[i16]) -> bool,
+    ) -> Result<(), String>;
     fn name(&self) -> &'static str;
 }
 
 struct MissingMouth;
 
 impl Mouth for MissingMouth {
-    fn speak(&mut self, _: &str, _: crate::reply::Pad) -> Result<(Vec<i16>, u32), String> {
+    fn speak(
+        &mut self,
+        _: &str,
+        _: Pad,
+        _: &AtomicBool,
+        _: &mut dyn FnMut(&[i16]) -> bool,
+    ) -> Result<(), String> {
         Err("piper-missing".into())
     }
     fn name(&self) -> &'static str {
@@ -78,38 +94,98 @@ struct PiperMouth {
 }
 
 impl Mouth for PiperMouth {
-    fn speak(&mut self, text: &str, mood: crate::reply::Pad) -> Result<(Vec<i16>, u32), String> {
+    fn speak(
+        &mut self,
+        text: &str,
+        mood: Pad,
+        cancel: &AtomicBool,
+        on_pcm: &mut dyn FnMut(&[i16]) -> bool,
+    ) -> Result<(), String> {
         let pad = galion_tts_piper::Pad {
             arousal: mood.arousal,
             valence: mood.valence,
             dominance: mood.dominance,
         };
-        let pieces = speakable_chunks(text);
-        let pieces: Vec<String> = if pieces.is_empty() {
-            vec![text.to_string()]
-        } else {
-            pieces.into_iter().map(|c| c.text).collect()
-        };
-        let mut pcm = Vec::new();
-        for piece in pieces {
-            let mut part = Vec::new();
-            let mut rate = SPEAKER_RATE;
-            self.tts
-                .speak(&piece, pad, &mut |chunk| {
-                    rate = chunk.sample_rate;
-                    part.extend_from_slice(chunk.samples);
-                })
-                .map_err(|_| "piper-missing".to_string())?;
-            pcm.extend(resample_linear(&part, rate, SPEAKER_RATE));
+        let mut any = false;
+        speak_pieces(
+            text,
+            cancel,
+            &mut |piece, emit| {
+                if cancel.load(Ordering::SeqCst) {
+                    return Ok(());
+                }
+                let mut stop = false;
+                self.tts
+                    .speak(piece, pad, &mut |chunk| {
+                        if stop || cancel.load(Ordering::SeqCst) {
+                            stop = true;
+                            return;
+                        }
+                        let pcm = resample_linear(chunk.samples, chunk.sample_rate, SPEAKER_RATE);
+                        if pcm.is_empty() {
+                            return;
+                        }
+                        any = true;
+                        if !emit(&pcm) {
+                            stop = true;
+                        }
+                    })
+                    .map_err(|_| "piper-missing".to_string())?;
+                if stop {
+                    return Ok(());
+                }
+                Ok(())
+            },
+            on_pcm,
+        )?;
+        if cancel.load(Ordering::SeqCst) {
+            return Ok(());
         }
-        if pcm.is_empty() {
+        if !any {
             return Err("piper-missing".into());
         }
-        Ok((pcm, SPEAKER_RATE))
+        Ok(())
     }
     fn name(&self) -> &'static str {
         "piper"
     }
+}
+
+/// First sentence is synthesised and handed to `on_pcm` before the next sentence starts.
+#[allow(clippy::type_complexity)]
+fn speak_pieces(
+    text: &str,
+    cancel: &AtomicBool,
+    one: &mut dyn FnMut(&str, &mut dyn FnMut(&[i16]) -> bool) -> Result<(), String>,
+    on_pcm: &mut dyn FnMut(&[i16]) -> bool,
+) -> Result<(), String> {
+    let pieces = speakable_chunks(text);
+    let pieces: Vec<String> = if pieces.is_empty() {
+        vec![text.to_string()]
+    } else {
+        pieces.into_iter().map(|chunk| chunk.text).collect()
+    };
+    for piece in pieces {
+        if cancel.load(Ordering::SeqCst) {
+            return Ok(());
+        }
+        let mut stop = false;
+        one(&piece, &mut |pcm| {
+            if stop || cancel.load(Ordering::SeqCst) {
+                stop = true;
+                return false;
+            }
+            if !on_pcm(pcm) {
+                stop = true;
+                return false;
+            }
+            true
+        })?;
+        if stop {
+            return Ok(());
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -119,14 +195,141 @@ struct RecMouth {
 
 #[cfg(test)]
 impl Mouth for RecMouth {
-    fn speak(&mut self, text: &str, _: crate::reply::Pad) -> Result<(Vec<i16>, u32), String> {
+    fn speak(
+        &mut self,
+        text: &str,
+        _: Pad,
+        cancel: &AtomicBool,
+        on_pcm: &mut dyn FnMut(&[i16]) -> bool,
+    ) -> Result<(), String> {
+        if cancel.load(Ordering::SeqCst) {
+            return Ok(());
+        }
         if let Ok(mut guard) = self.heard.lock() {
             guard.push(text.to_string());
         }
-        Ok((vec![1000, -1000, 1000, -1000], SPEAKER_RATE))
+        let _ = on_pcm(&[1000, -1000, 1000, -1000]);
+        Ok(())
     }
     fn name(&self) -> &'static str {
         "sample"
+    }
+}
+
+enum MouthJob {
+    Speak {
+        text: String,
+        mood: Pad,
+        cancel: Arc<AtomicBool>,
+        tx: tokio::sync::mpsc::UnboundedSender<FeedMsg>,
+    },
+    Shutdown,
+}
+
+/// One mouth thread. `stop` sets the in-flight job's cancel flag. The thread
+/// polls that flag between sentences and inside any wait, then returns to
+/// `recv`, so shutdown can join it.
+struct SpeakWorker {
+    tx: std::sync::mpsc::Sender<MouthJob>,
+    cancel: Option<Arc<AtomicBool>>,
+    join: Option<JoinHandle<()>>,
+    name: &'static str,
+}
+
+impl SpeakWorker {
+    fn spawn(mut mouth: Box<dyn Mouth>) -> Self {
+        let name = mouth.name();
+        let (tx, rx) = std::sync::mpsc::channel();
+        let join = std::thread::spawn(move || worker_loop(&mut mouth, rx));
+        Self {
+            tx,
+            cancel: None,
+            join: Some(join),
+            name,
+        }
+    }
+
+    fn name(&self) -> &'static str {
+        self.name
+    }
+
+    fn cancel(&mut self) {
+        if let Some(flag) = &self.cancel {
+            flag.store(true, Ordering::SeqCst);
+        }
+    }
+
+    fn start(&mut self, text: String, mood: Pad) -> AudioFeed {
+        self.cancel();
+        let cancel = Arc::new(AtomicBool::new(false));
+        self.cancel = Some(Arc::clone(&cancel));
+        let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
+        let _ = self.tx.send(MouthJob::Speak {
+            text,
+            mood,
+            cancel,
+            tx,
+        });
+        AudioFeed { rx }
+    }
+}
+
+impl Drop for SpeakWorker {
+    fn drop(&mut self) {
+        self.cancel();
+        let _ = self.tx.send(MouthJob::Shutdown);
+        if let Some(join) = self.join.take() {
+            let _ = join.join();
+        }
+    }
+}
+
+fn worker_loop(mouth: &mut Box<dyn Mouth>, rx: std::sync::mpsc::Receiver<MouthJob>) {
+    while let Ok(job) = rx.recv() {
+        let MouthJob::Speak {
+            text,
+            mood,
+            cancel,
+            tx,
+        } = job
+        else {
+            break;
+        };
+        if cancel.load(Ordering::SeqCst) {
+            let _ = tx.send(FeedMsg::End);
+            continue;
+        }
+        let mut emitted = false;
+        let result = mouth.speak(&text, mood, &cancel, &mut |pcm| {
+            if cancel.load(Ordering::SeqCst) || pcm.is_empty() {
+                return !cancel.load(Ordering::SeqCst);
+            }
+            for slice in audio::slice_pcm(pcm, SPEAKER_RATE, crate::audio::FRAME_MS) {
+                if cancel.load(Ordering::SeqCst) {
+                    return false;
+                }
+                if tx.send(FeedMsg::Slice(slice)).is_err() {
+                    return false;
+                }
+                emitted = true;
+            }
+            true
+        });
+        if cancel.load(Ordering::SeqCst) {
+            let _ = tx.send(FeedMsg::End);
+            continue;
+        }
+        match result {
+            Ok(()) if emitted => {
+                let _ = tx.send(FeedMsg::End);
+            }
+            Ok(()) => {
+                let _ = tx.send(FeedMsg::Failed("piper-missing".into()));
+            }
+            Err(code) => {
+                let _ = tx.send(FeedMsg::Failed(code));
+            }
+        }
     }
 }
 
@@ -134,7 +337,7 @@ pub struct LivePipeline {
     front: Front,
     ear: Ear,
     mind: HorbmMind,
-    mouth: Box<dyn Mouth>,
+    mouth: SpeakWorker,
     vad_backend: &'static str,
     vad_ready: bool,
     ear_name: &'static str,
@@ -150,7 +353,7 @@ impl LivePipeline {
     pub fn from_env() -> Self {
         let (front, backend, ready) = open_vad();
         let (ear, ear_name, worker) = open_ear();
-        let mouth = open_mouth();
+        let mouth = SpeakWorker::spawn(open_mouth());
         Self {
             front,
             ear,
@@ -182,7 +385,7 @@ impl LivePipeline {
             front,
             ear,
             mind,
-            mouth,
+            mouth: SpeakWorker::spawn(mouth),
             vad_backend: backend,
             vad_ready: ready,
             ear_name,
@@ -221,23 +424,19 @@ impl LivePipeline {
                 pcm: Vec::new(),
                 rate: SPEAKER_RATE,
                 reply,
+                feed: None,
             };
         }
-        match self.mouth.speak(&reply, out.mood) {
-            Ok((pcm, rate)) => {
-                self.phase = "idle";
-                events.push(dot_json("speaking", self.level));
-                TurnProduct {
-                    events,
-                    pcm,
-                    rate,
-                    reply,
-                }
-            }
-            Err(code) => {
-                let _ = t_ms;
-                self.fail(&code)
-            }
+        let _ = t_ms;
+        self.phase = "speaking";
+        let feed = self.mouth.start(reply.clone(), out.mood);
+        events.push(dot_json("speaking", self.level));
+        TurnProduct {
+            events,
+            pcm: Vec::new(),
+            rate: SPEAKER_RATE,
+            reply,
+            feed: Some(feed),
         }
     }
 
@@ -379,6 +578,7 @@ impl Pipeline for LivePipeline {
     }
 
     fn stop(&mut self) {
+        self.mouth.cancel();
         self.speech.clear();
         self.utterance.clear();
         self.in_speech = false;
@@ -388,6 +588,12 @@ impl Pipeline for LivePipeline {
         }
         if let Front::Child(child) = &mut self.front {
             child.reset();
+        }
+    }
+
+    fn utterance_done(&mut self) {
+        if self.phase == "speaking" {
+            self.phase = "idle";
         }
     }
 
@@ -443,6 +649,136 @@ impl LivePipeline {
             }
         }
     }
+}
+
+/// First 80 ms from [`galion_sam_orch::FakeTts`], then the gate holds the rest.
+struct GatedMouth {
+    inner: galion_sam_orch::FakeTts,
+}
+
+impl Mouth for GatedMouth {
+    fn speak(
+        &mut self,
+        text: &str,
+        mood: Pad,
+        cancel: &AtomicBool,
+        on_pcm: &mut dyn FnMut(&[i16]) -> bool,
+    ) -> Result<(), String> {
+        let pad = galion_sam_orch::Pad {
+            arousal: mood.arousal,
+            valence: mood.valence,
+            dominance: mood.dominance,
+        };
+        OrchTts::speak(&mut self.inner, text, &pad, cancel, &mut |pcm| {
+            let _ = on_pcm(pcm);
+        });
+        Ok(())
+    }
+    fn name(&self) -> &'static str {
+        "fake"
+    }
+}
+
+struct GatedPipeline {
+    mouth: SpeakWorker,
+    reply: String,
+    phase: &'static str,
+}
+
+impl GatedPipeline {
+    fn new(gate: Arc<galion_sam_orch::samantha_traits::WaitGate>) -> Self {
+        let mouth = GatedMouth {
+            inner: galion_sam_orch::FakeTts::gated(
+                vec![2_000; crate::audio::SPEAKER_FRAME_SAMPLES],
+                gate,
+            ),
+        };
+        Self {
+            mouth: SpeakWorker::spawn(Box::new(mouth)),
+            reply: "The kettle is on. It can wait.".into(),
+            phase: "idle",
+        }
+    }
+}
+
+impl Pipeline for GatedPipeline {
+    fn push_mic(&mut self, _pcm: &[i16], _rate: u32, _t_ms: u64) -> TurnProduct {
+        TurnProduct::events(vec![error_json("mic-unwired")])
+    }
+
+    fn push_text(&mut self, text: &str, _t_ms: u64) -> TurnProduct {
+        if text.trim().is_empty() {
+            self.phase = "idle";
+            return TurnProduct::events(vec![error_json("empty-text"), dot_json("idle", 0.0)]);
+        }
+        let out = TurnOut {
+            reply: self.reply.clone(),
+            intent_json: "null".into(),
+            arm_json: "null".into(),
+            propensity: 0.0,
+            evidence: Vec::new(),
+            sources: vec!["fixture".into()],
+            violations: 0,
+            lookup_us: 1,
+            took_us: 1,
+            mood: Pad::RESTING,
+            empathy_e: 0.0,
+            prosody_rate: 1.0,
+            prosody_energy: 1.0,
+            prosody_pitch_st: 0.0,
+            prosody_pause_ms: 0.0,
+        };
+        self.phase = "speaking";
+        let feed = self.mouth.start(self.reply.clone(), Pad::RESTING);
+        TurnProduct {
+            events: vec![turn_json(&out), dot_json("speaking", 0.0)],
+            pcm: Vec::new(),
+            rate: SPEAKER_RATE,
+            reply: self.reply.clone(),
+            feed: Some(feed),
+        }
+    }
+
+    fn stop(&mut self) {
+        self.mouth.cancel();
+        self.phase = "idle";
+    }
+
+    fn utterance_done(&mut self) {
+        if self.phase == "speaking" {
+            self.phase = "idle";
+        }
+    }
+
+    fn tick_mood(&mut self) -> (Pad, &'static str) {
+        (Pad::RESTING, "resting")
+    }
+
+    fn phase(&self) -> &'static str {
+        self.phase
+    }
+
+    fn level(&self) -> f32 {
+        0.0
+    }
+
+    fn info(&self) -> PipeInfo {
+        PipeInfo {
+            ear: "unwired",
+            mouth: self.mouth.name(),
+            mind: "horbm".into(),
+            vad_backend: "energy",
+            vad_ready: true,
+        }
+    }
+}
+
+/// The first slice is the fake mouth's opening PCM. The gate holds the rest.
+#[doc(hidden)]
+pub fn gated_mouth_factory(
+    gate: Arc<galion_sam_orch::samantha_traits::WaitGate>,
+) -> Arc<dyn Fn() -> Box<dyn Pipeline> + Send + Sync> {
+    Arc::new(move || Box::new(GatedPipeline::new(Arc::clone(&gate))))
 }
 
 fn open_vad() -> (Front, &'static str, bool) {
@@ -637,6 +973,7 @@ fn downsample_24_to_16(pcm: &[i16]) -> Vec<i16> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::pipeline::FeedMsg;
     use std::io::Write;
 
     #[test]
@@ -662,12 +999,14 @@ mod tests {
     fn text_miss_is_i_dont_know_and_the_mouth_is_called() {
         let heard = Arc::new(Mutex::new(Vec::new()));
         let mut pipe = test_pipe(heard.clone(), Ear::Script("unused".into()), "script");
-        let out = pipe.push_text("who won the match", 0);
+        let mut out = pipe.push_text("who won the match", 0);
+        out.drain_audio();
         assert!(out.events.iter().all(|e| !e.contains("brain-unlinked")));
         assert_eq!(out.reply, "I don't know.");
         assert!(!out.pcm.is_empty());
         assert_eq!(heard.lock().unwrap().as_slice(), ["I don't know."]);
-        let kettle = pipe.push_text("where is the kettle", 1);
+        let mut kettle = pipe.push_text("where is the kettle", 1);
+        kettle.drain_audio();
         assert_eq!(kettle.reply, "The kettle is on the stove.");
         assert!(kettle.sources_ok());
     }
@@ -683,7 +1022,8 @@ mod tests {
         assert!(pipe.vad_ready);
         assert_eq!(pipe.vad_backend, "energy");
         let pcm = vec![8_000i16; FRAME * 8];
-        let out = pipe.commit_pcm(&pcm, 16_000, 0);
+        let mut out = pipe.commit_pcm(&pcm, 16_000, 0);
+        out.drain_audio();
         assert!(out.events.iter().any(|e| e.contains("\"type\":\"vad\"")));
         assert_eq!(out.reply, "The kettle is on the stove.");
         assert!(!out.pcm.is_empty());
@@ -709,7 +1049,8 @@ mod tests {
             assert!(mid.pcm.is_empty(), "{}", mid.events.join("\n"));
             assert!(mid.events.iter().all(|e| !e.contains("\"event\":\"end\"")));
         }
-        let end = pipe.push_mic(&quiet, 16_000, 0);
+        let mut end = pipe.push_mic(&quiet, 16_000, 0);
+        end.drain_audio();
         assert!(end.events.iter().any(|e| e.contains("\"event\":\"end\"")));
         assert_eq!(end.reply, "The kettle is on the stove.");
         assert!(!end.pcm.is_empty());
@@ -718,6 +1059,115 @@ mod tests {
             heard.lock().unwrap().as_slice(),
             ["The kettle is on the stove."]
         );
+    }
+
+    #[test]
+    fn first_sentence_is_emitted_before_the_next_one_starts() {
+        let cancel = AtomicBool::new(false);
+        let second = Arc::new(AtomicBool::new(false));
+        let flag = Arc::clone(&second);
+        let mut n = 0u32;
+        let mut first_before_second = false;
+        speak_pieces(
+            "The kettle is on. It can wait.",
+            &cancel,
+            &mut |piece, emit| {
+                if piece.contains("wait") {
+                    flag.store(true, Ordering::SeqCst);
+                }
+                assert!(emit(&vec![2_000; crate::audio::SPEAKER_FRAME_SAMPLES]));
+                Ok(())
+            },
+            &mut |_pcm| {
+                n += 1;
+                if n == 1 {
+                    first_before_second = !flag.load(Ordering::SeqCst);
+                }
+                true
+            },
+        )
+        .unwrap();
+        assert!(first_before_second);
+        assert_eq!(n, 2);
+        assert!(second.load(Ordering::SeqCst));
+    }
+
+    #[test]
+    fn first_slice_is_queued_before_the_fake_mouth_finishes() {
+        let gate = galion_sam_orch::samantha_traits::WaitGate::new();
+        let mut pipe = GatedPipeline::new(Arc::clone(&gate));
+        let started = std::time::Instant::now();
+        let mut out = pipe.push_text("hello", 0);
+        let ready_us = started.elapsed().as_micros();
+        let feed = out.feed.as_mut().expect("stream");
+        let first = recv_feed(&mut feed.rx, Duration::from_secs(2)).expect("first slice");
+        let slice_us = started.elapsed().as_micros();
+        let FeedMsg::Slice(pcm) = first else {
+            panic!("expected a slice");
+        };
+        assert_eq!(pcm.len(), crate::audio::SPEAKER_FRAME_SAMPLES);
+        assert!(!gate.release.load(Ordering::SeqCst));
+        let quiet = std::time::Instant::now() + Duration::from_millis(40);
+        while std::time::Instant::now() < quiet {
+            assert!(
+                matches!(
+                    feed.rx.try_recv(),
+                    Err(tokio::sync::mpsc::error::TryRecvError::Empty)
+                ),
+                "the rest of the reply was synthesised before the gate opened"
+            );
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        eprintln!(
+            "MEASURE vm fake-mouth reply_ready_us={ready_us} reply_ready_to_first_slice_us={}",
+            slice_us.saturating_sub(ready_us)
+        );
+        gate.release.store(true, Ordering::SeqCst);
+        let rest = recv_feed(&mut feed.rx, Duration::from_secs(2)).expect("rest");
+        let FeedMsg::Slice(tail) = rest else {
+            panic!("expected the held tail");
+        };
+        assert_eq!(tail, vec![9, 9, 9, 9]);
+        drop(out);
+        let joined = std::time::Instant::now();
+        drop(pipe);
+        assert!(joined.elapsed() < Duration::from_secs(2));
+    }
+
+    #[test]
+    fn stop_unblocks_the_gated_fake_mouth() {
+        let gate = galion_sam_orch::samantha_traits::WaitGate::new();
+        let mut pipe = GatedPipeline::new(gate);
+        let mut out = pipe.push_text("hello", 0);
+        let feed = out.feed.as_mut().expect("stream");
+        let _ = recv_feed(&mut feed.rx, Duration::from_secs(2)).expect("first slice");
+        let started = std::time::Instant::now();
+        pipe.stop();
+        drop(out);
+        drop(pipe);
+        assert!(
+            started.elapsed() < Duration::from_secs(2),
+            "the mouth thread stayed parked after cancel"
+        );
+    }
+
+    fn recv_feed(
+        rx: &mut tokio::sync::mpsc::UnboundedReceiver<FeedMsg>,
+        timeout: Duration,
+    ) -> Option<FeedMsg> {
+        let deadline = std::time::Instant::now() + timeout;
+        loop {
+            match rx.try_recv() {
+                Ok(msg) => return Some(msg),
+                Err(tokio::sync::mpsc::error::TryRecvError::Disconnected) => return None,
+                Err(tokio::sync::mpsc::error::TryRecvError::Empty) => {
+                    if std::time::Instant::now() >= deadline {
+                        return None;
+                    }
+                    std::thread::sleep(Duration::from_millis(1));
+                }
+            }
+        }
     }
 
     #[test]

@@ -194,7 +194,9 @@ pub async fn say_text(State(app): State<AppState>, headers: HeaderMap, body: Byt
         let Ok(mut guard) = pipe.lock() else {
             return TurnProduct::events(vec![error_json("turn-lock")]);
         };
-        let product = guard.push_text(&text, 0);
+        let mut product = guard.push_text(&text, 0);
+        product.drain_audio();
+        guard.utterance_done();
         if let Ok(mut slot) = stage.lock() {
             publish(&mut slot, &product);
         }
@@ -231,7 +233,9 @@ pub async fn voice_turn(State(app): State<AppState>, headers: HeaderMap, body: B
         let Ok(mut guard) = pipe.lock() else {
             return TurnProduct::events(vec![error_json("turn-lock")]);
         };
-        let product = guard.commit_pcm(&pcm, 16_000, 0);
+        let mut product = guard.commit_pcm(&pcm, 16_000, 0);
+        product.drain_audio();
+        guard.utterance_done();
         if let Ok(mut slot) = stage.lock() {
             publish(&mut slot, &product);
         }

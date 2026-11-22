@@ -471,7 +471,7 @@ pub fn run_piper(reps: usize, warmup: usize) -> Result<Report, HarnessError> {
     let mut notes = vec![
         "TTS is Piper en_US-ljspeech-medium (LJSpeech, public-domain data, MIT pack) on this CPU. It is not Samantha and not a clone. GALION_SAMANTHA_REF was not read.".to_string(),
         "VAD, ASR, and the reply are the fake stages, the same ones as the fake backend. Those lines are not Vosk and not HORBM.".to_string(),
-        "First TTS audio is the first PCM byte from the warm child. First audio out is the wall time when one resampled 24 kHz heartbeat frame is in the sink. The heartbeat play row is derived from those arrivals on the 80 ms grid (origin = first PCM byte), the same rule as scripts/eval/piper_stream_ttfa.py. The rest of the utterance is drained after the clock stops.".to_string(),
+        "First TTS audio is the first PCM byte from the warm child. Reply ready to first slice is the reply stamp until one 80 ms frame of that PCM has been produced. First audio out is the wall time when one resampled 24 kHz heartbeat frame is in the sink. The heartbeat play row is derived from those arrivals on the 80 ms grid (origin = first PCM byte), the same rule as scripts/eval/piper_stream_ttfa.py. The rest of the utterance is drained after the clock stops.".to_string(),
         "Prosody is fixed at rest (length_scale 1.0, noise_scale 0, noise_w 0) so the distribution is the CPU, not a noise draw. The reply still carries a Pad. That Pad is not applied to this Piper child.".to_string(),
         format!("Spoken phrase: \"{PHRASE}\". Cores were not pinned."),
     ];

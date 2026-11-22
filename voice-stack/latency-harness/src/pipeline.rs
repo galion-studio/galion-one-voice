@@ -192,6 +192,7 @@ where
         }
     };
     let first_at = first_at.ok_or_else(|| StageError::new("tts", "no pcm"))?;
+    let reply_to_first_slice_us = us_between(reply_at, frame_at)?;
     let mut frame = [0.0f32; FRAME_SAMPLES];
     resample_to_frame(&buf[..need], rate, &mut frame);
     audio_out.emit_frame(&frame)?;
@@ -221,6 +222,7 @@ where
             eos_to_asr_us,
             asr_to_reply_us,
             reply_to_tts_us,
+            reply_to_first_slice_us,
             tts_to_audio_out_us,
             eos_to_audio_out_us,
             eos_to_heartbeat_play_us,
@@ -259,7 +261,7 @@ pub fn summarize(reps: &[Rep]) -> Vec<StageStat> {
     fn col(reps: &[Rep], f: impl Fn(&Rep) -> u64) -> Vec<u64> {
         reps.iter().map(f).collect()
     }
-    let specs: [(&str, &str, ClockKind, fn(&Rep) -> u64); 7] = [
+    let specs: [(&str, &str, ClockKind, fn(&Rep) -> u64); 8] = [
         ("vad_us", "vad (offline buffer)", ClockKind::Measured, |r| {
             r.vad_us
         }),
@@ -280,6 +282,12 @@ pub fn summarize(reps: &[Rep]) -> Vec<StageStat> {
             "reply ready to first TTS audio",
             ClockKind::Measured,
             |r| r.reply_to_tts_us,
+        ),
+        (
+            "reply_to_first_slice_us",
+            "reply ready to first slice",
+            ClockKind::Measured,
+            |r| r.reply_to_first_slice_us,
         ),
         (
             "tts_to_audio_out_us",

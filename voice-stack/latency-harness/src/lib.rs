@@ -8,7 +8,8 @@
 //! the root `Cargo.toml` members list stays unchanged.
 //!
 //! Stages, timed from the end of user speech:
-//! end of speech, ASR final, reply ready, first TTS audio, first audio out.
+//! end of speech, ASR final, reply ready, first TTS audio, first 80 ms slice,
+//! first audio out.
 //!
 //! [`ReplyEngine`] is the slot where `horbm::Brain` will land. This crate
 //! does not reimplement that brain. [`fake::FakeReply`] fills the slot in

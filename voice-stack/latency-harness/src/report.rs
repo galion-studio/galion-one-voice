@@ -70,6 +70,8 @@ pub struct Rep {
     pub eos_to_asr_us: u64,
     pub asr_to_reply_us: u64,
     pub reply_to_tts_us: u64,
+    /// Reply ready until one 80 ms slice of PCM has been produced.
+    pub reply_to_first_slice_us: u64,
     pub tts_to_audio_out_us: u64,
     pub eos_to_audio_out_us: u64,
     pub eos_to_heartbeat_play_us: u64,
@@ -612,11 +614,12 @@ fn reps_json(reps: &[Rep]) -> String {
     let mut s = String::from("[\n");
     for (i, r) in reps.iter().enumerate() {
         s.push_str(&format!(
-            "    {{\"vad_us\": {vad}, \"eos_to_asr_us\": {asr}, \"asr_to_reply_us\": {reply}, \"reply_to_tts_us\": {tts}, \"tts_to_audio_out_us\": {gap}, \"eos_to_audio_out_us\": {e2e}, \"eos_to_heartbeat_play_us\": {play}, \"heartbeat_play_derived\": true, \"mood_ticks\": {ticks}, \"sink_peak_milli\": {peak}}}",
+            "    {{\"vad_us\": {vad}, \"eos_to_asr_us\": {asr}, \"asr_to_reply_us\": {reply}, \"reply_to_tts_us\": {tts}, \"reply_to_first_slice_us\": {slice}, \"tts_to_audio_out_us\": {gap}, \"eos_to_audio_out_us\": {e2e}, \"eos_to_heartbeat_play_us\": {play}, \"heartbeat_play_derived\": true, \"mood_ticks\": {ticks}, \"sink_peak_milli\": {peak}}}",
             vad = r.vad_us,
             asr = r.eos_to_asr_us,
             reply = r.asr_to_reply_us,
             tts = r.reply_to_tts_us,
+            slice = r.reply_to_first_slice_us,
             gap = r.tts_to_audio_out_us,
             e2e = r.eos_to_audio_out_us,
             play = r.eos_to_heartbeat_play_us,
