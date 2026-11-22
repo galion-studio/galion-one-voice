@@ -43,7 +43,9 @@ pub use fake::FakeEngine;
 pub use galion_research_gateway::{
     ResearchClient, DEFAULT_BIND as RESEARCH_BIND, DEFAULT_PORT as RESEARCH_PORT, RESEARCH_CAP,
 };
-pub use horbm::{Brain, MoodMeta};
+pub use horbm::{
+    knowledge_dir_from_env, Brain, KnowledgeCards, LoadReport, MoodMeta, WINDOWS_KNOWLEDGE_DIR,
+};
 pub use index::{CardError, CardLoader, CardMatch, LoadedCard, MemoryCards, GAP_ADVICE, MAX_HITS};
 pub use measure::{time_ns, SampleNs};
 pub use pad::{Pad, FRAME_MS};
