@@ -54,7 +54,7 @@ Eight-byte header, then little-endian PCM16 mono.
 | 6–7 | `seq` u16 LE |
 | 8.. | samples, at most 4800 |
 
-The speaker path is 24 kHz, sliced on the 80 ms heartbeat (1920 samples). The `turn` text is sent when the reply is ready. The mouth speaks the first sentence first, and each 80 ms slice is sent as soon as it exists. Later sentences are synthesised while those slices go out. The first slice is sent immediately. Each later slice waits 80 ms, unless that gap has already passed. A client `stop` sets the mouth cancel flag and drops slices that have not been sent.
+The speaker path is 24 kHz, sliced on the 80 ms heartbeat (1920 samples). The `turn` text is sent when the reply is ready. The mouth speaks the first clause first (a comma, semicolon, colon, dash, or conjunction, once that piece has about four words; a sentence end still closes a shorter line), and each 80 ms slice is sent as soon as it exists. Later clauses are synthesised while those slices go out. The first slice is sent immediately. Each later slice waits 80 ms, unless that gap has already passed. A client `stop` sets the mouth cancel flag and drops slices that have not been sent.
 
 ### Client text
 

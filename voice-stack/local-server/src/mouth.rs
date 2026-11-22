@@ -56,8 +56,8 @@ impl MouthCue {
 
 pub(crate) trait Mouth: Send {
     fn speak(&mut self, text: &str, cue: &MouthCue) -> Result<(Vec<i16>, u32), String>;
-    /// Hand each ready sentence to `on_pcm` before the next sentence is synthesised.
-    /// Return `false` from `on_pcm` to stop. `cancel` is polled between sentences.
+    /// Hand each ready clause to `on_pcm` before the next clause is synthesised.
+    /// Return `false` from `on_pcm` to stop. `cancel` is polled between clauses.
     fn speak_stream(
         &mut self,
         text: &str,
@@ -219,7 +219,7 @@ pub(crate) fn open() -> Box<dyn Mouth> {
     }
 }
 
-/// First sentence is handed to `on_pcm` before the next sentence starts.
+/// First clause is handed to `on_pcm` before the next clause starts.
 #[allow(clippy::type_complexity)]
 pub(crate) fn speak_pieces(
     text: &str,
@@ -321,7 +321,8 @@ impl Mouth for PiperMouth {
                 let mut rate = SPEAKER_RATE;
                 let mut stop = false;
                 // Resting pad keeps Piper's own shaper as a copy. Empathy is applied
-                // once per sentence below, so pitch and gain are not applied twice.
+                // once per clause below, so pitch and gain are not applied twice.
+                // The leading pause stays on the first clause.
                 self.tts
                     .speak(piece, galion_tts_piper::Pad::RESTING, &mut |chunk| {
                         if stop || cancel.load(Ordering::SeqCst) {

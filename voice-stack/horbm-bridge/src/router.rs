@@ -282,6 +282,7 @@ fn map_reason(reason: horbm::GapReason) -> GapReason {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::chunks::SliceGrain;
     use crate::index::{LoadedCard, MemoryCards};
     use crate::UNKNOWN_REPLY;
     use galion_research_gateway::RESEARCH_CAP;
@@ -431,6 +432,7 @@ mod tests {
         let chunks = speakable_chunks(UNKNOWN_REPLY);
         assert_eq!(chunks.len(), 1);
         assert_eq!(chunks[0].text, UNKNOWN_REPLY);
+        assert_eq!(chunks[0].grain, SliceGrain::Sentence);
         assert!(!contains_forbidden(UNKNOWN_REPLY));
     }
 

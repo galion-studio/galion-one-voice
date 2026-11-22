@@ -1001,6 +1001,53 @@ mod tests {
     }
 
     #[test]
+    fn first_clause_is_handed_over_before_the_rest_of_the_sentence() {
+        let cancel = AtomicBool::new(false);
+        let mut heard = Vec::new();
+        crate::mouth::speak_pieces(
+            "AlphaFold predicts protein structure, and the twenty twenty one paper showed it at scale.",
+            &cancel,
+            &mut |piece, emit| {
+                heard.push(piece.to_string());
+                assert!(emit(&[1, 2, 3, 4]));
+                Ok(())
+            },
+            &mut |_pcm| true,
+        )
+        .unwrap();
+        assert!(heard.len() >= 2, "{heard:?}");
+        assert_eq!(heard[0], "AlphaFold predicts protein structure,");
+        assert!(heard[1].starts_with("and "));
+        let joined = heard.join(" ");
+        assert_eq!(
+            joined,
+            "AlphaFold predicts protein structure, and the twenty twenty one paper showed it at scale."
+        );
+    }
+
+    #[test]
+    fn cancel_after_the_first_clause_does_not_synthesize_the_rest() {
+        let cancel = AtomicBool::new(false);
+        let mut heard = Vec::new();
+        crate::mouth::speak_pieces(
+            "AlphaFold predicts protein structure, and the twenty twenty one paper showed it at scale.",
+            &cancel,
+            &mut |piece, emit| {
+                heard.push(piece.to_string());
+                cancel.store(true, Ordering::SeqCst);
+                let _ = emit(&[1]);
+                Ok(())
+            },
+            &mut |_pcm| true,
+        )
+        .unwrap();
+        assert_eq!(
+            heard,
+            vec!["AlphaFold predicts protein structure,".to_string()]
+        );
+    }
+
+    #[test]
     fn first_slice_is_queued_before_the_fake_mouth_finishes() {
         let gate = galion_sam_orch::samantha_traits::WaitGate::new();
         let mut pipe = GatedPipeline::new(Arc::clone(&gate));
