@@ -12,6 +12,3 @@ description = "Samantha s711 voice backend. Local zero-shot Chatterbox, raw 24 k
 [dependencies]
 serde_json = "1"
 sha2 = "0.10"
-
-# Standalone workspace. Not a member of the Galion Voice workspace.
-[workspace]

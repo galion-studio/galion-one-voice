@@ -29,6 +29,7 @@ galion-sam-asr = { path = "../asr" }
 galion-sam-horbm = { path = "../horbm-bridge" }
 galion-sam-orch = { path = "../pipeline-orchestrator" }
 galion-tts-piper = { path = "../tts-piper-stream" }
+samantha-voice-clone = { path = "../samantha-voice-clone" }
 
 [dev-dependencies]
 tokio-tungstenite = "=0.24.0"

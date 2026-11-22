@@ -4,8 +4,9 @@
 //!
 //! Silero runs in `vad-ear` (its own workspace, so `ort` stays out of this
 //! one). A quiet gap of 640 ms ends one turn. Vosk stays on a worker thread
-//! because its handles are not `Send`. The mouth is Piper when the LJ Speech
-//! pack is on disk. The brain is [`crate::brain::HorbmMind`]: read-only cards,
+//! because its handles are not `Send`. The mouth is chosen in [`crate::mouth`]:
+//! Piper LJ Speech, or s711 when CUDA and the local clone files are present.
+//! The brain is [`crate::brain::HorbmMind`]: read-only cards,
 //! and `I don't know.` when none match. `Brain::open` in the orchestrator
 //! stays unlinked. This path does not open `horbm-memory`'s sqlite file.
 
@@ -20,12 +21,11 @@ use std::thread::JoinHandle;
 use std::time::Duration;
 
 use galion_sam_asr::{final_text, open_engine, Asr, EngineOpts};
-use galion_sam_horbm::speakable_chunks;
 use galion_sam_orch::{AudioFrame, EnergyVad, Vad, VadEvent};
-use galion_tts_piper::{resample_linear, PiperTts, Tts};
 
 use crate::audio::{self, rms, SPEAKER_RATE};
 use crate::brain::HorbmMind;
+use crate::mouth::{self, Mouth, MouthCue};
 use crate::pipeline::{PipeInfo, Pipeline, TurnProduct};
 use crate::protocol::{dot_json, error_json, turn_json, vad_json};
 use crate::reply::{may_speak_piper, ReplyEngine};
@@ -57,76 +57,31 @@ struct Job {
     back: Sender<Result<String, String>>,
 }
 
-trait Mouth: Send {
-    fn speak(&mut self, text: &str, mood: crate::reply::Pad) -> Result<(Vec<i16>, u32), String>;
-    fn name(&self) -> &'static str;
-}
-
-struct MissingMouth;
-
-impl Mouth for MissingMouth {
-    fn speak(&mut self, _: &str, _: crate::reply::Pad) -> Result<(Vec<i16>, u32), String> {
-        Err("piper-missing".into())
-    }
-    fn name(&self) -> &'static str {
-        "missing"
-    }
-}
-
-struct PiperMouth {
-    tts: PiperTts,
-}
-
-impl Mouth for PiperMouth {
-    fn speak(&mut self, text: &str, mood: crate::reply::Pad) -> Result<(Vec<i16>, u32), String> {
-        let pad = galion_tts_piper::Pad {
-            arousal: mood.arousal,
-            valence: mood.valence,
-            dominance: mood.dominance,
-        };
-        let pieces = speakable_chunks(text);
-        let pieces: Vec<String> = if pieces.is_empty() {
-            vec![text.to_string()]
-        } else {
-            pieces.into_iter().map(|c| c.text).collect()
-        };
-        let mut pcm = Vec::new();
-        for piece in pieces {
-            let mut part = Vec::new();
-            let mut rate = SPEAKER_RATE;
-            self.tts
-                .speak(&piece, pad, &mut |chunk| {
-                    rate = chunk.sample_rate;
-                    part.extend_from_slice(chunk.samples);
-                })
-                .map_err(|_| "piper-missing".to_string())?;
-            pcm.extend(resample_linear(&part, rate, SPEAKER_RATE));
-        }
-        if pcm.is_empty() {
-            return Err("piper-missing".into());
-        }
-        Ok((pcm, SPEAKER_RATE))
-    }
-    fn name(&self) -> &'static str {
-        "piper"
-    }
-}
-
 #[cfg(test)]
 struct RecMouth {
     heard: Arc<Mutex<Vec<String>>>,
+    cues: Arc<Mutex<Vec<MouthCue>>>,
 }
 
 #[cfg(test)]
 impl Mouth for RecMouth {
-    fn speak(&mut self, text: &str, _: crate::reply::Pad) -> Result<(Vec<i16>, u32), String> {
+    fn speak(&mut self, text: &str, cue: &MouthCue) -> Result<(Vec<i16>, u32), String> {
         if let Ok(mut guard) = self.heard.lock() {
             guard.push(text.to_string());
         }
-        Ok((vec![1000, -1000, 1000, -1000], SPEAKER_RATE))
+        if let Ok(mut guard) = self.cues.lock() {
+            guard.push(*cue);
+        }
+        Ok((vec![1000, -1000, 1000, -1000], crate::audio::SPEAKER_RATE))
     }
-    fn name(&self) -> &'static str {
+    fn mouth(&self) -> &'static str {
         "sample"
+    }
+    fn voice(&self) -> &'static str {
+        "sample"
+    }
+    fn clone_status(&self) -> &'static str {
+        "off"
     }
 }
 
@@ -150,7 +105,7 @@ impl LivePipeline {
     pub fn from_env() -> Self {
         let (front, backend, ready) = open_vad();
         let (ear, ear_name, worker) = open_ear();
-        let mouth = open_mouth();
+        let mouth = mouth::open();
         Self {
             front,
             ear,
@@ -223,7 +178,8 @@ impl LivePipeline {
                 reply,
             };
         }
-        match self.mouth.speak(&reply, out.mood) {
+        let cue = MouthCue::from_turn(&out);
+        match self.mouth.speak(&reply, &cue) {
             Ok((pcm, rate)) => {
                 self.phase = "idle";
                 events.push(dot_json("speaking", self.level));
@@ -409,7 +365,9 @@ impl Pipeline for LivePipeline {
     fn info(&self) -> PipeInfo {
         PipeInfo {
             ear: self.ear_name,
-            mouth: self.mouth.name(),
+            mouth: self.mouth.mouth(),
+            voice: self.mouth.voice(),
+            clone_status: self.mouth.clone_status(),
             mind: "horbm".into(),
             vad_backend: self.vad_backend,
             vad_ready: self.vad_ready,
@@ -492,13 +450,6 @@ fn transcribe(engine: &mut dyn Asr, pcm: &[i16]) -> Result<String, String> {
         Err("asr-empty".into())
     } else {
         Ok(text.to_string())
-    }
-}
-
-fn open_mouth() -> Box<dyn Mouth> {
-    match PiperTts::open_resolved() {
-        Ok(tts) => Box::new(PiperMouth { tts }),
-        Err(_) => Box::new(MissingMouth),
     }
 }
 
@@ -815,8 +766,47 @@ mod tests {
             ear,
             ear_name,
             HorbmMind::open(&PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("knowledge")),
-            Box::new(RecMouth { heard }),
+            Box::new(RecMouth {
+                heard,
+                cues: Arc::new(Mutex::new(Vec::new())),
+            }),
         )
+    }
+
+    #[test]
+    fn empathy_prosody_reaches_the_mouth() {
+        let heard = Arc::new(Mutex::new(Vec::new()));
+        let cues = Arc::new(Mutex::new(Vec::new()));
+        let mut pipe = LivePipeline::for_test(
+            Front::Energy(EnergyVad::new(HANG_MS)),
+            "energy",
+            true,
+            Ear::Script("unused".into()),
+            "script",
+            HorbmMind::open(&PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("knowledge")),
+            Box::new(RecMouth {
+                heard,
+                cues: cues.clone(),
+            }),
+        );
+        let out = pipe.push_text("I am so tired", 0);
+        let turn = out
+            .events
+            .iter()
+            .find(|event| event.contains("\"type\":\"turn\""))
+            .expect("turn");
+        let parsed: serde_json::Value = serde_json::from_str(turn).unwrap();
+        let cue = cues.lock().unwrap()[0];
+        let prosody = &parsed["prosody"];
+        assert!((f64::from(cue.rate) - prosody["rate"].as_f64().unwrap()).abs() < 1e-4);
+        assert!((f64::from(cue.energy) - prosody["energy"].as_f64().unwrap()).abs() < 1e-4);
+        assert!((f64::from(cue.pitch_st) - prosody["pitch_st"].as_f64().unwrap()).abs() < 1e-4);
+        assert!((f64::from(cue.pause_ms) - prosody["pause_ms"].as_f64().unwrap()).abs() < 1e-4);
+        let mood = &parsed["mood"];
+        assert!((f64::from(cue.mood.arousal) - mood["arousal"].as_f64().unwrap()).abs() < 1e-4);
+        assert!((f64::from(cue.mood.valence) - mood["valence"].as_f64().unwrap()).abs() < 1e-4);
+        assert!((f64::from(cue.mood.dominance) - mood["dominance"].as_f64().unwrap()).abs() < 1e-4);
+        assert!(parsed["empathy_e"].as_f64().unwrap() > 0.0);
     }
 
     fn write_ear_script() -> PathBuf {

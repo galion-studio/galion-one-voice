@@ -88,6 +88,27 @@ if exist "G:\galion\horbm\knowledge\" (
 rem ReasoningRouter reads those cards first. Leave GALION_RESEARCH_BIND unset
 rem unless the gateway is already listening on 127.0.0.1:7911. Do not use 8787.
 
+rem Samantha s711 reference. Placeholder only. The wav is not in git and is not created here.
+rem GALION_SAMANTHA_REF is set only when that file is already on G:.
+rem Leave GALION_SAMANTHA_DEVICE unset. CPU keeps Piper. cuda is the opt-in that selects s711.
+set "SAMANTHA_REF=G:\galion\samantha-ref.wav"
+set "SAMANTHA_WEIGHTS=G:\galion\chatterbox-expr"
+if exist "%SAMANTHA_REF%" (
+  set "GALION_SAMANTHA_REF=%SAMANTHA_REF%"
+) else (
+  set "GALION_SAMANTHA_REF="
+)
+if exist "%SAMANTHA_WEIGHTS%\*" (
+  set "GALION_SAMANTHA_WEIGHTS=%SAMANTHA_WEIGHTS%"
+) else (
+  set "GALION_SAMANTHA_WEIGHTS="
+)
+if exist "%SAMANTHA_REF%" (
+  echo samantha_ref=present
+) else (
+  echo samantha_ref=absent
+)
+
 set "SERVER=%CARGO_TARGET_DIR%\release\samantha-local.exe"
 set "UI=%REPO%\voice-stack\local-server\ui"
 if not exist "%SERVER%" (

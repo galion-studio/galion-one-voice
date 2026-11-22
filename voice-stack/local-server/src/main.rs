@@ -30,7 +30,9 @@ fn real_main() -> Result<(), String> {
                 println!(
                     "samantha-local [--addr 127.0.0.1:7881] [--ui DIR]\n\
                      Binds 127.0.0.1 or ::1. GALION_SAMANTHA_WS overrides the default when --addr is absent.\n\
-                     GALION_SAMANTHA_REF is reported as set, missing, or unset. The file is not read."
+                     GALION_SAMANTHA_REF is reported as set, missing, or unset.\n\
+                     The s711 mouth reads that wav only when GALION_SAMANTHA_WEIGHTS is a local directory and GALION_SAMANTHA_DEVICE=cuda.\n\
+                     On CPU the server keeps Piper LJ Speech and logs why. That log is not a new timing."
                 );
                 return Ok(());
             }

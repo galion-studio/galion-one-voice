@@ -23,6 +23,7 @@ members = [
     "one-dot-ui",
     "pipeline-orchestrator",
     "research-gateway",
+    "samantha-voice-clone",
     "tts-piper-stream",
 ]
 # `vad` depends on the `ort` crate. LOCKS.toml keeps `ort` out of a Galion
