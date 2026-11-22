@@ -20,9 +20,10 @@ trap cleanup EXIT
 
 command -v git >/dev/null || { echo "sync-horbm-knowledge: git is required" >&2; exit 2; }
 
+# Disable autocrlf so card-bundle sha256 matches the manifest on Windows.
 echo "clone $REPO"
-git clone --depth 1 --filter=blob:none --sparse "$REPO" "$TMP/src"
-git -C "$TMP/src" sparse-checkout set --skip-checks v2/data/cards v2/shards/manifest.json
+git clone -c core.autocrlf=false -c core.eol=lf --depth 1 --filter=blob:none --sparse "$REPO" "$TMP/src"
+git -c core.autocrlf=false -c core.eol=lf -C "$TMP/src" sparse-checkout set --skip-checks v2/data/cards v2/shards/manifest.json
 
 mkdir -p "$TARGET"
 for name in horbm world diary; do
