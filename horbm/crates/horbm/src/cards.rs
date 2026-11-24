@@ -12,8 +12,10 @@
 //!
 //! This directory is the truth root. A card with `research_only: true`, or
 //! `not_for` containing `answer`, is not indexed and cannot be spoken as a
-//! fact. Dialogue style examples belong in [`ResearchRoot`]. That root stays
-//! empty unless `GALION_HORBM_RESEARCH_DIR` is set. It is not this directory.
+//! fact. Dialogue style examples belong in [`ResearchRoot`]: our own private
+//! research and development cards (laptop only), to be published later
+//! through knowledge.galion.app. That root stays empty unless
+//! `GALION_HORBM_RESEARCH_DIR` is set. It is not this directory.
 //!
 //! The field rules follow `v2/memory/src/card.rs` and `v2/data/schema.json`
 //! in `galion-studio/galion-knowledge`. The optional manifest is

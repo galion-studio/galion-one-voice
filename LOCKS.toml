@@ -197,6 +197,7 @@ hot_path = "retrieval"
 student_on_tick = false
 miss = "I don't know."
 remember_grant = "GALION_HORBM_REMEMBER=grant"
+# our own private research and development cards (laptop only), to be published later through knowledge.galion.app
 research_style_dir = "GALION_HORBM_RESEARCH_DIR"  # unset reads nothing; never the knowledge root
 decision = "2026-11-24 Q1 option A"
 owner = "Maciej Grajczyk"

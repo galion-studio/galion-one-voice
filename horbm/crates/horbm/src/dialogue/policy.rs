@@ -387,8 +387,8 @@ mod tests {
         let hit = ResearchHit {
             id: "soft-pace".to_string(),
             text: "The spare kettle sits in the cupboard.".to_string(),
-            licence: "synthetic".to_string(),
-            dataset: "synthetic".to_string(),
+            licence: "in-memory".to_string(),
+            dataset: "memory".to_string(),
             lang: "en".to_string(),
             score: 1.0,
             not_for: vec!["answer".to_string(), "cite".to_string()],

@@ -2,9 +2,11 @@
 // Copyright (c) 2026 Galion Labs
 //! Dialogue style examples. Not a truth source.
 //!
-//! The directory comes only from `GALION_HORBM_RESEARCH_DIR`. Unset, empty,
-//! or not a directory means this root is off: no hits and no file reads.
-//! There is no default path. The knowledge directory is never opened here.
+//! The directory is our own private research and development cards (laptop
+//! only), to be published later through knowledge.galion.app. The path comes
+//! only from `GALION_HORBM_RESEARCH_DIR`. Unset, empty, or not a directory
+//! means this root is off: no hits and no file reads. There is no default
+//! path. The knowledge directory is never opened here.
 //!
 //! Cards live at `<root>/cards/diary/dialogue/<dataset>/`. A bundle is one
 //! JSON value, at most 246 KiB. Larger files are not opened. Bundles are
@@ -125,6 +127,14 @@ pub struct StyleHint {
     pub id: String,
 }
 
+/// One card built in memory by a test. Not a file and not the laptop root.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct MemoryExample<'a> {
+    pub id: &'a str,
+    pub text: &'a str,
+    pub licence: &'a str,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 enum QueryLang {
     En,
@@ -228,9 +238,20 @@ impl ResearchRoot {
             .sum()
     }
 
-    /// No catalogued bundles. Off is empty. An oversize-only tree is empty.
+    /// Off, or a root with no bundles and no in-memory cards.
     pub fn is_empty(&self) -> bool {
-        self.bundle_count() == 0
+        match &self.inner {
+            Inner::Off => true,
+            Inner::Ready { bundles, state, .. } => {
+                bundles.is_empty()
+                    && state
+                        .lock()
+                        .expect("research style")
+                        .indexes
+                        .values()
+                        .all(|index| index.cards == 0)
+            }
+        }
     }
 
     pub fn bundle_count(&self) -> usize {
@@ -253,7 +274,9 @@ impl ResearchRoot {
         self.opened_bundles().len()
     }
 
-    /// `GALION_HORBM_RESEARCH_DIR` only. Any other state, including an unset
+    /// `GALION_HORBM_RESEARCH_DIR` only. That directory is our own private
+    /// research and development cards (laptop only), to be published later
+    /// through knowledge.galion.app. Any other state, including an unset
     /// variable, is [`Self::empty`] and does not read a file. Nothing is created.
     pub fn from_env() -> Self {
         match std::env::var("GALION_HORBM_RESEARCH_DIR") {
@@ -276,6 +299,53 @@ impl ResearchRoot {
                 eprintln!("horbm research cards: {err}");
                 Self::empty()
             }
+        }
+    }
+
+    /// Cards already in memory. Does not read a file. A test builds the card
+    /// here. The laptop cards stay on disk and are opened only by [`Self::load`].
+    pub fn from_examples(cards: &[MemoryExample<'_>]) -> Self {
+        let values: Vec<Value> = cards
+            .iter()
+            .map(|card| {
+                serde_json::json!({
+                    "id": card.id,
+                    "body": card.text,
+                    "licence": card.licence,
+                    "not_for": ["answer", "cite"],
+                })
+            })
+            .collect();
+        Self::from_memory(&values)
+    }
+
+    /// Cards already parsed. Does not read a file.
+    pub(crate) fn from_memory(cards: &[Value]) -> Self {
+        let bundle = BundleMeta {
+            path: PathBuf::new(),
+            rel: String::new(),
+            dataset: "memory".to_string(),
+            lang: BundleLang::Und,
+        };
+        let mut by_lang: HashMap<QueryLang, Vec<Accepted>> = HashMap::new();
+        for card in cards {
+            let Some((lang, accepted)) = accept_memory(card, &bundle) else {
+                continue;
+            };
+            by_lang.entry(lang).or_default().push(accepted);
+        }
+        let mut state = BuildState::default();
+        for (lang, accepted) in by_lang {
+            if let Ok(index) = index_cards(accepted) {
+                state.indexes.insert(lang, index);
+            }
+        }
+        Self {
+            inner: Inner::Ready {
+                bundles: Vec::new(),
+                skipped_size: 0,
+                state: Mutex::new(state),
+            },
         }
     }
 
@@ -461,26 +531,7 @@ fn build_index(
     lang: QueryLang,
     opened: &mut Vec<String>,
 ) -> Result<LangIndex, ()> {
-    let mut schema_builder = Schema::builder();
-    let body_options = TextOptions::default().set_indexing_options(
-        TextFieldIndexing::default()
-            .set_tokenizer(TOKENIZER_NAME)
-            .set_index_option(IndexRecordOption::WithFreqs),
-    );
-    let body = schema_builder.add_text_field("body", body_options);
-    let example = schema_builder.add_text_field("example", TextOptions::default().set_stored());
-    let id = schema_builder.add_text_field("id", STRING | STORED);
-    let licence = schema_builder.add_text_field("licence", STRING | STORED);
-    let dataset = schema_builder.add_text_field("dataset", STRING | STORED);
-    let lang_field = schema_builder.add_text_field("lang", STRING | STORED);
-    let schema = schema_builder.build();
-    let index = Index::create_in_ram(schema);
-    // Tokens are already split and lowercased. This tokenizer only
-    // separates them. It does not stem, and it does not drop long tokens.
-    index
-        .tokenizers()
-        .register(TOKENIZER_NAME, SimpleTokenizer::default());
-    let mut writer = index.writer(16 * 1024 * 1024).map_err(|_| ())?;
+    let (mut writer, fields, index) = open_writer()?;
     let mut cards = 0usize;
     for bundle in bundles {
         if !eligible(bundle, lang) {
@@ -495,33 +546,106 @@ fn build_index(
             Err(ReadFail::NotOpened) => continue,
         };
         opened.push(bundle.rel.clone());
-        for card in parsed {
-            let mut doc = TantivyDocument::new();
-            doc.add_text(id, &card.id);
-            doc.add_text(body, &card.indexed);
-            doc.add_text(example, &card.example);
-            doc.add_text(licence, &card.licence);
-            doc.add_text(dataset, &card.dataset);
-            doc.add_text(lang_field, &card.lang);
-            if writer.add_document(doc).is_ok() {
-                cards = cards.saturating_add(1);
-            }
-        }
+        cards = cards.saturating_add(write_cards(&writer, &parsed, &fields));
     }
     writer.commit().map_err(|_| ())?;
     drop(writer);
+    finish_index(index, fields, cards)
+}
+
+fn index_cards(cards: Vec<Accepted>) -> Result<LangIndex, ()> {
+    let (mut writer, fields, index) = open_writer()?;
+    let count = write_cards(&writer, &cards, &fields);
+    writer.commit().map_err(|_| ())?;
+    drop(writer);
+    finish_index(index, fields, count)
+}
+
+struct IndexFields {
+    body: tantivy::schema::Field,
+    id: tantivy::schema::Field,
+    example: tantivy::schema::Field,
+    licence: tantivy::schema::Field,
+    dataset: tantivy::schema::Field,
+    lang: tantivy::schema::Field,
+}
+
+fn open_writer() -> Result<(tantivy::IndexWriter, IndexFields, Index), ()> {
+    let mut schema_builder = Schema::builder();
+    let body_options = TextOptions::default().set_indexing_options(
+        TextFieldIndexing::default()
+            .set_tokenizer(TOKENIZER_NAME)
+            .set_index_option(IndexRecordOption::WithFreqs),
+    );
+    let body = schema_builder.add_text_field("body", body_options);
+    let example = schema_builder.add_text_field("example", TextOptions::default().set_stored());
+    let id = schema_builder.add_text_field("id", STRING | STORED);
+    let licence = schema_builder.add_text_field("licence", STRING | STORED);
+    let dataset = schema_builder.add_text_field("dataset", STRING | STORED);
+    let lang = schema_builder.add_text_field("lang", STRING | STORED);
+    let schema = schema_builder.build();
+    let index = Index::create_in_ram(schema);
+    // Tokens are already split and lowercased. This tokenizer only
+    // separates them. It does not stem, and it does not drop long tokens.
+    index
+        .tokenizers()
+        .register(TOKENIZER_NAME, SimpleTokenizer::default());
+    let writer = index.writer(16 * 1024 * 1024).map_err(|_| ())?;
+    Ok((
+        writer,
+        IndexFields {
+            body,
+            id,
+            example,
+            licence,
+            dataset,
+            lang,
+        },
+        index,
+    ))
+}
+
+fn write_cards(writer: &tantivy::IndexWriter, cards: &[Accepted], fields: &IndexFields) -> usize {
+    let mut count = 0usize;
+    for card in cards {
+        let mut doc = TantivyDocument::new();
+        doc.add_text(fields.id, &card.id);
+        doc.add_text(fields.body, &card.indexed);
+        doc.add_text(fields.example, &card.example);
+        doc.add_text(fields.licence, &card.licence);
+        doc.add_text(fields.dataset, &card.dataset);
+        doc.add_text(fields.lang, &card.lang);
+        if writer.add_document(doc).is_ok() {
+            count = count.saturating_add(1);
+        }
+    }
+    count
+}
+
+fn finish_index(index: Index, fields: IndexFields, cards: usize) -> Result<LangIndex, ()> {
     let reader = index.reader().map_err(|_| ())?;
     Ok(LangIndex {
         _index: index,
         reader,
-        body,
-        id,
-        example,
-        licence,
-        dataset,
-        lang: lang_field,
+        body: fields.body,
+        id: fields.id,
+        example: fields.example,
+        licence: fields.licence,
+        dataset: fields.dataset,
+        lang: fields.lang,
         cards,
     })
+}
+
+fn accept_memory(card: &Value, bundle: &BundleMeta) -> Option<(QueryLang, Accepted)> {
+    if let Some(accepted) = accept_card(card, None, None, bundle, QueryLang::En) {
+        if accepted.lang == "zh" {
+            return accept_card(card, None, None, bundle, QueryLang::Zh)
+                .map(|accepted| (QueryLang::Zh, accepted));
+        }
+        return Some((QueryLang::En, accepted));
+    }
+    accept_card(card, None, None, bundle, QueryLang::Zh).map(|accepted| (QueryLang::Zh, accepted))
 }
 
 enum ReadFail {
@@ -986,8 +1110,8 @@ mod tests {
         ResearchHit {
             id: id.to_string(),
             text: text.to_string(),
-            licence: "synthetic".to_string(),
-            dataset: "synthetic".to_string(),
+            licence: "in-memory".to_string(),
+            dataset: "memory".to_string(),
             lang: "en".to_string(),
             score,
             not_for: vec!["answer".to_string(), "cite".to_string()],
@@ -996,7 +1120,6 @@ mod tests {
 
     #[test]
     fn an_unset_flag_reads_nothing() {
-        assert!(std::env::var_os("GALION_HORBM_RESEARCH_DIR").is_none());
         let off = ResearchRoot::from_flag(None);
         assert!(off.is_empty());
         assert_eq!(off.files_read(), 0);
@@ -1004,8 +1127,12 @@ mod tests {
         assert!(found.hits.is_empty());
         assert_eq!(found.bundles_opened, 0);
         assert_eq!(off.files_read(), 0);
-        let aria = ResearchRoot::from_env();
-        assert!(aria.is_empty());
-        assert_eq!(aria.files_read(), 0);
+        assert!(ResearchRoot::from_flag(Some("  ")).is_empty());
+        if std::env::var_os("GALION_HORBM_RESEARCH_DIR").is_none() {
+            let env = ResearchRoot::from_env();
+            assert!(env.is_empty());
+            assert_eq!(env.files_read(), 0);
+            assert!(env.search(StylePersona::Samantha, "tired").hits.is_empty());
+        }
     }
 }

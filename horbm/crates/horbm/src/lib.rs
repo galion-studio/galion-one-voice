@@ -41,8 +41,10 @@
 //! or stop. The heuristic is deterministic. An answer with no sourced card
 //! becomes ask, and the spoken miss stays [`UNKNOWN_REPLY`]. The truth root
 //! is the only card source for answer and cite. [`ResearchRoot`] is optional
-//! and unset by default. It reads `GALION_HORBM_RESEARCH_DIR` only. A research
-//! card never becomes an answer or a citation. Check-ins
+//! and unset by default. It reads `GALION_HORBM_RESEARCH_DIR` only: our own
+//! private research and development cards (laptop only), to be published
+//! later through knowledge.galion.app. A research card never becomes an
+//! answer or a citation. Check-ins
 //! are off. The offline bandit is off and does not count a move unless learn
 //! consent is granted. Callbacks are stored only when remember is granted.
 //!
@@ -76,8 +78,8 @@ pub use galion_sam_empathy::{Intent, PronounClass, FRAME_MS};
 pub use horbm_brain::{Answer, Heuristic, MarkKind, SidebandMark};
 pub use horbm_keys::StringKeyArena;
 pub use research_style::{
-    ResearchHit, ResearchRoot, StyleHint, StylePersona, StyleSearch, MAX_RESEARCH_BUNDLE_BYTES,
-    STYLE_HIT_CAP,
+    MemoryExample, ResearchHit, ResearchRoot, StyleHint, StylePersona, StyleSearch,
+    MAX_RESEARCH_BUNDLE_BYTES, STYLE_HIT_CAP,
 };
 pub use retrieve::{
     CellState, HitPool, Int8Scorer, MemoryHit, MemoryHitCell, RetrievalConfig, RetrievalThread,
