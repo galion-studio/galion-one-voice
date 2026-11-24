@@ -26,6 +26,8 @@ pub mod reflect;
 pub mod student;
 /// Voice-stack cue that hands a spoken question to Galion Research.
 pub mod research_handoff;
+/// Domain 04 monotonic stamps. Lengths and timings only.
+pub mod stamps;
 /// Phone turn: 16 kHz utterance → transcript → reply text → 24 kHz WAV (feature `cascade`).
 #[cfg(feature = "cascade")]
 pub mod phone;
@@ -137,6 +139,7 @@ pub fn mock_cascade() -> Cascade<MockAsr, MockEmotion, MockLlm, MockTts> {
 }
 
 pub use canned::{CannedLlm, ProsodyEmotion, ReplyLlm};
+pub use stamps::{dry_run_log, stamp_log_clean, Domain04Stamps, StampClock, StampPoint};
 pub use hermes::{contains_forbidden, HermesLlm, HermesTarget, FORBIDDEN, LLM_NAME, REFUSED, UNREACHABLE};
 #[cfg(feature = "cascade")]
 pub use phone::{

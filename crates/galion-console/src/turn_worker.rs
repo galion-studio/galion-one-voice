@@ -352,7 +352,14 @@ fn turn_job_from(msg: BusMsg) -> TurnJob {
     }
 }
 
+fn stage_log(body: &str, stamps: &galion_cascade::Domain04Stamps) -> String {
+    let line = stamps.log_line();
+    debug_assert!(galion_cascade::stamp_log_clean(&line), "{line}");
+    if body.is_empty() { line } else { format!("{body} {line}") }
+}
+
 fn respond_speak(lane: &mut PhoneLane, mut job: SpeakJob, gate: &BusGate, prosody: &ProsodySlot) -> Option<TurnReply> {
+    lane.set_stamp_turn(job.id);
     let persona = gate.persona_id().as_str();
     let id = job.id;
     let delivery = job.prosody.unwrap_or_else(|| prosody.load());
@@ -377,7 +384,10 @@ fn respond_speak(lane: &mut PhoneLane, mut job: SpeakJob, gate: &BusGate, prosod
                 backend: t.speech_backend,
                 asr: t.asr.id(),
                 llm: "persona-floor",
-                stages: format!("tts={} tts_first={} first_audio={}", t.stage_ms.tts, t.stage_ms.tts_first_pcm, t.stage_ms.first_audio_ms),
+                stages: stage_log(
+                    &format!("tts={} tts_first={} first_audio={}", t.stage_ms.tts, t.stage_ms.tts_first_pcm, t.stage_ms.first_audio_ms),
+                    &t.stamps,
+                ),
                 error: None,
                 in_ms: 0,
                 took_ms: t0.elapsed().as_millis() as u32,
@@ -524,8 +534,9 @@ fn pack_ok(
     persona: &'static str,
     in_ms: u32,
     t0: Instant,
-    t: galion_cascade::PhoneTurn,
+    mut t: galion_cascade::PhoneTurn,
 ) -> TurnReply {
+    t.stamps.turn_id = id;
     let pcm = reply_pcm(&t.wav_bytes);
     let ms = (pcm.len() as u64 * 1000 / LANE_RATE_HZ as u64) as u32;
     TurnReply {
@@ -538,9 +549,12 @@ fn pack_ok(
         backend: t.speech_backend,
         asr: t.asr.id(),
         llm: t.llm,
-        stages: format!(
-            "asr={} llm={} tts={} tts_first={} first_audio={}",
-            t.stage_ms.asr, t.stage_ms.llm, t.stage_ms.tts, t.stage_ms.tts_first_pcm, t.stage_ms.first_audio_ms
+        stages: stage_log(
+            &format!(
+                "asr={} llm={} tts={} tts_first={} first_audio={}",
+                t.stage_ms.asr, t.stage_ms.llm, t.stage_ms.tts, t.stage_ms.tts_first_pcm, t.stage_ms.first_audio_ms
+            ),
+            &t.stamps,
         ),
         error: None,
         in_ms,
@@ -652,6 +666,7 @@ fn respond(
     prosody: &ProsodySlot,
     ask: &Mutex<Option<ResearchAsk>>,
 ) -> Option<TurnReply> {
+    lane.set_stamp_turn(job.id);
     let persona = gate.persona_id().as_str();
     lane.set_delivery(persona, prosody.load());
     lane.arm_cancel(gate.cancel_token(), job.id);
@@ -677,29 +692,7 @@ fn respond(
     std::hint::black_box(wav_in.as_slice());
     job.wipe();
     match result {
-        Ok(t) => {
-            let pcm = reply_pcm(&t.wav_bytes);
-            let ms = (pcm.len() as u64 * 1000 / LANE_RATE_HZ as u64) as u32;
-            Some(TurnReply {
-                id: job.id,
-                transcript: t.transcript,
-                text: t.reply_text,
-                pcm,
-                wav: t.wav_bytes,
-                ms,
-                backend: t.speech_backend,
-                asr: t.asr.id(),
-                llm: t.llm,
-                stages: format!(
-                    "asr={} llm={} tts={} tts_first={} first_audio={}",
-                    t.stage_ms.asr, t.stage_ms.llm, t.stage_ms.tts, t.stage_ms.tts_first_pcm, t.stage_ms.first_audio_ms
-                ),
-                error: None,
-                in_ms,
-                took_ms: t0.elapsed().as_millis() as u32,
-                persona,
-            })
-        }
+        Ok(t) => Some(pack_ok(job.id, persona, in_ms, t0, t)),
         Err(PhoneError::Superseded) => None,
         Err(e) => {
             let kind = match &e {

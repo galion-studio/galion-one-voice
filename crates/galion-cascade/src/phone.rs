@@ -54,8 +54,9 @@
 use crate::canned::CannedLlm;
 use crate::en_lane::{spoken_text, to_f32, to_pcm16, wav_bytes, LANE_RATE_HZ};
 use crate::hermes::HermesLlm;
+use crate::stamps::{StampClock, StampPoint};
 use crate::student::StudentLlm;
-use crate::{CascadeError, Emotion, Lang, Llm, MockLlm, Transcript};
+use crate::{CascadeError, Domain04Stamps, Emotion, Lang, Llm, MockLlm, Transcript};
 use galion_ml_voice::speech::{resample, SpeechStack};
 
 pub use galion_ml_voice::speech::FrameProsody;
@@ -225,6 +226,8 @@ pub struct PhoneTurn {
     pub asr: AsrSource,
     /// `canned-llm …` | `mock-llm …`.
     pub llm: &'static str,
+    /// Domain 04 times and lengths. The log line has no PCM and no words.
+    pub stamps: Domain04Stamps,
     /// `a21-weights` | `system-flite`.
     pub speech_backend: &'static str,
     /// Human label of the speech backend.
@@ -360,15 +363,33 @@ pub fn wav_to_pcm16k(b: &[u8]) -> Result<Vec<i16>, PhoneError> {
     Ok(to_pcm16(&resample(&to_f32(&frames), rate, PHONE_IN_RATE_HZ)))
 }
 
+struct PhoneTurnParts {
+    reply_text: String,
+    wav: Vec<u8>,
+    pcm_out: u64,
+    ms: u32,
+    stage_ms: StageMs,
+}
+
 /// Reusable phone lane (`Send`; keep one per worker thread).
 pub struct PhoneLane {
     pub cfg: PhoneConfig,
     asr: PhoneTurnAsr,
     llm: Box<dyn Llm + Send>,
     speech: SpeechStack,
+    clock: StampClock,
+    stamps: Domain04Stamps,
+    stamp_turn_id: u64,
+    /// Set when an utterance was accepted and the reply has not finished.
+    turn_open: bool,
 }
 
 fn ms_since(t: Instant) -> u32 { t.elapsed().as_millis().min(u32::MAX as u128) as u32 }
+
+/// Character length only. The text is not stored.
+fn char_len(text: &str) -> u32 {
+    u32::try_from(text.chars().count()).unwrap_or(u32::MAX)
+}
 
 impl PhoneLane {
     /// Env-configured lane (`GALION_ASR`, `GALION_LLM`, `GALION_SPEECH`, …).
@@ -385,8 +406,48 @@ impl PhoneLane {
             LlmMode::Student => Box::new(StudentLlm),
         };
         speech.prewarm();
-        Self { cfg, asr: PhoneTurnAsr::new(cfg.asr), llm, speech }
+        Self {
+            cfg,
+            asr: PhoneTurnAsr::new(cfg.asr),
+            llm,
+            speech,
+            clock: StampClock::start(),
+            stamps: Domain04Stamps::dry(),
+            stamp_turn_id: 0,
+            turn_open: false,
+        }
     }
+
+    /// Bus turn id copied onto the next sheet. Lengths and timings only.
+    pub fn set_stamp_turn(&mut self, id: u64) {
+        self.stamp_turn_id = id;
+        self.stamps.turn_id = id;
+    }
+
+    /// Sheet for the turn that just ran, including a turn that stopped early.
+    pub fn stamps(&self) -> &Domain04Stamps { &self.stamps }
+
+    /// Caller saw VAD silence on this lane's clock. The lane itself does not.
+    pub fn note_vad_silence_start(&mut self) {
+        let us = self.clock.us();
+        self.stamps.mark(StampPoint::VadSilenceStart, us);
+    }
+
+    fn accept_utterance(&mut self, pcm_in_samples: u64) {
+        self.stamps = Domain04Stamps::absent(self.stamp_turn_id);
+        self.stamps.pcm_in_samples = pcm_in_samples;
+        let us = self.clock.us();
+        self.stamps.mark(StampPoint::EouDecided, us);
+        self.turn_open = true;
+    }
+
+    fn note_asr(&mut self, transcript: &str) {
+        self.stamps.heard_chars = char_len(transcript);
+        let us = self.clock.us();
+        self.stamps.mark(StampPoint::AsrFinal, us);
+    }
+
+    fn close_turn(&mut self) { self.turn_open = false; }
 
     /// Register for the next Hermes completion (`samantha` or `jarvis`).
     /// Canned and echo ignore it.
@@ -437,18 +498,27 @@ impl PhoneLane {
 
     /// One full turn: 16 kHz mono PCM16 → [`PhoneTurn`] with 24 kHz WAV bytes.
     pub fn turn(&mut self, pcm16k: &[i16]) -> Result<PhoneTurn, PhoneError> {
+        self.accept_utterance(pcm16k.len() as u64);
         let t0 = Instant::now();
-        let (transcript, asr) = self.asr.transcribe(pcm16k)?;
+        let (transcript, asr) = match self.asr.transcribe(pcm16k) {
+            Ok(v) => v,
+            Err(e) => { self.close_turn(); return Err(e); }
+        };
+        self.note_asr(&transcript);
         let asr_ms = ms_since(t0);
         self.speak_transcript(t0, asr_ms, transcript, asr)
     }
 
     /// Speak `text` as given. No ASR and no canned reply.
     /// The persona floor already chose the words. ASR label is `text-inject`.
+    /// A sheet already opened by [`Self::hear`] keeps its ASR stamp.
     pub fn speak_fixed(&mut self, text: &str) -> Result<PhoneTurn, PhoneError> {
         let mut owned = text.trim().to_string();
         if owned.is_empty() { return Err(PhoneError::Empty); }
         if owned.len() > 2000 { owned.truncate(2000); }
+        if !self.turn_open {
+            self.stamps = Domain04Stamps::absent(self.stamp_turn_id);
+        }
         let t0 = Instant::now();
         self.emit(t0, 0, 0, String::new(), AsrSource::TextInject, owned)
     }
@@ -456,9 +526,12 @@ impl PhoneLane {
     /// Full turn from harness-supplied text (CannedLlm or echo, then Piper/flite).
     /// ASR label is `text-inject`. Not speech recognition.
     pub fn turn_text(&mut self, text: &str) -> Result<PhoneTurn, PhoneError> {
-        let t0 = Instant::now();
         let text = text.trim();
         if text.is_empty() { return Err(PhoneError::Empty); }
+        self.stamps = Domain04Stamps::absent(self.stamp_turn_id);
+        self.stamps.heard_chars = char_len(text);
+        self.turn_open = true;
+        let t0 = Instant::now();
         self.speak_transcript(t0, 0, text.to_string(), AsrSource::TextInject)
     }
 
@@ -471,19 +544,56 @@ impl PhoneLane {
         asr: AsrSource,
         reply_text: String,
     ) -> Result<PhoneTurn, PhoneError> {
-        if !self.speech.can_speak() { return Err(PhoneError::NoSpeech(self.speech.backend.label())); }
+        if !self.speech.can_speak() {
+            self.close_turn();
+            return Err(PhoneError::NoSpeech(self.speech.backend.label()));
+        }
+        let clock = self.clock;
+        let clause = clock.us();
         self.speech.ensure_warm();
         let t2 = Instant::now();
-        let audio = self.speech.speak(&reply_text).map_err(voice_to_phone)?;
-        let pcm = to_pcm16(&resample(&audio.samples, audio.sample_rate, PHONE_OUT_RATE_HZ));
+        let audio = match self.speech.speak(&reply_text) {
+            Ok(audio) => audio,
+            Err(e) => {
+                self.stamps.mark(StampPoint::FirstClauseFlushed, clause);
+                self.stamps.reply_chars = char_len(&reply_text);
+                self.close_turn();
+                return Err(voice_to_phone(e));
+            }
+        };
+        let tts_at = clock.us();
+        let pcm = to_pcm16(&resample(
+            &audio.samples,
+            audio.sample_rate,
+            PHONE_OUT_RATE_HZ,
+        ));
         let wav = wav_bytes(&pcm, PHONE_OUT_RATE_HZ);
         let tts_ms = ms_since(t2);
         let tts_first_pcm = self.speech.warmth().last_first_pcm_ms.unwrap_or(tts_ms);
         let first_audio_ms = ms_since(t0).saturating_sub(tts_ms.saturating_sub(tts_first_pcm));
+        self.stamps.mark(StampPoint::FirstClauseFlushed, clause);
+        self.stamps.mark(StampPoint::TtsFirstPcm, tts_at);
+        self.stamps.reply_chars = char_len(&reply_text);
+        self.stamps.pcm_out_samples = pcm.len() as u64;
+        self.close_turn();
+        let stamps = self.stamps.clone();
         Ok(PhoneTurn {
-            transcript, reply_text, wav_bytes: wav, ms: ms_since(t0),
-            stage_ms: StageMs { asr: asr_ms, llm: llm_ms, tts: tts_ms, tts_first_pcm, first_audio_ms }, asr,
-            llm: self.llm.name(), speech_backend: self.speech.backend.id(), speech_label: self.speech.backend.label(),
+            transcript,
+            reply_text,
+            wav_bytes: wav,
+            ms: ms_since(t0),
+            stage_ms: StageMs {
+                asr: asr_ms,
+                llm: llm_ms,
+                tts: tts_ms,
+                tts_first_pcm,
+                first_audio_ms,
+            },
+            asr,
+            llm: self.llm.name(),
+            speech_backend: self.speech.backend.id(),
+            speech_label: self.speech.backend.label(),
+            stamps,
         })
     }
 
@@ -498,103 +608,188 @@ impl PhoneLane {
         asr: AsrSource,
     ) -> Result<PhoneTurn, PhoneError> {
         if !self.speech.can_speak() {
+            self.close_turn();
             return Err(PhoneError::NoSpeech(self.speech.backend.label()));
         }
-        let llm = &mut self.llm;
-        let speech = &mut self.speech;
-        let llm_name = llm.name();
-        speech.ensure_warm();
-        let t_llm = Instant::now();
-        let mut early = crate::early_reply::EarlyReply::new();
-        let mut samples: Vec<f32> = Vec::new();
-        let mut rate = PHONE_OUT_RATE_HZ;
-        let mut tts_origin: Option<Instant> = None;
-        let mut first_audio_ms = None;
-        let mut tts_first_pcm = None;
-        let mut speak_err: Option<PhoneError> = None;
-        let speak_sentence = |speech: &mut galion_ml_voice::speech::SpeechStack,
-                              samples: &mut Vec<f32>,
-                              rate: &mut u32,
-                              tts_origin: &mut Option<Instant>,
-                              first_audio_ms: &mut Option<u32>,
-                              tts_first_pcm: &mut Option<u32>,
-                              sentence: &str|
-         -> Result<(), PhoneError> {
-            if tts_origin.is_none() {
-                *tts_origin = Some(Instant::now());
+        let clock = self.clock;
+        let llm_req = clock.us();
+        let llm_name = self.llm.name();
+        let backend_id = self.speech.backend.id();
+        let backend_label = self.speech.backend.label();
+        let mut llm_tok: Option<u64> = None;
+        let mut clause_at: Option<u64> = None;
+        let mut tts_at: Option<u64> = None;
+        let built: Result<PhoneTurnParts, PhoneError> = (|| {
+            let llm = &mut self.llm;
+            let speech = &mut self.speech;
+            speech.ensure_warm();
+            let t_llm = Instant::now();
+            let mut early = crate::early_reply::EarlyReply::new();
+            let mut samples: Vec<f32> = Vec::new();
+            let mut rate = PHONE_OUT_RATE_HZ;
+            let mut tts_origin: Option<Instant> = None;
+            let mut first_audio_ms = None;
+            let mut tts_first_pcm = None;
+            let mut speak_err: Option<PhoneError> = None;
+            let speak_sentence = |speech: &mut galion_ml_voice::speech::SpeechStack,
+                                  samples: &mut Vec<f32>,
+                                  rate: &mut u32,
+                                  tts_origin: &mut Option<Instant>,
+                                  first_audio_ms: &mut Option<u32>,
+                                  tts_first_pcm: &mut Option<u32>,
+                                  clause_at: &mut Option<u64>,
+                                  tts_at: &mut Option<u64>,
+                                  sentence: &str|
+             -> Result<(), PhoneError> {
+                if clause_at.is_none() {
+                    *clause_at = Some(clock.us());
+                }
+                if tts_origin.is_none() {
+                    *tts_origin = Some(Instant::now());
+                }
+                let audio = speech.speak(sentence).map_err(voice_to_phone)?;
+                if first_audio_ms.is_none() {
+                    *first_audio_ms = Some(ms_since(t0));
+                    *tts_first_pcm = speech.warmth().last_first_pcm_ms;
+                    *tts_at = Some(clock.us());
+                }
+                if samples.is_empty() {
+                    *rate = audio.sample_rate;
+                    samples.extend(audio.samples);
+                } else if audio.sample_rate == *rate {
+                    samples.extend(audio.samples);
+                } else {
+                    samples.extend(resample(&audio.samples, audio.sample_rate, *rate));
+                }
+                Ok(())
+            };
+            let model_text = llm
+                .reply_deltas(
+                    &Transcript {
+                        text: transcript.clone(),
+                        lang: Lang::En,
+                    },
+                    Emotion::Neutral,
+                    &mut |delta| {
+                        if llm_tok.is_none() && !delta.is_empty() {
+                            llm_tok = Some(clock.us());
+                        }
+                        if speak_err.is_some() || early.blocked() {
+                            return;
+                        }
+                        for sentence in early.push(delta) {
+                            if let Err(e) = speak_sentence(
+                                speech,
+                                &mut samples,
+                                &mut rate,
+                                &mut tts_origin,
+                                &mut first_audio_ms,
+                                &mut tts_first_pcm,
+                                &mut clause_at,
+                                &mut tts_at,
+                                &sentence,
+                            ) {
+                                speak_err = Some(e);
+                                return;
+                            }
+                        }
+                    },
+                )
+                .map_err(PhoneError::Cascade);
+            let llm_ms = ms_since(t_llm);
+            let model_text = match model_text {
+                Ok(text) => text,
+                Err(e) => return Err(e),
+            };
+            if let Some(e) = speak_err {
+                return Err(e);
             }
-            let audio = speech.speak(sentence).map_err(voice_to_phone)?;
-            if first_audio_ms.is_none() {
-                *first_audio_ms = Some(ms_since(t0));
-                *tts_first_pcm = speech.warmth().last_first_pcm_ms;
+            if !early.blocked() {
+                if let Some(tail) = early.finish() {
+                    speak_sentence(
+                        speech,
+                        &mut samples,
+                        &mut rate,
+                        &mut tts_origin,
+                        &mut first_audio_ms,
+                        &mut tts_first_pcm,
+                        &mut clause_at,
+                        &mut tts_at,
+                        &tail,
+                    )?;
+                }
             }
-            if samples.is_empty() {
-                *rate = audio.sample_rate;
-                samples.extend(audio.samples);
-            } else if audio.sample_rate == *rate {
-                samples.extend(audio.samples);
+            let reply_text = if early.blocked() && early.spoken().is_empty() {
+                crate::REFUSED.to_string()
+            } else if early.spoken().is_empty() {
+                spoken_text(&model_text)
             } else {
-                samples.extend(resample(&audio.samples, audio.sample_rate, *rate));
-            }
-            Ok(())
-        };
-        let model_text = llm.reply_deltas(
-            &Transcript { text: transcript.clone(), lang: Lang::En },
-            Emotion::Neutral,
-            &mut |delta| {
-                if speak_err.is_some() || early.blocked() {
-                    return;
+                early.spoken()
+            };
+            if samples.is_empty() {
+                if reply_text.is_empty() {
+                    return Err(PhoneError::Empty);
                 }
-                for sentence in early.push(delta) {
-                    if let Err(e) = speak_sentence(speech, &mut samples, &mut rate, &mut tts_origin, &mut first_audio_ms, &mut tts_first_pcm, &sentence) {
-                        speak_err = Some(e);
-                        return;
-                    }
-                }
-            },
-        ).map_err(PhoneError::Cascade)?;
-        let llm_ms = ms_since(t_llm);
-        if let Some(e) = speak_err {
-            return Err(e);
-        }
-        if !early.blocked() {
-            if let Some(tail) = early.finish() {
-                speak_sentence(speech, &mut samples, &mut rate, &mut tts_origin, &mut first_audio_ms, &mut tts_first_pcm, &tail)?;
+                speak_sentence(
+                    speech,
+                    &mut samples,
+                    &mut rate,
+                    &mut tts_origin,
+                    &mut first_audio_ms,
+                    &mut tts_first_pcm,
+                    &mut clause_at,
+                    &mut tts_at,
+                    &reply_text,
+                )?;
             }
+            let pcm = to_pcm16(&resample(&samples, rate, PHONE_OUT_RATE_HZ));
+            let wav = wav_bytes(&pcm, PHONE_OUT_RATE_HZ);
+            let tts_ms = tts_origin.map(ms_since).unwrap_or(0);
+            let tts_first_pcm = tts_first_pcm.unwrap_or(tts_ms);
+            let first_audio_ms = first_audio_ms.unwrap_or_else(|| ms_since(t0));
+            Ok(PhoneTurnParts {
+                reply_text,
+                wav,
+                pcm_out: pcm.len() as u64,
+                ms: ms_since(t0),
+                stage_ms: StageMs {
+                    asr: asr_ms,
+                    llm: llm_ms,
+                    tts: tts_ms,
+                    tts_first_pcm,
+                    first_audio_ms,
+                },
+            })
+        })();
+        self.stamps.mark(StampPoint::LlmReq, llm_req);
+        if let Some(us) = llm_tok {
+            self.stamps.mark(StampPoint::LlmFirstToken, us);
         }
-        let reply_text = if early.blocked() && early.spoken().is_empty() {
-            crate::REFUSED.to_string()
-        } else if early.spoken().is_empty() {
-            spoken_text(&model_text)
-        } else {
-            early.spoken()
-        };
-        if samples.is_empty() {
-            if reply_text.is_empty() {
-                return Err(PhoneError::Empty);
-            }
-            speak_sentence(speech, &mut samples, &mut rate, &mut tts_origin, &mut first_audio_ms, &mut tts_first_pcm, &reply_text)?;
+        if let Some(us) = clause_at {
+            self.stamps.mark(StampPoint::FirstClauseFlushed, us);
         }
-        let audio_samples = samples;
-        let audio_rate = rate;
-        let tts_ms = tts_origin.map(ms_since).unwrap_or(0);
-        let tts_first_pcm = tts_first_pcm.unwrap_or(tts_ms);
-        let first_audio_ms = first_audio_ms.unwrap_or_else(|| ms_since(t0));
+        if let Some(us) = tts_at {
+            self.stamps.mark(StampPoint::TtsFirstPcm, us);
+        }
+        self.close_turn();
+        let built = built?;
+        self.stamps.reply_chars = char_len(&built.reply_text);
+        self.stamps.pcm_out_samples = built.pcm_out;
+        let stamps = self.stamps.clone();
         Ok(PhoneTurn {
             transcript,
-            reply_text,
-            wav_bytes: {
-                let pcm = to_pcm16(&resample(&audio_samples, audio_rate, PHONE_OUT_RATE_HZ));
-                wav_bytes(&pcm, PHONE_OUT_RATE_HZ)
-            },
-            ms: ms_since(t0),
-            stage_ms: StageMs { asr: asr_ms, llm: llm_ms, tts: tts_ms, tts_first_pcm, first_audio_ms },
+            reply_text: built.reply_text,
+            wav_bytes: built.wav,
+            ms: built.ms,
+            stage_ms: built.stage_ms,
             asr,
             llm: llm_name,
-            speech_backend: speech.backend.id(),
-            speech_label: speech.backend.label(),
+            speech_backend: backend_id,
+            speech_label: backend_label,
+            stamps,
         })
     }
+
 
     /// As [`turn`](Self::turn) from WAV bytes (PCM16, any rate; resampled to 16 kHz).
     pub fn turn_wav(&mut self, wav: &[u8]) -> Result<PhoneTurn, PhoneError> { self.turn(&wav_to_pcm16k(wav)?) }
@@ -602,7 +797,11 @@ impl PhoneLane {
     /// Transcript only. The voice-stack worker calls this once, then either
     /// hands the question to research or continues with [`Self::speak_heard`].
     pub fn hear(&mut self, pcm16k: &[i16]) -> Result<(String, AsrSource), PhoneError> {
-        self.asr.transcribe(pcm16k)
+        self.accept_utterance(pcm16k.len() as u64);
+        match self.asr.transcribe(pcm16k) {
+            Ok((text, src)) => { self.note_asr(&text); Ok((text, src)) }
+            Err(e) => { self.close_turn(); Err(e) }
+        }
     }
 
     /// [`hear`](Self::hear) from WAV bytes.
@@ -612,6 +811,11 @@ impl PhoneLane {
 
     /// LLM and TTS for a transcript [`Self::hear`] already produced. Does not transcribe again.
     pub fn speak_heard(&mut self, transcript: String, asr: AsrSource) -> Result<PhoneTurn, PhoneError> {
+        if !self.turn_open {
+            self.stamps = Domain04Stamps::absent(self.stamp_turn_id);
+            self.stamps.heard_chars = char_len(&transcript);
+            self.turn_open = true;
+        }
         let t0 = Instant::now();
         self.speak_transcript(t0, 0, transcript, asr)
     }
@@ -793,6 +997,17 @@ mod tests {
         assert!(peak > 1500, "speech too quiet: {peak}");
         assert!(t.ms >= t.stage_ms.tts);
         assert!(t.stage_ms.tts_first_pcm <= t.stage_ms.tts);
+        let log = t.stamps.log_line();
+        assert!(crate::stamp_log_clean(&log), "{log}");
+        assert!(!log.contains("hello") && !log.contains("doing") && !log.contains("RIFF"), "{log}");
+        assert!(log.contains(&format!("heard_chars={}", t.transcript.chars().count())), "{log}");
+        assert!(log.contains(&format!("reply_chars={}", t.reply_text.chars().count())), "{log}");
+        assert!(t.stamps.t_vad_silence_start.is_none());
+        assert!(t.stamps.t_eou_decided.is_some() && t.stamps.t_asr_final.is_some());
+        assert!(t.stamps.t_llm_req.is_some() && t.stamps.t_llm_first_token.is_some());
+        assert!(t.stamps.t_first_clause_flushed.is_some() && t.stamps.t_tts_first_pcm.is_some());
+        assert!(t.stamps.t_first_media_frame_sent.is_none() && t.stamps.t_first_audio_heard.is_none());
+        assert!(t.stamps.pcm_out_samples > 0 && t.stamps.timings_non_decreasing());
         let (pid, spawns) = l.piper_worker();
         // WAV-in path, same lane (stack and, when A21 is up, the same Piper process)
         let t2 = l.turn_wav(&wav_bytes(&fx("thanks"), 16_000)).unwrap();
@@ -815,6 +1030,26 @@ mod tests {
         let e = l.turn(&voice(1.5)).unwrap_err();
         assert!(matches!(e, PhoneError::NoSpeech(ref m) if m.contains("GALION_SPEECH=off")), "{e}");
         assert_eq!(l.piper_worker().0, None);
+    }
+
+    #[test]
+    fn speech_off_stamp_log_is_lengths_only() {
+        use crate::stamp_log_clean;
+        let mut l = PhoneLane::with_speech(cfg(AsrMode::Stub), galion_ml_voice::speech::SpeechStack::silent("off"));
+        l.set_stamp_turn(4);
+        let pcm = fx("hello galion");
+        let err = l.turn(&pcm).unwrap_err();
+        assert!(matches!(err, PhoneError::NoSpeech(_)));
+        let log = l.stamps().log_line();
+        assert!(stamp_log_clean(&log), "{log}");
+        assert!(!log.contains("hello") && !log.contains("galion") && !log.contains("RIFF"), "{log}");
+        assert!(log.contains("turn_id=4") && log.contains("t_vad_silence_start=absent"), "{log}");
+        assert!(!log.contains("t_eou_decided=absent") && !log.contains("t_asr_final=absent"), "{log}");
+        assert!(log.contains("t_llm_req=absent") && log.contains("t_tts_first_pcm=absent"), "{log}");
+        assert!(log.contains("t_first_media_frame_sent=absent") && log.contains("t_first_audio_heard=absent"), "{log}");
+        assert!(log.contains(&format!("pcm_in_samples={}", pcm.len())), "{log}");
+        assert!(log.contains("pcm_out_samples=0") && log.contains("heard_chars=12") && log.contains("reply_chars=0"), "{log}");
+        assert!(l.stamps().timings_non_decreasing());
     }
 
     #[test]
