@@ -3,7 +3,7 @@
 
 [package]
 name = "horbm-ear"
-description = "Ear-side prosody on one 80 ms, 16 kHz frame. Pitch is the pitch-detection YIN crate. Sense defaults to deny. Nothing is written."
+description = "Ear-side prosody and Samantha's listener reading on one 80 ms, 16 kHz frame. Pitch is the pitch-detection YIN crate. Sensing starts on. Nothing is written."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
