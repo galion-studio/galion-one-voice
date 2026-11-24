@@ -31,7 +31,7 @@ jobs:
         # It downloads models into a cache and is not this job.
         run: |
           cargo test --manifest-path horbm/Cargo.toml -p horbm-eval
-          cargo run --manifest-path horbm/Cargo.toml -p horbm-eval --quiet
+          cargo run --manifest-path horbm/Cargo.toml -p horbm-eval --bin horbm-eval --quiet
       - name: HORBM int8 key arena with the compiled SIMD kernels
         run: cargo test -p horbm-keys --features simd-avx2,simd-avx512
       - name: Emotion V2 reference checker

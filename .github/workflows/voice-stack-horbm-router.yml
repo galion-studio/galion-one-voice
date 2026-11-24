@@ -26,7 +26,7 @@ jobs:
         run: |
           cargo test --manifest-path horbm/Cargo.toml -p horbm -p horbm-eval
           # Fake closed gate. The real Linux ear (`--features real`) is opt-in.
-          cargo run --manifest-path horbm/Cargo.toml -p horbm-eval --quiet
+          cargo run --manifest-path horbm/Cargo.toml -p horbm-eval --bin horbm-eval --quiet
           cargo test --manifest-path horbm/Cargo.toml -p horbm-duplex
           cargo test --manifest-path voice-stack/Cargo.toml -p galion-research-gateway -p galion-sam-horbm -p galion-sam-orch -p samantha-local-server
           cargo test --manifest-path voice-stack/Cargo.toml -p galion-sam-horbm --features horbm
