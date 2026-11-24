@@ -37,7 +37,7 @@ fn sine(hz: f32, amp: f32) -> Vec<i16> {
 }
 
 fn harness() -> Duplex<SilentRecognizer, CoreAffect, SpeakingBreath, SamanthaPersona, NativeMouth> {
-    Duplex::new(
+    let mut duplex = Duplex::new(
         Parts {
             recognizer: SilentRecognizer::new(),
             emotion: CoreAffect::samantha(),
@@ -47,7 +47,9 @@ fn harness() -> Duplex<SilentRecognizer, CoreAffect, SpeakingBreath, SamanthaPer
         },
         NoCards,
     )
-    .expect("samantha")
+    .expect("samantha");
+    duplex.set_aec(false);
+    duplex
 }
 
 #[test]

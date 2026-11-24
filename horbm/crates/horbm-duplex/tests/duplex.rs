@@ -292,7 +292,7 @@ fn silence() -> Vec<i16> {
 }
 
 fn samantha() -> Duplex<Scripted, SamanthaAffect, ExhaleBreath, Samantha, ToneMouth> {
-    Duplex::new(
+    let mut duplex = Duplex::new(
         Parts {
             recognizer: Scripted::new(&["where is the kettle", "yeah", "stop now"]),
             emotion: SamanthaAffect,
@@ -302,7 +302,12 @@ fn samantha() -> Duplex<Scripted, SamanthaAffect, ExhaleBreath, Samantha, ToneMo
         },
         Kettle,
     )
-    .expect("samantha")
+    .expect("samantha");
+    // The virtual-clock gate is not an acoustic path. The mouth tone and the
+    // scripted mic are the same square, so a live canceller would treat the
+    // person as echo.
+    duplex.set_aec(false);
+    duplex
 }
 
 fn tick(
