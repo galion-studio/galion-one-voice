@@ -216,6 +216,34 @@ impl LatencyReport {
         misses
     }
 
+    /// One turn, for the live host. No transcript and no samples.
+    ///
+    /// `event` is `voice` (eager end of turn to first audio) or `barge`
+    /// (barge-in to silence). Any other word is printed as `turn`.
+    /// Times are the frame clock. A missing stage is `none`.
+    #[must_use]
+    pub fn turn_text(&self, event: &str) -> String {
+        let event = event_token(event);
+        format!(
+            "duplex s28 event={event} clock=frame eager_to_voice_ms={} barge_to_silence_ms={} backchannel_cancels={}",
+            show_ms(self.voice_ms),
+            show_ms(self.barge_ms),
+            self.backchannel_cancels,
+        )
+    }
+
+    /// The same three fields as JSON. A missing stage is `null`.
+    #[must_use]
+    pub fn turn_json(&self, event: &str) -> String {
+        let event = event_token(event);
+        format!(
+            "{{\"event\":\"{event}\",\"clock\":\"frame\",\"eager_to_voice_ms\":{},\"barge_to_silence_ms\":{},\"backchannel_cancels\":{}}}",
+            json_ms(self.voice_ms),
+            json_ms(self.barge_ms),
+            self.backchannel_cancels,
+        )
+    }
+
     /// One line of counts. No transcript and no samples.
     #[must_use]
     pub fn gate_line(&self) -> String {
@@ -251,6 +279,28 @@ impl LatencyReport {
     }
 }
 
+fn event_token(event: &str) -> &'static str {
+    match event {
+        "voice" => "voice",
+        "barge" => "barge",
+        _ => "turn",
+    }
+}
+
+fn show_ms(value: Option<u64>) -> String {
+    match value {
+        Some(ms) => ms.to_string(),
+        None => "none".to_string(),
+    }
+}
+
+fn json_ms(value: Option<u64>) -> String {
+    match value {
+        Some(ms) => ms.to_string(),
+        None => "null".to_string(),
+    }
+}
+
 fn stage_u32(misses: &mut Vec<String>, name: &str, got: u32, cap: u32) {
     if got > cap {
         misses.push(format!("{name} {got} frames, budget {cap}"));
@@ -262,5 +312,34 @@ fn require_u32(misses: &mut Vec<String>, name: &str, got: Option<u32>, cap: u32)
         Some(got) if got <= cap => {}
         Some(got) => misses.push(format!("{name} {got} frames, budget {cap}")),
         None => misses.push(format!("{name} did not run")),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_turn_line_names_the_three_latencies_and_no_transcript() {
+        let mut report = LatencyReport::fresh();
+        report.voice_ms = Some(160);
+        report.barge_ms = Some(160);
+        report.backchannel_cancels = 0;
+        let text = report.turn_text("voice");
+        assert!(text.contains("event=voice"));
+        assert!(text.contains("eager_to_voice_ms=160"));
+        assert!(text.contains("barge_to_silence_ms=160"));
+        assert!(text.contains("backchannel_cancels=0"));
+        assert!(!text.to_ascii_lowercase().contains("kettle"));
+        let json = report.turn_json("barge");
+        assert_eq!(
+            json,
+            "{\"event\":\"barge\",\"clock\":\"frame\",\"eager_to_voice_ms\":160,\"barge_to_silence_ms\":160,\"backchannel_cancels\":0}"
+        );
+        assert!(!json.contains('\n'));
+        let open = LatencyReport::fresh().turn_json("nope");
+        assert!(open.contains("\"event\":\"turn\""));
+        assert!(open.contains("\"eager_to_voice_ms\":null"));
+        assert!(open.contains("\"barge_to_silence_ms\":null"));
     }
 }

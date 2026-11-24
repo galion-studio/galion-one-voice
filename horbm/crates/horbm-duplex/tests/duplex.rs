@@ -443,6 +443,20 @@ fn full_duplex_samantha_both_bands() {
     assert_eq!(report.backchannel_cancels, 0);
     assert!(report.overlap_live_frames >= 6);
     assert_eq!(report.research_frames, 0);
+    let voice = report.turn_text("voice");
+    let barge = report.turn_text("barge");
+    assert_eq!(
+        voice,
+        "duplex s28 event=voice clock=frame eager_to_voice_ms=160 barge_to_silence_ms=160 backchannel_cancels=0"
+    );
+    assert_eq!(
+        barge,
+        "duplex s28 event=barge clock=frame eager_to_voice_ms=160 barge_to_silence_ms=160 backchannel_cancels=0"
+    );
+    assert!(!voice.to_ascii_lowercase().contains("kettle"));
+    assert!(report
+        .turn_json("voice")
+        .contains("\"backchannel_cancels\":0"));
 }
 
 #[test]

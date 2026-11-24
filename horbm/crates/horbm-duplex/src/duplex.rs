@@ -15,8 +15,10 @@ use horbm_voice::{Mouth, MouthPull, SpokenLine};
 
 use crate::brain::BrainHandle;
 use crate::ports::{
-    Affect, Breath, BreathCue, Emotion, Hypothesis, Persona, Recognizer, Style, DEV_PERSONA,
+    Affect, Breath, BreathCue, EarSense, Emotion, Hypothesis, Persona, ProsodyCue, Recognizer,
+    Style, DEV_PERSONA,
 };
+use crate::prosody::ProsodyEar;
 use crate::report::LatencyReport;
 use crate::{LoopError, FRAME_MS, FRAME_SAMPLES};
 
@@ -116,6 +118,8 @@ pub struct Duplex<R, E, B, P, M> {
     last_voiced_ms: Option<u64>,
     eager_ms: Option<u64>,
     onset_ms: Option<u64>,
+    sense: ProsodyEar,
+    last_cue: ProsodyCue,
     report: LatencyReport,
 }
 
@@ -155,8 +159,27 @@ where
             last_voiced_ms: None,
             eager_ms: None,
             onset_ms: None,
+            sense: ProsodyEar::new(),
+            last_cue: ProsodyCue::disabled(),
             report: LatencyReport::fresh(),
         })
+    }
+
+    /// Prosody and ear sensing. On when the feature is compiled.
+    /// `false` is the runtime off switch: a non-zero sample is voiced again.
+    pub fn set_prosody(&mut self, on: bool) {
+        self.sense.set_enabled(on);
+    }
+
+    #[must_use]
+    pub fn prosody_enabled(&self) -> bool {
+        self.sense.enabled()
+    }
+
+    /// The cue from the last accepted frame. Disabled before the first tick.
+    #[must_use]
+    pub fn prosody(&self) -> ProsodyCue {
+        self.last_cue
     }
 
     #[must_use]
@@ -189,7 +212,13 @@ where
         }
         let t_ms = self.conductor.t_ms();
         let t32 = u32::try_from(t_ms).unwrap_or(u32::MAX);
-        let voiced = pcm.iter().any(|sample| *sample != 0);
+        let cue = self.sense.hear(pcm);
+        self.last_cue = cue;
+        let voiced = if cue.enabled {
+            cue.voiced
+        } else {
+            pcm.iter().any(|sample| *sample != 0)
+        };
         if voiced && self.first_voiced_ms.is_none() {
             self.first_voiced_ms = Some(t_ms);
         }
@@ -224,6 +253,8 @@ where
         let mut me_first = false;
         if out.me_silent || out.event == ConductorEvent::BargeIn {
             self.mouth.cancel();
+            self.recognizer.cancel()?;
+            self.you_open = false;
             self.yielded = true;
             self.skip_pull = false;
             self.note_barge(out.t_ms, voiced);
