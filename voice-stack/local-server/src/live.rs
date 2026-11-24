@@ -1358,14 +1358,14 @@ mod tests {
             eprintln!("energy default not asserted: GALION_VAD_BIN is already set");
             return;
         }
-        let (front, backend, ready) = open_vad();
+        let opened = open_vad();
         assert!(
-            matches!(front, Front::Energy(_)),
+            matches!(opened.front, Front::Energy(_)),
             "a missing child must use the energy ear"
         );
-        assert_eq!(backend, "energy");
+        assert_eq!(opened.backend, "energy");
         let require = std::env::var("GALION_VAD_REQUIRE").ok().as_deref() == Some("silero");
-        assert_eq!(ready, !require);
+        assert_eq!(opened.ready, !require);
     }
 
     #[test]
