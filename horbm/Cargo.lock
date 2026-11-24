@@ -184,6 +184,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "horbm-brain"
+version = "0.0.1"
+
+[[package]]
 name = "horbm-memory"
 version = "0.1.0"
 source = "git+https://github.com/galion-studio/galion-knowledge.git?rev=974e594444448597741372fef578142c46d28566#974e594444448597741372fef578142c46d28566"
@@ -193,10 +197,6 @@ dependencies = [
  "serde_json",
  "sha2",
 ]
-
-[[package]]
-name = "horbm-brain"
-version = "0.0.1"
 
 [[package]]
 name = "itoa"
