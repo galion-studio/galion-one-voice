@@ -5,11 +5,15 @@ version = "0.1.0"
 edition = "2021"
 license = "MIT"
 publish = false
-description = "One pre-clone analysis stage: voice baseline, emotion-moment hook, room, and target-speaker segments. Synthetic tests only. Does not clone."
+description = "Pre-clone analysis, and the Aria blend: one synthetic voice designed from two consented profiles. Synthetic tests only. Does not clone."
 
 [[bin]]
 name = "galion-preclone"
 path = "src/main.rs"
+
+[[bin]]
+name = "galion-aria-blend"
+path = "src/aria_main.rs"
 
 [features]
 default = []

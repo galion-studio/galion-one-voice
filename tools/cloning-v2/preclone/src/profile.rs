@@ -361,7 +361,7 @@ fn escape(s: &str) -> String {
     o
 }
 
-fn fmt_f64(x: f64) -> String {
+pub(crate) fn fmt_f64(x: f64) -> String {
     if !x.is_finite() {
         return "null".to_string();
     }
