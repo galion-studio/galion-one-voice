@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Galion Labs
-//! Native mouth. The in-process tone from `horbm_voice`, already on main.
+//! Native mouth. The in-process tone from `horbm_voice`.
 //!
-//! Piper stays behind that crate's `piper` feature and is not linked here.
-//! [`NativeMouth::last`] is the frame the tick just pulled, so a host can
-//! hand it to a speaker without the tick growing a second buffer type.
+//! The default build links this mouth and no Piper process. `--features piper`
+//! adds [`crate::PiperMouth`] beside it. [`NativeMouth::last`] is the frame
+//! the tick just pulled, so a host can hand it to a speaker without the tick
+//! growing a second buffer type.
 
 use horbm_voice::{FakeMouth, Mouth, MouthPull, SpokenLine};
 

@@ -9,7 +9,7 @@
 //! | [`EarSense`] | `ProsodyEar`, energy and pitch | on by default. `Duplex::set_prosody(false)` turns it off |
 //! | [`Persona`] | `SamanthaPersona` | always. Aria is parked |
 //! | [`Breath`] | stand-in until the breath crate lands | always |
-//! | mouth | `NativeMouth` over `horbm_voice::FakeMouth` | always |
+//! | mouth | `NativeMouth` over `horbm_voice::FakeMouth`. `PiperMouth` is opt-in | always. `--features piper` adds the worker |
 //!
 //! Development speaks as Samantha only. Another id is refused.
 
@@ -87,6 +87,14 @@ pub struct Affect {
 /// One step per 80 ms frame. The loop does not store the baseline.
 pub trait Emotion {
     fn step(&mut self, t_ms: u32) -> Affect;
+
+    /// The moment on this frame, when the adapter has one.
+    ///
+    /// The default is none. A stand-in affect does not steer the mouth.
+    /// [`crate::CoreAffect`] returns Samantha's moment. Aria is not seated.
+    fn moment_view(&self) -> Option<horbm_voice::MomentView> {
+        None
+    }
 }
 
 /// Where the breath is. Speech is an exhale.

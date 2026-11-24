@@ -12,7 +12,7 @@ use horbm_duplex::{
     NativeMouth, Parts, Persona, ProsodyEar, Recognizer, SamanthaPersona, SilentRecognizer,
     SpeakingBreath, ARIA_ACTIVE, ARIA_ID, DEV_PERSONA, FRAME_SAMPLES, SAMPLE_RATE,
 };
-use horbm_voice::{Mouth, MouthPull, SpokenLine};
+use horbm_voice::{is_aria, is_samantha, Mouth, MouthPull, SpokenLine, VoiceControls};
 
 struct NoCards;
 
@@ -83,6 +83,66 @@ fn emotion_core_satisfies_the_port_and_leaves_the_baseline() {
     assert!(moved.valence.is_finite() && moved.dominance.is_finite());
     assert_eq!(emotion.frames(), 2);
     assert_eq!(emotion.baseline().identity_bits(), bits);
+    let view = emotion.view();
+    assert!(is_samantha(&view.baseline));
+    assert!(!is_aria(&view.baseline));
+}
+
+#[test]
+fn the_tick_hands_samantha_s_moment_to_the_mouth_and_not_aria() {
+    struct Remember {
+        inner: NativeMouth,
+        felt: u32,
+        parked: bool,
+    }
+
+    impl Mouth for Remember {
+        fn id(&self) -> &str {
+            "remember"
+        }
+
+        fn start(&mut self, line: &SpokenLine) {
+            self.inner.start(line);
+        }
+
+        fn pull(&mut self) -> MouthPull {
+            self.inner.pull()
+        }
+
+        fn cancel(&mut self) {
+            self.inner.cancel();
+        }
+
+        fn speaking(&self) -> bool {
+            self.inner.speaking()
+        }
+
+        fn feel(&mut self, controls: VoiceControls) {
+            self.felt = self.felt.saturating_add(1);
+            self.parked = controls.parked;
+        }
+    }
+
+    let mut duplex = Duplex::new(
+        Parts {
+            recognizer: SilentRecognizer::new(),
+            emotion: CoreAffect::samantha(),
+            breath: SpeakingBreath,
+            persona: SamanthaPersona,
+            mouth: Remember {
+                inner: NativeMouth::new(),
+                felt: 0,
+                parked: true,
+            },
+        },
+        NoCards,
+    )
+    .expect("samantha");
+    duplex
+        .tick(&vec![0i16; FRAME_SAMPLES])
+        .expect("one quiet frame");
+    assert_eq!(duplex.mouth().felt, 1);
+    assert!(!duplex.mouth().parked);
 }
 
 #[test]

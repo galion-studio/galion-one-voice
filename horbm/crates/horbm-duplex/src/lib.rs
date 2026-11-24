@@ -9,12 +9,13 @@
 //! at 160 ms, inside the 200 ms lock.
 //!
 //! The brain is [`horbm::Brain`]. The floor is [`galion_conductor::Conductor`].
-//! The mouth on the live path is [`NativeMouth`]. Emotion is
-//! [`CoreAffect`] (`galion-emotion-core`). Prosody sensing is on unless
-//! [`Duplex::set_prosody`] turns it off. The recognizer is
-//! [`SilentRecognizer`] unless the crate is built with `--features vosk`.
-//! Breath is still a stand-in. The virtual-clock integration test keeps its
-//! own stand-ins and is the CI gate.
+//! The mouth on the live path is [`NativeMouth`] unless the crate is built
+//! with `--features piper` and the host asks for [`PiperMouth`]. Emotion is
+//! [`CoreAffect`] (`galion-emotion-core`). Each frame with a moment is handed
+//! to the mouth. Prosody sensing is on unless [`Duplex::set_prosody`] turns
+//! it off. The recognizer is [`SilentRecognizer`] unless the crate is built
+//! with `--features vosk`. Breath is still a stand-in. The virtual-clock
+//! integration test keeps its own stand-ins and is the CI gate.
 //!
 //! This tick is not the heartbeat frame step. It does not read a wall clock,
 //! open a socket, or load a weight.
@@ -32,6 +33,8 @@ mod emotion;
 mod live;
 mod mouth;
 mod persona;
+#[cfg(feature = "piper")]
+mod piper_mouth;
 mod ports;
 mod prosody;
 mod recog;
@@ -46,6 +49,11 @@ pub use mouth::NativeMouth;
 pub use persona::{
     open_persona, SamanthaPersona, ARIA_ACTIVE, ARIA_ID, SAMANTHA_BREVITY, SAMANTHA_SENTENCES,
     SAMANTHA_WARMTH,
+};
+#[cfg(feature = "piper")]
+pub use piper_mouth::{
+    discover_piper, measure_piper, piper_cache_dir, piper_skipped_json, PiperMouth, PiperPaths,
+    PiperStats, STOCK_VOICE,
 };
 pub use ports::{
     Affect, Breath, BreathCue, BreathPhase, EarSense, Emotion, Hypothesis, HypothesisKind, Persona,

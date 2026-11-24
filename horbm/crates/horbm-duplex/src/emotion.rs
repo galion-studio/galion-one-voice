@@ -7,7 +7,10 @@
 //! is the published stand-in rest, with the speaker id set to Samantha.
 //! Those numbers are not a measured voice.
 
-use galion_emotion_core::{EmotionCore, IntentMsg, VoiceBaseline, AROUSAL, DOMINANCE, VALENCE};
+use galion_emotion_core::{
+    Breath, EmotionCore, IntentMsg, VoiceBaseline, AROUSAL, DOMINANCE, VALENCE,
+};
+use horbm_voice::MomentView;
 
 use crate::ports::{Affect, Emotion};
 
@@ -40,6 +43,22 @@ impl CoreAffect {
         self.core.frames()
     }
 
+    /// Baseline, moment, and breath for the mouth. The baseline bits are
+    /// the ones [`Self::samantha`] copied in. This does not write them.
+    #[must_use]
+    pub fn view(&self) -> MomentView {
+        let cue = self.core.conductor_cue();
+        MomentView {
+            baseline: self.core.baseline(),
+            moment: self.core.moment(),
+            breath: Breath {
+                phase: cue.breath_phase,
+                volume: cue.lung_volume,
+                flow: cue.air_flow,
+            },
+        }
+    }
+
     /// One intent on the core clock. An off-clock intent leaves the core
     /// where it was and returns the previous affect.
     pub fn step_intent(&mut self, intent: &IntentMsg) -> Affect {
@@ -57,6 +76,10 @@ impl CoreAffect {
 impl Emotion for CoreAffect {
     fn step(&mut self, t_ms: u32) -> Affect {
         self.step_intent(&IntentMsg::steady(t_ms))
+    }
+
+    fn moment_view(&self) -> Option<MomentView> {
+        Some(self.view())
     }
 }
 
