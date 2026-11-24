@@ -10,8 +10,11 @@ use galion_emotion_core::{
 };
 use galion_sam_empathy::{Empathy, PronounClass, TickIn, FRAME_MS};
 
-use horbm_brain::{classify, pick, split_clause, Retrieved, Retriever, SidebandMark};
+use horbm_brain::{
+    classify, pick, split_clause, Answer, Heuristic, Retrieved, Retriever, SidebandMark,
+};
 
+use crate::retrieve::{CellState, MemoryHitCell, RetrievalThread, RetrievedCells};
 use crate::route::{accept_line, route_heard, CardLookup, Gap, ResearchAsk, Speakable};
 use crate::{Pad, TurnOut, UNKNOWN_REPLY};
 
@@ -63,7 +66,8 @@ impl CardLookup for EmptyCards {
 
 /// The linked brain. `open` reads the knowledge directory when it already
 /// exists and does not create it. Memory and case paths are not opened.
-/// The live server passes the same read-only loader.
+/// The live server passes the same read-only loader and may attach a
+/// [`RetrievalThread`]. That thread is not started here.
 pub struct Brain {
     empathy: Empathy,
     cards: Box<dyn CardLookup + Send>,
@@ -74,6 +78,8 @@ pub struct Brain {
     card_count: usize,
     emotion: EmotionCore,
     inner: InnerLife,
+    retrieval: Option<RetrievalThread>,
+    retrieval_epoch: u64,
 }
 
 struct Spoke {
@@ -99,6 +105,31 @@ impl Spoke {
 struct CardRetriever<'a> {
     cards: &'a dyn CardLookup,
     speakable: Speakable,
+}
+
+fn miss_spoke(lookup_us: u32) -> Spoke {
+    Spoke {
+        reply: UNKNOWN_REPLY.to_string(),
+        sources: vec!["honest:unknown".to_string()],
+        evidence: Vec::new(),
+        lookup_us,
+        picked: None,
+    }
+}
+
+fn fixture_spoke(query: &str) -> Option<Spoke> {
+    let answer = Heuristic::committed().answer(query);
+    if !answer.hit {
+        return None;
+    }
+    let source = format!("fixture:{}", answer.id);
+    Some(Spoke {
+        reply: String::new(),
+        sources: vec![source.clone()],
+        evidence: vec![source],
+        lookup_us: 0,
+        picked: Some(answer),
+    })
 }
 
 impl Retriever for CardRetriever<'_> {
@@ -137,7 +168,21 @@ impl Brain {
             card_count,
             emotion: EmotionCore::at_rest(),
             inner: InnerLife::seeded(),
+            retrieval: None,
+            retrieval_epoch: 0,
         }
+    }
+
+    /// Chat turns read this thread's cell. `Idle` keeps the card and fixture
+    /// paths. `Hits` and `Miss` do not call research. Not for `Heartbeat::step`.
+    pub fn with_retrieval(mut self, thread: RetrievalThread) -> Self {
+        self.retrieval = Some(thread);
+        self
+    }
+
+    /// Latest cell, if a thread is attached. Waits on the cell lock.
+    pub fn retrieval_cell(&self) -> Option<std::sync::Arc<MemoryHitCell>> {
+        self.retrieval.as_ref().map(|thread| thread.cell())
     }
 
     /// Clauses loaded at `open` or `with_cards`. The example kettle directory is one.
@@ -247,8 +292,15 @@ impl Brain {
         self.meta
     }
 
-    /// Empathy mood, rewritten lookup, cards, then the gateway, then
+    /// Empathy mood, then the retrieval cell when a thread is attached,
+    /// then cards, then the fixture on an idle cell, then the gateway, then
     /// [`crate::UNKNOWN_REPLY`].
+    ///
+    /// A granted hit speaks [`crate::MemoryHit::clause`]. A granted miss
+    /// speaks [`crate::UNKNOWN_REPLY`] and does not call research. `Idle`
+    /// means `remember` is denied: the diary is not opened, and the committed
+    /// fixture still answers when the cards miss. This waits for the retrieval
+    /// thread. Do not call it from `Heartbeat::step`.
     pub fn turn(&mut self, text: &str) -> TurnOut {
         let started = Instant::now();
         let heard = text.trim();
@@ -269,9 +321,13 @@ impl Brain {
         if query.is_empty() {
             return self.finish(query, started, Spoke::empty());
         }
+        let query_owned = query.to_string();
+        if let Some(spoke) = self.retrieval_spoke(&query_owned) {
+            return self.finish(&query_owned, started, spoke);
+        }
         let lookup_started = Instant::now();
         let picked = pick(
-            query,
+            &query_owned,
             &CardRetriever {
                 cards: self.cards.as_ref(),
                 speakable: self.speakable,
@@ -283,7 +339,7 @@ impl Brain {
         if picked.hit {
             let source = format!("card:{}", picked.id);
             return self.finish(
-                query,
+                &query_owned,
                 started,
                 Spoke {
                     reply: String::new(),
@@ -293,6 +349,11 @@ impl Brain {
                     picked: Some(picked),
                 },
             );
+        }
+        if self.retrieval.is_some() {
+            if let Some(spoke) = fixture_spoke(&query_owned) {
+                return self.finish(&query_owned, started, spoke);
+            }
         }
         let routed = match self.research.as_mut() {
             Some(port) => route_heard(
@@ -317,6 +378,57 @@ impl Brain {
                 picked: None,
             },
         )
+    }
+
+    /// `Some` for `Hits` and `Miss`. `None` for `Idle`, which is deny.
+    fn retrieval_spoke(&mut self, query: &str) -> Option<Spoke> {
+        let thread = self.retrieval.as_ref()?;
+        self.retrieval_epoch = self.retrieval_epoch.saturating_add(1);
+        let epoch = self.retrieval_epoch;
+        if thread.ask_wait(query, epoch, epoch).is_err() {
+            return Some(miss_spoke(0));
+        }
+        let cell = thread.cell();
+        match cell.state {
+            CellState::Idle => None,
+            CellState::Miss => Some(miss_spoke(cell.took_us)),
+            CellState::Hits => Some(self.hit_spoke(query, cell.as_ref())),
+        }
+    }
+
+    fn hit_spoke(&self, query: &str, cell: &MemoryHitCell) -> Spoke {
+        let Some(hit) = cell.hits.first() else {
+            return miss_spoke(cell.took_us);
+        };
+        let clause = hit.clause().trim();
+        if clause.is_empty() {
+            return miss_spoke(cell.took_us);
+        }
+        let Some(spoken) = (self.speakable)(clause) else {
+            return miss_spoke(cell.took_us);
+        };
+        if spoken.trim().is_empty() {
+            return miss_spoke(cell.took_us);
+        }
+        let (first, rest) = split_clause(&spoken, false);
+        let source = format!("retrieve:{}", hit.item_id);
+        Spoke {
+            reply: String::new(),
+            sources: vec![source.clone()],
+            evidence: vec![source],
+            lookup_us: cell.took_us,
+            picked: Some(Answer {
+                id: hit.item_id.clone(),
+                clause: spoken,
+                first,
+                rest,
+                hit: true,
+                mark: classify(query).map(|kind| SidebandMark {
+                    kind,
+                    posted: false,
+                }),
+            }),
+        }
     }
 
     fn finish(&self, query: &str, started: Instant, spoke: Spoke) -> TurnOut {
@@ -528,5 +640,140 @@ mod tests {
             horbm_brain::Heuristic::committed().miss_text(),
             UNKNOWN_REPLY
         );
+    }
+
+    fn scratch_dir(name: &str) -> std::path::PathBuf {
+        let dir = std::env::temp_dir().join(format!(
+            "horbm-turn-{name}-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    fn no_diary_files(dir: &std::path::Path) {
+        let entries = std::fs::read_dir(dir).unwrap();
+        for entry in entries.flatten() {
+            let name = entry.file_name().to_string_lossy().to_string();
+            assert!(!name.contains("horbm-mem"), "{name}");
+            assert!(
+                !name.ends_with(".sqlite")
+                    && !name.ends_with(".sqlite-wal")
+                    && !name.ends_with(".sqlite-shm")
+                    && !name.ends_with(".db"),
+                "{name}"
+            );
+        }
+        assert!(!dir.join("revisions.sqlite").exists());
+    }
+
+    /// Gate. A granted RAM fixture answers through the retrieval cell.
+    #[test]
+    fn a_granted_turn_returns_the_fixture_clause_from_the_cell() {
+        let scratch = scratch_dir("grant");
+        let thread = crate::RetrievalThread::spawn(crate::RetrievalConfig {
+            remember: true,
+            knowledge_dir: Some(scratch.clone()),
+            fixture_rows: 1_000,
+        })
+        .unwrap();
+        let mut brain = Brain::with_cards(EmptyCards, None).with_retrieval(thread);
+        let out = brain.turn("m742");
+        let cell = brain.retrieval_cell().unwrap();
+        assert_eq!(cell.state, crate::CellState::Hits);
+        assert!(cell.answer.is_empty(), "{}", cell.answer);
+        let hit = cell
+            .hits
+            .iter()
+            .find(|hit| hit.item_id == "sample-742")
+            .expect("sample-742");
+        assert_eq!(out.reply, hit.clause());
+        assert!(out.reply.contains("marker m742"), "{}", out.reply);
+        assert!(out.first_clause.split_whitespace().count() <= 2);
+        assert_eq!(out.sources, vec!["retrieve:sample-742".to_string()]);
+        no_diary_files(&scratch);
+        let _ = std::fs::remove_dir_all(scratch);
+    }
+
+    /// A granted miss is the persona line, not a card that would otherwise hit.
+    #[test]
+    fn a_granted_miss_does_not_fall_through_to_cards_or_research() {
+        let calls = Arc::new(AtomicU32::new(0));
+        let thread = crate::RetrievalThread::spawn(crate::RetrievalConfig {
+            remember: true,
+            knowledge_dir: None,
+            fixture_rows: 1_000,
+        })
+        .unwrap();
+        let mut brain = Brain::with_cards(
+            cards(),
+            Some(Box::new(Rec {
+                calls: Arc::clone(&calls),
+                seen: Arc::new(std::sync::Mutex::new(Vec::new())),
+            })),
+        )
+        .with_retrieval(thread);
+        let out = brain.turn("where is the kettle");
+        assert_eq!(out.reply, "I don't know.");
+        assert_eq!(out.sources, vec!["honest:unknown".to_string()]);
+        assert_eq!(brain.retrieval_cell().unwrap().state, crate::CellState::Miss);
+        assert_eq!(calls.load(Ordering::SeqCst), 0);
+        assert!(brain.gaps().is_empty());
+    }
+
+    /// Gate. `remember` denied keeps the fixture path and does not open the diary.
+    #[test]
+    fn a_denied_turn_still_speaks_the_clause_fixture() {
+        let scratch = scratch_dir("deny");
+        let thread = crate::RetrievalThread::spawn(crate::RetrievalConfig {
+            remember: false,
+            knowledge_dir: Some(scratch.clone()),
+            fixture_rows: 1_000,
+        })
+        .unwrap();
+        let mut brain = Brain::with_cards(EmptyCards, None).with_retrieval(thread);
+        let out = brain.turn("where is the kettle");
+        assert_eq!(out.reply, "The kettle is on the hob.");
+        assert_eq!(out.first_clause, "The kettle");
+        assert_eq!(out.rest, "is on the hob.");
+        assert_eq!(out.sources, vec!["fixture:kettle".to_string()]);
+        let cell = brain.retrieval_cell().unwrap();
+        assert_eq!(cell.state, crate::CellState::Idle);
+        assert!(cell.is_empty());
+        no_diary_files(&scratch);
+        let _ = std::fs::remove_dir_all(scratch);
+    }
+
+    /// Idle still prefers a loaded card over the fixture.
+    #[test]
+    fn a_denied_turn_with_cards_keeps_the_card_clause() {
+        let thread = crate::RetrievalThread::spawn(crate::RetrievalConfig {
+            remember: false,
+            knowledge_dir: None,
+            fixture_rows: 0,
+        })
+        .unwrap();
+        struct Stove;
+        impl CardLookup for Stove {
+            fn lookup(&self, query: &str) -> Option<CardHit> {
+                if query.to_ascii_lowercase().contains("kettle") {
+                    Some(CardHit {
+                        id: "kettle".into(),
+                        gist: "The kettle is on the stove.".into(),
+                    })
+                } else {
+                    None
+                }
+            }
+        }
+        let mut brain = Brain::with_cards(Stove, None).with_retrieval(thread);
+        let out = brain.turn("where is the kettle");
+        assert_eq!(out.reply, "The kettle is on the stove.");
+        assert_eq!(out.sources, vec!["card:kettle".to_string()]);
+        assert_eq!(brain.retrieval_cell().unwrap().state, crate::CellState::Idle);
     }
 }

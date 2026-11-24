@@ -142,6 +142,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "galion-tensor"
+version = "0.0.1"
+
+[[package]]
 name = "galion-tts-piper"
 version = "0.0.1"
 dependencies = [
@@ -197,9 +201,17 @@ dependencies = [
  "galion-research-gateway",
  "galion-sam-empathy",
  "horbm-brain",
+ "horbm-keys",
  "horbm-memory",
  "serde_json",
  "sha2",
+]
+
+[[package]]
+name = "horbm-keys"
+version = "0.0.1"
+dependencies = [
+ "galion-tensor",
 ]
 
 [[package]]
