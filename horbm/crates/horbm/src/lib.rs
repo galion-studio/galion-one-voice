@@ -30,11 +30,15 @@
 //! GEMI intent. [`Brain::inner_nudge`] steps that message through the moment
 //! core. Neither call rewrites the empathy mood or the voice baseline.
 //! Learning a new care stays off while `LOCKS.toml` `[consent] learn` is deny.
+//!
+//! [`LearnPass`] is not part of that order. It is the offline learn pass.
+//! Learn consent is [`LearnConfig::granted`]. [`Brain::turn`] does not call it.
 
 #![forbid(unsafe_code)]
 
 mod brain;
 mod cards;
+mod learn;
 mod route;
 
 pub use brain::{Brain, MoodMeta};
@@ -49,6 +53,10 @@ pub use galion_emotion_core::{
 pub use galion_research_gateway::RESEARCH_CAP;
 pub use galion_sam_empathy::{Intent, PronounClass, FRAME_MS};
 pub use horbm_brain::{Answer, Heuristic, MarkKind, SidebandMark};
+pub use learn::{
+    ClauseSource, LearnAudit, LearnConfig, LearnError, LearnPass, LearnedRow, LEARN_PACK_DB,
+    LEARN_PACK_LIVE, LEARN_PACK_NEXT, LEARN_PACK_RETIRING,
+};
 pub use route::{
     is_deep_question, route_heard, AskOutcome, CardHit, CardLookup, Gap, GapReason, ResearchAsk,
     RouteKind, RouteOut, Speakable, GAP_ADVICE, UNKNOWN_REPLY,
