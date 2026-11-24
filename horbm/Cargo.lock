@@ -131,6 +131,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "galion-tensor"
+version = "0.0.1"
+
+[[package]]
 name = "generic-array"
 version = "0.14.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -178,6 +182,7 @@ dependencies = [
  "galion-research-gateway",
  "galion-sam-empathy",
  "horbm-brain",
+ "horbm-keys",
  "horbm-memory",
  "serde_json",
  "sha2",
@@ -186,6 +191,13 @@ dependencies = [
 [[package]]
 name = "horbm-brain"
 version = "0.0.1"
+
+[[package]]
+name = "horbm-keys"
+version = "0.0.1"
+dependencies = [
+ "galion-tensor",
+]
 
 [[package]]
 name = "horbm-memory"

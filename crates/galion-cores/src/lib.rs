@@ -287,10 +287,12 @@ pub fn format_cpu_list(cpus: &[usize]) -> String {
     out.join(",")
 }
 
+#[cfg(unix)]
 extern "C" {
     fn sched_setaffinity(pid: i32, cpusetsize: usize, mask: *const u64) -> i32;
 }
 
+#[cfg(unix)]
 fn mask_of(cpus: &[usize]) -> [u64; CPU_SET_BITS / 64] {
     let mut mask = [0u64; CPU_SET_BITS / 64];
     for &c in cpus {
@@ -302,37 +304,54 @@ fn mask_of(cpus: &[usize]) -> [u64; CPU_SET_BITS / 64] {
 }
 
 /// Pin a child to `cpus` with `sched_setaffinity` after fork, before exec.
-/// Empty `cpus` leaves the inherited mask.
+/// Empty `cpus` leaves the inherited mask. Targets without that syscall keep
+/// the inherited mask.
 pub fn apply_affinity(cmd: &mut Command, cpus: &[usize]) {
-    if cpus.is_empty() {
-        return;
+    #[cfg(unix)]
+    {
+        if cpus.is_empty() {
+            return;
+        }
+        let mask = mask_of(cpus);
+        use std::os::unix::process::CommandExt;
+        // SAFETY: the closure runs in the forked child before exec and only makes
+        // one async-signal-safe syscall on a mask it owns by value.
+        unsafe {
+            cmd.pre_exec(move || {
+                if sched_setaffinity(0, std::mem::size_of_val(&mask), mask.as_ptr()) != 0 {
+                    return Err(std::io::Error::last_os_error());
+                }
+                Ok(())
+            });
+        }
     }
-    let mask = mask_of(cpus);
-    use std::os::unix::process::CommandExt;
-    // SAFETY: the closure runs in the forked child before exec and only makes
-    // one async-signal-safe syscall on a mask it owns by value.
-    unsafe {
-        cmd.pre_exec(move || {
-            if sched_setaffinity(0, std::mem::size_of_val(&mask), mask.as_ptr()) != 0 {
-                return Err(std::io::Error::last_os_error());
-            }
-            Ok(())
-        });
+    #[cfg(not(unix))]
+    {
+        let _ = (cmd, cpus);
     }
 }
 
 /// Pin the **calling thread** (pid 0 = this thread on Linux) to `cpus`.
 /// Threads it spawns afterwards inherit the mask. Empty `cpus` is a no-op.
+/// Targets without `sched_setaffinity` leave the thread where it is and return `Ok`.
 pub fn pin_current_thread(cpus: &[usize]) -> std::io::Result<()> {
-    if cpus.is_empty() {
-        return Ok(());
+    #[cfg(unix)]
+    {
+        if cpus.is_empty() {
+            return Ok(());
+        }
+        let mask = mask_of(cpus);
+        // SAFETY: plain syscall on a stack mask of the declared size.
+        if unsafe { sched_setaffinity(0, std::mem::size_of_val(&mask), mask.as_ptr()) } != 0 {
+            return Err(std::io::Error::last_os_error());
+        }
+        Ok(())
     }
-    let mask = mask_of(cpus);
-    // SAFETY: plain syscall on a stack mask of the declared size.
-    if unsafe { sched_setaffinity(0, std::mem::size_of_val(&mask), mask.as_ptr()) } != 0 {
-        return Err(std::io::Error::last_os_error());
+    #[cfg(not(unix))]
+    {
+        let _ = cpus;
+        Ok(())
     }
-    Ok(())
 }
 
 /// Pin the calling thread to `role`'s placement. Returns the placement used.
@@ -423,6 +442,7 @@ mod tests {
         assert_eq!(format_cpu_list(&[0, 1, 2, 6]), "0-2,6");
     }
 
+    #[cfg(unix)]
     #[test]
     fn affinity_lands_in_the_child_before_exec() {
         if usable_cpus() < 2 {
@@ -436,6 +456,7 @@ mod tests {
         assert!(text.trim_end().ends_with("\t1"), "{text}");
     }
 
+    #[cfg(unix)]
     #[test]
     fn current_thread_pin_is_per_thread() {
         if usable_cpus() < 2 {

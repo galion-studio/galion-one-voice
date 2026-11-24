@@ -7,28 +7,35 @@
 //! 1. Empathy (layer 3) steps the mood from the heard line and rewrites the
 //!    lookup. The feeling name, when one is invited, stays on the mood
 //!    metadata. It is not spoken.
-//! 2. Cards answer first, through [`CardLookup`]. The phase 4 pick in
-//!    `horbm-brain` chooses one stored clause from that lookup: at most two
-//!    spoken words first when the clause allows a cut, then the rest. A miss
-//!    is the stored persona clause [`UNKNOWN_REPLY`]. Lookup and Action turns
-//!    are marked for Galion Research and are not posted. [`KnowledgeCards`]
-//!    reads a directory of galion-knowledge cards, checks the card-bundle
-//!    manifest when one is present, and builds the covering lookup index. It
-//!    does not write a card, does not open `horbm-memory`, and does not bind
-//!    a socket. There is no knowledge-ro server in this repository. Port 7900
-//!    is not used here. The 7881 bridge calls this loader.
-//! 3. A deep miss may ask the research gateway. The caller passes
-//!    [`RESEARCH_CAP`] (3 seconds). This crate dials nothing itself.
+//! 2. When a [`RetrievalThread`] is attached, [`Brain::turn`] asks it and
+//!    reads the [`MemoryHitCell`]. `Hits` speaks [`MemoryHit::clause`]. `Miss`
+//!    speaks [`UNKNOWN_REPLY`] and does not call research. `Idle` is deny or
+//!    withdraw: the diary is not read. The card pick runs, and if that misses
+//!    the committed clause fixture still answers. Without a thread, cards
+//!    answer first through [`CardLookup`]. The phase 4 pick chooses one stored
+//!    clause: at most two spoken words first when the clause allows a cut,
+//!    then the rest. Lookup and Action turns are marked for Galion Research
+//!    and are not posted. [`KnowledgeCards`] reads a directory of
+//!    galion-knowledge cards, checks the card-bundle manifest when one is
+//!    present, and builds the covering lookup index. It does not write a card
+//!    and does not bind a socket. There is no knowledge-ro server in this
+//!    repository. Port 7900 is not used here. The 7881 bridge calls this loader
+//!    and attaches the retrieval thread.
+//! 3. A deep miss on the idle or unthreaded path may ask the research gateway.
+//!    The caller passes [`RESEARCH_CAP`] (3 seconds). This crate dials nothing
+//!    itself. A retrieval `Miss` does not.
 //! 4. Anything still unanswered is exactly [`UNKNOWN_REPLY`]. No gap filler.
 //!
-//! [`RetrievalThread`] is not part of that order. It links `horbm-memory`
-//! in-process, off the heartbeat thread, and publishes a [`MemoryHitCell`].
-//! [`Brain::turn`] does not read the cell. The heuristic pick does.
+//! [`RetrievalThread`] links `horbm-memory` in-process, off the heartbeat
+//! thread. Do not call [`Brain::turn`] from `Heartbeat::step`: the turn waits
+//! for the cell. [`Int8Scorer`] is implemented for the mapped key arena and
+//! is not called by the retrieval thread.
 
 #![forbid(unsafe_code)]
 
 mod brain;
 mod cards;
+mod keys;
 mod retrieve;
 mod route;
 
@@ -40,6 +47,7 @@ pub use cards::{
 pub use galion_research_gateway::RESEARCH_CAP;
 pub use galion_sam_empathy::{Intent, PronounClass, FRAME_MS};
 pub use horbm_brain::{Answer, Heuristic, MarkKind, SidebandMark};
+pub use horbm_keys::StringKeyArena;
 pub use retrieve::{
     CellState, HitPool, Int8Scorer, MemoryHit, MemoryHitCell, RetrievalConfig, RetrievalThread,
     RetrieveError, RetrievedCells, MEMORY_HIT_CAP,
