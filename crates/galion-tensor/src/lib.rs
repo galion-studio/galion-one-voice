@@ -34,7 +34,7 @@ pub use features::SimdLevel;
 pub use gemv::{gemv, gemv_f32_into, gemv_t_f32_into};
 pub use gemv_i8::{gemv_i8_f32x_into, gemv_i8_into, quantize_row_i8, QuantRowsI8};
 pub use kv::KvRing;
-pub use gq::{GqDType, GqError, GqFile, Prefault};
+pub use gq::{GqDType, GqError, GqFile, MappedBytes, Prefault};
 pub use shape::Shape;
 pub use storage::Storage;
 pub use tensor::Tensor;
