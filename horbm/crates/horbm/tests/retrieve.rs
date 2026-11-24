@@ -160,6 +160,31 @@ fn fixture_of_one_thousand_rows_returns_and_withdraw_clears_the_cell() {
     let _ = fs::remove_dir_all(&scratch);
 }
 
+/// From the superseded in-process FTS crate: stopwords alone are not a query.
+/// Here that is a granted miss, `I don't know.`, and the diary still writes nothing.
+#[test]
+fn stopwords_alone_are_a_miss_and_write_nothing() {
+    let _guard = disk_lock();
+    let scratch = scratch("stop");
+    let thread = RetrievalThread::spawn(RetrievalConfig {
+        remember: true,
+        knowledge_dir: Some(scratch.clone()),
+        fixture_rows: 1_000,
+    })
+    .expect("spawn");
+    thread
+        .ask_wait("the and of", 1, 1)
+        .expect("stopword ask");
+    let cell = thread.cell();
+    assert_eq!(cell.state, CellState::Miss);
+    assert!(cell.hits.is_empty());
+    assert_eq!(cell.answer, horbm::UNKNOWN_REPLY);
+    assert!(suspicious(&scratch).is_empty(), "{:?}", names(&scratch));
+    assert!(!scratch.join("revisions.sqlite").exists());
+    drop(thread);
+    let _ = fs::remove_dir_all(&scratch);
+}
+
 #[test]
 #[ignore = "set GALION_HORBM_REMEMBER=grant and GALION_HORBM_KNOWLEDGE to the card folder"]
 fn real_card_folder_is_read_and_not_written() {

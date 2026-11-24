@@ -650,6 +650,14 @@ mod tests {
         );
     }
 
+    /// Ported from the superseded phase-2 crate: a stopword-only ask is not a query.
+    #[test]
+    fn stopwords_alone_are_a_miss() {
+        let terms = horbm_memory::index_tokens("the and of");
+        assert!(terms.is_empty(), "{terms:?}");
+        assert!(!covers("the and of a marker", &terms));
+    }
+
     #[test]
     fn idle_is_empty_and_a_miss_is_not() {
         assert!(MemoryHitCell::idle().is_empty());

@@ -242,4 +242,16 @@ No change to `LOCKS.toml`. No edit to a missing `SOUL.md`. No model download. No
 | `cargo run -p galion-cascade --example domain04_dry_run` | one line, times `absent`, lengths `0` |
 | `cargo test -p galion-console --features phone-turn --lib turn_worker` | 10 passed |
 
-`cargo test --workspace` is the CI job in `.github/workflows/gates.yml`. It uses default features, so it runs the stamp tests and does not compile `phone.rs` or `turn_worker.rs`. The `--features cascade` and `--features phone-turn` commands are the ones that compile the glue.
+`cargo test --workspace` is the CI job in `.github/workflows/gates.yml`. It uses default features, so it runs the stamp tests and does not compile `phone.rs` or `turn_worker.rs`. The `--features cascade` and `--features phone-turn` commands compile the Unix phone glue. They are not Windows gates. `galion-cores` and the phone ASR parent use `std::os::unix`.
+
+## Windows gate
+
+Do not pass `--features cascade` on Windows. `speech_off_stamp_log_is_lengths_only` lives in `phone.rs` and is a Unix host check.
+
+```powershell
+Set-Location G:\galion\work\galion-one-voice
+cargo test -p galion-cascade --lib stamps::
+cargo run -p galion-cascade --example domain04_dry_run
+```
+
+The dry run must print `absent` for every time and `0` for every length, and the line must not contain a transcript word or a `RIFF` header.
