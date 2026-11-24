@@ -304,6 +304,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "galion-consent"
+version = "0.0.1"
+
+[[package]]
+name = "galion-cores"
+version = "0.0.1"
+
+[[package]]
 name = "galion-emotion"
 version = "0.1.0"
 
@@ -317,6 +325,24 @@ dependencies = [
 [[package]]
 name = "galion-emotion-in"
 version = "0.1.0"
+
+[[package]]
+name = "galion-heartbeat"
+version = "0.0.1"
+dependencies = [
+ "galion-emotion",
+]
+
+[[package]]
+name = "galion-ml-voice"
+version = "0.0.1"
+dependencies = [
+ "galion-consent",
+ "galion-cores",
+ "galion-emotion",
+ "galion-heartbeat",
+ "galion-tensor",
+]
 
 [[package]]
 name = "galion-mne-contract"
@@ -361,6 +387,10 @@ version = "0.0.1"
 dependencies = [
  "galion-emotion",
 ]
+
+[[package]]
+name = "galion-tensor"
+version = "0.0.1"
 
 [[package]]
 name = "galion-tts-piper"
@@ -444,6 +474,17 @@ dependencies = [
  "serde",
  "serde_json",
  "toml",
+]
+
+[[package]]
+name = "horbm-soak"
+version = "0.0.1"
+dependencies = [
+ "galion-emotion-core",
+ "galion-ml-voice",
+ "horbm",
+ "horbm-duplex",
+ "horbm-voice",
 ]
 
 [[package]]

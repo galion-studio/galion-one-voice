@@ -7,7 +7,9 @@
 //! is the published stand-in rest, with the speaker id set to Samantha.
 //! Those numbers are not a measured voice.
 
-use galion_emotion_core::{EmotionCore, IntentMsg, VoiceBaseline, AROUSAL, DOMINANCE, VALENCE};
+use galion_emotion_core::{
+    EmotionCore, IntentMsg, MomentState, VoiceBaseline, AROUSAL, DOMINANCE, VALENCE,
+};
 
 use crate::ports::{Affect, Emotion};
 
@@ -38,6 +40,12 @@ impl CoreAffect {
     #[must_use]
     pub fn frames(&self) -> u32 {
         self.core.frames()
+    }
+
+    /// The living moment. The baseline is [`Self::baseline`], not this.
+    #[must_use]
+    pub fn moment(&self) -> MomentState {
+        self.core.moment()
     }
 
     /// One intent on the core clock. An off-clock intent leaves the core

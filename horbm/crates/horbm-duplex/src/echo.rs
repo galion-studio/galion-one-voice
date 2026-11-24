@@ -93,19 +93,37 @@ impl PlaybackEcho {
     /// The far end is whatever [`Self::note_playback`] stored on the
     /// previous tick. A disabled filter returns the same samples.
     pub fn cancel(&mut self, mic: &[i16]) -> Result<Vec<i16>, LoopError> {
-        if mic.len() != FRAME_SAMPLES {
+        let mut out = vec![0i16; FRAME_SAMPLES];
+        self.cancel_into(mic, &mut out)?;
+        Ok(out)
+    }
+
+    /// Same as [`Self::cancel`], writing into `out`.
+    ///
+    /// `out` must already be one frame. This does not allocate that frame.
+    /// When echo removal is on, each block still comes back from `fdaf-aec`
+    /// as a new buffer. That crate's `process` returns a `Vec`.
+    pub fn cancel_into(&mut self, mic: &[i16], out: &mut [i16]) -> Result<(), LoopError> {
+        if mic.len() != FRAME_SAMPLES || out.len() != FRAME_SAMPLES {
+            let got = if mic.len() != FRAME_SAMPLES {
+                mic.len()
+            } else {
+                out.len()
+            };
             return Err(LoopError::Frame {
-                got: mic.len(),
+                got,
                 expected: FRAME_SAMPLES,
             });
         }
         if self.enabled() {
             #[cfg(feature = "aec")]
             {
-                return Ok(self.filter(mic));
+                self.filter_into(mic, out);
+                return Ok(());
             }
         }
-        Ok(mic.to_vec())
+        out.copy_from_slice(mic);
+        Ok(())
     }
 
     /// Far-end frame that pairs with the next microphone frame.
@@ -140,8 +158,7 @@ impl PlaybackEcho {
     }
 
     #[cfg(feature = "aec")]
-    fn filter(&mut self, mic: &[i16]) -> Vec<i16> {
-        let mut out = vec![0i16; FRAME_SAMPLES];
+    fn filter_into(&mut self, mic: &[i16], out: &mut [i16]) {
         let mut offset = 0;
         while offset < FRAME_SAMPLES {
             for index in 0..BLOCK {
@@ -155,7 +172,6 @@ impl PlaybackEcho {
             }
             offset += BLOCK;
         }
-        out
     }
 }
 

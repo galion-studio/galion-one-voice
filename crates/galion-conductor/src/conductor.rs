@@ -10,9 +10,15 @@
 
 use crate::brain::{ClauseBrain, PickedClause};
 use crate::clock::{
-    VirtualClock, COMMIT_SILENCE_FRAMES, DUCK_MS, FRAME_MS, HANG_FRAMES, PAUSE_MS,
-    SIDE_BAND_CAP_MS, STABLE_TICKS,
+    VirtualClock, COMMIT_SILENCE_FRAMES, DUCK_MS, FRAME_MS, HANG_FRAMES, MIXER_RESUME_QUIET_MS,
+    PAUSE_MS, SIDE_BAND_CAP_MS, STABLE_TICKS,
 };
+
+/// Quiet frames after a barge before the floor listens again.
+/// `MIXER_RESUME_QUIET_MS` is 240, one frame is 80, so this is 3.
+const RESUME_QUIET_FRAMES: u32 = MIXER_RESUME_QUIET_MS / FRAME_MS;
+
+const _: () = assert!(RESUME_QUIET_FRAMES == 3);
 use crate::lexicon::is_listed_backchannel;
 use crate::mne::read_back;
 use crate::reaction::{Reaction, ReactionKind, REACTION_SAMPLES};
@@ -80,6 +86,8 @@ pub struct Conductor<B: ClauseBrain, R: ResearchClient = OfflineClient> {
     ducked: bool,
     silence_next: bool,
     cancel: bool,
+    /// Quiet frames seen while [`Self::cancel`] is set. Speech resets it.
+    resume_quiet: u32,
     brain_calls: u32,
     rollbacks: u32,
     reaction_kind: ReactionKind,
@@ -152,6 +160,7 @@ impl<B: ClauseBrain, R: ResearchClient> Conductor<B, R> {
             ducked: false,
             silence_next: false,
             cancel: false,
+            resume_quiet: 0,
             brain_calls: 0,
             rollbacks: 0,
             reaction_kind,
@@ -190,6 +199,40 @@ impl<B: ClauseBrain, R: ResearchClient> Conductor<B, R> {
 
     pub fn research(&self) -> &R {
         &self.research
+    }
+
+    /// The mouth finished the committed clause. Return to listening.
+    ///
+    /// A paused floor (barge-in) is left alone. Three quiet frames after
+    /// that pause call [`Self::resume_listening`] from the tick.
+    pub fn mouth_idle(&mut self) {
+        if self.cancel || self.silence_next {
+            return;
+        }
+        if !matches!(self.floor, Floor::Speaking | Floor::Ducked) {
+            return;
+        }
+        self.enter_listening();
+    }
+
+    fn enter_listening(&mut self) {
+        self.floor = Floor::Listening;
+        self.partial.clear();
+        self.stable_ticks = 0;
+        self.silent_ticks = 0;
+        self.had_speech = false;
+        self.cell = None;
+        self.committed = None;
+        self.overlap_ms = 0;
+        self.ducked = false;
+        self.silence_next = false;
+        self.pending_reaction = None;
+    }
+
+    fn resume_listening(&mut self) {
+        self.cancel = false;
+        self.resume_quiet = 0;
+        self.enter_listening();
     }
 
     /// Advance one virtual frame. Does not read a wall clock.
@@ -258,7 +301,15 @@ impl<B: ClauseBrain, R: ResearchClient> Conductor<B, R> {
     }
 
     fn on_quiet(&mut self, t_us: u64, event: &mut TickEvent) {
-        if self.cancel || *event == TickEvent::BargeIn {
+        if self.cancel {
+            // The frame that applies silence is the barge itself, not a
+            // quiet frame of the pause that follows it.
+            if *event != TickEvent::BargeIn {
+                self.resume_quiet = self.resume_quiet.saturating_add(1);
+                if self.resume_quiet >= RESUME_QUIET_FRAMES {
+                    self.resume_listening();
+                }
+            }
             return;
         }
         if self.had_speech && self.silent_ticks == 0 {
@@ -292,6 +343,9 @@ impl<B: ClauseBrain, R: ResearchClient> Conductor<B, R> {
 
     fn on_speech(&mut self, text: &str, event: &mut TickEvent) {
         if self.cancel || *event == TickEvent::BargeIn {
+            if self.cancel {
+                self.resume_quiet = 0;
+            }
             return;
         }
         let trimmed = text.trim();

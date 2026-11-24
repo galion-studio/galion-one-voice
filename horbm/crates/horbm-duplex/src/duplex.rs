@@ -216,6 +216,12 @@ where
         &self.mouth
     }
 
+    /// The emotion port. The soak reads the moment from here.
+    #[must_use]
+    pub fn emotion(&self) -> &E {
+        &self.emotion
+    }
+
     /// One 80 ms frame. A short buffer leaves the clock where it was.
     pub fn tick(&mut self, pcm: &[i16]) -> Result<FrameOut, LoopError> {
         if pcm.len() != FRAME_SAMPLES {
@@ -224,9 +230,16 @@ where
                 expected: FRAME_SAMPLES,
             });
         }
+        if self.me_started && !self.yielded && !self.mouth.speaking() {
+            self.conductor.mouth_idle();
+            self.me_started = false;
+            self.skip_pull = false;
+            self.partial.clear();
+        }
         let t_ms = self.conductor.t_ms();
         let t32 = u32::try_from(t_ms).unwrap_or(u32::MAX);
-        let cleaned = self.echo.cancel(pcm)?;
+        let mut cleaned = [0i16; FRAME_SAMPLES];
+        self.echo.cancel_into(pcm, &mut cleaned)?;
         let cue = self.sense.hear(&cleaned);
         self.last_cue = cue;
         let voiced = if cue.enabled {
@@ -314,6 +327,12 @@ where
 
         let speaking = me_audible || (self.mouth.speaking() && !self.yielded);
         let breath = self.breath.cue(t32, speaking);
+        if self.yielded && matches!(out.floor, ConductorFloor::Listening) {
+            self.yielded = false;
+            self.me_started = false;
+            self.skip_pull = false;
+            self.partial.clear();
+        }
         Ok(FrameOut {
             t_ms: out.t_ms,
             event,
@@ -355,6 +374,9 @@ where
         if self.you_open {
             let _final = self.recognizer.finish().map_err(LoopError::from)?;
             self.you_open = false;
+            // The conductor already stored this partial. Clearing it here
+            // keeps a later residual from looking like a new utterance.
+            self.partial.clear();
         }
         Ok(())
     }
