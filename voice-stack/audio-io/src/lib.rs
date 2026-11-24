@@ -9,7 +9,7 @@
 //! `crates/galion-console/assets/v1-screen.html`). Playback matches the
 //! heartbeat: 24 kHz (`crates/galion-heartbeat/src/lib.rs`, 80 ms = 1920
 //! samples). Piper's 22050 Hz stream is resampled on the way in, the same
-//! rate pair `crates/galion-v2-live` already uses.
+//! rate pair `archive/2026-11-24/crates/galion-v2-live` already uses.
 //!
 //! The playback ring is lock-free. `Playback::barge_in` drops every sample
 //! queued at that instant. The next render period is silence. Samples pushed

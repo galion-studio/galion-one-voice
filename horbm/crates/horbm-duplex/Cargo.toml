@@ -1,0 +1,20 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Galion Labs
+
+[package]
+name = "horbm-duplex"
+description = "Closed full-duplex HORBM loop. One 80 ms clock, you and me live together. Recognizer, emotion, breath, and persona are ports."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+horbm = { path = "../horbm" }
+horbm-voice = { path = "../horbm-voice" }
+galion-conductor = { path = "../../../crates/galion-conductor" }
+
+[dev-dependencies]
+horbm = { path = "../horbm" }
+horbm-voice = { path = "../horbm-voice" }

@@ -8,7 +8,7 @@ Perpetual Open MIT License. (c) 2026 Galion Labs.
 | Written | 2026-11-24. No voice audio, no recording, no weight, no network call. |
 | Base | `main` `8caa52a`. Phase 4 clause pick and the phase 5 conductor stay as they are. This core adds the moment beside them. |
 | Crate | `crates/galion-emotion-core`. HORBM calls it from `horbm::Brain`. |
-| Locks | `LOCKS.toml` unchanged. `SOUL.md` is not in this tree; nothing was added. |
+| Locks | S11 left `LOCKS.toml` unchanged. S15 adds `[consent] learn = "deny"` (see `F-inner-life.md`). `SOUL.md` is not in this tree; nothing was added. |
 
 The core is the speaker's moment: a point and a velocity on valence, arousal, dominance, and approach. It is not a list of emotions. The twelve names in `tools/emotion-v2/harness/emotions.py`, and the design coordinates in `emotion-v2/emotions.toml`, are a projection (`project_universal`). The step does not compute that projection and does not write a Cowen pin. The 8-byte `EmotionWire` is produced by `galion-emotion::encode_with_consent`. The three-bit affect label is cleared. Those three bits cannot hold an open state.
 
@@ -26,9 +26,9 @@ The couplings are stand-in knobs (`FATIGUE_AROUSAL` and the rest in `factors.rs`
 
 ## Intent, consent, ports
 
-Inner life is not built. `standins/` holds four fixed files (`persona.txt`, `memory.txt`, `inner-life.txt`, `intent.txt`), schema `galion-emotion-standin/1`. Memory and the care/want/expect lines are context. They do not move the moment. The intent script expands to one `IntentMsg` per frame.
+`standins/` holds four fixed files (`persona.txt`, `memory.txt`, `inner-life.txt`, `intent.txt`), schema `galion-emotion-standin/1`. Persona and memory are stand-ins. `inner-life.txt` seeds `InnerLife` (`F-inner-life.md`). The file and the memory cards do not move the moment. The intent script still expands to one `IntentMsg` per frame for `replay`.
 
-`IntentMsg` is 72 bytes, magic `GEMI`, version 1, little-endian. The verb is an open ASCII token of at most 16 bytes, not a category. A pull is an offset from the baseline. Encode and decode are byte-identical for a valid message.
+`IntentMsg` is 72 bytes, magic `GEMI`, version 1, little-endian. The verb is an open ASCII token of at most 16 bytes, not a category. A pull is an offset from the baseline. Encode and decode are byte-identical for a valid message. The inner-life layer uses this message in both directions. It does not define another one.
 
 Consent is EmotionWire byte 7, low four bits, default deny: `sense`, `adapt`, `remember`, `share`. Her own intent moves the moment with every bit off. An inbound pull is mixed only when `sense` and `adapt` are both on. Inbound factor fields are ignored. `remember` gates `persisted_baseline`. `share` gates `shared_wire`. `local_wire` stays inside the runtime either way. Outbound expression does not require the caller's sense, which is the rule already in `galion-emotion`.
 
@@ -38,7 +38,7 @@ Consent is EmotionWire byte 7, low four bits, default deny: `sense`, `adapt`, `r
 
 `STEP_ALLOC_BUDGET` is 0. `STEP_FLOP_BUDGET` is 96, counted by hand from `apply`. The measured check is `tests/zero_alloc.rs`: a thousand steps, the cue, and the local wire, with a counting allocator.
 
-Not in this crate: a model of cares and wants, a lungs planner, a category classifier, voice audio, and any write to `LOCKS.toml`. `galion-feeling` remains the document chase over `galion-mne-contract`. This core is the fixed-size state the brain and the conductor call.
+Not in this crate: a lungs planner, a category classifier, voice audio, and learning of a new care or want (`LOCKS.toml` `[consent] learn` is deny; see `F-inner-life.md`). `galion-feeling` remains the document chase over `galion-mne-contract`. This core is the fixed-size state the brain and the conductor call.
 
 ```shell
 cargo test -p galion-emotion-core

@@ -18,9 +18,9 @@ The companion does not get a second audio stack, a second emotion type, or a sec
 |---|---|
 | 80 ms frame, 24 kHz, 1920 samples | `LOCKS.toml`, `galion_emotion::rika::FRAME_MS` |
 | Mic trait, one frame per tick | `galion_console::mic::MicSource` |
-| Energy VAD and the two-stage endpointer | `crates/galion-v2-live` (`vad.rs`, `endpoint.rs`), its own workspace |
+| Energy VAD and the two-stage endpointer | Running copy is in `voice-stack/local-server`. The original lane is archived at `archive/2026-11-24/crates/galion-v2-live` (`vad.rs`, `endpoint.rs`). |
 | Vosk, out of process | `crates/galion-asr-vosk` |
-| Warm Piper, JSON line in, PCM out | `crates/galion-v2-live/src/piper.rs`, runtime `runtimes/galion-piper-rt` |
+| Warm Piper, JSON line in, PCM out | Running child is `voice-stack/tts-piper-stream` plus `runtimes/galion-piper-rt`. The old lane's notes are `archive/2026-11-24/crates/galion-v2-live/src/piper.rs`. |
 | Prosody knobs and the Samantha profile | `galion-emotion` `ProsodyControl`, `SAMANTHA` |
 | Consent, default deny | `galion-emotion` `ConsentGate`, `EmotionWire` |
 | One dot | `galion-render` `DotState`, `LOCKS.toml` `[ui]` |
