@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
-//! Intent message between a stand-in inner life and the MnE stack.
+//! Intent message between the inner life and the MnE stack.
 //!
 //! Fixed 72 bytes, little-endian, magic `GEMI`, version 1. The verb is an
 //! open token of at most 16 ASCII bytes. It is not an emotion category.
