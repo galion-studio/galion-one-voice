@@ -78,7 +78,7 @@ pub fn parse_emotion(s: &str) -> Option<Emotion> {
 
 /// The EN lane cascade type.
 pub type EnCascade = Cascade<MlAsr<StubAsr>, FixedEmotion, MockLlm, MlTts<StubTts>>;
-pub fn en_cascade(emotion: Emotion) -> EnCascade { Cascade { asr: MlAsr(StubAsr), emo: FixedEmotion(emotion), llm: MockLlm, tts: MlTts(StubTts) } }
+pub fn en_cascade(emotion: Emotion) -> EnCascade { Cascade { asr: MlAsr(StubAsr), emo: FixedEmotion(emotion), llm: MockLlm, tts: MlTts(StubTts), last_stamps: galion_turn_stamps::TurnStamps::dry() } }
 
 /// One finished demo turn.
 pub struct DemoTurn {

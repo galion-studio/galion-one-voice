@@ -106,6 +106,8 @@ pub struct TurnReply {
     pub error: Option<String>,
     pub in_ms: u32,
     pub took_ms: u32,
+    /// Domain-04 sheet from the cascade. Lengths and times. No transcript and no PCM.
+    pub stamps: galion_turn_stamps::TurnStamps,
 }
 
 impl TurnReply {
@@ -382,6 +384,7 @@ fn respond_speak(lane: &mut PhoneLane, mut job: SpeakJob, gate: &BusGate, prosod
                 in_ms: 0,
                 took_ms: t0.elapsed().as_millis() as u32,
                 persona,
+                stamps: t.stamps,
             })
         }
         Err(PhoneError::Superseded) => None,
@@ -404,6 +407,7 @@ fn respond_speak(lane: &mut PhoneLane, mut job: SpeakJob, gate: &BusGate, prosod
                 in_ms: 0,
                 took_ms: t0.elapsed().as_millis() as u32,
                 persona,
+                stamps: lane.stamps(),
             })
         }
     }
@@ -449,17 +453,13 @@ fn respond_voice_stack(
                 String::new(),
                 "none",
                 "none",
+                lane.stamps(),
             ))
         }
     };
     let Some(cue) = research_cue(&transcript) else {
-        return pack_phone(
-            job.id,
-            persona,
-            in_ms,
-            t0,
-            lane.speak_heard(transcript, asr),
-        );
+        let heard = lane.speak_heard(transcript, asr);
+        return pack_phone(job.id, persona, in_ms, t0, heard, lane.stamps());
     };
     let llm = if cue.question.is_empty() {
         "research"
@@ -474,7 +474,7 @@ fn respond_voice_stack(
     if galion_cascade::contains_forbidden(&spoken) {
         spoken = galion_cascade::REFUSED.to_string();
     }
-    let mut result = lane.speak_fixed(&spoken);
+    let mut result = lane.speak_kept(&spoken);
     if let Ok(turn) = result.as_mut() {
         turn.transcript = transcript.clone();
         turn.asr = asr;
@@ -484,7 +484,17 @@ fn respond_voice_stack(
     let mut reply = match result {
         Ok(turn) => pack_ok(job.id, RESEARCH_VOICE, in_ms, t0, turn),
         Err(PhoneError::Superseded) => return None,
-        Err(e) => lane_error(job.id, RESEARCH_VOICE, in_ms, t0, e, spoken, asr.id(), llm),
+        Err(e) => lane_error(
+            job.id,
+            RESEARCH_VOICE,
+            in_ms,
+            t0,
+            e,
+            spoken,
+            asr.id(),
+            llm,
+            lane.stamps(),
+        ),
     };
     if reply.error.is_none() {
         reply.stages = format!("research=handoff {}", reply.stages);
@@ -502,6 +512,7 @@ fn pack_phone(
     in_ms: u32,
     t0: Instant,
     result: Result<galion_cascade::PhoneTurn, PhoneError>,
+    stamps: galion_turn_stamps::TurnStamps,
 ) -> Option<TurnReply> {
     match result {
         Ok(turn) => Some(pack_ok(id, persona, in_ms, t0, turn)),
@@ -515,6 +526,7 @@ fn pack_phone(
             String::new(),
             "none",
             "none",
+            stamps,
         )),
     }
 }
@@ -546,6 +558,7 @@ fn pack_ok(
         in_ms,
         took_ms: t0.elapsed().as_millis() as u32,
         persona,
+        stamps: t.stamps,
     }
 }
 
@@ -558,6 +571,7 @@ fn lane_error(
     text: String,
     asr: &'static str,
     llm: &'static str,
+    stamps: galion_turn_stamps::TurnStamps,
 ) -> TurnReply {
     let kind = match &e {
         PhoneError::AsrUnratified(_) => "AsrUnratified (set GALION_ASR=vosk and place the small-en model; docs/asr/VOSK.md)",
@@ -584,6 +598,7 @@ fn lane_error(
         in_ms,
         took_ms: t0.elapsed().as_millis() as u32,
         persona,
+        stamps,
     }
 }
 
@@ -609,7 +624,17 @@ fn respond_seamed(
         Ok(v) => v,
         Err(PhoneError::Superseded) => return None,
         Err(e) => {
-            return Some(lane_error(id, persona, in_ms, t0, e, String::new(), "none", "none"))
+            return Some(lane_error(
+                id,
+                persona,
+                in_ms,
+                t0,
+                e,
+                String::new(),
+                "none",
+                "none",
+                lane.stamps(),
+            ))
         }
     };
     let asr_label = asr.id();
@@ -619,7 +644,7 @@ fn respond_seamed(
     let token = decision.stage_token();
     let result = match decision.reply_from {
         ReplyFrom::Stored { text, .. } => {
-            let mut result = lane.speak_fixed(&text);
+            let mut result = lane.speak_kept(&text);
             if let Ok(turn) = result.as_mut() {
                 turn.transcript = transcript;
                 turn.asr = asr;
@@ -638,7 +663,17 @@ fn respond_seamed(
         }
         Err(PhoneError::Superseded) => None,
         Err(e) => {
-            let mut reply = lane_error(id, persona, in_ms, t0, e, String::new(), asr_label, "none");
+            let mut reply = lane_error(
+                id,
+                persona,
+                in_ms,
+                t0,
+                e,
+                String::new(),
+                asr_label,
+                "none",
+                lane.stamps(),
+            );
             reply.stages = token;
             Some(reply)
         }
@@ -698,6 +733,7 @@ fn respond(
                 in_ms,
                 took_ms: t0.elapsed().as_millis() as u32,
                 persona,
+                stamps: t.stamps,
             })
         }
         Err(PhoneError::Superseded) => None,
@@ -727,6 +763,7 @@ fn respond(
                 in_ms,
                 took_ms: t0.elapsed().as_millis() as u32,
                 persona,
+                stamps: lane.stamps(),
             })
         }
     }
@@ -903,6 +940,7 @@ mod tests {
             persona: "samantha",
             in_ms: 1,
             took_ms: 1,
+            stamps: galion_turn_stamps::TurnStamps::dry(),
         };
         reply.wipe();
         assert!(reply.pcm.iter().all(|&s| s == 0));

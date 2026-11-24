@@ -1,0 +1,17 @@
+# Galion Voice — Perpetual Open MIT License
+[package]
+name = "galion-turn-stamps"
+description = "Domain-04 turn stamps on the cascade clock. Lengths and heartbeat times only. No transcripts and no PCM."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version = "1.85"
+publish = false
+
+[dependencies]
+galion-heartbeat = { path = "../galion-heartbeat", default-features = false }
+
+[[bin]]
+name = "horbm-stamp-bench"
+path = "src/bin/stamp_bench.rs"

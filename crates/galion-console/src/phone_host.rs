@@ -385,6 +385,17 @@ pub fn jarvis_hub_wav(pcm: &[i16]) -> Option<Vec<u8>> {
 
 impl PhoneHost {
     fn publish(&mut self, r: TurnReply) {
+        let sheet = r.stamps.with_turn_id(r.id);
+        let stamp_msg = BusMsg::turn_stamps(
+            self.bus.alloc_id(),
+            r.id,
+            self.t_ms,
+            self.bus.cancel(),
+            sheet,
+        );
+        if let Some(stamp_msg) = self.bus.before_publish(stamp_msg) {
+            let _ = self.bus.try_send(stamp_msg);
+        }
         let speech = BusMsg::speech_pcm(
             self.bus.alloc_id(),
             r.id,

@@ -182,6 +182,7 @@ dependencies = [
  "galion-asr-vosk",
  "galion-ml-voice",
  "galion-tensor",
+ "galion-turn-stamps",
 ]
 
 [[package]]
@@ -208,6 +209,7 @@ dependencies = [
  "galion-presence",
  "galion-render",
  "galion-tensor",
+ "galion-turn-stamps",
  "ratatui",
 ]
 
@@ -315,6 +317,13 @@ name = "galion-tensor"
 version = "0.0.1"
 dependencies = [
  "rayon",
+]
+
+[[package]]
+name = "galion-turn-stamps"
+version = "0.0.1"
+dependencies = [
+ "galion-heartbeat",
 ]
 
 [[package]]

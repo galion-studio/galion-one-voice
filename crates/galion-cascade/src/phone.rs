@@ -57,10 +57,12 @@ use crate::hermes::HermesLlm;
 use crate::student::StudentLlm;
 use crate::{CascadeError, Emotion, Lang, Llm, MockLlm, Transcript};
 use galion_ml_voice::speech::{resample, SpeechStack};
+use galion_turn_stamps::{char_len, sample_len, HeartbeatClock, TurnStamps};
 
 pub use galion_ml_voice::speech::FrameProsody;
 use galion_ml_voice::stub::SAMPLES_PER_CHAR;
 use galion_ml_voice::VoiceError;
+use std::cell::Cell;
 use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 use std::time::Instant;
@@ -229,6 +231,8 @@ pub struct PhoneTurn {
     pub speech_backend: &'static str,
     /// Human label of the speech backend.
     pub speech_label: String,
+    /// Domain-04 sheet. Lengths and heartbeat times. Not the transcript and not the WAV.
+    pub stamps: TurnStamps,
 }
 
 /// S4 ASR for the phone path. Input is 16 kHz mono PCM16.
@@ -366,6 +370,8 @@ pub struct PhoneLane {
     asr: PhoneTurnAsr,
     llm: Box<dyn Llm + Send>,
     speech: SpeechStack,
+    clock: HeartbeatClock,
+    stamps: Cell<TurnStamps>,
 }
 
 fn ms_since(t: Instant) -> u32 { t.elapsed().as_millis().min(u32::MAX as u128) as u32 }
@@ -385,7 +391,31 @@ impl PhoneLane {
             LlmMode::Student => Box::new(StudentLlm),
         };
         speech.prewarm();
-        Self { cfg, asr: PhoneTurnAsr::new(cfg.asr), llm, speech }
+        Self {
+            cfg,
+            asr: PhoneTurnAsr::new(cfg.asr),
+            llm,
+            speech,
+            clock: HeartbeatClock::start(),
+            stamps: Cell::new(TurnStamps::dry()),
+        }
+    }
+
+    /// Last domain-04 sheet. Lengths and times only.
+    pub fn stamps(&self) -> TurnStamps {
+        self.stamps.get()
+    }
+
+    fn reset_sheet(&self, pcm_samples: u32) {
+        let mut sheet = TurnStamps::dry();
+        sheet.pcm_samples = pcm_samples;
+        self.stamps.set(sheet);
+    }
+
+    fn note_sheet(&self, f: impl FnOnce(&mut TurnStamps)) {
+        let mut sheet = self.stamps.get();
+        f(&mut sheet);
+        self.stamps.set(sheet);
     }
 
     /// Register for the next Hermes completion (`samantha` or `jarvis`).
@@ -438,17 +468,39 @@ impl PhoneLane {
     /// One full turn: 16 kHz mono PCM16 → [`PhoneTurn`] with 24 kHz WAV bytes.
     pub fn turn(&mut self, pcm16k: &[i16]) -> Result<PhoneTurn, PhoneError> {
         let t0 = Instant::now();
+        self.reset_sheet(sample_len(pcm16k.len()));
         let (transcript, asr) = self.asr.transcribe(pcm16k)?;
+        let asr_at = self.clock.now_ms();
+        let chars = char_len(&transcript);
+        self.note_sheet(|sheet| {
+            sheet.text_chars = chars;
+            sheet.t_asr_final = Some(asr_at);
+        });
         let asr_ms = ms_since(t0);
         self.speak_transcript(t0, asr_ms, transcript, asr)
     }
 
     /// Speak `text` as given. No ASR and no canned reply.
     /// The persona floor already chose the words. ASR label is `text-inject`.
+    /// This starts a fresh stamp sheet. A speak that continues [`Self::hear`]
+    /// uses [`Self::speak_kept`].
     pub fn speak_fixed(&mut self, text: &str) -> Result<PhoneTurn, PhoneError> {
+        self.speak_text(text, true)
+    }
+
+    /// Speak words chosen after [`Self::hear`]. Keeps `t_asr_final`, the heard
+    /// length, and the input sample count. Does not store the words.
+    pub fn speak_kept(&mut self, text: &str) -> Result<PhoneTurn, PhoneError> {
+        self.speak_text(text, false)
+    }
+
+    fn speak_text(&mut self, text: &str, fresh: bool) -> Result<PhoneTurn, PhoneError> {
         let mut owned = text.trim().to_string();
         if owned.is_empty() { return Err(PhoneError::Empty); }
         if owned.len() > 2000 { owned.truncate(2000); }
+        if fresh {
+            self.reset_sheet(0);
+        }
         let t0 = Instant::now();
         self.emit(t0, 0, 0, String::new(), AsrSource::TextInject, owned)
     }
@@ -459,7 +511,11 @@ impl PhoneLane {
         let t0 = Instant::now();
         let text = text.trim();
         if text.is_empty() { return Err(PhoneError::Empty); }
-        self.speak_transcript(t0, 0, text.to_string(), AsrSource::TextInject)
+        let owned = text.to_string();
+        self.reset_sheet(0);
+        let chars = char_len(&owned);
+        self.note_sheet(|sheet| sheet.text_chars = chars);
+        self.speak_transcript(t0, 0, owned, AsrSource::TextInject)
     }
 
     fn emit(
@@ -471,7 +527,17 @@ impl PhoneLane {
         asr: AsrSource,
         reply_text: String,
     ) -> Result<PhoneTurn, PhoneError> {
+        let reply_n = char_len(&reply_text);
+        self.note_sheet(|sheet| sheet.reply_chars = reply_n);
         if !self.speech.can_speak() { return Err(PhoneError::NoSpeech(self.speech.backend.label())); }
+        if reply_n > 0 {
+            let flushed = self.clock.now_ms();
+            self.note_sheet(|sheet| {
+                if sheet.t_first_clause_flushed.is_none() {
+                    sheet.t_first_clause_flushed = Some(flushed);
+                }
+            });
+        }
         self.speech.ensure_warm();
         let t2 = Instant::now();
         let audio = self.speech.speak(&reply_text).map_err(voice_to_phone)?;
@@ -480,10 +546,23 @@ impl PhoneLane {
         let tts_ms = ms_since(t2);
         let tts_first_pcm = self.speech.warmth().last_first_pcm_ms.unwrap_or(tts_ms);
         let first_audio_ms = ms_since(t0).saturating_sub(tts_ms.saturating_sub(tts_first_pcm));
+        let tts_at = self.clock.now_ms();
+        let audio_n = sample_len(pcm.len());
+        let llm_name = self.llm.name();
+        let speech_backend = self.speech.backend.id();
+        let speech_label = self.speech.backend.label();
+        self.note_sheet(|sheet| {
+            sheet.reply_chars = reply_n;
+            sheet.audio_samples = audio_n;
+            if audio_n > 0 {
+                sheet.t_tts_first_pcm = Some(tts_at);
+            }
+        });
         Ok(PhoneTurn {
             transcript, reply_text, wav_bytes: wav, ms: ms_since(t0),
             stage_ms: StageMs { asr: asr_ms, llm: llm_ms, tts: tts_ms, tts_first_pcm, first_audio_ms }, asr,
-            llm: self.llm.name(), speech_backend: self.speech.backend.id(), speech_label: self.speech.backend.label(),
+            llm: llm_name, speech_backend, speech_label,
+            stamps: self.stamps(),
         })
     }
 
@@ -500,6 +579,9 @@ impl PhoneLane {
         if !self.speech.can_speak() {
             return Err(PhoneError::NoSpeech(self.speech.backend.label()));
         }
+        let clock = self.clock;
+        self.note_sheet(|sheet| sheet.t_llm_req = Some(clock.now_ms()));
+        let cell = &self.stamps;
         let llm = &mut self.llm;
         let speech = &mut self.speech;
         let llm_name = llm.name();
@@ -528,6 +610,13 @@ impl PhoneLane {
                 *first_audio_ms = Some(ms_since(t0));
                 *tts_first_pcm = speech.warmth().last_first_pcm_ms;
             }
+            if !audio.samples.is_empty() {
+                let mut sheet = cell.get();
+                if sheet.t_tts_first_pcm.is_none() {
+                    sheet.t_tts_first_pcm = Some(clock.now_ms());
+                    cell.set(sheet);
+                }
+            }
             if samples.is_empty() {
                 *rate = audio.sample_rate;
                 samples.extend(audio.samples);
@@ -542,10 +631,24 @@ impl PhoneLane {
             &Transcript { text: transcript.clone(), lang: Lang::En },
             Emotion::Neutral,
             &mut |delta| {
+                if !delta.is_empty() {
+                    let mut sheet = cell.get();
+                    if sheet.t_llm_first_token.is_none() {
+                        sheet.t_llm_first_token = Some(clock.now_ms());
+                        cell.set(sheet);
+                    }
+                }
                 if speak_err.is_some() || early.blocked() {
                     return;
                 }
                 for sentence in early.push(delta) {
+                    if !sentence.is_empty() {
+                        let mut sheet = cell.get();
+                        if sheet.t_first_clause_flushed.is_none() {
+                            sheet.t_first_clause_flushed = Some(clock.now_ms());
+                            cell.set(sheet);
+                        }
+                    }
                     if let Err(e) = speak_sentence(speech, &mut samples, &mut rate, &mut tts_origin, &mut first_audio_ms, &mut tts_first_pcm, &sentence) {
                         speak_err = Some(e);
                         return;
@@ -559,6 +662,13 @@ impl PhoneLane {
         }
         if !early.blocked() {
             if let Some(tail) = early.finish() {
+                if !tail.is_empty() {
+                    let mut sheet = cell.get();
+                    if sheet.t_first_clause_flushed.is_none() {
+                        sheet.t_first_clause_flushed = Some(clock.now_ms());
+                        cell.set(sheet);
+                    }
+                }
                 speak_sentence(speech, &mut samples, &mut rate, &mut tts_origin, &mut first_audio_ms, &mut tts_first_pcm, &tail)?;
             }
         }
@@ -580,19 +690,36 @@ impl PhoneLane {
         let tts_ms = tts_origin.map(ms_since).unwrap_or(0);
         let tts_first_pcm = tts_first_pcm.unwrap_or(tts_ms);
         let first_audio_ms = first_audio_ms.unwrap_or_else(|| ms_since(t0));
+        let pcm = to_pcm16(&resample(&audio_samples, audio_rate, PHONE_OUT_RATE_HZ));
+        let reply_n = char_len(&reply_text);
+        let audio_n = sample_len(pcm.len());
+        let done = clock.now_ms();
+        {
+            let mut sheet = cell.get();
+            sheet.reply_chars = reply_n;
+            sheet.audio_samples = audio_n;
+            if sheet.t_first_clause_flushed.is_none() && reply_n > 0 {
+                sheet.t_first_clause_flushed = Some(done);
+            }
+            if sheet.t_tts_first_pcm.is_none() && audio_n > 0 {
+                sheet.t_tts_first_pcm = Some(done);
+            }
+            cell.set(sheet);
+        }
+        let speech_backend = speech.backend.id();
+        let speech_label = speech.backend.label();
+        let stamps = cell.get();
         Ok(PhoneTurn {
             transcript,
             reply_text,
-            wav_bytes: {
-                let pcm = to_pcm16(&resample(&audio_samples, audio_rate, PHONE_OUT_RATE_HZ));
-                wav_bytes(&pcm, PHONE_OUT_RATE_HZ)
-            },
+            wav_bytes: wav_bytes(&pcm, PHONE_OUT_RATE_HZ),
             ms: ms_since(t0),
             stage_ms: StageMs { asr: asr_ms, llm: llm_ms, tts: tts_ms, tts_first_pcm, first_audio_ms },
             asr,
             llm: llm_name,
-            speech_backend: speech.backend.id(),
-            speech_label: speech.backend.label(),
+            speech_backend,
+            speech_label,
+            stamps,
         })
     }
 
@@ -602,7 +729,15 @@ impl PhoneLane {
     /// Transcript only. The voice-stack worker calls this once, then either
     /// hands the question to research or continues with [`Self::speak_heard`].
     pub fn hear(&mut self, pcm16k: &[i16]) -> Result<(String, AsrSource), PhoneError> {
-        self.asr.transcribe(pcm16k)
+        self.reset_sheet(sample_len(pcm16k.len()));
+        let (text, src) = self.asr.transcribe(pcm16k)?;
+        let asr_at = self.clock.now_ms();
+        let chars = char_len(&text);
+        self.note_sheet(|sheet| {
+            sheet.text_chars = chars;
+            sheet.t_asr_final = Some(asr_at);
+        });
+        Ok((text, src))
     }
 
     /// [`hear`](Self::hear) from WAV bytes.
@@ -803,6 +938,38 @@ mod tests {
             assert_eq!(spawns, 1, "prewarm should be the only spawn");
             assert_eq!(spawns2, 1, "second turn must reuse the worker");
         }
+    }
+    #[test]
+    fn speak_kept_keeps_the_heard_stamp_and_prints_no_words() {
+        let mut l = PhoneLane::with_speech(cfg(AsrMode::Stub), galion_ml_voice::speech::SpeechStack::silent("off"));
+        let pcm = stub_fixture_pcm16("hello galion");
+        let (text, src) = l.hear(&pcm).unwrap();
+        assert_eq!(text, "hello galion");
+        assert_eq!(src, AsrSource::StubFixture);
+        let heard = l.stamps();
+        assert!(heard.t_asr_final.is_some());
+        assert!(heard.t_eou_decided.is_none());
+        assert!(heard.t_vad_silence_start.is_none());
+        assert!(heard.text_chars > 0);
+        assert!(heard.pcm_samples > 0);
+        let err = l.speak_kept("Any time.").unwrap_err();
+        assert!(matches!(err, PhoneError::NoSpeech(_)), "{err}");
+        let kept = l.stamps();
+        assert_eq!(kept.t_asr_final, heard.t_asr_final);
+        assert_eq!(kept.text_chars, heard.text_chars);
+        assert_eq!(kept.pcm_samples, heard.pcm_samples);
+        assert!(kept.reply_chars > 0);
+        assert!(kept.t_tts_first_pcm.is_none());
+        let log = kept.log();
+        assert!(galion_turn_stamps::log_is_lengths_only(&log));
+        assert!(!log.contains(&text));
+        assert!(!log.contains("hello"));
+        assert!(!log.contains("Any"));
+        assert!(!log.contains(' '));
+        let _ = l.speak_fixed("Any time.").unwrap_err();
+        assert!(l.stamps().t_asr_final.is_none());
+        assert_eq!(l.stamps().text_chars, 0);
+        assert_eq!(l.stamps().pcm_samples, 0);
     }
     #[test] fn speak_fixed_skips_the_canned_table() {
         let mut l = PhoneLane::with_speech(cfg(AsrMode::Stub), galion_ml_voice::speech::SpeechStack::silent("off"));

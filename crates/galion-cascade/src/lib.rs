@@ -120,20 +120,90 @@ impl Tts for MockTts {
 
 pub struct Turn { pub transcript: Transcript, pub emotion: Emotion, pub reply: String, pub audio: Vec<i16> }
 
-pub struct Cascade<A, E, L, T> { pub asr: A, pub emo: E, pub llm: L, pub tts: T }
+pub struct Cascade<A, E, L, T> {
+    pub asr: A,
+    pub emo: E,
+    pub llm: L,
+    pub tts: T,
+    /// Last turn's domain-04 sheet. Lengths and heartbeat times. No text, no PCM.
+    pub last_stamps: galion_turn_stamps::TurnStamps,
+}
 
 impl<A: Asr, E: EmotionIn, L: Llm, T: Tts> Cascade<A, E, L, T> {
+    /// ASR, the reply, and TTS. VAD and end-of-utterance stay absent: this lane
+    /// does not decide them. The sheet records lengths, not the words or the samples.
     pub fn turn(&mut self, pcm: &[i16]) -> Result<Turn, CascadeError> {
-        let transcript = self.asr.transcribe(pcm)?;
+        self.last_stamps = galion_turn_stamps::TurnStamps::dry();
+        if pcm.is_empty() {
+            return Err(CascadeError::Empty);
+        }
+        let mut clock = galion_turn_stamps::VirtualHeartbeat::new();
+        let mut stamps = galion_turn_stamps::TurnStamps::dry();
+        stamps.pcm_samples = galion_turn_stamps::sample_len(pcm.len());
+        let transcript = match self.asr.transcribe(pcm) {
+            Ok(t) => t,
+            Err(e) => {
+                self.last_stamps = stamps;
+                return Err(e);
+            }
+        };
+        stamps.t_asr_final = Some(clock.stamp());
+        stamps.text_chars = galion_turn_stamps::char_len(&transcript.text);
         let emotion = self.emo.classify(pcm);
-        let reply = self.llm.reply(&transcript, emotion)?;
-        let audio = self.tts.synth(&reply, transcript.lang)?;
+        stamps.t_llm_req = Some(clock.stamp());
+        let mut first_token = None;
+        let mut clause = None;
+        let reply = match self.llm.reply_deltas(&transcript, emotion, &mut |delta| {
+            if first_token.is_none() && !delta.is_empty() {
+                first_token = Some(clock.stamp());
+            }
+            if clause.is_none() && clause_boundary(delta) {
+                clause = Some(clock.stamp());
+            }
+        }) {
+            Ok(text) => text,
+            Err(e) => {
+                stamps.t_llm_first_token = first_token;
+                stamps.t_first_clause_flushed = clause;
+                self.last_stamps = stamps;
+                return Err(e);
+            }
+        };
+        stamps.t_llm_first_token = first_token;
+        if clause.is_none() && !reply.is_empty() {
+            clause = Some(clock.stamp());
+        }
+        stamps.t_first_clause_flushed = clause;
+        stamps.reply_chars = galion_turn_stamps::char_len(&reply);
+        let audio = match self.tts.synth(&reply, transcript.lang) {
+            Ok(pcm) => pcm,
+            Err(e) => {
+                self.last_stamps = stamps;
+                return Err(e);
+            }
+        };
+        if !audio.is_empty() {
+            stamps.t_tts_first_pcm = Some(clock.stamp());
+        }
+        stamps.audio_samples = galion_turn_stamps::sample_len(audio.len());
+        self.last_stamps = stamps;
         Ok(Turn { transcript, emotion, reply, audio })
     }
 }
 
+/// A clause is ready at punctuation. The characters are not stored.
+fn clause_boundary(delta: &str) -> bool {
+    delta.chars().any(|c| matches!(c, '.' | '!' | '?' | ',' | ';' | ':'))
+}
+
 pub fn mock_cascade() -> Cascade<MockAsr, MockEmotion, MockLlm, MockTts> {
-    Cascade { asr: MockAsr, emo: MockEmotion, llm: MockLlm, tts: MockTts }
+    Cascade {
+        asr: MockAsr,
+        emo: MockEmotion,
+        llm: MockLlm,
+        tts: MockTts,
+        last_stamps: galion_turn_stamps::TurnStamps::dry(),
+    }
 }
 
 pub use canned::{CannedLlm, ProsodyEmotion, ReplyLlm};
@@ -152,4 +222,36 @@ mod tests {
     #[test] fn empty_rejected() { assert!(matches!(mock_cascade().turn(&[]), Err(CascadeError::Empty))); }
     #[test] fn loud_is_angry() { assert_eq!(MockEmotion.classify(&[20_000; 160]), Emotion::Angry); }
     #[test] fn budgets() { assert!(BARGE_IN_BUDGET_MS < ONSET_P50_BUDGET_MS); }
+
+    #[test]
+    fn mock_turn_stamps_lengths_not_words() {
+        let mut lane = mock_cascade();
+        let turn = lane.turn(&[100; 1600]).unwrap();
+        let log = lane.last_stamps.log();
+        assert!(galion_turn_stamps::log_is_lengths_only(&log));
+        assert!(lane.last_stamps.t_vad_silence_start.is_none());
+        assert!(lane.last_stamps.t_eou_decided.is_none());
+        assert_eq!(lane.last_stamps.t_asr_final, Some(galion_turn_stamps::FRAME_MS));
+        assert!(lane.last_stamps.t_llm_req.unwrap() > lane.last_stamps.t_asr_final.unwrap());
+        assert!(lane.last_stamps.t_llm_first_token.is_some());
+        assert!(lane.last_stamps.t_first_clause_flushed.is_some());
+        assert!(lane.last_stamps.t_tts_first_pcm.is_some());
+        assert_eq!(lane.last_stamps.pcm_samples, 1600);
+        assert_eq!(lane.last_stamps.text_chars, galion_turn_stamps::char_len(&turn.transcript.text));
+        assert_eq!(lane.last_stamps.reply_chars, galion_turn_stamps::char_len(&turn.reply));
+        assert_eq!(lane.last_stamps.audio_samples, turn.audio.len() as u32);
+        assert!(!log.contains(&turn.transcript.text));
+        assert!(!log.contains(&turn.reply));
+        assert!(!log.contains("hello"));
+        assert!(!log.contains(' '));
+    }
+
+    #[test]
+    fn empty_turn_leaves_the_sheet_dry() {
+        let mut lane = mock_cascade();
+        assert!(matches!(lane.turn(&[]), Err(CascadeError::Empty)));
+        let log = lane.last_stamps.log();
+        assert_eq!(log, galion_turn_stamps::dry_run_report());
+        assert!(galion_turn_stamps::log_is_lengths_only(&log));
+    }
 }

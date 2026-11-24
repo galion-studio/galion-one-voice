@@ -372,6 +372,8 @@ pub enum BusBody {
         stage: String,
         kind: String,
     },
+    /// Domain-04 turn stamps. Lengths and heartbeat times. No transcript and no PCM.
+    TurnStamps(galion_turn_stamps::TurnStamps),
 }
 
 impl BusMsg {
@@ -568,6 +570,23 @@ impl BusMsg {
         }
     }
 
+    /// Domain-04 sheet. The body is lengths and times. Do not put pcm or a transcript here.
+    pub fn turn_stamps(
+        id: u64,
+        turn_id: u64,
+        t_ms: u64,
+        cancel: u64,
+        stamps: galion_turn_stamps::TurnStamps,
+    ) -> Self {
+        Self {
+            id,
+            turn_id,
+            t_ms,
+            cancel,
+            body: BusBody::TurnStamps(stamps.with_turn_id(turn_id)),
+        }
+    }
+
     /// `kind` is a short error class. Do not put pcm or a transcript here.
     pub fn fault(
         id: u64,
@@ -667,6 +686,7 @@ struct Inner {
     partials: Mutex<VecDeque<BusMsg>>,
     replies: Mutex<VecDeque<BusMsg>>,
     faults: Mutex<VecDeque<BusMsg>>,
+    stamps: Mutex<VecDeque<BusMsg>>,
     job_rx: Mutex<Option<Receiver<BusMsg>>>,
     /// Held so the worker-reply `sync_channel` stays connected for `try_send`.
     #[allow(dead_code)]
@@ -757,6 +777,7 @@ impl ProcessBus {
                 partials: Mutex::new(VecDeque::new()),
                 replies: Mutex::new(VecDeque::new()),
                 faults: Mutex::new(VecDeque::new()),
+                stamps: Mutex::new(VecDeque::new()),
                 job_rx: Mutex::new(Some(job_rx)),
                 worker_reply_rx: Mutex::new(Some(worker_reply_rx)),
             }),
@@ -848,6 +869,12 @@ impl ProcessBus {
             BusBody::Fault { .. } => {
                 self.enqueue_fifo(&self.inner.faults, FAULT_DEPTH, msg, Stale::Quiet)
             }
+            BusBody::TurnStamps(_) => self.enqueue_fifo(
+                &self.inner.stamps,
+                galion_turn_stamps::STAMP_DEPTH,
+                msg,
+                Stale::Publish,
+            ),
             BusBody::BargeIn { .. } => SendOutcome::Applied,
         })
     }
@@ -907,6 +934,11 @@ impl ProcessBus {
 
     pub fn try_recv_reply(&self) -> Option<BusMsg> {
         lock(&self.inner.replies).pop_front()
+    }
+
+    /// Oldest domain-04 sheet. The body has lengths and times, not words or PCM.
+    pub fn try_recv_stamps(&self) -> Option<BusMsg> {
+        lock(&self.inner.stamps).pop_front()
     }
 
     pub fn try_recv_consent(&self) -> Option<BusMsg> {
@@ -1015,6 +1047,10 @@ impl ProcessBus {
             .dropped_before_publish
             .fetch_add(n, Ordering::Relaxed);
         let _ = retain_fifo(&self.inner.faults, c);
+        let n = retain_fifo(&self.inner.stamps, c);
+        self.inner
+            .dropped_before_publish
+            .fetch_add(n, Ordering::Relaxed);
     }
 
     fn sense_granted(&self) -> bool {
@@ -1614,6 +1650,29 @@ mod tests {
             BusBody::Fault { stage, kind } => {
                 assert_eq!(stage, "asr");
                 assert_eq!(kind, "AsrUnratified");
+            }
+            other => panic!("{other:?}"),
+        }
+    }
+
+    #[test]
+    fn stamp_lane_is_lengths_not_words() {
+        let bus = ProcessBus::new();
+        let sheet = galion_turn_stamps::TurnStamps::dry();
+        bus.try_send(BusMsg::turn_stamps(bus.alloc_id(), 7, 80, 0, sheet))
+            .unwrap();
+        let msg = bus.try_recv_stamps().unwrap();
+        assert_eq!(msg.turn_id, 7);
+        assert_eq!(msg.t_ms, 80);
+        match msg.body {
+            BusBody::TurnStamps(got) => {
+                let log = got.log();
+                assert!(galion_turn_stamps::log_is_lengths_only(&log));
+                assert!(log.contains("t_vad_silence_start=absent\n"));
+                assert!(log.contains("pcm_samples=0\n"));
+                assert!(!log.contains("hello"));
+                assert!(!log.contains(' '));
+                assert_eq!(got.turn_id, 7);
             }
             other => panic!("{other:?}"),
         }
