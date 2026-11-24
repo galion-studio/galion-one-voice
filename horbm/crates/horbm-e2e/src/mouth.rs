@@ -50,6 +50,11 @@ fn open_flite() -> Result<FliteTts, String> {
     FliteTts::open(&voice).map_err(|err| one_line(&err))
 }
 
+/// `libflite` opened. The ear's generated sentences use this voice.
+pub fn flite_ready() -> bool {
+    open_flite().is_ok()
+}
+
 fn one_line(err: &impl std::fmt::Display) -> String {
     err.to_string().replace(['\n', '\r'], " ")
 }

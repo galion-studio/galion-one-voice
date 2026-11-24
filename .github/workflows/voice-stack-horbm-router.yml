@@ -1,6 +1,9 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 Galion Labs
-# Layer 5 router and the localhost research gateway. No model download.
+# Layer 5 router and the localhost research gateway.
+# The end-to-end smoke may fetch the pinned Vosk small-en model into a
+# cache outside the checkout. A failed fetch leaves asr=stub.
+# The router tests do not download a model.
 
 name: voice-stack horbm router
 

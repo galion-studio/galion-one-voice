@@ -200,6 +200,7 @@ dependencies = [
  "horbm",
  "horbm-duplex",
  "horbm-voice",
+ "sha2",
 ]
 
 [[package]]
