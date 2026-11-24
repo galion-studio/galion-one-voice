@@ -222,6 +222,13 @@ name = "galion-emotion"
 version = "0.1.0"
 
 [[package]]
+name = "galion-emotion-core"
+version = "0.1.0"
+dependencies = [
+ "galion-emotion",
+]
+
+[[package]]
 name = "galion-heartbeat"
 version = "0.0.1"
 dependencies = [

@@ -51,6 +51,13 @@ name = "galion-emotion"
 version = "0.1.0"
 
 [[package]]
+name = "galion-emotion-core"
+version = "0.1.0"
+dependencies = [
+ "galion-emotion",
+]
+
+[[package]]
 name = "galion-emotion-in"
 version = "0.1.0"
 
@@ -91,6 +98,7 @@ dependencies = [
 name = "horbm"
 version = "0.0.1"
 dependencies = [
+ "galion-emotion-core",
  "galion-research-gateway",
  "galion-sam-empathy",
  "horbm-brain",

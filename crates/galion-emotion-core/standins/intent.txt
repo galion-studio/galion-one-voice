@@ -1,0 +1,35 @@
+# Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
+# Intent script. Each expanded row is one 80 ms GEMI message.
+# repeat is a file convenience. The core still steps one frame at a time.
+schema galion-emotion-standin/1
+kind intent
+---
+t_ms 0
+repeat 5
+verb hold
+source own
+consent 0
+strength 0
+energy 0.70
+fatigue 0.05
+health 1
+breath rest
+volume 0.55
+flow 0
+---
+t_ms 400
+repeat 35
+verb settle
+source own
+consent 0
+strength 0.5
+valence_pull -0.10
+arousal_pull -0.15
+dominance_pull -0.05
+approach_pull -0.10
+energy 0.35
+fatigue 0.85
+health 0.9
+breath exhale
+volume 0.15
+flow -0.6
