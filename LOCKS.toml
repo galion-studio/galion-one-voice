@@ -76,6 +76,7 @@ sense = "deny"
 adapt = "deny"
 remember = "deny"
 share = "deny"
+learn = "deny"                    # inner-life durable weights; not an EmotionWire bit
 in_band = true                    # travels in every EmotionWire frame
 withdraw_wipes_ram_history = true # no grace period
 prohibited_purposes = ["workplace", "education"]   # EU AI Act Art. 5(1)(f)

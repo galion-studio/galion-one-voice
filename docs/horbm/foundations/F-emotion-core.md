@@ -8,7 +8,7 @@ Perpetual Open MIT License. (c) 2026 Galion Labs.
 | Written | 2026-11-24. No voice audio, no recording, no weight, no network call. |
 | Base | `main` `4b828b6`. |
 | Crate | `crates/galion-emotion-core`. HORBM calls it from `horbm::Brain`. |
-| Locks | `LOCKS.toml` unchanged. `SOUL.md` is not in this tree; nothing was added. |
+| Locks | The four EmotionWire bits are unchanged. `[consent] learn` is listed in [`F-inner-life.md`](F-inner-life.md). `SOUL.md` is not in this tree. |
 
 The core is the speaker's moment: a point and a velocity on valence, arousal, dominance, and approach. It is not a list of emotions. The twelve names in `tools/emotion-v2/harness/emotions.py`, and the design coordinates in `emotion-v2/emotions.toml`, are a projection (`project_universal`). The step does not compute that projection and does not write a Cowen pin. The 8-byte `EmotionWire` is produced by `galion-emotion::encode_with_consent`. The three-bit affect label is cleared. Those three bits cannot hold an open state.
 
@@ -26,7 +26,7 @@ The couplings are stand-in knobs (`FATIGUE_AROUSAL` and the rest in `factors.rs`
 
 ## Intent, consent, ports
 
-Inner life is not built. `standins/` holds four fixed files (`persona.txt`, `memory.txt`, `inner-life.txt`, `intent.txt`), schema `galion-emotion-standin/1`. Memory and the care/want/expect lines are context. They do not move the moment. The intent script expands to one `IntentMsg` per frame.
+The inner-life model is `inner`, written up in [`F-inner-life.md`](F-inner-life.md). `standins/` still holds four fixed files (`persona.txt`, `memory.txt`, `inner-life.txt`, `intent.txt`), schema `galion-emotion-standin/1`. Persona and memory stay stand-ins. `inner-life.txt` is the seed for the first care, want, and expectation. The intent script still expands to one `IntentMsg` per frame for the closed eval that does not run an inner-life turn.
 
 `IntentMsg` is 72 bytes, magic `GEMI`, version 1, little-endian. The verb is an open ASCII token of at most 16 bytes, not a category. A pull is an offset from the baseline. Encode and decode are byte-identical for a valid message.
 
@@ -38,7 +38,7 @@ Consent is EmotionWire byte 7, low four bits, default deny: `sense`, `adapt`, `r
 
 `STEP_ALLOC_BUDGET` is 0. `STEP_FLOP_BUDGET` is 96, counted by hand from `apply`. The measured check is `tests/zero_alloc.rs`: a thousand steps, the cue, and the local wire, with a counting allocator.
 
-Not in this crate: a model of cares and wants, a lungs planner, a category classifier, voice audio, and any write to `LOCKS.toml`. `galion-feeling` remains the document chase over `galion-mne-contract`. This core is the fixed-size state the brain and the conductor call.
+Not in this crate: a lungs planner, a category classifier, and voice audio. `EmotionCore::step` still does not write `VoiceBaseline`. `LOCKS.toml` `[consent] learn` is the inner-life weight gate (`deny`); the four EmotionWire bits are unchanged. The list of that edit is in [`F-inner-life.md`](F-inner-life.md). `galion-feeling` remains the document chase over `galion-mne-contract`. This core is the fixed-size state the brain and the conductor call.
 
 ```shell
 cargo test -p galion-emotion-core

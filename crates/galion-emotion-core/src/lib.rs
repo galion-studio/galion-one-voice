@@ -8,8 +8,10 @@
 //!
 //! One step is one 80 ms frame on [`clock::VirtualClock`]. Inside factors
 //! (breath, energy, fatigue, health) move the moment. Intent arrives as a
-//! 72-byte [`IntentMsg`]. Consent is the low four bits of EmotionWire
-//! byte 7, enforced through `galion-emotion`.
+//! 72-byte [`IntentMsg`]. The inner-life layer ([`inner`]) keeps cares,
+//! wants, and expectations and emits that same message. A surprise nudge
+//! is a pull on it. Consent is the low four bits of EmotionWire byte 7,
+//! enforced through `galion-emotion`. Learning is a separate lock key.
 //!
 //! CPU only. No model, no audio, no thread. The hot path does not allocate.
 #![forbid(unsafe_code)]
@@ -19,6 +21,7 @@ mod baseline;
 mod clock;
 mod conductor;
 mod factors;
+mod inner;
 mod intent;
 mod moment;
 mod project;
@@ -35,6 +38,12 @@ pub use factors::{
     BREATH_FLOW_AROUSAL, BREATH_VOLUME_AROUSAL, ENERGY_APPROACH, ENERGY_AROUSAL, ENERGY_REST,
     FATIGUE_APPROACH, FATIGUE_AROUSAL, FATIGUE_DOMINANCE, FATIGUE_REST, FATIGUE_VALENCE,
     HEALTH_AROUSAL, HEALTH_DOMINANCE, HEALTH_REST, HEALTH_VALENCE, VOLUME_REST,
+};
+pub use inner::{
+    learn_permitted, Care, Expect, InnerLife, TurnIn, TurnOut, Want, CARE_PULL, CARE_SLOTS,
+    CUE_BYTES, EXPECT_HOLD, INBOUND_FOLD, LABEL_BYTES, LEX_VALENCE, SEED_CARE, SEED_EXPECT,
+    SEED_STRENGTH, SEED_WANT, STARTLE_AROUSAL, STRENGTH_DECAY, STRENGTH_STEP, SURPRISE_MIN,
+    TURN_ALLOC_BUDGET, WANT_SLOTS, WORD_SURPRISE,
 };
 pub use intent::{
     IntentMsg, IntentSource, INTENT_BYTES, INTENT_MAGIC, INTENT_VERSION, MASK_BREATH, MASK_ENERGY,

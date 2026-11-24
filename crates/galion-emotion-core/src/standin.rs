@@ -1,11 +1,12 @@
 // Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
-//! Fixed stand-ins for the inner-life layer that is not built yet.
+//! Fixed stand-ins for persona and memory, plus the seed for inner life.
 //!
 //! Four files, one directory, schema `galion-emotion-standin/1`:
 //! `persona.txt`, `memory.txt`, `inner-life.txt`, `intent.txt`.
 //! Loading allocates. The frame step does not call this module.
-//! Memory and inner life are readable context. They do not move the moment.
-//! The intent script is the message stream that does.
+//! Persona and memory stay fixtures. `inner-life.txt` is the seed phrase
+//! for [`crate::InnerLife`], not the model. The intent script is a closed
+//! eval stream. It is not the live GEMI exchange.
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -52,7 +53,7 @@ pub struct MemoryCard {
     pub snippet: String,
 }
 
-/// Cares, wants, expects. A fixture, not a model of a mind.
+/// Seed phrases for [`crate::InnerLife`]. Not the live state.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct InnerLifeStandin {
     pub care: String,

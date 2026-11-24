@@ -18,7 +18,9 @@
 //! 4. Anything still unanswered is exactly [`UNKNOWN_REPLY`]. No gap filler.
 //!
 //! Beside that turn, [`Brain::step_moment`] advances the moment-to-moment
-//! emotion core one 80 ms frame. Empathy mood and the moment are separate:
+//! emotion core one 80 ms frame. [`Brain::inner_turn`] updates cares, wants,
+//! and expectations from the heard line and steps the core with the GEMI
+//! intent that turn emits. Empathy mood and the moment are separate:
 //! `tick_frame` does not step the core, and `step_moment` does not rewrite
 //! the mood. [`Brain::conductor_cue`] is what the conductor reads.
 
@@ -34,8 +36,8 @@ pub use cards::{
     WINDOWS_KNOWLEDGE_DIR,
 };
 pub use galion_emotion_core::{
-    ConductorCue, CoreError as EmotionError, EmotionCore, IntentMsg, MomentState, VoiceBaseline,
-    FRAME_MS as EMOTION_FRAME_MS,
+    ConductorCue, CoreError as EmotionError, EmotionCore, InnerLife, IntentMsg, IntentSource,
+    MomentState, VoiceBaseline, FRAME_MS as EMOTION_FRAME_MS,
 };
 pub use galion_research_gateway::RESEARCH_CAP;
 pub use galion_sam_empathy::{Intent, PronounClass, FRAME_MS};

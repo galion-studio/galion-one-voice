@@ -5,7 +5,7 @@
 use std::path::Path;
 use std::time::Instant;
 
-use galion_emotion_core::{ConductorCue, EmotionCore, IntentMsg, MomentState};
+use galion_emotion_core::{ConductorCue, EmotionCore, InnerLife, IntentMsg, MomentState, TurnIn};
 use galion_sam_empathy::{Empathy, PronounClass, TickIn, FRAME_MS};
 
 use crate::route::{accept_line, route_heard, CardLookup, Gap, ResearchAsk, Speakable};
@@ -68,6 +68,7 @@ pub struct Brain {
     gaps: Vec<Gap>,
     meta: MoodMeta,
     emotion: EmotionCore,
+    inner: InnerLife,
 }
 
 impl Brain {
@@ -83,6 +84,7 @@ impl Brain {
             gaps: Vec::new(),
             meta: resting_meta(),
             emotion: EmotionCore::at_rest(),
+            inner: InnerLife::at_rest(),
         }
     }
 
@@ -131,6 +133,46 @@ impl Brain {
         intent: &IntentMsg,
     ) -> Result<MomentState, galion_emotion_core::CoreError> {
         self.emotion.step(intent)
+    }
+
+    /// Cares, wants, and expectations. The moment core does not own them.
+    pub fn inner(&self) -> &InnerLife {
+        &self.inner
+    }
+
+    /// One dialogue turn. Updates the inner life from `line` and the current
+    /// emotion point, then steps the moment with the GEMI intent that turn
+    /// emitted. The baseline is the core's. This does not rewrite the mood.
+    pub fn inner_turn(&mut self, line: &str) -> Result<IntentMsg, galion_emotion_core::CoreError> {
+        let mut next = self.inner;
+        let out = next.turn(TurnIn {
+            line,
+            point: self.emotion.moment().pos,
+            t_ms: self.emotion.next_ms(),
+            consent: self.emotion.consent(),
+        });
+        self.emotion.step(&out.intent)?;
+        self.inner = next;
+        Ok(out.intent)
+    }
+
+    /// GEMI message from the MnE side. Does not step the moment.
+    pub fn take_mne_intent(
+        &mut self,
+        msg: &IntentMsg,
+    ) -> Result<(), galion_emotion_core::CoreError> {
+        self.inner.take_intent(msg)
+    }
+
+    /// GEMI bytes from the MnE side. Does not step the moment.
+    pub fn take_mne_bytes(&mut self, bytes: &[u8]) -> Result<(), galion_emotion_core::CoreError> {
+        self.inner.take_bytes(bytes)
+    }
+
+    /// Copy live cares, wants, and the expectation into the kept weights.
+    /// False while `LOCKS.toml` `[consent] learn` is not `allow`.
+    pub fn learn_inner(&mut self) -> bool {
+        self.inner.learn()
     }
 
     /// Snapshot for the conductor. The conductor does not own this state.

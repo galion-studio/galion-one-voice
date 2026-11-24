@@ -2,7 +2,8 @@
 //! The core. One spring, one baseline, one moment.
 //!
 //! `step` is the hot path. It does not allocate, does not call libm, and
-//! does not write [`crate::VoiceBaseline`].
+//! does not write [`crate::VoiceBaseline`]. An inner-life surprise is a
+//! pull on the [`crate::IntentMsg`] this function already accepts.
 
 use crate::axes::{clamp_pos, AXES};
 use crate::baseline::VoiceBaseline;
