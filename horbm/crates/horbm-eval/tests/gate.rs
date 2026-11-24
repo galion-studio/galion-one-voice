@@ -27,13 +27,13 @@ fn stub_stages_are_named_and_the_report_has_no_transcript() {
     let text = report.text();
     assert_eq!(report.end_of_turn, StageState::Stub);
     assert_eq!(report.backchannel, StageState::Stub);
-    assert_eq!(report.echo, StageState::Stub);
+    assert_eq!(report.echo, StageState::Live);
     assert!(text.contains("stage end_of_turn=stub"));
     assert!(text.contains("stage backchannel=stub"));
-    assert!(text.contains("stage echo_cancel=stub"));
+    assert!(text.contains("stage echo_cancel=live"));
     assert!(text.contains("metric backchannel_rate_per_s n=2 p50=stub p95=stub gate=off"));
     assert!(text.contains("metric backchannel_offset_ms n=0 p50=stub p95=stub gate=off"));
-    assert!(text.contains("metric false_barge_in n=2 p50=stub p95=stub gate=off"));
+    assert!(text.contains("metric false_barge_in n=2 p50=0.000 p95=0.000 gate=on limit=p95<=0.000"));
     assert!(text.contains("metric pause_handling_tor"));
     assert!(text.contains("gate=off"));
     for word in ["kettle", "hob", "window", "garden", "aria", "yeah", "mm-hm"] {
@@ -42,15 +42,13 @@ fn stub_stages_are_named_and_the_report_has_no_transcript() {
 }
 
 #[test]
-fn echo_probe_barges_while_the_canceller_is_absent() {
+fn echo_probe_stays_quiet_when_the_canceller_is_on() {
     let report = run_stand_in();
-    assert_eq!(report.echo, StageState::Stub);
+    assert_eq!(report.echo, StageState::Live);
+    assert!(report.echo_wired);
     assert_eq!(report.echo_probe_ran, 2);
     assert_eq!(report.echo_probe_opened, report.echo_probe_ran);
-    assert_eq!(
-        report.echo_probe_barged, report.echo_probe_ran,
-        "a quiet echo would let a stub stage look like a pass"
-    );
+    assert_eq!(report.echo_probe_barged, 0);
     assert!(report.eot_probe_took_floor);
 }
 

@@ -33,7 +33,9 @@ const OVERLAP_P95_MAX: f64 = 0.550;
 const PAUSE_TOR_P95_MAX: Option<f64> = None;
 const BACKCHANNEL_RATE_P95_MAX: Option<f64> = None;
 const BACKCHANNEL_OFFSET_P95_MAX: Option<f64> = None;
-const FALSE_BARGE_P95_MAX: Option<f64> = None;
+/// Measured false barge-in p95 is 0 on both echo trials, with the canceller
+/// on inside `Duplex::tick`. The gate is that value. Any barge fails.
+const FALSE_BARGE_P95_MAX: Option<f64> = Some(0.0);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum StageState {

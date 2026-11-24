@@ -405,7 +405,7 @@ fn arm_echo<M: Mouth>(
     #[cfg(duplex_aec)]
     {
         duplex.set_aec(true);
-        return duplex.aec_enabled();
+        duplex.aec_enabled()
     }
     #[cfg(not(duplex_aec))]
     {
