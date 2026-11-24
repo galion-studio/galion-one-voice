@@ -5,6 +5,7 @@
 use std::path::Path;
 use std::time::Instant;
 
+use galion_emotion_core::{ConductorCue, EmotionCore, IntentMsg, MomentState};
 use galion_sam_empathy::{Empathy, PronounClass, TickIn, FRAME_MS};
 
 use horbm_brain::{classify, pick, split_clause, Retrieved, Retriever, SidebandMark};
@@ -69,6 +70,7 @@ pub struct Brain {
     gaps: Vec<Gap>,
     meta: MoodMeta,
     card_count: usize,
+    emotion: EmotionCore,
 }
 
 struct Spoke {
@@ -130,6 +132,7 @@ impl Brain {
             gaps: Vec::new(),
             meta: resting_meta(),
             card_count,
+            emotion: EmotionCore::at_rest(),
         }
     }
 
@@ -172,7 +175,25 @@ impl Brain {
         self.meta
     }
 
-    /// One 80 ms frame with no new words. Does not speak.
+    /// The speaker's moment. Empathy mood is [`Self::mood_meta`].
+    pub fn emotion(&self) -> &EmotionCore {
+        &self.emotion
+    }
+
+    /// One 80 ms emotion frame. Does not change the empathy mood.
+    pub fn step_moment(
+        &mut self,
+        intent: &IntentMsg,
+    ) -> Result<MomentState, galion_emotion_core::CoreError> {
+        self.emotion.step(intent)
+    }
+
+    /// Snapshot for the conductor. The conductor does not own this state.
+    pub fn conductor_cue(&self) -> ConductorCue {
+        self.emotion.conductor_cue()
+    }
+
+    /// One 80 ms frame with no new words. Does not speak. Does not step the moment.
     pub fn tick_frame(&mut self) -> MoodMeta {
         let tick = self.empathy.tick(TickIn {
             inbound: None,

@@ -1,0 +1,9 @@
+# Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
+# Stand-in inner life. The layer that would care, want, and expect is not built.
+# These lines are fixture text so a closed eval has something to read.
+schema galion-emotion-standin/1
+kind inner
+
+care the person on the line is heard
+want answer the question that was asked
+expect a short pause before speaking

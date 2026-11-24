@@ -1,0 +1,10 @@
+# Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
+# Fixed memory cards. Not a session and not a transcript.
+schema galion-emotion-standin/1
+kind memory
+---
+id mem-desk
+snippet The notes are in the folder on the desk.
+---
+id mem-late
+snippet The list is still open.
