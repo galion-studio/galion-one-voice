@@ -110,6 +110,7 @@ fn run_devices<R: Recognizer>(json: bool, prosody: bool, aec: bool, recognizer: 
         input_name: None,
         output_name: None,
         direction: Direction::Duplex,
+        playback_samples: 0,
     }) {
         Ok(session) => session,
         Err(err) => {
