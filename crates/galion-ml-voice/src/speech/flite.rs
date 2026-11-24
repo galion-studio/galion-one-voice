@@ -186,7 +186,7 @@ impl TtsEngine for FliteTts {
             }).map_err(VoiceError::Backend)?;
             if pcm.is_empty() || rate == 0 { return Err(VoiceError::Backend("flite produced no audio".into())); }
             let f: Vec<f32> = pcm.iter().map(|&s| s as f32 / 32768.0).collect();
-            return Ok(Audio { sample_rate: SPEECH_RATE, samples: resample(&f, rate, SPEECH_RATE) });
+            Ok(Audio { sample_rate: SPEECH_RATE, samples: resample(&f, rate, SPEECH_RATE) })
         }
     }
 }
