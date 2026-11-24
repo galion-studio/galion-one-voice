@@ -193,7 +193,7 @@ brain=horbm mouth=cpu gpu=true name="RTX 4090" total_mib=24564 used_mib=20564 fr
 
 The first line is the fixture with no GPU. The second and third are fixtures with a GPU. `probe_llm` is `api` on the first and the third, and `local-gpu` on the second. `brain` is `horbm` on all three. `mouth` in the decision (the device) is `cpu` on all three. `gpu=true` is the report and is not the device.
 
-The same test spawns the `horbm-boot` binary on each fixture file and requires that stdout to be the decision line. Twelve tests in the crate cover the four `llm` tokens, a DRM card, a string `gpu` (refused), a UTF-8 BOM, unknown keys, a partial object, and the `[boot]` table in `LOCKS.toml`. `cargo test -p horbm-boot` runs them.
+The same test spawns the `horbm-boot` binary from `CARGO_BIN_EXE_horbm-boot`. That value is the path Cargo built, and on Windows it already ends in `.exe`. Fixture paths are joined from `CARGO_MANIFEST_DIR`. The test requires that stdout to be the decision line. Twelve tests in the crate cover the four `llm` tokens, a DRM card, a string `gpu` (refused), a UTF-8 BOM, unknown keys, a partial object, and the `[boot]` table in `LOCKS.toml`. `cargo test -p horbm-boot` runs them.
 
 ## 7. Laptop test
 

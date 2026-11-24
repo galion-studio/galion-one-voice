@@ -26,28 +26,18 @@ fn fixture_path(name: &str) -> PathBuf {
         .join(name)
 }
 
-/// The built `horbm-boot` binary. Cargo 1.85 exports `CARGO_BIN_EXE_horbm_boot`
-/// while this crate is compiled. Cargo 1.83 on the build host does not, so the
-/// fallback is the sibling of this test executable (`target/<profile>/horbm-boot`).
-fn boot_bin() -> PathBuf {
-    if let Some(path) = option_env!("CARGO_BIN_EXE_horbm_boot") {
-        return PathBuf::from(path);
-    }
-    let mut path = std::env::current_exe().expect("test executable");
-    path.pop();
-    path.pop();
-    path.push("horbm-boot");
-    if cfg!(windows) {
-        path.set_extension("exe");
-    }
-    path
+/// Absolute path Cargo gives this integration test. The name keeps the hyphen.
+/// On Windows the value already ends in `.exe`.
+fn boot_bin() -> &'static str {
+    env!("CARGO_BIN_EXE_horbm-boot")
 }
 
 fn run_bin(path: &Path) -> std::process::Output {
-    Command::new(boot_bin())
+    let bin = boot_bin();
+    Command::new(bin)
         .arg(path)
         .output()
-        .expect("spawn horbm-boot")
+        .unwrap_or_else(|err| panic!("spawn {bin}: {err}"))
 }
 
 fn boot_table() -> std::collections::HashMap<String, String> {
