@@ -590,6 +590,13 @@ name = "horbm-brain"
 version = "0.0.1"
 
 [[package]]
+name = "horbm-voice"
+version = "0.0.1"
+dependencies = [
+ "horbm",
+]
+
+[[package]]
 name = "http"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1111,6 +1118,8 @@ dependencies = [
  "galion-sam-horbm",
  "galion-sam-orch",
  "galion-tts-piper",
+ "horbm",
+ "horbm-voice",
  "hyper",
  "hyper-util",
  "samantha-voice-clone",
