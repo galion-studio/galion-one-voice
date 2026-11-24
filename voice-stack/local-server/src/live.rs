@@ -241,22 +241,33 @@ pub struct LivePipeline {
     _worker: Option<JoinHandle<()>>,
 }
 
+struct Opened {
+    front: Front,
+    backend: &'static str,
+    ready: bool,
+    ear: Ear,
+    ear_name: &'static str,
+    asr_worker: Option<JoinHandle<()>>,
+}
+
 impl LivePipeline {
     pub fn from_env() -> Self {
         let (front, backend, ready) = open_vad();
-        let (ear, ear_name, worker) = open_ear();
+        let (ear, ear_name, asr_worker) = open_ear();
         let choice = mouth::decide(&mouth::read_input());
         let device = mouth::mouth_device(&choice);
         Self::assemble(
-            front,
-            backend,
-            ready,
-            ear,
-            ear_name,
+            Opened {
+                front,
+                backend,
+                ready,
+                ear,
+                ear_name,
+                asr_worker,
+            },
             HorbmMind::from_env(),
             mouth::open_selected(&choice),
             device,
-            worker,
         )
     }
 
@@ -271,29 +282,34 @@ impl LivePipeline {
         mouth: Box<dyn Mouth>,
     ) -> Self {
         Self::assemble(
+            Opened {
+                front,
+                backend,
+                ready,
+                ear,
+                ear_name,
+                asr_worker: None,
+            },
+            mind,
+            mouth,
+            native::BOOT_MOUTH_DEVICE,
+        )
+    }
+
+    fn assemble(
+        opened: Opened,
+        mind: HorbmMind,
+        mouth: Box<dyn Mouth>,
+        mouth_device: &'static str,
+    ) -> Self {
+        let Opened {
             front,
             backend,
             ready,
             ear,
             ear_name,
-            mind,
-            mouth,
-            native::BOOT_MOUTH_DEVICE,
-            None,
-        )
-    }
-
-    fn assemble(
-        front: Front,
-        backend: &'static str,
-        ready: bool,
-        ear: Ear,
-        ear_name: &'static str,
-        mind: HorbmMind,
-        mouth: Box<dyn Mouth>,
-        mouth_device: &'static str,
-        asr_worker: Option<JoinHandle<()>>,
-    ) -> Self {
+            asr_worker,
+        } = opened;
         let brain = MindBrain::new(mind);
         let mind = Arc::clone(&brain.mind);
         let last = Arc::clone(&brain.last);
@@ -565,6 +581,10 @@ impl Pipeline for LivePipeline {
     }
 
     fn info(&self) -> PipeInfo {
+        let mind = self.mind.lock().unwrap_or_else(|err| err.into_inner());
+        let knowledge_cards = mind.knowledge_cards();
+        let knowledge_dir = mind.knowledge_path().display().to_string();
+        drop(mind);
         let mouth = self.worker.lock().unwrap_or_else(|err| err.into_inner());
         PipeInfo {
             ear: self.ear_name,
@@ -575,8 +595,8 @@ impl Pipeline for LivePipeline {
             mind: native::BOOT_BRAIN.into(),
             vad_backend: self.vad_backend,
             vad_ready: self.vad_ready,
-            knowledge_cards: self.mind.knowledge_cards(),
-            knowledge_dir: self.mind.knowledge_path().display().to_string(),
+            knowledge_cards,
+            knowledge_dir,
         }
     }
 }
