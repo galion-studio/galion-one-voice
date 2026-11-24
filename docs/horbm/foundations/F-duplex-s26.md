@@ -9,6 +9,7 @@ Perpetual Open MIT License. (c) 2026 Galion Labs.
 | Clock | 80 ms, 16 kHz, 1280 samples. Virtual. `Duplex::tick` is the only step. |
 | Persona | Samantha. Any other id or voice is refused. |
 | Locks | `LOCKS.toml` was not edited. `SOUL.md` is not in this tree and was not added. |
+| Live | S28 wires the real adapters. This page's virtual-clock test stays the CI gate. See [F-duplex-s28.md](F-duplex-s28.md). |
 
 Both bands are stepped on the same call. The you band is one scripted frame. The me band is the mouth frame, when Samantha is speaking. A listed backchannel keeps the turn. Any other overlap stops the me band on the frame that starts 160 ms after the onset. That is inside the 200 ms barge-in lock.
 

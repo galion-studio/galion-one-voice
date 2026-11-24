@@ -408,6 +408,18 @@ impl std::fmt::Debug for HermesLlm {
     }
 }
 
+/// Arguments for one direct research call. One struct stays under clippy's argument limit.
+struct DirectIn<'a> {
+    question: &'a str,
+    sources: &'a [ResearchSource],
+    calls: &'a AtomicU32,
+    budget: ResearchBudget,
+    started: Instant,
+    split: bool,
+    helpers: Vec<ResearchHelper>,
+    watch: &'a dyn ResearchWatch,
+}
+
 impl HermesLlm {
     /// Build a client. A URL that is not numeric loopback `http://` leaves the
     /// client unable to connect; replies are then [`UNREACHABLE`].
@@ -559,7 +571,7 @@ impl HermesLlm {
     }
 
     pub fn complete_as(&self, persona: &str, user: &str) -> String {
-        self.complete_prompt(system_prompt(persona), &user, 480)
+        self.complete_prompt(system_prompt(persona), user, 480)
     }
 
     /// One completion, with each text delta handed to `on_delta` as it arrives.
@@ -642,16 +654,16 @@ impl HermesLlm {
         // Three calls is the smallest split: plan, one helper, synthesis.
         // Fewer than that, or an obvious one-lookup question, stays a single call.
         if budget.helpers == 0 || budget.calls < 3 || !question_needs_helpers(&question) {
-            return self.direct_report(
-                &question,
+            return self.direct_report(DirectIn {
+                question: &question,
                 sources,
-                &calls,
+                calls: &calls,
                 budget,
                 started,
-                false,
-                Vec::new(),
+                split: false,
+                helpers: Vec::new(),
                 watch,
-            );
+            });
         }
 
         watch.on_research(&ResearchEvent::Phase("planning"));
@@ -696,16 +708,16 @@ impl HermesLlm {
             Ok(text) => parse_subquestions(&text, budget.helpers, &question),
         };
         if planned.is_empty() {
-            return self.direct_report(
-                &question,
+            return self.direct_report(DirectIn {
+                question: &question,
                 sources,
-                &calls,
+                calls: &calls,
                 budget,
                 started,
-                false,
-                Vec::new(),
+                split: false,
+                helpers: Vec::new(),
                 watch,
-            );
+            });
         }
 
         let helpers = Mutex::new(
@@ -767,9 +779,16 @@ impl HermesLlm {
             if call_window(started, budget.budget, self.timeout).is_some()
                 && calls.load(Ordering::SeqCst) < budget.calls
             {
-                return self.direct_report(
-                    &question, sources, &calls, budget, started, true, helpers, watch,
-                );
+                return self.direct_report(DirectIn {
+                    question: &question,
+                    sources,
+                    calls: &calls,
+                    budget,
+                    started,
+                    split: true,
+                    helpers,
+                    watch,
+                });
             }
             let timed = helpers.iter().any(|h| h.status == "Timeout");
             let down = helpers.iter().any(|h| h.status == "Unreachable");
@@ -845,17 +864,17 @@ impl HermesLlm {
         }
     }
 
-    fn direct_report(
-        &self,
-        question: &str,
-        sources: &[ResearchSource],
-        calls: &AtomicU32,
-        budget: ResearchBudget,
-        started: Instant,
-        split: bool,
-        helpers: Vec<ResearchHelper>,
-        watch: &dyn ResearchWatch,
-    ) -> ResearchReport {
+    fn direct_report(&self, inn: DirectIn<'_>) -> ResearchReport {
+        let DirectIn {
+            question,
+            sources,
+            calls,
+            budget,
+            started,
+            split,
+            helpers,
+            watch,
+        } = inn;
         watch.on_research(&ResearchEvent::Phase("direct"));
         let Some(timeout) = self.begin_call(calls, budget.calls, budget, started, watch) else {
             return finish(
@@ -1318,11 +1337,7 @@ pub fn classify_research(raw: &str, sources: &[ResearchSource]) -> ResearchAnswe
             if !claim.is_empty() {
                 found.push(claim);
             }
-        } else if saw_foreign {
-            if !claim.is_empty() {
-                unknown.push(claim);
-            }
-        } else if admits_unknown(&claim) {
+        } else if saw_foreign || admits_unknown(&claim) {
             if !claim.is_empty() {
                 unknown.push(claim);
             }

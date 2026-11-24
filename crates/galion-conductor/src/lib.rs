@@ -37,7 +37,7 @@ pub use clock::{
     VirtualClock, BARGE_IN_MAX_MS, COMMIT_SILENCE_FRAMES, DUCK_MS, FRAME_MS, HANG_FRAMES,
     MIXER_RESUME_QUIET_MS, MIXER_YIELD_MS, PAUSE_MS, SIDE_BAND_CAP_MS, STABLE_TICKS,
 };
-pub use conductor::{Conductor, Ear, Floor, TickEvent, TickOut};
+pub use conductor::{Conductor, Ear, Floor, TickEvent, TickOut, TurnMsg};
 pub use lexicon::is_listed_backchannel;
 pub use mne::{read_back, stand_in_listen_intent};
 pub use reaction::{clip, synthetic_clip, Reaction, ReactionKind, REACTION_SAMPLES};

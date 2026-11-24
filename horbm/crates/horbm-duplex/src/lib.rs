@@ -9,9 +9,14 @@
 //! at 160 ms, inside the 200 ms lock.
 //!
 //! The brain is [`horbm::Brain`]. The floor is [`galion_conductor::Conductor`].
-//! The mouth is the [`horbm_voice::Mouth`] trait. Recognizer, emotion, breath,
-//! and persona are ports: those crates are still open pull requests, and the
-//! integration test supplies the stand-ins.
+//! The mouth on the live path is [`NativeMouth`]. Emotion is
+//! [`CoreAffect`] (`galion-emotion-core`). Prosody sensing is on unless
+//! [`Duplex::set_prosody`] turns it off. Echo cancellation is
+//! [`PlaybackEcho`] over `fdaf-aec` unless [`Duplex::set_aec`] bypasses it,
+//! or the crate is built with `--no-default-features`. The recognizer is
+//! [`SilentRecognizer`] unless the crate is built with `--features vosk`.
+//! Breath is still a stand-in. The virtual-clock integration test keeps its
+//! own stand-ins and is the CI gate.
 //!
 //! This tick is not the heartbeat frame step. It does not read a wall clock,
 //! open a socket, or load a weight.
@@ -23,17 +28,39 @@
 #![forbid(unsafe_code)]
 
 mod brain;
+mod breath;
 mod duplex;
+mod echo;
+mod emotion;
+mod live;
+mod mouth;
+mod persona;
 mod ports;
+mod prosody;
+mod recog;
 mod report;
 
+pub use breath::SpeakingBreath;
 pub use duplex::{Duplex, Floor, FrameOut, LoopEvent, Parts};
+pub use echo::{PlaybackEcho, AEC_CRATE, AEC_LICENSE, AEC_VERSION};
+pub use emotion::CoreAffect;
 pub use horbm_voice::{FRAME_MS, FRAME_SAMPLES, SAMPLE_RATE};
-pub use ports::{
-    Affect, Breath, BreathCue, BreathPhase, Emotion, Hypothesis, HypothesisKind, Persona,
-    RecogError, Recognizer, Style, BREVITY_RATE, DEV_PERSONA,
+pub use live::FramePump;
+pub use mouth::NativeMouth;
+pub use persona::{
+    open_persona, SamanthaPersona, ARIA_ACTIVE, ARIA_ID, SAMANTHA_BREVITY, SAMANTHA_SENTENCES,
+    SAMANTHA_WARMTH,
 };
+pub use ports::{
+    Affect, Breath, BreathCue, BreathPhase, EarSense, Emotion, Hypothesis, HypothesisKind, Persona,
+    ProsodyCue, RecogError, Recognizer, Style, BREVITY_RATE, DEV_PERSONA,
+};
+pub use prosody::ProsodyEar;
+pub use recog::SilentRecognizer;
 pub use report::{Budgets, LatencyReport};
+
+#[cfg(feature = "vosk")]
+pub use recog::AsrRecognizer;
 
 const _: () = assert!(FRAME_MS == 80);
 const _: () = assert!(FRAME_MS == horbm::FRAME_MS);
