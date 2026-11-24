@@ -380,14 +380,9 @@ fn cli_reads_a_wav_and_writes_the_same_bytes_as_the_library() {
         writer.write_sample(*s).unwrap();
     }
     writer.finalize().unwrap();
-    let mut bin = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target");
-    bin.push(if cfg!(debug_assertions) {
-        "debug"
-    } else {
-        "release"
-    });
-    bin.push("galion-preclone");
-    let status = Command::new(&bin)
+    // Cargo's path includes the `.exe` suffix on Windows.
+    let bin = env!("CARGO_BIN_EXE_galion-preclone");
+    let status = Command::new(bin)
         .arg("--wav")
         .arg(&wav_path)
         .arg("--out")
