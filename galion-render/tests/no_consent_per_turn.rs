@@ -1,3 +1,4 @@
+#![cfg(unix)]
 // Galion Voice — Perpetual Open MIT License
 // Copyright (c) 2026 Galion Labs.
 //! A live turn with an already-cloned voice makes no consent call.

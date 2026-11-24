@@ -9,6 +9,7 @@ Perpetual Open MIT License. (c) 2026 Galion Labs.
 | Repo | `galion-studio/galion-one-voice`, read on `main` at `4759d41` before this branch. |
 | Research read | `docs/horbm/research/R1`–`R4` on the unmerged branches `cursor/horbm-r1-retrieval-core-690c`, `cursor/horbm-r2-ranking-eureka-906f`, `cursor/horbm-r3-memory-persona-3e32`, `cursor/horbm-r4-cpu-realtime-2180`. R4 is draft PR #207, closed unmerged. |
 | This change | Phase 1 of R4 §11: domain 04 stamps on the cascade that already runs. `LOCKS.toml` and `SOUL.md` were not edited. `SOUL.md` is not in this checkout. |
+| Path note, 2026-11-24 | `crates/galion-v2-live` and `voice-stack/horbm-bridge/seam/horbm` moved to `archive/2026-11-24/` under those same relative paths. The sentences below describe them as they stood when this audit was written. |
 
 ## How to read a number
 
