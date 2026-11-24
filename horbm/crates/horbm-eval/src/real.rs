@@ -4,7 +4,10 @@
 //!
 //! Default builds do not compile the workers. `--features real` links
 //! `galion-asr-vosk` and the Piper/Flite worker in `galion-ml-voice` as they
-//! are. This file is glue: it does not change those crates.
+//! are. This file is glue: it does not change those crates. Each utterance
+//! is sent with a Vosk phrase list: the dialogue lines, the backchannel
+//! list, and `[unk]`. `yep` and `yea` are left off that list, because on
+//! this Piper voice they outrank `yeah`.
 //!
 //! The runtime path is Linux x86_64 because the pinned libvosk archive and
 //! the pinned Piper runtime are that platform. Other targets compile and
@@ -73,7 +76,7 @@ mod linux {
     };
     use crate::score::{
         mean_wer, percentile, score_emotion, score_grounding, score_latency, score_persona,
-        score_unknown, score_wer, LatencySample, Spoken, VoiceTurn,
+        score_unknown, score_wer, wer_tokens, LatencySample, Spoken, VoiceTurn,
     };
     use galion_asr_vosk::{clean_transcript, VoskClient, SAMPLE_RATE};
     use galion_emotion::text_affect;
@@ -82,8 +85,8 @@ mod linux {
     };
     use horbm::Brain;
     use horbm_voice::{
-        is_listed_backchannel, AudioFrame, Ear, EarEvent, HorbmTurn, Mouth, MouthPull, SpokenLine,
-        TickEvent, TurnBrain, VoiceLoop,
+        is_listed_backchannel, listed_backchannels, AudioFrame, Ear, EarEvent, HorbmTurn, Mouth,
+        MouthPull, SpokenLine, TickEvent, TurnBrain, VoiceLoop,
     };
     use std::collections::VecDeque;
     use std::path::{Path, PathBuf};
@@ -125,14 +128,16 @@ mod linux {
         static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
         let lock = LOCK.get_or_init(|| Mutex::new(()));
         let _held = lock.lock().unwrap_or_else(|err| err.into_inner());
+        let model_bytes = vosk.model_bytes;
         let (ear, mouth, _env) = open_pair(&bin, &vosk, piper.as_ref(), config.prosody)?;
-        run_gate(config, ear, mouth)
+        run_gate(config, ear, mouth, model_bytes)
     }
 
     fn run_gate(
         config: &Config,
         mut ear: VoskEar,
         mut mouth: StackMouth,
+        model_bytes: u64,
     ) -> Result<Report, GateErr> {
         let voice_name = mouth.voice_name();
         let mouth_id = mouth.id().to_string();
@@ -161,6 +166,23 @@ mod linux {
             eager_ms.push(turn.eager_ms);
             voices.push(turn.voice);
             spoken.push(turn.spoken);
+        }
+        let script_ms = ear.decode_ms.clone();
+        let script_audio = ear.audio_ms.clone();
+        if script_ms.len() != SCRIPT.len() || script_audio.len() != SCRIPT.len() {
+            return Err(GateErr::fail(
+                "the seven scripted lines were not all decoded",
+            ));
+        }
+        let sad_hyp = pairs
+            .iter()
+            .find(|(reference, _)| reference == "I am sad")
+            .map(|(_, hypothesis)| hypothesis.clone())
+            .ok_or_else(|| GateErr::fail("the sad line was not heard"))?;
+        if !heard_word(&sad_hyp, "sad") || heard_word(&sad_hyp, "said") {
+            return Err(GateErr::fail(format!(
+                "I am sad was heard as {sad_hyp:?}. The word sad has to come back as sad."
+            )));
         }
         let kettle_hyp = kettle_hyp.ok_or_else(|| GateErr::fail("kettle turn was not heard"))?;
         let (barge_ms, barge_virtual) = barge_in(&mut ear, &mut mouth, &truth.cards, &kettle_hyp)?;
@@ -209,6 +231,13 @@ mod linux {
             &config.thresholds.real.latency,
         );
         let (wer_check, wer_mean) = score_wer(&pairs, config.thresholds.asr.wer_max);
+        let (rtf, p50_ms, p95_ms) = script_timing(&script_ms, &script_audio);
+        if rtf > 1.0 {
+            return Err(GateErr::fail(format!(
+                "ear real-time factor {rtf:.3} is over 1. The round trip is slower than the audio."
+            )));
+        }
+        let (rss_kb, hwm_kb) = worker_mem_kb();
         let pass = grounded.pass
             && unknown.pass
             && persona.pass
@@ -234,7 +263,7 @@ mod linux {
             research_dir: "unset",
             truth_cards: truth.ids,
             stand_ins: vec![
-                format!("ear:galion-asr-vosk ({MODEL_NAME})"),
+                format!("ear:galion-asr-vosk ({MODEL_NAME}, dialogue grammar)"),
                 format!("mouth:{mouth_id} ({voice_name})"),
                 "research:OfflineClient (GALION_HORBM_RESEARCH_DIR unset)".into(),
                 "persona:samantha (Aria inactive)".into(),
@@ -293,6 +322,15 @@ mod linux {
                         "wer_max": config.thresholds.asr.wer_max,
                         "sentences": pairs.len(),
                         "model": MODEL_NAME,
+                        "grammar": "dialogue+backchannel",
+                        "rtf": rtf,
+                        "latency_p50_ms": p50_ms,
+                        "latency_p95_ms": p95_ms,
+                        "rss_mb": rss_kb / 1024,
+                        "hwm_mb": hwm_kb / 1024,
+                        "model_bytes": model_bytes,
+                        "yeah": backchannel_heard,
+                        "sad": sad_hyp,
                         "mouth": mouth_id,
                         "voice": voice_name,
                         "prosody": prosody,
@@ -469,23 +507,17 @@ mod linux {
         Ok((cancel, heard))
     }
 
-    /// The mouth says a listed backchannel. The ear's transcript is what the
-    /// loop sees. Piper "yeah" often comes back as another word, so the first
-    /// phrase the recognizer actually returns as a listed backchannel is used.
+    /// The mouth says `yeah`. The transcript has to be that word. Another
+    /// listed backchannel is not a substitute.
     fn hear_backchannel(ear: &mut VoskEar, mouth: &mut StackMouth) -> Result<String, GateErr> {
-        let mut misses = Vec::new();
-        for phrase in ["yeah", "okay", "yep", "oh"] {
-            let pcm = mouth.render_user(phrase)?;
-            let text = ear.recognize(&pcm)?;
-            if is_listed_backchannel(&text) {
-                return Ok(text);
-            }
-            misses.push(format!("{phrase}->{text}"));
+        let pcm = mouth.render_user("yeah")?;
+        let text = ear.recognize(&pcm)?;
+        if !text.eq_ignore_ascii_case("yeah") {
+            return Err(GateErr::fail(format!(
+                "yeah was heard as {text:?}. A listed backchannel substitute was not used."
+            )));
         }
-        Err(GateErr::fail(format!(
-            "no listed backchannel was heard ({})",
-            misses.join(", ")
-        )))
+        Ok(text)
     }
 
     fn speaking_kettle(
@@ -528,6 +560,9 @@ mod linux {
         primed: VecDeque<EarEvent>,
         sense: bool,
         sensed_frames: u32,
+        grammar: Vec<String>,
+        decode_ms: Vec<u32>,
+        audio_ms: Vec<u32>,
     }
 
     impl VoskEar {
@@ -547,6 +582,9 @@ mod linux {
                 primed: VecDeque::new(),
                 sense,
                 sensed_frames: 0,
+                grammar: ear_grammar(),
+                decode_ms: Vec::new(),
+                audio_ms: Vec::new(),
             })
         }
 
@@ -556,6 +594,9 @@ mod linux {
                 primed: VecDeque::new(),
                 sense: false,
                 sensed_frames: 0,
+                grammar: Vec::new(),
+                decode_ms: Vec::new(),
+                audio_ms: Vec::new(),
             }
         }
 
@@ -568,11 +609,20 @@ mod linux {
             if self.sense {
                 self.sense_buffer(pcm)?;
             }
+            let grammar = self.grammar.clone();
             let client = self
                 .client
                 .as_mut()
                 .ok_or_else(|| GateErr::fail("vosk worker is not open"))?;
-            let result = client.recognize(pcm, None).map_err(GateErr::fail)?;
+            let started = Instant::now();
+            let result = client
+                .recognize(pcm, Some(&grammar))
+                .map_err(GateErr::fail)?;
+            let decode_ms = elapsed_ms(started);
+            let samples = u32::try_from(pcm.len()).unwrap_or(u32::MAX);
+            let audio_ms = samples.saturating_mul(1000) / SAMPLE_RATE;
+            self.decode_ms.push(decode_ms);
+            self.audio_ms.push(audio_ms);
             let text = clean_transcript(&result.text);
             if text.is_empty() {
                 Err(GateErr::fail(
@@ -822,6 +872,7 @@ mod linux {
     struct VoskPaths {
         model: PathBuf,
         lib: PathBuf,
+        model_bytes: u64,
     }
 
     struct PiperPaths {
@@ -1005,7 +1056,11 @@ mod linux {
                 })?
             }
         };
-        Ok(VoskPaths { model, lib })
+        Ok(VoskPaths {
+            model_bytes: dir_bytes(&model),
+            model,
+            lib,
+        })
     }
 
     fn find_lib(cache: &Path) -> Option<PathBuf> {
@@ -1126,6 +1181,152 @@ mod linux {
             Ok(())
         } else {
             Err(GateErr::fail("tar extract failed"))
+        }
+    }
+
+    /// Phrase list for one utterance. The closed script is the dialogue.
+    /// `stop` is the interruption this gate speaks. `sad`, `happy`,
+    /// `tired`, and `i am tired` are the affect words next to those lines.
+    /// The backchannel list is included so a short acknowledgement stays
+    /// on the list. `yep` and `yea` are omitted: measured on Piper
+    /// `en_US-ljspeech-medium`, they outrank `yeah` in the small model.
+    /// `[unk]` is the Vosk open token. This worker drops that token, so a
+    /// phrase that is not listed does not come back as words.
+    fn ear_grammar() -> Vec<String> {
+        let mut phrases = Vec::new();
+        for phrase in listed_backchannels() {
+            if *phrase == "yep" || *phrase == "yea" {
+                continue;
+            }
+            phrases.push((*phrase).to_string());
+        }
+        for (line, _) in SCRIPT {
+            let phrase = spoken_phrase(line);
+            if !phrase.is_empty() {
+                phrases.push(phrase);
+            }
+        }
+        for phrase in ["stop", "i am tired", "sad", "happy", "tired", "[unk]"] {
+            phrases.push((*phrase).to_string());
+        }
+        phrases.sort_unstable();
+        phrases.dedup();
+        phrases
+    }
+
+    fn spoken_phrase(text: &str) -> String {
+        text.to_lowercase()
+            .chars()
+            .map(|ch| {
+                if ch.is_ascii_lowercase()
+                    || ch.is_ascii_digit()
+                    || ch == '\''
+                    || ch == '-'
+                    || ch == ' '
+                {
+                    ch
+                } else {
+                    ' '
+                }
+            })
+            .collect::<String>()
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ")
+    }
+
+    fn heard_word(text: &str, word: &str) -> bool {
+        wer_tokens(text).iter().any(|token| token == word)
+    }
+
+    fn script_timing(decode_ms: &[u32], audio_ms: &[u32]) -> (f64, u32, u32) {
+        let audio: u64 = audio_ms.iter().map(|ms| u64::from(*ms)).sum();
+        let wall: u64 = decode_ms.iter().map(|ms| u64::from(*ms)).sum();
+        let rtf = if audio == 0 {
+            0.0
+        } else {
+            wall as f64 / audio as f64
+        };
+        (rtf, percentile(decode_ms, 50), percentile(decode_ms, 95))
+    }
+
+    /// Linux only. The worker is a child process; its resident set is not
+    /// this process. `comm` holds at most 15 bytes, and `galion-asr-vosk`
+    /// is exactly that long.
+    fn worker_mem_kb() -> (u64, u64) {
+        let mut rss = 0u64;
+        let mut hwm = 0u64;
+        let Ok(entries) = std::fs::read_dir("/proc") else {
+            return (0, 0);
+        };
+        for entry in entries.flatten() {
+            let comm = std::fs::read_to_string(entry.path().join("comm")).unwrap_or_default();
+            if comm.trim() != "galion-asr-vosk" {
+                continue;
+            }
+            let status = std::fs::read_to_string(entry.path().join("status")).unwrap_or_default();
+            for line in status.lines() {
+                if let Some(rest) = line.strip_prefix("VmRSS:") {
+                    rss = rss.max(leading_kb(rest));
+                } else if let Some(rest) = line.strip_prefix("VmHWM:") {
+                    hwm = hwm.max(leading_kb(rest));
+                }
+            }
+        }
+        (rss, hwm)
+    }
+
+    fn leading_kb(rest: &str) -> u64 {
+        rest.split_whitespace()
+            .next()
+            .and_then(|value| value.parse().ok())
+            .unwrap_or(0)
+    }
+
+    fn dir_bytes(path: &Path) -> u64 {
+        let mut sum = 0u64;
+        let mut stack = vec![path.to_path_buf()];
+        while let Some(dir) = stack.pop() {
+            let Ok(read) = std::fs::read_dir(&dir) else {
+                continue;
+            };
+            for entry in read.flatten() {
+                let Ok(kind) = entry.file_type() else {
+                    continue;
+                };
+                if kind.is_dir() {
+                    stack.push(entry.path());
+                } else if let Ok(meta) = entry.metadata() {
+                    sum = sum.saturating_add(meta.len());
+                }
+            }
+        }
+        sum
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::ear_grammar;
+
+        #[test]
+        fn the_bias_list_keeps_yeah_and_the_dialogue_and_drops_yep() {
+            let phrases = ear_grammar();
+            for phrase in [
+                "yeah",
+                "okay",
+                "i am sad",
+                "i am happy",
+                "i am so tired",
+                "where is the kettle",
+                "who won the match",
+                "why is the sky blue",
+                "stop",
+                "[unk]",
+            ] {
+                assert!(phrases.iter().any(|item| item == phrase), "{phrase}");
+            }
+            assert!(!phrases.iter().any(|item| item == "yep"));
+            assert!(!phrases.iter().any(|item| item == "yea"));
         }
     }
 }

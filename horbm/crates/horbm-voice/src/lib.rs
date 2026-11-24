@@ -35,7 +35,7 @@ pub use clock::{
 };
 pub use device::{place, select_place, Place};
 pub use ear::{Ear, EarEvent, FakeEar};
-pub use lexicon::is_listed_backchannel;
+pub use lexicon::{is_listed_backchannel, listed_backchannels};
 pub use mouth::{AudioFrame, FakeMouth, Mouth, MouthPull};
 pub use turn::{TickEvent, TickOut, VoiceLoop};
 

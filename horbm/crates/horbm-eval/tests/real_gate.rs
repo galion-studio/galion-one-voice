@@ -31,7 +31,16 @@ fn the_real_linux_ear_and_mouth_round_trip() {
     assert_eq!(latency["clock"], "wall");
     let asr = report.scores.asr.expect("asr score");
     assert!(asr.pass, "{:?}", asr.failures);
-    let prosody = asr.detail.expect("asr detail");
-    assert_eq!(prosody["prosody"], "on");
-    assert!(prosody["sensed_frames"].as_u64().unwrap_or(0) > 0);
+    let detail = asr.detail.expect("asr detail");
+    assert_eq!(detail["prosody"], "on");
+    assert!(detail["sensed_frames"].as_u64().unwrap_or(0) > 0);
+    let wer = detail["wer"].as_f64().expect("wer");
+    assert!(wer <= 0.05, "mean wer {wer}");
+    assert_eq!(detail["yeah"], "yeah");
+    assert_eq!(detail["sad"], "i am sad");
+    let rtf = detail["rtf"].as_f64().expect("rtf");
+    assert!(rtf < 1.0, "rtf {rtf}");
+    assert!(detail["model_bytes"].as_u64().unwrap_or(0) > 0);
+    let heard = latency["backchannel_heard"].as_str().unwrap_or("");
+    assert_eq!(heard, "yeah");
 }
