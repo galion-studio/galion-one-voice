@@ -30,6 +30,13 @@
 //! GEMI intent. [`Brain::inner_nudge`] steps that message through the moment
 //! core. Neither call rewrites the empathy mood or the voice baseline.
 //! Learning a new care stays off while `LOCKS.toml` `[consent] learn` is deny.
+//!
+//! [`Brain::samantha`] is the slower layer: care, curiosity, help, and
+//! expect. [`Brain::turn`] lets that layer bias the pace and, when the act
+//! is comfort, skips the research ask. It does not replace the spoken
+//! clause. [`Brain::samantha_nudge`] steps the same GEMI note on the moment
+//! clock. [`Brain::tick_frame`] decays the goals and counts silence. It
+//! still does not step the moment.
 
 #![forbid(unsafe_code)]
 
@@ -49,6 +56,11 @@ pub use galion_emotion_core::{
 pub use galion_research_gateway::RESEARCH_CAP;
 pub use galion_sam_empathy::{Intent, PronounClass, FRAME_MS};
 pub use horbm_brain::{Answer, Heuristic, MarkKind, SidebandMark};
+pub use horbm_inner::{
+    DialogueLean, Heard, InnerMsg, MsgDir, Perceived, SamanthaInner, Verb, CARE_HOME,
+    CHECKIN_GAP_MS, CHECKIN_MS, CURIOSITY_HOME, EXPECT_HOME, HELP_HOME, PERSONA as SAMANTHA_INNER,
+    REMEMBER_LOCK, TICK_MS, WAIT_MS,
+};
 pub use route::{
     is_deep_question, route_heard, AskOutcome, CardHit, CardLookup, Gap, GapReason, ResearchAsk,
     RouteKind, RouteOut, Speakable, GAP_ADVICE, UNKNOWN_REPLY,

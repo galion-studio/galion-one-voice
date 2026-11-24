@@ -142,6 +142,7 @@ dependencies = [
  "galion-research-gateway",
  "galion-sam-empathy",
  "horbm-brain",
+ "horbm-inner",
  "serde_json",
  "sha2",
 ]
@@ -157,6 +158,16 @@ dependencies = [
  "galion-conductor",
  "horbm",
  "horbm-voice",
+]
+
+[[package]]
+name = "horbm-inner"
+version = "0.0.1"
+dependencies = [
+ "galion-emotion",
+ "galion-emotion-core",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
