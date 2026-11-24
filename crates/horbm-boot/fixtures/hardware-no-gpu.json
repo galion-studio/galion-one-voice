@@ -1,0 +1,16 @@
+{
+  "processors": 8,
+  "arch": "x86_64",
+  "os": "linux",
+  "ram_total_mib": 16000,
+  "ram_free_mib": 8000,
+  "gpu": null,
+  "worker_mib": 512,
+  "cap": 15,
+  "weights": false,
+  "mouth": true,
+  "llm": "api",
+  "rule": "cpu-only",
+  "line": "CPU only. Hermes stays on the laptop model. Weights stay off.",
+  "at": "2026-11-18T12:00:00+01:00"
+}

@@ -1,0 +1,21 @@
+{
+  "processors": 8,
+  "arch": "x86_64",
+  "os": "linux",
+  "ram_total_mib": 16000,
+  "ram_free_mib": 8000,
+  "gpu": {
+    "name": "RTX 4090",
+    "total_mib": 24564,
+    "used_mib": 20564,
+    "free_mib": 4000
+  },
+  "worker_mib": 512,
+  "cap": 15,
+  "weights": false,
+  "mouth": true,
+  "llm": "api",
+  "rule": "gpu-low",
+  "line": "A card is here, but not enough free memory. Hermes stays on the laptop model.",
+  "at": "2026-11-18T12:00:00+01:00"
+}

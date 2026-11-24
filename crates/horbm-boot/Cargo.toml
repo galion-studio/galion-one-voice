@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Galion Labs
+
+[package]
+name = "horbm-boot"
+description = "Read a galion-boot hardware.json and select the HORBM brain on CPU. The GPU flag is reported. It does not move the mouth."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "horbm-boot"
+path = "src/main.rs"
+
+[dependencies]
+# Same pin as voice-stack/local-server. No tokio. No SIMD. No GPU runtime.
+serde_json = "=1.0.134"
