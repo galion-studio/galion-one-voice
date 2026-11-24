@@ -40,8 +40,7 @@ static ALLOCATOR: Counting = Counting;
 #[test]
 fn turn_and_nudge_stay_inside_the_alloc_budget() {
     ARMED.with(|armed| armed.set(true));
-    let mut probe = Vec::<u8>::new();
-    probe.push(1);
+    let probe = vec![1u8];
     ARMED.with(|armed| armed.set(false));
     assert!(
         ALLOCS.load(Ordering::SeqCst) > 0,

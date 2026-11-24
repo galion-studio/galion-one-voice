@@ -6,7 +6,7 @@ Perpetual Open MIT License. (c) 2026 Galion Labs.
 |---|---|
 | Swarm | S15, inner life. Roles: cares and wants, expectations and surprise, GEMI exchange, tests and this note. |
 | Written | 2026-11-24. No voice audio, no recording, no weight, no network call. |
-| Base | PR #263, branch `cursor/emotion-core-moment-0010`. This change stacks on that PR. |
+| Base | `main` `3269229` (PR #263 merged). |
 | Crate | `crates/galion-emotion-core` module `inner`. `Brain::inner_nudge` calls it. |
 | Locks | Added `LOCKS.toml` `[consent] learn = "deny"`. `scripts/check-locks.sh` asserts that string. No other lock value changed. `SOUL.md` is not in this tree; nothing was added. |
 
