@@ -14,7 +14,7 @@ Owner: Mate Grajczyk. Nothing in this note merges a pull request.
 | Diary face, galion-knowledge PR #36 | `cursor/horbm-memory-git-face-3cd7` | `974e594444448597741372fef578142c46d28566` | Open. Not merged. Voice PR #253 pins this SHA. |
 | Alternate phase 2, PR #251 | `cursor/horbm-phase2-retrieval-24dc` | `5b69340344a839149b120ceba761f5ad5108a9f1` | Open. Superseded by #253. Not in this branch. |
 
-`LOCKS.toml` is unchanged. `SOUL.md` is not in this tree.
+`LOCKS.toml` gains a `[horbm]` block. Consent values are the same. `SOUL.md` is still not in this tree: nothing here reads it, and the spoken miss stays the existing persona clause.
 
 ## Q1 option A
 
@@ -22,7 +22,7 @@ R4 §13 asks whether HORBM is the hot-path brain, with S0 deferred, or whether t
 
 That matches the split R4 §1 already wrote. The hot path is a stored clause. Galion Research stays off the tick, and only for Lookup and Action marks. Phase 4 does not post those marks (`posted: false`). Phases 2–4 do not download weights and do not put a third-party model on the turn.
 
-R4’s own banner says the 2026-11-04 ruling wins until the owner says otherwise. This note treats option A as that answer for the code below. It does not edit the ruling.
+R4’s own banner says the 2026-11-04 ruling wins until the owner says otherwise. On 2026-11-24 the owner opened `LOCKS.toml` for architecture edits. `[horbm]` records option A: `hot_path = "retrieval"`, `student_on_tick = false`, miss `I don't know.`, and the only grant string `GALION_HORBM_REMEMBER=grant`. `[consent]` is unchanged. `scripts/check-locks.sh` checks the new keys.
 
 ## What each phase actually is
 
