@@ -93,6 +93,7 @@ fn pin_bin() -> Command {
     cmd
 }
 
+#[cfg(unix)]
 #[test]
 fn galion_pin_execs_unpinned_when_the_map_is_off() {
     let missing = pin_bin().output().unwrap();
@@ -122,4 +123,27 @@ fn galion_pin_execs_unpinned_when_the_map_is_off() {
     let err = String::from_utf8(custom.stderr).unwrap();
     assert!(err.contains("role=retrieval"), "{err}");
     assert!(err.contains("threads=2"), "{err}");
+}
+
+#[cfg(windows)]
+#[test]
+fn galion_pin_runs_a_child_when_the_map_is_off() {
+    let missing = pin_bin().output().unwrap();
+    assert_eq!(missing.status.code(), Some(2));
+
+    let bad = pin_bin().arg("not-a-role").arg("--").arg("cmd").output().unwrap();
+    assert_eq!(bad.status.code(), Some(2));
+
+    let hello = pin_bin().args(["bus", "--", "cmd", "/C", "exit 0"]).output().unwrap();
+    assert!(hello.status.success(), "stderr {:?}", String::from_utf8_lossy(&hello.stderr));
+    let err = String::from_utf8(hello.stderr).unwrap();
+    assert!(err.contains("role=bus"), "{err}");
+    assert!(err.contains("map=off"), "{err}");
+    assert!(err.contains("cpus=inherit"), "{err}");
+    assert!(err.contains("threads=4"), "{err}");
+
+    let threads = pin_bin().args(["reasoning", "--", "cmd", "/C", "exit 0"]).output().unwrap();
+    assert!(threads.status.success(), "{:?}", String::from_utf8_lossy(&threads.stderr));
+    let err = String::from_utf8(threads.stderr).unwrap();
+    assert!(err.contains("threads=4"), "{err}");
 }

@@ -418,7 +418,7 @@ impl TtsEngine for A21WeightTts {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, unix))]
 mod tests {
     use super::*;
 

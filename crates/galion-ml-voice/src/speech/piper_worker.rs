@@ -13,6 +13,7 @@
 
 use crate::VoiceError;
 use std::io::{Read, Write};
+#[cfg(unix)]
 use std::os::unix::io::AsRawFd;
 use std::path::Path;
 use std::process::{Child, ChildStderr, ChildStdin, ChildStdout, Command, Stdio};
@@ -126,6 +127,7 @@ impl PiperWorker {
         // lat240: optional core pinning (`GALION_PIPER_CPUS=6-7`). The pinned Piper
         // CLI starts one ONNX intra-op thread per core and exposes no thread
         // setting, so affinity is the only CPU lever it has. Unset = inherit.
+        #[cfg(unix)]
         if let Some(cpus) = std::env::var("GALION_PIPER_CPUS").ok().and_then(|v| parse_cpus(&v)) {
             use std::os::unix::process::CommandExt;
             // SAFETY: pre_exec runs in the forked child before exec; sched_setaffinity
@@ -144,6 +146,7 @@ impl PiperWorker {
             let _ = child.wait();
             return Err(VoiceError::Backend("A21 piper pipes missing".into()));
         };
+        #[cfg(unix)]
         if let Err(e) = set_nonblock(stdout.as_raw_fd()).and_then(|_| set_nonblock(stderr.as_raw_fd())) {
             let _ = child.kill();
             let _ = child.wait();
@@ -199,6 +202,20 @@ impl PiperWorker {
 
     /// Non-blocking read of stdout PCM and stderr. Does not wait for the utterance.
     pub fn poll_pipes(&mut self) -> Result<(), VoiceError> {
+        #[cfg(not(unix))]
+        {
+            return Err(VoiceError::Backend(
+                "A21 piper pipe wait is not available on this platform".into(),
+            ));
+        }
+        #[cfg(unix)]
+        {
+            self.poll_pipes_unix()
+        }
+    }
+
+    #[cfg(unix)]
+    fn poll_pipes_unix(&mut self) -> Result<(), VoiceError> {
         for _ in 0..8 {
             let stdout_fd = self.stdout.as_ref().map(|p| p.as_raw_fd()).unwrap_or(-1);
             let stderr_fd = self.stderr.as_ref().map(|p| p.as_raw_fd()).unwrap_or(-1);
@@ -326,6 +343,21 @@ impl PiperWorker {
     pub fn first_chunk_ms(&self) -> Option<u32> { self.first_chunk_ms }
 
     fn read_utterance(&mut self, timeout: Duration, emit: &mut dyn FnMut(&mut Vec<u8>)) -> Result<(), VoiceError> {
+        #[cfg(not(unix))]
+        {
+            let _ = (timeout, emit);
+            return Err(VoiceError::Backend(
+                "A21 piper pipe wait is not available on this platform".into(),
+            ));
+        }
+        #[cfg(unix)]
+        {
+            self.read_utterance_unix(timeout, emit)
+        }
+    }
+
+    #[cfg(unix)]
+    fn read_utterance_unix(&mut self, timeout: Duration, emit: &mut dyn FnMut(&mut Vec<u8>)) -> Result<(), VoiceError> {
         let deadline = Instant::now() + timeout;
         let mark = self.err_log.len();
         loop {
@@ -450,16 +482,23 @@ fn tail(s: &str) -> String {
 
 fn elapsed_ms(t0: Instant) -> u32 { t0.elapsed().as_millis().min(u32::MAX as u128) as u32 }
 
+#[cfg(unix)]
 #[derive(Clone, Copy)]
 #[repr(C)]
 struct PollFd { fd: i32, events: i16, revents: i16 }
 
+#[cfg(unix)]
 const POLLIN: i16 = 0x001;
+#[cfg(unix)]
 const POLLHUP: i16 = 0x010;
+#[cfg(unix)]
 const F_GETFL: i32 = 3;
+#[cfg(unix)]
 const F_SETFL: i32 = 4;
+#[cfg(unix)]
 const O_NONBLOCK: i32 = 0o4000;
 
+#[cfg(unix)]
 extern "C" {
     fn poll(fds: *mut PollFd, nfds: u64, timeout: i32) -> i32;
     fn fcntl(fd: i32, cmd: i32, arg: i32) -> i32;
@@ -477,10 +516,12 @@ pub fn parse_cpus(s: &str) -> Option<Vec<usize>> {
     if v.is_empty() { None } else { Some(v) }
 }
 
+#[cfg(unix)]
 extern "C" {
     fn sched_setaffinity(pid: i32, cpusetsize: usize, mask: *const u64) -> i32;
 }
 
+#[cfg(unix)]
 fn set_affinity(cpus: &[usize]) -> std::io::Result<()> {
     let mut mask = [0u64; 16]; // 1024 cpus, glibc cpu_set_t size
     for &c in cpus { mask[c / 64] |= 1u64 << (c % 64); }
@@ -490,6 +531,7 @@ fn set_affinity(cpus: &[usize]) -> std::io::Result<()> {
     Ok(())
 }
 
+#[cfg(unix)]
 fn set_nonblock(fd: i32) -> std::io::Result<()> {
     // SAFETY: fd is a pipe this process owns; F_GETFL/F_SETFL take an int flag.
     let flags = unsafe { fcntl(fd, F_GETFL, 0) };
@@ -502,6 +544,7 @@ fn set_nonblock(fd: i32) -> std::io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(unix)]
     use std::os::unix::fs::PermissionsExt;
 
     #[test]
@@ -552,6 +595,7 @@ mod tests {
 
     /// Two syntheses, one process. The fake runtime speaks the same protocol
     /// as Piper 2023.11.14-2: raw s16le, then a `Real-time factor:` line.
+    #[cfg(unix)]
     #[test]
     fn two_turns_reuse_one_piper_process() {
         let dir = std::env::temp_dir().join(format!("galion-piper-worker-{}", std::process::id()));

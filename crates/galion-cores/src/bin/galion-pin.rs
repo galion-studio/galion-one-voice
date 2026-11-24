@@ -15,7 +15,6 @@
 //! `GALION_PIN_DEFAULT_THREADS` (default 4). One stderr line names the placement.
 
 use galion_cores::{active_map, pin_current_thread, placement, CoreRole};
-use std::os::unix::process::CommandExt;
 use std::process::Command;
 
 fn usage() -> ! {
@@ -41,7 +40,7 @@ fn main() {
         std::env::var("GALION_PIN_DEFAULT_THREADS").ok().and_then(|t| t.parse().ok()).unwrap_or(4)
     };
     if let Err(e) = pin_current_thread(&p.cpus) {
-        eprintln!("galion-pin: sched_setaffinity {}: {e}", p.cpu_list());
+        eprintln!("galion-pin: pin {}: {e}", p.cpu_list());
         std::process::exit(1);
     }
     eprintln!(
@@ -53,7 +52,26 @@ fn main() {
     let program = rest.remove(0);
     let rest: Vec<String> =
         rest.into_iter().map(|a| if a == "{threads}" { threads.to_string() } else { a }).collect();
-    let err = Command::new(&program).args(&rest).exec();
+    exec_program(&program, &rest);
+}
+
+/// Unix replaces this process. Windows has no `exec`, so the launcher waits
+/// and forwards the child status.
+#[cfg(unix)]
+fn exec_program(program: &str, args: &[String]) -> ! {
+    use std::os::unix::process::CommandExt;
+    let err = Command::new(program).args(args).exec();
     eprintln!("galion-pin: exec {program}: {err}");
     std::process::exit(127);
+}
+
+#[cfg(not(unix))]
+fn exec_program(program: &str, args: &[String]) -> ! {
+    match Command::new(program).args(args).status() {
+        Ok(status) => std::process::exit(status.code().unwrap_or(1)),
+        Err(err) => {
+            eprintln!("galion-pin: exec {program}: {err}");
+            std::process::exit(127);
+        }
+    }
 }

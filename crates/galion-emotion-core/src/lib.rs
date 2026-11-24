@@ -8,8 +8,10 @@
 //!
 //! One step is one 80 ms frame on [`clock::VirtualClock`]. Inside factors
 //! (breath, energy, fatigue, health) move the moment. Intent arrives as a
-//! 72-byte [`IntentMsg`]. Consent is the low four bits of EmotionWire
-//! byte 7, enforced through `galion-emotion`.
+//! 72-byte [`IntentMsg`]. [`inner::InnerLife`] emits that same message and
+//! consumes one coming back. Consent is the low four bits of EmotionWire
+//! byte 7, enforced through `galion-emotion`. Learning a new care is a
+//! separate lock, `[consent] learn`, default deny.
 //!
 //! CPU only. No model, no audio, no thread. The hot path does not allocate.
 #![forbid(unsafe_code)]
@@ -19,6 +21,7 @@ mod baseline;
 mod clock;
 mod conductor;
 mod factors;
+mod inner;
 mod intent;
 mod moment;
 mod project;
@@ -35,6 +38,12 @@ pub use factors::{
     BREATH_FLOW_AROUSAL, BREATH_VOLUME_AROUSAL, ENERGY_APPROACH, ENERGY_AROUSAL, ENERGY_REST,
     FATIGUE_APPROACH, FATIGUE_AROUSAL, FATIGUE_DOMINANCE, FATIGUE_REST, FATIGUE_VALENCE,
     HEALTH_AROUSAL, HEALTH_DOMINANCE, HEALTH_REST, HEALTH_VALENCE, VOLUME_REST,
+};
+pub use inner::{
+    learning_allowed, InnerLife, InnerTurn, Motive, TurnView, BELIEF_AFTER_MISS, CARE_LEVEL,
+    CARE_SLOTS, EXPECT_LEVEL, EXPECT_SLOTS, LEARNED_SLOTS, LEARN_LOCK, SURPRISE_APPROACH,
+    SURPRISE_AROUSAL, SURPRISE_DOMINANCE, SURPRISE_VALENCE, TURN_ALLOC_BUDGET, WANT_LEVEL,
+    WANT_SLOTS,
 };
 pub use intent::{
     IntentMsg, IntentSource, INTENT_BYTES, INTENT_MAGIC, INTENT_VERSION, MASK_BREATH, MASK_ENERGY,

@@ -1,11 +1,13 @@
 // Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
-//! Fixed stand-ins for the inner-life layer that is not built yet.
+//! Fixed stand-ins for persona and memory, plus the seed for inner life.
 //!
 //! Four files, one directory, schema `galion-emotion-standin/1`:
 //! `persona.txt`, `memory.txt`, `inner-life.txt`, `intent.txt`.
 //! Loading allocates. The frame step does not call this module.
-//! Memory and inner life are readable context. They do not move the moment.
-//! The intent script is the message stream that does.
+//! Persona and memory stay stand-ins. `inner-life.txt` is prose for
+//! [`crate::InnerLife::from_prose`]. The file does not move the moment.
+//! The layer emits an [`crate::IntentMsg`], and the core steps that.
+//! The intent script is the fixed stream [`StandinWorld::replay`] steps.
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -15,6 +17,7 @@ use crate::axes::{APPROACH, AROUSAL, AXES, DOMINANCE, VALENCE};
 use crate::baseline::VoiceBaseline;
 use crate::clock::FRAME_MS;
 use crate::factors::BreathPhase;
+use crate::inner::InnerLife;
 use crate::intent::{
     pack_verb, IntentMsg, IntentSource, MASK_BREATH, MASK_ENERGY, MASK_FATIGUE, MASK_HEALTH,
 };
@@ -52,7 +55,7 @@ pub struct MemoryCard {
     pub snippet: String,
 }
 
-/// Cares, wants, expects. A fixture, not a model of a mind.
+/// Prose seed for cares, wants, and expects. The live state is [`InnerLife`].
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct InnerLifeStandin {
     pub care: String,
@@ -71,6 +74,11 @@ pub struct StandinWorld {
 impl StandinWorld {
     pub fn replay(&self) -> Result<EmotionCore, CoreError> {
         EmotionCore::replay(self.baseline, &self.script)
+    }
+
+    /// The real inner life, seeded from [`Self::inner`]. Does not allocate.
+    pub fn inner_life(&self) -> InnerLife {
+        InnerLife::from_prose(&self.inner.care, &self.inner.want, &self.inner.expect)
     }
 }
 

@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
-//! Intent message between a stand-in inner life and the MnE stack.
+//! Intent message between the inner life and the MnE stack.
 //!
 //! Fixed 72 bytes, little-endian, magic `GEMI`, version 1. The verb is an
 //! open token of at most 16 ASCII bytes. It is not an emotion category.
@@ -116,8 +116,8 @@ impl IntentMsg {
         out[8..12].copy_from_slice(&self.t_ms.to_le_bytes());
         out[12..28].copy_from_slice(&self.verb);
         write_f32(&mut out, 28, self.strength);
-        for i in 0..AXES {
-            write_f32(&mut out, 32 + i * 4, self.pull[i]);
+        for (i, pull) in self.pull.iter().enumerate() {
+            write_f32(&mut out, 32 + i * 4, *pull);
         }
         out[48] = self.pull_mask;
         out[49] = self.factor_mask;
@@ -146,8 +146,8 @@ impl IntentMsg {
         let mut verb = [0u8; VERB_BYTES];
         verb.copy_from_slice(&bytes[12..28]);
         let mut pull = [0.0; AXES];
-        for i in 0..AXES {
-            pull[i] = read_f32(bytes, 32 + i * 4)?;
+        for (i, slot) in pull.iter_mut().enumerate() {
+            *slot = read_f32(bytes, 32 + i * 4)?;
         }
         let breath_phase = BreathPhase::from_u8(bytes[50]).ok_or(CoreError::BadIntent)?;
         if bytes[51] != 0 {

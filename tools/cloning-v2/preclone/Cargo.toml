@@ -1,0 +1,31 @@
+# Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
+[package]
+name = "galion-preclone"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+publish = false
+description = "One pre-clone analysis stage: voice baseline, emotion-moment hook, room, and target-speaker segments. Synthetic tests only. Does not clone."
+
+[[bin]]
+name = "galion-preclone"
+path = "src/main.rs"
+
+[features]
+default = []
+# Compiles the GPU eligibility gate. This stage still measures on the CPU.
+# There is no GPU kernel; eligibility must not change the profile bytes.
+gpu = []
+
+[dependencies]
+galion-refcheck = { path = "../../emotion-v2/refcheck" }
+hound = "3.5"
+rustfft = "6"
+serde_json = "1"
+
+# Own workspace, same pattern as tools/emotion-v2/refcheck.
+# The voice runtime does not build this tool.
+[workspace]
+
+[profile.release]
+opt-level = 3
