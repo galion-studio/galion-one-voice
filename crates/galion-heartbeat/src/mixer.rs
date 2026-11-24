@@ -199,13 +199,7 @@ fn emit(lane: &Lane, src: &[f32], dst: &mut [f32]) {
     let mut i = 0;
     while i < FRAME_SAMPLES {
         let s = src[i] * g;
-        dst[i] = if s > 1.0 {
-            1.0
-        } else if s < -1.0 {
-            -1.0
-        } else {
-            s
-        };
+        dst[i] = s.clamp(-1.0, 1.0);
         i += 1;
     }
 }

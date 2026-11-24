@@ -247,18 +247,18 @@ impl Ffi {
         // SAFETY: symbol signatures match vosk_api.h (Apache-2.0). The handle stays open for the process.
         unsafe {
             Ok(Self {
-                model_new: std::mem::transmute(sym(h, "vosk_model_new")?),
-                model_free: std::mem::transmute(sym(h, "vosk_model_free")?),
-                rec_new: std::mem::transmute(sym(h, "vosk_recognizer_new")?),
-                rec_grm: std::mem::transmute(sym(h, "vosk_recognizer_new_grm")?),
-                set_words: std::mem::transmute(sym(h, "vosk_recognizer_set_words")?),
-                accept: std::mem::transmute(sym(h, "vosk_recognizer_accept_waveform")?),
-                result: std::mem::transmute(sym(h, "vosk_recognizer_result")?),
-                partial: std::mem::transmute(sym(h, "vosk_recognizer_partial_result")?),
-                final_result: std::mem::transmute(sym(h, "vosk_recognizer_final_result")?),
-                reset: std::mem::transmute(sym(h, "vosk_recognizer_reset")?),
-                rec_free: std::mem::transmute(sym(h, "vosk_recognizer_free")?),
-                set_log: std::mem::transmute(sym(h, "vosk_set_log_level")?),
+                model_new: std::mem::transmute::<*mut c_void, ModelNew>(sym(h, "vosk_model_new")?),
+                model_free: std::mem::transmute::<*mut c_void, ModelFree>(sym(h, "vosk_model_free")?),
+                rec_new: std::mem::transmute::<*mut c_void, RecNew>(sym(h, "vosk_recognizer_new")?),
+                rec_grm: std::mem::transmute::<*mut c_void, RecGrm>(sym(h, "vosk_recognizer_new_grm")?),
+                set_words: std::mem::transmute::<*mut c_void, SetWords>(sym(h, "vosk_recognizer_set_words")?),
+                accept: std::mem::transmute::<*mut c_void, Accept>(sym(h, "vosk_recognizer_accept_waveform")?),
+                result: std::mem::transmute::<*mut c_void, ResultFn>(sym(h, "vosk_recognizer_result")?),
+                partial: std::mem::transmute::<*mut c_void, ResultFn>(sym(h, "vosk_recognizer_partial_result")?),
+                final_result: std::mem::transmute::<*mut c_void, ResultFn>(sym(h, "vosk_recognizer_final_result")?),
+                reset: std::mem::transmute::<*mut c_void, ResetFn>(sym(h, "vosk_recognizer_reset")?),
+                rec_free: std::mem::transmute::<*mut c_void, RecFree>(sym(h, "vosk_recognizer_free")?),
+                set_log: std::mem::transmute::<*mut c_void, SetLog>(sym(h, "vosk_set_log_level")?),
             })
         }
     }

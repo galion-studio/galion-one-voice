@@ -194,12 +194,14 @@ fn push_doc(docs: &mut Vec<Doc>, text: String, pile: Pile, source_id: u32, sourc
     });
 }
 
+type Retrieved = (Vec<String>, Vec<String>, Vec<String>, Vec<(u32, String)>);
+
 fn retrieve(
     query: &[String],
     docs: &[Doc],
     sources: &[ResearchSource],
     history: &[LocalNote],
-) -> (Vec<String>, Vec<String>, Vec<String>, Vec<(u32, String)>) {
+) -> Retrieved {
     let n = docs.len();
     let mut df: HashMap<&str, usize> = HashMap::new();
     for doc in docs {
