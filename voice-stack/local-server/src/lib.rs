@@ -7,9 +7,11 @@
 //! `galion-samantha-ws/1` on `127.0.0.1:7881`, or another loopback port from
 //! `GALION_SAMANTHA_WS` including `::1`. Typed and spoken turns use the HORBM
 //! card bridge. A miss is "I don't know." Silero runs out of process when
-//! `GALION_VAD_BIN` is set. Piper LJ Speech is the mouth. The s711 clone is
-//! selected only when the local reference, the local checkpoint, and CUDA
-//! are all present. CPU keeps Piper and logs why.
+//! `GALION_VAD_BIN` is set. A turn is [`horbm_voice::VoiceLoop`]: ear, then
+//! `horbm::Brain::turn`, then the mouth selected at boot. CPU is the default
+//! device. The in-process tone is the mouth unless this crate is built with
+//! `--features piper`. The s711 clone is selected only when the local
+//! reference, the local checkpoint, and an explicit cuda opt-in are all present.
 
 #![forbid(unsafe_code)]
 
@@ -18,6 +20,7 @@ pub mod bind;
 mod brain;
 mod live;
 mod mouth;
+mod native;
 pub mod pipeline;
 pub mod protocol;
 pub mod reply;
@@ -26,7 +29,9 @@ mod voice_http;
 
 pub use audio::{FRAME_MS, MIC_FRAME_SAMPLES, MIC_RATE, SPEAKER_FRAME_SAMPLES, SPEAKER_RATE};
 pub use bind::{origin_allowed, require_loopback};
+pub use horbm_voice::{EarEvent, TickEvent, BARGE_IN_MAX_MS};
 pub use live::{gated_mouth_factory, live_factory};
+pub use native::{NativeSession, BOOT_BRAIN, BOOT_MOUTH_DEVICE};
 pub use pipeline::{unlinked_factory, FakePipeline, PipeInfo, Pipeline, TurnProduct};
 pub use reply::{
     FakeReply, HorbmAdapter, HorbmBrain, OpenHorbm, Pad, ReplyEngine, TurnOut, UnlinkedBrain,
