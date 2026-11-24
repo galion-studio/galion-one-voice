@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Galion Labs
+
+[package]
+name = "horbm-ear"
+description = "Ear-side prosody on one 80 ms, 16 kHz frame. Pitch is the pitch-detection YIN crate. Sense defaults to deny. Nothing is written."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version = "1.85"
+publish = false
+
+[dependencies]
+galion-emotion = { path = "../../galion-emotion" }
+galion-emotion-core = { path = "../galion-emotion-core" }
+pitch-detection = "0.3.0"

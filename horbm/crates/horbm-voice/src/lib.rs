@@ -35,9 +35,10 @@ pub use clock::{
 };
 pub use device::{place, select_place, Place};
 pub use ear::{Ear, EarEvent, FakeEar};
+pub use horbm::Pad;
 pub use lexicon::is_listed_backchannel;
 pub use mouth::{AudioFrame, FakeMouth, Mouth, MouthPull};
-pub use turn::{TickEvent, TickOut, VoiceLoop};
+pub use turn::{TickEvent, TickOut, TurnMsg, VoiceLoop};
 
 #[cfg(feature = "piper")]
 pub use piper_mouth::PiperMouth;
