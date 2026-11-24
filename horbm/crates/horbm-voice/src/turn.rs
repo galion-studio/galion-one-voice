@@ -13,6 +13,8 @@ use crate::mouth::{AudioFrame, Mouth, MouthPull};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TickEvent {
     None,
+    /// The ear heard speech start on this frame.
+    Onset,
     EndOfSpeech,
     FirstAudio,
     Backchannel,
@@ -49,6 +51,8 @@ pub struct VoiceLoop<E, M, B> {
     eot_ms: Option<u64>,
     first_audio_ms: Option<u64>,
     barge_ms: Option<u64>,
+    /// Mouth samples from the previous frame. The ear treats a copy as echo.
+    played: Vec<i16>,
 }
 
 impl<E, M, B> VoiceLoop<E, M, B>
@@ -77,6 +81,7 @@ where
             eot_ms: None,
             first_audio_ms: None,
             barge_ms: None,
+            played: Vec::new(),
         }
     }
 
@@ -107,8 +112,17 @@ where
     }
 
     /// Advance one virtual frame. Does not read a wall clock.
+    ///
+    /// The previous mouth frame is handed to the ear first, so a copy of her
+    /// own voice is echo. Then the ear, then the brain on a transcript, then
+    /// one mouth frame.
     pub fn tick(&mut self, pcm: &[i16]) -> TickOut {
         let t_ms = self.clock.t_ms();
+        if self.speaking {
+            self.ear.note_playback(&self.played);
+        } else {
+            self.ear.note_playback(&[]);
+        }
         let heard = self.ear.poll(pcm);
         if self.silence_next {
             let out = self.yield_floor(t_ms);
@@ -118,13 +132,22 @@ where
 
         let mut event = TickEvent::None;
         let mut reply = None;
-        self.on_ear(heard, t_ms, &mut event, &mut reply);
+        if self.on_ear(heard, t_ms, &mut event, &mut reply) {
+            let out = self.yield_floor(t_ms);
+            self.clock.advance();
+            return out;
+        }
 
         let mut audio = None;
         if self.speaking && self.await_audio {
             self.await_audio = false;
         } else if self.speaking {
             audio = self.pull_audio(t_ms, &mut event);
+        }
+        if let Some(frame) = &audio {
+            self.played = frame.samples.clone();
+        } else if !self.speaking {
+            self.played.clear();
         }
 
         let out = TickOut {
@@ -142,21 +165,50 @@ where
         out
     }
 
+    /// `true` means yield the floor on this frame. The ear has already decided
+    /// the overlap is a barge-in, so the silent frame is this one.
     fn on_ear(
         &mut self,
         heard: EarEvent,
         t_ms: u64,
         event: &mut TickEvent,
         reply: &mut Option<String>,
-    ) {
+    ) -> bool {
         let (text, end) = match heard {
-            EarEvent::Quiet | EarEvent::Fault(_) => return,
+            EarEvent::Quiet | EarEvent::Fault(_) | EarEvent::User => return false,
+            EarEvent::Onset => {
+                if *event == TickEvent::None {
+                    *event = TickEvent::Onset;
+                }
+                return false;
+            }
+            EarEvent::Backchannel => {
+                self.overlap_ms = 0;
+                self.overlap_origin_ms = None;
+                if self.speaking && *event == TickEvent::None {
+                    *event = TickEvent::Backchannel;
+                }
+                return false;
+            }
+            EarEvent::Barge => {
+                if !self.speaking {
+                    return false;
+                }
+                let back = u64::from(FRAME_MS) * 2;
+                self.overlap_origin_ms = Some(t_ms.saturating_sub(back));
+                self.overlap_ms = FRAME_MS.saturating_mul(3);
+                return true;
+            }
             EarEvent::Partial(text) => (text, false),
             EarEvent::End(text) => (text, true),
         };
         let text = text.trim();
         if text.is_empty() {
-            return;
+            if end && !self.speaking && *event == TickEvent::None {
+                *event = TickEvent::EndOfSpeech;
+                self.eot_ms = Some(t_ms);
+            }
+            return false;
         }
         if self.speaking {
             if is_listed_backchannel(text) {
@@ -166,11 +218,12 @@ where
             } else {
                 self.arm_overlap(t_ms);
             }
-            return;
+            return false;
         }
         if end {
             self.begin_turn(text, t_ms, event, reply);
         }
+        false
     }
 
     fn begin_turn(
@@ -237,6 +290,7 @@ where
         self.silence_next = false;
         self.overlap_ms = 0;
         self.overlap_origin_ms = None;
+        self.played.clear();
         self.epoch = self.epoch.wrapping_add(1);
         TickOut {
             t_ms,

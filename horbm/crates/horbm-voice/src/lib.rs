@@ -6,8 +6,10 @@
 //! [`VoiceLoop::tick`] on the turn worker, beside the heartbeat frame step.
 //! This function is not that step. The clock moves only when `tick` runs.
 //!
-//! Order, fixed: ear, then [`horbm::Brain::turn`], then mouth. Piper and Vosk
-//! are feature-gated adapters. The default build links neither.
+//! Order, fixed: the previous mouth frame, then the ear, then
+//! [`horbm::Brain::turn`] on a transcript, then one mouth frame. The default
+//! ear is energy activity and an endpointer. Piper and Vosk are feature-gated
+//! adapters. The default build links neither.
 //!
 //! # Safety
 //!
@@ -19,6 +21,7 @@ mod brain;
 mod clock;
 mod device;
 mod ear;
+mod energy;
 mod lexicon;
 mod mouth;
 mod turn;
@@ -35,6 +38,7 @@ pub use clock::{
 };
 pub use device::{place, select_place, Place};
 pub use ear::{Ear, EarEvent, FakeEar};
+pub use energy::{EnergyEar, EnergyGate, GateEvent};
 pub use horbm::Pad;
 pub use lexicon::is_listed_backchannel;
 pub use mouth::{AudioFrame, FakeMouth, Mouth, MouthPull};
@@ -43,7 +47,7 @@ pub use turn::{TickEvent, TickOut, VoiceLoop};
 #[cfg(feature = "piper")]
 pub use piper_mouth::PiperMouth;
 #[cfg(feature = "vosk")]
-pub use vosk_ear::VoskEar;
+pub use vosk_ear::{StreamingEar, VoskEar};
 
 const _: () = assert!(FRAME_MS == 80);
 const _: () = assert!(FRAME_MS == horbm::FRAME_MS);

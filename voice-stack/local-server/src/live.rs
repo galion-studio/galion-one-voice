@@ -3,7 +3,9 @@
 //! Mic to ear to [`horbm_voice::VoiceLoop`] to a mouth adapter.
 //!
 //! Silero runs in `vad-ear` (its own workspace, so `ort` stays out of this
-//! one). A quiet gap of 640 ms ends one turn. Vosk stays on a worker thread
+//! one). The energy gate is [`horbm_voice::EnergyGate`], the same floor and
+//! 60 ms onset as the orchestrator. A quiet gap of 640 ms ends one turn on
+//! this socket. Vosk stays on a worker thread
 //! because its handles are not `Send`. The spoken turn is one
 //! [`horbm_voice::VoiceLoop::tick`]: ear, then `horbm::Brain::turn`, then the
 //! mouth selected at boot. CPU is the default device. Piper is linked only
@@ -22,8 +24,10 @@ use std::thread::JoinHandle;
 use std::time::Duration;
 
 use galion_sam_asr::{final_text, open_engine, Asr, EngineOpts};
-use galion_sam_orch::{AudioFrame, EnergyVad, Tts as OrchTts, Vad, VadEvent};
-use horbm_voice::{EarEvent, Mouth as VoiceMouth, MouthPull, SpokenLine, VoiceLoop};
+use galion_sam_orch::Tts as OrchTts;
+use horbm_voice::{
+    EarEvent, EnergyGate, GateEvent, Mouth as VoiceMouth, MouthPull, SpokenLine, VoiceLoop,
+};
 
 use crate::audio::{self, rms, SPEAKER_RATE};
 use crate::brain::HorbmMind;
@@ -45,7 +49,7 @@ pub fn live_factory() -> Arc<dyn Fn() -> Box<dyn crate::pipeline::Pipeline> + Se
 
 enum Front {
     Child(ChildVad),
-    Energy(EnergyVad),
+    Energy(EnergyGate),
 }
 
 enum Ear {
@@ -403,18 +407,11 @@ impl LivePipeline {
     fn push_frame(&mut self, frame: &[i16]) -> Option<&'static str> {
         self.level = rms(frame).clamp(0.0, 1.0);
         match &mut self.front {
-            Front::Energy(vad) => {
-                let event = vad.push(&AudioFrame {
-                    pcm: frame.to_vec(),
-                    rate_hz: 16_000,
-                    ms: 20,
-                });
-                match event {
-                    VadEvent::Start => Some("start"),
-                    VadEvent::End => Some("end"),
-                    VadEvent::None => None,
-                }
-            }
+            Front::Energy(vad) => match vad.push(frame, 20.0) {
+                GateEvent::Start => Some("start"),
+                GateEvent::End => Some("end"),
+                GateEvent::None => None,
+            },
             Front::Child(child) => match child.push(frame) {
                 Some("start") => Some("start"),
                 Some("end") => Some("end"),
@@ -843,7 +840,7 @@ fn open_vad() -> (Front, &'static str, bool) {
         }
     }
     let ready = !require;
-    (Front::Energy(EnergyVad::new(HANG_MS)), "energy", ready)
+    (Front::Energy(EnergyGate::new(HANG_MS)), "energy", ready)
 }
 
 fn open_ear() -> (Ear, &'static str, Option<JoinHandle<()>>) {
@@ -1422,7 +1419,7 @@ mod tests {
 
     fn test_pipe(heard: Arc<Mutex<Vec<String>>>, ear: Ear, ear_name: &'static str) -> LivePipeline {
         LivePipeline::for_test(
-            Front::Energy(EnergyVad::new(HANG_MS)),
+            Front::Energy(EnergyGate::new(HANG_MS)),
             "energy",
             true,
             ear,
@@ -1440,7 +1437,7 @@ mod tests {
         let heard = Arc::new(Mutex::new(Vec::new()));
         let cues = Arc::new(Mutex::new(Vec::new()));
         let mut pipe = LivePipeline::for_test(
-            Front::Energy(EnergyVad::new(HANG_MS)),
+            Front::Energy(EnergyGate::new(HANG_MS)),
             "energy",
             true,
             Ear::Script("unused".into()),
