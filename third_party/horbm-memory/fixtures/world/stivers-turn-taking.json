@@ -1,0 +1,24 @@
+{
+  "id": "stivers-turn-taking",
+  "title": "Turn-taking gap",
+  "section": "world",
+  "category": "science",
+  "summary": "Across ten languages, the mean offset from a polar question to its answer is about 208 milliseconds.",
+  "body": "Stivers, Enfield, and colleagues measured turn-taking in conversation. Across ten languages the mean offset from a polar question to its answer is +208 ms. Each language's mode sits between 0 and +200 ms. This card is a sample for the memory index, not a substitute for the paper.",
+  "claim_type": "fact",
+  "sources": [
+    {
+      "title": "Stivers et al., Universals and cultural variation in turn-taking in conversation, PNAS 2009",
+      "url": "https://doi.org/10.1073/pnas.0903616106",
+      "author": "Tanya Stivers and colleagues",
+      "date": "2009"
+    }
+  ],
+  "evidence_strength": "strong",
+  "said_by": "Tanya Stivers and colleagues",
+  "as_of_date": "2009",
+  "status": "draft",
+  "contested_views": [],
+  "related": [],
+  "tags": ["conversation", "sample"]
+}

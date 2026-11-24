@@ -1,0 +1,24 @@
+{
+  "id": "cormack-rrf",
+  "title": "Reciprocal rank fusion",
+  "section": "world",
+  "category": "science",
+  "summary": "Reciprocal rank fusion combines ranked lists without putting their scores on one scale.",
+  "body": "Gordon V. Cormack, Charles L. A. Clarke, and Stefan Büttcher described reciprocal rank fusion at SIGIR 2009. The diary adds 1/(k+rank) across the BM25 list and the int8 cosine list, with k = 60.",
+  "claim_type": "fact",
+  "sources": [
+    {
+      "title": "Cormack, Clarke, and Büttcher, Reciprocal Rank Fusion, SIGIR 2009",
+      "url": "https://doi.org/10.1145/1571941.1572114",
+      "author": "Gordon V. Cormack, Charles L. A. Clarke, and Stefan Büttcher",
+      "date": "2009"
+    }
+  ],
+  "evidence_strength": "strong",
+  "said_by": "Gordon V. Cormack, Charles L. A. Clarke, and Stefan Büttcher",
+  "as_of_date": "2009",
+  "status": "draft",
+  "contested_views": [],
+  "related": ["robertson-bm25"],
+  "tags": ["retrieval", "sample"]
+}

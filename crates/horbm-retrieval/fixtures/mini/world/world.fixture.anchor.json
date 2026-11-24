@@ -1,0 +1,26 @@
+{
+  "id": "world.fixture.anchor",
+  "title": "Phase two anchor clause",
+  "section": "world",
+  "category": "fixture",
+  "summary": "The anchor clause says phase2anchor is the retrieval token.",
+  "body": "A committed text fixture card. The unique token is phase2anchor.",
+  "claim_type": "fact",
+  "sources": [
+    {
+      "title": "HORBM fixture",
+      "url": "https://example.com/anchor",
+      "author": "Galion Labs",
+      "date": "2026-11-24",
+      "accessed": "2026-11-24",
+      "note": "Committed text fixture for the phase 2 retrieval test."
+    }
+  ],
+  "evidence_strength": "strong",
+  "said_by": "fixture",
+  "as_of_date": "2026-11-24",
+  "status": "fixture",
+  "contested_views": [],
+  "related": [],
+  "tags": ["fixture"]
+}

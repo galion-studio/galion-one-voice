@@ -1,0 +1,24 @@
+{
+  "id": "robertson-bm25",
+  "title": "BM25",
+  "section": "world",
+  "category": "science",
+  "summary": "BM25 is the probabilistic relevance model surveyed by Robertson and Zaragoza in 2009.",
+  "body": "Stephen Robertson and Hugo Zaragoza surveyed BM25 in Foundations and Trends in Information Retrieval, 2009. HORBM uses that lexical score, via SQLite FTS5, as one leg of diary retrieval. This card is a sample fixture.",
+  "claim_type": "fact",
+  "sources": [
+    {
+      "title": "Robertson and Zaragoza, The Probabilistic Relevance Framework: BM25 and Beyond, 2009",
+      "url": "https://doi.org/10.1561/1500000019",
+      "author": "Stephen Robertson and Hugo Zaragoza",
+      "date": "2009"
+    }
+  ],
+  "evidence_strength": "strong",
+  "said_by": "Stephen Robertson and Hugo Zaragoza",
+  "as_of_date": "2009",
+  "status": "draft",
+  "contested_views": [],
+  "related": ["cormack-rrf"],
+  "tags": ["retrieval", "sample"]
+}

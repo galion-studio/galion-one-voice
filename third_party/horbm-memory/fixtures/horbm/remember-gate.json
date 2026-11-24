@@ -1,0 +1,24 @@
+{
+  "id": "remember-gate",
+  "title": "Remember gate",
+  "section": "horbm",
+  "category": "honesty",
+  "summary": "An episode is stored only when remember is explicit. Consent is given by use. There is no withdrawal command.",
+  "body": "HORBM research note R3, 2026-11-18, kept episodes off disk until remember. Owner decision, Mate, 2026-11-18 21:57: using the system is consent. An admin may archive one row with forget. The archive keeps the text and search does not read it.",
+  "claim_type": "opinion",
+  "sources": [
+    {
+      "title": "Galion Labs, HORBM R3 memory, persona, empathy, 2026-11-18",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/208",
+      "author": "Galion Labs",
+      "date": "2026-11-18"
+    }
+  ],
+  "evidence_strength": "moderate",
+  "said_by": "Galion Labs",
+  "as_of_date": "2026-11-18",
+  "status": "draft",
+  "contested_views": [],
+  "related": ["four-hits"],
+  "tags": ["horbm", "consent", "sample"]
+}

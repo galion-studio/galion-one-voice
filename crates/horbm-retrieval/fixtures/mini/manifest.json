@@ -1,0 +1,13 @@
+{
+  "schema": "galion-shard-manifest/1",
+  "version": "fixture",
+  "core_pack": {
+    "id": "core",
+    "section": "core",
+    "category": "core",
+    "sha256": "9bf6089ca1164c0fdf453e686dbb73e73d67e19a2f6cc1a083825755b15af0ce",
+    "bytes": 1536,
+    "payload": "card-bundle/1",
+    "card_count": 2
+  }
+}
