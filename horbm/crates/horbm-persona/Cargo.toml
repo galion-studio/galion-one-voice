@@ -13,6 +13,6 @@ rust-version = "1.85"
 [dependencies]
 galion-emotion-core = { path = "../../../crates/galion-emotion-core" }
 serde = { version = "1", features = ["derive"] }
-# galion-mne-contract, pulled in through horbm-duplex, pins toml = "=0.8.19".
-# One workspace can select only one toml. 0.8.19 is that pin.
-toml = "=0.8.19"
+# 0.8.23 compiles with the serde the voice-stack workspace already uses.
+# 0.8.19 does not. galion-mne-contract allows this version.
+toml = "0.8.23"
