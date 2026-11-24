@@ -193,7 +193,7 @@ pub struct Heartbeat<G: ConsentGate> {
 
 impl<G: ConsentGate> Heartbeat<G> {
     pub fn new(cfg: HeartbeatConfig, gate: G) -> Self {
-        let rika = Rika::new(cfg.rika.clone());
+        let rika = Rika::new(cfg.rika);
         let persona = VoicePersona::Samantha;
         Self {
             cfg,
@@ -213,7 +213,7 @@ impl<G: ConsentGate> Heartbeat<G> {
     /// Fresh session state (hang-up / new call). Wipes all affect-derived state.
     /// Not a hot-path call.
     pub fn reset(&mut self) {
-        self.rika = Rika::new(self.cfg.rika.clone());
+        self.rika = Rika::new(self.cfg.rika);
         self.detector.reset();
         self.index = 0;
         self.pending = neutral_output(0, Some(OffReason::Disabled));
