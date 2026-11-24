@@ -441,6 +441,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "horbm-eval"
+version = "0.0.1"
+dependencies = [
+ "galion-conductor",
+ "galion-emotion",
+ "galion-emotion-core",
+ "galion-emotion-in",
+ "horbm",
+ "horbm-voice",
+ "serde",
+ "serde_json",
+ "toml",
+]
+
+[[package]]
 name = "horbm-voice"
 version = "0.0.1"
 dependencies = [
