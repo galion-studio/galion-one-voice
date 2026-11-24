@@ -408,7 +408,10 @@ dependencies = [
 name = "horbm-voice"
 version = "0.0.1"
 dependencies = [
+ "galion-emotion",
+ "galion-emotion-core",
  "galion-sam-asr",
+ "galion-sam-prosody",
  "galion-tts-piper",
  "horbm",
 ]

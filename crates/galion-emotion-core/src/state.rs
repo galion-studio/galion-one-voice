@@ -175,10 +175,10 @@ fn apply(core: &mut EmotionCore, intent: &IntentMsg) {
         target[i] = clamp_pos(i, core.baseline.pos[i] + add);
     }
 
-    for i in 0..AXES {
+    for (i, goal) in target.iter().enumerate() {
         let x = core.moment.pos[i];
         let v = core.moment.vel[i];
-        let acc = STIFFNESS * (target[i] - x) - DAMPING * v;
+        let acc = STIFFNESS * (*goal - x) - DAMPING * v;
         let v2 = (v + acc * DT_S).clamp(-VEL_LIMIT, VEL_LIMIT);
         let x2 = clamp_pos(i, x + v2 * DT_S);
         core.moment.vel[i] = v2;

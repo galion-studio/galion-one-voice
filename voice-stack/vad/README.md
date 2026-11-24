@@ -5,7 +5,7 @@
 
 Perpetual Open MIT License. (c) 2026 Galion Labs.
 
-CPU voice activity detection for Samantha. Package `galion-sam-vad`, directory `voice-stack/vad`, the path in `voice-stack/INTEGRATION.md` on the architecture branch. Twenty millisecond frames go in. Speech start, speech end, and barge-in come out. The score is Silero VAD v5 on the CPU, through the same `ort` 2.0.0-rc.15 pin as `runtimes/galion-piper-rt`. If that model is missing or will not load, the score is the energy gate from `crates/galion-v2-live/src/vad.rs`.
+CPU voice activity detection for Samantha. Package `galion-sam-vad`, directory `voice-stack/vad`, the path in `voice-stack/INTEGRATION.md` on the architecture branch. Twenty millisecond frames go in. Speech start, speech end, and barge-in come out. The score is Silero VAD v5 on the CPU, through the same `ort` 2.0.0-rc.15 pin as `runtimes/galion-piper-rt`. If that model is missing or will not load, the score is the energy gate from `archive/2026-11-24/crates/galion-v2-live/src/vad.rs`.
 
 This crate is its own Cargo workspace. It is not a member of the repo root workspace. `ort` stays inside this workspace, the same way the Piper runtime keeps it out of the root. `rust-version` is 1.92 because that `ort` pin will not compile on 1.85.
 
@@ -13,10 +13,10 @@ This crate is its own Cargo workspace. It is not a member of the repo root works
 
 | Already in the repo | What this crate keeps |
 | --- | --- |
-| `crates/galion-v2-live/src/vad.rs` | Noise floor −60 dB, +12 dB margin, −48 dB clamp. Onset 60 ms. |
-| `crates/galion-v2-live/src/endpoint.rs` | Speculate at 60 ms, commit a finished sentence at 160 ms, hold an unfinished word for 500 ms. Same unfinished-word list. |
-| `crates/galion-v2-live/src/bin/call.rs` | 20 ms frames. 24 kHz ear resampled to 16 kHz. Barge-in once 80 ms of consecutive overlap has built up while she is speaking. The call's own VAD hang is 300 ms (`Vad::new(300.0)`); set `GALION_VAD_HANG_MS=300` to use that. |
-| `crates/galion-v2-live/src/audio.rs` | WAV layout and the linear resample formula. |
+| `archive/2026-11-24/crates/galion-v2-live/src/vad.rs` | Noise floor −60 dB, +12 dB margin, −48 dB clamp. Onset 60 ms. |
+| `archive/2026-11-24/crates/galion-v2-live/src/endpoint.rs` | Speculate at 60 ms, commit a finished sentence at 160 ms, hold an unfinished word for 500 ms. Same unfinished-word list. |
+| `archive/2026-11-24/crates/galion-v2-live/src/bin/call.rs` | 20 ms frames. 24 kHz ear resampled to 16 kHz. Barge-in once 80 ms of consecutive overlap has built up while she is speaking. The call's own VAD hang is 300 ms (`Vad::new(300.0)`); set `GALION_VAD_HANG_MS=300` to use that. |
+| `archive/2026-11-24/crates/galion-v2-live/src/audio.rs` | WAV layout and the linear resample formula. |
 | `crates/galion-heartbeat` | The 80 ms heartbeat. Four VAD frames are one heartbeat. This crate stamps the index. It does not call `Heartbeat::step`. |
 | `GALION_SILERO_VAD` | Same environment variable the articulation worker already uses for a local Silero file. |
 | one-dot | [`FrameReport::level`](src/lib.rs) is a 0..1 speech probability a later `/dot` feed can paint. This crate does not serve the page. |

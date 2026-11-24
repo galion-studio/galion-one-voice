@@ -2,7 +2,7 @@
 // Copyright (c) 2026 Galion Labs
 
 //! WAV in and linear resample. The byte layout and the resample formula match
-//! `crates/galion-v2-live/src/audio.rs` so a 20 ms frame from that lane is the
+//! `archive/2026-11-24/crates/galion-v2-live/src/audio.rs` so a 20 ms frame from that lane is the
 //! same frame here. No codec crate: CC0 clips used by the bench are 16-bit PCM.
 
 use crate::VadError;

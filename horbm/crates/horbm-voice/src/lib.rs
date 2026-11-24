@@ -9,6 +9,10 @@
 //! Order, fixed: ear, then [`horbm::Brain::turn`], then mouth. Piper and Vosk
 //! are feature-gated adapters. The default build links neither.
 //!
+//! Before the ear, one 80 ms moment is mapped onto the mouth. Samantha's
+//! baseline stays put. Aria is parked. A new feeling is on the voice two
+//! frames later.
+//!
 //! # Safety
 //!
 //! No `unsafe`. No wall clock. No socket.
@@ -20,6 +24,7 @@ mod clock;
 mod device;
 mod ear;
 mod lexicon;
+mod moment_voice;
 mod mouth;
 mod turn;
 
@@ -36,6 +41,11 @@ pub use clock::{
 pub use device::{place, select_place, Place};
 pub use ear::{Ear, EarEvent, FakeEar};
 pub use lexicon::is_listed_backchannel;
+pub use moment_voice::{
+    aria_baseline, instant, is_aria, is_samantha, render_tone, samantha_baseline, shape_sentence,
+    BreathPlace, MomentView, MomentVoice, Rendered, VoiceControls, AFFECT_TO_VOICE_FRAMES,
+    AFFECT_TO_VOICE_MS, ARIA_PARKED,
+};
 pub use mouth::{AudioFrame, FakeMouth, Mouth, MouthPull};
 pub use turn::{TickEvent, TickOut, VoiceLoop};
 

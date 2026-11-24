@@ -5,7 +5,9 @@
 use std::path::Path;
 use std::time::Instant;
 
-use galion_emotion_core::{ConductorCue, EmotionCore, IntentMsg, MomentState};
+use galion_emotion_core::{
+    ConductorCue, EmotionCore, InnerLife, InnerTurn, IntentMsg, MomentState, VoiceBaseline,
+};
 use galion_sam_empathy::{Empathy, PronounClass, TickIn, FRAME_MS};
 
 use horbm_brain::{classify, pick, split_clause, Retrieved, Retriever, SidebandMark};
@@ -71,6 +73,7 @@ pub struct Brain {
     meta: MoodMeta,
     card_count: usize,
     emotion: EmotionCore,
+    inner: InnerLife,
 }
 
 struct Spoke {
@@ -133,6 +136,7 @@ impl Brain {
             meta: resting_meta(),
             card_count,
             emotion: EmotionCore::at_rest(),
+            inner: InnerLife::seeded(),
         }
     }
 
@@ -180,12 +184,56 @@ impl Brain {
         &self.emotion
     }
 
+    /// Who is speaking. The moment starts on this baseline. Empathy, cards,
+    /// and the inner life stay as they are. Later [`Self::step_moment`] calls
+    /// still do not write the baseline.
+    pub fn seat(&mut self, baseline: VoiceBaseline) {
+        self.emotion = EmotionCore::from_baseline(baseline);
+    }
+
     /// One 80 ms emotion frame. Does not change the empathy mood.
     pub fn step_moment(
         &mut self,
         intent: &IntentMsg,
     ) -> Result<MomentState, galion_emotion_core::CoreError> {
         self.emotion.step(intent)
+    }
+
+    /// The inner life. Persona and memory are not stored here.
+    pub fn inner(&self) -> &InnerLife {
+        &self.inner
+    }
+
+    /// One dialogue turn of cares, wants, and expects. Emits a GEMI intent
+    /// and, when `inbound` is set, consumes one. Does not step the moment
+    /// and does not write the baseline or the empathy mood.
+    pub fn inner_turn(
+        &mut self,
+        t_ms: u32,
+        dialogue: &str,
+        inbound: Option<&IntentMsg>,
+    ) -> InnerTurn {
+        let point = self.emotion.moment().pos;
+        let consent = self.emotion.consent();
+        self.inner.turn(galion_emotion_core::TurnView {
+            t_ms,
+            dialogue: dialogue.as_bytes(),
+            point,
+            inbound,
+            consent,
+        })
+    }
+
+    /// [`Self::inner_turn`] on the next emotion frame, then
+    /// [`Self::step_moment`] with that message. The existing port. The
+    /// baseline and the empathy mood stay as they were.
+    pub fn inner_nudge(
+        &mut self,
+        dialogue: &str,
+        inbound: Option<&IntentMsg>,
+    ) -> Result<InnerTurn, galion_emotion_core::CoreError> {
+        self.inner
+            .nudge(&mut self.emotion, dialogue.as_bytes(), inbound)
     }
 
     /// Snapshot for the conductor. The conductor does not own this state.

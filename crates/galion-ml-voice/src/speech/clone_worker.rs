@@ -61,6 +61,7 @@ use super::{sha256, FrameProsody};
 use crate::{Audio, LanguageId, TtsEngine, VoiceError};
 use std::cell::UnsafeCell;
 use std::io::{Read, Write};
+#[cfg(unix)]
 use std::os::unix::io::AsRawFd;
 use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStderr, ChildStdin, ChildStdout, Command, Stdio};
@@ -957,7 +958,16 @@ impl CloneWorker {
             return Err(VoiceError::Backend("clone worker pipes missing".into()));
         };
         if let Err(e) =
-            set_nonblock(stdout.as_raw_fd()).and_then(|_| set_nonblock(stderr.as_raw_fd()))
+            {
+                #[cfg(unix)]
+                {
+                    set_nonblock(stdout.as_raw_fd()).and_then(|_| set_nonblock(stderr.as_raw_fd()))
+                }
+                #[cfg(not(unix))]
+                {
+                    Ok::<(), std::io::Error>(())
+                }
+            }
         {
             let _ = child.kill();
             let _ = child.wait();
@@ -1097,6 +1107,24 @@ impl CloneWorker {
     /// Does not write stdin and does not call generate.
     /// The host calls this before `Heartbeat::step`, never inside it.
     pub fn poll_pcm(
+        &mut self,
+        ring: &mut galion_heartbeat::symphony::NanoPcmRing,
+    ) -> Result<PcmPull, VoiceError> {
+        #[cfg(not(unix))]
+        {
+            let _ = ring;
+            return Err(VoiceError::Backend(
+                "clone worker pipe wait is not available on this platform".into(),
+            ));
+        }
+        #[cfg(unix)]
+        {
+            self.poll_pcm_unix(ring)
+        }
+    }
+
+    #[cfg(unix)]
+    fn poll_pcm_unix(
         &mut self,
         ring: &mut galion_heartbeat::symphony::NanoPcmRing,
     ) -> Result<PcmPull, VoiceError> {
@@ -1292,6 +1320,21 @@ impl CloneWorker {
     }
 
     fn read_utterance(&mut self, t0: Instant, timeout: Duration) -> Result<Vec<i16>, VoiceError> {
+        #[cfg(not(unix))]
+        {
+            let _ = (t0, timeout);
+            return Err(VoiceError::Backend(
+                "clone worker pipe wait is not available on this platform".into(),
+            ));
+        }
+        #[cfg(unix)]
+        {
+            self.read_utterance_unix(t0, timeout)
+        }
+    }
+
+    #[cfg(unix)]
+    fn read_utterance_unix(&mut self, t0: Instant, timeout: Duration) -> Result<Vec<i16>, VoiceError> {
         let deadline = Instant::now() + timeout;
         let mark = self.err_log.len();
         loop {
@@ -1999,6 +2042,7 @@ enum Pipe {
     Err,
 }
 
+#[cfg(unix)]
 #[derive(Clone, Copy)]
 #[repr(C)]
 struct PollFd {
@@ -2007,17 +2051,24 @@ struct PollFd {
     revents: i16,
 }
 
+#[cfg(unix)]
 const POLLIN: i16 = 0x001;
+#[cfg(unix)]
 const POLLHUP: i16 = 0x010;
+#[cfg(unix)]
 const F_GETFL: i32 = 3;
+#[cfg(unix)]
 const F_SETFL: i32 = 4;
+#[cfg(unix)]
 const O_NONBLOCK: i32 = 0o4000;
 
+#[cfg(unix)]
 extern "C" {
     fn poll(fds: *mut PollFd, nfds: u64, timeout: i32) -> i32;
     fn fcntl(fd: i32, cmd: i32, arg: i32) -> i32;
 }
 
+#[cfg(unix)]
 fn set_nonblock(fd: i32) -> std::io::Result<()> {
     // SAFETY: fd is a pipe this process owns; F_GETFL/F_SETFL take an int flag.
     let flags = unsafe { fcntl(fd, F_GETFL, 0) };
@@ -2098,6 +2149,7 @@ mod tests {
         // Scratch dir under temp; renamed rather than deleted.
         let _ = std::fs::rename(&store, store.with_extension("off"));
     }
+    #[cfg(unix)]
     use std::os::unix::fs::PermissionsExt;
     use std::process::{Command, Stdio};
 
@@ -2509,6 +2561,7 @@ mod tests {
         assert!(!clamped.stdout.is_empty());
     }
 
+    #[cfg(unix)]
     #[test]
     fn two_turns_reuse_one_clone_process_and_the_clock_is_not_a_product_claim() {
         let dir = std::env::temp_dir().join(format!("galion-clone-worker-{}", std::process::id()));
@@ -2548,6 +2601,7 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
     }
 
+    #[cfg(unix)]
     #[test]
     fn marker_before_large_pcm_does_not_deadlock() {
         let dir = std::env::temp_dir().join(format!("galion-clone-marker-{}", std::process::id()));
@@ -2926,6 +2980,7 @@ sys.stdin.buffer.readline()
         assert!(!drain.drain_frame(&mut out));
     }
 
+    #[cfg(unix)]
     #[test]
     fn first_frame_is_drained_before_the_utterance_marker() {
         use std::sync::atomic::{AtomicBool, Ordering};

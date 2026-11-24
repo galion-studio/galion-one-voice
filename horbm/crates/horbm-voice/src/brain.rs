@@ -2,7 +2,10 @@
 // Copyright (c) 2026 Galion Labs
 //! The voice asks [`horbm::Brain`] for the spoken line. Nothing else writes it.
 
-use horbm::{Brain, CardLookup, Pad};
+use galion_emotion_core::Breath;
+use horbm::{Brain, CardLookup, Pad, VoiceBaseline};
+
+use crate::moment_voice::{samantha_baseline, MomentView};
 
 /// One line the mouth may speak, plus the mood the brain already computed.
 #[derive(Clone, Debug, PartialEq)]
@@ -18,6 +21,12 @@ pub struct SpokenLine {
 /// One brain turn. The voice loop calls this on end of speech and nowhere else.
 pub trait TurnBrain {
     fn turn(&mut self, heard: &str) -> SpokenLine;
+
+    /// The moment on this frame, when the brain has one. The default is none,
+    /// and the mouth keeps the unsteered packet.
+    fn moment_view(&self) -> Option<MomentView> {
+        None
+    }
 }
 
 /// [`horbm::Brain`] behind [`TurnBrain`].
@@ -26,18 +35,27 @@ pub struct HorbmTurn {
 }
 
 impl HorbmTurn {
-    pub fn new(brain: Brain) -> Self {
+    /// Samantha's voice. The moment starts on her baseline. [`Self::seat`]
+    /// is how Aria stays parked.
+    pub fn new(mut brain: Brain) -> Self {
+        brain.seat(samantha_baseline());
         Self { brain }
     }
 
     pub fn with_cards(cards: impl CardLookup + Send + 'static) -> Self {
-        Self {
-            brain: Brain::with_cards(cards, None),
-        }
+        Self::new(Brain::with_cards(cards, None))
+    }
+
+    pub fn brain(&self) -> &Brain {
+        &self.brain
     }
 
     pub fn brain_mut(&mut self) -> &mut Brain {
         &mut self.brain
+    }
+
+    pub fn seat(&mut self, baseline: VoiceBaseline) {
+        self.brain.seat(baseline);
     }
 }
 
@@ -52,6 +70,19 @@ impl TurnBrain for HorbmTurn {
             pitch_st: out.mood_meta.pitch_st,
             pause_ms: out.mood_meta.pause_ms,
         }
+    }
+
+    fn moment_view(&self) -> Option<MomentView> {
+        let cue = self.brain.conductor_cue();
+        Some(MomentView {
+            baseline: self.brain.emotion().baseline(),
+            moment: self.brain.emotion().moment(),
+            breath: Breath {
+                phase: cue.breath_phase,
+                volume: cue.lung_volume,
+                flow: cue.air_flow,
+            },
+        })
     }
 }
 
