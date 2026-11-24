@@ -30,11 +30,16 @@
 //! GEMI intent. [`Brain::inner_nudge`] steps that message through the moment
 //! core. Neither call rewrites the empathy mood or the voice baseline.
 //! Learning a new care stays off while `LOCKS.toml` `[consent] learn` is deny.
+//!
+//! [`RetrievalThread`] is not part of that order. It links `horbm-memory`
+//! in-process, off the heartbeat thread, and publishes a [`MemoryHitCell`].
+//! [`Brain::turn`] does not read the cell. The heuristic pick does.
 
 #![forbid(unsafe_code)]
 
 mod brain;
 mod cards;
+mod retrieve;
 mod route;
 
 pub use brain::{Brain, MoodMeta};
@@ -49,6 +54,10 @@ pub use galion_emotion_core::{
 pub use galion_research_gateway::RESEARCH_CAP;
 pub use galion_sam_empathy::{Intent, PronounClass, FRAME_MS};
 pub use horbm_brain::{Answer, Heuristic, MarkKind, SidebandMark};
+pub use retrieve::{
+    CellState, HitPool, Int8Scorer, MemoryHit, MemoryHitCell, RetrievalConfig, RetrievalThread,
+    RetrieveError, RetrievedCells, MEMORY_HIT_CAP,
+};
 pub use route::{
     is_deep_question, route_heard, AskOutcome, CardHit, CardLookup, Gap, GapReason, ResearchAsk,
     RouteKind, RouteOut, Speakable, GAP_ADVICE, UNKNOWN_REPLY,
