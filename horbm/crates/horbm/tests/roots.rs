@@ -26,6 +26,16 @@ fn write(dir: &Path, name: &str, body: &str) {
     std::fs::write(dir.join(name), body).unwrap();
 }
 
+fn write_style(root: &Path, name: &str, body: &str) {
+    let dir = root
+        .join("cards")
+        .join("diary")
+        .join("dialogue")
+        .join("synthetic");
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join(name), body).unwrap();
+}
+
 fn fact_card(id: &str, summary: &str, body: &str) -> String {
     format!(
         r#"{{
@@ -61,6 +71,8 @@ fn dialogue_card(id: &str, title: &str, body: &str) -> String {
   "research_only": true,
   "use_for": ["style", "empathy", "moves"],
   "not_for": ["answer", "cite"],
+  "licence": "synthetic",
+  "fixture": "synthetic",
   "sources": [],
   "evidence_strength": "none",
   "said_by": "horbm",
@@ -208,7 +220,7 @@ fn comfort_can_take_a_style_mark_and_still_says_the_miss() {
         ),
     );
     let research = temp_dir("research-style");
-    write(
+    write_style(
         &research,
         "soft-pace.json",
         &dialogue_card(
@@ -217,7 +229,7 @@ fn comfort_can_take_a_style_mark_and_still_says_the_miss() {
             "When they say i am tired, keep the line short.",
         ),
     );
-    write(
+    write_style(
         &research,
         "ask-plain.json",
         &dialogue_card(
@@ -226,7 +238,7 @@ fn comfort_can_take_a_style_mark_and_still_says_the_miss() {
             "When they ask who won the match, stay plain.",
         ),
     );
-    write(
+    write_style(
         &research,
         "offer-back.json",
         &dialogue_card(
@@ -236,7 +248,8 @@ fn comfort_can_take_a_style_mark_and_still_says_the_miss() {
         ),
     );
     let style = ResearchRoot::load(&research).unwrap();
-    assert_eq!(style.len(), 3);
+    assert_eq!(style.bundle_count(), 3);
+    assert_eq!(style.files_read(), 0);
     let mut brain =
         Brain::with_cards(KnowledgeCards::load(&truth).unwrap().cards, None).with_style(style);
     let tired = brain.turn("i am so tired");

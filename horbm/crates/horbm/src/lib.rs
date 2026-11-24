@@ -41,7 +41,8 @@
 //! or stop. The heuristic is deterministic. An answer with no sourced card
 //! becomes ask, and the spoken miss stays [`UNKNOWN_REPLY`]. The truth root
 //! is the only card source for answer and cite. [`ResearchRoot`] is optional
-//! and unset by default. A research card never becomes that source. Check-ins
+//! and unset by default. It reads `GALION_HORBM_RESEARCH_DIR` only. A research
+//! card never becomes an answer or a citation. Check-ins
 //! are off. The offline bandit is off and does not count a move unless learn
 //! consent is granted. Callbacks are stored only when remember is granted.
 //!
@@ -56,13 +57,14 @@ mod brain;
 mod cards;
 mod dialogue;
 mod keys;
+mod research_style;
 mod retrieve;
 mod route;
 
 pub use brain::{Brain, MoodMeta};
 pub use cards::{
     blocks_answer, knowledge_dir_from_env, CardError, KnowledgeCards, LoadReport, LoadedPack,
-    ResearchRoot, WINDOWS_KNOWLEDGE_DIR,
+    WINDOWS_KNOWLEDGE_DIR,
 };
 pub use dialogue::{flag_granted, DialogueConsent, Move, OfflineBandit, TurnSnap, RING_CAP};
 pub use galion_emotion_core::{
@@ -73,6 +75,10 @@ pub use galion_research_gateway::RESEARCH_CAP;
 pub use galion_sam_empathy::{Intent, PronounClass, FRAME_MS};
 pub use horbm_brain::{Answer, Heuristic, MarkKind, SidebandMark};
 pub use horbm_keys::StringKeyArena;
+pub use research_style::{
+    ResearchHit, ResearchRoot, StyleHint, StylePersona, StyleSearch, MAX_RESEARCH_BUNDLE_BYTES,
+    STYLE_HIT_CAP,
+};
 pub use retrieve::{
     CellState, HitPool, Int8Scorer, MemoryHit, MemoryHitCell, RetrievalConfig, RetrievalThread,
     RetrieveError, RetrievedCells, MEMORY_HIT_CAP,

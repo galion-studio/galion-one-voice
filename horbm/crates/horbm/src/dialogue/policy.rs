@@ -10,6 +10,7 @@
 use super::cues::{self, CheckInPhrase};
 use super::filter::{self, Legal};
 use super::moves::Move;
+use crate::research_style::ResearchHit;
 use crate::UNKNOWN_REPLY;
 
 /// What the gathered evidence looks like, plus the ring facts the heuristic
@@ -19,6 +20,7 @@ pub struct Choice<'a> {
     pub intent: &'a str,
     pub reply: &'a str,
     pub sources: &'a [String],
+    pub research: &'a [ResearchHit],
     pub current_topic: Option<&'a str>,
     pub ring_source: Option<&'a str>,
     pub ring_clause: Option<&'a str>,
@@ -60,7 +62,8 @@ enum Offer<'a> {
 /// Heuristic scores, then the persona and truth mask. Higher wins.
 /// Ties keep the earlier move in [`Move::ALL`].
 pub fn choose(choice: &Choice<'_>) -> (Move, ReplyPlan, f32) {
-    let sourced = filter::is_sourced(choice.reply, choice.sources);
+    let sourced = filter::is_sourced_truth(choice.reply, choice.sources, choice.research);
+    let hits = choice.research;
     let stop = cues::is_stop(choice.heard, choice.intent);
     let cite = cues::is_cite(choice.heard);
     let switch = cues::is_switch(choice.heard);
@@ -68,15 +71,17 @@ pub fn choose(choice: &Choice<'_>) -> (Move, ReplyPlan, f32) {
     let vent = choice.intent == "vent";
 
     let (cite_source, cite_clause) = if sourced {
-        (filter::real_source(choice.sources), Some(choice.reply))
+        (
+            independent_source(choice.sources, hits),
+            citable_clause(choice.reply, hits),
+        )
     } else if cite {
-        let source = choice
-            .ring_source
-            .filter(|source| filter::is_real_source(source));
-        let clause = choice.ring_clause.filter(|clause| {
-            let clause = clause.trim();
-            !clause.is_empty() && clause != UNKNOWN_REPLY && !filter::is_scripted_comfort(clause)
+        let source = choice.ring_source.filter(|source| {
+            filter::is_real_source(source) && !filter::source_is_research(source, hits)
         });
+        let clause = choice
+            .ring_clause
+            .and_then(|clause| citable_clause(clause, hits));
         (source, clause)
     } else {
         (None, None)
@@ -163,8 +168,35 @@ fn plan_for(
             None => ReplyPlan::miss(),
         },
         Move::Answer => ReplyPlan::Keep,
-        Move::Comfort | Move::Ask => keep_honest(choice.reply),
+        Move::Comfort | Move::Ask => {
+            if filter::research_blocks_speech(choice.reply, choice.sources, choice.research) {
+                ReplyPlan::miss()
+            } else {
+                keep_honest(choice.reply)
+            }
+        }
     }
+}
+
+fn independent_source<'a>(sources: &'a [String], hits: &[ResearchHit]) -> Option<&'a str> {
+    sources
+        .iter()
+        .find(|source| filter::is_real_source(source) && !filter::source_is_research(source, hits))
+        .map(String::as_str)
+}
+
+fn citable_clause<'a>(clause: &'a str, hits: &[ResearchHit]) -> Option<&'a str> {
+    let trimmed = clause.trim();
+    if trimmed.is_empty() || trimmed == UNKNOWN_REPLY || filter::is_scripted_comfort(trimmed) {
+        return None;
+    }
+    if hits
+        .iter()
+        .any(|hit| filter::reply_uses_example(clause, hit))
+    {
+        return None;
+    }
+    Some(clause)
 }
 
 fn keep_honest(reply: &str) -> ReplyPlan {
@@ -289,6 +321,7 @@ mod tests {
             intent,
             reply,
             sources,
+            research: &[],
             current_topic: None,
             ring_source: None,
             ring_clause: None,
@@ -347,6 +380,77 @@ mod tests {
         let bandit = OfflineBandit::new();
         assert!(!bandit.enabled());
         assert_eq!(bandit.choose_steered(scores), Move::Answer);
+    }
+
+    #[test]
+    fn a_research_hit_is_not_an_answer_and_not_a_citation() {
+        let hit = ResearchHit {
+            id: "soft-pace".to_string(),
+            text: "The spare kettle sits in the cupboard.".to_string(),
+            licence: "synthetic".to_string(),
+            dataset: "synthetic".to_string(),
+            lang: "en".to_string(),
+            score: 1.0,
+            not_for: vec!["answer".to_string(), "cite".to_string()],
+        };
+        assert!(!hit.allows_answer());
+        assert!(!hit.allows_cite());
+        assert!(hit.tagged_not_for_answer_and_cite());
+        let hits = [hit.clone()];
+        let card = vec!["card:soft-pace".to_string()];
+        let mut asked = choice(
+            "where is the spare kettle",
+            "ask",
+            "The spare kettle sits in the cupboard.",
+            &card,
+        );
+        asked.research = &hits;
+        let (chosen, plan, _) = choose(&asked);
+        assert_ne!(chosen, Move::Answer);
+        assert_ne!(chosen, Move::Cite);
+        assert_eq!(spoken(&plan, asked.reply), UNKNOWN_REPLY);
+        assert!(!plan_mentions(&plan, "cupboard"));
+        assert!(!plan_mentions(&plan, "soft-pace"));
+
+        let unknown = vec!["honest:unknown".to_string()];
+        let mut cited = choice("cite that", "ask", UNKNOWN_REPLY, &unknown);
+        cited.research = &hits;
+        cited.ring_source = Some("retrieve:soft-pace");
+        cited.ring_clause = Some(hit.text.as_str());
+        let (chosen, plan, _) = choose(&cited);
+        assert_ne!(chosen, Move::Cite);
+        assert_ne!(spoken(&plan, cited.reply), hit.text.as_str());
+        assert!(!spoken(&plan, cited.reply)
+            .to_ascii_lowercase()
+            .contains("cupboard"));
+
+        let truth = vec!["card:kettle".to_string()];
+        let mut still = choice(
+            "where is the kettle",
+            "ask",
+            "The kettle is on the hob.",
+            &truth,
+        );
+        still.research = &hits;
+        let (chosen, _, _) = choose(&still);
+        assert_eq!(chosen, Move::Answer);
+    }
+
+    fn spoken<'a>(plan: &'a ReplyPlan, original: &'a str) -> &'a str {
+        match plan {
+            ReplyPlan::Keep => original,
+            ReplyPlan::Replace { reply, .. } => reply,
+        }
+    }
+
+    fn plan_mentions(plan: &ReplyPlan, needle: &str) -> bool {
+        match plan {
+            ReplyPlan::Keep => false,
+            ReplyPlan::Replace { reply, sources, .. } => {
+                reply.to_ascii_lowercase().contains(needle)
+                    || sources.iter().any(|source| source.contains(needle))
+            }
+        }
     }
 
     #[test]

@@ -64,6 +64,7 @@ if all(isinstance(x, int) for x in (fm, a2v, a2f)) and a2v > fm * a2f:
 eq("consent.default", "deny")
 for b in ("sense", "adapt", "remember", "share"): eq(f"consent.{b}", "deny")
 eq("consent.learn", "deny")       # S15: not a fifth EmotionWire bit
+eq("consent.research_style", "deny")  # S35: style examples only; not an EmotionWire bit
 eq("consent.prohibited_overridable", False)
 pp = get("consent.prohibited_purposes")
 if pp is KeyError or not {"workplace", "education"} <= set(pp): fails.append("consent.prohibited_purposes must include workplace+education")
@@ -87,6 +88,7 @@ eq("horbm.hot_path", "retrieval")
 eq("horbm.student_on_tick", False)
 eq("horbm.miss", "I don't know.")
 eq("horbm.remember_grant", "GALION_HORBM_REMEMBER=grant")
+eq("horbm.research_style_dir", "GALION_HORBM_RESEARCH_DIR")
 
 # Owner pins. Global foreign_runtime_allowed stays false. These blocks do not widen it.
 eq("formats.exceptions.a21_piper.in_tree_ort", False)
