@@ -3,14 +3,16 @@
 
 //! S02 — voice activity and end of turn for Samantha (`galion-sam-vad`).
 //!
-//! Mic audio arrives as 20 ms frames at 16 kHz (320 samples), the same ear
-//! the live call already uses (`crates/galion-v2-live/src/bin/call.rs` resamples
-//! each 24 kHz frame to 16 kHz before `Vad::push`). Four of those frames are
+//! Mic audio arrives as 20 ms frames at 16 kHz (320 samples). The frame size
+//! was copied from the archived lane
+//! `archive/2026-11-24/crates/galion-v2-live/src/bin/call.rs` (24 kHz resampled
+//! to 16 kHz before `Vad::push`). The process that speaks today is
+//! `samantha-local`, which does not link that crate. Four of those frames are
 //! one 80 ms heartbeat (`crates/galion-heartbeat` `FRAME_MS`).
 //!
 //! The score comes from Silero VAD v5 on the CPU (ONNX Runtime, no GPU
 //! provider). If the model file is missing or will not load, the score comes
-//! from the energy gate in `crates/galion-v2-live/src/vad.rs`. The turn rules
+//! from the energy gate in `archive/2026-11-24/crates/galion-v2-live/src/vad.rs`. The turn rules
 //! (onset, hangover, speculate / commit / hold, barge-in) sit on top of either
 //! score. See [`turn`].
 //!
