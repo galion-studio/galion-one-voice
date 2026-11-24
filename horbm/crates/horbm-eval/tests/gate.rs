@@ -20,7 +20,7 @@ fn embedded_thresholds_are_the_r4_gate() {
     assert_eq!(thresholds.latency.eager_to_voice_p95_max_ms, 240);
     assert_eq!(thresholds.latency.barge_in_max_ms, 200);
     assert!(!thresholds.latency.backchannel_cancels);
-    assert_eq!(thresholds.asr.wer_max, 0.05);
+    assert_eq!(thresholds.asr.wer_max, 0.02);
     assert_eq!(thresholds.real.latency.clock, "wall");
     assert_eq!(thresholds.real.latency.frame_ms, 80);
     assert_eq!(thresholds.real.latency.eager_to_voice_p50_max_ms, 200);

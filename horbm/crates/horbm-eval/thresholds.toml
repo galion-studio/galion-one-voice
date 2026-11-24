@@ -31,21 +31,22 @@ eager_to_voice_p95_max_ms = 240
 barge_in_max_ms = 200
 backchannel_cancels = false
 
-# Real mode only. Mean per-sentence word error rate of the mouth-to-ear
-# round trip (the seven scripted lines). The ear is
-# vosk-model-small-en-us-0.15 with a Vosk phrase list: this dialogue,
-# the backchannel list except yep/yea, and [unk]. The fake gate does not
-# read this. `sad` and `yeah` are checked on their own as well, because
-# one wrong sentence of three words is only 0.048 of the mean.
+# Real mode only. Mean per-sentence word error rate of the held-out
+# mouth-to-ear set (24 Piper lines). Those lines are not in the keyword
+# list. Measured 0.000 with free decoding on vosk-model-small-en-us-0.15.
+# 0.02 sits just above that result: a couple of missed sentences still
+# pass, and the old ~0.11 rate does not. The seven scripted lines are
+# reported beside it and are not this number. The fake gate does not
+# read this.
 [asr]
-wer_max = 0.05
+wer_max = 0.02
 
 # Real mode wall clock. The virtual R4 lock above is unchanged.
 # Eager-to-voice is the warm Piper/Flite reply, same 200/240 budgets.
-# Barge-in on this path includes one vosk decode of the interruption.
-# With the phrase list that decode is a few tens of milliseconds. The
-# wall budget stays 500 ms, wider than the 200 ms frame lock. The virtual
-# overlap is still reported beside it and is not this number.
+# Barge-in on this path includes one free vosk decode of the interruption
+# plus a short keyword pass. The wall budget stays 500 ms, wider than
+# the 200 ms frame lock. The virtual overlap is still reported beside
+# it and is not this number.
 [real.latency]
 clock = "wall"
 frame_ms = 80

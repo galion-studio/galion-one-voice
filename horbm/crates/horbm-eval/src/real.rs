@@ -4,10 +4,10 @@
 //!
 //! Default builds do not compile the workers. `--features real` links
 //! `galion-asr-vosk` and the Piper/Flite worker in `galion-ml-voice` as they
-//! are. This file is glue: it does not change those crates. Each utterance
-//! is sent with a Vosk phrase list: the dialogue lines, the backchannel
-//! list, and `[unk]`. `yep` and `yea` are left off that list, because on
-//! this Piper voice they outrank `yeah`.
+//! are. This file is glue: it does not change those crates. The transcript
+//! is free decoding. A second pass spots only the backchannel list, `stop`,
+//! and a few affect words, then may rewrite one overlapping token. The
+//! scripted lines and the held-out lines are never put in that list.
 //!
 //! The runtime path is Linux x86_64 because the pinned libvosk archive and
 //! the pinned Piper runtime are that platform. Other targets compile and
@@ -78,7 +78,7 @@ mod linux {
         mean_wer, percentile, score_emotion, score_grounding, score_latency, score_persona,
         score_unknown, score_wer, wer_tokens, LatencySample, Spoken, VoiceTurn,
     };
-    use galion_asr_vosk::{clean_transcript, VoskClient, SAMPLE_RATE};
+    use galion_asr_vosk::{clean_transcript, VoskClient, Word, SAMPLE_RATE};
     use galion_emotion::text_affect;
     use galion_ml_voice::speech::{
         resample, sha256, FrameProsody, SpeechBackend, SpeechStack, SPEECH_RATE,
@@ -108,6 +108,54 @@ mod linux {
     const VOICE_URL: &str = "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/ljspeech/medium/en_US-ljspeech-medium.onnx";
     const VOICE_SHA: &str = "6f52a751e2349abe7a76735eb09dc1875298c77ea2342ffd2fef79ff81b87f22";
     const VOICE_JSON_SHA: &str = "141d612cc0a95ed7efc1ca936b845c2364967f2e9217c5dbfcf69fc4d6c65860";
+
+    /// Single affect words. Not sentences, and not the eval script.
+    const AFFECT_WORDS: &[&str] = &[
+        "sad",
+        "happy",
+        "tired",
+        "angry",
+        "afraid",
+        "lonely",
+        "glad",
+        "upset",
+        "worried",
+        "excited",
+        "calm",
+        "anxious",
+        "scared",
+        "miserable",
+        "joyful",
+    ];
+
+    /// Piper lines that are not keywords and are not the seven scripted turns.
+    /// The recognizer is not given this text.
+    const HELD_OUT: &[&str] = &[
+        "can you pass the salt",
+        "what time is dinner",
+        "the bus was late today",
+        "I left my keys on the table",
+        "let's go for a walk",
+        "the coffee is still hot",
+        "did you lock the door",
+        "I need a glass of water",
+        "the meeting starts at noon",
+        "please turn the light off",
+        "I feel sad today",
+        "I'm so tired",
+        "that's amazing",
+        "I feel really happy",
+        "this makes me angry",
+        "I'm a bit worried",
+        "what a lovely surprise",
+        "I miss you tonight",
+        "where did you put the book",
+        "how was your morning",
+        "can you say that again",
+        "what should we cook tonight",
+        "is the window open",
+        "who is at the door",
+    ];
 
     pub(super) fn execute(config: &Config) -> Result<Report, GateErr> {
         if !config
@@ -188,6 +236,18 @@ mod linux {
         let (barge_ms, barge_virtual) = barge_in(&mut ear, &mut mouth, &truth.cards, &kettle_hyp)?;
         let (backchannel_cancel, backchannel_heard) =
             backchannel(&mut ear, &mut mouth, &truth.cards, &kettle_hyp)?;
+        let held_at = ear.decode_ms.len();
+        let mut held = Vec::new();
+        for line in HELD_OUT {
+            let pcm = mouth.render_user(line)?;
+            let hyp = ear.recognize(&pcm)?;
+            held.push(((*line).to_string(), hyp));
+        }
+        if held.len() < 20 {
+            return Err(GateErr::fail("the held-out set has fewer than 20 lines"));
+        }
+        let held_ms = ear.decode_ms[held_at..].to_vec();
+        let held_audio = ear.audio_ms[held_at..].to_vec();
         let emotion = measure_emotion(&config.thresholds).map_err(GateErr::fail)?;
         if config.prosody && ear.sensed_frames == 0 {
             return Err(GateErr::fail(
@@ -230,11 +290,13 @@ mod linux {
             },
             &config.thresholds.real.latency,
         );
-        let (wer_check, wer_mean) = score_wer(&pairs, config.thresholds.asr.wer_max);
+        let (wer_check, held_wer) = score_wer(&held, config.thresholds.asr.wer_max);
+        let script_wer = mean_wer(&pairs).unwrap_or(1.0);
         let (rtf, p50_ms, p95_ms) = script_timing(&script_ms, &script_audio);
-        if rtf > 1.0 {
+        let (held_rtf, held_p50_ms, held_p95_ms) = script_timing(&held_ms, &held_audio);
+        if rtf > 1.0 || held_rtf > 1.0 {
             return Err(GateErr::fail(format!(
-                "ear real-time factor {rtf:.3} is over 1. The round trip is slower than the audio."
+                "ear real-time factor script {rtf:.3} held-out {held_rtf:.3} is over 1"
             )));
         }
         let (rss_kb, hwm_kb) = worker_mem_kb();
@@ -245,16 +307,8 @@ mod linux {
             && latency.pass
             && wer_check.pass;
         let prosody = if config.prosody { "on" } else { "off" };
-        let pair_rows: Vec<_> = pairs
-            .iter()
-            .map(|(reference, hypothesis)| {
-                serde_json::json!({
-                    "ref": reference,
-                    "hyp": hypothesis,
-                    "wer": mean_wer(&[(reference.clone(), hypothesis.clone())]),
-                })
-            })
-            .collect();
+        let pair_rows = pair_rows_of(&pairs);
+        let held_rows = pair_rows_of(&held);
         Ok(Report {
             schema: "horbm-eval-report/1",
             mode: Mode::Real.as_str(),
@@ -263,7 +317,7 @@ mod linux {
             research_dir: "unset",
             truth_cards: truth.ids,
             stand_ins: vec![
-                format!("ear:galion-asr-vosk ({MODEL_NAME}, dialogue grammar)"),
+                format!("ear:galion-asr-vosk ({MODEL_NAME}, free decode + keyword spot)"),
                 format!("mouth:{mouth_id} ({voice_name})"),
                 "research:OfflineClient (GALION_HORBM_RESEARCH_DIR unset)".into(),
                 "persona:samantha (Aria inactive)".into(),
@@ -318,14 +372,23 @@ mod linux {
                 asr: Some(out(
                     &wer_check,
                     serde_json::json!({
-                        "wer": wer_mean,
+                        "wer": held_wer,
                         "wer_max": config.thresholds.asr.wer_max,
-                        "sentences": pairs.len(),
+                        "held_out_wer": held_wer,
+                        "held_out_n": held.len(),
+                        "held_out_rtf": held_rtf,
+                        "held_out_p50_ms": held_p50_ms,
+                        "held_out_p95_ms": held_p95_ms,
+                        "script_wer": script_wer,
+                        "script_n": pairs.len(),
+                        "script_rtf": rtf,
+                        "script_p50_ms": p50_ms,
+                        "script_p95_ms": p95_ms,
                         "model": MODEL_NAME,
-                        "grammar": "dialogue+backchannel",
-                        "rtf": rtf,
-                        "latency_p50_ms": p50_ms,
-                        "latency_p95_ms": p95_ms,
+                        "decode": "free+keyword",
+                        "rtf": held_rtf,
+                        "latency_p50_ms": held_p50_ms,
+                        "latency_p95_ms": held_p95_ms,
                         "rss_mb": rss_kb / 1024,
                         "hwm_mb": hwm_kb / 1024,
                         "model_bytes": model_bytes,
@@ -336,6 +399,7 @@ mod linux {
                         "prosody": prosody,
                         "sensed_frames": ear.sensed_frames,
                         "pairs": pair_rows,
+                        "held_out": held_rows,
                     }),
                 )),
             },
@@ -582,7 +646,7 @@ mod linux {
                 primed: VecDeque::new(),
                 sense,
                 sensed_frames: 0,
-                grammar: ear_grammar(),
+                grammar: keyword_list(),
                 decode_ms: Vec::new(),
                 audio_ms: Vec::new(),
             })
@@ -615,7 +679,8 @@ mod linux {
                 .as_mut()
                 .ok_or_else(|| GateErr::fail("vosk worker is not open"))?;
             let started = Instant::now();
-            let result = client
+            let free = client.recognize(pcm, None).map_err(GateErr::fail)?;
+            let spot = client
                 .recognize(pcm, Some(&grammar))
                 .map_err(GateErr::fail)?;
             let decode_ms = elapsed_ms(started);
@@ -623,7 +688,7 @@ mod linux {
             let audio_ms = samples.saturating_mul(1000) / SAMPLE_RATE;
             self.decode_ms.push(decode_ms);
             self.audio_ms.push(audio_ms);
-            let text = clean_transcript(&result.text);
+            let text = merge_keyword(&free.words, &spot.words, &clean_transcript(&free.text));
             if text.is_empty() {
                 Err(GateErr::fail(
                     "vosk returned an empty transcript. No words were invented.",
@@ -1184,15 +1249,11 @@ mod linux {
         }
     }
 
-    /// Phrase list for one utterance. The closed script is the dialogue.
-    /// `stop` is the interruption this gate speaks. `sad`, `happy`,
-    /// `tired`, and `i am tired` are the affect words next to those lines.
-    /// The backchannel list is included so a short acknowledgement stays
-    /// on the list. `yep` and `yea` are omitted: measured on Piper
-    /// `en_US-ljspeech-medium`, they outrank `yeah` in the small model.
-    /// `[unk]` is the Vosk open token. This worker drops that token, so a
-    /// phrase that is not listed does not come back as words.
-    fn ear_grammar() -> Vec<String> {
+    /// Keyword spotter list. Backchannels, `stop`, and single affect words.
+    /// `yep` and `yea` are omitted: on this Piper voice they outrank `yeah`.
+    /// `[unk]` lets the spotter ignore the rest of a sentence. No scripted
+    /// line and no held-out line is included.
+    fn keyword_list() -> Vec<String> {
         let mut phrases = Vec::new();
         for phrase in listed_backchannels() {
             if *phrase == "yep" || *phrase == "yea" {
@@ -1200,20 +1261,108 @@ mod linux {
             }
             phrases.push((*phrase).to_string());
         }
-        for (line, _) in SCRIPT {
-            let phrase = spoken_phrase(line);
-            if !phrase.is_empty() {
-                phrases.push(phrase);
-            }
+        phrases.push("stop".to_string());
+        for word in AFFECT_WORDS {
+            phrases.push((*word).to_string());
         }
-        for phrase in ["stop", "i am tired", "sad", "happy", "tired", "[unk]"] {
-            phrases.push((*phrase).to_string());
-        }
+        phrases.push("[unk]".to_string());
         phrases.sort_unstable();
         phrases.dedup();
         phrases
     }
 
+    fn is_keyword(word: &str) -> bool {
+        word != "[unk]" && word != "<unk>" && keyword_list().iter().any(|item| item == word)
+    }
+
+    /// Free transcript, with a keyword written over one token when the
+    /// spotter localises it. A one-word free result that is not itself a
+    /// keyword can be replaced by the single spotted keyword (`that` →
+    /// `yeah`). A longer result changes a token only when the keyword is
+    /// confident, short, overlaps that token, and is one edit away
+    /// (`said` → `sad`). Partials from the free pass are not rewritten.
+    fn merge_keyword(free: &[Word], spot: &[Word], free_text: &str) -> String {
+        let mut words: Vec<Word> = free
+            .iter()
+            .filter(|word| word.word != "[unk]" && word.word != "<unk>")
+            .cloned()
+            .collect();
+        if words.is_empty() {
+            return free_text.to_string();
+        }
+        let spots: Vec<&Word> = spot.iter().filter(|word| is_keyword(&word.word)).collect();
+        if words.len() == 1 && spots.len() == 1 && spots[0].conf >= 0.5 {
+            let free_word = words[0].word.as_str();
+            if !is_keyword(free_word) || token_distance(free_word, &spots[0].word) <= 1 {
+                words[0].word = spots[0].word.clone();
+            }
+            return join_words(&words);
+        }
+        for kw in spots {
+            if kw.conf < 0.9 || kw.end - kw.start > 0.75 {
+                continue;
+            }
+            let mut best: Option<(usize, f32)> = None;
+            for (index, word) in words.iter().enumerate() {
+                let start = word.start.max(kw.start);
+                let end = word.end.min(kw.end);
+                let overlap = (end - start).max(0.0);
+                let span = (word.end - word.start).max(0.05);
+                if overlap / span < 0.5 {
+                    continue;
+                }
+                if best.map(|(_, have)| overlap > have).unwrap_or(true) {
+                    best = Some((index, overlap));
+                }
+            }
+            if let Some((index, _)) = best {
+                if words[index].word != kw.word && token_distance(&words[index].word, &kw.word) <= 1
+                {
+                    words[index].word = kw.word.clone();
+                }
+            }
+        }
+        join_words(&words)
+    }
+
+    fn join_words(words: &[Word]) -> String {
+        words
+            .iter()
+            .map(|word| word.word.as_str())
+            .collect::<Vec<_>>()
+            .join(" ")
+    }
+
+    fn token_distance(left: &str, right: &str) -> usize {
+        let left: Vec<char> = left.chars().collect();
+        let right: Vec<char> = right.chars().collect();
+        let mut prev: Vec<usize> = (0..=right.len()).collect();
+        let mut cur = vec![0; right.len() + 1];
+        for (i, ca) in left.iter().enumerate() {
+            cur[0] = i + 1;
+            for (j, cb) in right.iter().enumerate() {
+                let cost = usize::from(ca != cb);
+                cur[j + 1] = (prev[j + 1] + 1).min(cur[j] + 1).min(prev[j] + cost);
+            }
+            std::mem::swap(&mut prev, &mut cur);
+        }
+        prev[right.len()]
+    }
+
+    fn pair_rows_of(pairs: &[(String, String)]) -> Vec<serde_json::Value> {
+        pairs
+            .iter()
+            .map(|(reference, hypothesis)| {
+                serde_json::json!({
+                    "ref": reference,
+                    "hyp": hypothesis,
+                    "wer": mean_wer(&[(reference.clone(), hypothesis.clone())]),
+                })
+            })
+            .collect()
+    }
+
+    #[cfg(test)]
     fn spoken_phrase(text: &str) -> String {
         text.to_lowercase()
             .chars()
@@ -1306,27 +1455,88 @@ mod linux {
 
     #[cfg(test)]
     mod tests {
-        use super::ear_grammar;
+        use super::{keyword_list, merge_keyword, spoken_phrase, AFFECT_WORDS, HELD_OUT, SCRIPT};
+        use galion_asr_vosk::Word;
+
+        fn word(text: &str, start: f32, end: f32, conf: f32) -> Word {
+            Word {
+                word: text.to_string(),
+                start,
+                end,
+                conf,
+            }
+        }
 
         #[test]
-        fn the_bias_list_keeps_yeah_and_the_dialogue_and_drops_yep() {
-            let phrases = ear_grammar();
-            for phrase in [
-                "yeah",
-                "okay",
-                "i am sad",
-                "i am happy",
-                "i am so tired",
-                "where is the kettle",
-                "who won the match",
-                "why is the sky blue",
-                "stop",
-                "[unk]",
-            ] {
-                assert!(phrases.iter().any(|item| item == phrase), "{phrase}");
-            }
+        fn the_keyword_list_is_not_the_script_or_the_held_out_set() {
+            let phrases = keyword_list();
+            assert!(phrases.iter().any(|item| item == "yeah"));
+            assert!(phrases.iter().any(|item| item == "stop"));
+            assert!(phrases.iter().any(|item| item == "sad"));
             assert!(!phrases.iter().any(|item| item == "yep"));
             assert!(!phrases.iter().any(|item| item == "yea"));
+            assert!(!phrases.iter().any(|item| item == "i am sad"));
+            for (line, _) in SCRIPT {
+                let phrase = spoken_phrase(line);
+                assert!(
+                    !phrases.iter().any(|item| item == &phrase),
+                    "script line {phrase} is in the keyword list"
+                );
+            }
+            assert!(HELD_OUT.len() >= 20);
+            for line in HELD_OUT {
+                let phrase = spoken_phrase(line);
+                assert!(
+                    !phrases.iter().any(|item| item == &phrase),
+                    "held-out line {phrase} is in the keyword list"
+                );
+                assert!(phrase.split_whitespace().count() > 1, "{phrase}");
+            }
+            for word in AFFECT_WORDS {
+                assert!(phrases.iter().any(|item| item == word), "{word}");
+                assert!(!word.contains(' '));
+            }
+        }
+
+        #[test]
+        fn a_keyword_rewrites_said_and_yeah_and_leaves_other_words() {
+            let said = merge_keyword(
+                &[
+                    word("i", 0.09, 0.30, 1.0),
+                    word("am", 0.30, 0.42, 1.0),
+                    word("said", 0.42, 0.96, 0.77),
+                ],
+                &[word("hm", 0.09, 0.39, 0.78), word("sad", 0.40, 0.96, 1.0)],
+                "i am said",
+            );
+            assert_eq!(said, "i am sad");
+            let yeah = merge_keyword(
+                &[word("that", 0.0, 0.39, 0.57)],
+                &[word("yeah", 0.09, 0.39, 0.58)],
+                "that",
+            );
+            assert_eq!(yeah, "yeah");
+            let today = merge_keyword(
+                &[
+                    word("i", 0.09, 0.27, 1.0),
+                    word("feel", 0.27, 0.60, 1.0),
+                    word("sad", 0.60, 0.96, 0.76),
+                    word("today", 0.96, 1.50, 1.0),
+                ],
+                &[word("sad", 0.63, 0.96, 1.0), word("da", 0.99, 1.50, 1.0)],
+                "i feel sad today",
+            );
+            assert_eq!(today, "i feel sad today");
+            let happy = merge_keyword(
+                &[
+                    word("i", 0.09, 0.30, 0.89),
+                    word("am", 0.30, 0.42, 0.89),
+                    word("happy", 0.42, 0.99, 1.0),
+                ],
+                &[word("hm", 0.09, 0.42, 1.0), word("happy", 0.42, 0.99, 1.0)],
+                "i am happy",
+            );
+            assert_eq!(happy, "i am happy");
         }
     }
 }
