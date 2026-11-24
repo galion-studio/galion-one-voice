@@ -10,7 +10,7 @@ Perpetual Open MIT License. (c) 2026 Galion Labs.
 | Open Mind tree | `galion-studio/obsidian-open-mind` `main` `0b0a898695b0525b179b5dd791bbfa8c281b7ffc` (2026-11-21). Read only. Not cloned into this repo. Not vendored. |
 | Plan | `docs/horbm/research/R4-cpu-realtime-integration.md` §7, §10 rank 11, §11 phase 8, on draft PR #207, branch `cursor/horbm-r4-cpu-realtime-2180`. The draft is closed and unmerged. |
 | Q1 | Settled for this phase, 2026-11-18, option A. HORBM retrieval answers first. Galion Research (the Rust engine in Open Mind crates `hermes-rs` and `hermes-gateway`) handles a hard question off the tick, with the 3 s cap. R4 §13 still prints Q1 as open, because that note was not edited. This phase follows the settlement. It does not call Galion Research. |
-| This change | Crate `horbm-boot`. It reads a `hardware.json` fixture and selects the brain by the name `horbm`, mouth device `cpu`. `LOCKS.toml` is untouched. No `SOUL.md` exists in this tree. |
+| This change | Crate `horbm-boot`. It reads a `hardware.json` fixture and selects the brain by the name `horbm`, mouth device `cpu`. `LOCKS.toml` `[boot]` records that choice. `SOUL.md` is not in this tree and was not created. Consent in `LOCKS.toml` is unchanged. |
 
 ## How to read a number
 
@@ -147,6 +147,8 @@ The probe reports a card. Several voice programs already have their own device p
 
 Crate `crates/horbm-boot`, member of the root workspace, so `cargo test --workspace` runs it. `.github/workflows/gates.yml` also runs the phase gate by name.
 
+`LOCKS.toml` `[boot]` records the same names. `scripts/check-locks.sh` requires `brain = "horbm"`, `mouth_device = "cpu"`, `gpu_moves_mouth = false`, `probe_llm_selects_brain = false`, and `report_gpu = true`. A crate test reads that table and compares it to `BRAIN_NAME` and `MOUTH_DEVICE`. Consent keys in the same file are unchanged.
+
 `VoiceBoot::select` / `VoiceBoot::open` always set:
 
 | Field | Value |
@@ -191,7 +193,7 @@ brain=horbm mouth=cpu gpu=true name="RTX 4090" total_mib=24564 used_mib=20564 fr
 
 The first line is the fixture with no GPU. The second and third are fixtures with a GPU. `probe_llm` is `api` on the first and the third, and `local-gpu` on the second. `brain` is `horbm` on all three. `mouth` in the decision (the device) is `cpu` on all three. `gpu=true` is the report and is not the device.
 
-The same test spawns the `horbm-boot` binary on each fixture file and requires that stdout to be the decision line. Eleven tests in the crate cover the four `llm` tokens, a DRM card, a string `gpu` (refused), a UTF-8 BOM, unknown keys, and a partial object. `cargo test -p horbm-boot` runs them.
+The same test spawns the `horbm-boot` binary on each fixture file and requires that stdout to be the decision line. Twelve tests in the crate cover the four `llm` tokens, a DRM card, a string `gpu` (refused), a UTF-8 BOM, unknown keys, a partial object, and the `[boot]` table in `LOCKS.toml`. `cargo test -p horbm-boot` runs them.
 
 ## 7. Laptop test
 
@@ -231,4 +233,4 @@ To read a real probe file from this laptop, point the same binary at that `hardw
 5. `galion-probe/run-probe.sh` still defaults `target-cpu=native`. Out of scope. This crate does not.
 6. An explicit `GALION_SAMANTHA_DEVICE=cuda` or `GALION_TTS_DEVICE=cuda` can still request the Piper or s711 opt-in those programs already document. The boot GPU flag does not set those variables.
 7. Q7, the 8192 MiB `mouth` threshold, is unchanged. This crate reports `probe_mouth` and still names the CPU brain.
-8. No `SOUL.md` was found to update. `LOCKS.toml` was not edited.
+8. `LOCKS.toml` `[boot]` now records the same choice the crate makes: brain `horbm`, mouth device `cpu`, the probe `llm` line does not select the brain, a GPU flag is reported and does not move the mouth. `scripts/check-locks.sh` checks those five keys. Consent keys are unchanged. `SOUL.md` is not in this tree. Phase 8 does not change the persona, so no `SOUL.md` was created.

@@ -50,6 +50,31 @@ fn run_bin(path: &Path) -> std::process::Output {
         .expect("spawn horbm-boot")
 }
 
+fn boot_table() -> std::collections::HashMap<String, String> {
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../LOCKS.toml");
+    let text = std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+    let mut in_boot = false;
+    let mut map = std::collections::HashMap::new();
+    for line in text.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with('[') {
+            in_boot = trimmed == "[boot]";
+            continue;
+        }
+        if !in_boot || trimmed.is_empty() || trimmed.starts_with('#') {
+            continue;
+        }
+        let Some((key, value)) = trimmed.split_once('=') else {
+            continue;
+        };
+        map.insert(
+            key.trim().to_string(),
+            value.trim().trim_matches('"').to_string(),
+        );
+    }
+    map
+}
+
 fn assert_cpu(boot: &VoiceBoot) {
     assert_eq!(boot.brain, BRAIN_NAME, "{boot}");
     assert_eq!(boot.brain, "horbm", "{boot}");
@@ -57,6 +82,25 @@ fn assert_cpu(boot: &VoiceBoot) {
     assert_eq!(boot.mouth_device, "cpu", "{boot}");
     assert!(boot.selects_cpu_brain(), "{boot}");
     assert_ne!(boot.brain, boot.probe_llm, "{boot}");
+}
+
+#[test]
+fn the_lock_names_the_same_cpu_brain() {
+    let table = boot_table();
+    assert_eq!(table.get("brain").map(String::as_str), Some(BRAIN_NAME));
+    assert_eq!(
+        table.get("mouth_device").map(String::as_str),
+        Some(MOUTH_DEVICE)
+    );
+    assert_eq!(
+        table.get("gpu_moves_mouth").map(String::as_str),
+        Some("false")
+    );
+    assert_eq!(
+        table.get("probe_llm_selects_brain").map(String::as_str),
+        Some("false")
+    );
+    assert_eq!(table.get("report_gpu").map(String::as_str), Some("true"));
 }
 
 #[test]

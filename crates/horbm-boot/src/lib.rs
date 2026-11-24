@@ -12,6 +12,8 @@
 //! A GPU object is reported on [`VoiceBoot::gpu`] and does not change either
 //! choice. That selection is the same whether or not the unmerged phone wire
 //! `GALION_LLM=horbm` has landed: callers compare the name.
+//! `LOCKS.toml` `[boot]` records the same two names. Consent in that file
+//! is a separate section and is not read here.
 //!
 //! The degrade `mouth` boolean is a RAM threshold in the probe
 //! (`ram_total_mib >= 8192`). It is stored on [`VoiceBoot::probe_mouth`].

@@ -79,6 +79,11 @@ eq("ui.gradient_scope", "background"); eq("ui.chrome_allowed", False)
 eq("ui.dot_states", ["idle", "listening", "speaking"])
 # licence
 eq("licence.code", "Perpetual Open MIT"); eq("licence.paid_tiers", False)
+# boot (phase 8). The probe llm line does not select the brain. A GPU flag
+# does not move the mouth. Consent above is a different section and stays deny.
+eq("boot.brain", "horbm"); eq("boot.mouth_device", "cpu")
+eq("boot.gpu_moves_mouth", False); eq("boot.probe_llm_selects_brain", False)
+eq("boot.report_gpu", True)
 
 # Owner pins. Global foreign_runtime_allowed stays false. These blocks do not widen it.
 eq("formats.exceptions.a21_piper.in_tree_ort", False)

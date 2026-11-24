@@ -181,3 +181,18 @@ copyright = "(c) 2026 Maciej Grajczyk"
 free_forever = true
 paid_tiers = false
 sources = ["Q-BRANDING.Q9", "Q-BRANDING.Q10", "Q-BRANDING.Q13"]
+
+# ---------------------------------------------------------------- boot
+# Owner decision 2026-11-24 19:15, Mate Grajczyk (Maciej Grajczyk): this file
+# may be edited when the architecture needs it. This section is that edit.
+# Consent above is unchanged. The voice brain is HORBM on CPU. The galion-boot
+# llm line (api, local-gpu, lan, cpu-light) is reported and does not select
+# the brain. A GPU flag is reported and does not move the mouth. The 8192 MiB
+# probe mouth threshold (R4 Q7) is not this mouth device.
+[boot]
+brain = "horbm"
+mouth_device = "cpu"
+gpu_moves_mouth = false
+probe_llm_selects_brain = false
+report_gpu = true
+sources = ["owner 2026-11-24 19:15", "R4 §11 phase 8"]
