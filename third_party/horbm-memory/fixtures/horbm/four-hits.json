@@ -1,0 +1,24 @@
+{
+  "id": "four-hits",
+  "title": "Four sourced hits",
+  "section": "horbm",
+  "category": "honesty",
+  "summary": "The voice diary publishes at most four hits, and each hit keeps who said it, when, and the source.",
+  "body": "HORBM research note R1, 2026-11-18, recommends a hybrid of BM25 and one static int8 vector per card, scanned exactly and fused with reciprocal rank fusion. The published packet is at most four hits. A missing speaker, date, or source stays visible as unknown.",
+  "claim_type": "opinion",
+  "sources": [
+    {
+      "title": "Galion Labs, HORBM R1 retrieval core, 2026-11-18",
+      "url": "https://github.com/galion-studio/galion-one-voice/pull/209",
+      "author": "Galion Labs",
+      "date": "2026-11-18"
+    }
+  ],
+  "evidence_strength": "moderate",
+  "said_by": "Galion Labs",
+  "as_of_date": "2026-11-18",
+  "status": "draft",
+  "contested_views": [],
+  "related": [],
+  "tags": ["horbm", "sample"]
+}

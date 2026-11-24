@@ -1,0 +1,26 @@
+{
+  "id": "world.fixture.kettle",
+  "title": "Fixture kettle",
+  "section": "world",
+  "category": "fixture",
+  "summary": "The kettle card is the small committed neighbour of the anchor.",
+  "body": "This fixture mentions a kettle and does not mention the anchor token.",
+  "claim_type": "fact",
+  "sources": [
+    {
+      "title": "HORBM fixture kettle",
+      "url": "https://example.com/kettle",
+      "author": "Galion Labs",
+      "date": "2026-11-24",
+      "accessed": "2026-11-24",
+      "note": "Second committed text fixture card."
+    }
+  ],
+  "evidence_strength": "weak",
+  "said_by": "fixture",
+  "as_of_date": "2026-11-24",
+  "status": "fixture",
+  "contested_views": [],
+  "related": [],
+  "tags": ["fixture"]
+}
