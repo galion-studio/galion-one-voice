@@ -2,30 +2,42 @@
 // Copyright (c) 2026 Galion Labs
 //! Closed evaluation gate for the HORBM layers that are on main.
 //!
-//! A scripted turn is text plus, where the ear or the mouth needs a frame,
-//! a generated 16 kHz tone. No voice recording and no dataset text.
+//! The default mode is the closed fake gate: a scripted turn is text plus,
+//! where the ear or the mouth needs a frame, a generated 16 kHz tone. No
+//! voice recording and no dataset text. [`horbm_voice::FakeEar`] and
+//! [`horbm_voice::FakeMouth`] stand in behind [`horbm_voice::Ear`] and
+//! [`horbm_voice::Mouth`]. Time for that latency score is the virtual frame
+//! clock.
+//!
+//! [`Mode::Real`] is opt-in (`--features real`, then `--real`). On Linux it
+//! puts `galion-asr-vosk` behind the ear trait and the Piper/Flite worker in
+//! `galion-ml-voice` behind the mouth trait. The mouth renders the same seven
+//! scripted lines, the ear hears that PCM, and the word error rate is the
+//! round trip. Latency on that path is wall clock. Models download into a
+//! cache directory and are not committed. A missing model skips the run.
+//!
 //! Answers and citations come from the truth-root cards only.
 //! `GALION_HORBM_RESEARCH_DIR` must be unset; the runner does not open it.
+//! Research stays the conductor's offline client. Samantha is the persona.
+//! Ear prosody sensing stays on unless `--no-prosody` or
+//! `GALION_EAR_PROSODY=0`.
 //!
-//! On this path: card retrieval and [`horbm::Brain`], the emotion core,
-//! [`galion_conductor::Conductor`], and [`horbm_voice::VoiceLoop`].
-//! Vosk and Piper are not linked. [`horbm_voice::FakeEar`] and
-//! [`horbm_voice::FakeMouth`] stand in behind [`horbm_voice::Ear`] and
-//! [`horbm_voice::Mouth`]. Research stays the conductor's offline client.
-//!
-//! Time for the latency score is the virtual frame clock. The emotion
-//! frame budget is the 80 ms lock, measured around [`horbm::Brain::step_moment`].
+//! The emotion frame budget is the 80 ms lock, measured around
+//! [`horbm::Brain::step_moment`].
 
 #![forbid(unsafe_code)]
 
 mod gate;
+mod prosody;
+mod real;
 mod score;
 mod thresholds;
 
-pub use gate::{run, run_with, Config};
+pub use gate::{run, run_with, Config, Mode, Report};
+pub use prosody::ear_prosody_enabled;
 pub use score::{
-    score_emotion, score_grounding, score_latency, score_persona, score_unknown, EmotionSample,
-    LatencySample, Spoken, VoiceTurn,
+    score_emotion, score_grounding, score_latency, score_persona, score_unknown, score_wer,
+    EmotionSample, LatencySample, Spoken, VoiceTurn,
 };
 pub use thresholds::Thresholds;
 

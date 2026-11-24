@@ -92,8 +92,17 @@ where
         &self.mouth
     }
 
+    pub fn mouth_mut(&mut self) -> &mut M {
+        &mut self.mouth
+    }
+
     pub fn ear_mut(&mut self) -> &mut E {
         &mut self.ear
+    }
+
+    /// Give the host its ear and mouth back. The clock does not move.
+    pub fn into_parts(self) -> (E, M, B) {
+        (self.ear, self.mouth, self.brain)
     }
 
     /// Milliseconds from end of speech to the first mouth frame, on this clock.

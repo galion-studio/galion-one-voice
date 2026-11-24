@@ -23,18 +23,43 @@ use crate::score::{
 };
 use crate::thresholds::Thresholds;
 
+/// Which ear and mouth the gate runs.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Mode {
+    /// [`horbm_voice::FakeEar`] and [`horbm_voice::FakeMouth`]. Virtual clock.
+    Fake,
+    /// `galion-asr-vosk` and the Piper/Flite worker. Wall clock. Linux.
+    Real,
+}
+
+impl Mode {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Fake => "fake",
+            Self::Real => "real",
+        }
+    }
+}
+
 pub struct Config {
     pub research_dir: Option<String>,
     pub thresholds: Thresholds,
+    pub mode: Mode,
+    /// Real-ear prosody sensing. On unless the off switch is set.
+    /// Fake mode does not read audio, so the flag does not change that run.
+    pub prosody: bool,
 }
 
 #[derive(Debug, Serialize)]
 pub struct Report {
     pub schema: &'static str,
+    pub mode: &'static str,
     pub pass: bool,
+    /// The real ear was not run. The binary exits 2. This is not a score miss.
+    pub skipped: bool,
     pub research_dir: &'static str,
     pub truth_cards: Vec<String>,
-    pub stand_ins: Vec<&'static str>,
+    pub stand_ins: Vec<String>,
     pub scores: Scores,
     pub error: Option<String>,
 }
@@ -46,6 +71,9 @@ pub struct Scores {
     pub persona: ScoreOut,
     pub emotion: ScoreOut,
     pub latency: ScoreOut,
+    /// Real mode only. The fake gate leaves this empty.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub asr: Option<ScoreOut>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -66,23 +94,31 @@ pub fn run() -> Report {
     run_with(Config {
         research_dir: crate::research_dir_from_env(),
         thresholds: Thresholds::embedded(),
+        mode: Mode::Fake,
+        prosody: true,
     })
 }
 
 pub fn run_with(config: Config) -> Report {
     if !research_dir_is_unset(config.research_dir.as_deref()) {
         return fail(
+            config.mode,
             "set",
             "GALION_HORBM_RESEARCH_DIR is set; the truth root is the only answer source",
         );
     }
-    match execute(&config.thresholds) {
+    let result = match config.mode {
+        Mode::Fake => execute(&config.thresholds).map_err(crate::real::GateErr::fail),
+        Mode::Real => crate::real::execute(&config),
+    };
+    match result {
         Ok(report) => report,
-        Err(error) => fail("unset", &error),
+        Err(err) if err.skip => skip(config.mode, &err.message),
+        Err(err) => fail(config.mode, "unset", &err.message),
     }
 }
 
-fn fail(research_dir: &'static str, error: &str) -> Report {
+fn fail(mode: Mode, research_dir: &'static str, error: &str) -> Report {
     let broken = ScoreOut {
         pass: false,
         failures: vec![error.to_string()],
@@ -90,27 +126,94 @@ fn fail(research_dir: &'static str, error: &str) -> Report {
     };
     Report {
         schema: "horbm-eval-report/1",
+        mode: mode.as_str(),
         pass: false,
+        skipped: false,
         research_dir,
         truth_cards: Vec::new(),
-        stand_ins: stand_ins(),
+        stand_ins: stand_ins(mode),
         scores: Scores {
             grounded: broken.clone(),
             unknown: broken.clone(),
             persona: broken.clone(),
             emotion: broken.clone(),
             latency: broken,
+            asr: None,
         },
         error: Some(error.to_string()),
     }
 }
 
-fn stand_ins() -> Vec<&'static str> {
-    vec![
-        "ear:FakeEar (Vosk is not linked)",
-        "mouth:FakeMouth (Piper is not linked)",
-        "research:OfflineClient (GALION_HORBM_RESEARCH_DIR unset)",
-    ]
+fn skip(mode: Mode, error: &str) -> Report {
+    let mut report = fail(mode, "unset", error);
+    report.skipped = true;
+    report
+}
+
+fn stand_ins(mode: Mode) -> Vec<String> {
+    match mode {
+        Mode::Fake => vec![
+            "ear:FakeEar (Vosk is not linked)".into(),
+            "mouth:FakeMouth (Piper is not linked)".into(),
+            "research:OfflineClient (GALION_HORBM_RESEARCH_DIR unset)".into(),
+        ],
+        Mode::Real => vec![
+            "research:OfflineClient (GALION_HORBM_RESEARCH_DIR unset)".into(),
+            "persona:samantha (Aria inactive)".into(),
+        ],
+    }
+}
+
+/// The seven scripted turns. The second field is the truth-root card, if any.
+pub(crate) const SCRIPT: &[(&str, Option<&str>)] = &[
+    ("where is the kettle", Some("kettle")),
+    ("right here", Some("here")),
+    ("who won the match", None),
+    ("why is the sky blue?", None),
+    ("I am happy", None),
+    ("I am sad", None),
+    ("I am so tired", None),
+];
+
+pub(crate) struct Truth {
+    _dir: TempDir,
+    pub cards: KnowledgeCards,
+    pub ids: Vec<String>,
+    pub pack: Vec<CardFact>,
+    pub forbidden: Vec<String>,
+}
+
+pub(crate) fn load_truth() -> Result<Truth, String> {
+    let dir = TempDir(truth_dir()?);
+    write_truth(&dir.0)?;
+    let loaded = KnowledgeCards::load(&dir.0).map_err(|err| err.to_string())?;
+    let pack = vec![
+        CardFact {
+            id: "kettle".into(),
+            gist: "The kettle is on the hob.".into(),
+        },
+        CardFact {
+            id: "here".into(),
+            gist: "Right here.".into(),
+        },
+    ];
+    let mut ids: Vec<_> = loaded.cards.ids().map(str::to_string).collect();
+    ids.sort();
+    let mut expect_ids: Vec<_> = pack.iter().map(|card| card.id.clone()).collect();
+    expect_ids.sort();
+    if ids != expect_ids {
+        return Err(format!(
+            "truth root indexed {ids:?}, script has {expect_ids:?}"
+        ));
+    }
+    let forbidden = standin_snippets()?;
+    Ok(Truth {
+        _dir: dir,
+        cards: loaded.cards,
+        ids,
+        pack,
+        forbidden,
+    })
 }
 
 struct TempDir(PathBuf);
@@ -132,50 +235,18 @@ fn execute(thresholds: &Thresholds) -> Result<Report, String> {
         return Err("brain emotion frame does not match the core".into());
     }
 
-    let root = TempDir(truth_dir()?);
-    write_truth(&root.0)?;
-    let loaded = KnowledgeCards::load(&root.0).map_err(|err| err.to_string())?;
-    let pack = vec![
-        CardFact {
-            id: "kettle".into(),
-            gist: "The kettle is on the hob.".into(),
-        },
-        CardFact {
-            id: "here".into(),
-            gist: "Right here.".into(),
-        },
-    ];
-    let mut ids: Vec<_> = loaded.cards.ids().map(str::to_string).collect();
-    ids.sort();
-    let mut expect_ids: Vec<_> = pack.iter().map(|card| card.id.clone()).collect();
-    expect_ids.sort();
-    if ids != expect_ids {
-        return Err(format!(
-            "truth root indexed {ids:?}, script has {expect_ids:?}"
-        ));
-    }
-
-    let forbidden = standin_snippets()?;
+    let truth = load_truth()?;
     let pcm = tone_frame(
         thresholds.emotion.sample_rate_hz,
         thresholds.emotion.frame_ms,
     )?;
-    let script = [
-        ("where is the kettle", Some("kettle")),
-        ("right here", Some("here")),
-        ("who won the match", None),
-        ("why is the sky blue?", None),
-        ("I am happy", None),
-        ("I am sad", None),
-        ("I am so tired", None),
-    ];
 
     let mut spoken = Vec::new();
     let mut voices = Vec::new();
     let mut eager_ms = Vec::new();
     let mut research_merged = false;
-    for (query, expect) in script {
-        let turn = one_turn(&loaded.cards, query, expect, &pcm)?;
+    for (query, expect) in SCRIPT {
+        let turn = one_turn(&truth.cards, query, *expect, &pcm)?;
         research_merged |= turn.research_merged;
         eager_ms.push(turn.voice_gap_ms);
         eager_ms.push(turn.conductor_gap_ms);
@@ -184,14 +255,24 @@ fn execute(thresholds: &Thresholds) -> Result<Report, String> {
     }
 
     let emotion = measure_emotion(thresholds)?;
-    let barge_voice = barge_voice(&loaded.cards, &pcm)?;
-    let barge_conductor = barge_conductor(&loaded.cards)?;
+    let barge_voice = barge_voice(&truth.cards, &pcm)?;
+    let barge_conductor = barge_conductor(&truth.cards)?;
     let backchannel_cancel =
-        backchannel_voice(&loaded.cards, &pcm)? || backchannel_conductor(&loaded.cards)?;
-    let (clock_advanced_ms, wall_sleep_ms) = clock_ignores_wall(&loaded.cards);
+        backchannel_voice(&truth.cards, &pcm)? || backchannel_conductor(&truth.cards)?;
+    let (clock_advanced_ms, wall_sleep_ms) = clock_ignores_wall(&truth.cards);
 
-    let grounded = score_grounding(&spoken, &pack, &forbidden, &thresholds.grounding);
-    let mut unknown = score_unknown(&spoken, &pack, &forbidden, &thresholds.grounding);
+    let grounded = score_grounding(
+        &spoken,
+        &truth.pack,
+        &truth.forbidden,
+        &thresholds.grounding,
+    );
+    let mut unknown = score_unknown(
+        &spoken,
+        &truth.pack,
+        &truth.forbidden,
+        &thresholds.grounding,
+    );
     if research_merged {
         unknown.pass = false;
         unknown
@@ -214,10 +295,12 @@ fn execute(thresholds: &Thresholds) -> Result<Report, String> {
     let pass = grounded.pass && unknown.pass && persona.pass && emotion_check.pass && latency.pass;
     Ok(Report {
         schema: "horbm-eval-report/1",
+        mode: Mode::Fake.as_str(),
         pass,
+        skipped: false,
         research_dir: "unset",
-        truth_cards: ids,
-        stand_ins: stand_ins(),
+        truth_cards: truth.ids,
+        stand_ins: stand_ins(Mode::Fake),
         scores: Scores {
             grounded: out(
                 &grounded,
@@ -263,12 +346,13 @@ fn execute(thresholds: &Thresholds) -> Result<Report, String> {
                     "clock_advanced_ms": clock_advanced_ms,
                 }),
             ),
+            asr: None,
         },
         error: None,
     })
 }
 
-fn out(check: &Check, detail: serde_json::Value) -> ScoreOut {
+pub(crate) fn out(check: &Check, detail: serde_json::Value) -> ScoreOut {
     ScoreOut {
         pass: check.pass,
         failures: check.failures.clone(),
@@ -366,7 +450,10 @@ fn voice_gap(cards: &KnowledgeCards, query: &str, reply: &str, pcm: &[i16]) -> R
     u32::try_from(gap).map_err(|_| "gap does not fit u32".into())
 }
 
-fn conductor_gap(cards: &KnowledgeCards, query: &str) -> Result<(u32, bool, String), String> {
+pub(crate) fn conductor_gap(
+    cards: &KnowledgeCards,
+    query: &str,
+) -> Result<(u32, bool, String), String> {
     let mut conductor = Conductor::new(LinkedBrain::new(cards.clone()));
     let _ = conductor.tick(FloorEar::Speech(query), None);
     let _ = conductor.tick(FloorEar::Speech(query), None);
@@ -532,11 +619,11 @@ fn clock_ignores_wall(cards: &KnowledgeCards) -> (u32, u32) {
     (u32::try_from(advanced).unwrap_or(u32::MAX), wall_sleep_ms)
 }
 
-struct EmotionRun {
-    sample: EmotionSample,
+pub(crate) struct EmotionRun {
+    pub sample: EmotionSample,
 }
 
-fn measure_emotion(thresholds: &Thresholds) -> Result<EmotionRun, String> {
+pub(crate) fn measure_emotion(thresholds: &Thresholds) -> Result<EmotionRun, String> {
     let frames = thresholds.emotion.frames;
     let (mut rest, rest_us) = step_script(frames, |_| {})?;
     let (tired, tired_us) = step_script(frames, |msg| {
@@ -610,7 +697,7 @@ fn step_script(frames: u32, edit: impl Fn(&mut IntentMsg)) -> Result<(Brain, Vec
     Ok((brain, times))
 }
 
-fn samantha_window() -> VoiceWindow {
+pub(crate) fn samantha_window() -> VoiceWindow {
     let voice = &galion_emotion::SAMANTHA.voice;
     VoiceWindow {
         pitch_max: voice.pitch_bound_st,
@@ -621,7 +708,7 @@ fn samantha_window() -> VoiceWindow {
     }
 }
 
-fn anchors() -> VoiceAnchors {
+pub(crate) fn anchors() -> VoiceAnchors {
     let samantha = &galion_emotion::SAMANTHA.voice;
     let jarvis = &galion_emotion::JARVIS.voice;
     VoiceAnchors {

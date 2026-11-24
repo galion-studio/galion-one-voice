@@ -14,6 +14,10 @@ pub struct Thresholds {
     pub grounding: GroundingThresholds,
     pub emotion: EmotionThresholds,
     pub latency: LatencyThresholds,
+    /// Real-mode word error rate. The fake gate does not read it.
+    pub asr: AsrThresholds,
+    /// Real-mode wall clock. The fake gate keeps [`Self::latency`].
+    pub real: RealThresholds,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -53,6 +57,18 @@ pub struct LatencyThresholds {
     pub backchannel_cancels: bool,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AsrThresholds {
+    pub wer_max: f64,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RealThresholds {
+    pub latency: LatencyThresholds,
+}
+
 impl Thresholds {
     pub fn embedded() -> Self {
         Self::parse(EMBEDDED).expect("embedded thresholds.toml")
@@ -77,8 +93,16 @@ impl Thresholds {
         if self.latency.clock != "virtual" {
             return Err("latency.clock must be virtual".into());
         }
-        if self.emotion.frame_ms != self.latency.frame_ms {
+        if self.real.latency.clock != "wall" {
+            return Err("real.latency.clock must be wall".into());
+        }
+        if self.emotion.frame_ms != self.latency.frame_ms
+            || self.emotion.frame_ms != self.real.latency.frame_ms
+        {
             return Err("emotion and latency frame_ms differ".into());
+        }
+        if !self.asr.wer_max.is_finite() || !(0.0..=1.0).contains(&self.asr.wer_max) {
+            return Err("asr.wer_max must be between 0 and 1".into());
         }
         if self.emotion.frame_ms == 0 || self.emotion.frames == 0 {
             return Err("frame count is empty".into());

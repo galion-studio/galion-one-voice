@@ -27,6 +27,8 @@ jobs:
       - name: Workspace tests
         run: cargo test --workspace
       - name: HORBM closed eval (synthetic turns, virtual clock)
+        # Fake mode only. `--features real` is the Linux ear and mouth.
+        # It downloads models into a cache and is not this job.
         run: |
           cargo test --manifest-path horbm/Cargo.toml -p horbm-eval
           cargo run --manifest-path horbm/Cargo.toml -p horbm-eval --quiet
