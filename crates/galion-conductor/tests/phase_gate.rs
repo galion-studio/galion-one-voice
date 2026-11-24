@@ -224,6 +224,10 @@ fn locks_file_matches_the_conductor_gate() {
         text.contains("backchannel_cancels = false"),
         "a listed backchannel does not cancel"
     );
+    assert!(
+        text.contains("side_band_cap_ms = 3000"),
+        "side band cap stays 3000 ms"
+    );
     assert!(text.contains("frame_ms = 80"));
     assert!(
         text.contains("default = \"deny\""),
@@ -250,7 +254,10 @@ fn crate_sources_do_not_call_the_frame_step_or_read_a_wall_clock() {
             "SystemTime",
             "tokio",
             "TcpStream",
+            "std::net",
             "target_feature",
+            "Hermes",
+            "hermes",
         ] {
             assert!(
                 !text.contains(banned),

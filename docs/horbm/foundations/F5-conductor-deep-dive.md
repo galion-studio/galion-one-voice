@@ -146,7 +146,7 @@ Pass is the two `phase5 gate:` lines above, with `barge_in_ms` at most 200 and `
 - PR #253's retrieval thread is not called. A slow brain must not do the work inside `answer`.
 - Piper is unchanged. `t_tts_first_pcm` stays absent. The reaction is not speech audio.
 - The mixer's 800 ms yield and 240 ms resume are named (`MIXER_YIELD_MS`, `MIXER_RESUME_QUIET_MS`) and are not the cancel path. Cancel for a real interruption is the 200 ms lock. A listed backchannel never enters that path.
-- Galion Research is not on this path. Phase 6 is the side band.
+- Galion Research is not called from this phase 5 conductor. Phase 6 adds that side band in `docs/horbm/foundations/F6-side-band.md`.
 - `SOUL.md` was not added.
 - `LOCKS.toml` changes in this phase: comment on `gates.barge_in_max_ms` now says the yield is silence by 200 ms on the frame clock; new key `gates.backchannel_cancels = false`. No other lock value moved. Consent did not move.
 - Do not merge this pull request. The laptop test comes first.

@@ -3,7 +3,7 @@
 
 [package]
 name = "galion-conductor"
-description = "HORBM phase 5 conductor. Eager end-of-turn, epoch rollback, barge-in at the 200 ms lock, wordless reaction. Virtual clock only. Does not call the heartbeat frame function."
+description = "HORBM conductor. Eager end-of-turn, epoch rollback, barge-in at the 200 ms lock, wordless reaction, and a Galion Research side band capped at 3 s on the virtual clock. Does not call the heartbeat frame function."
 version = "0.0.1"
 edition = "2021"
 license = "MIT"
