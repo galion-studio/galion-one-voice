@@ -36,6 +36,15 @@ impl HorbmMind {
     pub fn from_env() -> Self {
         Self::open(&knowledge_dir())
     }
+
+    /// Cards the open directory contributed. One for the shipped kettle note.
+    pub fn knowledge_cards(&self) -> usize {
+        self.engine.cards()
+    }
+
+    pub fn knowledge_path(&self) -> &Path {
+        self.engine.knowledge_dir()
+    }
 }
 
 pub fn knowledge_dir() -> PathBuf {
@@ -148,6 +157,8 @@ mod tests {
         assert!(!tired.reply.to_ascii_lowercase().contains("sorry"));
         assert_eq!(names(&dir), names_before);
         assert!(!dir.join("memory").exists());
+        assert_eq!(mind.knowledge_cards(), 1);
+        assert_eq!(mind.knowledge_path(), dir);
     }
 
     #[test]

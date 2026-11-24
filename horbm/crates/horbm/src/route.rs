@@ -54,6 +54,14 @@ pub struct CardHit {
 /// Read-only lookup. Implementors must not write the knowledge directory.
 pub trait CardLookup {
     fn lookup(&self, query: &str) -> Option<CardHit>;
+    /// How many clauses this lookup can return. The default is unknown.
+    fn len(&self) -> usize {
+        0
+    }
+
+    fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
 }
 
 /// Gateway result. Nothing in this enum is a model guess.

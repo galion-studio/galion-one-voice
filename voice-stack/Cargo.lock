@@ -580,9 +580,14 @@ version = "0.0.1"
 dependencies = [
  "galion-research-gateway",
  "galion-sam-empathy",
+ "horbm-brain",
  "serde_json",
  "sha2",
 ]
+
+[[package]]
+name = "horbm-brain"
+version = "0.0.1"
 
 [[package]]
 name = "http"

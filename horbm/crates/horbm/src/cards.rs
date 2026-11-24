@@ -192,6 +192,10 @@ impl KnowledgeCards {
 }
 
 impl CardLookup for KnowledgeCards {
+    fn len(&self) -> usize {
+        self.cards.len()
+    }
+
     fn lookup(&self, query: &str) -> Option<CardHit> {
         let terms = index_tokens(query);
         if terms.is_empty() {

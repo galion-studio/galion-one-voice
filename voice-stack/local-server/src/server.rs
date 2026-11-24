@@ -317,6 +317,8 @@ fn health_json(bound: &str, samantha_ref: &str, info: &crate::pipeline::PipeInfo
         "voice": info.voice,
         "clone": info.clone_status,
         "mind": info.mind,
+        "knowledge_cards": info.knowledge_cards,
+        "knowledge_dir": info.knowledge_dir,
     })
     .to_string()
 }
@@ -818,9 +820,13 @@ mod tests {
                 mind: "horbm".into(),
                 vad_backend: "silero",
                 vad_ready: true,
+                knowledge_cards: 1506,
+                knowledge_dir: "knowledge".into(),
             },
         );
         assert!(piper.contains("\"mouth\":\"piper\""));
+        assert!(piper.contains("\"mind\":\"horbm\""));
+        assert!(piper.contains("\"knowledge_cards\":1506"));
         assert!(piper.contains("\"voice\":\"ljspeech\""));
         assert!(piper.contains("\"clone\":\"cpu-not-realtime\""));
         assert!(piper.contains("\"ok\":true"));
@@ -835,6 +841,8 @@ mod tests {
                 mind: "horbm".into(),
                 vad_backend: "silero",
                 vad_ready: true,
+                knowledge_cards: 1,
+                knowledge_dir: "knowledge".into(),
             },
         );
         assert!(s711.contains("\"mouth\":\"s711\""));

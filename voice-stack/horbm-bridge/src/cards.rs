@@ -171,6 +171,10 @@ impl CardLoader for LocalCards {
 }
 
 impl horbm::CardLookup for LocalCards {
+    fn len(&self) -> usize {
+        self.json.len() + self.prose.len()
+    }
+
     fn lookup(&self, query: &str) -> Option<horbm::CardHit> {
         card_match(self, query).map(|hit| horbm::CardHit {
             id: hit.id,
@@ -247,6 +251,8 @@ pub(crate) fn brain_from_dir(knowledge_dir: &Path, bind: Option<&str>) -> horbm:
 /// are accepted so the `Brain::open` shape stays, and they are not opened.
 pub struct CardEngine {
     brain: horbm::Brain,
+    knowledge_dir: std::path::PathBuf,
+    cards: usize,
 }
 
 impl CardEngine {
@@ -266,9 +272,23 @@ impl CardEngine {
         bind: Option<&str>,
     ) -> Self {
         let _ = (memory_db, cases);
+        let brain = brain_from_dir(knowledge_dir, bind);
+        let cards = brain.cards();
         Self {
-            brain: brain_from_dir(knowledge_dir, bind),
+            brain,
+            knowledge_dir: knowledge_dir.to_path_buf(),
+            cards,
         }
+    }
+
+    /// Clauses available to this engine. The example directory is the kettle card.
+    /// `G:\galion\horbm\knowledge` is the real pack when that directory is opened.
+    pub fn cards(&self) -> usize {
+        self.cards
+    }
+
+    pub fn knowledge_dir(&self) -> &std::path::Path {
+        &self.knowledge_dir
     }
 
     pub fn mood_meta(&self) -> horbm::MoodMeta {

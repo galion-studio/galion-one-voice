@@ -1,0 +1,19 @@
+{
+  "persona_miss": {
+    "id": "horbm-say-i-dont-know",
+    "text": "I don't know.",
+    "atomic": true
+  },
+  "clauses": [
+    {
+      "id": "kettle",
+      "text": "The kettle is on the hob.",
+      "atomic": false
+    },
+    {
+      "id": "here",
+      "text": "Right here.",
+      "atomic": true
+    }
+  ]
+}
