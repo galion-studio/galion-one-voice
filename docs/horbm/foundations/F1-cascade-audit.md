@@ -82,6 +82,8 @@ Path: `crates/galion-heartbeat`. `FRAME_MS = 80` **[D]**, `SAMPLE_RATE = 24_000`
 
 Status: **works** as the frame clock. It does not run ASR, a reply, or TTS. Stamps do not belong inside `step`.
 
+`DualBandMixer` in `src/mixer.rs` implements duck and yield (`PAUSE_MS = 200` **[D]**, `YIELD_MS = 800` **[D]**) and is unit-tested in that file. No host calls it. Live overlap is whatever the phone host and the symphony wire do.
+
 Gap: the bus clock (`BusMsg.t_ms`, "heartbeat time, frame × 80") and the stamp clock (monotonic microseconds) are not the same clock. Nothing converts one into the other.
 
 ### Process bus — works, carries PCM and words
@@ -140,17 +142,17 @@ Status: **works** as a loopback client when a gateway is up. A dead gateway spea
 
 ### `galion-asr-vosk` — works out of process, model not in git
 
-Path: `crates/galion-asr-vosk`. The library speaks NDJSON to the `galion-asr-vosk` binary. The binary dlopens libvosk. This crate does not link it and does not download a model. Protocol **[D]**: 16_000 Hz, 320 samples per 20 ms frame, max utterance 60 seconds of samples. Default model dir `weights/asr/vosk-model-small-en-us-0.15` **[D]**, not vendored. The worker can emit partials and a final. The phone lane's `transcribe` waits for the final text of one buffer. It does not feed partials into the reply while the person is still speaking.
+Path: `crates/galion-asr-vosk`. The library speaks NDJSON to the `galion-asr-vosk` binary. The binary dlopens libvosk. This crate does not link it and does not download a model. Protocol **[D]**: 16_000 Hz, 320 samples per 20 ms frame, max utterance 60 seconds of samples. Default model dir `weights/asr/vosk-model-small-en-us-0.15` **[D]**, not vendored. The worker can emit partials and a final. `RecogResult` keeps the partial lines. `PhoneTurnAsr` uses the final text only, so a partial never starts the reply while the person is still speaking. `voice-stack/asr` is a second streaming adapter, with `AsrEvent` and a first-partial timer. `PhoneLane` does not call it.
 
 Tests: `src/lib.rs` checks the live screen script does not default to `interim`. `tests/protocol.rs` covers the NDJSON codec. A missing model returns `AsrUnavailable`. The transcript is not invented.
 
 The request line carries PCM (base64). That is the worker protocol, not the stamp log. The stamp log stores `pcm_in_samples` and `heard_chars`.
 
-Status: **works** when the model and library are on disk. **Missing** as a streaming partial source for domain 04: there is no `t_asr_partial` in the domain 04 list, and this lane does not stamp partials.
+Status: **works** on Unix when the model and library are on disk. The client imports `std::os::unix::io::AsRawFd` and calls `poll` with no Windows branch, so this crate does not build the phone ASR parent on the laptop. `voice-stack/asr` is the Windows-aware worker (`libvosk.dll`, `PATH` prepend). **Missing** as a streaming partial source for domain 04: there is no `t_asr_partial` in the domain 04 list, and this lane does not stamp partials.
 
 ### VAD — two implementations, neither stamps the cascade
 
-**voice-stack** `voice-stack/vad` (`galion-sam-vad`). 20 ms frames **[D]**, 16_000 Hz **[D]**, 320 samples **[D]**, 4 frames per 80 ms heartbeat **[D]**. `TurnCfg::default` **[D]**: onset 60 ms, hangover 500 ms, speculate 60 ms, commit 160 ms, hold 500 ms, start threshold 0.5, keep 0.35, barge 80 ms. Silero is used when the ONNX file loads. Otherwise the energy gate from `galion-v2-live` `vad.rs` is the score. `vad-ear` (`src/bin/vad_ear.rs`) is a stdin/stdout process. A missing model still answers `backend=energy`. The Windows `Send` impl for `Peek` is in `voice-stack/tts-piper-stream/src/session.rs` (the Piper drain, not the VAD). Both the `Peek` impl and the `vad-ear` bin are on this tree. Commit `4409e6b` is not an ancestor of `4759d41`; the code those notes describe is present.
+**voice-stack** `voice-stack/vad` (`galion-sam-vad`). 20 ms frames **[D]**, 16_000 Hz **[D]**, 320 samples **[D]**, 4 frames per 80 ms heartbeat **[D]**. `TurnCfg::default` **[D]**: onset 60 ms, hangover 500 ms, speculate 60 ms, commit 160 ms, hold 500 ms, start threshold 0.5, keep 0.35, barge 80 ms. Silero is used when the ONNX file loads. Otherwise the energy gate from `galion-v2-live` `vad.rs` is the score. `vad-ear` (`src/bin/vad_ear.rs`) is a stdin/stdout process. A missing model still answers `backend=energy`. The Windows `Send` impl for `Peek` is in `voice-stack/tts-piper-stream/src/session.rs` (the Piper drain, not the VAD). Both the `Peek` impl and the `vad-ear` bin are on this tree. They landed in merge `ed1d93d` (PR #243, branch `cursor/windows-build-peek-vad-ear-6d88`). Commit `4409e6b` is not in this history. The live Samantha server uses a 640 ms hang (`voice-stack/local-server/src/live.rs`, `HANG_MS`) **[D]**. Its comment says 160 ms was splitting one sentence into two turns. That 640 ms is not `TurnCfg`'s 500 ms default and not the orchestrator fake's 160 ms.
 
 **galion-v2-live** `src/vad.rs`: energy VAD, `min_voiced_ms = 60` **[D]**, hang passed in by the caller. `call.rs` constructs `Vad::new(300.0)` and then sets `min_voiced_ms = 40` **[D]**. `endpoint.rs` **[D]**: speculate 60 ms, commit 160 ms, hold 500 ms. Speculate may start a reply; commit is what may play. That is the domain 04 partial-commit shape, and it is not wired to `PhoneLane` or to `Domain04Stamps`.
 
@@ -170,7 +172,12 @@ Status: Piper path **works** when the pack or flite is present, **missing** when
 
 Path: `voice-stack/horbm-bridge`, package `galion-sam-horbm`. Not a root workspace member.
 
-The brief's phrase "brain not landed" is not in this tree. What the code does:
+The spoken sentence "brain not landed" is not in this tree. Two placeholders are:
+
+- `voice-stack/horbm-bridge/seam/horbm` is a compile seam. Its own header says it stands in until crate `horbm` is the path dependency. A normal `turn` returns an empty reply and the source id `seam:horbm-not-landed`. The probe input `::s04-probe::` returns a fixture sentence. The live bridge `Cargo.toml` already depends on `horbm/crates/horbm`, so this seam is not what `galion-sam-horbm` links.
+- `voice-stack/local-server` `UnlinkedBrain::turn` returns the error `brain-unlinked` and speaks nothing.
+
+What the linked crate does:
 
 - Crate `horbm` (`horbm/crates/horbm`) is a path dependency. `horbm_linked()` returns true. `Brain::turn` order is empathy, then cards, then an optional research ask, then exactly `UNKNOWN_REPLY` = `I don't know.` **[D]** (`horbm/crates/horbm/src/route.rs`). No gap filler sentence.
 - `CardEngine` / `CardBrain` read a knowledge directory when it already exists. They do not create it. Memory and case paths are not opened.
@@ -215,8 +222,8 @@ Piper exception: CPU, separate process, sunset 2027-02-01 **[D]**. Chatterbox ex
 
 ## Top gaps
 
-1. **The hot path is not HORBM.** Option A is policy. The phone lane still answers with the rule table, the echo mock, the Galion Research loopback client, or the blocked S0 line. Crate `horbm` can answer from cards or say it does not know, and the phone lane does not call it. `galion-sam-orch` `Brain::open` still reports that the brain is not linked.
-2. **The ear is not on the stamp clock.** `t_vad_silence_start` is absent on every cascade turn. `voice-stack/vad` and `galion-v2-live`'s endpointer already have silence, speculate, and commit, on different hang numbers (500 ms default vs 300 ms in `call.rs` vs 160 ms commit). None of them call `note_vad_silence_start`. `t_first_media_frame_sent` and `t_first_audio_heard` stay absent.
+1. **The hot path is not HORBM.** Option A is policy. The phone lane still answers with the rule table, the echo mock, the Galion Research loopback client, or the blocked S0 line. The English demo lane (`en_lane.rs`) uses `MockLlm`, not `CannedLlm`. Crate `horbm` can answer from cards or say it does not know, and the phone lane does not call it. `galion-sam-orch` `Brain::open` still reports that the brain is not linked. The seam crate still tags a miss `seam:horbm-not-landed`, and the unlinked server brain returns `brain-unlinked`.
+2. **The ear is not on the stamp clock.** `t_vad_silence_start` is absent on every cascade turn. `voice-stack/vad` and `galion-v2-live`'s endpointer already have silence, speculate, and commit, on different hang numbers (500 ms default, 300 ms in `call.rs`, 160 ms commit, 640 ms on the Samantha server). None of them call `note_vad_silence_start`. `t_first_media_frame_sent` and `t_first_audio_heard` stay absent. The phone ASR parent in `galion-asr-vosk` does not build on Windows.
 3. **PCM and words still move beside the stamp line.** The bus bodies and the Vosk request carry PCM. Partial ASR, reply text, and `galion-sideband::Turn` carry words. The stamp line does not. A worker error's `stages` string does not yet include the partial sheet. A debug print of a `BusMsg` is not the stamp log.
 4. **The measured turn gap is the old loop.** Sprint-report first content audio p50 608 ms **[M]** used a cloud model the 2026-11-04 ruling removed. This session did not measure a replacement. R4's 200 ms p50 target **[T]** is still a target. Three mouths and three workspaces mean a number from one of them is not a number for the others.
 5. **The onset constant and the lock disagree, and S0 cannot speak.** Cascade `ONSET_P50_BUDGET_MS` is 800 **[D]**. The lock is 300 **[D]**. `INFERENCE_IMPLEMENTED` is false **[D]**. A later S0 fill has to be marked as a guess; there is no guess tag on a reply yet.
