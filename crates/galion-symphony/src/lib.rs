@@ -608,12 +608,16 @@ pub fn gate_report(measured_frames: usize) -> Report {
 mod tests {
     use super::*;
 
+    fn lock_off(cond: bool) -> bool {
+        cond
+    }
+
     #[test]
     fn tick_matches_the_heartbeat_period() {
         assert_eq!(TICK_NS, u64::from(galion_heartbeat::FRAME_MS) * 1_000_000);
         assert_eq!(P1_BUDGET_NS, 800_000);
         assert_eq!(P3_LL_NS, 80_000);
-        assert!(!PRODUCT_CLAIM);
+        assert!(lock_off(!PRODUCT_CLAIM));
         let locks = include_str!("../../../LOCKS.toml");
         assert!(locks.contains("frame_ms = 80"));
     }

@@ -41,6 +41,7 @@
 
 use super::clone_worker::{persona_name, ref_sha, CLONE_RATE_HZ};
 use crate::VoiceError;
+use std::fmt::Write;
 
 pub const MAGIC: &[u8; 8] = b"GALIONVC";
 pub const VERSION: u16 = 1;
@@ -252,7 +253,11 @@ fn sha_bytes(hex_str: &str) -> [u8; 32] {
 }
 
 fn hex_bytes(bytes: &[u8]) -> String {
-    bytes.iter().map(|b| format!("{b:02x}")).collect()
+    let mut out = String::with_capacity(bytes.len() * 2);
+    for b in bytes {
+        let _ = write!(out, "{b:02x}");
+    }
+    out
 }
 
 /// `true` when the Chatterbox exception allows reference clips.
