@@ -12,7 +12,7 @@ publish = false
 [features]
 # V1-03: real-speech path (A21 weight slot + interim system TTS via runtime dlopen of
 # libflite). Off by default: the default build stays no-I/O, no FFI.
-speech = ["dep:galion-heartbeat", "dep:galion-consent", "dep:galion-cores"]
+speech = ["dep:galion-heartbeat", "dep:galion-consent", "dep:galion-cores", "dep:galion-source-filter"]
 
 [[example]]
 name = "piper_warmth"
@@ -41,6 +41,8 @@ galion-consent = { path = "../galion-consent", optional = true }
 galion-cores = { path = "../galion-cores", optional = true }
 # Persona-mood conditioning (zero-dependency crate) for the Piper path.
 galion-emotion = { path = "../../galion-emotion" }
+# Samantha's post-TTS source-filter. Compiled only with the speech feature.
+galion-source-filter = { path = "../galion-source-filter", optional = true }
 
 [dev-dependencies]
 galion-emotion = { path = "../../galion-emotion" }
