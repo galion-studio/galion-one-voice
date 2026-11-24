@@ -12,7 +12,7 @@ Perpetual Open MIT License. (c) 2026 Galion Labs.
 
 HORBM is the heuristic open-retrieval brain. A turn is a lookup. There is no LLM on the hot path. Galion Research is off the tick, with the 3 second cap already in `voice-stack/research-gateway`. Owner instruction of 2026-11-24: do not build that brain on the old voice infrastructure or on the Piper TTS pipeline.
 
-R4 (`docs/horbm/research/R4-cpu-realtime-integration.md` on closed, unmerged draft PR #207, §11) still says phase 4 leaves the Piper path unchanged. That sentence is research. It is not the architecture to implement. Phase 1 of that note is already on `main`: domain 04 stamps in `crates/galion-cascade` (PR #250, `4b828b6`). PR #251 is superseded by PR #253. Do not land both.
+R4 (`docs/horbm/research/R4-cpu-realtime-integration.md` on closed, unmerged draft PR #207, §11) still says phase 4 leaves the Piper path unchanged. That sentence is research. It is not the architecture to implement. Phase 1 of that note is already on `main`: domain 04 stamps in `crates/galion-cascade` (PR #250, `4b828b6`). PR #251 is superseded by PR #253. Do not land both. As of 2026-11-24 18:39 UTC, GitHub reports #251 and #252 `mergeable: false` (`dirty`) against `main`. #253 is `mergeable: true` (`clean`). None of the three is merged here.
 
 ## Top findings
 
@@ -133,8 +133,8 @@ A deploy note and an old demo note still contain a VPS address and a tunnel host
 ## Ordered next steps
 
 1. Laptop test this branch. Do not merge it from the agent, and do not enable auto-merge.
-2. Review PR #253. Treat PR #251 as superseded. Do not merge #251.
-3. Keep PR #252 from making Piper part of the brain. A heuristic pick may replace `CannedLlm` on the phone lane. The 7881 mouth stays behind `Mouth`.
+2. Review PR #253. It is the retrieval thread, it is clean against `main`, and it supersedes PR #251. Rebase #251 only if something in it is still missing from #253. Do not merge the dirty branch as it stands.
+3. Rebase PR #252 before any review of the heuristic pick. GitHub reports it dirty against `main`. The pick may replace `CannedLlm` on the phone lane. The 7881 mouth stays behind `Mouth`. Piper is not retimed by that branch, and it must not become the architecture.
 4. Move the Research `ask` off the turn that starts the mouth. Speak the local clause first.
 5. Add a `Mouth` implementation that does not spawn Piper. Text on the existing socket is enough until a MIT or Apache-2.0 speaker is actually available. Leave `PiperMouth` in the binary so today's server still speaks.
 6. When 7881 no longer looks up `galion-piper-rt`, archive that runtime and the `a21_piper` pin together, and edit `check-locks.sh` in the same change.
