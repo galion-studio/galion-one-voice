@@ -6,11 +6,11 @@ Perpetual Open MIT License. (c) 2026 Galion Labs.
 |---|---|
 | Swarm | HORBM foundations, phase 7 learn pass |
 | Written | 2026-11-24. No benchmark, no weight download, no voice audio, no paid API. |
-| Voice tree | Branch `cursor/horbm-learn-pass-ae07`, stacked on PR #253 `cursor/f2-retrieval-thread-3cd7` at `de26ba67db0d0eba83a0e66f1630b71da9e19d72`. `main` at the time of the read was `204fd8cd6e399d0e1cced23c595214be94de1f57` and does not contain `horbm::retrieve`. |
+| Voice tree | Branch `cursor/horbm-learn-pass-ae07`, rebased onto `main` `8caa52a1ddad4ed89dc89a6ece50382a064aa2cd` (PRs #252 and #254). This branch does not contain `horbm::retrieve`. |
 | Diary | `galion-studio/galion-knowledge` PR #36, branch `cursor/horbm-memory-git-face-3cd7`, head `974e594444448597741372fef578142c46d28566`. Open, not merged. The voice pin is that revision. |
 | Open Mind | `galion-studio/obsidian-open-mind` `main` `0b0a898695b0525b179b5dd791bbfa8c281b7ffc`. Read only. Not cloned into this tree. Not written. |
 | Plan | `docs/horbm/research/R4-cpu-realtime-integration.md` §9 and §11 on closed draft PR #207, head `dd902bbcfe34e23f63745a19fc2fed8e468a3b09`, branch `cursor/horbm-r4-cpu-realtime-2180`. Not merged. |
-| This change | `horbm::learn` beside `horbm::retrieve`. `LOCKS.toml` `[consent]` gains `learn = "deny"` and `learn_in_band = false`. The four EmotionWire bits are unchanged. `SOUL.md` is not in this checkout and was not created. |
+| This change | `horbm::learn` on `main`. It links `horbm-memory` and does not link PR #253's retrieval thread. `LOCKS.toml` `[consent]` gains `learn = "deny"` and `learn_in_band = false`. The four EmotionWire bits are unchanged. `SOUL.md` is not in this checkout and was not created. |
 
 ## How to read a number
 
@@ -28,7 +28,7 @@ R4 §11, line 444, is the whole assignment **[T]**:
 |---|---|---|
 | Learn pass: separate consent, source on every clause, pack swap, withdrawal deletes. | Fresh config writes nothing. Granted config writes one sourced row. Withdrawal leaves no row. | phase 2 |
 
-Phase 2 is open PR #253. It is the preferred seam (`horbm::retrieve`, `RetrievalConfig`). PR #251 is a different crate and is not the base of this change. The name `cursor/horbm-memory-git-face-3cd7` is the galion-knowledge branch for PR #36, which #253 already pins. It is not the voice branch. This voice branch stacks on `cursor/f2-retrieval-thread-3cd7`.
+Phase 2 is still open as PR #253. PR #251 is superseded and is not this base. The learn gate writes one diary row through `horbm-memory`. It does not call `horbm::retrieve`, and that module is not on `main`. The git face `cursor/horbm-memory-git-face-3cd7` is galion-knowledge PR #36. This branch pins the same revision `974e594444448597741372fef578142c46d28566` and does not vendor the crate. This voice branch is based on `main`.
 
 Q1 inside the R4 file is still written as open (line 62 and line 486). The owner ruling this pass follows is the one named on 2026-11-18, option A: HORBM retrieval answers first. Galion Research, the Rust engine, handles hard questions off the tick with a 3 second cap. This note does not call that engine Hermes. F2 on the phase 2 branch records the same ruling as HORBM answering first (`docs/horbm/foundations/F2-retrieval-audit.md`, the paragraph under "What this phase ships"). The 3 second cap is already `RESEARCH_CAP` on the deep-miss path in `Brain::turn`. The learn pass does not call Galion Research and does not run on that cap. The loop is offline. The call never waits for it (R4 §9, line 389).
 
@@ -54,7 +54,7 @@ learn_in_band = false
 
 `bits` stays `sense`, `adapt`, `remember`, `share`. EmotionWire byte 7 is still masked with `0x0f` in `galion-emotion` `encode_with_consent`, and bits 4..7 stay reserved. Learn does not travel in the frame. `scripts/check-locks.sh` requires `learn = "deny"`, `learn_in_band = false`, and the four-bit list. `LEDGER.md` records the owner line. The pass still does not parse `LOCKS.toml`. A fresh process matches the deny default. `GALION_HORBM_LEARN=grant` is the process grant and does not rewrite the file.
 
-The write switch is `LearnConfig.granted`. `GALION_HORBM_LEARN=grant` is the only env value that sets it. `GALION_HORBM_REMEMBER` is not read. `RetrievalConfig.remember` is not copied into the learn pass.
+The write switch is `LearnConfig.granted`. `GALION_HORBM_LEARN=grant` is the only env value that sets it. Unset, the pass writes nothing. `GALION_HORBM_REMEMBER` is not read. There is no recall field on `LearnConfig`.
 
 R4 §9 condition 1 also says `remember` must still be granted before a clause is written. This pass does not enforce that coupling. A host that wants both grants withholds `GALION_HORBM_LEARN` until recall is granted. The pass itself will not treat a recall grant as permission to write, and it will not treat a learn grant as permission for the retrieval thread to open its diary. The phase 7 gate names one granted config. That config is the learn grant.
 
@@ -72,21 +72,11 @@ There is no `learn()` method. The synchronous sourced write is `Store::diary_add
 
 `Store::open` always starts the worker thread. This pass calls `pause_worker` immediately and never calls `push_turn`, `remember`, `resume_worker`, or `drain`. One `diary_add` is the only insert.
 
-## 3. The phase 2 seam this pass keeps
+## 3. Why this pass does not include the retrieval thread
 
-Public surface in `horbm/crates/horbm/src/retrieve.rs`, re-exported from `horbm`. This change does not edit that file.
+PR #253's `horbm::retrieve` (`RetrievalConfig`, `RetrievalThread`, `MemoryHitCell`) is the recall path. It is not on `main`, and the learn gate does not call it. A learn write is `Store::diary_add` into a pack directory, then a directory rename. Recall withdraw on that thread, when it lands, drops a RAM diary. Learn withdraw deletes the pack files. The two grants stay separate.
 
-| Item | Role |
-|---|---|
-| `RetrievalConfig` | `remember`, `knowledge_dir`, `fixture_rows`. Grant is the trimmed string `grant` only. |
-| `RetrievalThread` | Std thread `horbm-retrieval`. `ask` / `ask_wait` / `set_remember`. |
-| `MemoryHitCell` | `Idle` on deny or withdraw, `Miss` speaks `I don't know.`, `Hits` at most four. |
-| `RetrievedCells` | `cell` / `try_cell`. Do not call `cell` from `Heartbeat::step`. |
-| `Int8Scorer` | Seam for the mapped arena. Unused here. |
-
-`set_remember(false)` drops the in-memory diary and publishes `Idle`. That is the recall withdraw. It is not the learn withdraw. `Brain::turn` is unchanged. Queries still use `Store::search_lexical` inside the retrieval thread, and only when `remember` is granted. A learn grant does not open that diary.
-
-`LearnPass::open_beside` borrows a `RetrievalConfig` so a caller can hold both, and so `knowledge_dir` becomes a path the learn pass refuses to write. `remember` is not read.
+`LearnPass::open_outside` takes card directories and refuses to write inside them. It does not take a retrieval config. `Brain::turn` is unchanged.
 
 ## 4. PR #251 is a different seam
 
@@ -103,7 +93,7 @@ Module `horbm/crates/horbm/src/learn.rs`.
 | Step | Behaviour |
 |---|---|
 | Fresh | `LearnConfig::fresh` or any flag other than `grant`. `write_clause` returns denied before `Store::open`. The pack directory is not created. |
-| Granted | Validate session, time, and consent record. Validate speaker and text. Refuse an empty pack path, `G:\galion\horbm\knowledge`, a directory that already holds `manifest.json` or `revisions.sqlite`, and any `knowledge_dir` passed through `open_beside`. |
+| Granted | Validate session, time, and consent record. Validate speaker and text. Refuse an empty pack path, `G:\galion\horbm\knowledge`, a directory that already holds `manifest.json` or `revisions.sqlite`, and any card directory passed to `open_outside`. |
 | Source | Label `session=…;turn=…;time=…;consent=…` stored in the diary `source` column. The pass reads the row back and refuses the swap if the stored source, text, speaker, or date differs, or if the diary count is not 1, or if `archive` is not empty. |
 | Pack swap | Insert into `next/learn-pack.sqlite`. Close the store. Rename `live/` to `retiring/` when it exists, rename `next/` to `live/`, delete `retiring/`. The live directory is the only one left. A second write builds a new `next/` and swaps again, so the live pack still has one row and the previous file is gone. |
 | Withdrawal | Delete `live/`, `next/`, and `retiring/` under the pack directory. Do not call `Store::forget`. A missing pack is a no-op. A card folder is refused and left as it was. |
@@ -125,7 +115,7 @@ Fresh config: the pack path does not exist and no sqlite file appears under the 
 
 Supporting tests in the same file: a recall grant with learn denied writes nothing; a learn grant with recall denied still writes one row and leaves the retrieval cell `Idle`; an empty source writes nothing; a second write swaps the pack down to the new row; a directory with `manifest.json` is not written.
 
-`cargo test --manifest-path horbm/Cargo.toml -p horbm` is the crate run, including the phase 2 retrieve tests. Those tests must stay green. They use temp directories and a RAM fixture. They do not open a real knowledge folder.
+`cargo test --manifest-path horbm/Cargo.toml -p horbm` is the horbm workspace run. `cargo test --workspace` is the root workspace. Both use temp directories for the learn tests. They do not open a real knowledge folder. The root workspace excludes `horbm`.
 
 ## 8. Laptop test
 
@@ -133,11 +123,11 @@ From `G:\galion\work\galion-one-voice`, after this branch is checked out. Rust 1
 
 ```powershell
 Set-Location G:\galion\work\galion-one-voice
-cargo test --manifest-path horbm/Cargo.toml -p horbm --test learn -- --test-threads=1
-cargo test --manifest-path horbm/Cargo.toml -p horbm --test retrieve -- --test-threads=1
+cargo test --workspace
+cargo test --manifest-path horbm/Cargo.toml -p horbm -- --test-threads=1
 ```
 
-A pass of the first command is the phase 7 gate: fresh writes nothing, granted writes one sourced row, withdrawal leaves no row. The second command is the phase 2 gate on the same branch and must still pass. Leave `GALION_HORBM_LEARN` unset unless a later host process is meant to learn. Unset, the learn pass writes nothing.
+A pass of the horbm command includes the phase 7 gate: fresh writes nothing, granted writes one sourced row, withdrawal leaves no row. Leave `GALION_HORBM_LEARN` unset. Unset, the learn pass writes nothing.
 
 ## 9. Gaps left
 
@@ -149,4 +139,4 @@ A pass of the first command is the phase 7 gate: fresh writes nothing, granted w
 | Emotion-wire bits | `remember` is still not read from `EmotionWire` (F2 gap 3). Learn is not an emotion-wire bit. |
 | Int8 pack swap | Phase 3 maps keys. This swap is the learn-pack directory, not a `.gq` file. |
 | Q2, Q3, Q5 in R4 | The bit is named `learn` in `LOCKS.toml`, default deny, and it is not on the emotion wire. Who may grant it, and encryption at rest, are still open. The process grant is `GALION_HORBM_LEARN=grant`. |
-| PR #36 and PR #253 | Both open. This branch does not merge them. |
+| PR #36 and PR #253 | The diary pin is PR #36's head. PR #253's retrieval thread is not in this branch. Neither is merged here. |
