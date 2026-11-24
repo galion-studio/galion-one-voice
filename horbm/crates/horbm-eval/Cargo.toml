@@ -1,0 +1,26 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Galion Labs
+
+[package]
+name = "horbm-eval"
+description = "Closed HORBM evaluation gate. Synthetic turns, virtual clock, one TOML threshold file."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "horbm-eval"
+path = "src/main.rs"
+
+[dependencies]
+horbm = { path = "../horbm" }
+horbm-voice = { path = "../horbm-voice" }
+galion-conductor = { path = "../../../crates/galion-conductor" }
+galion-emotion = { path = "../../../galion-emotion" }
+galion-emotion-core = { path = "../../../crates/galion-emotion-core" }
+galion-emotion-in = { path = "../../../voice-stack/emotion-in" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
