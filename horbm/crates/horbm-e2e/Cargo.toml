@@ -1,0 +1,25 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Galion Labs
+# Own workspace. The root workspace excludes `horbm`, and this package is not
+# a member of the horbm workspace, so `cargo test --workspace` does not build
+# it. `scripts/horbm-e2e-smoke.sh` is the entry.
+
+[workspace]
+
+[package]
+name = "horbm-e2e"
+description = "Samantha end-to-end duplex smoke. No mic, no speaker, no committed audio."
+version = "0.0.1"
+edition = "2021"
+license = "MIT"
+publish = false
+rust-version = "1.85"
+
+[dependencies]
+horbm = { path = "../horbm" }
+horbm-duplex = { path = "../horbm-duplex" }
+horbm-voice = { path = "../horbm-voice" }
+galion-emotion-core = { path = "../../../crates/galion-emotion-core" }
+galion-sam-asr = { path = "../../../voice-stack/asr" }
+galion-tts-piper = { path = "../../../voice-stack/tts-piper-stream" }
+galion-ml-voice = { path = "../../../crates/galion-ml-voice", default-features = false, features = ["speech"] }
