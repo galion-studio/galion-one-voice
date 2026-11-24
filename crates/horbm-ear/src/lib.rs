@@ -21,13 +21,20 @@
 //! shimmer are the rest of the glue. The open-space point is a fixed coupling,
 //! not a category list. [`port::ListenerOffer`] is what the emotion core can
 //! take later. This crate does not call [`port::EmotionCore::step`].
+//!
+//! [`eot::Scorer`] turns those scalars, plus the latest ASR partial, into a
+//! [`eot::TurnMsg`]. Thresholds are `eot.toml`, compiled in. A denied frame
+//! is [`eot::TurnMsg::PauseOnly`], which is the conductor's existing hang.
+//! Nothing in the scorer reads a weight or a sound file.
 
 #![forbid(unsafe_code)]
 
 mod dsp;
+pub mod eot;
 pub mod link;
 pub mod port;
 
+pub use eot::{EotConfig, ProsodyCue, Scorer, TurnMsg};
 pub use galion_emotion::consent_bits;
 pub use galion_emotion::Purpose;
 pub use port::{ListenerOffer, ListenerPort};
