@@ -32,6 +32,8 @@ pub fn is_scripted_comfort(reply: &str) -> bool {
 }
 
 /// A source the truth gate will stand behind. `honest:unknown` is not one.
+/// `style:` is a dialogue mark from the research root and is not one either.
+/// `research:` is the off-tick gateway, not a research-root card.
 pub fn is_real_source(source: &str) -> bool {
     let id = source
         .strip_prefix("card:")
@@ -103,6 +105,11 @@ mod tests {
         assert!(is_sourced(
             "The kettle is on the hob.",
             &["card:kettle".into()]
+        ));
+        assert!(!is_real_source("style:soft-pace"));
+        assert!(!is_sourced(
+            "Keep the line short.",
+            &["style:soft-pace".into()]
         ));
         assert!(is_scripted_comfort("I hear you."));
         assert!(!is_scripted_comfort("I don't know."));

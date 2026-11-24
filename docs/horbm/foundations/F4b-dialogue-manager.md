@@ -25,12 +25,20 @@ The state tracker reuses `galion_sam_empathy::NameBook` (32 names). A ring of 32
 |---|---|---|
 | `stop` | Goodbye, or the whole line is `stop` / `please stop` / `be quiet` | `Talk soon.` |
 | `cite` | A cite cue, and a real source is already in hand or in the ring | That stored clause |
-| `answer` | A real source (`card:`, `retrieve:`, `fixture:`, `research:`) | The gathered clause |
+| `answer` | A truth-root source (`card:`, `retrieve:`, `fixture:`) or the gateway (`research:`) | The gathered clause |
 | `offer_topic` | A switch cue with a topic already in the ring, or a granted check-in | `Back to {topic}?` or the stored callback |
 | `comfort` | A vent, and no sourced clause | `I don't know.` |
 | `ask` | Anything still open, including an answer the filter removed | `I don't know.` |
 
-`honest:unknown` is not a source. An answer without a card does not speak. Comfort does not add a sympathy script. The feeling stays on the mood metadata. A vent that also has a card still answers the card.
+`honest:unknown` is not a source. `style:` is not a source. An answer without a truth card does not speak. Comfort does not add a sympathy script. The feeling stays on the mood metadata. A vent that also has a truth card still answers that card.
+
+## Two roots
+
+The knowledge directory is the truth root. It is the only card source for `answer` and `cite`. **[D]**
+
+`GALION_HORBM_RESEARCH_DIR` is the research root. Unset, empty, or not an existing directory means no research cards, and the turn matches the truth-only path. A dialogue card has `research_only: true`, `use_for` of `style`, `empathy`, and `moves`, `not_for` of `answer` and `cite`, and `claim_type: interpretation`. It may mark comfort, offer_topic, and ask with `style:{id}` on `evidence`. It is not spoken, and it is not a source. Comfort still says `I don't know.` when no truth card covers the line.
+
+A card with `research_only: true`, or `not_for` containing `answer`, is dropped from the truth index. The retrieval cell drops the same ids before it publishes, so that card is never `Hits[0]` even when the truth root is pointed at it. The gateway prefix `research:` is the off-tick port, not this directory.
 
 ## Policy and the bandit
 
@@ -53,8 +61,9 @@ Learn follows the grant string from PR #255 (`GALION_HORBM_LEARN=grant`). This l
 ```text
 bash scripts/check-locks.sh
 cargo test --manifest-path horbm/Cargo.toml -p horbm --test dialogue
+cargo test --manifest-path horbm/Cargo.toml -p horbm --test roots
 cargo test --manifest-path horbm/Cargo.toml
 cargo test --workspace
 ```
 
-The dialogue test is the layer gate: each move in its scenario, no answer without a card, consent denied stores no callback and no bandit count, check-ins off by default, and two runs of the same lines match. No audio file. No network in the turn.
+The dialogue test is the layer gate: each move in its scenario, no answer without a card, consent denied stores no callback and no bandit count, check-ins off by default, and two runs of the same lines match. The roots test uses synthetic cards written in the test, not a dataset file. No audio file. No network in the turn.

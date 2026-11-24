@@ -39,8 +39,10 @@
 //! Layer 4 runs after that evidence is in hand and before the reply is split
 //! into clauses. It picks one move: answer, cite, ask, comfort, offer_topic,
 //! or stop. The heuristic is deterministic. An answer with no sourced card
-//! becomes ask, and the spoken miss stays [`UNKNOWN_REPLY`]. Check-ins are
-//! off. The offline bandit is off and does not count a move unless learn
+//! becomes ask, and the spoken miss stays [`UNKNOWN_REPLY`]. The truth root
+//! is the only card source for answer and cite. [`ResearchRoot`] is optional
+//! and unset by default. A research card never becomes that source. Check-ins
+//! are off. The offline bandit is off and does not count a move unless learn
 //! consent is granted. Callbacks are stored only when remember is granted.
 //!
 //! [`RetrievalThread`] links `horbm-memory` in-process, off the heartbeat
@@ -59,8 +61,8 @@ mod route;
 
 pub use brain::{Brain, MoodMeta};
 pub use cards::{
-    knowledge_dir_from_env, CardError, KnowledgeCards, LoadReport, LoadedPack,
-    WINDOWS_KNOWLEDGE_DIR,
+    blocks_answer, knowledge_dir_from_env, CardError, KnowledgeCards, LoadReport, LoadedPack,
+    ResearchRoot, WINDOWS_KNOWLEDGE_DIR,
 };
 pub use dialogue::{flag_granted, DialogueConsent, Move, OfflineBandit, TurnSnap, RING_CAP};
 pub use galion_emotion_core::{

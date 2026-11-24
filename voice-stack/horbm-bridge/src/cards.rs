@@ -241,7 +241,8 @@ pub(crate) fn brain_from_dir(knowledge_dir: &Path, bind: Option<&str>) -> horbm:
     eprintln!("{}", report.log_line());
     let research = research::research_port(bind)
         .map(|port| Box::new(PortAsk(port)) as Box<dyn horbm::ResearchAsk + Send>);
-    let mut brain = horbm::Brain::with_cards(LocalCards { json, prose }, research);
+    let mut brain = horbm::Brain::with_cards(LocalCards { json, prose }, research)
+        .with_style(horbm::ResearchRoot::from_env());
     brain.set_speakable(speakable_line);
     attach_retrieval(brain, knowledge_dir)
 }

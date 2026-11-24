@@ -14,7 +14,8 @@ use horbm_brain::{
     classify, pick, split_clause, Answer, Heuristic, Retrieved, Retriever, SidebandMark,
 };
 
-use crate::dialogue::{DecideIn, Decision, Dialogue, DialogueConsent, ReplyPlan, TurnSnap};
+use crate::cards::ResearchRoot;
+use crate::dialogue::{DecideIn, Decision, Dialogue, DialogueConsent, Move, ReplyPlan, TurnSnap};
 use crate::retrieve::{CellState, MemoryHitCell, RetrievalThread, RetrievedCells};
 use crate::route::{accept_line, route_heard, CardLookup, Gap, ResearchAsk, Speakable};
 use crate::{Pad, TurnOut, UNKNOWN_REPLY};
@@ -82,6 +83,7 @@ pub struct Brain {
     retrieval: Option<RetrievalThread>,
     retrieval_epoch: u64,
     dialogue: Dialogue,
+    style: ResearchRoot,
 }
 
 struct Spoke {
@@ -204,7 +206,15 @@ impl Brain {
             retrieval: None,
             retrieval_epoch: 0,
             dialogue: Dialogue::new(),
+            style: ResearchRoot::empty(),
         }
+    }
+
+    /// Dialogue cards. Empty unless a research root was attached. They are
+    /// not a fact source.
+    pub fn with_style(mut self, style: ResearchRoot) -> Self {
+        self.style = style;
+        self
     }
 
     /// Chat turns read this thread's cell. `Idle` keeps the card and fixture
@@ -232,12 +242,14 @@ impl Brain {
         match crate::KnowledgeCards::load(knowledge_dir) {
             Ok(loaded) => {
                 eprintln!("{}", loaded.report.log_line());
-                Self::with_cards(loaded.cards, None)
+                Self::with_cards(loaded.cards, None).with_style(ResearchRoot::from_env())
             }
-            Err(crate::CardError::NotADirectory(_)) => Self::with_cards(EmptyCards, None),
+            Err(crate::CardError::NotADirectory(_)) => {
+                Self::with_cards(EmptyCards, None).with_style(ResearchRoot::from_env())
+            }
             Err(err) => {
                 eprintln!("horbm cards: {err}");
-                Self::with_cards(EmptyCards, None)
+                Self::with_cards(EmptyCards, None).with_style(ResearchRoot::from_env())
             }
         }
     }
@@ -421,8 +433,21 @@ impl Brain {
                 self.gaps.push(gap);
             }
         }
-        let spoke = apply_plan(gathered.spoke, decision.plan().clone());
+        let mut spoke = apply_plan(gathered.spoke, decision.plan().clone());
+        if let Some(id) = self.style_id(decision.chosen, &query_owned) {
+            spoke.evidence.push(format!("style:{id}"));
+        }
         self.finish(&query_owned, started, spoke, &decision)
+    }
+
+    /// Style mark for comfort, ask, and offer_topic. Not an answer source.
+    fn style_id(&self, chosen: Option<Move>, query: &str) -> Option<String> {
+        match chosen {
+            Some(Move::Comfort | Move::Ask | Move::OfferTopic) => {
+                self.style.lookup(query).map(|hint| hint.id)
+            }
+            _ => None,
+        }
     }
 
     /// Retrieval, cards, the idle fixture, then the gateway. No reply split.

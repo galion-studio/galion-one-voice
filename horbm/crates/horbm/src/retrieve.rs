@@ -440,7 +440,7 @@ fn thread_main(
 ) {
     let store = if config.remember {
         match open_store(&config) {
-            Ok(store) => Some(store),
+            Ok(opened) => Some(opened),
             Err(err) => {
                 let _ = ready.send(Err(err));
                 return;
@@ -455,7 +455,7 @@ fn thread_main(
     worker(store, config, &shared);
 }
 
-fn worker(mut store: Option<horbm_memory::Store>, config: RetrievalConfig, shared: &Shared) {
+fn worker(mut store: Option<Opened>, config: RetrievalConfig, shared: &Shared) {
     while let Some(cmd) = recv(shared) {
         match cmd {
             Command::Ask {
@@ -477,18 +477,12 @@ fn worker(mut store: Option<horbm_memory::Store>, config: RetrievalConfig, share
     }
 }
 
-fn publish_ask(
-    shared: &Shared,
-    store: Option<&horbm_memory::Store>,
-    text: &str,
-    turn_id: u64,
-    epoch: u64,
-) {
-    let Some(store) = store else {
+fn publish_ask(shared: &Shared, store: Option<&Opened>, text: &str, turn_id: u64, epoch: u64) {
+    let Some(opened) = store else {
         publish(shared, MemoryHitCell::idle(), true);
         return;
     };
-    match asked(store, text, turn_id, epoch) {
+    match asked(&opened.store, &opened.blocked, text, turn_id, epoch) {
         Ok(cell) => publish(shared, cell, false),
         Err(err) => {
             *shared.last_error.lock().expect("retrieval error") = Some(err.message);
@@ -499,7 +493,7 @@ fn publish_ask(
 
 fn apply_consent(
     shared: &Shared,
-    store: &mut Option<horbm_memory::Store>,
+    store: &mut Option<Opened>,
     config: &RetrievalConfig,
     grant: bool,
 ) {
@@ -522,23 +516,38 @@ fn apply_consent(
     publish(shared, MemoryHitCell::idle(), true);
 }
 
-fn open_store(config: &RetrievalConfig) -> Result<horbm_memory::Store, RetrieveError> {
+struct Opened {
+    store: horbm_memory::Store,
+    /// Card ids that must not be published as `Hits[0]`.
+    blocked: std::collections::BTreeSet<String>,
+}
+
+fn open_store(config: &RetrievalConfig) -> Result<Opened, RetrieveError> {
     let mut store = horbm_memory::Store::open_in_memory().map_err(RetrieveError::memory)?;
     if config.fixture_rows > 0 {
         let cards: Vec<_> = (0..config.fixture_rows)
             .map(horbm_memory::synthetic_card)
             .collect();
         store.upsert_cards(&cards).map_err(RetrieveError::memory)?;
-        return Ok(store);
+        return Ok(Opened {
+            store,
+            blocked: std::collections::BTreeSet::new(),
+        });
     }
-    if let Some(dir) = &config.knowledge_dir {
-        store.ingest_dir(dir).map_err(RetrieveError::memory)?;
-    }
-    Ok(store)
+    let blocked = match &config.knowledge_dir {
+        Some(dir) => {
+            let blocked = crate::cards::blocked_answer_ids(dir);
+            store.ingest_dir(dir).map_err(RetrieveError::memory)?;
+            blocked
+        }
+        None => std::collections::BTreeSet::new(),
+    };
+    Ok(Opened { store, blocked })
 }
 
 fn asked(
     store: &horbm_memory::Store,
+    blocked: &std::collections::BTreeSet<String>,
     text: &str,
     turn_id: u64,
     epoch: u64,
@@ -547,6 +556,9 @@ fn asked(
     let terms = horbm_memory::index_tokens(text);
     let mut hits = Vec::new();
     for hit in &response.hits {
+        if blocked.contains(&hit.item_id) {
+            continue;
+        }
         if covers(&hit.haystack, &terms) {
             hits.push(MemoryHit::from_hit(hit));
         }
@@ -624,7 +636,8 @@ mod tests {
     #[test]
     fn locks_keep_remember_deny_and_name_the_retrieval_hot_path() {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../LOCKS.toml");
-        let text = std::fs::read_to_string(&path).unwrap_or_else(|err| panic!("{}: {err}", path.display()));
+        let text = std::fs::read_to_string(&path)
+            .unwrap_or_else(|err| panic!("{}: {err}", path.display()));
         assert!(text.contains("remember = \"deny\""), "consent remember");
         assert!(text.contains("default = \"deny\""), "consent default");
         assert!(text.contains("hot_path = \"retrieval\""));
