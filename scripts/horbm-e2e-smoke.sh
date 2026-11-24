@@ -47,16 +47,12 @@ if [[ "${HORBM_E2E_NO_SILERO:-}" != "1" ]]; then
   features+=(silero)
 fi
 
-# No sound card: ALSA's null PCM, so the cpal host still opens. snd-dummy is
-# not required. A card already listed under /proc/asound/cards is left alone.
+# ALSA null PCM for the flush measurement. A listed card can still be a
+# device that never calls back (HDMI with no display). snd-dummy is not
+# required. An asoundrc the caller already exported is left alone.
 if [[ "$(uname -s)" == "Linux" && -z "${ALSA_CONFIG_PATH:-}" ]]; then
-  have_card=0
-  if [[ -r /proc/asound/cards ]] && grep -Eq '^[[:space:]]*[0-9]' /proc/asound/cards; then
-    have_card=1
-  fi
-  if [[ "$have_card" -eq 0 ]]; then
-    asound_dir=$(mktemp -d "${TMPDIR:-/tmp}/horbm-e2e-asound.XXXXXX")
-    cat > "$asound_dir/asoundrc" << 'EOF'
+  asound_dir=$(mktemp -d "${TMPDIR:-/tmp}/horbm-e2e-asound.XXXXXX")
+  cat > "$asound_dir/asoundrc" << 'EOF'
 pcm.!default {
     type null
 }
@@ -64,9 +60,8 @@ ctl.!default {
     type null
 }
 EOF
-    export ALSA_CONFIG_PATH="$asound_dir/asoundrc"
-    trap 'rm -rf "$asound_dir"' EXIT
-  fi
+  export ALSA_CONFIG_PATH="$asound_dir/asoundrc"
+  trap 'rm -rf "$asound_dir"' EXIT
 fi
 
 feature_args=()

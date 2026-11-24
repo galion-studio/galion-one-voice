@@ -181,22 +181,22 @@ impl AlsaOut {
             return None;
         }
         let pcm = std::mem::take(&mut self.held);
-        // 100 ms at 16 kHz. The ring takes a block only when the resampled
-        // block fits. The callback is already running, so this write and the
-        // flush stay in one stretch.
-        const CHUNK: usize = 1_600;
-        for chunk in pcm.chunks(CHUNK) {
-            let wrote = self.session.playback().push_pcm16(chunk, SAMPLE_RATE).ok()?;
-            if wrote != chunk.len() {
-                return None;
-            }
-        }
-        if self.session.playback().queued() == 0 {
+        // One block, then the skip. A null PCM callback can drain a long
+        // write before this function reaches `barge_in`. The skip still
+        // names the tail of that write, so the next callback writes silence
+        // even when the ring is already empty.
+        let n = pcm.len().min(3_200);
+        let wrote = self
+            .session
+            .playback()
+            .push_pcm16(&pcm[..n], SAMPLE_RATE)
+            .ok()?;
+        if wrote == 0 {
             return None;
         }
         let started = Instant::now();
         self.session.playback().barge_in();
-        let deadline = started + std::time::Duration::from_millis(20);
+        let deadline = started + std::time::Duration::from_millis(100);
         while self.session.playback().flush_honor_ns().is_none() {
             if Instant::now() >= deadline {
                 break;
