@@ -1096,7 +1096,7 @@ fn fact_from_user(raw: &str) -> String {
         s.truncate(160);
     }
     s.to_ascii_lowercase()
-        .trim_end_matches(|c: char| matches!(c, '.' | '!' | '?' | ','))
+        .trim_end_matches(['.', '!', '?', ','])
         .trim()
         .to_string()
 }

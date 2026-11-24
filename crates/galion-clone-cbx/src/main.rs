@@ -229,7 +229,10 @@ fn registered(cfg: &Config) -> Vec<(String, String)> {
 }
 
 fn write_registered(cfg: &Config, list: &[(String, String)]) -> std::io::Result<()> {
-    let body: String = list.iter().map(|(p, s)| format!("{p} {s}\n")).collect();
+    let mut body = String::new();
+    for (p, s) in list {
+        body.push_str(&format!("{p} {s}\n"));
+    }
     let tmp = cfg.state.join("registered.new");
     std::fs::write(&tmp, body)?;
     std::fs::rename(tmp, registered_path(cfg))
@@ -246,7 +249,9 @@ struct Request {
     body: Vec<u8>,
 }
 
-fn parse_head(head: &str) -> Option<(String, String, Vec<(String, String)>, usize)> {
+type RequestHead = (String, String, Vec<(String, String)>, usize);
+
+fn parse_head(head: &str) -> Option<RequestHead> {
     let mut lines = head.split("\r\n");
     let mut first = lines.next()?.split_whitespace();
     let method = first.next()?.to_string();

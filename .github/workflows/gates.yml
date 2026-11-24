@@ -26,6 +26,10 @@ jobs:
           scripts/deploy/write-release-manifest.test.sh
       - name: Workspace tests
         run: cargo test --workspace
+      - name: HORBM closed eval (synthetic turns, virtual clock)
+        run: |
+          cargo test --manifest-path horbm/Cargo.toml -p horbm-eval
+          cargo run --manifest-path horbm/Cargo.toml -p horbm-eval --quiet
       - name: HORBM int8 key arena with the compiled SIMD kernels
         run: cargo test -p horbm-keys --features simd-avx2,simd-avx512
       - name: Emotion V2 reference checker
