@@ -1,0 +1,20 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Galion Labs
+
+[package]
+name = "horbm-eval"
+description = "Closed full-duplex turn-taking eval for Samantha. Virtual 80 ms clock. No audio files."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+horbm = { path = "../horbm" }
+horbm-duplex = { path = "../horbm-duplex" }
+horbm-voice = { path = "../horbm-voice" }
+
+[[bin]]
+name = "horbm-turn-eval"
+path = "src/bin/horbm-turn-eval.rs"

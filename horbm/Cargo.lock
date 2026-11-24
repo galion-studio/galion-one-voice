@@ -405,6 +405,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "horbm-eval"
+version = "0.0.1"
+dependencies = [
+ "horbm",
+ "horbm-duplex",
+ "horbm-voice",
+]
+
+[[package]]
 name = "horbm-voice"
 version = "0.0.1"
 dependencies = [
