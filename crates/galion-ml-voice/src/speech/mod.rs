@@ -371,8 +371,8 @@ pub struct SpeechStack {
 }
 
 enum Engine {
-    Clone(clone_worker::CloneTts),
-    A21(weights::A21WeightTts),
+    Clone(Box<clone_worker::CloneTts>),
+    A21(Box<weights::A21WeightTts>),
     Flite(flite::FliteTts),
     #[cfg(test)]
     Mock(Box<dyn TtsEngine + Send>),
@@ -454,7 +454,7 @@ impl SpeechStack {
                 return Self::bare(
                     SpeechBackend::Clone { model, persona },
                     weights,
-                    Some(Engine::Clone(t)),
+                    Some(Engine::Clone(Box::new(t))),
                 );
             }
         }
@@ -464,7 +464,7 @@ impl SpeechStack {
                 return Self::bare(
                     SpeechBackend::A21Weights { voice },
                     weights,
-                    Some(Engine::A21(t)),
+                    Some(Engine::A21(Box::new(t))),
                 );
             }
             if mode == "a21" {
@@ -798,7 +798,7 @@ impl SpeechStack {
         if let Ok(piper) = weights::A21WeightTts::try_new(&self.weights) {
             let voice = piper.voice().to_string();
             self.backend = SpeechBackend::A21Weights { voice };
-            self.engine = Some(Engine::A21(piper));
+            self.engine = Some(Engine::A21(Box::new(piper)));
             return self.synth_one(text);
         }
         self.fallback_flite(text, "clone worker failed and the Piper voice pack is absent")
@@ -853,7 +853,7 @@ impl SpeechStack {
             model: engine.model_name().to_string(),
             persona: engine.persona().to_string(),
         };
-        Self::bare(backend, weights, Some(Engine::Clone(engine)))
+        Self::bare(backend, weights, Some(Engine::Clone(Box::new(engine))))
     }
 }
 

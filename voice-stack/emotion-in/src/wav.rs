@@ -34,14 +34,15 @@ pub fn resample_frame(input: &[f32], _in_rate: u32, out: &mut [f32; FRAME_SAMPLE
         return;
     }
     let last = input.len() - 1;
-    for i in 0..FRAME_SAMPLES {
-        let src = (i as f32) * (last as f32) / (FRAME_SAMPLES as f32 - 1.0);
+    let span = FRAME_SAMPLES as f32 - 1.0;
+    for (i, slot) in out.iter_mut().enumerate() {
+        let src = (i as f32) * (last as f32) / span;
         let j = (src.floor() as usize).min(last);
         let frac = src - j as f32;
         let a = input[j];
         let b = input[(j + 1).min(last)];
         let s = a + (b - a) * frac;
-        out[i] = if s.is_finite() { s } else { 0.0 };
+        *slot = if s.is_finite() { s } else { 0.0 };
     }
 }
 
@@ -227,7 +228,7 @@ fn read_header<R: Read>(reader: &mut R) -> Result<(Fmt, usize), EmotionError> {
         let id = [chunk[0], chunk[1], chunk[2], chunk[3]];
         let size = u32::from_le_bytes([chunk[4], chunk[5], chunk[6], chunk[7]]) as usize;
         if &id == b"fmt " {
-            if size < 16 || size > 64 {
+            if !(16..=64).contains(&size) {
                 return Err(EmotionError::new(
                     EmotionErrorKind::BadAudio,
                     "wav fmt chunk is an unexpected size",

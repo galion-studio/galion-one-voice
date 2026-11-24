@@ -1,0 +1,44 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Galion Labs
+
+[package]
+name = "horbm-duplex"
+description = "Closed full-duplex HORBM loop. One 80 ms clock, you and me live together. Live adapters are feature-gated."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+rust-version.workspace = true
+
+[features]
+default = ["prosody", "aec"]
+# Ear energy and pitch. On by default. `--no-default-features` compiles it
+# out. `Duplex::set_prosody(false)` is the runtime switch when this is on.
+prosody = []
+# Acoustic echo cancellation in front of the ear. On by default.
+# `fdaf-aec` (MIT) is the canceller. `--no-default-features` compiles it
+# out. `Duplex::set_aec(false)` is the runtime bypass when this is on.
+aec = ["dep:fdaf-aec"]
+# Recognizer over `galion_sam_asr::Asr`. Off in CI. Does not load a model
+# unless the host opens one. The contract tests use `FakeAsr`.
+vosk = ["dep:galion-sam-asr"]
+# `horbm-duplex-live`. Opens the default devices through cpal. Off in CI.
+live = ["dep:galion-sam-audio-io"]
+
+[dependencies]
+horbm = { path = "../horbm" }
+horbm-voice = { path = "../horbm-voice" }
+galion-conductor = { path = "../../../crates/galion-conductor" }
+galion-emotion-core = { path = "../../../crates/galion-emotion-core" }
+galion-sam-asr = { path = "../../../voice-stack/asr", optional = true }
+galion-sam-audio-io = { path = "../../../voice-stack/audio-io", optional = true }
+fdaf-aec = { version = "0.1.0", optional = true }
+
+[dev-dependencies]
+horbm = { path = "../horbm" }
+horbm-voice = { path = "../horbm-voice" }
+
+[[bin]]
+name = "horbm-duplex-live"
+path = "src/bin/horbm-duplex-live.rs"
+required-features = ["live"]

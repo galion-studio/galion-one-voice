@@ -61,6 +61,7 @@ use super::{sha256, FrameProsody};
 use crate::{Audio, LanguageId, TtsEngine, VoiceError};
 use std::cell::UnsafeCell;
 use std::io::{Read, Write};
+#[cfg(unix)]
 use std::os::unix::io::AsRawFd;
 use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStderr, ChildStdin, ChildStdout, Command, Stdio};
@@ -130,7 +131,7 @@ impl CloneFrameDrain {
         // SAFETY: this slot is unpublished. The consumer does not read it
         // until `w` is release-stored below.
         unsafe {
-            *(&mut *self.buf.get()).get_unchecked_mut(w % RING_CAP) = sample;
+            *(*self.buf.get()).get_unchecked_mut(w % RING_CAP) = sample;
         }
         self.w.store(w.wrapping_add(1), Ordering::Release);
         true
@@ -144,10 +145,10 @@ impl CloneFrameDrain {
         if w.wrapping_sub(r) < CLONE_FRAME_SAMPLES {
             return false;
         }
-        for i in 0..CLONE_FRAME_SAMPLES {
+        for (i, slot) in out.iter_mut().enumerate() {
             // SAFETY: index `r + i` is inside the published range. The
             // producer does not reuse it until `r` advances below.
-            out[i] = unsafe { *(&*self.buf.get()).get_unchecked((r + i) % RING_CAP) };
+            *slot = unsafe { *(*self.buf.get()).get_unchecked((r + i) % RING_CAP) };
         }
         self.r
             .store(r.wrapping_add(CLONE_FRAME_SAMPLES), Ordering::Release);
@@ -314,7 +315,7 @@ fn superseded_original(persona: &str, digest: &str) -> bool {
         let Some(rest) = line.trim().strip_prefix('#') else {
             return false;
         };
-        let mut parts = rest.trim().split_whitespace();
+        let mut parts = rest.split_whitespace();
         let Some(row_persona) = parts.next() else {
             return false;
         };
@@ -956,9 +957,16 @@ impl CloneWorker {
             let _ = child.wait();
             return Err(VoiceError::Backend("clone worker pipes missing".into()));
         };
-        if let Err(e) =
-            set_nonblock(stdout.as_raw_fd()).and_then(|_| set_nonblock(stderr.as_raw_fd()))
-        {
+        if let Err(e) = {
+            #[cfg(unix)]
+            {
+                set_nonblock(stdout.as_raw_fd()).and_then(|_| set_nonblock(stderr.as_raw_fd()))
+            }
+            #[cfg(not(unix))]
+            {
+                Ok::<(), std::io::Error>(())
+            }
+        } {
             let _ = child.kill();
             let _ = child.wait();
             return Err(VoiceError::Backend(format!("clone worker nonblock: {e}")));
@@ -1100,6 +1108,24 @@ impl CloneWorker {
         &mut self,
         ring: &mut galion_heartbeat::symphony::NanoPcmRing,
     ) -> Result<PcmPull, VoiceError> {
+        #[cfg(not(unix))]
+        {
+            let _ = ring;
+            return Err(VoiceError::Backend(
+                "clone worker pipe wait is not available on this platform".into(),
+            ));
+        }
+        #[cfg(unix)]
+        {
+            self.poll_pcm_unix(ring)
+        }
+    }
+
+    #[cfg(unix)]
+    fn poll_pcm_unix(
+        &mut self,
+        ring: &mut galion_heartbeat::symphony::NanoPcmRing,
+    ) -> Result<PcmPull, VoiceError> {
         let mark = self.err_log.len();
         let mut samples = 0usize;
         for _ in 0..8 {
@@ -1220,10 +1246,7 @@ impl CloneWorker {
     }
 
     pub fn is_alive(&mut self) -> bool {
-        match self.child.as_mut().map(|c| c.try_wait()) {
-            Some(Ok(None)) => true,
-            _ => false,
-        }
+        matches!(self.child.as_mut().map(|c| c.try_wait()), Some(Ok(None)))
     }
 
     /// One clause in, one PCM buffer out. Same process on every call.
@@ -1292,6 +1315,21 @@ impl CloneWorker {
     }
 
     fn read_utterance(&mut self, t0: Instant, timeout: Duration) -> Result<Vec<i16>, VoiceError> {
+        #[cfg(not(unix))]
+        {
+            let _ = (t0, timeout);
+            return Err(VoiceError::Backend(
+                "clone worker pipe wait is not available on this platform".into(),
+            ));
+        }
+        #[cfg(unix)]
+        {
+            self.read_utterance_unix(t0, timeout)
+        }
+    }
+
+    #[cfg(unix)]
+    fn read_utterance_unix(&mut self, t0: Instant, timeout: Duration) -> Result<Vec<i16>, VoiceError> {
         let deadline = Instant::now() + timeout;
         let mark = self.err_log.len();
         loop {
@@ -1835,14 +1873,13 @@ pub fn jarvis_texture_enabled(persona: &str) -> bool {
     if persona_name(persona) != "jarvis" {
         return false;
     }
-    match std::env::var("GALION_JARVIS_TEXTURE")
-        .ok()
-        .as_deref()
-        .map(str::trim)
-    {
-        Some("0") | Some("false") | Some("off") => false,
-        _ => true,
-    }
+    !matches!(
+        std::env::var("GALION_JARVIS_TEXTURE")
+            .ok()
+            .as_deref()
+            .map(str::trim),
+        Some("0") | Some("false") | Some("off")
+    )
 }
 
 pub(crate) fn ref_sha(persona: &str) -> Option<String> {
@@ -1999,6 +2036,7 @@ enum Pipe {
     Err,
 }
 
+#[cfg(unix)]
 #[derive(Clone, Copy)]
 #[repr(C)]
 struct PollFd {
@@ -2007,17 +2045,24 @@ struct PollFd {
     revents: i16,
 }
 
+#[cfg(unix)]
 const POLLIN: i16 = 0x001;
+#[cfg(unix)]
 const POLLHUP: i16 = 0x010;
+#[cfg(unix)]
 const F_GETFL: i32 = 3;
+#[cfg(unix)]
 const F_SETFL: i32 = 4;
+#[cfg(unix)]
 const O_NONBLOCK: i32 = 0o4000;
 
+#[cfg(unix)]
 extern "C" {
     fn poll(fds: *mut PollFd, nfds: u64, timeout: i32) -> i32;
     fn fcntl(fd: i32, cmd: i32, arg: i32) -> i32;
 }
 
+#[cfg(unix)]
 fn set_nonblock(fd: i32) -> std::io::Result<()> {
     // SAFETY: fd is a pipe this process owns; F_GETFL/F_SETFL take an int flag.
     let flags = unsafe { fcntl(fd, F_GETFL, 0) };
@@ -2098,8 +2143,21 @@ mod tests {
         // Scratch dir under temp; renamed rather than deleted.
         let _ = std::fs::rename(&store, store.with_extension("off"));
     }
-    use std::os::unix::fs::PermissionsExt;
     use std::process::{Command, Stdio};
+
+    fn make_executable(path: &std::path::Path) {
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut perm = std::fs::metadata(path).unwrap().permissions();
+            perm.set_mode(0o755);
+            std::fs::set_permissions(path, perm).unwrap();
+        }
+        #[cfg(not(unix))]
+        {
+            let _ = path;
+        }
+    }
 
     #[test]
     fn frame_matches_heartbeat() {
@@ -2509,6 +2567,7 @@ mod tests {
         assert!(!clamped.stdout.is_empty());
     }
 
+    #[cfg(unix)]
     #[test]
     fn two_turns_reuse_one_clone_process_and_the_clock_is_not_a_product_claim() {
         let dir = std::env::temp_dir().join(format!("galion-clone-worker-{}", std::process::id()));
@@ -2516,9 +2575,7 @@ mod tests {
         std::fs::create_dir_all(&dir).unwrap();
         let script = dir.join("fake-clone.py");
         std::fs::write(&script, FAKE_CLONE).unwrap();
-        let mut perm = std::fs::metadata(&script).unwrap().permissions();
-        perm.set_mode(0o755);
-        std::fs::set_permissions(&script, perm).unwrap();
+        make_executable(&script);
         let before = entries(&dir);
         let mut w = CloneWorker::spawn_for_test(&script, CloneModel::Nano, "jarvis");
         let pid = w.pid();
@@ -2548,6 +2605,7 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
     }
 
+    #[cfg(unix)]
     #[test]
     fn marker_before_large_pcm_does_not_deadlock() {
         let dir = std::env::temp_dir().join(format!("galion-clone-marker-{}", std::process::id()));
@@ -2555,9 +2613,7 @@ mod tests {
         std::fs::create_dir_all(&dir).unwrap();
         let script = dir.join("marker-first.py");
         std::fs::write(&script, MARKER_FIRST).unwrap();
-        let mut perm = std::fs::metadata(&script).unwrap().permissions();
-        perm.set_mode(0o755);
-        std::fs::set_permissions(&script, perm).unwrap();
+        make_executable(&script);
         let mut w = CloneWorker::spawn(&script, CloneModel::Nano, "samantha").unwrap();
         let pcm = w.synthesize("hi").unwrap();
         assert_eq!(pcm.len(), 40_000, "80 KiB of s16le");
@@ -2742,7 +2798,8 @@ mod tests {
         let one = wire.step(&frame, bands, &mut me, Some(&mut ring));
         assert!(one.nano_frame);
         assert_eq!(one.clone_samples, galion_heartbeat::FRAME_SAMPLES as u16);
-        let expect = (1000 + (3 % 50)) as f32 / 32768.0;
+        // The stub packs `1000 + (n % 50)` and this utterance uses n = 3.
+        let expect = (1000 + 3) as f32 / 32768.0;
         assert!((me[0] - expect).abs() < 1e-6, "protocol tone, not a model");
         assert_eq!(ring.queued(), 2 * galion_heartbeat::FRAME_SAMPLES);
 
@@ -2926,6 +2983,7 @@ sys.stdin.buffer.readline()
         assert!(!drain.drain_frame(&mut out));
     }
 
+    #[cfg(unix)]
     #[test]
     fn first_frame_is_drained_before_the_utterance_marker() {
         use std::sync::atomic::{AtomicBool, Ordering};
@@ -2935,9 +2993,7 @@ sys.stdin.buffer.readline()
         std::fs::create_dir_all(&dir).unwrap();
         let script = dir.join("stream-clone.py");
         std::fs::write(&script, STREAM_CLONE).unwrap();
-        let mut perm = std::fs::metadata(&script).unwrap().permissions();
-        perm.set_mode(0o755);
-        std::fs::set_permissions(&script, perm).unwrap();
+        make_executable(&script);
         let mut w = CloneWorker::spawn(&script, CloneModel::Nano, "samantha").unwrap();
         let frames = w.frames();
         let done = Arc::new(AtomicBool::new(false));

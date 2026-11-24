@@ -55,7 +55,7 @@ fn hb(rika: bool) -> Heartbeat<DefaultConsentGate> {
     Heartbeat::new(cfg, g)
 }
 
-fn fin<'a>(pcm: &'a [f32], late: bool) -> FrameIn<'a> {
+fn fin(pcm: &[f32], late: bool) -> FrameIn<'_> {
     FrameIn {
         you_pcm: pcm,
         affect: None,
@@ -68,7 +68,7 @@ fn fin<'a>(pcm: &'a [f32], late: bool) -> FrameIn<'a> {
     }
 }
 
-fn view<'a>(you_active: bool, feeling_e: f32, sense: bool, me_slot: &'a [f32]) -> BandView<'a> {
+fn view(you_active: bool, feeling_e: f32, sense: bool, me_slot: &[f32]) -> BandView<'_> {
     BandView {
         you_active,
         feeling_e,

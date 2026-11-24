@@ -255,7 +255,7 @@ Two different clocks, already written down, plus the swarm bar.
 | `horbm_lookup` | none in this table | Report `lookup_us`. A research note on branch `cursor/horbm-r1-retrieval-core-690c` recommends ≤5 ms p95 for the diary. That note calls the figure an opinion, not a measurement. |
 | `prosody` | 80 ms | `affect_to_voice_max_ms` remains 160. |
 | `emotion_in` | 2.4 ms | 3% of the frame (`affect_overhead_max_pct`). |
-| `tts_first` | 80 ms | BUDGET.md p50 71.3 ms and budget 30 ms are an earlier stack. A comment in `crates/galion-v2-live/src/piper.rs` records a different warm TTFA (29/33 ms, n=20). This file does not reconcile those runs. |
+| `tts_first` | 80 ms | BUDGET.md p50 71.3 ms and budget 30 ms are an earlier stack. A comment in `archive/2026-11-24/crates/galion-v2-live/src/piper.rs` records a different warm TTFA (29/33 ms, n=20). This file does not reconcile those runs. |
 | `playback`, `ws_write` | 80 ms | Unmeasured here. |
 | `dot_present` | 1 ms | `present_max_ms`. |
 

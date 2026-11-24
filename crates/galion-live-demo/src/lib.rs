@@ -411,7 +411,7 @@ pub fn run_frames_draining(
         s.me_onsets += ctx.onset as u32;
         s.yields += ctx.yield_now as u32;
         s.lean_in_frames += ho.lean_in_audible() as u32;
-        s.soft_hum_frames += (ctx.cue == Cue::SoftBreath && !(ctx.voiced && !ctx.yield_now)) as u32;
+        s.soft_hum_frames += ((ctx.yield_now || !ctx.voiced) && ctx.cue == Cue::SoftBreath) as u32;
         let rec = FrameRecord {
             index: i,
             t_ms: i * FRAME_MS,
