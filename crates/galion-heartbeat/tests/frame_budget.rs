@@ -16,7 +16,7 @@ fn granted() -> DefaultConsentGate {
     g
 }
 
-fn frame<'a>(pcm: &'a [f32], late: bool, me_speaking: bool) -> galion_heartbeat::FrameIn<'a> {
+fn frame(pcm: &[f32], late: bool, me_speaking: bool) -> galion_heartbeat::FrameIn<'_> {
     FrameIn {
         you_pcm: pcm,
         affect: None,
@@ -31,7 +31,7 @@ fn frame<'a>(pcm: &'a [f32], late: bool, me_speaking: bool) -> galion_heartbeat:
 
 /// ceil(n * numer/denom) - 1, clamped. Rank index into an ascending sample.
 fn rank(n: usize, numer: usize, denom: usize) -> usize {
-    let ceil = (n * numer + denom - 1) / denom;
+    let ceil = (n * numer).div_ceil(denom);
     ceil.saturating_sub(1).min(n - 1)
 }
 

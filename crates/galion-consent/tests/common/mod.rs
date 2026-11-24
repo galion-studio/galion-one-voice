@@ -6,6 +6,7 @@
 #![allow(dead_code)]
 
 use galion_consent::{sha256, weight_files, Env};
+use std::fmt::Write;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -80,7 +81,11 @@ pub fn fields(persona: &str, sha: &str, seconds: f64) -> Vec<(String, String)> {
 }
 
 pub fn render(fields: &[(String, String)]) -> String {
-    fields.iter().map(|(k, v)| format!("{k}: {v}\n")).collect()
+    let mut out = String::new();
+    for (k, v) in fields {
+        let _ = writeln!(out, "{k}: {v}");
+    }
+    out
 }
 
 impl Tree {
