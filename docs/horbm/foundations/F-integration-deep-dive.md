@@ -9,7 +9,7 @@ Owner: Mate Grajczyk. Nothing in this note merges a pull request.
 |---|---|---|---|
 | R4 plan, PR #207 | `cursor/horbm-r4-cpu-realtime-2180` | `dd902bbcfe34e23f63745a19fc2fed8e468a3b09` | Closed, not merged. Not on `main`. |
 | Phase 3 int8 arena, PR #249 | `main` | `204fd8cd6e399d0e1cced23c595214be94de1f57` | Merged. `crates/horbm-keys`. |
-| Phase 4 brain, PR #252 | `cursor/horbm-phase4-brain-70b3` | `6eb04d2980f39b83bcf4d4a0fec2c74e34b3611c` | Open. Base was `4759d419`, before the arena landed. |
+| Phase 4 brain, PR #252 | `cursor/horbm-phase4-brain-70b3` | `98814d5197aa27743e98f54b6dcb528a3be869bb` | Rebased onto `main` at `4b828b6` (#249 and #250). The rebase conflict is `Cargo.lock` plus the cascade re-exports that #250 added; both sides are kept. |
 | Retrieval cell, PR #253 | `cursor/f2-retrieval-thread-3cd7` | `de26ba67db0d0eba83a0e66f1630b71da9e19d72` | Open. Clean against `204fd8cd` before this branch. |
 | Diary face, galion-knowledge PR #36 | `cursor/horbm-memory-git-face-3cd7` | `974e594444448597741372fef578142c46d28566` | Open. Not merged. Voice PR #253 pins this SHA. |
 | Alternate phase 2, PR #251 | `cursor/horbm-phase2-retrieval-24dc` | `5b69340344a839149b120ceba761f5ad5108a9f1` | Open. Superseded by #253. Not in this branch. |
@@ -64,7 +64,7 @@ The git pin is knowledge `974e5944`, the head of unmerged PR #36, not `master` `
 - `Brain::turn` on #252 picks a knowledge-card gist. A card miss can still call the research port on a deep question. The 7881 process copies `reply` only. `first_clause` does not reach the mouth.
 - `RetrievalAdapter` and `KeyAdapter` are function pointers. The features `retrieval` and `keys` compile a status string. They do not path-depend on a crate. #252’s summary is right: the plugs were not linked, because those crates were not on that branch.
 
-`merge-tree` of #252 onto `main` at `204fd8cd` conflicts only in the root `Cargo.lock` (both sides insert a package before `ident_case`: `horbm-keys` on main, `horbm-brain` on #252). No other file conflicts with main. Merging #252 onto #253 also conflicts in `horbm/Cargo.lock` and `horbm/crates/horbm/src/lib.rs` (the re-exports). This branch keeps both.
+Rebased onto `main` at `4b828b6`. The root `Cargo.lock` keeps `horbm-keys` and `horbm-brain`. `galion-cascade` keeps the domain 04 stamps from #250 and the `HorbmChat` re-export from #252. `cargo metadata --locked` accepts that lock.
 
 `galion-cores` affinity now compiles on non-Unix targets: `sched_setaffinity` is Unix-only, and elsewhere `apply_affinity` leaves the inherited mask. That was the first error under `--features cascade` on `x86_64-pc-windows-gnu`. The speech workers are still next.
 
@@ -94,11 +94,11 @@ Root crate `horbm-retrieval` plus a vendored `third_party/horbm-memory` pinned a
 
 `merge-tree` against #253 shares no paths. The APIs cannot both be the call Swarm 4 makes. #253 is the one F3 and F4 name (`Idle` / `Miss` / `Hits`, `clause()`, string `item_id`, `Int8Scorer`). This branch does not merge #251.
 
-A throwaway merge of #251 onto `204fd8cd` did not fail `cargo test -p horbm-retrieval -- --test-threads=1` (6 passed) or `cargo test -p horbm-keys` (7 passed, scalar and with the SIMD features). The “1 failing test” was not reproduced on that merge. Vendored package tests under `third_party/horbm-memory` are outside the workspace. `whole::addon_shard_manifest_matches_shard_manifest` panics on a missing `../shards/manifest.json` before its assertion, and `whole::imports_the_real_pack_and_keeps_every_field` expects `../data/cards`. Those paths were not vendored. A workspace test run does not execute them. No fix was applied to #251.
+A throwaway merge of #251 onto `204fd8cd` did not fail `cargo test -p horbm-retrieval -- --test-threads=1` (6 passed) or `cargo test -p horbm-keys` (7 passed, scalar and with the SIMD features). The “1 failing test” was not reproduced on that merge. Vendored package tests under `third_party/horbm-memory` are outside the workspace. No fix was applied to #251. The deny, fixture, withdraw, and no-disk checks already exist on #253. The stopword-only ask from #251 is now a granted miss on this branch (`stopwords_alone_are_a_miss_and_write_nothing`). The superseded behavior, where a denied `query` still returned hits, was not ported. #253 reuses `horbm-memory` by git revision and does not vendor `third_party/horbm-memory`.
 
 ## What this branch wires
 
-Base of the branch: `main` at `204fd8cd` (PR #249). The branch then merges #253 (`de26ba67`) and #252 (`6eb04d29`) and adds the integration commits. GitHub cannot stack one PR on two sibling parents. The pull request’s base is `main`. Do not merge #252, #253, knowledge #36, or this pull request from this work.
+Base of the branch: rebased PR #252 at `98814d5`, which itself sits on `main` at `4b828b6` (#249 and #250). This branch then merges #253 (`de26ba67`) and adds the integration commits. The pull request’s GitHub base is `main`. Do not merge #252, #253, knowledge #36, or this pull request from this work.
 
 `Brain::turn`, when a `RetrievalThread` is attached:
 
