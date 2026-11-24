@@ -15,6 +15,12 @@
 //! already had. While sensing is on, a filler or an unfinished word holds
 //! the floor through a short pause, and a finished word yields on a falling
 //! contour with an energy drop, or on a rising question contour.
+//!
+//! [`ListenCue`] is the listening slot beside that decision. A mild
+//! clause-final fall with a short pause is still [`TurnMsg::Hold`]: the
+//! user has not given the floor away. A strong fall, a long pause, and a
+//! question rise are yields, and the cue on those frames is [`ListenCue::None`].
+//! The speaker, not this scorer, decides whether a cue becomes a sound.
 
 use std::collections::VecDeque;
 
@@ -32,6 +38,24 @@ pub enum TurnMsg {
     Hold,
     /// The user has finished. `question` is a rising terminal contour.
     Yield { question: bool },
+}
+
+/// Whether this frame is a place to nod while the user still holds the floor.
+///
+/// The scorer does not play audio. A [`ListenCue::ClauseFall`] is only
+/// reported together with [`TurnMsg::Hold`]. [`TurnMsg::Yield`] and
+/// [`TurnMsg::PauseOnly`] clear the cue: one is taking the turn, the other
+/// has no contour.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ListenCue {
+    /// Mid-word, flat, denied, or a yield. Not a backchannel slot.
+    None,
+    /// Clause-final fall, finished word, short pause, turn still held.
+    ClauseFall,
+    /// Rising question contour. Never a backchannel.
+    QuestionRise,
+    /// Filler or an unfinished word. Never a backchannel.
+    Filler,
 }
 
 /// The numbers the scorer reads. One row of `eot.toml`.
@@ -88,6 +112,7 @@ pub struct Scorer {
     tail: VecDeque<Voiced>,
     /// Pause length of the latest unvoiced frame. A new phrase clears the tail.
     gap_ms: u32,
+    listen: ListenCue,
 }
 
 impl EotConfig {
@@ -198,6 +223,7 @@ impl Scorer {
             cfg,
             tail: VecDeque::new(),
             gap_ms: 0,
+            listen: ListenCue::None,
         }
     }
 
@@ -209,6 +235,11 @@ impl Scorer {
         &self.cfg
     }
 
+    /// Listening slot for the frame just pushed. [`ListenCue::None`] until then.
+    pub fn listen(&self) -> ListenCue {
+        self.listen
+    }
+
     /// One ear result plus the latest ASR partial.
     ///
     /// [`FrameOut::Denied`] clears the contour and returns [`TurnMsg::PauseOnly`].
@@ -218,9 +249,13 @@ impl Scorer {
             FrameOut::Denied => {
                 self.tail.clear();
                 self.gap_ms = 0;
+                self.listen = ListenCue::None;
                 TurnMsg::PauseOnly
             }
-            FrameOut::Rejected => TurnMsg::Hold,
+            FrameOut::Rejected => {
+                self.listen = ListenCue::None;
+                TurnMsg::Hold
+            }
             FrameOut::Heard(frame) => self.push_cue(ProsodyCue::from(&frame), partial),
         }
     }
@@ -247,11 +282,14 @@ impl Scorer {
                 }
             }
             self.gap_ms = 0;
-            // The word is still sounding. Yield waits for the pause.
+            // The word is still sounding. A nod waits for the pause.
+            self.listen = ListenCue::None;
             return TurnMsg::Hold;
         }
         self.gap_ms = cue.pause_ms;
-        self.decide(partial, cue.pause_ms)
+        let turn = self.decide(partial, cue.pause_ms);
+        self.listen = self.classify_listen(partial, cue.pause_ms, turn);
+        turn
     }
 
     fn decide(&self, partial: &str, pause_ms: u32) -> TurnMsg {
@@ -270,21 +308,9 @@ impl Scorer {
             return TurnMsg::Hold;
         }
 
-        let early = self.tail.front().map(|s| s.f0).unwrap_or(0.0);
-        let late = self.tail.back().copied().unwrap_or(Voiced {
-            f0: 0.0,
-            energy: 0.0,
-            rate: 0.0,
-        });
-        let semis = semitones(early, late.f0);
-        let peak = self
-            .tail
-            .iter()
-            .map(|s| s.energy)
-            .fold(0.0f32, f32::max)
-            .max(1.0e-6);
-        let energy_drop = late.energy / peak <= self.cfg.energy_ratio;
-        let pace_drop = pace_dropped(&self.tail, self.cfg.pace_min_hz, self.cfg.pace_drop_ratio);
+        let Some((semis, energy_drop, pace_drop)) = self.contour() else {
+            return TurnMsg::Hold;
+        };
         let strong = semis <= -self.cfg.strong_fall_semitones && energy_drop;
         let mild = semis <= -self.cfg.fall_semitones && energy_drop && !pace_drop;
         let question = semis >= self.cfg.rise_semitones;
@@ -302,6 +328,58 @@ impl Scorer {
             return TurnMsg::Yield { question: false };
         }
         TurnMsg::Hold
+    }
+
+    /// Semitones across the tail, whether energy fell, and whether pace fell.
+    /// `None` when the tail is shorter than the configured minimum.
+    fn contour(&self) -> Option<(f32, bool, bool)> {
+        if self.tail.len() < self.cfg.min_voiced {
+            return None;
+        }
+        let early = self.tail.front().map(|sample| sample.f0).unwrap_or(0.0);
+        let late = self.tail.back().copied().unwrap_or(Voiced {
+            f0: 0.0,
+            energy: 0.0,
+            rate: 0.0,
+        });
+        let semis = semitones(early, late.f0);
+        let peak = self
+            .tail
+            .iter()
+            .map(|sample| sample.energy)
+            .fold(0.0f32, f32::max)
+            .max(1.0e-6);
+        let energy_drop = late.energy / peak <= self.cfg.energy_ratio;
+        let pace_drop = pace_dropped(&self.tail, self.cfg.pace_min_hz, self.cfg.pace_drop_ratio);
+        Some((semis, energy_drop, pace_drop))
+    }
+
+    /// Clause edge while the turn is still held. A yield has already decided
+    /// the user is done, so it is not a place to nod.
+    fn classify_listen(&self, partial: &str, pause_ms: u32, turn: TurnMsg) -> ListenCue {
+        if !matches!(turn, TurnMsg::Hold) || pause_ms == 0 {
+            return ListenCue::None;
+        }
+        let Some(word) = last_word(partial) else {
+            return ListenCue::None;
+        };
+        if self.cfg.holds(&word) {
+            return ListenCue::Filler;
+        }
+        let Some((semis, energy_drop, pace_drop)) = self.contour() else {
+            return ListenCue::None;
+        };
+        if semis >= self.cfg.rise_semitones {
+            return ListenCue::QuestionRise;
+        }
+        // Mild clause fall: past one quiet frame, not yet the 160 ms yield.
+        // A strong fall yields on that first quiet frame, so it never lands
+        // here. A pace drop is a hesitation, not a clause edge.
+        let fell = semis <= -self.cfg.fall_semitones && energy_drop && !pace_drop;
+        if fell && pause_ms >= self.cfg.yield_pause_ms && pause_ms < self.cfg.mild_pause_ms {
+            return ListenCue::ClauseFall;
+        }
+        ListenCue::None
     }
 }
 
@@ -478,7 +556,50 @@ mod tests {
         let mut scorer = Scorer::bundled();
         scorer.push_cue(cue(true, 200.0, 0.2, 3.0, 0), "ready");
         assert_eq!(scorer.push(FrameOut::Denied, "ready"), TurnMsg::PauseOnly);
+        assert_eq!(scorer.listen(), ListenCue::None);
         assert!(scorer.tail.is_empty());
         assert_eq!(scorer.push(FrameOut::Rejected, "ready"), TurnMsg::Hold);
+        assert_eq!(scorer.listen(), ListenCue::None);
+    }
+
+    #[test]
+    fn a_mild_clause_fall_is_a_hold_and_a_rise_or_filler_is_not() {
+        let partial = "I walked down to the market";
+        let mut mild = Scorer::bundled();
+        for (f0, energy) in [(200.0, 0.20), (193.0, 0.16), (186.0, 0.12), (180.0, 0.08)] {
+            assert_eq!(
+                mild.push_cue(cue(true, f0, energy, 3.0, 0), partial),
+                TurnMsg::Hold
+            );
+            assert_eq!(mild.listen(), ListenCue::None, "mid-word");
+        }
+        assert_eq!(mild.push_cue(quiet(80), partial), TurnMsg::Hold);
+        assert_eq!(mild.listen(), ListenCue::ClauseFall);
+        assert_eq!(
+            mild.push_cue(quiet(160), partial),
+            TurnMsg::Yield { question: false }
+        );
+        assert_eq!(mild.listen(), ListenCue::None, "a yield is not a nod");
+
+        let mut rise = Scorer::bundled();
+        let question = "is the kettle ready";
+        for (f0, energy) in [(140.0, 0.22), (165.0, 0.22), (195.0, 0.22), (230.0, 0.22)] {
+            rise.push_cue(cue(true, f0, energy, 3.0, 0), question);
+        }
+        assert_eq!(rise.push_cue(quiet(40), question), TurnMsg::Hold);
+        assert_eq!(rise.listen(), ListenCue::QuestionRise);
+        assert_eq!(
+            rise.push_cue(quiet(80), question),
+            TurnMsg::Yield { question: true }
+        );
+        assert_eq!(rise.listen(), ListenCue::None);
+
+        let mut filler = Scorer::bundled();
+        let um = "I was going to um...";
+        for (f0, energy) in [(180.0, 0.2), (160.0, 0.12), (140.0, 0.06), (120.0, 0.04)] {
+            filler.push_cue(cue(true, f0, energy, 3.0, 0), um);
+        }
+        assert_eq!(filler.push_cue(quiet(80), um), TurnMsg::Hold);
+        assert_eq!(filler.listen(), ListenCue::Filler);
     }
 }

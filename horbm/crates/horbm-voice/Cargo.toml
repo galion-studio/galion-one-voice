@@ -27,3 +27,6 @@ gpu = []
 horbm = { path = "../horbm" }
 galion-tts-piper = { path = "../../../voice-stack/tts-piper-stream", optional = true }
 galion-sam-asr = { path = "../../../voice-stack/asr", optional = true }
+
+[dev-dependencies]
+horbm-ear = { path = "../../../crates/horbm-ear" }

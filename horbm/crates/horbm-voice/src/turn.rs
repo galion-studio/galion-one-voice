@@ -2,12 +2,13 @@
 // Copyright (c) 2026 Galion Labs
 //! Ear, then the HORBM turn, then the mouth. One call is one conductor frame.
 
+use crate::backchannel::{Backchannel, BackchannelConfig, ListenCue, ListenMood, ListenPolicy};
 use crate::brain::TurnBrain;
 use crate::clock::{VirtualClock, BARGE_IN_MAX_MS, FRAME_MS, PAUSE_MS};
 use crate::device::{place, Place};
 use crate::ear::{Ear, EarEvent};
 use crate::lexicon::is_listed_backchannel;
-use crate::mouth::{AudioFrame, Mouth, MouthPull};
+use crate::mouth::{AudioFrame, BackchannelPlay, Mouth, MouthPull};
 
 /// What this frame decided.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -17,6 +18,8 @@ pub enum TickEvent {
     FirstAudio,
     Backchannel,
     BargeIn,
+    /// Samantha nodded while the user kept the floor. Not a barge-in.
+    ListenBackchannel,
 }
 
 /// End-of-turn message from the ear prosody scorer.
@@ -51,6 +54,8 @@ pub struct TickOut {
     pub place: Place,
     /// True when this frame's yield was a rising terminal contour.
     pub end_question: bool,
+    /// A listening nod on this frame. The user's turn is still open.
+    pub backchannel: Option<Backchannel>,
 }
 
 /// The turn loop. `epoch` starts at 1, matching the conductor.
@@ -71,6 +76,7 @@ pub struct VoiceLoop<E, M, B> {
     barge_ms: Option<u64>,
     last_partial: String,
     frame_question: bool,
+    listen: ListenPolicy,
 }
 
 impl<E, M, B> VoiceLoop<E, M, B>
@@ -101,7 +107,27 @@ where
             barge_ms: None,
             last_partial: String::new(),
             frame_question: false,
+            listen: ListenPolicy::new(),
         }
+    }
+
+    /// Listening nods. Default is on. The host applies
+    /// [`BackchannelConfig::from_env`] for `GALION_BACKCHANNEL`.
+    pub fn set_backchannel_config(&mut self, config: BackchannelConfig) {
+        self.listen.enabled = config.enabled;
+    }
+
+    pub fn backchannel_enabled(&self) -> bool {
+        self.listen.enabled
+    }
+
+    /// Only `samantha` nods. Aria and clone-pack ids stay quiet.
+    pub fn set_persona(&mut self, persona: impl Into<String>) {
+        self.listen.set_persona(persona);
+    }
+
+    pub fn persona(&self) -> &str {
+        self.listen.persona()
     }
 
     pub fn epoch(&self) -> u64 {
@@ -141,8 +167,25 @@ where
     /// A yield starts the brain from the latest partial. The mouth still
     /// waits one frame before the first samples, the same gap a final uses.
     /// Hold leaves the mouth idle. Overlap after the mouth has started does
-    /// not consult the message.
+    /// not consult the message. This path does not nod: pass a cue to
+    /// [`Self::tick_listen`].
     pub fn tick_turn(&mut self, pcm: &[i16], turn: TurnMsg) -> TickOut {
+        self.tick_listen(pcm, turn, ListenCue::None, ListenMood::resting())
+    }
+
+    /// [`Self::tick_turn`] plus a listening cue and Samantha's moment.
+    ///
+    /// A nod is one quiet frame on the me band while the user still holds
+    /// the you band. It does not start the brain, does not mark the mouth as
+    /// speaking, and does not arm barge-in. Yield, a question rise, a filler,
+    /// and a denied ear (`PauseOnly`) do not nod.
+    pub fn tick_listen(
+        &mut self,
+        pcm: &[i16],
+        turn: TurnMsg,
+        cue: ListenCue,
+        mood: ListenMood,
+    ) -> TickOut {
         let t_ms = self.clock.t_ms();
         let heard = self.ear.poll(pcm);
         if self.silence_next {
@@ -154,13 +197,36 @@ where
         let mut event = TickEvent::None;
         let mut reply = None;
         self.frame_question = false;
+        let quiet = matches!(heard, EarEvent::Quiet);
+        if !self.speaking {
+            if let EarEvent::Partial(ref text) | EarEvent::End(ref text) = heard {
+                if !text.trim().is_empty() {
+                    self.listen.note_voiced(t_ms);
+                }
+            }
+        }
         self.on_ear(heard, t_ms, turn, &mut event, &mut reply);
 
         let mut audio = None;
+        let mut backchannel = None;
         if self.speaking && self.await_audio {
             self.await_audio = false;
         } else if self.speaking {
             audio = self.pull_audio(t_ms, &mut event);
+        } else {
+            let holding = quiet
+                && matches!(turn, TurnMsg::Hold)
+                && event == TickEvent::None
+                && !self.speaking;
+            backchannel = self.listen.consider(t_ms, quiet, holding, cue, mood);
+            if let Some(nod) = backchannel {
+                event = TickEvent::ListenBackchannel;
+                audio = Some(self.mouth.listen_backchannel(&BackchannelPlay {
+                    text: nod.text,
+                    kind: nod.kind,
+                    energy: nod.energy,
+                }));
+            }
         }
 
         let out = TickOut {
@@ -174,6 +240,7 @@ where
             reply,
             place: self.place,
             end_question: self.frame_question,
+            backchannel,
         };
         self.clock.advance();
         out
@@ -311,6 +378,7 @@ where
             reply: None,
             place: self.place,
             end_question: false,
+            backchannel: None,
         }
     }
 }
