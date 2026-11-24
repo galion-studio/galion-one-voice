@@ -1,0 +1,21 @@
+{
+  "processors": 8,
+  "arch": "x86_64",
+  "os": "linux",
+  "ram_total_mib": 16000,
+  "ram_free_mib": 8000,
+  "gpu": {
+    "name": "RTX 4090",
+    "total_mib": 24564,
+    "used_mib": 1000,
+    "free_mib": 23564
+  },
+  "worker_mib": 512,
+  "cap": 15,
+  "weights": true,
+  "mouth": true,
+  "llm": "local-gpu",
+  "rule": "gpu-room",
+  "line": "Obsidian has room for local weights.",
+  "at": "2026-11-18T12:00:00+01:00"
+}
