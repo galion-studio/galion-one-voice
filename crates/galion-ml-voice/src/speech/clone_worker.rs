@@ -131,7 +131,7 @@ impl CloneFrameDrain {
         // SAFETY: this slot is unpublished. The consumer does not read it
         // until `w` is release-stored below.
         unsafe {
-            *(&mut *self.buf.get()).get_unchecked_mut(w % RING_CAP) = sample;
+            *(*self.buf.get()).get_unchecked_mut(w % RING_CAP) = sample;
         }
         self.w.store(w.wrapping_add(1), Ordering::Release);
         true
@@ -145,10 +145,10 @@ impl CloneFrameDrain {
         if w.wrapping_sub(r) < CLONE_FRAME_SAMPLES {
             return false;
         }
-        for i in 0..CLONE_FRAME_SAMPLES {
+        for (i, slot) in out.iter_mut().enumerate() {
             // SAFETY: index `r + i` is inside the published range. The
             // producer does not reuse it until `r` advances below.
-            out[i] = unsafe { *(&*self.buf.get()).get_unchecked((r + i) % RING_CAP) };
+            *slot = unsafe { *(*self.buf.get()).get_unchecked((r + i) % RING_CAP) };
         }
         self.r
             .store(r.wrapping_add(CLONE_FRAME_SAMPLES), Ordering::Release);
@@ -315,7 +315,7 @@ fn superseded_original(persona: &str, digest: &str) -> bool {
         let Some(rest) = line.trim().strip_prefix('#') else {
             return false;
         };
-        let mut parts = rest.trim().split_whitespace();
+        let mut parts = rest.split_whitespace();
         let Some(row_persona) = parts.next() else {
             return false;
         };
@@ -957,18 +957,16 @@ impl CloneWorker {
             let _ = child.wait();
             return Err(VoiceError::Backend("clone worker pipes missing".into()));
         };
-        if let Err(e) =
+        if let Err(e) = {
+            #[cfg(unix)]
             {
-                #[cfg(unix)]
-                {
-                    set_nonblock(stdout.as_raw_fd()).and_then(|_| set_nonblock(stderr.as_raw_fd()))
-                }
-                #[cfg(not(unix))]
-                {
-                    Ok::<(), std::io::Error>(())
-                }
+                set_nonblock(stdout.as_raw_fd()).and_then(|_| set_nonblock(stderr.as_raw_fd()))
             }
-        {
+            #[cfg(not(unix))]
+            {
+                Ok::<(), std::io::Error>(())
+            }
+        } {
             let _ = child.kill();
             let _ = child.wait();
             return Err(VoiceError::Backend(format!("clone worker nonblock: {e}")));
@@ -1248,10 +1246,7 @@ impl CloneWorker {
     }
 
     pub fn is_alive(&mut self) -> bool {
-        match self.child.as_mut().map(|c| c.try_wait()) {
-            Some(Ok(None)) => true,
-            _ => false,
-        }
+        matches!(self.child.as_mut().map(|c| c.try_wait()), Some(Ok(None)))
     }
 
     /// One clause in, one PCM buffer out. Same process on every call.
@@ -1878,14 +1873,13 @@ pub fn jarvis_texture_enabled(persona: &str) -> bool {
     if persona_name(persona) != "jarvis" {
         return false;
     }
-    match std::env::var("GALION_JARVIS_TEXTURE")
-        .ok()
-        .as_deref()
-        .map(str::trim)
-    {
-        Some("0") | Some("false") | Some("off") => false,
-        _ => true,
-    }
+    !matches!(
+        std::env::var("GALION_JARVIS_TEXTURE")
+            .ok()
+            .as_deref()
+            .map(str::trim),
+        Some("0") | Some("false") | Some("off")
+    )
 }
 
 pub(crate) fn ref_sha(persona: &str) -> Option<String> {
@@ -2149,9 +2143,21 @@ mod tests {
         // Scratch dir under temp; renamed rather than deleted.
         let _ = std::fs::rename(&store, store.with_extension("off"));
     }
-    #[cfg(unix)]
-    use std::os::unix::fs::PermissionsExt;
     use std::process::{Command, Stdio};
+
+    fn make_executable(path: &std::path::Path) {
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut perm = std::fs::metadata(path).unwrap().permissions();
+            perm.set_mode(0o755);
+            std::fs::set_permissions(path, perm).unwrap();
+        }
+        #[cfg(not(unix))]
+        {
+            let _ = path;
+        }
+    }
 
     #[test]
     fn frame_matches_heartbeat() {
@@ -2569,9 +2575,7 @@ mod tests {
         std::fs::create_dir_all(&dir).unwrap();
         let script = dir.join("fake-clone.py");
         std::fs::write(&script, FAKE_CLONE).unwrap();
-        let mut perm = std::fs::metadata(&script).unwrap().permissions();
-        perm.set_mode(0o755);
-        std::fs::set_permissions(&script, perm).unwrap();
+        make_executable(&script);
         let before = entries(&dir);
         let mut w = CloneWorker::spawn_for_test(&script, CloneModel::Nano, "jarvis");
         let pid = w.pid();
@@ -2609,9 +2613,7 @@ mod tests {
         std::fs::create_dir_all(&dir).unwrap();
         let script = dir.join("marker-first.py");
         std::fs::write(&script, MARKER_FIRST).unwrap();
-        let mut perm = std::fs::metadata(&script).unwrap().permissions();
-        perm.set_mode(0o755);
-        std::fs::set_permissions(&script, perm).unwrap();
+        make_executable(&script);
         let mut w = CloneWorker::spawn(&script, CloneModel::Nano, "samantha").unwrap();
         let pcm = w.synthesize("hi").unwrap();
         assert_eq!(pcm.len(), 40_000, "80 KiB of s16le");
@@ -2796,7 +2798,8 @@ mod tests {
         let one = wire.step(&frame, bands, &mut me, Some(&mut ring));
         assert!(one.nano_frame);
         assert_eq!(one.clone_samples, galion_heartbeat::FRAME_SAMPLES as u16);
-        let expect = (1000 + (3 % 50)) as f32 / 32768.0;
+        // The stub packs `1000 + (n % 50)` and this utterance uses n = 3.
+        let expect = (1000 + 3) as f32 / 32768.0;
         assert!((me[0] - expect).abs() < 1e-6, "protocol tone, not a model");
         assert_eq!(ring.queued(), 2 * galion_heartbeat::FRAME_SAMPLES);
 
@@ -2990,9 +2993,7 @@ sys.stdin.buffer.readline()
         std::fs::create_dir_all(&dir).unwrap();
         let script = dir.join("stream-clone.py");
         std::fs::write(&script, STREAM_CLONE).unwrap();
-        let mut perm = std::fs::metadata(&script).unwrap().permissions();
-        perm.set_mode(0o755);
-        std::fs::set_permissions(&script, perm).unwrap();
+        make_executable(&script);
         let mut w = CloneWorker::spawn(&script, CloneModel::Nano, "samantha").unwrap();
         let frames = w.frames();
         let done = Arc::new(AtomicBool::new(false));
