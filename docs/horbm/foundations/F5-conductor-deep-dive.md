@@ -9,7 +9,7 @@ Perpetual Open MIT License. (c) 2026 Galion Labs.
 | Voice tree | `galion-studio/galion-one-voice` `main` `204fd8cd6e399d0e1cced23c595214be94de1f57` |
 | Plan | `docs/horbm/research/R4-cpu-realtime-integration.md` §11 on draft PR #207, head `dd902bbcfe34e23f63745a19fc2fed8e468a3b09`, branch `cursor/horbm-r4-cpu-realtime-2180`. The draft is closed and unmerged. |
 | Open inputs | PR #250 `cursor/horbm-f1-cascade-stamps-2163` @ `40917538faf0c5d415e5d94e44bec2b8439f4abc`. PR #252 `cursor/horbm-phase4-brain-70b3` @ `6eb04d2980f39b83bcf4d4a0fec2c74e34b3611c`. PR #253 `cursor/f2-retrieval-thread-3cd7` @ `de26ba67db0d0eba83a0e66f1630b71da9e19d72`. None of these are merged. |
-| This change | `crates/galion-conductor` and this note. `LOCKS.toml` is untouched. `SOUL.md` is not in this checkout. |
+| This change | `crates/galion-conductor`, this note, and one new gate in `LOCKS.toml`. `SOUL.md` is not in this checkout and was not created. |
 
 The dive was split four ways, then written up here: floor control already on `main`, the MnE contract and the frame step, the open phase interfaces, and the foundations, locks, and clocks.
 
@@ -65,7 +65,7 @@ Phase 2 (PR #253) says `RetrievalThread::ask` must not run inside the frame step
 
 F3 (`docs/horbm/foundations/F3-compute-audit.md` on `main`) already owns the int8 arena, the scalar dot, and the SIMD features on `galion-tensor`. This phase does not add a dot, a key file, or a `target-cpu` flag.
 
-`LOCKS.toml` `[clock] frame_ms = 80` and `[gates] barge_in_max_ms = 200` **[D]**. Neither file is edited. `SOUL.md` is absent.
+`LOCKS.toml` `[clock] frame_ms = 80` and `[gates] barge_in_max_ms = 200` **[D]**. Owner rule 2026-11-24 19:15 allows an edit when the architecture needs it. The phase 5 gate's second half, "no cancel on a listed backchannel", was not a key. This change adds `[gates] backchannel_cancels = false`. `barge_in_max_ms` stays 200. Consent stays deny. `scripts/check-locks.sh` now requires the new key. `SOUL.md` is absent and was not created: the conductor does not define a persona.
 
 ## 4. What landed
 
@@ -112,7 +112,9 @@ Host: Linux, rustc 1.83.0, this crate's `rust-version` is 1.83 so a 1.85 laptop 
 cargo test --manifest-path crates/galion-conductor/Cargo.toml -- --nocapture
 ```
 
-14 tests passed (6 in the library, 8 in `tests/phase_gate.rs`). The two lock lines:
+`bash scripts/check-locks.sh` prints `OK: all Eureka locks hold`. The conductor test `locks_file_matches_the_conductor_gate` reads `LOCKS.toml` and requires `barge_in_max_ms = 200`, `backchannel_cancels = false`, `frame_ms = 80`, and consent `default = "deny"`.
+
+15 tests passed (6 in the library, 9 in `tests/phase_gate.rs`). The two lock lines:
 
 ```text
 phase5 gate: barge_in_ms=160 limit_ms=200 clock=virtual frame_ms=80 result=pass
@@ -131,6 +133,8 @@ cargo test --manifest-path crates\galion-conductor\Cargo.toml -- --nocapture
 if ($LASTEXITCODE -ne 0) { throw "conductor gate failed" }
 cargo clippy --manifest-path crates\galion-conductor\Cargo.toml --all-targets -- -D warnings
 if ($LASTEXITCODE -ne 0) { throw "conductor clippy failed" }
+bash scripts/check-locks.sh
+if ($LASTEXITCODE -ne 0) { throw "locks failed" }
 ```
 
 Pass is the two `phase5 gate:` lines above, with `barge_in_ms` at most 200 and `cancel=false` on the backchannel line. Do not set `RUSTFLAGS` to `-C target-cpu=native`.
@@ -143,4 +147,6 @@ Pass is the two `phase5 gate:` lines above, with `barge_in_ms` at most 200 and `
 - Piper is unchanged. `t_tts_first_pcm` stays absent. The reaction is not speech audio.
 - The mixer's 800 ms yield and 240 ms resume are named (`MIXER_YIELD_MS`, `MIXER_RESUME_QUIET_MS`) and are not the cancel path. Cancel for a real interruption is the 200 ms lock. A listed backchannel never enters that path.
 - Galion Research is not on this path. Phase 6 is the side band.
+- `SOUL.md` was not added.
+- `LOCKS.toml` changes in this phase: comment on `gates.barge_in_max_ms` now says the yield is silence by 200 ms on the frame clock; new key `gates.backchannel_cancels = false`. No other lock value moved. Consent did not move.
 - Do not merge this pull request. The laptop test comes first.

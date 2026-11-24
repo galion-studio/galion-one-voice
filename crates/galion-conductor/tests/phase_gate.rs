@@ -213,6 +213,27 @@ fn a_wall_sleep_does_not_move_the_virtual_clock() {
 }
 
 #[test]
+fn locks_file_matches_the_conductor_gate() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../LOCKS.toml");
+    let text = std::fs::read_to_string(&path).expect("LOCKS.toml");
+    assert!(
+        text.contains("barge_in_max_ms = 200"),
+        "barge-in lock stays 200 ms"
+    );
+    assert!(
+        text.contains("backchannel_cancels = false"),
+        "a listed backchannel does not cancel"
+    );
+    assert!(text.contains("frame_ms = 80"));
+    assert!(
+        text.contains("default = \"deny\""),
+        "consent default stays deny"
+    );
+    assert_eq!(BARGE_IN_MAX_MS, 200);
+    assert_eq!(FRAME_MS, 80);
+}
+
+#[test]
 fn crate_sources_do_not_call_the_frame_step_or_read_a_wall_clock() {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
     let mut files = 0u32;
