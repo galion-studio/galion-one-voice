@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Galion Labs
+# Windows build of galion-cores and the voice-stack workspace.
+# vad stays excluded (ort). No model download. No deploy.
+
+name: voice-stack windows
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    name: galion-cores and voice-stack
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.85.0
+      - name: galion-cores
+        run: cargo test -p galion-cores
+      - name: voice-stack workspace
+        run: cargo test --manifest-path voice-stack/Cargo.toml --workspace

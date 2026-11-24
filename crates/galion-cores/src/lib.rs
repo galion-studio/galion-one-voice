@@ -287,10 +287,25 @@ pub fn format_cpu_list(cpus: &[usize]) -> String {
     out.join(",")
 }
 
+#[cfg(unix)]
 extern "C" {
     fn sched_setaffinity(pid: i32, cpusetsize: usize, mask: *const u64) -> i32;
 }
 
+#[cfg(windows)]
+#[link(name = "kernel32")]
+extern "system" {
+    fn GetCurrentThread() -> *mut core::ffi::c_void;
+    fn GetCurrentProcess() -> *mut core::ffi::c_void;
+    fn SetThreadAffinityMask(thread: *mut core::ffi::c_void, mask: usize) -> usize;
+    fn GetProcessAffinityMask(
+        process: *mut core::ffi::c_void,
+        process_mask: *mut usize,
+        system_mask: *mut usize,
+    ) -> i32;
+}
+
+#[cfg(unix)]
 fn mask_of(cpus: &[usize]) -> [u64; CPU_SET_BITS / 64] {
     let mut mask = [0u64; CPU_SET_BITS / 64];
     for &c in cpus {
@@ -301,38 +316,93 @@ fn mask_of(cpus: &[usize]) -> [u64; CPU_SET_BITS / 64] {
     mask
 }
 
-/// Pin a child to `cpus` with `sched_setaffinity` after fork, before exec.
-/// Empty `cpus` leaves the inherited mask.
+/// Pin a child to `cpus` before it starts.
+///
+/// On Unix this is `sched_setaffinity` in the forked child, before exec.
+/// On Windows `std::process::Command` has no pre-exec hook, so this is a
+/// no-op and the child keeps the process mask it inherits. Empty `cpus`
+/// leaves the inherited mask on every platform.
 pub fn apply_affinity(cmd: &mut Command, cpus: &[usize]) {
     if cpus.is_empty() {
         return;
     }
-    let mask = mask_of(cpus);
-    use std::os::unix::process::CommandExt;
-    // SAFETY: the closure runs in the forked child before exec and only makes
-    // one async-signal-safe syscall on a mask it owns by value.
-    unsafe {
-        cmd.pre_exec(move || {
-            if sched_setaffinity(0, std::mem::size_of_val(&mask), mask.as_ptr()) != 0 {
-                return Err(std::io::Error::last_os_error());
-            }
-            Ok(())
-        });
+    #[cfg(unix)]
+    {
+        let mask = mask_of(cpus);
+        use std::os::unix::process::CommandExt;
+        // SAFETY: the closure runs in the forked child before exec and only makes
+        // one async-signal-safe syscall on a mask it owns by value.
+        unsafe {
+            cmd.pre_exec(move || {
+                if sched_setaffinity(0, std::mem::size_of_val(&mask), mask.as_ptr()) != 0 {
+                    return Err(std::io::Error::last_os_error());
+                }
+                Ok(())
+            });
+        }
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = (cmd, cpus);
     }
 }
 
-/// Pin the **calling thread** (pid 0 = this thread on Linux) to `cpus`.
-/// Threads it spawns afterwards inherit the mask. Empty `cpus` is a no-op.
+/// Pin the calling thread to `cpus`.
+///
+/// Unix uses `sched_setaffinity` (pid 0 is this thread on Linux). Windows
+/// uses `SetThreadAffinityMask`. Threads spawned afterwards inherit the
+/// Unix mask; on Windows they inherit the process mask. Empty `cpus` is a
+/// no-op.
 pub fn pin_current_thread(cpus: &[usize]) -> std::io::Result<()> {
     if cpus.is_empty() {
         return Ok(());
     }
-    let mask = mask_of(cpus);
-    // SAFETY: plain syscall on a stack mask of the declared size.
-    if unsafe { sched_setaffinity(0, std::mem::size_of_val(&mask), mask.as_ptr()) } != 0 {
-        return Err(std::io::Error::last_os_error());
+    #[cfg(unix)]
+    {
+        let mask = mask_of(cpus);
+        // SAFETY: plain syscall on a stack mask of the declared size.
+        if unsafe { sched_setaffinity(0, std::mem::size_of_val(&mask), mask.as_ptr()) } != 0 {
+            return Err(std::io::Error::last_os_error());
+        }
+        Ok(())
     }
-    Ok(())
+    #[cfg(windows)]
+    {
+        pin_current_thread_windows(cpus)
+    }
+    #[cfg(not(any(unix, windows)))]
+    {
+        let _ = cpus;
+        Err(std::io::Error::new(
+            std::io::ErrorKind::Unsupported,
+            "thread affinity is not available on this platform",
+        ))
+    }
+}
+
+#[cfg(windows)]
+fn pin_current_thread_windows(cpus: &[usize]) -> std::io::Result<()> {
+    let mut bits: usize = 0;
+    for &cpu in cpus {
+        if cpu >= usize::BITS as usize {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "cpu index does not fit in a Windows thread affinity mask",
+            ));
+        }
+        bits |= 1usize << cpu;
+    }
+    if bits == 0 {
+        return Ok(());
+    }
+    // SAFETY: GetCurrentThread is a pseudo-handle for this thread.
+    // SetThreadAffinityMask changes only that thread. Zero means the call failed.
+    let prev = unsafe { SetThreadAffinityMask(GetCurrentThread(), bits) };
+    if prev == 0 {
+        Err(std::io::Error::last_os_error())
+    } else {
+        Ok(())
+    }
 }
 
 /// Pin the calling thread to `role`'s placement. Returns the placement used.
@@ -342,11 +412,46 @@ pub fn pin_current_thread_to(role: CoreRole) -> std::io::Result<RolePlacement> {
     Ok(p)
 }
 
-/// This thread's allowed cores, from `/proc/thread-self/status`.
+/// Cores this thread may run on.
+///
+/// Unix reads `Cpus_allowed_list` from `/proc/thread-self/status`. Windows
+/// reads the process mask via `GetProcessAffinityMask`. A Windows thread pin
+/// is not visible in that process mask.
 pub fn current_cpus() -> Option<Vec<usize>> {
-    let s = std::fs::read_to_string("/proc/thread-self/status").ok()?;
-    let line = s.lines().find(|l| l.starts_with("Cpus_allowed_list:"))?;
-    parse_cpu_list(line.split_once(':')?.1)
+    #[cfg(unix)]
+    {
+        let s = std::fs::read_to_string("/proc/thread-self/status").ok()?;
+        let line = s.lines().find(|l| l.starts_with("Cpus_allowed_list:"))?;
+        parse_cpu_list(line.split_once(':')?.1)
+    }
+    #[cfg(windows)]
+    {
+        current_cpus_windows()
+    }
+    #[cfg(not(any(unix, windows)))]
+    {
+        None
+    }
+}
+
+#[cfg(windows)]
+fn current_cpus_windows() -> Option<Vec<usize>> {
+    let mut process_mask = 0usize;
+    let mut system_mask = 0usize;
+    // SAFETY: both pointers refer to local slots. Zero means the call failed.
+    let ok = unsafe {
+        GetProcessAffinityMask(GetCurrentProcess(), &mut process_mask, &mut system_mask)
+    };
+    if ok == 0 {
+        return None;
+    }
+    let mut cpus = Vec::new();
+    for bit in 0..usize::BITS {
+        if process_mask & (1usize << bit) != 0 {
+            cpus.push(bit as usize);
+        }
+    }
+    (!cpus.is_empty()).then_some(cpus)
 }
 
 #[cfg(test)]
@@ -423,6 +528,7 @@ mod tests {
         assert_eq!(format_cpu_list(&[0, 1, 2, 6]), "0-2,6");
     }
 
+    #[cfg(unix)]
     #[test]
     fn affinity_lands_in_the_child_before_exec() {
         if usable_cpus() < 2 {
@@ -436,6 +542,7 @@ mod tests {
         assert!(text.trim_end().ends_with("\t1"), "{text}");
     }
 
+    #[cfg(unix)]
     #[test]
     fn current_thread_pin_is_per_thread() {
         if usable_cpus() < 2 {
@@ -450,5 +557,25 @@ mod tests {
         .unwrap();
         assert_eq!(inside, vec![0]);
         assert_eq!(current_cpus().unwrap(), before, "other threads keep their mask");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_thread_pin_uses_a_cpu_from_the_process_mask() {
+        let Some(cpus) = current_cpus() else {
+            return;
+        };
+        pin_current_thread(&[cpus[0]]).expect("SetThreadAffinityMask");
+        pin_current_thread(&cpus).expect("restore process mask bits");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_apply_affinity_still_runs_the_child() {
+        let mut cmd = Command::new("cmd");
+        cmd.arg("/C").arg("exit 0");
+        apply_affinity(&mut cmd, &[0]);
+        let status = cmd.status().expect("spawn");
+        assert!(status.success());
     }
 }
