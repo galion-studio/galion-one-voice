@@ -14,6 +14,7 @@ use horbm_brain::{
     classify, pick, split_clause, Answer, Heuristic, Retrieved, Retriever, SidebandMark,
 };
 
+use crate::dialogue::{DecideIn, Decision, Dialogue, DialogueConsent, ReplyPlan, TurnSnap};
 use crate::retrieve::{CellState, MemoryHitCell, RetrievalThread, RetrievedCells};
 use crate::route::{accept_line, route_heard, CardLookup, Gap, ResearchAsk, Speakable};
 use crate::{Pad, TurnOut, UNKNOWN_REPLY};
@@ -80,6 +81,7 @@ pub struct Brain {
     inner: InnerLife,
     retrieval: Option<RetrievalThread>,
     retrieval_epoch: u64,
+    dialogue: Dialogue,
 }
 
 struct Spoke {
@@ -88,6 +90,37 @@ struct Spoke {
     evidence: Vec<String>,
     lookup_us: u32,
     picked: Option<horbm_brain::Answer>,
+}
+
+struct Gathered {
+    spoke: Spoke,
+    gap: Option<Gap>,
+}
+
+fn effective_reply(spoke: &Spoke) -> &str {
+    if let Some(answer) = &spoke.picked {
+        if !answer.clause.trim().is_empty() {
+            return answer.clause.as_str();
+        }
+    }
+    spoke.reply.as_str()
+}
+
+fn apply_plan(spoke: Spoke, plan: ReplyPlan) -> Spoke {
+    match plan {
+        ReplyPlan::Keep => spoke,
+        ReplyPlan::Replace {
+            reply,
+            sources,
+            evidence,
+        } => Spoke {
+            reply,
+            sources,
+            evidence,
+            lookup_us: spoke.lookup_us,
+            picked: None,
+        },
+    }
 }
 
 impl Spoke {
@@ -170,6 +203,7 @@ impl Brain {
             inner: InnerLife::seeded(),
             retrieval: None,
             retrieval_epoch: 0,
+            dialogue: Dialogue::new(),
         }
     }
 
@@ -214,6 +248,52 @@ impl Brain {
 
     pub fn note_name(&mut self, name: &str, class: PronounClass) {
         self.empathy.note_name(name, class);
+        self.dialogue.note_name(name, class);
+    }
+
+    /// Layer 4 consent. Remember and learn start denied. Check-ins start off.
+    /// This does not open the retrieval diary and does not write a file.
+    pub fn set_dialogue_consent(&mut self, consent: DialogueConsent) {
+        self.dialogue.set_consent(consent);
+    }
+
+    pub fn dialogue_consent(&self) -> DialogueConsent {
+        self.dialogue.consent()
+    }
+
+    /// Store a callback. False when remember is denied. The text is not written.
+    pub fn note_callback(&mut self, text: &str) -> bool {
+        self.dialogue.note_callback(text)
+    }
+
+    pub fn callbacks(&self) -> &[String] {
+        self.dialogue.callbacks()
+    }
+
+    pub fn check_ins(&self) -> bool {
+        self.dialogue.check_ins()
+    }
+
+    /// The offline bandit. Off by default. Enabling it still does not count
+    /// a move until learn consent is granted, and the count does not steer.
+    pub fn set_bandit_enabled(&mut self, enabled: bool) {
+        self.dialogue.set_bandit_enabled(enabled);
+    }
+
+    pub fn bandit_updates(&self) -> u32 {
+        self.dialogue.bandit_updates()
+    }
+
+    pub fn bandit_counts(&self) -> [u32; 6] {
+        self.dialogue.bandit_counts()
+    }
+
+    pub fn ring_len(&self) -> usize {
+        self.dialogue.ring_len()
+    }
+
+    pub fn ring_get(&self, index: usize) -> Option<&TurnSnap> {
+        self.dialogue.ring_get(index)
     }
 
     pub fn gaps(&self) -> &[Gap] {
@@ -293,14 +373,15 @@ impl Brain {
     }
 
     /// Empathy mood, then the retrieval cell when a thread is attached,
-    /// then cards, then the fixture on an idle cell, then the gateway, then
-    /// [`crate::UNKNOWN_REPLY`].
+    /// then cards, then the fixture on an idle cell, then the gateway.
+    /// Layer 4 then picks the move. [`Self::finish`] splits the clause.
     ///
     /// A granted hit speaks [`crate::MemoryHit::clause`]. A granted miss
     /// speaks [`crate::UNKNOWN_REPLY`] and does not call research. `Idle`
     /// means `remember` is denied: the diary is not opened, and the committed
     /// fixture still answers when the cards miss. This waits for the retrieval
-    /// thread. Do not call it from `Heartbeat::step`.
+    /// thread. Do not call it from `Heartbeat::step`. Barge-in is not this
+    /// function.
     pub fn turn(&mut self, text: &str) -> TurnOut {
         let started = Instant::now();
         let heard = text.trim();
@@ -319,15 +400,39 @@ impl Brain {
             prep.query.as_str()
         };
         if query.is_empty() {
-            return self.finish(query, started, Spoke::empty());
+            return self.finish(query, started, Spoke::empty(), &Decision::pass());
         }
         let query_owned = query.to_string();
-        if let Some(spoke) = self.retrieval_spoke(&query_owned) {
-            return self.finish(&query_owned, started, spoke);
+        let gathered = self.gather(&query_owned);
+        let reply = effective_reply(&gathered.spoke).to_string();
+        let sources = gathered.spoke.sources.clone();
+        let decision = self.dialogue.decide(DecideIn {
+            heard,
+            intent: self.meta.intent,
+            reply: &reply,
+            sources: &sources,
+            arousal: self.meta.arousal,
+            valence: self.meta.valence,
+            dominance: self.meta.dominance,
+            e: self.meta.e,
+        });
+        if matches!(decision.plan(), ReplyPlan::Keep) {
+            if let Some(gap) = gathered.gap {
+                self.gaps.push(gap);
+            }
+        }
+        let spoke = apply_plan(gathered.spoke, decision.plan().clone());
+        self.finish(&query_owned, started, spoke, &decision)
+    }
+
+    /// Retrieval, cards, the idle fixture, then the gateway. No reply split.
+    fn gather(&mut self, query: &str) -> Gathered {
+        if let Some(spoke) = self.retrieval_spoke(query) {
+            return Gathered { spoke, gap: None };
         }
         let lookup_started = Instant::now();
         let picked = pick(
-            &query_owned,
+            query,
             &CardRetriever {
                 cards: self.cards.as_ref(),
                 speakable: self.speakable,
@@ -338,21 +443,20 @@ impl Brain {
         let lookup_us = elapsed_us(lookup_started.elapsed());
         if picked.hit {
             let source = format!("card:{}", picked.id);
-            return self.finish(
-                &query_owned,
-                started,
-                Spoke {
+            return Gathered {
+                spoke: Spoke {
                     reply: String::new(),
                     sources: vec![source.clone()],
                     evidence: vec![source],
                     lookup_us,
                     picked: Some(picked),
                 },
-            );
+                gap: None,
+            };
         }
         if self.retrieval.is_some() {
-            if let Some(spoke) = fixture_spoke(&query_owned) {
-                return self.finish(&query_owned, started, spoke);
+            if let Some(spoke) = fixture_spoke(query) {
+                return Gathered { spoke, gap: None };
             }
         }
         let routed = match self.research.as_mut() {
@@ -364,20 +468,16 @@ impl Brain {
             ),
             None => route_heard(query, self.cards.as_ref(), None, self.speakable),
         };
-        if let Some(gap) = routed.gap.clone() {
-            self.gaps.push(gap);
-        }
-        self.finish(
-            query,
-            started,
-            Spoke {
+        Gathered {
+            gap: routed.gap,
+            spoke: Spoke {
                 reply: routed.spoken,
                 sources: routed.sources,
                 evidence: routed.evidence,
                 lookup_us: routed.lookup_us,
                 picked: None,
             },
-        )
+        }
     }
 
     /// `Some` for `Hits` and `Miss`. `None` for `Idle`, which is deny.
@@ -431,7 +531,7 @@ impl Brain {
         }
     }
 
-    fn finish(&self, query: &str, started: Instant, spoke: Spoke) -> TurnOut {
+    fn finish(&self, query: &str, started: Instant, spoke: Spoke, decision: &Decision) -> TurnOut {
         let Spoke {
             reply,
             sources,
@@ -458,8 +558,11 @@ impl Brain {
         TurnOut {
             reply,
             intent: self.meta.intent.to_string(),
-            arm: "none".to_string(),
-            propensity: 0.0,
+            arm: match decision.chosen {
+                Some(move_) => move_.as_str().to_string(),
+                None => "none".to_string(),
+            },
+            propensity: decision.propensity,
             evidence,
             sources,
             violations: 0,
@@ -720,7 +823,10 @@ mod tests {
         let out = brain.turn("where is the kettle");
         assert_eq!(out.reply, "I don't know.");
         assert_eq!(out.sources, vec!["honest:unknown".to_string()]);
-        assert_eq!(brain.retrieval_cell().unwrap().state, crate::CellState::Miss);
+        assert_eq!(
+            brain.retrieval_cell().unwrap().state,
+            crate::CellState::Miss
+        );
         assert_eq!(calls.load(Ordering::SeqCst), 0);
         assert!(brain.gaps().is_empty());
     }
@@ -774,6 +880,9 @@ mod tests {
         let out = brain.turn("where is the kettle");
         assert_eq!(out.reply, "The kettle is on the stove.");
         assert_eq!(out.sources, vec!["card:kettle".to_string()]);
-        assert_eq!(brain.retrieval_cell().unwrap().state, crate::CellState::Idle);
+        assert_eq!(
+            brain.retrieval_cell().unwrap().state,
+            crate::CellState::Idle
+        );
     }
 }

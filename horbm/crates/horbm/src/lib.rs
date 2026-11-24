@@ -36,6 +36,13 @@
 //! core. Neither call rewrites the empathy mood or the voice baseline.
 //! Learning a new care stays off while `LOCKS.toml` `[consent] learn` is deny.
 //!
+//! Layer 4 runs after that evidence is in hand and before the reply is split
+//! into clauses. It picks one move: answer, cite, ask, comfort, offer_topic,
+//! or stop. The heuristic is deterministic. An answer with no sourced card
+//! becomes ask, and the spoken miss stays [`UNKNOWN_REPLY`]. Check-ins are
+//! off. The offline bandit is off and does not count a move unless learn
+//! consent is granted. Callbacks are stored only when remember is granted.
+//!
 //! [`RetrievalThread`] links `horbm-memory` in-process, off the heartbeat
 //! thread. Do not call [`Brain::turn`] from `Heartbeat::step`: the turn waits
 //! for the cell. [`Int8Scorer`] is implemented for the mapped key arena and
@@ -45,6 +52,7 @@
 
 mod brain;
 mod cards;
+mod dialogue;
 mod keys;
 mod retrieve;
 mod route;
@@ -54,6 +62,7 @@ pub use cards::{
     knowledge_dir_from_env, CardError, KnowledgeCards, LoadReport, LoadedPack,
     WINDOWS_KNOWLEDGE_DIR,
 };
+pub use dialogue::{flag_granted, DialogueConsent, Move, OfflineBandit, TurnSnap, RING_CAP};
 pub use galion_emotion_core::{
     ConductorCue, CoreError as EmotionError, EmotionCore, InnerLife, InnerTurn, IntentMsg,
     MomentState, VoiceBaseline, FRAME_MS as EMOTION_FRAME_MS,
