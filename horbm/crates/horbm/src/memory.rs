@@ -559,8 +559,7 @@ fn starts_with_ident(rest: &str) -> bool {
 }
 
 fn trim_separators(text: &str) -> &str {
-    text.trim_start_matches(|ch: char| matches!(ch, ':' | '-' | ',' | ';'))
-        .trim_start()
+    text.trim_start_matches([':', '-', ',', ';']).trim_start()
 }
 
 fn strip_this_or_that(text: &str) -> &str {
@@ -669,7 +668,7 @@ pub(crate) fn name_line(names: &[TrackedName]) -> Option<String> {
     if cleaned.is_empty() {
         return None;
     }
-    cleaned.sort_by(|left, right| left.0.cmp(&right.0).then(left.2.cmp(&right.2)));
+    cleaned.sort_by(|left, right| left.0.cmp(&right.0).then(left.2.cmp(right.2)));
     let rendered: Vec<String> = cleaned
         .into_iter()
         .map(|(_, text, class)| format!("{text} ({class})"))
