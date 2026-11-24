@@ -8,9 +8,10 @@
 //! is `horbm-memory` (`Store::open_in_memory` and `Store::search_lexical`).
 //! `Stack::open` is not used: it creates `revisions.sqlite`.
 //!
-//! `LOCKS.toml` `[consent] remember = "deny"`. This module does not read the
-//! lock file. The default matches it. `GALION_HORBM_REMEMBER=grant` is the
-//! explicit grant for a process that is allowed to open the diary.
+//! `LOCKS.toml` `[consent] remember = "deny"`. `[horbm] remember_grant` names
+//! the only grant string. This module does not read the lock file. The
+//! default matches it. `GALION_HORBM_REMEMBER=grant` is the explicit grant
+//! for a process that is allowed to open the diary.
 //!
 //! Do not call [`RetrievalThread::ask`], [`RetrievalThread::ask_wait`],
 //! [`RetrievalThread::set_remember`], or [`RetrievalThread::cell`] from
@@ -618,6 +619,19 @@ mod tests {
     #[test]
     fn cap_matches_the_diary() {
         assert_eq!(MEMORY_HIT_CAP, horbm_memory::MAX_HITS);
+    }
+
+    #[test]
+    fn locks_keep_remember_deny_and_name_the_retrieval_hot_path() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../LOCKS.toml");
+        let text = std::fs::read_to_string(&path).unwrap_or_else(|err| panic!("{}: {err}", path.display()));
+        assert!(text.contains("remember = \"deny\""), "consent remember");
+        assert!(text.contains("default = \"deny\""), "consent default");
+        assert!(text.contains("hot_path = \"retrieval\""));
+        assert!(text.contains("student_on_tick = false"));
+        assert!(text.contains("miss = \"I don't know.\""));
+        assert!(text.contains("remember_grant = \"GALION_HORBM_REMEMBER=grant\""));
+        assert_eq!(UNKNOWN_REPLY, "I don't know.");
     }
 
     #[test]
