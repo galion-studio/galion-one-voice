@@ -6,7 +6,7 @@ Perpetual Open MIT License. (c) 2026 Galion Labs.
 |---|---|
 | Swarm | S11, moment-to-moment emotion core. Roles: state, inside factors, intent wire, tests and this note. |
 | Written | 2026-11-24. No voice audio, no recording, no weight, no network call. |
-| Base | `main` `4b828b6`. |
+| Base | `main` `8caa52a`. Phase 4 clause pick and the phase 5 conductor stay as they are. This core adds the moment beside them. |
 | Crate | `crates/galion-emotion-core`. HORBM calls it from `horbm::Brain`. |
 | Locks | `LOCKS.toml` unchanged. `SOUL.md` is not in this tree; nothing was added. |
 
