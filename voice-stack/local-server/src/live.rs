@@ -760,7 +760,7 @@ struct ChildVad {
 impl ChildVad {
     fn spawn(bin: &Path) -> Result<Self, ()> {
         let mut cmd = if bin.extension().and_then(|s| s.to_str()) == Some("py") {
-            let mut cmd = Command::new("python3");
+            let mut cmd = Command::new(samantha_voice_clone::resolve_python());
             cmd.arg(bin);
             cmd
         } else {

@@ -233,35 +233,36 @@ where
         let (turns, turn_rx) = TurnMailbox::pair();
         let (chunk_tx, chunk_rx) = mpsc::channel(CHUNK_CHANNEL_BOUND);
 
-        let mut joins = Vec::with_capacity(5);
-        joins.push(tokio::spawn(capture(mic, frame_tx, shutdown_rx.clone())));
-        joins.push(tokio::spawn(listen(
-            vad,
-            frame_rx,
-            turns,
-            floor.clone(),
-            speaker.clone(),
-            shutdown_rx.clone(),
-        )));
-        joins.push(tokio::spawn(think(
-            asr,
-            reply,
-            turn_rx,
-            chunk_tx,
-            floor.clone(),
-            mood.clone(),
-            reports.clone(),
-            shutdown_rx.clone(),
-        )));
-        joins.push(tokio::spawn(speak(
-            tts,
-            chunk_rx,
-            speaker,
-            floor.clone(),
-            reports.clone(),
-            shutdown_rx.clone(),
-        )));
-        joins.push(tokio::spawn(mood_tick(mood, mood_tx, shutdown_rx)));
+        let joins = vec![
+            tokio::spawn(capture(mic, frame_tx, shutdown_rx.clone())),
+            tokio::spawn(listen(
+                vad,
+                frame_rx,
+                turns,
+                floor.clone(),
+                speaker.clone(),
+                shutdown_rx.clone(),
+            )),
+            tokio::spawn(think(ThinkIn {
+                asr,
+                reply,
+                turns: turn_rx,
+                chunks: chunk_tx,
+                floor: floor.clone(),
+                mood: mood.clone(),
+                reports: reports.clone(),
+                shutdown: shutdown_rx.clone(),
+            })),
+            tokio::spawn(speak(
+                tts,
+                chunk_rx,
+                speaker,
+                floor.clone(),
+                reports.clone(),
+                shutdown_rx.clone(),
+            )),
+            tokio::spawn(mood_tick(mood, mood_tx, shutdown_rx)),
+        ];
 
         Handle {
             phase_rx,
@@ -608,16 +609,29 @@ fn emit_turn(turns: &TurnMailbox, floor: &Floor, buf: &mut Vec<AudioFrame>, next
     }
 }
 
-async fn think<A: Asr, R: ReplyEngine, M: MoodTick>(
-    mut asr: A,
-    mut reply: R,
-    mut turns: TurnInbox,
+/// What [`Pipeline::spawn`] hands the think task. One struct keeps the task under clippy's argument limit.
+struct ThinkIn<A, R, M> {
+    asr: A,
+    reply: R,
+    turns: TurnInbox,
     chunks: mpsc::Sender<SpeakItem>,
     floor: Arc<Floor>,
     mood: Arc<Mutex<M>>,
     reports: Arc<Mutex<Vec<TurnReport>>>,
-    mut shutdown: watch::Receiver<bool>,
-) {
+    shutdown: watch::Receiver<bool>,
+}
+
+async fn think<A: Asr, R: ReplyEngine, M: MoodTick>(task: ThinkIn<A, R, M>) {
+    let ThinkIn {
+        mut asr,
+        mut reply,
+        mut turns,
+        chunks,
+        floor,
+        mood,
+        reports,
+        mut shutdown,
+    } = task;
     loop {
         let heard = tokio::select! {
             changed = shutdown.changed() => {
