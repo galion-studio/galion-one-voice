@@ -19,9 +19,15 @@ cascade = ["dep:galion-ml-voice", "galion-ml-voice/speech", "dep:galion-asr-vosk
 # Default build stays offline: galion-tensor with rayon off is std-only.
 # It is the S0 .gq reader. This crate does not download or write weights.
 galion-tensor = { path = "../galion-tensor", default-features = false }
+# Locked 80 ms quantum for the domain 04 stamp line. Default features stay off
+# so the presence harness is not pulled into the cascade.
+galion-heartbeat = { path = "../galion-heartbeat", default-features = false }
 # W21-03: optional path dep (workspace-local, offline, zero transitive deps).
 galion-ml-voice = { path = "../galion-ml-voice", optional = true }
 galion-asr-vosk = { path = "../galion-asr-vosk", optional = true }
+
+[[example]]
+name = "domain04_dry_run"
 
 [[example]]
 name = "student_probe"

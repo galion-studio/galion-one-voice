@@ -180,6 +180,7 @@ name = "galion-cascade"
 version = "0.0.1"
 dependencies = [
  "galion-asr-vosk",
+ "galion-heartbeat",
  "galion-ml-voice",
  "galion-tensor",
 ]
