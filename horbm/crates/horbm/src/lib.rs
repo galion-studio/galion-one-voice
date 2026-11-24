@@ -31,9 +31,10 @@
 //! core. Neither call rewrites the empathy mood or the voice baseline.
 //! Learning a new care stays off while `LOCKS.toml` `[consent] learn` is deny.
 //!
-//! [`Brain::boot`] reads a persona file once. The baseline numbers and the
-//! inner-life seed come from that file. With no path, the stand-in baseline
-//! and the stand-in seed stay. [`Brain::admit_move`] is the legal-move port.
+//! [`Brain::open`] and [`Brain::boot`] with no path load Samantha, the
+//! development persona. Aria stays in the repo and is not loaded. An explicit
+//! path replaces Samantha. An invalid file is refused. [`Brain::admit_move`]
+//! is the legal-move port.
 
 #![forbid(unsafe_code)]
 

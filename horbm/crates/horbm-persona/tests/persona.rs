@@ -61,6 +61,20 @@ fn fact(has_card: bool) -> MoveClaim<'static> {
 }
 
 #[test]
+fn development_default_is_samantha() {
+    let shipped = Persona::samantha().unwrap();
+    let file = load_example("samantha.toml");
+    assert_eq!(shipped, file);
+    assert_eq!(shipped.id(), "samantha");
+    let aria = load_example("aria.toml");
+    assert_eq!(aria.id(), "aria");
+    assert_ne!(shipped.id(), aria.id());
+    let text = std::fs::read_to_string(examples().join("aria.toml")).unwrap();
+    assert!(text.contains("Inactive"));
+    assert!(text.contains("Later"));
+}
+
+#[test]
 fn load_roundtrip() {
     for name in ["samantha.toml", "aria.toml"] {
         let persona = load_example(name);
@@ -360,6 +374,7 @@ fn example_files_carry_no_personal_data() {
         comments(&sam),
         vec![
             "# Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.",
+            "# Development default. Boot loads this file.",
             "# Test voice. Warm, curious, playful, honest, and emotionally attentive.",
             "# Not a recording. Not a measured person. No clip and no donor.",
         ]
@@ -368,6 +383,7 @@ fn example_files_carry_no_personal_data() {
         comments(&aria),
         vec![
             "# Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.",
+            "# Later. Inactive during development. Boot loads Samantha and does not load this file.",
             "# Test voice. Warmth and curiosity, with calm precision.",
             "# Playful, honest, emotionally attentive, steady at work.",
             "# Not a recording. Not a measured person. No clip and no donor.",

@@ -1,4 +1,5 @@
 # Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
+# Development default. Boot loads this file.
 # Test voice. Warm, curious, playful, honest, and emotionally attentive.
 # Not a recording. Not a measured person. No clip and no donor.
 schema = "galion-horbm-persona/1"

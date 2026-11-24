@@ -26,7 +26,7 @@ The couplings are stand-in knobs (`FATIGUE_AROUSAL` and the rest in `factors.rs`
 
 ## Intent, consent, ports
 
-`standins/` holds four fixed files (`persona.txt`, `memory.txt`, `inner-life.txt`, `intent.txt`), schema `galion-emotion-standin/1`. Memory is a stand-in. `persona.txt` is the fallback speaker when boot is given no persona file (`F-persona.md`). `inner-life.txt` seeds `InnerLife` on that same fallback (`F-inner-life.md`). The file and the memory cards do not move the moment. The intent script still expands to one `IntentMsg` per frame for `replay`.
+`standins/` holds four fixed files (`persona.txt`, `memory.txt`, `inner-life.txt`, `intent.txt`), schema `galion-emotion-standin/1`. Memory is a stand-in. `persona.txt` is this crate's closed-eval fixture. HORBM boot loads Samantha (`F-persona.md`). `inner-life.txt` seeds `InnerLife` for that fixture (`F-inner-life.md`). The file and the memory cards do not move the moment. The intent script still expands to one `IntentMsg` per frame for `replay`.
 
 `IntentMsg` is 72 bytes, magic `GEMI`, version 1, little-endian. The verb is an open ASCII token of at most 16 bytes, not a category. A pull is an offset from the baseline. Encode and decode are byte-identical for a valid message. The inner-life layer uses this message in both directions. It does not define another one.
 

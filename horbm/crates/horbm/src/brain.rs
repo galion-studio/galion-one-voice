@@ -129,7 +129,7 @@ impl Brain {
         research: Option<Box<dyn ResearchAsk + Send>>,
     ) -> Self {
         let card_count = cards.len();
-        let (emotion, inner, persona) = install(Persona::standin());
+        let (emotion, inner, persona) = install(development_persona());
         Self {
             empathy: Empathy::new(),
             cards: Box::new(cards),
@@ -151,8 +151,8 @@ impl Brain {
 
     /// Read the persona file once, then open cards the way [`Self::open`] does.
     ///
-    /// `None` keeps the stand-in baseline and the stand-in inner-life seed.
-    /// An unreadable or invalid file returns the error and does not build a brain.
+    /// `None` loads Samantha. An explicit path replaces her. An unreadable or
+    /// invalid file returns the error and does not build a brain.
     pub fn boot(
         memory_db: &Path,
         knowledge_dir: &Path,
@@ -161,7 +161,7 @@ impl Brain {
     ) -> Result<Self, PersonaError> {
         let persona = match persona_file {
             Some(path) => Persona::load(path)?,
-            None => Persona::standin(),
+            None => development_persona(),
         };
         let mut brain = Self::open(memory_db, knowledge_dir, cases);
         brain.install_persona(persona);
@@ -400,6 +400,10 @@ impl Brain {
             sideband,
         }
     }
+}
+
+fn development_persona() -> Persona {
+    Persona::samantha().expect("samantha.toml is the development persona")
 }
 
 fn install(persona: Persona) -> (EmotionCore, InnerLife, Persona) {

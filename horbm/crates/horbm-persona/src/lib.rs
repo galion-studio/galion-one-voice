@@ -33,6 +33,8 @@ pub const TOKEN_BYTES: usize = 16;
 pub const BOUNDARY_BYTES: usize = 24;
 /// The spoken miss. The same sentence the turn already uses.
 pub const UNKNOWN_LINE: &str = "I don't know.";
+/// Shipped development persona. Boot parses this text. Aria is not included.
+pub const SAMANTHA_TOML: &str = include_str!("../personas/samantha.toml");
 /// Heap allocations [`Persona::verdict`] and [`Persona::style`] may make.
 pub const TURN_ALLOC_BUDGET: usize = 0;
 
@@ -112,7 +114,7 @@ pub struct Persona {
 
 impl Persona {
     /// The emotion-core fixture: `VoiceBaseline::standin` and the seeded
-    /// inner life, plus the honesty rules. Used when boot is given no file.
+    /// inner life, plus the honesty rules. HORBM boot loads [`Self::samantha`].
     pub const fn standin() -> Self {
         let base = VoiceBaseline::standin();
         let style = style::hook(0.5, 0.4, 2);
@@ -151,6 +153,11 @@ impl Persona {
             want: pack_bytes(b"answer"),
             expect: pack_bytes(b"pause"),
         }
+    }
+
+    /// Samantha, the development persona. The same bytes as `personas/samantha.toml`.
+    pub fn samantha() -> Result<Self, PersonaError> {
+        Self::parse(SAMANTHA_TOML)
     }
 
     pub fn load(path: &std::path::Path) -> Result<Self, PersonaError> {

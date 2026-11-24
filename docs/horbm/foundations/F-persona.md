@@ -26,9 +26,9 @@ Schema `galion-horbm-persona/1`, `version = 1`. TOML. One file, one speaker, rea
 
 `[baseline]` is valence, arousal, dominance, approach, and `pitch_centre_hz`. The ranges match the emotion core. Pitch 216 is the design centre (432 / 2), passed through as a value, and is the same centre the stand-in uses. `Persona::baseline` copies the five numbers into a `VoiceBaseline`. The core stores that copy. The moment swings around it.
 
-`[inner]` is three tokens, each 1 to 16 lowercase letters: care, want, expect. `Persona::inner_life` passes them to `InnerLife::from_prose`. A single word is used as written, so `focus` becomes the care. Samantha and Aria use `heard`, `answer`, and `pause`, which fit the inner-life scanner. When `Brain::boot` is given no path, the seed is `InnerLife::seeded` and the baseline is `VoiceBaseline::standin`, the same values as `standins/inner-life.txt` and `standins/persona.txt`. An unreadable or invalid file is refused. Boot returns the error and leaves no brain. The stand-in runs only when the caller passes no path.
+`[inner]` is three tokens, each 1 to 16 lowercase letters: care, want, expect. `Persona::inner_life` passes them to `InnerLife::from_prose`. A single word is used as written, so `focus` becomes the care. Samantha uses `heard`, `answer`, and `pause`, which fit the inner-life scanner. `Brain::open` and `Brain::boot` with no path parse `personas/samantha.toml` (`Persona::samantha`). That is the development persona. An explicit path replaces her. An unreadable or invalid file is refused. Boot returns the error and leaves no brain.
 
-The example files are `horbm/crates/horbm-persona/personas/samantha.toml` and `aria.toml`. They are design knobs for two test voices. They carry no measured person, no performer, no donor, no clip, and no address.
+`personas/aria.toml` stays in the repo for later. It is inactive. Boot does not load it. Both files are design knobs. They carry no measured person, no performer, no donor, no clip, and no address. `VoiceBaseline::standin` remains the emotion-core fixture, not the speaker HORBM boots.
 
 ## Port
 

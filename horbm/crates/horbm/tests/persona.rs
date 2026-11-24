@@ -83,23 +83,27 @@ fn invalid_persona_refused_at_boot() {
 }
 
 #[test]
-fn boot_without_a_file_uses_the_stand_in() {
+fn boot_without_a_file_loads_samantha() {
     let root = scratch("none");
     std::fs::create_dir(&root).unwrap();
     let knowledge = root.join("knowledge");
     let brain = Brain::boot(&root, &knowledge, &root.join("cases"), None).unwrap();
     assert!(!knowledge.exists());
-    assert_eq!(brain.persona().id(), "standin-speaker");
-    assert_eq!(
+    assert_eq!(brain.persona().id(), "samantha");
+    assert_eq!(brain.emotion().baseline().persona_id(), "samantha");
+    assert_ne!(
         brain.emotion().baseline().identity_bits(),
         VoiceBaseline::standin().identity_bits()
     );
-    assert_eq!(*brain.inner(), InnerLife::seeded());
+    assert_eq!(brain.inner().care(0).unwrap().token_str(), "heard");
     assert_eq!(brain.admit_move(bare()), MoveVerdict::Forbid);
     assert_eq!(brain.persona().unknown_line(), UNKNOWN_REPLY);
     assert_eq!(UNKNOWN_LINE, UNKNOWN_REPLY);
-    let open = Brain::with_cards(NoCards, None);
-    assert_eq!(open.persona().id(), "standin-speaker");
+    let open = Brain::open(&root, &knowledge, &root.join("cases"));
+    assert_eq!(open.persona().id(), "samantha");
+    let cards = Brain::with_cards(NoCards, None);
+    assert_eq!(cards.persona().id(), "samantha");
+    assert_ne!(cards.persona().id(), "aria");
     let _ = std::fs::remove_dir_all(&root);
 }
 
