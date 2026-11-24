@@ -13,5 +13,6 @@ rust-version = "1.85"
 [dependencies]
 galion-research-gateway = { path = "../../../voice-stack/research-gateway" }
 galion-sam-empathy = { path = "../../../voice-stack/empathy" }
+galion-emotion-core = { path = "../../../crates/galion-emotion-core" }
 serde_json = "1"
 sha2 = "0.10"

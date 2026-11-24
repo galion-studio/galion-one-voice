@@ -1,0 +1,12 @@
+# Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
+# Stand-in fixture. Not a recording. Not a measured person.
+schema galion-emotion-standin/1
+kind persona
+
+id standin-speaker
+voice steady-rest
+valence 0.15
+arousal 0.35
+dominance 0.48
+approach 0.05
+pitch_centre_hz 216

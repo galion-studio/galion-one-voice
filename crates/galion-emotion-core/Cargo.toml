@@ -1,0 +1,11 @@
+# Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
+[package]
+name = "galion-emotion-core"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+publish = false
+description = "Moment-to-moment emotion core for MnE V2: an open flow on the 80 ms clock, baseline kept apart from the moment, inside factors, and a fixed intent message. CPU only."
+
+[dependencies]
+galion-emotion = { path = "../../galion-emotion" }

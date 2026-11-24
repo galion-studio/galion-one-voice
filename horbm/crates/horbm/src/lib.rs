@@ -16,6 +16,11 @@
 //! 3. A deep miss may ask the research gateway. The caller passes
 //!    [`RESEARCH_CAP`] (3 seconds). This crate dials nothing itself.
 //! 4. Anything still unanswered is exactly [`UNKNOWN_REPLY`]. No gap filler.
+//!
+//! Beside that turn, [`Brain::step_moment`] advances the moment-to-moment
+//! emotion core one 80 ms frame. Empathy mood and the moment are separate:
+//! `tick_frame` does not step the core, and `step_moment` does not rewrite
+//! the mood. [`Brain::conductor_cue`] is what the conductor reads.
 
 #![forbid(unsafe_code)]
 
@@ -27,6 +32,10 @@ pub use brain::{Brain, MoodMeta};
 pub use cards::{
     knowledge_dir_from_env, CardError, KnowledgeCards, LoadReport, LoadedPack,
     WINDOWS_KNOWLEDGE_DIR,
+};
+pub use galion_emotion_core::{
+    ConductorCue, CoreError as EmotionError, EmotionCore, IntentMsg, MomentState, VoiceBaseline,
+    FRAME_MS as EMOTION_FRAME_MS,
 };
 pub use galion_research_gateway::RESEARCH_CAP;
 pub use galion_sam_empathy::{Intent, PronounClass, FRAME_MS};
