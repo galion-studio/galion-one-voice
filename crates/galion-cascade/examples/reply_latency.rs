@@ -231,7 +231,7 @@ impl PiperSession {
     fn write_line(&mut self, text: &str) -> Option<()> {
         let line = format!(
             "{{\"text\":\"{}\"}}\n",
-            text.replace('\\', " ").replace('"', " ")
+            text.replace(['\\', '"'], " ")
         );
         self.stdin.write_all(line.as_bytes()).ok()?;
         self.stdin.flush().ok()

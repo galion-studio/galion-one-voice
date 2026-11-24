@@ -47,9 +47,11 @@ type DeleteWaveFn = unsafe extern "C" fn(*mut CstWave);
 
 #[cfg(unix)]
 struct Lib { text_to_wave: TextToWaveFn, delete_wave: DeleteWaveFn, voice: usize }
+#[cfg(unix)]
+type FliteSlot = (String, Result<Lib, String>);
 // Flite is not thread-safe: every call goes through LIBS' mutex.
 #[cfg(unix)]
-static LIBS: OnceLock<Mutex<Vec<(String, Result<Lib, String>)>>> = OnceLock::new();
+static LIBS: OnceLock<Mutex<Vec<FliteSlot>>> = OnceLock::new();
 
 /// Voices shipped by Debian/Ubuntu `libflite1`.
 pub const VOICES: &[&str] = &["slt", "kal16", "awb", "rms", "kal"];
