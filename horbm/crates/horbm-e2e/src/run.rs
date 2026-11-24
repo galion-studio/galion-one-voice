@@ -372,6 +372,7 @@ fn drive(
     let mut speech_end = None;
     let mut heard_voice = false;
     let mut first_audio = None;
+    let mut playing = false;
     let mut barge_onset = None;
     let mut conductor_barge_ms = None;
 
@@ -379,14 +380,23 @@ fn drive(
         note_end(frame, &mut heard_voice, &mut speech_end);
         let out = duplex.tick(frame).map_err(|err| err.to_string())?;
         note_audio(&mut first_audio, speech_end, duplex.mouth().buffered_at());
+        if out.me_first || out.event == LoopEvent::FirstAudio {
+            playing = true;
+        }
         note_barge(&out, &mut barge_onset, &mut conductor_barge_ms);
     }
+    // A stub mouth never stamps a wall-clock buffer time. Waiting on that
+    // stamp pulls the tone dry before the barge. Stop once a mouth frame
+    // has actually played.
     let mut extra = 0u32;
-    while first_audio.is_none() && extra < 30 {
+    while !playing && extra < 8 {
         let silence = vec![0i16; FRAME_SAMPLES];
         note_end(&silence, &mut heard_voice, &mut speech_end);
         let out = duplex.tick(&silence).map_err(|err| err.to_string())?;
         note_audio(&mut first_audio, speech_end, duplex.mouth().buffered_at());
+        if out.me_first || out.event == LoopEvent::FirstAudio {
+            playing = true;
+        }
         note_barge(&out, &mut barge_onset, &mut conductor_barge_ms);
         extra += 1;
     }
