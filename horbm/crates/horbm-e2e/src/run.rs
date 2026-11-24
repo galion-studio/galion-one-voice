@@ -146,7 +146,7 @@ impl Breath for LiveBreath {
                 BreathPhase::Exhale
             }
         };
-        let _ = std::hint::black_box(frame.glottis);
+        let _ = std::hint::black_box(frame.lungs());
         BreathCue { phase, speaking }
     }
 }

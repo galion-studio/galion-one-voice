@@ -15,9 +15,12 @@
 //!    80 ms frame. `speaking` is the me band. Quiet is the you band on that
 //!    same call: recover, do not spend the speech budget.
 //!
-//! [`GlottalAir`] is the whole interface for swarm S41. This crate does not
-//! link the articulation crates. S41's glottis reads `pressure` and `flow`
-//! once per frame and owns formants, open quotient, and F0.
+//! The lungs sample is [`galion_emotion_core::Breath`]: phase, volume, and
+//! flow. `galion-source-filter` (PR 305) reads that value in
+//! `MouthControls::from_moment` and mixes breath noise only while the phase
+//! is [`BreathPhase::Exhale`]. Pressure on the frame is the loudness
+//! envelope. It is not a second lungs type. This crate does not link the
+//! source-filter or the articulation crates.
 //!
 //! The hot path allocates nothing ([`TICK_ALLOC_BUDGET`]). Inhale noise is
 //! the heartbeat's seeded LCG, written into a caller buffer. No recording
@@ -38,7 +41,7 @@ use galion_emotion_core::{
     MASK_BREATH, VOLUME_REST,
 };
 
-pub use galion_emotion_core::{BreathPhase, FRAME_MS as EMOTION_FRAME_MS};
+pub use galion_emotion_core::{Breath, BreathPhase, FRAME_MS as EMOTION_FRAME_MS};
 pub use lungs::Lungs;
 pub use plan::{plan_pauses, Pause, PauseWhy, Plan};
 
@@ -295,27 +298,18 @@ pub fn loudness_gain(pressure: f32) -> f32 {
     }
 }
 
-/// Air for one glottal frame. S41 reads this and nothing else from the lungs.
-///
-/// `pressure` is relative subglottal drive during speech, and
-/// [`OPEN_PRESSURE`] while inhaling, releasing, holding, or resting.
-/// `flow` is +1 full inhale through −1 full exhale. Neither field is a
-/// litre or a cm H₂O measurement.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct GlottalAir {
-    pub pressure: f32,
-    pub flow: f32,
-}
-
 /// One 80 ms lungs frame.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Frame {
     pub phase: BreathPhase,
     /// Relative volume, 0..1. Not a litre.
     pub volume: f32,
-    /// +1 inhale through −1 exhale.
+    /// +1 inhale through −1 exhale. Negative flow is outward air.
+    /// `galion-source-filter` uses that sign for the exhale gain.
     pub flow: f32,
-    /// Speech pressure, or [`OPEN_PRESSURE`] off the speech phase.
+    /// Relative subglottal pressure during speech, or [`OPEN_PRESSURE`]
+    /// otherwise. The loudness envelope. Not a second lungs sample, and not
+    /// cm H₂O. The source-filter does not read it.
     pub pressure: f32,
     /// dB offset from [`PS_REF`] during speech. 0 otherwise. Not dB SPL.
     pub loudness_db: f32,
@@ -323,15 +317,31 @@ pub struct Frame {
     pub loudness_gain: f32,
     /// The me band should not phonate. Air is moving in, or the phrase ended.
     pub pause: bool,
-    pub glottis: GlottalAir,
+}
+
+impl Frame {
+    /// The lungs sample `MouthControls::from_moment` and
+    /// `SpeechStack::set_mouth_moment` take.
+    ///
+    /// Noise is mixed only when `phase` is [`BreathPhase::Exhale`]. Outward
+    /// air is a negative flow. Volume is relative.
+    #[must_use]
+    pub fn lungs(self) -> Breath {
+        Breath {
+            phase: self.phase,
+            volume: self.volume,
+            flow: self.flow,
+        }
+    }
 }
 
 /// Write the lungs frame into an intent so the core can stop using the
 /// stand-in breath cycle. Does not touch the pull, the verb, or the baseline.
 pub fn stamp_intent(frame: &Frame, msg: &mut IntentMsg) {
-    msg.breath_phase = frame.phase;
-    msg.lung_volume = frame.volume.clamp(0.0, 1.0);
-    msg.air_flow = frame.flow.clamp(-1.0, 1.0);
+    let lungs = frame.lungs();
+    msg.breath_phase = lungs.phase;
+    msg.lung_volume = lungs.volume.clamp(0.0, 1.0);
+    msg.air_flow = lungs.flow.clamp(-1.0, 1.0);
     msg.factor_mask |= MASK_BREATH;
 }
 

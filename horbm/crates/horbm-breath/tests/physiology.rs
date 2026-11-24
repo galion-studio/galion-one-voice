@@ -163,7 +163,7 @@ fn the_pause_buffer_reports_truncation() {
 }
 
 #[test]
-fn speech_pressure_falls_and_the_glottis_matches() {
+fn speech_pressure_falls_and_the_lungs_sample_matches() {
     let mut lungs = Lungs::samantha();
     let mut first = None;
     let mut last = None;
@@ -176,8 +176,10 @@ fn speech_pressure_falls_and_the_glottis_matches() {
         }
         let frame = lungs.tick(Drive::rest(), true);
         assert!(frame.volume.is_finite() && frame.flow.is_finite() && frame.pressure.is_finite());
-        assert_eq!(frame.glottis.pressure.to_bits(), frame.pressure.to_bits());
-        assert_eq!(frame.glottis.flow.to_bits(), frame.flow.to_bits());
+        let lungs = frame.lungs();
+        assert_eq!(lungs.phase, frame.phase);
+        assert_eq!(lungs.volume.to_bits(), frame.volume.to_bits());
+        assert_eq!(lungs.flow.to_bits(), frame.flow.to_bits());
         assert!((-1.0..=1.0).contains(&frame.flow));
         assert!((0.0..=1.0).contains(&frame.volume));
         match frame.phase {
@@ -337,6 +339,35 @@ fn a_nan_drive_does_not_poison_the_frame() {
         assert!(frame.flow.is_finite());
         assert!(frame.loudness_gain.is_finite());
     }
+}
+
+#[test]
+fn the_source_filter_reads_this_breath_and_noise_is_the_exhale() {
+    let mut lungs = Lungs::samantha();
+    let mut saw_speech = false;
+    for _ in 0..30 {
+        let frame = lungs.tick(Drive::rest(), true);
+        let sample = frame.lungs();
+        assert_eq!(sample.phase, frame.phase);
+        assert_eq!(sample.volume.to_bits(), frame.volume.to_bits());
+        assert_eq!(sample.flow.to_bits(), frame.flow.to_bits());
+        match frame.phase {
+            BreathPhase::Inhale => assert!(frame.flow >= 0.0),
+            BreathPhase::Speech => {
+                saw_speech = true;
+                assert!(frame.flow <= 0.0);
+                break;
+            }
+            BreathPhase::Hold | BreathPhase::Rest => {}
+            BreathPhase::Exhale => panic!("speech startup produced an exhale"),
+        }
+    }
+    assert!(saw_speech, "never reached speech");
+    let release = lungs.tick(Drive::rest(), false);
+    assert_eq!(release.phase, BreathPhase::Exhale);
+    assert!(release.flow <= 0.0, "outward flow {}", release.flow);
+    assert_eq!(release.lungs().phase, BreathPhase::Exhale);
+    assert_eq!(release.lungs().flow.to_bits(), release.flow.to_bits());
 }
 
 #[test]

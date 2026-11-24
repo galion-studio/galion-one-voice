@@ -9,8 +9,8 @@ use crate::noise;
 use crate::plan::{plan_pauses, Plan};
 use crate::{
     depth_fraction, flow_of, group_limit_s, inhale_frames, loudness_db, loudness_gain,
-    subglottal_pressure, BreathError, Drive, Frame, GlottalAir, Pause, EXHALE_FRAMES, FRAME_S,
-    NOISE_SEED, OPEN_PRESSURE, PAUSE_CAP, SAMANTHA, VOLUME_FLOOR, VOLUME_SPAN,
+    subglottal_pressure, BreathError, Drive, Frame, Pause, EXHALE_FRAMES, FRAME_S, NOISE_SEED,
+    OPEN_PRESSURE, PAUSE_CAP, SAMANTHA, VOLUME_FLOOR, VOLUME_SPAN,
 };
 
 const FLOOR_MARGIN: f32 = 0.02;
@@ -225,7 +225,6 @@ impl Lungs {
             loudness_db: loudness_db(pressure),
             loudness_gain: loudness_gain(pressure),
             pause: false,
-            glottis: GlottalAir { pressure, flow },
         }
     }
 
@@ -297,10 +296,6 @@ impl Lungs {
             loudness_db: 0.0,
             loudness_gain: 0.0,
             pause,
-            glottis: GlottalAir {
-                pressure: OPEN_PRESSURE,
-                flow,
-            },
         }
     }
 }
