@@ -63,6 +63,10 @@ if all(isinstance(x, int) for x in (fm, a2v, a2f)) and a2v > fm * a2f:
 # consent
 eq("consent.default", "deny")
 for b in ("sense", "adapt", "remember", "share"): eq(f"consent.{b}", "deny")
+# Owner decision, Mate, 2026-11-24 21:31 CET: ear prosody starts on.
+# The session bits above stay deny. This layer has its own switch.
+eq("consent.ear_prosody.sense", "allow")
+eq("consent.ear_prosody.off_env", "GALION_EAR_SENSE")
 eq("consent.prohibited_overridable", False)
 pp = get("consent.prohibited_purposes")
 if pp is KeyError or not {"workplace", "education"} <= set(pp): fails.append("consent.prohibited_purposes must include workplace+education")
