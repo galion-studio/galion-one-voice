@@ -440,6 +440,13 @@ mod tests {
     use galion_emotion::{EMPATHY_OKLCH, NEUTRAL_OKLCH};
     use galion_heartbeat::FRAME_MS;
 
+    /// Content fallback when no model speaks. The gateway line is the older
+    /// miss. A host with no S0 student file speaks the documented probe line
+    /// (`Student brain unavailable.`). Neither is a canned reply.
+    fn unavailable_fallback(text: &str) -> bool {
+        text == "model can't be reached" || text.starts_with("Student brain unavailable.")
+    }
+
     fn frame(v: f32, a: f32, d: f32, c: f32) -> EmotionFrame {
         EmotionFrame {
             seq: 1,
@@ -494,13 +501,30 @@ mod tests {
         path.on_heartbeat_frame(Some(&frame(-0.6, 0.2, 0.4, 1.0)));
         let plan = path.on_asr_final("My mother died this morning.");
         assert_eq!(plan.persona, "samantha");
-        // Unset GALION_LLM attaches the loopback Hermes client. This host
-        // has nothing on :8642, so the connect is refused and the spoken
-        // line is the unreachable line, never a canned echo.
-        assert_eq!(plan.text, "model can't be reached");
-        assert_eq!(plan.llm, "hermes-agent");
-        assert!(plan.hermes_attached);
-        assert!(!plan.inhouse);
+        // A content turn does not invent a reply. An attached gateway that
+        // does not answer speaks "model can't be reached". The S0 probe, when
+        // that file is not on the host, speaks the documented unavailable line.
+        assert!(
+            unavailable_fallback(&plan.text),
+            "content turn spoke {:?}, not an unavailable fallback",
+            plan.text
+        );
+        assert!(
+            !plan.text.to_ascii_lowercase().contains("mother")
+                && !plan.text.to_ascii_lowercase().contains("died"),
+            "{}",
+            plan.text
+        );
+        if plan.text.starts_with("Student brain unavailable.") {
+            assert_eq!(plan.llm, "galion-student-blocked");
+            assert!(!plan.hermes_attached);
+            assert!(plan.inhouse);
+        } else {
+            assert_eq!(plan.text, "model can't be reached");
+            assert_eq!(plan.llm, "hermes-agent");
+            assert!(plan.hermes_attached);
+            assert!(!plan.inhouse);
+        }
         assert_eq!(plan.mood, "grief");
         assert!(!plan.film_voice);
         assert!(!plan.clone_live);
@@ -508,7 +532,7 @@ mod tests {
         let line = path.nano_request_line();
         assert!(line.contains("\"model\":\"nano\""));
         assert!(line.contains("\"persona\":\"samantha\""));
-        assert!(line.contains("model can't be reached"));
+        assert!(line.contains(&plan.text), "{line}");
         assert!(!line.contains(HUB_KEY));
         assert!(!line.contains("reference"));
         assert!(!line.contains("pcm"));
@@ -534,7 +558,17 @@ mod tests {
         let joy = path.on_heartbeat_frame(Some(&frame(0.8, 0.8, 0.5, 0.9)));
         assert_eq!(joy.e, 0.0);
         let said = path.on_asr_final("I got the job. I can't stop smiling.");
-        assert_eq!(said.text, "model can't be reached");
+        assert!(
+            unavailable_fallback(&said.text),
+            "content turn spoke {:?}, not an unavailable fallback",
+            said.text
+        );
+        let spoken = said.text.to_ascii_lowercase();
+        assert!(
+            !spoken.contains("job") && !spoken.contains("smiling"),
+            "{}",
+            said.text
+        );
         assert!(!v2_persona::is_canned_empathy(&said.text));
         assert!((said.warmth - 0.62).abs() < 1e-3);
         assert_eq!(said.oklch_l, NEUTRAL_OKLCH.l);

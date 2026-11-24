@@ -3,14 +3,23 @@
 //!
 //! The host calls `tick` on the turn worker, beside the 80 ms frame step.
 //! This function is not that step. It may allocate. It does not sleep.
+//!
+//! Galion Research is asked only after the local brain has returned, and only
+//! for a lookup. The ask itself returns on this frame. A later frame merges
+//! the result when its virtual arrival is inside the cap.
 
 use crate::brain::{ClauseBrain, PickedClause};
 use crate::clock::{
-    VirtualClock, COMMIT_SILENCE_FRAMES, DUCK_MS, FRAME_MS, HANG_FRAMES, PAUSE_MS, STABLE_TICKS,
+    VirtualClock, COMMIT_SILENCE_FRAMES, DUCK_MS, FRAME_MS, HANG_FRAMES, PAUSE_MS,
+    SIDE_BAND_CAP_MS, STABLE_TICKS,
 };
 use crate::lexicon::is_listed_backchannel;
 use crate::mne::read_back;
 use crate::reaction::{Reaction, ReactionKind, REACTION_SAMPLES};
+use crate::research::{
+    cap_decision, classify, AskResult, CapDecision, OfflineClient, PollResult, ResearchClient,
+    SideBandView, SideIntent,
+};
 use crate::stamps::Domain04Stamps;
 use galion_mne_contract::Document;
 
@@ -47,9 +56,17 @@ struct Held {
     picked: PickedClause,
 }
 
+struct PendingResearch {
+    id: u64,
+    asked_ms: u64,
+    epoch: u64,
+}
+
 /// Conductor over a [`ClauseBrain`]. The brain is the phase 4 seam.
-pub struct Conductor<B: ClauseBrain> {
+/// `R` is the Galion Research client. The default is offline.
+pub struct Conductor<B: ClauseBrain, R: ResearchClient = OfflineClient> {
     brain: B,
+    research: R,
     clock: VirtualClock,
     floor: Floor,
     epoch: u64,
@@ -68,9 +85,19 @@ pub struct Conductor<B: ClauseBrain> {
     reaction_kind: ReactionKind,
     pending_reaction: Option<ReactionKind>,
     stamps: Domain04Stamps,
+    pending: Option<PendingResearch>,
+    merged: Option<String>,
+    side_note: SideBandView,
+    frame_log: Option<String>,
+    side_log: Vec<String>,
+    side_cancels: u32,
 }
 
 /// One frame of output. `t_ms` is the virtual frame start.
+///
+/// `clause` is the local brain line, once the turn commits. `research_clause`
+/// is set only when a side-band result merged inside the cap. A drop leaves
+/// it empty and the local clause in place.
 pub struct TickOut {
     pub t_ms: u64,
     pub floor: Floor,
@@ -86,16 +113,32 @@ pub struct TickOut {
     pub brain_calls: u32,
     pub readback: Option<Result<Document, String>>,
     pub stamps: Domain04Stamps,
+    pub side_band: SideBandView,
+    pub research_clause: Option<String>,
+    pub side_log_line: Option<String>,
 }
 
-impl<B: ClauseBrain> Conductor<B> {
+impl<B: ClauseBrain> Conductor<B, OfflineClient> {
+    /// Local brain, offline research. A lookup reports unavailable on the
+    /// eager frame. The commit frame does not move.
     pub fn new(brain: B) -> Self {
-        Self::with_reaction(brain, ReactionKind::Silence)
+        Self::assemble(brain, OfflineClient::new(), ReactionKind::Silence)
     }
 
     pub fn with_reaction(brain: B, reaction_kind: ReactionKind) -> Self {
+        Self::assemble(brain, OfflineClient::new(), reaction_kind)
+    }
+}
+
+impl<B: ClauseBrain, R: ResearchClient> Conductor<B, R> {
+    pub fn with_research(brain: B, research: R) -> Self {
+        Self::assemble(brain, research, ReactionKind::Silence)
+    }
+
+    fn assemble(brain: B, research: R, reaction_kind: ReactionKind) -> Self {
         Self {
             brain,
+            research,
             clock: VirtualClock::new(),
             floor: Floor::Listening,
             epoch: 1,
@@ -114,6 +157,12 @@ impl<B: ClauseBrain> Conductor<B> {
             reaction_kind,
             pending_reaction: None,
             stamps: Domain04Stamps::default(),
+            pending: None,
+            merged: None,
+            side_note: SideBandView::Idle,
+            frame_log: None,
+            side_log: Vec::new(),
+            side_cancels: 0,
         }
     }
 
@@ -129,15 +178,35 @@ impl<B: ClauseBrain> Conductor<B> {
         self.clock.t_ms()
     }
 
+    /// How many pending asks barge-in or a resumed turn has cancelled.
+    pub fn side_cancels(&self) -> u32 {
+        self.side_cancels
+    }
+
+    /// Side-band trace. Counts and event names only. No transcript.
+    pub fn side_log(&self) -> &[String] {
+        &self.side_log
+    }
+
+    pub fn research(&self) -> &R {
+        &self.research
+    }
+
     /// Advance one virtual frame. Does not read a wall clock.
+    /// Does not wait on Galion Research.
     pub fn tick(&mut self, ear: Ear<'_>, intent: Option<&Document>) -> TickOut {
         let t_ms = self.clock.t_ms();
         let t_us = self.clock.t_us();
+        self.side_note = SideBandView::Idle;
+        self.frame_log = None;
         let mut event = TickEvent::None;
         let me_silent = self.apply_armed_silence(&mut event);
         match ear {
             Ear::Quiet => self.on_quiet(t_us, &mut event),
             Ear::Speech(text) => self.on_speech(text, &mut event),
+        }
+        if !self.cancel {
+            self.poll_research(t_ms);
         }
         let reaction = self.pending_reaction.take().map(Reaction::from_kind);
         let readback = intent.map(|doc| read_back(doc, reaction.as_ref()));
@@ -161,6 +230,9 @@ impl<B: ClauseBrain> Conductor<B> {
             brain_calls: self.brain_calls,
             readback,
             stamps: self.stamps.clone(),
+            side_band: self.side_note,
+            research_clause: self.merged.clone(),
+            side_log_line: self.frame_log.clone(),
         };
         self.clock.advance();
         out
@@ -172,6 +244,7 @@ impl<B: ClauseBrain> Conductor<B> {
         }
         self.silence_next = false;
         self.cancel = true;
+        self.abandon_floor();
         self.epoch = self.epoch.wrapping_add(1);
         self.cell = None;
         self.committed = None;
@@ -270,6 +343,7 @@ impl<B: ClauseBrain> Conductor<B> {
         let query = self.partial.clone();
         let picked = self.brain.answer(&query);
         self.brain_calls = self.brain_calls.saturating_add(1);
+        self.offer_research(self.clock.t_ms(), &query);
         self.stamps.mark_llm_token(decided);
         self.cell = Some(Held {
             epoch: self.epoch,
@@ -296,6 +370,7 @@ impl<B: ClauseBrain> Conductor<B> {
     }
 
     fn rollback(&mut self, event: &mut TickEvent) {
+        self.abandon_floor();
         self.cell = None;
         self.pending_reaction = None;
         self.epoch = self.epoch.wrapping_add(1);
@@ -304,5 +379,102 @@ impl<B: ClauseBrain> Conductor<B> {
         self.floor = Floor::Listening;
         self.rollbacks = self.rollbacks.saturating_add(1);
         *event = TickEvent::TurnResumed;
+    }
+
+    fn offer_research(&mut self, now_ms: u64, query: &str) {
+        match classify(query) {
+            SideIntent::None => {}
+            SideIntent::MoneyDenied => {
+                self.side_note = SideBandView::Refused;
+                self.note_log("side_band event=refused elapsed_ms=0");
+            }
+            SideIntent::Lookup => match self.research.ask(query, now_ms) {
+                AskResult::Unavailable => {
+                    self.side_note = SideBandView::Unavailable;
+                    self.note_log("side_band event=unavailable elapsed_ms=0");
+                }
+                AskResult::Pending { id } => {
+                    self.pending = Some(PendingResearch {
+                        id,
+                        asked_ms: now_ms,
+                        epoch: self.epoch,
+                    });
+                    self.side_note = SideBandView::Pending { elapsed_ms: 0 };
+                }
+            },
+        }
+    }
+
+    fn poll_research(&mut self, now_ms: u64) {
+        let Some((id, asked_ms, pending_epoch)) = self
+            .pending
+            .as_ref()
+            .map(|pending| (pending.id, pending.asked_ms, pending.epoch))
+        else {
+            return;
+        };
+        if pending_epoch != self.epoch {
+            self.abandon_floor();
+            return;
+        }
+        let waited = now_ms.saturating_sub(asked_ms);
+        match self.research.poll(id, now_ms) {
+            PollResult::Ready { elapsed_ms, text } => {
+                self.pending = None;
+                if cap_decision(Some(elapsed_ms), waited, SIDE_BAND_CAP_MS) == CapDecision::Merge {
+                    let chars = text.chars().count();
+                    self.merged = Some(text);
+                    self.side_note = SideBandView::Merged { elapsed_ms };
+                    self.note_log_owned(format!(
+                        "side_band event=merged elapsed_ms={elapsed_ms} cap_ms={SIDE_BAND_CAP_MS} chars={chars}"
+                    ));
+                } else {
+                    self.research.cancel(id);
+                    self.side_note = SideBandView::Dropped { elapsed_ms };
+                    self.note_log_owned(format!(
+                        "side_band event=dropped elapsed_ms={elapsed_ms} cap_ms={SIDE_BAND_CAP_MS}"
+                    ));
+                }
+            }
+            PollResult::Pending => {
+                if cap_decision(None, waited, SIDE_BAND_CAP_MS) == CapDecision::Drop {
+                    self.abandon_cap(waited);
+                } else {
+                    self.side_note = SideBandView::Pending { elapsed_ms: waited };
+                }
+            }
+            PollResult::Gone => {
+                self.pending = None;
+            }
+        }
+    }
+
+    fn abandon_floor(&mut self) {
+        self.merged = None;
+        let Some(pending) = self.pending.take() else {
+            return;
+        };
+        self.research.cancel(pending.id);
+        self.side_cancels = self.side_cancels.saturating_add(1);
+        self.side_note = SideBandView::Cancelled;
+    }
+
+    fn abandon_cap(&mut self, elapsed_ms: u64) {
+        if let Some(pending) = self.pending.take() {
+            self.research.cancel(pending.id);
+        }
+        self.side_note = SideBandView::Dropped { elapsed_ms };
+        self.note_log_owned(format!(
+            "side_band event=dropped elapsed_ms={elapsed_ms} cap_ms={SIDE_BAND_CAP_MS}"
+        ));
+    }
+
+    fn note_log(&mut self, line: &str) {
+        self.note_log_owned(line.to_string());
+    }
+
+    fn note_log_owned(&mut self, line: String) {
+        self.frame_log = Some(line.clone());
+        self.side_log.push(line);
     }
 }

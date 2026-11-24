@@ -39,6 +39,7 @@ sources = ["Q-EUREKA.Q5", "Q-EMOTION.Q1", "Q-EMOTION.Q3", "Q-RIKA.Q7"]
 [gates]
 barge_in_max_ms = 200             # yield on user barge-in; silence by this on the frame clock
 backchannel_cancels = false       # a listed backchannel keeps the turn (phase 5 conductor, 2026-11-24)
+side_band_cap_ms = 3000           # Galion Research side band; merge on the frame clock only at or under this (phase 6, 2026-11-24)
 onset_p50_max_ms = 300            # hard blocking gate, not a warning
 affect_to_voice_max_ms = 160      # E-in -> A-out
 affect_to_voice_max_frames = 2

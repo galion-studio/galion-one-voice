@@ -11,6 +11,13 @@ pub const FRAME_MS: u32 = 80;
 /// Barge-in lock. `LOCKS.toml` `[gates] barge_in_max_ms`.
 pub const BARGE_IN_MAX_MS: u32 = 200;
 
+/// Galion Research side band. `LOCKS.toml` `[gates] side_band_cap_ms`.
+///
+/// A result is merged only when its arrival, on this frame clock, is at or
+/// under this many milliseconds. The value is not a frame multiple. The
+/// comparison is in milliseconds, not in frames.
+pub const SIDE_BAND_CAP_MS: u64 = 3_000;
+
 /// Duck, copied from `galion-heartbeat` `mixer::DUCK_MS`.
 pub const DUCK_MS: u32 = 80;
 
@@ -41,6 +48,7 @@ pub const COMMIT_SILENCE_FRAMES: u32 = 2;
 
 const _: () = assert!(FRAME_MS == 80);
 const _: () = assert!(BARGE_IN_MAX_MS == 200);
+const _: () = assert!(SIDE_BAND_CAP_MS == 3_000);
 const _: () = assert!(PAUSE_MS == 200);
 const _: () = assert!(DUCK_MS == FRAME_MS);
 const _: () = assert!(STABLE_TICKS == 2);
