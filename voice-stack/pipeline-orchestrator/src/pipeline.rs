@@ -603,8 +603,12 @@ fn emit_turn(turns: &TurnMailbox, floor: &Floor, buf: &mut Vec<AudioFrame>, next
         listen_audio_ms,
         ended_at: Instant::now(),
     };
-    if turns.publish(heard) {
-        floor.set_epoch(epoch, Phase::Thinking);
+    // Record thinking before the mailbox wakes the thinker. `try_send` can
+    // run that task, and the speaker, on another thread before this
+    // function continues. The phase list would then show speaking first.
+    floor.set_epoch(epoch, Phase::Thinking);
+    if !turns.publish(heard) {
+        floor.set_epoch(epoch, Phase::Idle);
     }
 }
 
