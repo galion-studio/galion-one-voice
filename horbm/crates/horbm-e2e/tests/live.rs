@@ -108,8 +108,24 @@ fn assert_common(outcome: &Outcome, text: &str, sense: Sense) {
     assert_eq!(field(text, "emotion"), "real");
     assert_eq!(field(text, "emotion_allocs"), "0");
     assert_eq!(field(text, "brain"), "real");
-    assert_eq!(field(text, "breath"), "stub");
-    assert_stub_has_no_time(text, "breath");
+    assert_eq!(field(text, "breath"), "real");
+    let breath_p50: f64 = field(text, "breath_p50_us").parse().expect("breath p50");
+    let breath_p99: f64 = field(text, "breath_p99_us").parse().expect("breath p99");
+    assert!(
+        breath_p50 > 0.0 && breath_p50 <= breath_p99,
+        "breath p50 {breath_p50} p99 {breath_p99}"
+    );
+    assert!(breath_p99 < 80_000.0, "breath p99 {breath_p99} us");
+    let breath_ns: u64 = field(text, "breath_ns").parse().expect("breath ns");
+    assert!(breath_ns > 0);
+    let group_ms: u32 = field(text, "breath_group_ms")
+        .parse()
+        .expect("breath group");
+    assert!(
+        (480..=4_000).contains(&group_ms),
+        "breath group {group_ms} ms"
+    );
+    let _pauses: u32 = field(text, "breath_pauses").parse().expect("breath pauses");
     for key in [
         "dialogue",
         "person_memory",

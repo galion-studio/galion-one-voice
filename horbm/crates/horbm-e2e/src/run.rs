@@ -9,6 +9,7 @@ use std::time::Instant;
 
 use galion_emotion_core::{EmotionCore, IntentMsg, AROUSAL, DOMINANCE, VALENCE};
 use horbm::{CardHit, CardLookup};
+use horbm_breath::{Drive, Lungs};
 use horbm_duplex::{
     Affect, Breath, BreathCue, BreathPhase, Duplex, Emotion, LoopError, LoopEvent, Parts, Persona,
     Style, DEV_PERSONA, FRAME_SAMPLES,
@@ -25,6 +26,7 @@ use crate::vad::{self, Energy};
 use crate::wav;
 
 pub const SCRIPT: &str = "where is the kettle";
+const KETTLE_REPLY: &str = "The kettle is on the hob.";
 pub const TRIALS: u32 = 11;
 const BARGE: &str = "stop now";
 const LINES: [&str; 3] = [SCRIPT, "yeah", BARGE];
@@ -110,21 +112,42 @@ impl Emotion for CoreEmotion {
     }
 }
 
-struct QuietBreath;
+struct LiveBreath {
+    lungs: Lungs,
+    core: EmotionCore,
+    planned: bool,
+}
 
-impl Breath for QuietBreath {
-    fn cue(&mut self, _t_ms: u32, speaking: bool) -> BreathCue {
-        if speaking {
-            BreathCue {
-                phase: BreathPhase::Exhale,
-                speaking: true,
-            }
-        } else {
-            BreathCue {
-                phase: BreathPhase::Inhale,
-                speaking: false,
-            }
+impl LiveBreath {
+    fn samantha() -> Self {
+        Self {
+            lungs: Lungs::samantha(),
+            core: EmotionCore::at_rest(),
+            planned: false,
         }
+    }
+}
+
+impl Breath for LiveBreath {
+    fn cue(&mut self, t_ms: u32, speaking: bool) -> BreathCue {
+        let msg = IntentMsg::steady(t_ms);
+        let _ = self.core.step(&msg);
+        let reply = if self.planned {
+            None
+        } else {
+            self.planned = true;
+            Some(KETTLE_REPLY)
+        };
+        let frame = self.lungs.frame(&self.core, speaking, reply);
+        let phase = match frame.phase {
+            horbm_breath::BreathPhase::Inhale => BreathPhase::Inhale,
+            horbm_breath::BreathPhase::Hold | horbm_breath::BreathPhase::Rest => BreathPhase::Hold,
+            horbm_breath::BreathPhase::Speech | horbm_breath::BreathPhase::Exhale => {
+                BreathPhase::Exhale
+            }
+        };
+        let _ = std::hint::black_box(frame.glottis);
+        BreathCue { phase, speaking }
     }
 }
 
@@ -277,7 +300,15 @@ pub fn run(sense: Sense) -> Result<Outcome, String> {
     report.push("listener_feeling", "stub");
     report.push("emotion", "real");
     report.push("mood_into_voice", "stub");
-    report.push("breath", "stub");
+    let times = horbm_breath::measure_ticks();
+    let mut planned = Lungs::samantha();
+    let plan = planned.plan_reply(KETTLE_REPLY, Drive::rest());
+    report.push("breath", "real");
+    report.push("breath_ns", times.p50_ns.to_string());
+    report.push("breath_p50_us", format!("{:.3}", times.p50_us()));
+    report.push("breath_p99_us", format!("{:.3}", times.p99_us()));
+    report.push("breath_pauses", plan.count.to_string());
+    report.push("breath_group_ms", plan.group_ms.to_string());
     report.push("mouth", kind.name());
     report.push("piper_duplex", "stub");
     if mouth_real {
@@ -361,13 +392,16 @@ fn drive(
             emotion: CoreEmotion {
                 core: EmotionCore::at_rest(),
             },
-            breath: QuietBreath,
+            breath: LiveBreath::samantha(),
             persona: Samantha,
             mouth: LiveMouth::open(kind)?,
         },
         Kettle,
     )
     .map_err(|err| err.to_string())?;
+    // No speaker. The input is the script, not a microphone echo.
+    // Ear prosody stays at the duplex default, which is on.
+    duplex.set_aec(false);
 
     let mut speech_end = None;
     let mut heard_voice = false;
@@ -549,7 +583,7 @@ pub fn refuse_other_persona() -> Result<(), String> {
             emotion: CoreEmotion {
                 core: EmotionCore::at_rest(),
             },
-            breath: QuietBreath,
+            breath: LiveBreath::samantha(),
             persona: Other,
             mouth: LiveMouth::open(EngineKind::Stub)?,
         },
