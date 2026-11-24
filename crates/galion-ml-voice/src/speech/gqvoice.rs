@@ -113,7 +113,7 @@ impl GqVoice {
                 "gqvoice: a .gq weight is not a voice packet".into(),
             ));
         }
-        if bytes.len() < HEADER_LEN || &bytes[..8] != MAGIC {
+        if bytes.len() < HEADER_LEN || bytes[..8] != MAGIC {
             return Err(VoiceError::Backend(
                 "gqvoice: raw chatterbox pcm is not the runtime format".into(),
             ));
@@ -410,6 +410,10 @@ fn get_u32(buf: &[u8], at: usize) -> u32 {
 mod tests {
     use super::*;
 
+    fn lock_off(cond: bool) -> bool {
+        cond
+    }
+
     fn tmp(tag: &str) -> PathBuf {
         let d = std::env::temp_dir().join(format!("galion-gqvoice-{tag}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&d);
@@ -445,7 +449,7 @@ mod tests {
 
     #[test]
     fn chatterbox_suffix_is_refused_as_runtime() {
-        assert!(!CHATTERBOX_IS_RUNTIME);
+        assert!(lock_off(!CHATTERBOX_IS_RUNTIME));
         let dir = tmp("refuse");
         let samples = vec![1i16, 2, 3, 4];
         let raw_path = dir.join("samantha.s16le");

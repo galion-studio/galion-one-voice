@@ -105,8 +105,11 @@ pub fn spoken_text(reply: &str) -> String {
     match (r.starts_with('['), r.find(']')) { (true, Some(i)) => r[i + 1..].trim().to_string(), _ => r.to_string() }
 }
 
+/// Backend id plus a human label. Same pair the lane already returns.
+pub type SpeechTag = (&'static str, String);
+
 /// Speak `text` with the detected speech stack; `(pcm, backend, weights)`.
-pub fn speak(text: &str) -> (Option<Vec<i16>>, (&'static str, String), (&'static str, String)) {
+pub fn speak(text: &str) -> (Option<Vec<i16>>, SpeechTag, SpeechTag) {
     let mut st = galion_ml_voice::speech::SpeechStack::detect();
     let pcm = if st.can_speak() { st.speak(text).ok().map(|a| { debug_assert_eq!(a.sample_rate, LANE_RATE_HZ); to_pcm16(&a.samples) }) } else { None };
     let backend = if pcm.is_some() { (st.backend.id(), st.backend.label()) } else { ("none", st.backend.label()) };
