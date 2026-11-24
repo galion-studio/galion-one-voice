@@ -19,4 +19,7 @@ galion-mne-contract = { path = "../../tools/symphony/mne-contract" }
 [features]
 default = []
 
+[dev-dependencies]
+horbm-ear = { path = "../horbm-ear" }
+
 [workspace]
