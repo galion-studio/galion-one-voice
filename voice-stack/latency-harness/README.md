@@ -24,7 +24,7 @@ The bar on each stage is 80 ms. A row that misses it says so. Missing a bar is a
 ## What is reused
 
 - Heartbeat frame size, the late-tick-is-a-pause rule, and the percentile index, from `crates/galion-heartbeat` and its frame-budget test. This crate does not link that crate and does not remeasure `Heartbeat::step`.
-- Piper spawn flags and the first-PCM clock, from `crates/galion-v2-live/src/piper.rs` and `scripts/eval/piper_stream_ttfa.py`. The runtime lookup follows `crates/galion-ml-voice/src/speech/weights.rs`: `$GALION_A21_RUNTIME`, else `galion-piper-rt` when that binary is installed, else `weights/runtime/piper/piper`. `$GALION_PIPER_LEGACY=1` keeps the legacy CLI.
+- Piper spawn flags and the first-PCM clock, from `archive/2026-11-24/crates/galion-v2-live/src/piper.rs` and `scripts/eval/piper_stream_ttfa.py`. The runtime lookup follows `crates/galion-ml-voice/src/speech/weights.rs`: `$GALION_A21_RUNTIME`, else `galion-piper-rt` when that binary is installed, else `weights/runtime/piper/piper`. `$GALION_PIPER_LEGACY=1` keeps the legacy CLI.
 - The A21 pack pin for `en_US-ljspeech-medium`, from the same weights module. A mismatch does not get a latency number.
 
 VAD, ASR, and the reply in both backends are in-process fakes. They do real work (an RMS scan, a string copy) and they do not sleep. They are not Vosk and they are not HORBM. The Piper backend changes only the mouth.

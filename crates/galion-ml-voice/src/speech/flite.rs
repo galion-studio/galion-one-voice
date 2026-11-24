@@ -12,41 +12,57 @@
 //! explicit A21 counsel item (see docs/agent-v1-demo/A21-BLOCKERS.md).
 #![allow(unsafe_code)]
 
-use super::{resample, SPEECH_RATE};
+#[cfg(unix)]
+use super::resample;
+use super::SPEECH_RATE;
 use crate::{split_lang_token, Audio, LanguageId, TtsEngine, VoiceError};
 use std::ffi::{c_char, c_int, c_void, CStr, CString};
 use std::sync::{Mutex, OnceLock};
 
+#[cfg(unix)]
 extern "C" {
     fn dlopen(filename: *const c_char, flag: c_int) -> *mut c_void;
     fn dlsym(handle: *mut c_void, symbol: *const c_char) -> *mut c_void;
     fn dlerror() -> *mut c_char;
     fn srand(seed: u32);
 }
+#[cfg(unix)]
 const RTLD_NOW: c_int = 2;
+#[cfg(unix)]
 const RTLD_GLOBAL: c_int = 0x100;
 
 /// Flite `cst_wave` (flite/include/cst_wave.h).
+#[cfg(unix)]
 #[repr(C)]
 struct CstWave { kind: *const c_char, sample_rate: c_int, num_samples: c_int, num_channels: c_int, samples: *mut i16 }
 
+#[cfg(unix)]
 type InitFn = unsafe extern "C" fn() -> c_int;
+#[cfg(unix)]
 type RegisterFn = unsafe extern "C" fn(*const c_char) -> *mut c_void;
+#[cfg(unix)]
 type TextToWaveFn = unsafe extern "C" fn(*const c_char, *mut c_void) -> *mut CstWave;
+#[cfg(unix)]
 type DeleteWaveFn = unsafe extern "C" fn(*mut CstWave);
 
+#[cfg(unix)]
 struct Lib { text_to_wave: TextToWaveFn, delete_wave: DeleteWaveFn, voice: usize }
+#[cfg(unix)]
+type FliteSlot = (String, Result<Lib, String>);
 // Flite is not thread-safe: every call goes through LIBS' mutex.
-static LIBS: OnceLock<Mutex<Vec<(String, Result<Lib, String>)>>> = OnceLock::new();
+#[cfg(unix)]
+static LIBS: OnceLock<Mutex<Vec<FliteSlot>>> = OnceLock::new();
 
 /// Voices shipped by Debian/Ubuntu `libflite1`.
 pub const VOICES: &[&str] = &["slt", "kal16", "awb", "rms", "kal"];
 
+#[cfg(unix)]
 fn last_dl_error() -> String {
     // SAFETY: dlerror returns NULL or a NUL-terminated thread-local string.
     unsafe { let p = dlerror(); if p.is_null() { "unknown dlopen error".into() } else { CStr::from_ptr(p).to_string_lossy().into_owned() } }
 }
 
+#[cfg(unix)]
 fn open_lib(name: &str) -> Result<*mut c_void, String> {
     let c = CString::new(name).unwrap();
     // SAFETY: valid C string; flags are standard glibc values.
@@ -54,6 +70,7 @@ fn open_lib(name: &str) -> Result<*mut c_void, String> {
     if h.is_null() { Err(format!("{name}: {}", last_dl_error())) } else { Ok(h) }
 }
 
+#[cfg(unix)]
 fn sym(h: *mut c_void, name: &str) -> Result<*mut c_void, String> {
     let c = CString::new(name).unwrap();
     // SAFETY: handle came from dlopen; name is a valid C string.
@@ -61,6 +78,7 @@ fn sym(h: *mut c_void, name: &str) -> Result<*mut c_void, String> {
     if p.is_null() { Err(format!("symbol {name}: {}", last_dl_error())) } else { Ok(p) }
 }
 
+#[cfg(unix)]
 fn load(voice: &str) -> Result<Lib, String> {
     let core = open_lib("libflite.so.1")?;
     // Language + lexicon first (voice libs reference them).
@@ -80,6 +98,7 @@ fn load(voice: &str) -> Result<Lib, String> {
     }
 }
 
+#[cfg(unix)]
 fn with_lib<R>(voice: &str, f: impl FnOnce(&Lib) -> R) -> Result<R, String> {
     let m = LIBS.get_or_init(|| Mutex::new(Vec::new()));
     let mut g = m.lock().unwrap_or_else(|p| p.into_inner());
@@ -102,12 +121,19 @@ impl FliteTts {
     /// Open `voice` (one of [`VOICES`]).
     pub fn open(voice: &str) -> Result<Self, VoiceError> {
         if !VOICES.contains(&voice) { return Err(VoiceError::Backend(format!("unknown flite voice {voice}"))); }
-        with_lib(voice, |_| ()).map_err(|e| VoiceError::Backend(format!("libflite unavailable ({e}); install the distro package libflite1")))?;
-        Ok(Self {
-            voice: voice.to_string(),
-            #[cfg(test)]
-            scripted: None,
-        })
+        #[cfg(not(unix))]
+        {
+            return Err(VoiceError::Backend("libflite is only opened on Unix".into()));
+        }
+        #[cfg(unix)]
+        {
+            with_lib(voice, |_| ()).map_err(|e| VoiceError::Backend(format!("libflite unavailable ({e}); install the distro package libflite1")))?;
+            Ok(Self {
+                voice: voice.to_string(),
+                #[cfg(test)]
+                scripted: None,
+            })
+        }
     }
     /// Same voice id as [`Self::open`], with PCM already in memory.
     /// Does not dlopen and does not read a Piper pack.
@@ -133,26 +159,34 @@ impl TtsEngine for FliteTts {
         if let Some(samples) = &self.scripted {
             return Ok(Audio { sample_rate: SPEECH_RATE, samples: samples.clone() });
         }
-        let c = CString::new(body.replace('\0', " ")).unwrap();
-        let (rate, pcm) = with_lib(&self.voice, |l| {
-            // SAFETY: voice pointer from register_*; wave freed below; access serialized by mutex.
-            unsafe {
-                // Flite's excitation noise uses libc rand(); reseed under the mutex so
-                // the same text always yields the same samples (demo determinism).
-                srand(0x6a1_0001);
-                let w = (l.text_to_wave)(c.as_ptr(), l.voice as *mut c_void);
-                if w.is_null() { return (0, Vec::new()); }
-                let wv = &*w;
-                let n = (wv.num_samples.max(0) as usize) * (wv.num_channels.max(1) as usize);
-                let pcm: Vec<i16> = if wv.samples.is_null() { Vec::new() } else { std::slice::from_raw_parts(wv.samples, n).to_vec() };
-                let ch = wv.num_channels.max(1) as usize;
-                let rate = wv.sample_rate as u32;
-                (l.delete_wave)(w);
-                (rate, pcm.chunks(ch).map(|c| c[0]).collect())
-            }
-        }).map_err(VoiceError::Backend)?;
-        if pcm.is_empty() || rate == 0 { return Err(VoiceError::Backend("flite produced no audio".into())); }
-        let f: Vec<f32> = pcm.iter().map(|&s| s as f32 / 32768.0).collect();
-        Ok(Audio { sample_rate: SPEECH_RATE, samples: resample(&f, rate, SPEECH_RATE) })
+        #[cfg(not(unix))]
+        {
+            let _ = body;
+            return Err(VoiceError::Backend("libflite is only opened on Unix".into()));
+        }
+        #[cfg(unix)]
+        {
+            let c = CString::new(body.replace('\0', " ")).unwrap();
+            let (rate, pcm) = with_lib(&self.voice, |l| {
+                // SAFETY: voice pointer from register_*; wave freed below; access serialized by mutex.
+                unsafe {
+                    // Flite's excitation noise uses libc rand(); reseed under the mutex so
+                    // the same text always yields the same samples (demo determinism).
+                    srand(0x6a1_0001);
+                    let w = (l.text_to_wave)(c.as_ptr(), l.voice as *mut c_void);
+                    if w.is_null() { return (0, Vec::new()); }
+                    let wv = &*w;
+                    let n = (wv.num_samples.max(0) as usize) * (wv.num_channels.max(1) as usize);
+                    let pcm: Vec<i16> = if wv.samples.is_null() { Vec::new() } else { std::slice::from_raw_parts(wv.samples, n).to_vec() };
+                    let ch = wv.num_channels.max(1) as usize;
+                    let rate = wv.sample_rate as u32;
+                    (l.delete_wave)(w);
+                    (rate, pcm.chunks(ch).map(|c| c[0]).collect())
+                }
+            }).map_err(VoiceError::Backend)?;
+            if pcm.is_empty() || rate == 0 { return Err(VoiceError::Backend("flite produced no audio".into())); }
+            let f: Vec<f32> = pcm.iter().map(|&s| s as f32 / 32768.0).collect();
+            Ok(Audio { sample_rate: SPEECH_RATE, samples: resample(&f, rate, SPEECH_RATE) })
+        }
     }
 }

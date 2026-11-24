@@ -13,6 +13,6 @@ rust-version = "1.85"
 [dependencies]
 galion-emotion-core = { path = "../../../crates/galion-emotion-core" }
 serde = { version = "1", features = ["derive"] }
-# 0.8.19 does not compile against serde 1.0.229 (serde_core). 0.8.23 matches the
-# serde already in this workspace. The horbm workspace rust-version is 1.85.
-toml = "0.8.23"
+# galion-mne-contract, pulled in through horbm-duplex, pins toml = "=0.8.19".
+# One workspace can select only one toml. 0.8.19 is that pin.
+toml = "=0.8.19"

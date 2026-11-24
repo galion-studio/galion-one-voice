@@ -418,15 +418,18 @@ impl TtsEngine for A21WeightTts {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, unix))]
 mod tests {
     use super::*;
 
     fn exe(dir: &Path, name: &str, body: &str) -> PathBuf {
-        use std::os::unix::fs::PermissionsExt;
         let p = dir.join(name);
         std::fs::write(&p, body).unwrap();
-        std::fs::set_permissions(&p, std::fs::Permissions::from_mode(0o755)).unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&p, std::fs::Permissions::from_mode(0o755)).unwrap();
+        }
         p
     }
     const FAKE_LEGACY: &str = "#!/usr/bin/env python3\nimport json, struct, sys\nfor line in sys.stdin.buffer:\n    n = len(json.loads(line).get('text', ''))\n    sys.stdout.buffer.write(struct.pack('<200h', *([1000 + n] * 200))); sys.stdout.buffer.flush()\n    sys.stderr.write('Real-time factor: 0.1\\n'); sys.stderr.flush()\n";

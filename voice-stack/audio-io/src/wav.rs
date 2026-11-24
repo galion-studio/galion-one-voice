@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Galion Labs
-//! PCM16 WAV read and write. Same layout as `crates/galion-v2-live/src/audio.rs`:
+//! PCM16 WAV read and write. Same layout as `archive/2026-11-24/crates/galion-v2-live/src/audio.rs`:
 //! RIFF/WAVE, `fmt ` then `data`, 16-bit little-endian. No other codec.
 //!
 //! This module does not know about a voice. Callers pass samples they already

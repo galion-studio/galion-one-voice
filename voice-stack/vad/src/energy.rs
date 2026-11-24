@@ -3,7 +3,7 @@
 
 //! Energy gate used when the Silero model is missing or will not load.
 //! The floor, the +12 dB margin, and the -48 dB clamp are the same numbers as
-//! `crates/galion-v2-live/src/vad.rs`.
+//! `archive/2026-11-24/crates/galion-v2-live/src/vad.rs`.
 
 use crate::audio;
 

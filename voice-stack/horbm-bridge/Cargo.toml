@@ -33,4 +33,4 @@ name = "galion_sam_horbm"
 path = "src/lib.rs"
 
 # Member of voice-stack/Cargo.toml, not of the root workspace.
-# Crate `horbm` is the path dependency above. seam/horbm is the old type seam and is not linked.
+# Crate `horbm` is the path dependency above. archive/2026-11-24/voice-stack/horbm-bridge/seam/horbm is the old type seam and is not linked.

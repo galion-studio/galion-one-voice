@@ -157,7 +157,7 @@ The dependency, relative to this `Cargo.toml`, is:
 horbm = { path = "../../horbm/crates/horbm" }
 ```
 
-`seam/horbm` is the old type seam. It is not the dependency.
+`archive/2026-11-24/voice-stack/horbm-bridge/seam/horbm` is the old type seam. It is not the dependency.
 
 ## Mood between turns
 
@@ -203,5 +203,5 @@ build still finished.
 | `src/pad.rs` | `Pad`, resting triple, 80 ms frame |
 | `src/session.rs` | `Session`, `MoodTick` |
 | `src/linked.rs` | `HorbmEngine` (`--features horbm`) |
-| `seam/horbm` | old type seam, not the linked brain |
+| `archive/2026-11-24/voice-stack/horbm-bridge/seam/horbm` | old type seam, not the linked brain |
 | `../../horbm/crates/horbm` | linked `horbm` crate |
