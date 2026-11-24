@@ -1,0 +1,22 @@
+# Galion Voice — Perpetual Open MIT License
+# Copyright (c) 2026 Galion Labs.
+
+[package]
+name = "galion-conductor"
+description = "HORBM phase 5 conductor. Eager end-of-turn, epoch rollback, barge-in at the 200 ms lock, wordless reaction. Virtual clock only. Does not call the heartbeat frame function."
+version = "0.0.1"
+edition = "2021"
+license = "MIT"
+publish = false
+rust-version = "1.83"
+
+[dependencies]
+# Own workspace, same pattern as tools/symphony/feeling.
+# galion-mne-contract is itself a workspace root, so it cannot be a path
+# dependency of a root-workspace member.
+galion-mne-contract = { path = "../../tools/symphony/mne-contract" }
+
+[features]
+default = []
+
+[workspace]
