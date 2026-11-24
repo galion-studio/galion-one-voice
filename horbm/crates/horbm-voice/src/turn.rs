@@ -7,6 +7,7 @@ use crate::clock::{VirtualClock, BARGE_IN_MAX_MS, FRAME_MS, PAUSE_MS};
 use crate::device::{place, Place};
 use crate::ear::{Ear, EarEvent};
 use crate::lexicon::is_listed_backchannel;
+use crate::moment_voice::MomentVoice;
 use crate::mouth::{AudioFrame, Mouth, MouthPull};
 
 /// What this frame decided.
@@ -49,6 +50,7 @@ pub struct VoiceLoop<E, M, B> {
     eot_ms: Option<u64>,
     first_audio_ms: Option<u64>,
     barge_ms: Option<u64>,
+    moment: Option<MomentVoice>,
 }
 
 impl<E, M, B> VoiceLoop<E, M, B>
@@ -77,6 +79,7 @@ where
             eot_ms: None,
             first_audio_ms: None,
             barge_ms: None,
+            moment: None,
         }
     }
 
@@ -109,6 +112,7 @@ where
     /// Advance one virtual frame. Does not read a wall clock.
     pub fn tick(&mut self, pcm: &[i16]) -> TickOut {
         let t_ms = self.clock.t_ms();
+        self.follow_moment();
         let heard = self.ear.poll(pcm);
         if self.silence_next {
             let out = self.yield_floor(t_ms);
@@ -140,6 +144,25 @@ where
         };
         self.clock.advance();
         out
+    }
+
+    fn follow_moment(&mut self) {
+        let Some(view) = self.brain.moment_view() else {
+            return;
+        };
+        let bits = view.baseline.identity_bits();
+        let stale = self
+            .moment
+            .as_ref()
+            .map(|voice| voice.identity() != bits)
+            .unwrap_or(true);
+        if stale {
+            self.moment = Some(MomentVoice::new(view.baseline));
+        }
+        if let Some(voice) = self.moment.as_mut() {
+            let controls = voice.tick(view.moment, view.breath);
+            self.mouth.feel(controls);
+        }
     }
 
     fn on_ear(

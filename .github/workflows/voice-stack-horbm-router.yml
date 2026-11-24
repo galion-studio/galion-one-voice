@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 Galion Labs
-# Layer 5 router and the localhost research gateway. No model download.
+# Layer 5 router, the localhost research gateway, and the moment-to-mouth
+# glue. Linux only. No model download. The synthetic tone is not a voice.
 
 name: voice-stack horbm router
 
@@ -21,14 +22,17 @@ jobs:
       - name: cargo build
         run: |
           cargo build --manifest-path horbm/Cargo.toml -p horbm
+          cargo build --manifest-path horbm/Cargo.toml -p horbm-voice --features piper
           cargo build --manifest-path voice-stack/Cargo.toml -p galion-sam-horbm -p samantha-local-server
       - name: cargo test
         run: |
           cargo test --manifest-path horbm/Cargo.toml -p horbm
+          cargo test --manifest-path horbm/Cargo.toml -p horbm-voice --features piper
           cargo test --manifest-path voice-stack/Cargo.toml -p galion-research-gateway -p galion-sam-horbm -p galion-sam-orch -p samantha-local-server
           cargo test --manifest-path voice-stack/Cargo.toml -p galion-sam-horbm --features horbm
       - name: cargo clippy
         run: |
           cargo clippy --manifest-path horbm/Cargo.toml -p horbm --all-targets -- -D warnings
+          cargo clippy --manifest-path horbm/Cargo.toml -p horbm-voice --all-targets --features piper -- -D warnings
           cargo clippy --manifest-path voice-stack/Cargo.toml -p galion-research-gateway -p galion-sam-horbm -p samantha-local-server --all-targets --no-deps -- -D warnings
           cargo clippy --manifest-path voice-stack/Cargo.toml -p galion-sam-horbm --all-targets --no-deps --features horbm -- -D warnings

@@ -3,7 +3,7 @@
 
 [package]
 name = "horbm-voice"
-description = "HORBM-native voice turn. Ear, brain turn, mouth, on the conductor frame clock. Piper and Vosk are optional adapters."
+description = "HORBM-native voice turn. Ear, brain turn, mouth, on the conductor frame clock. The Samantha moment drives pace, noise, pitch, energy, pause, and breath. Piper and Vosk are optional adapters."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -25,5 +25,10 @@ gpu = []
 
 [dependencies]
 horbm = { path = "../horbm" }
+galion-emotion-core = { path = "../../../crates/galion-emotion-core" }
+galion-sam-prosody = { path = "../../../voice-stack/emotion-prosody" }
 galion-tts-piper = { path = "../../../voice-stack/tts-piper-stream", optional = true }
 galion-sam-asr = { path = "../../../voice-stack/asr", optional = true }
+
+[dev-dependencies]
+galion-emotion = { path = "../../../galion-emotion" }
