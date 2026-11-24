@@ -208,6 +208,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "horbm-brain"
+version = "0.0.1"
+
+[[package]]
 name = "horbm-keys"
 version = "0.0.1"
 dependencies = [
@@ -224,10 +228,6 @@ dependencies = [
  "serde_json",
  "sha2",
 ]
-
-[[package]]
-name = "horbm-brain"
-version = "0.0.1"
 
 [[package]]
 name = "horbm-voice"
