@@ -22,6 +22,8 @@ galion-tensor = { path = "../galion-tensor", default-features = false }
 # Locked 80 ms quantum for the domain 04 stamp line. Default features stay off
 # so the presence harness is not pulled into the cascade.
 galion-heartbeat = { path = "../galion-heartbeat", default-features = false }
+# Phase 4 brain. Zero dependencies. Not a weight and not a network client.
+horbm-brain = { path = "../../horbm/crates/horbm-brain" }
 # W21-03: optional path dep (workspace-local, offline, zero transitive deps).
 galion-ml-voice = { path = "../galion-ml-voice", optional = true }
 galion-asr-vosk = { path = "../galion-asr-vosk", optional = true }

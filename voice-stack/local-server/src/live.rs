@@ -506,6 +506,8 @@ impl Pipeline for LivePipeline {
             mind: "horbm".into(),
             vad_backend: self.vad_backend,
             vad_ready: self.vad_ready,
+            knowledge_cards: self.mind.knowledge_cards(),
+            knowledge_dir: self.mind.knowledge_path().display().to_string(),
         }
     }
 }
@@ -684,6 +686,8 @@ impl Pipeline for GatedPipeline {
             mind: "horbm".into(),
             vad_backend: "energy",
             vad_ready: true,
+            knowledge_cards: 0,
+            knowledge_dir: String::new(),
         }
     }
 }

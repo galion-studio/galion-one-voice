@@ -7,8 +7,10 @@ use std::time::Instant;
 
 use galion_sam_empathy::{Empathy, PronounClass, TickIn, FRAME_MS};
 
+use horbm_brain::{classify, pick, split_clause, Retrieved, Retriever, SidebandMark};
+
 use crate::route::{accept_line, route_heard, CardLookup, Gap, ResearchAsk, Speakable};
-use crate::{Pad, TurnOut};
+use crate::{Pad, TurnOut, UNKNOWN_REPLY};
 
 /// Mood and the prosody knobs that belong on the turn. Not a sentence.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -66,6 +68,52 @@ pub struct Brain {
     speakable: Speakable,
     gaps: Vec<Gap>,
     meta: MoodMeta,
+    card_count: usize,
+}
+
+struct Spoke {
+    reply: String,
+    sources: Vec<String>,
+    evidence: Vec<String>,
+    lookup_us: u32,
+    picked: Option<horbm_brain::Answer>,
+}
+
+impl Spoke {
+    fn empty() -> Self {
+        Self {
+            reply: String::new(),
+            sources: Vec::new(),
+            evidence: Vec::new(),
+            lookup_us: 0,
+            picked: None,
+        }
+    }
+}
+
+struct CardRetriever<'a> {
+    cards: &'a dyn CardLookup,
+    speakable: Speakable,
+}
+
+impl Retriever for CardRetriever<'_> {
+    fn retrieve(&self, query: &str, limit: usize) -> Vec<Retrieved> {
+        if limit == 0 {
+            return Vec::new();
+        }
+        let Some(hit) = self.cards.lookup(query) else {
+            return Vec::new();
+        };
+        let Some(text) = (self.speakable)(&hit.gist) else {
+            return Vec::new();
+        };
+        vec![Retrieved {
+            id: hit.id,
+            text,
+            atomic: false,
+            score: 1,
+        }]
+    }
 }
 
 impl Brain {
@@ -73,6 +121,7 @@ impl Brain {
         cards: impl CardLookup + Send + 'static,
         research: Option<Box<dyn ResearchAsk + Send>>,
     ) -> Self {
+        let card_count = cards.len();
         Self {
             empathy: Empathy::new(),
             cards: Box::new(cards),
@@ -80,7 +129,13 @@ impl Brain {
             speakable: accept_line,
             gaps: Vec::new(),
             meta: resting_meta(),
+            card_count,
         }
+    }
+
+    /// Clauses loaded at `open` or `with_cards`. The example kettle directory is one.
+    pub fn cards(&self) -> usize {
+        self.card_count
     }
 
     /// Read `knowledge_dir` when it is already a directory. A missing path is
@@ -149,6 +204,34 @@ impl Brain {
         } else {
             prep.query.as_str()
         };
+        if query.is_empty() {
+            return self.finish(query, started, Spoke::empty());
+        }
+        let lookup_started = Instant::now();
+        let picked = pick(
+            query,
+            &CardRetriever {
+                cards: self.cards.as_ref(),
+                speakable: self.speakable,
+            },
+            UNKNOWN_REPLY,
+            "horbm-say-i-dont-know",
+        );
+        let lookup_us = elapsed_us(lookup_started.elapsed());
+        if picked.hit {
+            let source = format!("card:{}", picked.id);
+            return self.finish(
+                query,
+                started,
+                Spoke {
+                    reply: String::new(),
+                    sources: vec![source.clone()],
+                    evidence: vec![source],
+                    lookup_us,
+                    picked: Some(picked),
+                },
+            );
+        }
         let routed = match self.research.as_mut() {
             Some(port) => route_heard(
                 query,
@@ -161,18 +244,58 @@ impl Brain {
         if let Some(gap) = routed.gap.clone() {
             self.gaps.push(gap);
         }
+        self.finish(
+            query,
+            started,
+            Spoke {
+                reply: routed.spoken,
+                sources: routed.sources,
+                evidence: routed.evidence,
+                lookup_us: routed.lookup_us,
+                picked: None,
+            },
+        )
+    }
+
+    fn finish(&self, query: &str, started: Instant, spoke: Spoke) -> TurnOut {
+        let Spoke {
+            reply,
+            sources,
+            evidence,
+            lookup_us,
+            picked,
+        } = spoke;
+        let (reply, first_clause, rest, sideband) = match picked {
+            Some(answer) => (answer.clause, answer.first, answer.rest, answer.mark),
+            None => {
+                let atomic = reply == UNKNOWN_REPLY || reply.is_empty();
+                let (first, rest) = split_clause(&reply, atomic);
+                let mark = if reply.is_empty() {
+                    None
+                } else {
+                    classify(query).map(|kind| SidebandMark {
+                        kind,
+                        posted: false,
+                    })
+                };
+                (reply, first, rest, mark)
+            }
+        };
         TurnOut {
-            reply: routed.spoken,
+            reply,
             intent: self.meta.intent.to_string(),
             arm: "none".to_string(),
             propensity: 0.0,
-            evidence: routed.evidence,
-            sources: routed.sources,
+            evidence,
+            sources,
             violations: 0,
-            lookup_us: routed.lookup_us,
+            lookup_us,
             took_us: elapsed_us(started.elapsed()),
             mood: self.meta.pad(),
             mood_meta: self.meta,
+            first_clause,
+            rest,
+            sideband,
         }
     }
 }
@@ -210,7 +333,10 @@ fn elapsed_us(elapsed: std::time::Duration) -> u32 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{AskOutcome, CardHit, CardLookup, GapReason, ResearchAsk, UNKNOWN_REPLY};
+    use crate::{
+        AskOutcome, CardHit, CardLookup, GapReason, MarkKind, ResearchAsk, SidebandMark,
+        UNKNOWN_REPLY,
+    };
     use std::sync::atomic::{AtomicU32, Ordering};
     use std::sync::Arc;
     use std::time::Duration;
@@ -318,5 +444,27 @@ mod tests {
         let queries = looked.lock().unwrap().clone();
         assert!(queries.iter().any(|q| q.contains("Maciej")), "{queries:?}");
         assert!(queries.iter().all(|q| !q.contains(" he ")));
+    }
+
+    #[test]
+    fn a_card_hit_is_the_stored_clause_with_a_two_word_lead() {
+        let mut brain = Brain::with_cards(cards(), None);
+        let out = brain.turn("where is the kettle");
+        assert_eq!(out.reply, "The kettle is on the hob.");
+        assert_eq!(out.first_clause, "The kettle");
+        assert!(out.first_clause.split_whitespace().count() <= 2);
+        assert_eq!(out.rest, "is on the hob.");
+        assert_eq!(out.sources, vec!["card:kettle".to_string()]);
+        match out.sideband {
+            Some(SidebandMark {
+                kind: MarkKind::Lookup { query },
+                posted: false,
+            }) => assert!(query.to_ascii_lowercase().contains("kettle"), "{query}"),
+            other => panic!("lookup was not marked: {other:?}"),
+        }
+        assert_eq!(
+            horbm_brain::Heuristic::committed().miss_text(),
+            UNKNOWN_REPLY
+        );
     }
 }

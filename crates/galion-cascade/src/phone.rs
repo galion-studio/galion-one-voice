@@ -93,22 +93,23 @@ impl AsrMode {
 
 /// S5 LLM mode (`GALION_LLM`). Unset and `hermes` are the loopback Hermes gateway
 /// (owner card t493s3301: the phone brain defaults to Hermes, not the rule table).
-/// `canned` is the rule table. `student` is the blocked S0 probe.
-/// Anything else is an error.
+/// `canned` is the rule table. `horbm` is the stored-clause pick.
+/// `student` is the blocked S0 probe. Anything else is an error.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum LlmMode { Canned, Echo, Hermes, Student }
+pub enum LlmMode { Canned, Echo, Hermes, Student, Horbm }
 
 impl LlmMode {
     pub fn from_env() -> Result<Self, PhoneError> {
         Self::from_choice(std::env::var("GALION_LLM").ok().as_deref())
     }
     /// `None`, `""`, and `hermes` → [`LlmMode::Hermes`]. `canned` → [`LlmMode::Canned`].
-    /// `echo` / `mock` → echo. `student` → [`LlmMode::Student`].
+    /// `horbm` → [`LlmMode::Horbm`]. `echo` / `mock` → echo. `student` → [`LlmMode::Student`].
     /// Every other value, including `reflect`, is [`PhoneError::UnknownLlm`].
     pub fn from_choice(v: Option<&str>) -> Result<Self, PhoneError> {
         let raw = v.unwrap_or("").trim();
         match raw.to_ascii_lowercase().as_str() {
             "canned" => Ok(LlmMode::Canned),
+            "horbm" => Ok(LlmMode::Horbm),
             "echo" | "mock" => Ok(LlmMode::Echo),
             "" | "hermes" => Ok(LlmMode::Hermes),
             "student" => Ok(LlmMode::Student),
@@ -150,7 +151,7 @@ pub enum PhoneError {
     Superseded,
     /// Error from the cascade (LLM / route).
     Cascade(CascadeError),
-    /// `GALION_LLM` is not `canned`, `echo`/`mock`, or `hermes`. Not a canned fallback.
+    /// `GALION_LLM` is not `canned`, `horbm`, `echo`/`mock`, or `hermes`. Not a canned fallback.
     UnknownLlm(String),
 }
 
@@ -164,7 +165,7 @@ impl std::fmt::Display for PhoneError {
             PhoneError::NoSpeech(m) => write!(f, "no speech backend: {m}"),
             PhoneError::Superseded => write!(f, "turn superseded before speech finished"),
             PhoneError::Cascade(e) => write!(f, "cascade: {e:?}"),
-            PhoneError::UnknownLlm(m) => write!(f, "unknown GALION_LLM '{m}'; use canned, echo, or hermes"),
+            PhoneError::UnknownLlm(m) => write!(f, "unknown GALION_LLM '{m}'; use canned, horbm, echo, or hermes"),
         }
     }
 }
@@ -401,6 +402,7 @@ impl PhoneLane {
     pub fn with_speech(cfg: PhoneConfig, mut speech: SpeechStack) -> Self {
         let llm: Box<dyn Llm + Send> = match cfg.llm {
             LlmMode::Canned => Box::new(CannedLlm::new()),
+            LlmMode::Horbm => Box::new(crate::HorbmChat::fixture()),
             LlmMode::Echo => Box::new(MockLlm),
             LlmMode::Hermes => Box::new(HermesLlm::from_env()),
             LlmMode::Student => Box::new(StudentLlm),
@@ -865,6 +867,7 @@ mod tests {
         assert_eq!(LlmMode::from_choice(None).unwrap(), LlmMode::Hermes);
         assert_eq!(LlmMode::from_choice(Some("")).unwrap(), LlmMode::Hermes);
         assert_eq!(LlmMode::from_choice(Some("canned")).unwrap(), LlmMode::Canned);
+        assert_eq!(LlmMode::from_choice(Some("horbm")).unwrap(), LlmMode::Horbm);
         assert_eq!(LlmMode::from_choice(Some("echo")).unwrap(), LlmMode::Echo);
         assert_eq!(LlmMode::from_choice(Some(" Hermes ")).unwrap(), LlmMode::Hermes);
         assert_eq!(LlmMode::from_choice(Some("student")).unwrap(), LlmMode::Student);
@@ -941,6 +944,18 @@ mod tests {
         assert_eq!(decode_stub_fixture(&wav_to_pcm16k(&wav_bytes(&fx("hi"), 24_000)).unwrap()).unwrap(), "hi");
         assert!(matches!(wav_to_pcm16k(b"nope"), Err(PhoneError::BadWav(_))));
     }
+    #[test]
+    fn horbm_chat_turn_is_the_fixture_clause_and_does_not_speak() {
+        let mut lane = PhoneLane::new(PhoneConfig { asr: AsrMode::Stub, llm: LlmMode::Horbm });
+        let (heard, src, reply) = lane.inject_text("where is the kettle").unwrap();
+        assert_eq!(heard, "where is the kettle");
+        assert_eq!(src, AsrSource::TextInject);
+        assert!(!src.is_recognised());
+        assert_eq!(reply, "The kettle is on the hob.");
+        let miss = lane.inject_text("who won the match").unwrap().2;
+        assert_eq!(miss, "I don't know.");
+    }
+
     #[test] fn text_inject_is_not_recognition() {
         let mut l = PhoneLane::new(cfg(AsrMode::Interim));
         let (t, src, r) = l.inject_text("  thanks ").unwrap();

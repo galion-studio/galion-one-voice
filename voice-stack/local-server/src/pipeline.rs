@@ -51,6 +51,10 @@ pub struct PipeInfo {
     pub mind: String,
     pub vad_backend: &'static str,
     pub vad_ready: bool,
+    /// Clauses loaded for mind `horbm`. Zero when this pipe has no card brain.
+    pub knowledge_cards: usize,
+    /// Directory those clauses were read from. Empty when none was opened.
+    pub knowledge_dir: String,
 }
 
 #[derive(Debug)]
@@ -362,6 +366,8 @@ impl<R: ReplyEngine> Pipeline for FakePipeline<R> {
             mind: self.reply.name().to_string(),
             vad_backend: "energy",
             vad_ready: true,
+            knowledge_cards: 0,
+            knowledge_dir: String::new(),
         }
     }
 }

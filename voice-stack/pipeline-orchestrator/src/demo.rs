@@ -158,15 +158,24 @@ pub async fn measure_barge() -> Barge {
     );
     send_frames(&running.tx, 6, 10).await;
     let deadline = tokio::time::Instant::now() + Duration::from_secs(3);
-    while running.speaker.played_len() == 0 || running.handle.phase() != Phase::Speaking {
+    // The first chunk sets Speaking and then writes PCM. A later turn can
+    // move the phase to Thinking before this task samples both at once.
+    // Barge once that first chunk is in the speaker and Speaking was entered.
+    loop {
+        let played = running.speaker.played_len() > 0;
+        let spoke = running.handle.phases().contains(&Phase::Speaking);
+        if played && spoke {
+            break;
+        }
         if tokio::time::Instant::now() > deadline {
             panic!(
-                "did not reach speaking; phase={:?} phases={:?}",
+                "did not reach speaking; phase={:?} phases={:?} played={}",
                 running.handle.phase(),
-                running.handle.phases()
+                running.handle.phases(),
+                running.speaker.played_len()
             );
         }
-        tokio::time::sleep(Duration::from_millis(5)).await;
+        tokio::time::sleep(Duration::from_millis(1)).await;
     }
     send_frames(&running.tx, 4, 0).await;
     let report = wait_report(&running.handle, true).await;

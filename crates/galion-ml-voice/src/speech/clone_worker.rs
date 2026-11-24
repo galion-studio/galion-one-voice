@@ -2570,10 +2570,18 @@ mod tests {
     #[test]
     fn real_stub_pcm_survives_the_stdout_redirect() {
         let script = worker_script().expect("worker script");
-        std::env::set_var("GALION_CLONE_STUB_PCM", "1");
-        std::env::remove_var("GALION_CLONE_LOCAL_REFS");
-        let mut w = CloneWorker::spawn(&script, CloneModel::Nano, "samantha").unwrap();
-        std::env::remove_var("GALION_CLONE_STUB_PCM");
+        // The stub flag is on the child only. A parallel test that sets and
+        // clears GALION_CLONE_STUB_PCM on this process must not drop it
+        // between set and spawn, which sent the worker down the real-weight
+        // path (`pinned safetensors missing`). The protocol PCM checks below
+        // still run whether or not that checkpoint is on disk.
+        let mut w = CloneWorker::spawn_env(
+            &script,
+            CloneModel::Nano,
+            "samantha",
+            &[("GALION_CLONE_STUB_PCM", "1")],
+        )
+        .unwrap();
         let pcm = w.synthesize("Hi.").unwrap();
         assert_eq!(w.engine(), "protocol-stub");
         assert_eq!(pcm.len(), 201);

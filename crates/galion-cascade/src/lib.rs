@@ -14,6 +14,8 @@ pub mod route;
 pub mod en_lane;
 /// Rule-table reply stand-in and prosody heuristic (no weights). Always compiled.
 pub mod canned;
+/// HORBM heuristic pick for a chat turn. The canned table stays for `GALION_LLM=canned`.
+pub mod horbm_chat;
 /// Loopback Hermes chat client (OpenAI-compatible, std `TcpStream`, no TLS).
 pub mod hermes;
 /// First sentence of a streaming reply, for TTS before the rest of the text.
@@ -139,6 +141,7 @@ pub fn mock_cascade() -> Cascade<MockAsr, MockEmotion, MockLlm, MockTts> {
 }
 
 pub use canned::{CannedLlm, ProsodyEmotion, ReplyLlm};
+pub use horbm_chat::HorbmChat;
 pub use stamps::{dry_run_log, stamp_log_clean, Domain04Stamps, StampClock, StampPoint};
 pub use hermes::{contains_forbidden, HermesLlm, HermesTarget, FORBIDDEN, LLM_NAME, REFUSED, UNREACHABLE};
 #[cfg(feature = "cascade")]

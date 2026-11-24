@@ -5,7 +5,7 @@
 
 [workspace]
 resolver = "2"
-members = ["crates/horbm"]
+members = ["crates/horbm", "crates/horbm-brain"]
 
 [workspace.package]
 version = "0.0.1"

@@ -1,0 +1,22 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Galion Labs
+
+[package]
+name = "horbm-brain"
+description = "HORBM phase 4 brain: heuristic pick of one stored clause. No weights, no network, no audio."
+version = "0.0.1"
+edition = "2021"
+license = "MIT"
+publish = false
+rust-version = "1.85"
+
+[features]
+default = []
+# Swarm 2 (FTS5, crates/horbm-retrieval) had not landed when this crate was
+# written. The feature compiles the retrieval plug and does not link a crate.
+retrieval = []
+# Swarm 3 (int8 keys, crates/horbm-keys) had not landed. The feature compiles
+# the key plug. The int8 dot stays in galion-tensor when that crate is wired.
+keys = []
+
+[dependencies]
