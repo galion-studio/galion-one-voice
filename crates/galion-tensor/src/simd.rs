@@ -48,6 +48,13 @@ pub fn dot_scalar(a: &[f32], b: &[f32]) -> f32 {
     acc
 }
 
+/// View bytes as int8. Every bit pattern is a valid `i8`.
+#[inline]
+pub fn i8_from_bytes(bytes: &[u8]) -> &[i8] {
+    // SAFETY: i8 and u8 share size and alignment, and i8 has no invalid values.
+    unsafe { std::slice::from_raw_parts(bytes.as_ptr() as *const i8, bytes.len()) }
+}
+
 /// Reference int8 dot with i32 accumulation. Exact for `len ≤ DOT_I8_MAX_K`.
 #[inline]
 pub fn dot_i8_scalar(a: &[i8], b: &[i8]) -> i32 {
@@ -484,16 +491,32 @@ pub fn dot_for(level: SimdLevel) -> DotFn {
     }
 }
 
+/// Level whose kernel [`dot_i8_for`] will call.
+///
+/// AVX-512 int8 needs AVX-512BW in addition to AVX-512F. Without BW, an AVX-512
+/// request uses AVX2 when that feature is compiled and the CPU has it, otherwise scalar.
+pub fn dot_i8_level(level: SimdLevel) -> SimdLevel {
+    match level {
+        #[cfg(all(feature = "simd-avx512", target_arch = "x86_64"))]
+        SimdLevel::Avx512 if cpu_supports(SimdLevel::Avx512) && cpu_avx512bw() => SimdLevel::Avx512,
+        #[cfg(all(feature = "simd-avx2", any(target_arch = "x86", target_arch = "x86_64")))]
+        SimdLevel::Avx2 | SimdLevel::Avx512 if cpu_supports(SimdLevel::Avx2) => SimdLevel::Avx2,
+        #[cfg(all(feature = "simd-neon", target_arch = "aarch64"))]
+        SimdLevel::Neon if cpu_supports(SimdLevel::Neon) => SimdLevel::Neon,
+        _ => SimdLevel::Scalar,
+    }
+}
+
 /// Resolve an int8 dot kernel for `level` (all are bit-exact vs [`dot_i8_scalar`]).
 /// AVX-512 additionally needs AVX-512BW; otherwise it degrades to AVX2 (if compiled) or scalar.
 pub fn dot_i8_for(level: SimdLevel) -> DotI8Fn {
-    match level {
+    match dot_i8_level(level) {
         #[cfg(all(feature = "simd-avx512", target_arch = "x86_64"))]
-        SimdLevel::Avx512 if cpu_supports(SimdLevel::Avx512) && cpu_avx512bw() => dot_i8_avx512_unchecked,
+        SimdLevel::Avx512 => dot_i8_avx512_unchecked,
         #[cfg(all(feature = "simd-avx2", any(target_arch = "x86", target_arch = "x86_64")))]
-        SimdLevel::Avx2 | SimdLevel::Avx512 if cpu_supports(SimdLevel::Avx2) => dot_i8_avx2_unchecked,
+        SimdLevel::Avx2 => dot_i8_avx2_unchecked,
         #[cfg(all(feature = "simd-neon", target_arch = "aarch64"))]
-        SimdLevel::Neon if cpu_supports(SimdLevel::Neon) => dot_i8_neon_unchecked,
+        SimdLevel::Neon => dot_i8_neon_unchecked,
         _ => dot_i8_scalar,
     }
 }
@@ -602,5 +625,27 @@ mod tests {
     #[test]
     fn dot_i8_max_k_is_safe() {
         assert!((DOT_I8_MAX_K as i64) * 16384 < i32::MAX as i64);
+    }
+
+    #[test]
+    fn i8_from_bytes_keeps_the_bit_pattern() {
+        let raw = [0u8, 1, 127, 128, 255];
+        let view = i8_from_bytes(&raw);
+        assert_eq!(view, &[0, 1, 127, -128, -1]);
+        assert_eq!(i8_from_bytes(&[]).len(), 0);
+    }
+
+    #[test]
+    fn dot_i8_level_matches_the_kernel_that_runs() {
+        let a = vi8(40, 3);
+        let b = vi8(40, 9);
+        for l in LEVELS {
+            let used = dot_i8_level(l);
+            assert!(used <= l);
+            assert!(used.compiled() && cpu_supports(used));
+            assert_eq!(dot_i8_for(l)(&a, &b), dot_i8_scalar(&a, &b));
+            assert_eq!(dot_i8_for(used)(&a, &b), dot_i8_scalar(&a, &b));
+        }
+        assert_eq!(dot_i8_level(SimdLevel::Scalar), SimdLevel::Scalar);
     }
 }

@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Galion Labs
+
+[package]
+name = "horbm-keys"
+description = "Mapped int8 key arena for HORBM. The scalar dot is the oracle. SIMD is galion-tensor, behind the same features."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+galion-tensor = { path = "../galion-tensor", default-features = false }
+
+[features]
+default = []
+simd-avx2 = ["galion-tensor/simd-avx2"]
+simd-avx512 = ["galion-tensor/simd-avx512"]
+simd-neon = ["galion-tensor/simd-neon"]

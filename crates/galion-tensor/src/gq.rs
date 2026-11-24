@@ -318,6 +318,55 @@ fn touch_pages(b: &[u8]) -> u8 {
     acc
 }
 
+fn load_backing(path: &Path, pf: Prefault) -> GqResult<Backing> {
+    let file = std::fs::File::open(path).map_err(|e| GqError::Io(e.to_string()))?;
+    let len = file.metadata().map_err(|e| GqError::Io(e.to_string()))?.len();
+    let len = usize::try_from(len).map_err(|_| GqError::OutOfBounds("file len"))?;
+    #[cfg(unix)]
+    {
+        map_file(&file, len, pf)
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = (file, pf, len);
+        Ok(Backing::from_bytes(&std::fs::read(path).map_err(|e| GqError::Io(e.to_string()))?))
+    }
+}
+
+fn apply_prefault(pf: Prefault, bytes: &[u8]) {
+    let needs_touch = pf == Prefault::Touch || (pf == Prefault::Populate && !cfg!(target_os = "linux"));
+    if needs_touch {
+        std::hint::black_box(touch_pages(bytes));
+    }
+}
+
+/// Read-only bytes of any file, with the same map and [`Prefault`] policy as [`GqFile::open`].
+///
+/// Unix maps the file (`MAP_PRIVATE`). Every other OS reads it into an aligned heap buffer,
+/// which is what `.gq` already does on Windows. `Prefault::Populate` is synchronous on Linux
+/// (`MAP_POPULATE`) and a page walk elsewhere. `Prefault::Touch` always walks.
+pub struct MappedBytes {
+    backing: Backing,
+}
+
+impl fmt::Debug for MappedBytes {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("MappedBytes").field("len", &self.len()).finish()
+    }
+}
+
+impl MappedBytes {
+    pub fn open(path: impl AsRef<Path>, pf: Prefault) -> GqResult<Self> {
+        let backing = load_backing(path.as_ref(), pf)?;
+        apply_prefault(pf, backing.bytes());
+        Ok(MappedBytes { backing })
+    }
+
+    pub fn bytes(&self) -> &[u8] { self.backing.bytes() }
+    pub fn len(&self) -> usize { self.bytes().len() }
+    pub fn is_empty(&self) -> bool { self.len() == 0 }
+}
+
 // ---------------------------------------------------------------------------------------------
 // GqFile
 // ---------------------------------------------------------------------------------------------
@@ -338,20 +387,9 @@ impl fmt::Debug for GqFile {
 impl GqFile {
     /// Open via mmap (unix) with the given prefault policy; heap read elsewhere.
     pub fn open(path: impl AsRef<Path>, pf: Prefault) -> GqResult<Self> {
-        let path = path.as_ref();
-        let file = std::fs::File::open(path).map_err(|e| GqError::Io(e.to_string()))?;
-        let len = file.metadata().map_err(|e| GqError::Io(e.to_string()))?.len();
-        let len = usize::try_from(len).map_err(|_| GqError::OutOfBounds("file len"))?;
-        #[cfg(unix)]
-        let backing = map_file(&file, len, pf)?;
-        #[cfg(not(unix))]
-        let backing = {
-            let _ = file;
-            Backing::from_bytes(&std::fs::read(path).map_err(|e| GqError::Io(e.to_string()))?)
-        };
+        let backing = load_backing(path.as_ref(), pf)?;
         let g = Self::from_backing(backing)?;
-        let needs_touch = pf == Prefault::Touch || (pf == Prefault::Populate && !cfg!(target_os = "linux"));
-        if needs_touch { std::hint::black_box(touch_pages(g.backing.bytes())); }
+        apply_prefault(pf, g.backing.bytes());
         Ok(g)
     }
 
@@ -635,6 +673,9 @@ mod tests {
             g.verify_all().unwrap();
             assert_eq!(g.f32_view("enc.w").unwrap().unwrap(), av.as_slice());
             assert_eq!(g.file_sha256(), sha256(&bytes));
+            let mapped = MappedBytes::open(&p, pf).unwrap();
+            assert_eq!(mapped.bytes(), bytes.as_slice());
+            assert!(!mapped.is_empty());
         }
         // SHA256SUMS manifest round trip.
         let sums = format!("# galion\n{}  syn.gq\n", to_hex(&sha256(&bytes)));
