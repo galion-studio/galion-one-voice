@@ -3,7 +3,7 @@
 //! Resamplers for the two rates this stack already uses.
 //!
 //! [`resample_linear`] is the batch form of the linear resample in
-//! `crates/galion-v2-live/src/audio.rs` (Piper 22050 → the 24 kHz line).
+//! `archive/2026-11-24/crates/galion-v2-live/src/audio.rs` (Piper 22050 → the 24 kHz line).
 //! It runs on the producer thread, where a `Vec` is fine.
 //!
 //! [`BoxResampler`] is the streaming form of the one-dot page's box average

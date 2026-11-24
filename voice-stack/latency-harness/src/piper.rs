@@ -2,7 +2,7 @@
 // Copyright (c) 2026 Galion Labs
 
 //! Piper mouth. One persistent child, the same `--json-input --output_raw`
-//! protocol as `crates/galion-v2-live/src/piper.rs` and
+//! protocol as `archive/2026-11-24/crates/galion-v2-live/src/piper.rs` and
 //! `scripts/eval/piper_stream_ttfa.py`.
 //!
 //! The binary and the `en_US-ljspeech-medium` pack are located the way

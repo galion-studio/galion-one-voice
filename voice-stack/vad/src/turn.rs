@@ -5,10 +5,10 @@
 //!
 //! The numbers are the ones the live lane already runs:
 //!
-//! * onset 60 ms — `Vad::min_voiced_ms` in `crates/galion-v2-live/src/vad.rs`
-//! * barge-in at 80 ms of consecutive overlap — the duck point in `crates/galion-v2-live/src/bin/call.rs`
+//! * onset 60 ms — `Vad::min_voiced_ms` in `archive/2026-11-24/crates/galion-v2-live/src/vad.rs`
+//! * barge-in at 80 ms of consecutive overlap — the duck point in `archive/2026-11-24/crates/galion-v2-live/src/bin/call.rs`
 //! * speculate at 60 ms, commit a finished sentence at 160 ms, hold an unfinished
-//!   word for 500 ms — `EndpointCfg` in `crates/galion-v2-live/src/endpoint.rs`
+//!   word for 500 ms — `EndpointCfg` in `archive/2026-11-24/crates/galion-v2-live/src/endpoint.rs`
 //! * with no transcript yet, the hangover is the 500 ms hold, not the 160 ms
 //!   commit. 160 ms is only safe once the words say he finished. The live call
 //!   uses a 300 ms VAD hang (`Vad::new(300.0)`) because ASR is in that loop.
@@ -21,7 +21,7 @@
 use crate::HEARTBEAT_MS;
 
 /// Words after which a pause is more likely a breath than a turn end.
-/// The list is the one in `crates/galion-v2-live/src/endpoint.rs`.
+/// The list is the one in `archive/2026-11-24/crates/galion-v2-live/src/endpoint.rs`.
 const UNFINISHED: &[&str] = &[
     "and", "but", "or", "so", "because", "cause", "the", "a", "an", "to", "of", "in", "on", "at",
     "with", "for", "from", "my", "your", "his", "her", "their", "our", "um", "uh", "er", "like",

@@ -63,6 +63,7 @@ if all(isinstance(x, int) for x in (fm, a2v, a2f)) and a2v > fm * a2f:
 # consent
 eq("consent.default", "deny")
 for b in ("sense", "adapt", "remember", "share"): eq(f"consent.{b}", "deny")
+eq("consent.learn", "deny")       # S15: not a fifth EmotionWire bit
 # Owner decision, Mate, 2026-11-24 21:31 CET: ear prosody starts on.
 # The session bits above stay deny. This layer has its own switch.
 eq("consent.ear_prosody.sense", "allow")

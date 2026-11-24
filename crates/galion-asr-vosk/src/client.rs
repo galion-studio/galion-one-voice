@@ -9,7 +9,6 @@ use crate::protocol::{
     SAMPLE_RATE,
 };
 use std::io::{Read, Write};
-use std::os::unix::io::AsRawFd;
 use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 use std::time::{Duration, Instant};
@@ -86,7 +85,7 @@ impl VoskClient {
                 return Err("vosk worker stdout missing".into());
             }
         };
-        if let Err(e) = set_nonblock(stdout.as_raw_fd()) {
+        if let Err(e) = prepare_stdout(&stdout) {
             let _ = child.kill();
             let _ = child.wait();
             return Err(format!("vosk worker nonblock: {e}"));
@@ -172,22 +171,9 @@ impl VoskClient {
                 .saturating_duration_since(Instant::now())
                 .as_millis()
                 .min(i32::MAX as u128) as i32;
-            let mut fds = [PollFd {
-                fd: self.stdout.as_raw_fd(),
-                events: POLLIN | POLLHUP,
-                revents: 0,
-            }];
-            // SAFETY: fds points at one live pipe fd owned by this client; nfds is 1.
-            let rc = unsafe { poll(fds.as_mut_ptr(), 1, wait_ms) };
-            if rc < 0 {
-                let err = std::io::Error::last_os_error();
-                if err.kind() == std::io::ErrorKind::Interrupted {
-                    continue;
-                }
-                return Err(format!("vosk worker poll: {err}"));
-            }
-            if rc == 0 {
-                continue;
+            match stdout_ready(&self.stdout, wait_ms)? {
+                StdoutWait::Ready => {}
+                StdoutWait::Retry => continue,
             }
             let mut tmp = [0u8; 8192];
             match self.stdout.read(&mut tmp) {
@@ -245,14 +231,14 @@ pub fn resolve_bin() -> Result<PathBuf, String> {
     let mut cands = Vec::new();
     if let Ok(exe) = std::env::current_exe() {
         if let Some(dir) = exe.parent() {
-            cands.push(dir.join("galion-asr-vosk"));
+            cands.push(dir.join(vosk_bin_name()));
             if let Some(parent) = dir.parent() {
-                cands.push(parent.join("galion-asr-vosk"));
+                cands.push(parent.join(vosk_bin_name()));
             }
         }
     }
-    cands.push(PathBuf::from("target/debug/galion-asr-vosk"));
-    cands.push(PathBuf::from("target/release/galion-asr-vosk"));
+    cands.push(PathBuf::from("target/debug").join(vosk_bin_name()));
+    cands.push(PathBuf::from("target/release").join(vosk_bin_name()));
     for c in &cands {
         if c.is_file() {
             return Ok(c.clone());
@@ -311,6 +297,99 @@ fn clip(s: &str) -> String {
     t
 }
 
+fn vosk_bin_name() -> &'static str {
+    #[cfg(windows)]
+    {
+        "galion-asr-vosk.exe"
+    }
+    #[cfg(not(windows))]
+    {
+        "galion-asr-vosk"
+    }
+}
+
+enum StdoutWait {
+    Ready,
+    Retry,
+}
+
+fn prepare_stdout(stdout: &std::process::ChildStdout) -> std::io::Result<()> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::io::AsRawFd;
+        set_nonblock(stdout.as_raw_fd())
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = stdout;
+        Ok(())
+    }
+}
+
+fn stdout_ready(stdout: &std::process::ChildStdout, wait_ms: i32) -> Result<StdoutWait, String> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::io::AsRawFd;
+        let mut fds = [PollFd {
+            fd: stdout.as_raw_fd(),
+            events: POLLIN | POLLHUP,
+            revents: 0,
+        }];
+        // SAFETY: fds points at one live pipe fd owned by this client; nfds is 1.
+        let rc = unsafe { poll(fds.as_mut_ptr(), 1, wait_ms) };
+        if rc < 0 {
+            let err = std::io::Error::last_os_error();
+            if err.kind() == std::io::ErrorKind::Interrupted {
+                return Ok(StdoutWait::Retry);
+            }
+            return Err(format!("vosk worker poll: {err}"));
+        }
+        if rc == 0 {
+            return Ok(StdoutWait::Retry);
+        }
+        Ok(StdoutWait::Ready)
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::io::AsRawHandle;
+        let mut avail = 0u32;
+        // SAFETY: the handle is the child's stdout pipe, owned by this client.
+        // A null buffer asks only for the available byte count.
+        let ok = unsafe {
+            PeekNamedPipe(
+                stdout.as_raw_handle() as *mut core::ffi::c_void,
+                std::ptr::null_mut(),
+                0,
+                std::ptr::null_mut(),
+                &mut avail,
+                std::ptr::null_mut(),
+            )
+        };
+        if ok == 0 {
+            let err = std::io::Error::last_os_error();
+            // ERROR_BROKEN_PIPE: the child closed the pipe. The following read returns EOF.
+            if err.raw_os_error() == Some(109) {
+                return Ok(StdoutWait::Ready);
+            }
+            return Err(format!("vosk worker peek: {err}"));
+        }
+        if avail > 0 {
+            return Ok(StdoutWait::Ready);
+        }
+        let slice = wait_ms.clamp(0, 50) as u64;
+        if slice > 0 {
+            std::thread::sleep(Duration::from_millis(slice));
+        }
+        Ok(StdoutWait::Retry)
+    }
+    #[cfg(not(any(unix, windows)))]
+    {
+        let _ = (stdout, wait_ms);
+        Err("vosk worker wait is not available on this platform".into())
+    }
+}
+
+#[cfg(unix)]
 #[repr(C)]
 struct PollFd {
     fd: i32,
@@ -318,17 +397,37 @@ struct PollFd {
     revents: i16,
 }
 
+#[cfg(unix)]
 const POLLIN: i16 = 0x001;
+#[cfg(unix)]
 const POLLHUP: i16 = 0x010;
+#[cfg(unix)]
 const F_GETFL: i32 = 3;
+#[cfg(unix)]
 const F_SETFL: i32 = 4;
+#[cfg(unix)]
 const O_NONBLOCK: i32 = 0o4000;
 
+#[cfg(unix)]
 extern "C" {
     fn poll(fds: *mut PollFd, nfds: u64, timeout: i32) -> i32;
     fn fcntl(fd: i32, cmd: i32, arg: i32) -> i32;
 }
 
+#[cfg(windows)]
+#[link(name = "kernel32")]
+extern "system" {
+    fn PeekNamedPipe(
+        handle: *mut core::ffi::c_void,
+        buffer: *mut u8,
+        buffer_size: u32,
+        bytes_read: *mut u32,
+        total_bytes_avail: *mut u32,
+        bytes_left: *mut u32,
+    ) -> i32;
+}
+
+#[cfg(unix)]
 fn set_nonblock(fd: i32) -> std::io::Result<()> {
     // SAFETY: fd is a pipe this process owns; F_GETFL/F_SETFL take an int flag.
     let flags = unsafe { fcntl(fd, F_GETFL, 0) };

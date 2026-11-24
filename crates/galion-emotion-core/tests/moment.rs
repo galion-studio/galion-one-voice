@@ -193,7 +193,7 @@ fn intent_message_roundtrips_and_the_step_budget_is_stated() {
     assert_eq!(back.encode().unwrap(), bytes);
     assert_eq!(back, msg);
     assert_eq!(STEP_ALLOC_BUDGET, 0);
-    assert!(STEP_FLOP_BUDGET <= 128);
+    assert!(std::hint::black_box(STEP_FLOP_BUDGET) <= 128);
 
     let scores = project_universal(&EmotionCore::at_rest().moment());
     assert_eq!(scores.len(), 12);
