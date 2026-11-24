@@ -10,7 +10,7 @@ Perpetual Open MIT License. (c) 2026 Galion Labs.
 | Diary | `galion-studio/galion-knowledge` PR #36, branch `cursor/horbm-memory-git-face-3cd7`, head `974e594444448597741372fef578142c46d28566`. Open, not merged. The voice pin is that revision. |
 | Open Mind | `galion-studio/obsidian-open-mind` `main` `0b0a898695b0525b179b5dd791bbfa8c281b7ffc`. Read only. Not cloned into this tree. Not written. |
 | Plan | `docs/horbm/research/R4-cpu-realtime-integration.md` §9 and §11 on closed draft PR #207, head `dd902bbcfe34e23f63745a19fc2fed8e468a3b09`, branch `cursor/horbm-r4-cpu-realtime-2180`. Not merged. |
-| This change | `horbm::learn` beside `horbm::retrieve`. `LOCKS.toml` is untouched. `SOUL.md` is not in this checkout. |
+| This change | `horbm::learn` beside `horbm::retrieve`. `LOCKS.toml` `[consent]` gains `learn = "deny"` and `learn_in_band = false`. The four EmotionWire bits are unchanged. `SOUL.md` is not in this checkout and was not created. |
 
 ## How to read a number
 
@@ -32,7 +32,7 @@ Phase 2 is open PR #253. It is the preferred seam (`horbm::retrieve`, `Retrieval
 
 Q1 inside the R4 file is still written as open (line 62 and line 486). The owner ruling this pass follows is the one named on 2026-11-18, option A: HORBM retrieval answers first. Galion Research, the Rust engine, handles hard questions off the tick with a 3 second cap. This note does not call that engine Hermes. F2 on the phase 2 branch records the same ruling as HORBM answering first (`docs/horbm/foundations/F2-retrieval-audit.md`, the paragraph under "What this phase ships"). The 3 second cap is already `RESEARCH_CAP` on the deep-miss path in `Brain::turn`. The learn pass does not call Galion Research and does not run on that cap. The loop is offline. The call never waits for it (R4 §9, line 389).
 
-`LOCKS.toml` and `SOUL.md` are not edited. `SOUL.md` is not in `galion-one-voice` or at the root of `obsidian-open-mind`.
+`SOUL.md` is not in `galion-one-voice` or at the root of `obsidian-open-mind`. It was not created. The owner ruling of 2026-11-24 19:15 allows a lock edit when the architecture needs it. This pass needs one key: learn consent is not one of the four in-band bits, and the lock file has to say so.
 
 ## 1. Consent, and why learn is not `remember`
 
@@ -43,7 +43,16 @@ bits = ["sense", "adapt", "remember", "share"]
 default = "deny"
 ```
 
-There is no `learn` bit. `withdraw_wipes_ram_history = true`. `adapt` is one of the two bits Rika requires, with `sense`. R4 §9 condition 2 (line 396) says a separate learn consent is required, that `remember` means recall and not training, and that `adapt` is not the learn bit. Q2 in that note asks what the bit should be called. This pass does not add a bit to the lock file.
+`withdraw_wipes_ram_history = true`. `adapt` is one of the two bits Rika requires, with `sense`. R4 §9 condition 2 (line 396) says a separate learn consent is required, that `remember` means recall and not training, and that `adapt` is not the learn bit. Q2 in that note asks what the bit should be called.
+
+The lock file now names it. Under `[consent]`:
+
+```toml
+learn = "deny"
+learn_in_band = false
+```
+
+`bits` stays `sense`, `adapt`, `remember`, `share`. EmotionWire byte 7 is still masked with `0x0f` in `galion-emotion` `encode_with_consent`, and bits 4..7 stay reserved. Learn does not travel in the frame. `scripts/check-locks.sh` requires `learn = "deny"`, `learn_in_band = false`, and the four-bit list. `LEDGER.md` records the owner line. The pass still does not parse `LOCKS.toml`. A fresh process matches the deny default. `GALION_HORBM_LEARN=grant` is the process grant and does not rewrite the file.
 
 The write switch is `LearnConfig.granted`. `GALION_HORBM_LEARN=grant` is the only env value that sets it. `GALION_HORBM_REMEMBER` is not read. `RetrievalConfig.remember` is not copied into the learn pass.
 
@@ -139,5 +148,5 @@ A pass of the first command is the phase 7 gate: fresh writes nothing, granted w
 | `Store::forget` still archives | The voice pass deletes its own pack files instead. The diary crate is unchanged. |
 | Emotion-wire bits | `remember` is still not read from `EmotionWire` (F2 gap 3). Learn is not an emotion-wire bit. |
 | Int8 pack swap | Phase 3 maps keys. This swap is the learn-pack directory, not a `.gq` file. |
-| Q2, Q3, Q5 in R4 | The bit's name in `LOCKS.toml`, who may grant it, and encryption at rest. Not decided here. The env grant is the stand-in, default deny. |
+| Q2, Q3, Q5 in R4 | The bit is named `learn` in `LOCKS.toml`, default deny, and it is not on the emotion wire. Who may grant it, and encryption at rest, are still open. The process grant is `GALION_HORBM_LEARN=grant`. |
 | PR #36 and PR #253 | Both open. This branch does not merge them. |

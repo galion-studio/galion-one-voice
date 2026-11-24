@@ -62,8 +62,12 @@ if all(isinstance(x, int) for x in (fm, a2v, a2f)) and a2v > fm * a2f:
     fails.append(f"gates.affect_to_voice_max_ms {a2v} > frame_ms*frames {fm*a2f}")
 # consent
 eq("consent.default", "deny")
-for b in ("sense", "adapt", "remember", "share"): eq(f"consent.{b}", "deny")
+for b in ("sense", "adapt", "remember", "share", "learn"): eq(f"consent.{b}", "deny")
 eq("consent.learn", "deny")       # S15: not a fifth EmotionWire bit
+eq("consent.learn_in_band", False)
+bits = get("consent.bits")
+if bits is KeyError or bits != ["sense", "adapt", "remember", "share"]:
+    fails.append("consent.bits must stay the four EmotionWire bits; learn is offline")
 eq("consent.prohibited_overridable", False)
 pp = get("consent.prohibited_purposes")
 if pp is KeyError or not {"workplace", "education"} <= set(pp): fails.append("consent.prohibited_purposes must include workplace+education")

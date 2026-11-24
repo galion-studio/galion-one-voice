@@ -12,12 +12,14 @@
 //!
 //! Learn consent is not recall. `GALION_HORBM_LEARN=grant` is the only value
 //! that lets this pass write. This module does not read a retrieval config.
-//! `LOCKS.toml` records the deny default. This module does not parse that file.
+//! `LOCKS.toml` `[consent] learn` is `"deny"` and `learn_in_band` is false.
+//! This module does not parse that file. The default matches it. The process
+//! grant does not rewrite the file, and it does not set an EmotionWire bit.
 //!
 //! Do not call [`LearnPass::write_clause`], [`LearnPass::withdraw`], or
-//! [`LearnPass::audit`] from `Heartbeat::step` or from the `horbm-retrieval`
-//! thread. The call never waits on this pass. The pass does not call Galion
-//! Research and it does not read or write audio.
+//! [`LearnPass::audit`] from `Heartbeat::step`. The call never waits on this
+//! pass. The pass does not call Galion Research and it does not read or write
+//! audio.
 
 use std::fs;
 use std::io;
