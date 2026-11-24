@@ -62,6 +62,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "galion-sam-asr"
+version = "0.0.1"
+
+[[package]]
 name = "galion-sam-empathy"
 version = "0.0.1"
 dependencies = [
@@ -75,6 +79,13 @@ name = "galion-sam-prosody"
 version = "0.0.1"
 dependencies = [
  "galion-emotion",
+]
+
+[[package]]
+name = "galion-tts-piper"
+version = "0.0.1"
+dependencies = [
+ "sha2",
 ]
 
 [[package]]
@@ -101,6 +112,15 @@ dependencies = [
 [[package]]
 name = "horbm-brain"
 version = "0.0.1"
+
+[[package]]
+name = "horbm-voice"
+version = "0.0.1"
+dependencies = [
+ "galion-sam-asr",
+ "galion-tts-piper",
+ "horbm",
+]
 
 [[package]]
 name = "itoa"

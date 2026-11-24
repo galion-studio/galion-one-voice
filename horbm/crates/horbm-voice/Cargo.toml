@@ -1,0 +1,29 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Galion Labs
+
+[package]
+name = "horbm-voice"
+description = "HORBM-native voice turn. Ear, brain turn, mouth, on the conductor frame clock. Piper and Vosk are optional adapters."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+rust-version.workspace = true
+
+[features]
+default = []
+# Optional mouth. Not compiled into the core. Does not spawn Piper unless the
+# host builds `PiperMouth` around `PiperTts`.
+piper = ["dep:galion-tts-piper"]
+# Optional ear. Not compiled into the core. `VoskAsr` dlopens libvosk; the
+# feature test uses `FakeAsr` and does not load a model.
+vosk = ["dep:galion-sam-asr"]
+# Compile the hardware probe. The default build is CPU and does not look
+# for a device. GPU is selected only when this feature is on and a device
+# is present.
+gpu = []
+
+[dependencies]
+horbm = { path = "../horbm" }
+galion-tts-piper = { path = "../../../voice-stack/tts-piper-stream", optional = true }
+galion-sam-asr = { path = "../../../voice-stack/asr", optional = true }
