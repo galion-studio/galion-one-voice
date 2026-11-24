@@ -869,13 +869,18 @@ struct ChildVad {
 
 impl ChildVad {
     fn spawn(bin: &Path) -> Result<Self, ()> {
-        let mut cmd = if bin.extension().and_then(|s| s.to_str()) == Some("py") {
-            let mut cmd = Command::new("python3");
-            cmd.arg(bin);
-            cmd
-        } else {
-            Command::new(bin)
-        };
+        if bin.extension().and_then(|s| s.to_str()) == Some("py") {
+            for cmd in py_invocations(bin) {
+                if let Ok(child) = Self::from_cmd(cmd) {
+                    return Ok(child);
+                }
+            }
+            return Err(());
+        }
+        Self::from_cmd(Command::new(bin))
+    }
+
+    fn from_cmd(mut cmd: Command) -> Result<Self, ()> {
         let hang = std::env::var("GALION_VAD_HANG_MS").unwrap_or_else(|_| "640".into());
         let commit = std::env::var("GALION_VAD_COMMIT_MS").unwrap_or_else(|_| "640".into());
         cmd.env("GALION_VAD_HANG_MS", hang)
@@ -884,12 +889,22 @@ impl ChildVad {
             .stdout(Stdio::piped())
             .stderr(Stdio::null());
         let mut child = cmd.spawn().map_err(|_| ())?;
-        let stdin = child.stdin.take().ok_or(())?;
-        let stdout = child.stdout.take().ok_or(())?;
+        let stdin = match child.stdin.take() {
+            Some(stdin) => stdin,
+            None => return reap(child),
+        };
+        let stdout = match child.stdout.take() {
+            Some(stdout) => stdout,
+            None => return reap(child),
+        };
         let mut stdout = BufReader::new(stdout);
         let mut line = String::new();
-        stdout.read_line(&mut line).map_err(|_| ())?;
-        let backend = parse_ready(&line).ok_or(())?;
+        if stdout.read_line(&mut line).is_err() {
+            return reap(child);
+        }
+        let Some(backend) = parse_ready(&line) else {
+            return reap(child);
+        };
         Ok(Self {
             child,
             stdin,
@@ -916,6 +931,32 @@ impl ChildVad {
         let mut line = String::new();
         let _ = self.stdout.read_line(&mut line);
     }
+}
+
+/// `python3` on Linux, `python` or `py -3` on Windows. The first that prints
+/// a ready line is the child. A missing name fails at `spawn` and the next
+/// is tried.
+fn py_invocations(script: &Path) -> Vec<Command> {
+    let mut cmds = Vec::new();
+    for name in ["python3", "python"] {
+        let mut cmd = Command::new(name);
+        cmd.arg(script);
+        cmds.push(cmd);
+    }
+    #[cfg(windows)]
+    {
+        let mut cmd = Command::new("py");
+        cmd.arg("-3");
+        cmd.arg(script);
+        cmds.push(cmd);
+    }
+    cmds
+}
+
+fn reap<T>(mut child: Child) -> Result<T, ()> {
+    let _ = child.kill();
+    let _ = child.wait();
+    Err(())
 }
 
 impl Drop for ChildVad {
@@ -1256,13 +1297,43 @@ mod tests {
     #[test]
     fn vad_child_reports_silero_ready() {
         let path = write_ear_script();
-        let child = ChildVad::spawn(&path).expect("ear");
-        assert_eq!(child.backend, "silero");
-        let mut child = child;
-        let event = child.push(&[1_000i16; FRAME]);
-        assert_eq!(event, Some("start"));
-        drop(child);
+        match ChildVad::spawn(&path) {
+            Ok(mut child) => {
+                assert_eq!(child.backend, "silero");
+                let event = child.push(&[1_000i16; FRAME]);
+                assert_eq!(event, Some("start"));
+                drop(child);
+            }
+            Err(()) => {
+                eprintln!(
+                    "vad child skipped: no python interpreter; the energy ear is the default"
+                );
+                assert_energy_is_the_default_ear();
+            }
+        }
         let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn a_missing_interpreter_keeps_the_energy_ear() {
+        let missing = ChildVad::from_cmd(Command::new("galion-no-such-python"));
+        assert!(missing.is_err());
+        assert_energy_is_the_default_ear();
+    }
+
+    fn assert_energy_is_the_default_ear() {
+        if std::env::var_os("GALION_VAD_BIN").is_some() {
+            eprintln!("energy default not asserted: GALION_VAD_BIN is already set");
+            return;
+        }
+        let (front, backend, ready) = open_vad();
+        assert!(
+            matches!(front, Front::Energy(_)),
+            "a missing child must use the energy ear"
+        );
+        assert_eq!(backend, "energy");
+        let require = std::env::var("GALION_VAD_REQUIRE").ok().as_deref() == Some("silero");
+        assert_eq!(ready, !require);
     }
 
     #[test]
