@@ -79,6 +79,11 @@ eq("ui.gradient_scope", "background"); eq("ui.chrome_allowed", False)
 eq("ui.dot_states", ["idle", "listening", "speaking"])
 # licence
 eq("licence.code", "Perpetual Open MIT"); eq("licence.paid_tiers", False)
+# horbm hot path (2026-11-24). Does not loosen consent.
+eq("horbm.hot_path", "retrieval")
+eq("horbm.student_on_tick", False)
+eq("horbm.miss", "I don't know.")
+eq("horbm.remember_grant", "GALION_HORBM_REMEMBER=grant")
 
 # Owner pins. Global foreign_runtime_allowed stays false. These blocks do not widen it.
 eq("formats.exceptions.a21_piper.in_tree_ort", False)

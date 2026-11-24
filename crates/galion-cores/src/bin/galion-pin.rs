@@ -15,8 +15,10 @@
 //! `GALION_PIN_DEFAULT_THREADS` (default 4). One stderr line names the placement.
 
 use galion_cores::{active_map, pin_current_thread, placement, CoreRole};
-use std::os::unix::process::CommandExt;
 use std::process::Command;
+
+#[cfg(unix)]
+use std::os::unix::process::CommandExt;
 
 fn usage() -> ! {
     eprintln!("usage: galion-pin <bus|asr|reasoning|piper_samantha|piper_jarvis|retrieval> [--] <program> [args...]");
@@ -53,7 +55,25 @@ fn main() {
     let program = rest.remove(0);
     let rest: Vec<String> =
         rest.into_iter().map(|a| if a == "{threads}" { threads.to_string() } else { a }).collect();
-    let err = Command::new(&program).args(&rest).exec();
+    replace(&program, &rest);
+}
+
+/// Unix replaces this process so the pin stays on the program.
+/// Other targets wait on a child. `sched_setaffinity` is not on those targets.
+#[cfg(unix)]
+fn replace(program: &str, rest: &[String]) -> ! {
+    let err = Command::new(program).args(rest).exec();
     eprintln!("galion-pin: exec {program}: {err}");
     std::process::exit(127);
+}
+
+#[cfg(not(unix))]
+fn replace(program: &str, rest: &[String]) -> ! {
+    match Command::new(program).args(rest).status() {
+        Ok(status) => std::process::exit(status.code().unwrap_or(1)),
+        Err(err) => {
+            eprintln!("galion-pin: exec {program}: {err}");
+            std::process::exit(127);
+        }
+    }
 }

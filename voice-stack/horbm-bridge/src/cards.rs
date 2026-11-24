@@ -243,12 +243,28 @@ pub(crate) fn brain_from_dir(knowledge_dir: &Path, bind: Option<&str>) -> horbm:
         .map(|port| Box::new(PortAsk(port)) as Box<dyn horbm::ResearchAsk + Send>);
     let mut brain = horbm::Brain::with_cards(LocalCards { json, prose }, research);
     brain.set_speakable(speakable_line);
-    brain
+    attach_retrieval(brain, knowledge_dir)
 }
 
-/// HORBM reply engine. A turn is [`horbm::Brain::turn`]: empathy mood, then
-/// cards, then the gateway, then [`UNKNOWN_REPLY`]. Memory and case paths
-/// are accepted so the `Brain::open` shape stays, and they are not opened.
+/// The 7881 turn reads the retrieval cell. `remember` stays denied unless
+/// `GALION_HORBM_REMEMBER=grant`. A denied spawn does not open the diary.
+fn attach_retrieval(brain: horbm::Brain, knowledge_dir: &Path) -> horbm::Brain {
+    let mut config = horbm::RetrievalConfig::from_env();
+    config.knowledge_dir = Some(knowledge_dir.to_path_buf());
+    config.fixture_rows = 0;
+    match horbm::RetrievalThread::spawn(config) {
+        Ok(thread) => brain.with_retrieval(thread),
+        Err(err) => {
+            eprintln!("horbm retrieval: {}", err.message());
+            brain
+        }
+    }
+}
+
+/// HORBM reply engine. A turn is [`horbm::Brain::turn`]: the retrieval cell
+/// when `remember` is granted, otherwise cards and the clause fixture, then
+/// the gateway, then [`UNKNOWN_REPLY`]. Memory and case paths are accepted
+/// so the `Brain::open` shape stays, and they are not opened.
 pub struct CardEngine {
     brain: horbm::Brain,
     knowledge_dir: std::path::PathBuf,

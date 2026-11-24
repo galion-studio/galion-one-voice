@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Galion Labs
 //! Local HORBM mind. A turn is [`galion_sam_horbm::CardEngine`], which calls
-//! `horbm::Brain::turn`. Empathy sets the mood, cards answer first, a deep
-//! miss may ask the research gateway, and any other miss is `I don't know.`
-//! Memory and case files are not opened.
+//! `horbm::Brain::turn`. That turn reads the retrieval cell. `Hits` speaks
+//! the stored clause. `Miss` is `I don't know.` `Idle` is `remember` denied:
+//! cards answer, and the clause fixture covers a card miss. A deep miss on
+//! that idle path may ask the research gateway.
 //!
-//! `Brain::open` in `voice-stack/pipeline-orchestrator` still returns
-//! `horbm is not linked`. That is not this process. The card index crate is
-//! `horbm-memory` in `galion-knowledge` `v2/memory` (revision `761a7f22`).
-//! This process does not fetch that crate and does not create its sqlite
-//! file. Cards stay read-only. There is no knowledge-ro listener on
-//! 127.0.0.1:7900 in this repository.
+//! `GALION_HORBM_REMEMBER=grant` opens the in-memory diary for the same
+//! directory this process already loaded. Any other value leaves the diary
+//! closed. `Brain::open` in `voice-stack/pipeline-orchestrator` still returns
+//! `horbm is not linked`. That is not this process. There is no knowledge-ro
+//! listener on 127.0.0.1:7900 in this repository.
 
 use std::path::{Path, PathBuf};
 
