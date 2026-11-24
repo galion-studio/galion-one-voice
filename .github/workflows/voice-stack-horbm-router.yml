@@ -32,3 +32,9 @@ jobs:
           cargo clippy --manifest-path horbm/Cargo.toml -p horbm --all-targets -- -D warnings
           cargo clippy --manifest-path voice-stack/Cargo.toml -p galion-research-gateway -p galion-sam-horbm -p samantha-local-server --all-targets --no-deps -- -D warnings
           cargo clippy --manifest-path voice-stack/Cargo.toml -p galion-sam-horbm --all-targets --no-deps --features horbm -- -D warnings
+      - name: HORBM speech recognition
+        run: |
+          cargo test --manifest-path horbm/Cargo.toml --workspace
+          cargo test --manifest-path horbm/Cargo.toml -p horbm-asr --features vosk
+          cargo clippy --manifest-path horbm/Cargo.toml -p horbm-asr --all-targets -- -D warnings
+          cargo clippy --manifest-path horbm/Cargo.toml -p horbm-asr --all-targets --features vosk -- -D warnings

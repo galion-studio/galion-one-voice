@@ -1,0 +1,21 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Galion Labs
+
+[package]
+name = "horbm-asr"
+description = "HORBM speech recognition. 80 ms ear frames, partials and finals, barge-in cancel. Vosk is a feature."
+version = "0.0.1"
+edition = "2021"
+license = "MIT"
+publish = false
+rust-version = "1.85"
+
+[features]
+default = []
+# In-process Vosk through voice-stack/asr, used as-is. Off unless requested.
+# whisper-rs and sherpa-onnx are not features: LOCKS.toml forbids the ggml
+# and ort runtimes, and R4 does not follow the whisper.cpp advice.
+vosk = ["dep:galion-sam-asr"]
+
+[dependencies]
+galion-sam-asr = { path = "../../../voice-stack/asr", optional = true }

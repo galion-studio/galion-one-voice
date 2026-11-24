@@ -118,6 +118,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "horbm-asr"
+version = "0.0.1"
+dependencies = [
+ "galion-sam-asr",
+]
+
+[[package]]
 name = "horbm-brain"
 version = "0.0.1"
 
