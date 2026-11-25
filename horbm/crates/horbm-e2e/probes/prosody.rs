@@ -23,7 +23,7 @@ fn main() {
         std::process::exit(1);
     }
     for (index, sample) in pcm.iter_mut().enumerate() {
-        let t = index as f32 / f32::from(horbm_ear::SAMPLE_RATE);
+        let t = index as f32 / horbm_ear::SAMPLE_RATE as f32;
         *sample = (t * 200.0 * std::f32::consts::TAU).sin() * 0.2;
     }
     let started = std::time::Instant::now();

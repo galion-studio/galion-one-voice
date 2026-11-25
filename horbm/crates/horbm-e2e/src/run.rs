@@ -225,7 +225,14 @@ pub fn run(sense: Sense) -> Result<Outcome, String> {
     let mut queued = 0usize;
 
     for trial in 0..TRIALS {
-        let one = drive(kind, ear.as_ref(), &question_frames, &yeah, &stop_frames)?;
+        let one = drive(
+            kind,
+            ear.as_ref(),
+            sense,
+            &question_frames,
+            &yeah,
+            &stop_frames,
+        )?;
         if trial == 0 {
             brain_query = one.brain_query;
             if one.from_script != brain_from_script {
@@ -256,7 +263,11 @@ pub fn run(sense: Sense) -> Result<Outcome, String> {
 
     let mouth_real = kind != EngineKind::Stub;
     if mouth_real && (first_audio.len() != TRIALS as usize || barge_ns.len() != TRIALS as usize) {
-        return Err("a real mouth did not time first audio and barge-in on every trial".into());
+        return Err(format!(
+            "a real mouth did not time first audio and barge-in on every trial (first {} of {TRIALS}, barge {} of {TRIALS})",
+            first_audio.len(),
+            barge_ns.len()
+        ));
     }
     if !mouth_real && (!first_audio.is_empty() || !barge_ns.is_empty()) {
         return Err("a stub mouth was timed".into());
@@ -420,6 +431,7 @@ fn push_ear(report: &mut Report, ear: &EarPlan) {
 fn drive(
     kind: EngineKind,
     ear: &EarPlan,
+    sense: Sense,
     question: &[Vec<i16>],
     yeah: &[i16],
     stop: &[Vec<i16>],
@@ -446,6 +458,11 @@ fn drive(
         Kettle,
     )
     .map_err(|err| err.to_string())?;
+    // The scripted WAV is not a microphone hearing the mouth. Echo
+    // cancellation would treat the barge as playback. Prosody follows the
+    // ear switch: off means a non-zero sample is voiced again.
+    duplex.set_aec(false);
+    duplex.set_prosody(sense == Sense::On);
 
     let mut speech_end = None;
     let mut heard_voice = false;

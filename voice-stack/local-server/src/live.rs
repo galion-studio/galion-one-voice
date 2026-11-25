@@ -1,35 +1,37 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Galion Labs
-//! Mic to ear to HORBM cards to Piper.
+//! Mic to ear to [`horbm_voice::VoiceLoop`] to a mouth adapter.
 //!
 //! Silero runs in `vad-ear` (its own workspace, so `ort` stays out of this
 //! one). A quiet gap of 640 ms ends one turn. Vosk stays on a worker thread
-//! because its handles are not `Send`. The mouth is chosen in [`crate::mouth`]:
-//! Piper LJ Speech, or s711 when CUDA and the local clone files are present.
-//! The brain is [`crate::brain::HorbmMind`]: read-only cards,
-//! and `I don't know.` when none match. `Brain::open` in the orchestrator
-//! stays unlinked. This path does not open `horbm-memory`'s sqlite file.
+//! because its handles are not `Send`. The spoken turn is one
+//! [`horbm_voice::VoiceLoop::tick`]: ear, then `horbm::Brain::turn`, then the
+//! mouth selected at boot. CPU is the default device. Piper is linked only
+//! with `--features piper`. The s711 clone is selected only for an explicit
+//! cuda opt-in. The brain is [`crate::brain::HorbmMind`]. `Brain::open` in the
+//! orchestrator stays unlinked. This path does not open `horbm-memory`'s
+//! sqlite file.
 
 use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStdin, Command, Stdio};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::mpsc::{self, Sender};
-use std::sync::Arc;
-#[cfg(test)]
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
 use std::time::Duration;
 
 use galion_sam_asr::{final_text, open_engine, Asr, EngineOpts};
 use galion_sam_orch::{AudioFrame, EnergyVad, Tts as OrchTts, Vad, VadEvent};
+use horbm_voice::{EarEvent, Mouth as VoiceMouth, MouthPull, SpokenLine, VoiceLoop};
 
 use crate::audio::{self, rms, SPEAKER_RATE};
 use crate::brain::HorbmMind;
 use crate::mouth::{self, Mouth, MouthCue};
+use crate::native::{self, MindBrain, QueueEar, Stored};
 use crate::pipeline::{AudioFeed, FeedMsg, PipeInfo, Pipeline, TurnProduct};
 use crate::protocol::{dot_json, error_json, turn_json, vad_json};
-use crate::reply::{may_speak_piper, Pad, ReplyEngine, TurnOut};
+use crate::reply::{Pad, ReplyEngine, TurnOut};
 
 const FRAME: usize = 320;
 const SPEECH_RMS: f32 = 0.02;
@@ -220,8 +222,14 @@ fn worker_loop(mouth: &mut Box<dyn Mouth>, rx: std::sync::mpsc::Receiver<MouthJo
 pub struct LivePipeline {
     front: Front,
     ear: Ear,
-    mind: HorbmMind,
-    mouth: SpeakWorker,
+    mind: Arc<Mutex<HorbmMind>>,
+    last: Arc<Mutex<Option<Stored>>>,
+    feed: Arc<Mutex<Option<AudioFeed>>>,
+    #[cfg_attr(not(test), allow(dead_code))]
+    turns: Arc<AtomicU32>,
+    voice: VoiceLoop<QueueEar, LoopMouth, MindBrain>,
+    worker: Arc<Mutex<SpeakWorker>>,
+    mouth_device: &'static str,
     vad_backend: &'static str,
     vad_ready: bool,
     ear_name: &'static str,
@@ -233,26 +241,34 @@ pub struct LivePipeline {
     _worker: Option<JoinHandle<()>>,
 }
 
+struct Opened {
+    front: Front,
+    backend: &'static str,
+    ready: bool,
+    ear: Ear,
+    ear_name: &'static str,
+    asr_worker: Option<JoinHandle<()>>,
+}
+
 impl LivePipeline {
     pub fn from_env() -> Self {
         let (front, backend, ready) = open_vad();
-        let (ear, ear_name, worker) = open_ear();
-        let mouth = SpeakWorker::spawn(mouth::open());
-        Self {
-            front,
-            ear,
-            mind: HorbmMind::from_env(),
-            mouth,
-            vad_backend: backend,
-            vad_ready: ready,
-            ear_name,
-            phase: "idle",
-            level: 0.0,
-            speech: Vec::new(),
-            in_speech: false,
-            utterance: Vec::new(),
-            _worker: worker,
-        }
+        let (ear, ear_name, asr_worker) = open_ear();
+        let choice = mouth::decide(&mouth::read_input());
+        let device = mouth::mouth_device(&choice);
+        Self::assemble(
+            Opened {
+                front,
+                backend,
+                ready,
+                ear,
+                ear_name,
+                asr_worker,
+            },
+            HorbmMind::from_env(),
+            mouth::open_selected(&choice),
+            device,
+        )
     }
 
     #[cfg(test)]
@@ -265,11 +281,59 @@ impl LivePipeline {
         mind: HorbmMind,
         mouth: Box<dyn Mouth>,
     ) -> Self {
+        Self::assemble(
+            Opened {
+                front,
+                backend,
+                ready,
+                ear,
+                ear_name,
+                asr_worker: None,
+            },
+            mind,
+            mouth,
+            native::BOOT_MOUTH_DEVICE,
+        )
+    }
+
+    fn assemble(
+        opened: Opened,
+        mind: HorbmMind,
+        mouth: Box<dyn Mouth>,
+        mouth_device: &'static str,
+    ) -> Self {
+        let Opened {
+            front,
+            backend,
+            ready,
+            ear,
+            ear_name,
+            asr_worker,
+        } = opened;
+        let brain = MindBrain::new(mind);
+        let mind = Arc::clone(&brain.mind);
+        let last = Arc::clone(&brain.last);
+        let turns = Arc::clone(&brain.turns);
+        let feed = Arc::new(Mutex::new(None));
+        let worker = Arc::new(Mutex::new(SpeakWorker::spawn(mouth)));
+        let voice = VoiceLoop::new(
+            QueueEar::default(),
+            LoopMouth {
+                worker: Arc::clone(&worker),
+                feed: Arc::clone(&feed),
+            },
+            brain,
+        );
         Self {
             front,
             ear,
             mind,
-            mouth: SpeakWorker::spawn(mouth),
+            last,
+            feed,
+            turns,
+            voice,
+            worker,
+            mouth_device,
             vad_backend: backend,
             vad_ready: ready,
             ear_name,
@@ -278,8 +342,13 @@ impl LivePipeline {
             speech: Vec::new(),
             in_speech: false,
             utterance: Vec::new(),
-            _worker: None,
+            _worker: asr_worker,
         }
+    }
+
+    #[cfg(test)]
+    fn voice_turns(&self) -> u32 {
+        self.turns.load(Ordering::Relaxed)
     }
 
     fn fail(&mut self, code: &str) -> TurnProduct {
@@ -288,19 +357,28 @@ impl LivePipeline {
     }
 
     fn hear(&mut self, text: &str, t_ms: u64, preface: Vec<String>) -> TurnProduct {
-        let started = std::time::Instant::now();
-        let mut out = match self.mind.turn(text) {
-            Ok(out) => out,
-            Err(code) => return self.fail(&code),
+        let _ = t_ms;
+        self.voice.ear_mut().push(EarEvent::end(text));
+        let _frame = self.voice.tick(&[]);
+        let stored = self
+            .last
+            .lock()
+            .unwrap_or_else(|err| err.into_inner())
+            .take();
+        let feed = self
+            .feed
+            .lock()
+            .unwrap_or_else(|err| err.into_inner())
+            .take();
+        let out = match stored {
+            Some(Stored::Out(out)) => out,
+            Some(Stored::Err(code)) => return self.fail(&code),
+            None => return self.fail("brain-unlinked"),
         };
-        if out.took_us == 0 {
-            out.took_us = u32::try_from(started.elapsed().as_micros()).unwrap_or(u32::MAX);
-        }
-        out.mood = out.mood.finite_or_resting();
         let reply = out.reply.clone();
         let mut events = preface;
         events.push(turn_json(&out));
-        if !may_speak_piper(&reply, out.violations) {
+        let Some(feed) = feed else {
             self.phase = "idle";
             events.push(dot_json("idle", self.level));
             return TurnProduct {
@@ -310,11 +388,8 @@ impl LivePipeline {
                 reply,
                 feed: None,
             };
-        }
-        let _ = t_ms;
+        };
         self.phase = "speaking";
-        let cue = MouthCue::from_turn(&out);
-        let feed = self.mouth.start(reply.clone(), cue);
         events.push(dot_json("speaking", self.level));
         TurnProduct {
             events,
@@ -463,7 +538,10 @@ impl Pipeline for LivePipeline {
     }
 
     fn stop(&mut self) {
-        self.mouth.cancel();
+        self.worker
+            .lock()
+            .unwrap_or_else(|err| err.into_inner())
+            .cancel();
         self.speech.clear();
         self.utterance.clear();
         self.in_speech = false;
@@ -483,7 +561,12 @@ impl Pipeline for LivePipeline {
     }
 
     fn tick_mood(&mut self) -> (crate::reply::Pad, &'static str) {
-        match self.mind.tick() {
+        match self
+            .mind
+            .lock()
+            .unwrap_or_else(|err| err.into_inner())
+            .tick()
+        {
             Some(pad) => (pad.finite_or_resting(), "brain"),
             None => (crate::reply::Pad::RESTING, "resting"),
         }
@@ -498,17 +581,63 @@ impl Pipeline for LivePipeline {
     }
 
     fn info(&self) -> PipeInfo {
+        let mind = self.mind.lock().unwrap_or_else(|err| err.into_inner());
+        let knowledge_cards = mind.knowledge_cards();
+        let knowledge_dir = mind.knowledge_path().display().to_string();
+        drop(mind);
+        let mouth = self.worker.lock().unwrap_or_else(|err| err.into_inner());
         PipeInfo {
             ear: self.ear_name,
-            mouth: self.mouth.mouth(),
-            voice: self.mouth.voice(),
-            clone_status: self.mouth.clone_status(),
-            mind: "horbm".into(),
+            mouth: mouth.mouth(),
+            voice: mouth.voice(),
+            clone_status: mouth.clone_status(),
+            mouth_device: self.mouth_device,
+            mind: native::BOOT_BRAIN.into(),
             vad_backend: self.vad_backend,
             vad_ready: self.vad_ready,
-            knowledge_cards: self.mind.knowledge_cards(),
-            knowledge_dir: self.mind.knowledge_path().display().to_string(),
+            knowledge_cards,
+            knowledge_dir,
         }
+    }
+}
+
+/// Mouth the voice loop starts. Playback stays on the existing worker thread.
+struct LoopMouth {
+    worker: Arc<Mutex<SpeakWorker>>,
+    feed: Arc<Mutex<Option<AudioFeed>>>,
+}
+
+impl VoiceMouth for LoopMouth {
+    fn id(&self) -> &str {
+        "host"
+    }
+
+    fn start(&mut self, line: &SpokenLine) {
+        if line.text.trim().is_empty() {
+            return;
+        }
+        let cue = MouthCue::from_spoken(line);
+        let feed = self
+            .worker
+            .lock()
+            .unwrap_or_else(|err| err.into_inner())
+            .start(line.text.clone(), cue);
+        *self.feed.lock().unwrap_or_else(|err| err.into_inner()) = Some(feed);
+    }
+
+    fn pull(&mut self) -> MouthPull {
+        MouthPull::Idle
+    }
+
+    fn cancel(&mut self) {
+        self.worker
+            .lock()
+            .unwrap_or_else(|err| err.into_inner())
+            .cancel();
+    }
+
+    fn speaking(&self) -> bool {
+        false
     }
 }
 
@@ -683,7 +812,8 @@ impl Pipeline for GatedPipeline {
             mouth: self.mouth.mouth(),
             voice: self.mouth.voice(),
             clone_status: self.mouth.clone_status(),
-            mind: "horbm".into(),
+            mouth_device: native::BOOT_MOUTH_DEVICE,
+            mind: native::BOOT_BRAIN.into(),
             vad_backend: "energy",
             vad_ready: true,
             knowledge_cards: 0,
@@ -759,13 +889,18 @@ struct ChildVad {
 
 impl ChildVad {
     fn spawn(bin: &Path) -> Result<Self, ()> {
-        let mut cmd = if bin.extension().and_then(|s| s.to_str()) == Some("py") {
-            let mut cmd = Command::new("python3");
-            cmd.arg(bin);
-            cmd
-        } else {
-            Command::new(bin)
-        };
+        if bin.extension().and_then(|s| s.to_str()) == Some("py") {
+            for cmd in py_invocations(bin) {
+                if let Ok(child) = Self::from_cmd(cmd) {
+                    return Ok(child);
+                }
+            }
+            return Err(());
+        }
+        Self::from_cmd(Command::new(bin))
+    }
+
+    fn from_cmd(mut cmd: Command) -> Result<Self, ()> {
         let hang = std::env::var("GALION_VAD_HANG_MS").unwrap_or_else(|_| "640".into());
         let commit = std::env::var("GALION_VAD_COMMIT_MS").unwrap_or_else(|_| "640".into());
         cmd.env("GALION_VAD_HANG_MS", hang)
@@ -774,12 +909,22 @@ impl ChildVad {
             .stdout(Stdio::piped())
             .stderr(Stdio::null());
         let mut child = cmd.spawn().map_err(|_| ())?;
-        let stdin = child.stdin.take().ok_or(())?;
-        let stdout = child.stdout.take().ok_or(())?;
+        let stdin = match child.stdin.take() {
+            Some(stdin) => stdin,
+            None => return reap(child),
+        };
+        let stdout = match child.stdout.take() {
+            Some(stdout) => stdout,
+            None => return reap(child),
+        };
         let mut stdout = BufReader::new(stdout);
         let mut line = String::new();
-        stdout.read_line(&mut line).map_err(|_| ())?;
-        let backend = parse_ready(&line).ok_or(())?;
+        if stdout.read_line(&mut line).is_err() {
+            return reap(child);
+        }
+        let Some(backend) = parse_ready(&line) else {
+            return reap(child);
+        };
         Ok(Self {
             child,
             stdin,
@@ -806,6 +951,32 @@ impl ChildVad {
         let mut line = String::new();
         let _ = self.stdout.read_line(&mut line);
     }
+}
+
+/// `python3` on Linux, `python` or `py -3` on Windows. The first that prints
+/// a ready line is the child. A missing name fails at `spawn` and the next
+/// is tried.
+fn py_invocations(script: &Path) -> Vec<Command> {
+    let mut cmds = Vec::new();
+    for name in ["python3", "python"] {
+        let mut cmd = Command::new(name);
+        cmd.arg(script);
+        cmds.push(cmd);
+    }
+    #[cfg(windows)]
+    {
+        let mut cmd = Command::new("py");
+        cmd.arg("-3");
+        cmd.arg(script);
+        cmds.push(cmd);
+    }
+    cmds
+}
+
+fn reap<T>(mut child: Child) -> Result<T, ()> {
+    let _ = child.kill();
+    let _ = child.wait();
+    Err(())
 }
 
 impl Drop for ChildVad {
@@ -917,10 +1088,12 @@ mod tests {
         assert_eq!(out.reply, "I don't know.");
         assert!(!out.pcm.is_empty());
         assert_eq!(heard.lock().unwrap().as_slice(), ["I don't know."]);
+        assert_eq!(pipe.voice_turns(), 1);
         let mut kettle = pipe.push_text("where is the kettle", 1);
         kettle.drain_audio();
         assert_eq!(kettle.reply, "The kettle is on the stove.");
         assert!(kettle.sources_ok());
+        assert_eq!(pipe.voice_turns(), 2);
     }
 
     #[test]
@@ -971,6 +1144,7 @@ mod tests {
             heard.lock().unwrap().as_slice(),
             ["The kettle is on the stove."]
         );
+        assert_eq!(pipe.voice_turns(), 1);
     }
 
     #[test]
@@ -1143,13 +1317,43 @@ mod tests {
     #[test]
     fn vad_child_reports_silero_ready() {
         let path = write_ear_script();
-        let child = ChildVad::spawn(&path).expect("ear");
-        assert_eq!(child.backend, "silero");
-        let mut child = child;
-        let event = child.push(&[1_000i16; FRAME]);
-        assert_eq!(event, Some("start"));
-        drop(child);
+        match ChildVad::spawn(&path) {
+            Ok(mut child) => {
+                assert_eq!(child.backend, "silero");
+                let event = child.push(&[1_000i16; FRAME]);
+                assert_eq!(event, Some("start"));
+                drop(child);
+            }
+            Err(()) => {
+                eprintln!(
+                    "vad child skipped: no python interpreter; the energy ear is the default"
+                );
+                assert_energy_is_the_default_ear();
+            }
+        }
         let _ = std::fs::remove_file(&path);
+    }
+
+    #[test]
+    fn a_missing_interpreter_keeps_the_energy_ear() {
+        let missing = ChildVad::from_cmd(Command::new("galion-no-such-python"));
+        assert!(missing.is_err());
+        assert_energy_is_the_default_ear();
+    }
+
+    fn assert_energy_is_the_default_ear() {
+        if std::env::var_os("GALION_VAD_BIN").is_some() {
+            eprintln!("energy default not asserted: GALION_VAD_BIN is already set");
+            return;
+        }
+        let (front, backend, ready) = open_vad();
+        assert!(
+            matches!(front, Front::Energy(_)),
+            "a missing child must use the energy ear"
+        );
+        assert_eq!(backend, "energy");
+        let require = std::env::var("GALION_VAD_REQUIRE").ok().as_deref() == Some("silero");
+        assert_eq!(ready, !require);
     }
 
     #[test]

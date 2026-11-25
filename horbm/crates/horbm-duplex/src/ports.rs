@@ -1,17 +1,16 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Galion Labs
-//! Seams for layers that are still open pull requests.
+//! Seams between the duplex tick and the layers beside it.
 //!
-//! The real crates are not on `main`, so this loop does not name them.
-//! A later adapter implements these traits and the stand-ins in the
-//! integration test go away.
-//!
-//! | Port | Open change | What plugs in |
+//! | Port | Adapter | Build |
 //! |---|---|---|
-//! | [`Recognizer`] | speech recognizer, PR 279, `horbm-asr::SpeechRecognizer` | `push_frame` / `finish` / `cancel` |
-//! | [`Emotion`] | emotion core, PR 263, `EmotionCore::step` | one affect sample per frame |
-//! | [`Breath`] | breath, PR 278, `plan_speech` | one control cue per frame |
-//! | [`Persona`] | persona, PR 276, `Persona::samantha` | id, voice, style, miss line |
+//! | [`Recognizer`] | `AsrRecognizer` over `galion_sam_asr::Asr` | `--features vosk`, off by default |
+//! | [`Emotion`] | `CoreAffect` over `galion_emotion_core::EmotionCore` | always |
+//! | [`EarSense`] | `ProsodyEar`, energy and pitch | on by default. `Duplex::set_prosody(false)` turns it off |
+//! | echo | `PlaybackEcho` over `fdaf-aec` | on by default. `Duplex::set_aec(false)` bypasses it |
+//! | [`Persona`] | `SamanthaPersona` | always. Aria is parked |
+//! | [`Breath`] | stand-in until the breath crate lands | always |
+//! | mouth | `NativeMouth` over `horbm_voice::FakeMouth` | always |
 //!
 //! Development speaks as Samantha only. Another id is refused.
 
@@ -141,4 +140,36 @@ pub trait Persona {
     fn style(&self) -> Style;
     /// The spoken miss. Development requires `I don't know.`
     fn unknown_line(&self) -> &str;
+}
+
+/// What the ear sensed on this frame. No samples.
+///
+/// `enabled` is false when the runtime switch is off, or when the `prosody`
+/// feature was not compiled. The tick then treats any non-zero sample as
+/// voiced, which is the virtual-clock gate.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ProsodyCue {
+    pub enabled: bool,
+    pub voiced: bool,
+    pub rms_db: f32,
+    pub f0_hz: f32,
+}
+
+impl ProsodyCue {
+    #[must_use]
+    pub const fn disabled() -> Self {
+        Self {
+            enabled: false,
+            voiced: false,
+            rms_db: -120.0,
+            f0_hz: 0.0,
+        }
+    }
+}
+
+/// Prosody and ear sensing. One cue per 80 ms frame. No model.
+pub trait EarSense {
+    fn hear(&mut self, pcm: &[i16]) -> ProsodyCue;
+    fn enabled(&self) -> bool;
+    fn set_enabled(&mut self, on: bool);
 }

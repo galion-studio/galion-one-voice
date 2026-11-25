@@ -10,7 +10,7 @@ fn main() {
     let mut ear = horbm_ear::Ear::new();
     let mut pcm = vec![0.0f32; horbm_ear::FRAME_SAMPLES];
     for (index, sample) in pcm.iter_mut().enumerate() {
-        let t = index as f32 / f32::from(horbm_ear::SAMPLE_RATE);
+        let t = index as f32 / horbm_ear::SAMPLE_RATE as f32;
         *sample = (t * 190.0 * std::f32::consts::TAU).sin() * 0.2;
     }
     let horbm_ear::FrameOut::Heard(frame) = ear.push(&pcm) else {
