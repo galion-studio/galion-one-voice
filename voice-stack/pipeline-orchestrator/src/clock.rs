@@ -45,7 +45,7 @@ pub const CHUNK_CHANNEL_BOUND: usize = 4;
 pub const MAX_UTTERANCE_MS: u32 = 60_000;
 /// Default end-of-turn hang. Two heartbeats of silence.
 pub const VAD_HANG_MS: f64 = 160.0;
-/// Same minimum voiced run as `galion-v2-live` `Vad`.
+/// Same minimum voiced run as `Vad` in `archive/2026-11-24/crates/galion-v2-live/src/vad.rs`.
 pub const VAD_MIN_VOICED_MS: f64 = 60.0;
 
 const _: () = assert!(HEARTBEAT_MS == 80);

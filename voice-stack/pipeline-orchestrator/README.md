@@ -16,7 +16,7 @@ The numbers and the stage shapes come from the tree that already runs:
 | 80 ms heartbeat, 12.5 Hz | `LOCKS.toml` `[clock]`, `galion-heartbeat` | Mood advances on that tick. `Heartbeat::step` is not called. That step does not block and does not allocate. |
 | Capture 16 kHz, 20 ms, 320 samples | `galion-asr-vosk` | `AudioFrame::capture` is one Vosk frame. |
 | Playback 24 kHz, 1920 samples per 80 ms | `galion-heartbeat`, Piper worker | TTS chunks are PCM for that rate. This crate does not resample. |
-| Energy VAD, 60 ms minimum voiced | `galion-v2-live` `Vad` | `EnergyVad` uses the same floor, margin, and RMS formula. Default hang is 160 ms. |
+| Energy VAD, 60 ms minimum voiced | `voice-stack/vad`, from `archive/2026-11-24/crates/galion-v2-live` `src/vad.rs` | `EnergyVad` uses the same floor, margin, and RMS formula. Default hang is 160 ms. |
 | Clause flush at punctuation or 8 words | `galion-ml-voice` `speech/clause.rs` | The speaker receives those chunks, one at a time. |
 | Phases idle / listening / thinking / speaking | `galion_console::bus::OrbMode` | `Handle::subscribe` is the in-process feed. The HTML dot polls `/state` every 80 ms. |
 | Barge-in ceiling 200 ms | `LOCKS.toml` `[gates] barge_in_max_ms` | `AudioOut::stop` does not wait on the chunk channel. The fake-speaker time is what the tests print. |

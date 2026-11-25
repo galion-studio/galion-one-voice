@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
-//! Energy gate from `crates/galion-v2-live/src/vad.rs` and
+//! Energy gate from `archive/2026-11-24/crates/galion-v2-live/src/vad.rs` and
 //! `voice-stack/vad/src/energy.rs`.
 //!
 //! Floor starts at -60 dBFS, a frame is voice at +12 dB, and the threshold
@@ -39,7 +39,7 @@ impl EnergyVad {
     }
 }
 
-/// Same dB as `galion_v2_live::audio::rms_db` (mean square, 10 log10).
+/// Same dB as `audio::rms_db` in `archive/2026-11-24/crates/galion-v2-live/src/audio.rs` (mean square, 10 log10).
 pub fn rms_db(x: &[f32]) -> f64 {
     if x.is_empty() {
         return -120.0;

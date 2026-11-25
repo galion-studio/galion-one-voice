@@ -15,13 +15,13 @@ parts already use:
 | Capture for VAD/ASR | 16 kHz mono PCM16 | 20 ms, 320 samples | `galion-asr-vosk` `FRAME_SAMPLES`, one-dot page `VAD_FRAME` |
 | Heartbeat mic (`AudioIn::fill`) | 24 kHz mono f32 | 80 ms, 1920 samples | `MicSource` and the contract `AudioIn` |
 | Playback ring (`AudioOut`) | 24 kHz mono f32 | 80 ms, 1920 samples | `galion-heartbeat` `SAMPLE_RATE` / `FRAME_SAMPLES` |
-| Piper blocks | 22050 Hz PCM16 | resampled on push | `galion-v2-live` `PIPER_HZ` |
+| Piper blocks | 22050 Hz PCM16 | resampled on push | `archive/2026-11-24/crates/galion-v2-live` `PIPER_HZ` |
 
-Downmix is an average across channels, as in `galion-v2-live`'s `to_mono`.
+Downmix is an average across channels, as in `archive/2026-11-24/crates/galion-v2-live`'s `to_mono`.
 Capture resampling is a streaming box average, the same idea as `onCapChunk`
 in `crates/galion-console/assets/v1-screen.html`, with the remainder kept
 across short device periods. Playback resampling is linear, the same shape
-as `galion-v2-live`'s `resample`.
+as `archive/2026-11-24/crates/galion-v2-live`'s `resample`.
 
 `Playback::barge_in` drops every sample queued at that call. The render
 period that sees it writes silence. Samples pushed after `barge_in` returns

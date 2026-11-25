@@ -28,7 +28,7 @@ The companion does not get a second audio stack, a second emotion type, or a sec
 | Turn beside the heartbeat, not inside it | `crates/galion-openmind` (the rule; the brain here is HORBM, not the Hermes handoff) |
 | Stage timer | `galion_console::live::StageTimer` |
 
-`galion-v2-live` is a standalone workspace (empty `[workspace]` table) and is not a root member. `galion-sam-contract` uses that same shape so `cargo test --workspace` at the root does not build it yet.
+`archive/2026-11-24/crates/galion-v2-live` was a standalone workspace (empty `[workspace]` table) and was not a root member. That lane is archived. `galion-sam-contract` uses that same shape so `cargo test --workspace` at the root does not build it yet.
 
 ## Crate names
 
@@ -81,7 +81,7 @@ That follow-up is a draft. It is not merged from this sector. It does not edit t
 Why a nested workspace, not a root member:
 
 - Root `exclude` exists so `cargo tree --workspace` stays free of `ort`. `galion-piper-rt` loads onnxruntime in its own process (`LOCKS.toml` `formats.exceptions.a21_piper`). Joining the voice stack to the root workspace before every member is checked would put that question on the whole tree.
-- `galion-v2-live` is already a nested workspace for the same kind of reason (it depends on `serde_json` and is not a root member).
+- `archive/2026-11-24/crates/galion-v2-live` was a nested workspace for the same kind of reason (it depended on `serde_json` and was not a root member). That lane is archived.
 
 Before the follow-up lists a member, this command is run on that member's `Cargo.toml` and must print nothing:
 
