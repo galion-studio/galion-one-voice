@@ -1069,29 +1069,88 @@ mod linux {
     }
 
     fn ensure_vosk_bin(root: &Path) -> Result<PathBuf, GateErr> {
-        let bin = root
-            .join("target")
-            .join("debug")
-            .join(format!("galion-asr-vosk{}", std::env::consts::EXE_SUFFIX));
-        if bin.is_file() {
-            return Ok(bin);
+        let name = format!("galion-asr-vosk{}", std::env::consts::EXE_SUFFIX);
+        for key in ["GALION_VOSK_BIN", "CARGO_BIN_EXE_galion-asr-vosk"] {
+            if let Some(path) = env_file(key) {
+                return Ok(path);
+            }
         }
-        let status = Command::new("cargo")
+        if let Some(path) = inherited_bin(&name) {
+            return Ok(path);
+        }
+        // A private target dir, not the one `cargo test` has locked and not
+        // `$CARGO_TARGET_DIR` if that variable points at the locked dir.
+        let target_dir = cache_dir().join("vosk-target");
+        let built = target_dir.join("debug").join(&name);
+        if built.is_file() {
+            return Ok(built);
+        }
+        let manifest = root.join("Cargo.toml");
+        let output = Command::new("cargo")
             .arg("build")
             .arg("--manifest-path")
-            .arg(root.join("Cargo.toml"))
+            .arg(&manifest)
             .arg("-p")
             .arg("galion-asr-vosk")
             .arg("--bin")
             .arg("galion-asr-vosk")
-            .status()
-            .map_err(|err| GateErr::fail(format!("cargo build galion-asr-vosk: {err}")))?;
-        if !status.success() || !bin.is_file() {
-            return Err(GateErr::fail(
-                "galion-asr-vosk binary was not built. No transcript was invented.",
-            ));
+            .env("CARGO_TARGET_DIR", &target_dir)
+            .output()
+            .map_err(|err| {
+                GateErr::fail(format!(
+                    "cargo build -p galion-asr-vosk failed to start: {err}. No transcript was invented."
+                ))
+            })?;
+        if output.status.success() && built.is_file() {
+            return Ok(built);
         }
-        Ok(bin)
+        let detail = String::from_utf8_lossy(&output.stderr);
+        let detail = detail.trim();
+        let tail: String = detail
+            .lines()
+            .rev()
+            .take(12)
+            .collect::<Vec<_>>()
+            .into_iter()
+            .rev()
+            .collect::<Vec<_>>()
+            .join(" ");
+        Err(GateErr::fail(format!(
+            "galion-asr-vosk binary was not built. No transcript was invented. {tail}"
+        )))
+    }
+
+    fn env_file(key: &str) -> Option<PathBuf> {
+        let raw = std::env::var(key).ok()?;
+        let path = PathBuf::from(raw.trim());
+        path.is_file().then_some(path)
+    }
+
+    fn inherited_bin(name: &str) -> Option<PathBuf> {
+        let mut dirs = Vec::new();
+        if let Some(dir) = std::env::var_os("CARGO_TARGET_DIR") {
+            dirs.push(PathBuf::from(dir));
+        }
+        dirs.push(PathBuf::from("target"));
+        dirs.push(
+            PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("../../..")
+                .join("target"),
+        );
+        dirs.push(
+            PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("../..")
+                .join("target"),
+        );
+        for dir in dirs {
+            for profile in ["debug", "release"] {
+                let path = dir.join(profile).join(name);
+                if path.is_file() {
+                    return Some(path);
+                }
+            }
+        }
+        None
     }
 
     fn prepare_vosk(cache: &Path) -> Result<VoskPaths, GateErr> {

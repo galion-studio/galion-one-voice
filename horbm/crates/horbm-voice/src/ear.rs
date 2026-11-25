@@ -10,10 +10,19 @@ use std::fmt;
 pub enum EarEvent {
     Quiet,
     Partial(String),
-    /// Final transcript for this utterance.
+    /// Final transcript for this utterance. Empty text is an energy turn-end
+    /// with no recognizer, and the loop does not invent a line.
     End(String),
     /// The recognizer failed. The loop does not invent a line.
     Fault(String),
+    /// Speech crossed the onset on this frame.
+    Onset,
+    /// User energy while she speaks, still inside the short-backchannel window.
+    User,
+    /// Third consecutive user frame while she speaks. Barge-in.
+    Barge,
+    /// A short overlap ended. It does not cancel her turn.
+    Backchannel,
 }
 
 impl EarEvent {
@@ -30,10 +39,17 @@ impl EarEvent {
     }
 }
 
-/// Streaming speech-to-text for one frame of PCM.
+/// Streaming ear for one frame of PCM.
+///
+/// [`Ear::note_playback`] is the mouth frame already in the air. The default
+/// ignores it. The energy ear uses it to drop her own voice.
 pub trait Ear {
     fn id(&self) -> &str;
     fn poll(&mut self, pcm: &[i16]) -> EarEvent;
+
+    fn note_playback(&mut self, pcm: &[i16]) {
+        let _ = pcm;
+    }
 }
 
 /// Scripted ear for tests. It does not read the samples.
@@ -67,6 +83,10 @@ impl fmt::Display for EarEvent {
             EarEvent::Partial(text) => write!(f, "partial:{text}"),
             EarEvent::End(text) => write!(f, "end:{text}"),
             EarEvent::Fault(text) => write!(f, "fault:{text}"),
+            EarEvent::Onset => write!(f, "onset"),
+            EarEvent::User => write!(f, "user"),
+            EarEvent::Barge => write!(f, "barge"),
+            EarEvent::Backchannel => write!(f, "backchannel"),
         }
     }
 }

@@ -8,6 +8,7 @@
 //! for a lookup. The ask itself returns on this frame. A later frame merges
 //! the result when its virtual arrival is inside the cap.
 
+use crate::backchannel::{Backchannel, BackchannelConfig, ListenCue, ListenMood, ListenPolicy};
 use crate::brain::{ClauseBrain, PickedClause};
 use crate::clock::{
     VirtualClock, COMMIT_SILENCE_FRAMES, DUCK_MS, FRAME_MS, HANG_FRAMES, PAUSE_MS,
@@ -30,6 +31,23 @@ pub enum Ear<'a> {
     Speech(&'a str),
 }
 
+/// End-of-turn message from the ear prosody scorer.
+///
+/// The same three variants live on `horbm_ear::TurnMsg`. This crate does not
+/// link the ear. [`TurnMsg::PauseOnly`] is the path [`Conductor::tick`] has
+/// always used, and it is what a denied prosody ear (`horbm_ear::Ear::deny`,
+/// `GALION_EAR_SENSE` off) asks for. [`TurnMsg::Hold`] keeps the floor with
+/// the user. [`TurnMsg::Yield`] releases the clause on this quiet frame.
+///
+/// Barge-in does not read this message. Overlap while Samantha is speaking
+/// still arms silence on the 200 ms lock.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TurnMsg {
+    PauseOnly,
+    Hold,
+    Yield { question: bool },
+}
+
 /// Floor. Speculating holds the clause behind the gate. Speaking has released it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Floor {
@@ -49,6 +67,8 @@ pub enum TickEvent {
     Committed,
     Backchannel,
     BargeIn,
+    /// Samantha nodded while the user kept the floor. Not a barge-in.
+    ListenBackchannel,
 }
 
 struct Held {
@@ -91,6 +111,10 @@ pub struct Conductor<B: ClauseBrain, R: ResearchClient = OfflineClient> {
     frame_log: Option<String>,
     side_log: Vec<String>,
     side_cancels: u32,
+    /// Set for the frame that took a rising-pitch yield. Cleared each tick.
+    frame_question: bool,
+    /// Listening nods. Default on, Samantha. Does not own the floor.
+    listen: ListenPolicy,
 }
 
 /// One frame of output. `t_ms` is the virtual frame start.
@@ -116,6 +140,10 @@ pub struct TickOut {
     pub side_band: SideBandView,
     pub research_clause: Option<String>,
     pub side_log_line: Option<String>,
+    /// True when this frame's yield was a rising terminal contour.
+    pub end_question: bool,
+    /// A listening nod on this frame. The floor stays with the user.
+    pub backchannel: Option<Backchannel>,
 }
 
 impl<B: ClauseBrain> Conductor<B, OfflineClient> {
@@ -163,7 +191,28 @@ impl<B: ClauseBrain, R: ResearchClient> Conductor<B, R> {
             frame_log: None,
             side_log: Vec::new(),
             side_cancels: 0,
+            frame_question: false,
+            listen: ListenPolicy::new(),
         }
+    }
+
+    /// Listening nods. Default is on. `GALION_BACKCHANNEL=0|off` is
+    /// [`BackchannelConfig::from_env`], applied here by the host.
+    pub fn set_backchannel_config(&mut self, config: BackchannelConfig) {
+        self.listen.enabled = config.enabled;
+    }
+
+    pub fn backchannel_enabled(&self) -> bool {
+        self.listen.enabled
+    }
+
+    /// Only `samantha` nods. Aria and clone-pack ids stay quiet.
+    pub fn set_persona(&mut self, persona: impl Into<String>) {
+        self.listen.set_persona(persona);
+    }
+
+    pub fn persona(&self) -> &str {
+        self.listen.persona()
     }
 
     pub fn epoch(&self) -> u64 {
@@ -192,18 +241,65 @@ impl<B: ClauseBrain, R: ResearchClient> Conductor<B, R> {
         &self.research
     }
 
-    /// Advance one virtual frame. Does not read a wall clock.
-    /// Does not wait on Galion Research.
+    /// Advance one virtual frame. Pause-only end of turn.
+    /// Does not read a wall clock. Does not wait on Galion Research.
     pub fn tick(&mut self, ear: Ear<'_>, intent: Option<&Document>) -> TickOut {
+        self.tick_turn(ear, intent, TurnMsg::PauseOnly)
+    }
+
+    /// [`Self::tick`] with an end-of-turn message from the prosody scorer.
+    ///
+    /// Speaking and ducked frames ignore `turn`, so barge-in stays the
+    /// overlap rule. A yield on a quiet listening frame starts the brain and
+    /// releases the clause on that same frame. A hold does neither.
+    /// This path does not nod: the host passes a listening cue to
+    /// [`Self::tick_listen`].
+    pub fn tick_turn(&mut self, ear: Ear<'_>, intent: Option<&Document>, turn: TurnMsg) -> TickOut {
+        self.tick_listen(ear, intent, turn, ListenCue::None, ListenMood::resting())
+    }
+
+    /// [`Self::tick_turn`] plus a listening cue and Samantha's moment.
+    ///
+    /// A nod fires only while the user holds, on the quiet frame after a
+    /// clause-final fall, and it does not take the floor. Yield, a question
+    /// rise, a filler, and a denied ear (`PauseOnly`) do not nod. The nod is
+    /// not a barge-in and it does not cancel the user's turn.
+    pub fn tick_listen(
+        &mut self,
+        ear: Ear<'_>,
+        intent: Option<&Document>,
+        turn: TurnMsg,
+        cue: ListenCue,
+        mood: ListenMood,
+    ) -> TickOut {
         let t_ms = self.clock.t_ms();
         let t_us = self.clock.t_us();
         self.side_note = SideBandView::Idle;
         self.frame_log = None;
+        self.frame_question = false;
         let mut event = TickEvent::None;
         let me_silent = self.apply_armed_silence(&mut event);
+        let user_has_floor = matches!(self.floor, Floor::Listening | Floor::Speculating);
+        if user_has_floor {
+            if let Ear::Speech(text) = ear {
+                if !text.trim().is_empty() {
+                    self.listen.note_voiced(t_ms);
+                }
+            }
+        }
+        let quiet = matches!(ear, Ear::Quiet);
         match ear {
-            Ear::Quiet => self.on_quiet(t_us, &mut event),
+            Ear::Quiet => self.on_quiet(t_us, &mut event, turn),
             Ear::Speech(text) => self.on_speech(text, &mut event),
+        }
+        let holding = quiet
+            && matches!(turn, TurnMsg::Hold)
+            && self.floor == Floor::Listening
+            && event == TickEvent::None
+            && !self.cancel;
+        let backchannel = self.listen.consider(t_ms, quiet, holding, cue, mood);
+        if backchannel.is_some() {
+            event = TickEvent::ListenBackchannel;
         }
         if !self.cancel {
             self.poll_research(t_ms);
@@ -233,6 +329,8 @@ impl<B: ClauseBrain, R: ResearchClient> Conductor<B, R> {
             side_band: self.side_note,
             research_clause: self.merged.clone(),
             side_log_line: self.frame_log.clone(),
+            end_question: self.frame_question,
+            backchannel,
         };
         self.clock.advance();
         out
@@ -257,7 +355,7 @@ impl<B: ClauseBrain, R: ResearchClient> Conductor<B, R> {
         true
     }
 
-    fn on_quiet(&mut self, t_us: u64, event: &mut TickEvent) {
+    fn on_quiet(&mut self, t_us: u64, event: &mut TickEvent, turn: TurnMsg) {
         if self.cancel || *event == TickEvent::BargeIn {
             return;
         }
@@ -277,15 +375,38 @@ impl<B: ClauseBrain, R: ResearchClient> Conductor<B, R> {
                 }
             }
         }
-        if self.floor == Floor::Listening
-            && !self.partial.is_empty()
-            && self.stable_ticks >= STABLE_TICKS
-            && self.silent_ticks >= HANG_FRAMES
-        {
-            self.eager(t_us, event);
+        // The message applies while we are still deciding the user's turn.
+        // Speaking and ducked stay on the barge-in path in `on_speech`.
+        if matches!(self.floor, Floor::Speaking | Floor::Ducked | Floor::Paused) {
             return;
         }
-        if self.floor == Floor::Speculating && self.silent_ticks >= COMMIT_SILENCE_FRAMES {
+        if self.floor == Floor::Speculating && matches!(turn, TurnMsg::Hold) {
+            self.rollback(event);
+            return;
+        }
+        let pause_only = matches!(turn, TurnMsg::PauseOnly)
+            && !self.partial.is_empty()
+            && self.stable_ticks >= STABLE_TICKS
+            && self.silent_ticks >= HANG_FRAMES;
+        let yielded = matches!(turn, TurnMsg::Yield { .. })
+            && !self.partial.is_empty()
+            && self.silent_ticks >= HANG_FRAMES;
+        if self.floor == Floor::Listening && (pause_only || yielded) {
+            if let TurnMsg::Yield { question } = turn {
+                self.frame_question = question;
+            }
+            self.eager(t_us, event);
+            // A prosodic yield already heard the ending contour, so the
+            // confirm silence is this frame. Pause-only still waits.
+            if yielded {
+                self.commit(t_us, event);
+            }
+            return;
+        }
+        if self.floor == Floor::Speculating
+            && !matches!(turn, TurnMsg::Hold)
+            && self.silent_ticks >= COMMIT_SILENCE_FRAMES
+        {
             self.commit(t_us, event);
         }
     }

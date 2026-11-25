@@ -7,8 +7,18 @@ use horbm_eval::{Config, Mode, Thresholds};
 
 /// Linux x86_64 round trip. A missing model or a failed download is a skip,
 /// not a score. The default `cargo test` build does not compile this test.
+///
+/// `CARGO_BIN_EXE_galion-asr-vosk` is the worker Cargo built for this test.
+/// A clean target directory still has the binary, because this package builds
+/// it when the `real` feature is on.
 #[test]
 fn the_real_linux_ear_and_mouth_round_trip() {
+    let vosk_bin = env!("CARGO_BIN_EXE_galion-asr-vosk");
+    assert!(
+        std::path::Path::new(vosk_bin).is_file(),
+        "galion-asr-vosk was not built at {vosk_bin}. No transcript was invented."
+    );
+    std::env::set_var("GALION_VOSK_BIN", vosk_bin);
     let report = horbm_eval::run_with(Config {
         research_dir: None,
         thresholds: Thresholds::embedded(),
