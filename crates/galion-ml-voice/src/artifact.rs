@@ -37,6 +37,10 @@ pub const FRAME_MS: u32 = 80;
 /// Samples in one frame at [`SAMPLE_RATE`].
 pub const FRAME_SAMPLES: usize = (SAMPLE_RATE as usize * FRAME_MS as usize) / 1000;
 /// One percent of an 80 ms frame. Non-inference tick budget (CPU foundation).
+///
+/// The tick test judges this on the 99th percentile after warmup. One sample
+/// may run longer. The clock and the single-sample ceiling are in
+/// `docs/horbm/foundations/S53-timing-gates.md`. This constant stays 800 µs.
 pub const TICK_BUDGET: Duration = Duration::from_micros(800);
 /// Longest utterance this compiler will pack (15 min at 24 kHz).
 pub const MAX_SAMPLES: u32 = 15 * 60 * SAMPLE_RATE;

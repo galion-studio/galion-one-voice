@@ -47,6 +47,8 @@ galion-source-filter = { path = "../galion-source-filter", optional = true }
 [dev-dependencies]
 galion-emotion = { path = "../../galion-emotion" }
 galion-heartbeat = { path = "../galion-heartbeat", default-features = false }
+# Thread CPU clock for the tick gate. Already in the workspace lock (vad, piper-rt).
+libc = "0.2"
 
 [[bin]]
 name = "galion-voice-compile"
