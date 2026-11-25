@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Galion Labs
-//! Direct layer 5 call. The live 7881 turn is [`horbm::Brain::turn`], which
-//! runs empathy and then this same order.
+//! Direct layer 5 call. The in-call reply is one [`horbm::Brain::turn`].
+//! Cards answer first. A miss on this call is `I don't know.` The Galion
+//! Research gateway is a follow-up, not part of that reply. It does not
+//! replace the line [`route`] already returned.
 //!
-//! [`route`] calls [`crate::ReasoningRouter::turn`], which calls
-//! [`crate::ReasoningRouter::route`]. Cards answer first. A miss is
-//! `I don't know.` This module does not bind a socket, does not dial the
-//! Node desk, and does not call a model. A research bind is used only when
-//! it is `127.0.0.1` and it is not the desk, Hermes, or this voice server.
+//! [`route`] calls [`crate::ReasoningRouter::turn`]. This module does not
+//! bind a socket, does not dial the Node desk, and does not call a model.
+//! A research bind is used only when it is `127.0.0.1` and it is not the
+//! desk, Hermes, or this voice server.
 
 use std::net::SocketAddr;
 
@@ -44,7 +45,9 @@ fn refused(addr: SocketAddr) -> bool {
     REFUSED_PORTS.contains(&addr.port())
 }
 
-/// One turn through layer 5. The router reads its cards before any research.
+/// One in-call reply. This is the brain turn: the local clause is the text.
+/// A deep card miss is `I don't know.` The gateway, when a port is attached,
+/// is a follow-up and is not spoken here.
 pub fn route(router: &mut ReasoningRouter, heard: &str) -> Reply {
     router.turn(heard)
 }

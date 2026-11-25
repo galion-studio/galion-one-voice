@@ -2,7 +2,8 @@
 // Copyright (c) 2026 Galion Labs
 //! HORBM layer 5, the reasoning router.
 //!
-//! Order, fixed by the owner on 21 Nov 2026:
+//! [`ReasoningRouter::route`] is the path the pipeline orchestrator calls.
+//! Its order stays fixed:
 //!
 //! 1. HORBM cards answer first.
 //! 2. When no card matches there is no gap filler. No S0, no LLM, no Ollama.
@@ -11,9 +12,14 @@
 //!    [`galion_research_gateway::RESEARCH_CAP`] (3 seconds). On timeout the
 //!    spoken line is still [`crate::UNKNOWN_REPLY`].
 //!
-//! The 7881 UI calls `horbm::Brain::turn`, which uses this same order after
-//! the empathy rewrite. It does not call the gateway before the cards.
+//! [`ReplyEngine::turn`] is not that path. It is one [`horbm::Brain::turn`],
+//! built once when the router is constructed. The in-call reply is the local
+//! clause. A deep question whose cards miss speaks [`crate::UNKNOWN_REPLY`]
+//! and never the gateway body. The gateway runs only after that turn value
+//! is dropped. [`ReasoningRouter::research_follow_up`] reads the result and
+//! does not speak it.
 
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use galion_research_gateway::{ClientReply, ResearchClient};
@@ -92,21 +98,36 @@ pub struct RouteOutcome {
     pub took_us: u32,
 }
 
-/// Layer 5. Cards, then maybe research, then an honest miss.
+/// Layer 5.
+///
+/// `route` is the orchestrator's path: cards, then the gateway, then an
+/// honest miss. [`ReplyEngine::turn`] is one brain turn: the local clause
+/// is spoken, and the gateway is a follow-up.
+///
+/// The card loader and the research port are each one value. `route` and
+/// the brain share them. `CardLoader` is `Send` and not `Sync`, so the share
+/// is a mutex. Each lookup or ask holds that mutex only for the delegated
+/// call.
 pub struct ReasoningRouter {
-    cards: Box<dyn CardLoader>,
-    research: Option<Box<dyn ResearchPort>>,
+    cards: Arc<Mutex<Box<dyn CardLoader>>>,
+    research: Option<Arc<Mutex<Box<dyn ResearchPort>>>>,
     gaps: Vec<GapEntry>,
     mood: Pad,
+    /// Built once in [`Self::new`]. A turn does not build another.
+    brain: horbm::Brain,
 }
 
 impl ReasoningRouter {
     pub fn new(cards: impl CardLoader, research: Option<Box<dyn ResearchPort>>) -> Self {
+        let cards = Arc::new(Mutex::new(Box::new(cards) as Box<dyn CardLoader>));
+        let research = research.map(|port| Arc::new(Mutex::new(port)));
+        let brain = build_brain(&cards, &research);
         Self {
-            cards: Box::new(cards),
+            cards,
             research,
             gaps: Vec::new(),
             mood: Pad::RESTING,
+            brain,
         }
     }
 
@@ -151,11 +172,27 @@ impl ReasoningRouter {
         &self.gaps
     }
 
+    /// Gateway result for the last in-call turn, once the worker has finished.
+    ///
+    /// Does not block. Does not change the reply [`ReplyEngine::turn`] already
+    /// returned. `None` means nothing is waiting.
+    pub fn research_follow_up(&mut self) -> Option<horbm::ResearchFollowUp> {
+        self.brain.research_follow_up()
+    }
+
+    /// Orchestrator path. Cards, then a deep-question gateway ask, then a miss.
+    ///
+    /// This still calls [`horbm::route_heard`] with the research port. The
+    /// in-call [`ReplyEngine::turn`] does not speak that answer.
     pub fn route(&mut self, heard: &str) -> RouteOutcome {
-        let cards = LookupAdapt(self.cards.as_ref());
-        let routed = match self.research.as_mut() {
+        let cards = SharedCards {
+            cards: Arc::clone(&self.cards),
+        };
+        let routed = match &self.research {
             Some(port) => {
-                let mut ask = AskAdapt(port.as_mut());
+                let mut ask = SharedAsk {
+                    port: Arc::clone(port),
+                };
                 horbm::route_heard(heard, &cards, Some(&mut ask), speakable_line)
             }
             None => horbm::route_heard(heard, &cards, None, speakable_line),
@@ -170,17 +207,22 @@ impl ReasoningRouter {
 
 impl ReplyEngine for ReasoningRouter {
     fn turn(&mut self, text: &str) -> Reply {
-        let outcome = self.route(text);
-        Reply {
-            text: outcome.spoken,
+        let out = self.brain.turn(text);
+        let reply = Reply {
+            text: out.reply.clone(),
             mood: self.mood,
-            sources: outcome.sources,
-            evidence: outcome.evidence,
+            sources: out.sources.clone(),
+            evidence: out.evidence.clone(),
             propensity: 0.0,
             violations: 0,
-            lookup_us: outcome.lookup_us,
-            took_us: outcome.took_us,
-        }
+            lookup_us: out.lookup_us,
+            took_us: out.took_us,
+        };
+        // The local clause is already in `reply`. Dropping the turn value
+        // is what lets a deep-miss follow-up start. The follow hook is not
+        // public, so the whole value is dropped while it is still intact.
+        drop(out);
+        reply
     }
 
     fn tick(&mut self) -> Pad {
@@ -215,28 +257,60 @@ pub(crate) fn speakable_line(text: &str) -> Option<String> {
     )
 }
 
-struct LookupAdapt<'a>(&'a dyn CardLoader);
+struct SharedCards {
+    cards: Arc<Mutex<Box<dyn CardLoader>>>,
+}
 
-impl horbm::CardLookup for LookupAdapt<'_> {
+impl horbm::CardLookup for SharedCards {
     fn lookup(&self, query: &str) -> Option<horbm::CardHit> {
-        CardLoader::lookup(self.0, query).map(|hit| horbm::CardHit {
+        let hit = {
+            let guard = self.cards.lock().expect("cards");
+            CardLoader::lookup(guard.as_ref(), query)
+        };
+        hit.map(|hit| horbm::CardHit {
             id: hit.id,
             gist: hit.gist,
         })
     }
 }
 
-struct AskAdapt<'a>(&'a mut dyn ResearchPort);
+struct SharedAsk {
+    port: Arc<Mutex<Box<dyn ResearchPort>>>,
+}
 
-impl horbm::ResearchAsk for AskAdapt<'_> {
+impl horbm::ResearchAsk for SharedAsk {
     fn ask(&mut self, question: &str, cap: Duration) -> horbm::AskOutcome {
-        match self.0.ask(question, cap) {
+        let answer = {
+            let mut guard = self.port.lock().expect("research");
+            guard.ask(question, cap)
+        };
+        match answer {
             ResearchAnswer::Answer { text, source } => horbm::AskOutcome::Answer { text, source },
             ResearchAnswer::Miss => horbm::AskOutcome::Miss,
             ResearchAnswer::Timeout => horbm::AskOutcome::Timeout,
             ResearchAnswer::Unreachable => horbm::AskOutcome::Unreachable,
         }
     }
+}
+
+/// One brain for the life of the router. The adapters hold the same arcs
+/// `route` locks. Persona configuration is whatever [`horbm::Brain::with_cards`]
+/// loads. This function does not name one.
+fn build_brain(
+    cards: &Arc<Mutex<Box<dyn CardLoader>>>,
+    research: &Option<Arc<Mutex<Box<dyn ResearchPort>>>>,
+) -> horbm::Brain {
+    let lookup = SharedCards {
+        cards: Arc::clone(cards),
+    };
+    let ask = research.as_ref().map(|port| {
+        Box::new(SharedAsk {
+            port: Arc::clone(port),
+        }) as Box<dyn horbm::ResearchAsk + Send>
+    });
+    let mut brain = horbm::Brain::with_cards(lookup, ask);
+    brain.set_speakable(speakable_line);
+    brain
 }
 
 fn map_route(out: horbm::RouteOut) -> RouteOutcome {
