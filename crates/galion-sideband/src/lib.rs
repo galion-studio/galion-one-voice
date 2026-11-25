@@ -16,6 +16,8 @@
 pub mod client;
 /// W21-03 · plan P0.1: `language_hint` / `lang_pin` side-band types.
 pub mod lang;
+/// Posted Galion Research mark. Virtual time, same wire as [`ToHermes`] / [`FromHermes`].
+pub mod mark;
 
 use core::time::Duration;
 
@@ -91,7 +93,19 @@ pub enum FromHermes {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum NoKnowledgeReason { Timeout, Unreachable, NotFound, Denied }
+pub enum NoKnowledgeReason {
+    Timeout,
+    Unreachable,
+    NotFound,
+    Denied,
+    /// The voice path cancelled the ask before a body arrived.
+    Cancelled,
+}
 
 /// Classify a reply by elapsed time: anything past the cap is dropped as Timeout.
 pub fn within_cap(elapsed: Duration) -> bool { elapsed <= RETRIEVAL_CAP }
+
+pub use mark::{
+    MarkEdge, MarkKind, MarkLog, SidebandConsent, SidebandMark, LEARN_IN_BAND, LEARN_LOCK,
+    MARK_SOURCE, REMEMBER_LOCK,
+};
