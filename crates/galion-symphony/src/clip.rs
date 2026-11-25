@@ -210,7 +210,7 @@ pub fn open(path: &Path) -> Result<Clip> {
 }
 
 pub fn parse(bytes: &[u8]) -> Result<Clip> {
-    if bytes.len() < HEADER_LEN || &bytes[0..8] != MAGIC {
+    if bytes.len() < HEADER_LEN || bytes[0..8] != MAGIC {
         return Err(Error::Bad("clip: bad magic".into()));
     }
     let version = u16::from_le_bytes([bytes[8], bytes[9]]);

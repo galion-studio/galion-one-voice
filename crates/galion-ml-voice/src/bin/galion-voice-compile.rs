@@ -53,8 +53,8 @@ fn run(args: &[String]) -> Result<ExitCode, ArtError> {
     }
     let persona = persona.ok_or_else(|| ArtError::BadInput("missing --persona".into()))?;
     let input = input.ok_or_else(|| ArtError::BadInput("missing --input".into()))?;
-    let out = out.unwrap_or_else(|| artifact::artifact_path(&persona));
-    let rep = artifact::compile_file(&input, &out, &persona, rate, channels)?;
+    let out = out.unwrap_or_else(|| artifact::artifact_path(persona));
+    let rep = artifact::compile_file(&input, &out, persona, rate, channels)?;
     println!(
         "compiled {} frames={} samples={} sha256={} pcm_bytes={}",
         rep.path.display(),

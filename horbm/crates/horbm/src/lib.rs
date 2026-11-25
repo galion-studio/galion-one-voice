@@ -31,6 +31,11 @@
 //! core. Neither call rewrites the empathy mood or the voice baseline.
 //! Learning a new care stays off while `LOCKS.toml` `[consent] learn` is deny.
 //!
+//! [`Brain::open`] and [`Brain::boot`] with no path load Samantha, the
+//! development persona. Aria stays in the repo and is not loaded. An explicit
+//! path replaces Samantha. An invalid file is refused. [`Brain::admit_move`]
+//! is the legal-move port.
+//!
 //! [`LearnPass`] is not part of that order. It is the offline learn pass.
 //! Learn consent is [`LearnConfig::granted`]. [`Brain::turn`] does not call it.
 
@@ -53,6 +58,9 @@ pub use galion_emotion_core::{
 pub use galion_research_gateway::RESEARCH_CAP;
 pub use galion_sam_empathy::{Intent, PronounClass, FRAME_MS};
 pub use horbm_brain::{Answer, Heuristic, MarkKind, SidebandMark};
+pub use horbm_persona::{
+    LegalMovePort, MoveClaim, MoveVerdict, Persona, PersonaError, StyleHook, UNKNOWN_LINE,
+};
 pub use learn::{
     ClauseSource, LearnAudit, LearnConfig, LearnError, LearnPass, LearnedRow, LEARN_PACK_DB,
     LEARN_PACK_LIVE, LEARN_PACK_NEXT, LEARN_PACK_RETIRING,

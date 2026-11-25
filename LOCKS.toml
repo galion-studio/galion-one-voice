@@ -74,7 +74,7 @@ sources = ["CURSOR-20-AGENTS.A15", "FINAL-BUILD-SPEC.S2"]
 [consent]
 bits = ["sense", "adapt", "remember", "share"]  # EmotionWire byte 7, bits 0..3
 default = "deny"                  # every bit off at session start
-sense = "deny"
+sense = "deny"                  # session bit for the rest of the voice. Ear prosody is [consent.ear_prosody].
 adapt = "deny"
 remember = "deny"
 share = "deny"
@@ -89,6 +89,12 @@ persist_requires = "AffectStore<Consented>"
 sources = ["Q-EMOTION.Q4", "Q-EUREKA.Q15", "Q-EMOTION.Q7", "Q-EMOTION.Q9",
            "Q-EMOTION.Q10", "Q-RIKA.Q10", "Q-RIKA.Q12", "Q-BUILD.Q14",
            "owner-2026-11-24-learn"]
+
+# Owner decision, Mate, 2026-11-24 21:31 CET. Ear-side prosody starts on.
+# The session bits above stay deny. GALION_EAR_SENSE=0|off|deny closes this layer.
+[consent.ear_prosody]
+sense = "allow"
+off_env = "GALION_EAR_SENSE"
 
 # ---------------------------------------------------------------- formats / runtimes
 [formats]

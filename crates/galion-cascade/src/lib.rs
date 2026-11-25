@@ -157,5 +157,6 @@ mod tests {
     #[test] fn mock_turn() { let t = mock_cascade().turn(&[100; 1600]).unwrap(); assert_eq!(t.emotion, Emotion::Neutral); assert!(t.reply.contains("hello galion")); assert!(!t.audio.is_empty()); }
     #[test] fn empty_rejected() { assert!(matches!(mock_cascade().turn(&[]), Err(CascadeError::Empty))); }
     #[test] fn loud_is_angry() { assert_eq!(MockEmotion.classify(&[20_000; 160]), Emotion::Angry); }
-    #[test] fn budgets() { assert!(BARGE_IN_BUDGET_MS < ONSET_P50_BUDGET_MS); }
+    #[test] fn budgets() { assert!(lock_off(BARGE_IN_BUDGET_MS < ONSET_P50_BUDGET_MS)); }
+    fn lock_off(cond: bool) -> bool { cond }
 }
