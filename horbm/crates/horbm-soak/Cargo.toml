@@ -16,3 +16,7 @@ horbm-duplex = { path = "../horbm-duplex" }
 horbm-voice = { path = "../horbm-voice" }
 galion-emotion-core = { path = "../../../crates/galion-emotion-core" }
 galion-ml-voice = { path = "../../../crates/galion-ml-voice", features = ["speech"] }
+
+[dev-dependencies]
+# Thread CPU clock for the soak gate. Already locked in the horbm workspace.
+libc = "0.2"

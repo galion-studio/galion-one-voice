@@ -831,6 +831,7 @@ dependencies = [
  "horbm",
  "horbm-duplex",
  "horbm-voice",
+ "libc",
 ]
 
 [[package]]

@@ -26,9 +26,103 @@ use crate::{AllocSpan, Report, Window};
 /// Fixed seed. The schedule and the sine phase come from this and nothing else.
 pub const SEED: u64 = 0x5341_4D41_4E54_4831;
 
+/// Dropped from the ranked tick series. Allocation buckets and the RSS
+/// warmup read already use this cutoff. Ticks `0..WARMUP_TICKS` are not
+/// ranked. Tick `WARMUP_TICKS` is the first ranked tick.
 const WARMUP_TICKS: u64 = 250;
 const WINDOW_TICKS: u64 = 3_750;
 const END_SLACK: u64 = 800;
+
+/// Clock around [`run`]'s `Duplex::tick`.
+///
+/// [`TickClock::Wall`] is [`std::time::Instant`]. The gate sample and the
+/// wall sample are that one reading.
+///
+/// [`TickClock::ThreadCpu`] reads a monotonic nanosecond clock the caller
+/// supplies. On Unix that clock is `CLOCK_THREAD_CPUTIME_ID`. Wall time is
+/// still [`std::time::Instant`] around the same call, and it is not a gate.
+/// This crate stays free of `unsafe`. The integration test owns the syscall.
+#[derive(Clone, Copy)]
+pub enum TickClock {
+    Wall,
+    ThreadCpu(fn() -> u64),
+}
+
+impl TickClock {
+    /// `wall` or `thread-cpu`. Printed on the soak line.
+    #[must_use]
+    pub fn name(self) -> &'static str {
+        match self {
+            TickClock::Wall => "wall",
+            TickClock::ThreadCpu(_) => "thread-cpu",
+        }
+    }
+}
+
+fn elapsed_ns(started: Instant) -> u64 {
+    u64::try_from(started.elapsed().as_nanos()).unwrap_or(u64::MAX)
+}
+
+/// Ranked tick samples. Warmup ticks are counted, then left out of every
+/// window. A window still closes on the 3,750-tick block boundary, so the
+/// first window is short by the warmup and the later windows stay 3,750.
+struct Series {
+    gate: Vec<u64>,
+    wall: Vec<u64>,
+    windows: Vec<Window>,
+    warmup_ticks: u64,
+    warmup_gate_max: u64,
+    warmup_wall_max: u64,
+}
+
+impl Series {
+    fn new() -> Self {
+        Self {
+            gate: Vec::with_capacity(WINDOW_TICKS as usize),
+            wall: Vec::with_capacity(WINDOW_TICKS as usize),
+            windows: Vec::new(),
+            warmup_ticks: 0,
+            warmup_gate_max: 0,
+            warmup_wall_max: 0,
+        }
+    }
+
+    /// Records one tick. Returns whether this tick closed a block.
+    fn on_tick(&mut self, tick: u64, gate_ns: u64, wall_ns: u64) -> bool {
+        if tick < WARMUP_TICKS {
+            self.warmup_ticks = self.warmup_ticks.saturating_add(1);
+            self.warmup_gate_max = self.warmup_gate_max.max(gate_ns);
+            self.warmup_wall_max = self.warmup_wall_max.max(wall_ns);
+        } else {
+            self.gate.push(gate_ns);
+            self.wall.push(wall_ns);
+        }
+        if tick % WINDOW_TICKS == WINDOW_TICKS - 1 {
+            self.close();
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Closes a partial window when the call stopped off a block boundary.
+    fn finish(&mut self) -> bool {
+        if self.gate.is_empty() {
+            return false;
+        }
+        self.close();
+        true
+    }
+
+    fn close(&mut self) {
+        if self.gate.is_empty() {
+            return;
+        }
+        let index = self.windows.len() as u32;
+        self.windows
+            .push(close_window(index, &mut self.gate, &mut self.wall));
+    }
+}
 
 const PHRASES: [&[&str]; 3] = [
     &["where", "is", "the", "kettle"],
@@ -455,7 +549,7 @@ pub fn ticks_for(minutes: u64) -> u64 {
     minutes.saturating_mul(60).saturating_mul(1_000) / 80
 }
 
-pub fn run(minutes: u64, allocs: &dyn Fn() -> u64) -> Report {
+pub fn run(minutes: u64, allocs: &dyn Fn() -> u64, clock: TickClock) -> Report {
     let ticks = ticks_for(minutes);
     let probed = probes(allocs);
     let line = Rc::new(RefCell::new(EMPTY));
@@ -485,8 +579,7 @@ pub fn run(minutes: u64, allocs: &dyn Fn() -> u64) -> Report {
     let mut idle = AllocSpan::new();
     let mut play = AllocSpan::new();
     let mut hold = AllocSpan::new();
-    let mut walls: Vec<u64> = Vec::with_capacity(WINDOW_TICKS as usize);
-    let mut windows = Vec::new();
+    let mut series = Series::new();
     let mut user_sent = 0u64;
     let mut user_heard = 0u64;
     let mut prosody_bad = 0u64;
@@ -501,7 +594,11 @@ pub fn run(minutes: u64, allocs: &dyn Fn() -> u64) -> Report {
         fill_sine(&mut pcm, action.voiced, &mut phase, hz);
 
         let before = allocs();
-        let started = Instant::now();
+        let wall_at = Instant::now();
+        let cpu_at = match clock {
+            TickClock::ThreadCpu(read) => read(),
+            TickClock::Wall => 0,
+        };
         let frame = match duplex.tick(&pcm) {
             Ok(frame) => frame,
             Err(err) => {
@@ -509,9 +606,15 @@ pub fn run(minutes: u64, allocs: &dyn Fn() -> u64) -> Report {
                 break;
             }
         };
+        let gate_ns = match clock {
+            TickClock::ThreadCpu(read) => read().saturating_sub(cpu_at),
+            TickClock::Wall => elapsed_ns(wall_at),
+        };
+        let wall_ns = match clock {
+            TickClock::Wall => gate_ns,
+            TickClock::ThreadCpu(_) => elapsed_ns(wall_at),
+        };
         let spent = allocs().saturating_sub(before);
-        let wall = u64::try_from(started.elapsed().as_nanos()).unwrap_or(u64::MAX);
-        walls.push(wall);
 
         if action.mark_onset {
             machine.onset = Some(frame.t_ms);
@@ -554,21 +657,27 @@ pub fn run(minutes: u64, allocs: &dyn Fn() -> u64) -> Report {
         if tick == WARMUP_TICKS {
             rss_warm = Some(vm_rss_kib());
         }
-        if walls.len() == WINDOW_TICKS as usize {
+        if series.on_tick(tick, gate_ns, wall_ns) {
             if let Ok(kib) = vm_rss_kib() {
                 rss_peak = rss_peak.max(kib);
             }
-            windows.push(close_window(windows.len() as u32, &mut walls));
         }
         prev = Some(Prev::from_frame(&frame));
     }
 
-    if !walls.is_empty() {
+    if series.finish() {
         if let Ok(kib) = vm_rss_kib() {
             rss_peak = rss_peak.max(kib);
         }
-        windows.push(close_window(windows.len() as u32, &mut walls));
     }
+    let clock_name = clock.name();
+    let Series {
+        windows,
+        warmup_ticks,
+        warmup_gate_max,
+        warmup_wall_max,
+        ..
+    } = series;
     let rss_end = vm_rss_kib();
     if !machine.end_probe {
         machine
@@ -623,18 +732,97 @@ pub fn run(minutes: u64, allocs: &dyn Fn() -> u64) -> Report {
         prosody_bad,
         turns: machine.turns,
         failures: machine.failures,
+        clock: clock_name,
+        warmup_ticks,
+        warmup_gate_max_ns: warmup_gate_max,
+        warmup_wall_max_ns: warmup_wall_max,
     }
 }
 
-fn close_window(index: u32, walls: &mut Vec<u64>) -> Window {
-    walls.sort_unstable();
+fn close_window(index: u32, gate: &mut Vec<u64>, wall: &mut Vec<u64>) -> Window {
+    debug_assert_eq!(gate.len(), wall.len());
+    gate.sort_unstable();
+    wall.sort_unstable();
     let window = crate::Window {
         index,
-        ticks: walls.len() as u64,
-        p50_ns: percentile(walls, 50.0),
-        p99_ns: percentile(walls, 99.0),
-        max_ns: walls.last().copied().unwrap_or(0),
+        ticks: gate.len() as u64,
+        p50_ns: percentile(gate, 50.0),
+        p99_ns: percentile(gate, 99.0),
+        max_ns: gate.last().copied().unwrap_or(0),
+        wall_p50_ns: percentile(wall, 50.0),
+        wall_p99_ns: percentile(wall, 99.0),
+        wall_max_ns: wall.last().copied().unwrap_or(0),
     };
-    walls.clear();
+    gate.clear();
+    wall.clear();
     window
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The laptop wall sample that missed the 90 ms max once and passed on rerun.
+    const REPORTED_WALL_SPIKE_NS: u64 = 94_500_000;
+
+    #[test]
+    fn warmup_is_excluded_and_the_block_stays_3750() {
+        let mut series = Series::new();
+        for tick in 0..ticks_for(5) {
+            let ns = if tick == 10 {
+                REPORTED_WALL_SPIKE_NS
+            } else {
+                1_000_000
+            };
+            series.on_tick(tick, ns, ns);
+        }
+        assert!(!series.finish());
+        assert_eq!(series.warmup_ticks, WARMUP_TICKS);
+        assert_eq!(series.warmup_gate_max, REPORTED_WALL_SPIKE_NS);
+        assert_eq!(series.windows.len(), 1);
+        assert_eq!(series.windows[0].ticks, WINDOW_TICKS - WARMUP_TICKS);
+        assert_eq!(series.windows[0].p50_ns, 1_000_000);
+        assert_eq!(series.windows[0].p99_ns, 1_000_000);
+        assert_eq!(series.windows[0].max_ns, 1_000_000);
+    }
+
+    #[test]
+    fn one_ranked_spike_sets_max_and_not_p99() {
+        let mut series = Series::new();
+        for tick in 0..ticks_for(5) {
+            let gate = if tick == WARMUP_TICKS {
+                REPORTED_WALL_SPIKE_NS
+            } else {
+                1_000_000
+            };
+            let wall = gate.saturating_add(5_000_000);
+            series.on_tick(tick, gate, wall);
+        }
+        assert!(!series.finish());
+        let window = &series.windows[0];
+        assert_eq!(window.ticks, 3_500);
+        assert_eq!(window.p99_ns, 1_000_000);
+        assert_eq!(window.max_ns, REPORTED_WALL_SPIKE_NS);
+        assert!(window.wall_max_ns > window.max_ns);
+        assert!(window.p99_ns < 50_000_000);
+    }
+
+    #[test]
+    fn an_hour_is_twelve_windows_and_only_the_first_is_short() {
+        let mut series = Series::new();
+        for tick in 0..ticks_for(60) {
+            let closed = series.on_tick(tick, 1_000, 2_000);
+            if tick == WINDOW_TICKS - 1 || tick == ticks_for(60) - 1 {
+                assert!(closed);
+            }
+        }
+        assert!(!series.finish());
+        assert_eq!(series.windows.len(), 12);
+        assert_eq!(series.windows[0].ticks, 3_500);
+        assert!(series.windows[1..]
+            .iter()
+            .all(|window| window.ticks == 3_750));
+        let ranked: u64 = series.windows.iter().map(|window| window.ticks).sum();
+        assert_eq!(ranked, ticks_for(60) - WARMUP_TICKS);
+    }
 }
