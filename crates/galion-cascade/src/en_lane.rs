@@ -110,7 +110,7 @@ pub type SpeechTag = (&'static str, String);
 
 /// Speak `text` with the detected speech stack; `(pcm, backend, weights)`.
 pub fn speak(text: &str) -> (Option<Vec<i16>>, SpeechTag, SpeechTag) {
-    let mut st = galion_ml_voice::speech::SpeechStack::detect();
+    let mut st = crate::speech_worker::speech_host().open_stack();
     let pcm = if st.can_speak() { st.speak(text).ok().map(|a| { debug_assert_eq!(a.sample_rate, LANE_RATE_HZ); to_pcm16(&a.samples) }) } else { None };
     let backend = if pcm.is_some() { (st.backend.id(), st.backend.label()) } else { ("none", st.backend.label()) };
     (pcm, backend, (st.weights.id(), st.weights.summary()))
