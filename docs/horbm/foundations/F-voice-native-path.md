@@ -62,3 +62,5 @@ Archive means a later pass moves the tree aside. It does not mean delete. The au
 The loopback server now calls `VoiceLoop::tick` for each spoken turn. Piper is a mouth adapter (`--features piper`). The clone worker is the other mouth adapter, and only for an explicit cuda opt-in. The default build's mouth is the in-process tone, so Piper is not in that cargo tree. CPU stays the boot device (`brain` `horbm`, `mouth_device` `cpu`). The `[boot]` table from the open boot pull is not on this branch, so those two values live in the server instead of `LOCKS.toml`.
 
 Nothing was moved to `archive/`. `voice-stack/pipeline-orchestrator` is still the mic endpointer and the gated mouth test. `voice-stack/horbm-bridge` still loads the cards. The unlinked seam and `crates/galion-v2-live` were already unused; the open audit pull moves those, and this branch does not move them again.
+
+S18 moved the socket's energy gate into `horbm-voice` (`EnergyGate` / `EnergyEar`). The 640 ms hang on 7881 is that gate. The orchestrator's `EnergyVad` remains for its own loop. See [F-ear.md](F-ear.md).
