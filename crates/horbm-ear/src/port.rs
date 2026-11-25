@@ -3,10 +3,13 @@
 //! The listener point the emotion core can take later.
 //!
 //! Axis order and limits are the core's: valence and approach on −1..=1,
-//! arousal and dominance on 0..=1. [`ListenerOffer::inbound_intent`] copies
-//! the point into an inbound [`IntentMsg`] as a pull relative to a speaker
-//! baseline. It does not call [`EmotionCore::step`]. The core still admits
-//! an inbound pull only when both sense and adapt are set.
+//! arousal and dominance on 0..=1. [`ListenerOffer::heard_axes`] is the
+//! three floats a later inner layer reads: valence, arousal, and strength.
+//! It is `None` when any of those three is non-finite. A denied frame never
+//! builds an offer, so it has no axes. [`ListenerOffer::inbound_intent`]
+//! copies the point into an inbound [`IntentMsg`] as a pull relative to a
+//! speaker baseline. Neither function calls [`EmotionCore::step`]. The core
+//! still admits an inbound pull only when both sense and adapt are set.
 
 pub use galion_emotion_core::{
     CoreError, EmotionCore, IntentMsg, IntentSource, VoiceBaseline, APPROACH, AROUSAL, AXES,
@@ -42,6 +45,17 @@ impl ListenerOffer {
     }
     pub fn approach(self) -> f32 {
         self.point[APPROACH]
+    }
+
+    /// `(valence, arousal, strength)` for a later inner-life point.
+    ///
+    /// `None` when valence, arousal, or strength is non-finite (`NaN` or
+    /// infinity). Dominance and approach are not part of this triple. A
+    /// denied frame does not produce a [`ListenerOffer`], so it has nothing
+    /// to read. This function does not call [`EmotionCore::step`].
+    pub fn heard_axes(self) -> Option<(f32, f32, f32)> {
+        let axes = (self.valence(), self.arousal(), self.strength);
+        (axes.0.is_finite() && axes.1.is_finite() && axes.2.is_finite()).then_some(axes)
     }
 
     /// Inbound intent for a later `step`. Factor mask stays 0: the ear does
