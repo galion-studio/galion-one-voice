@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Galion Labs
-//! Long-call soak for Samantha's duplex loop.
+//! Long-call soak for the configured persona's duplex loop.
 //!
 //! [`run`] drives [`horbm_duplex::Duplex::tick`] on the virtual 80 ms clock.
 //! Five virtual minutes is the CI length. `GALION_SOAK_FULL=1` runs sixty.
@@ -61,6 +61,8 @@ pub struct Report {
     pub minutes: u64,
     pub ticks: u64,
     pub seed: u64,
+    /// Id reported by the persona the duplex actually loaded.
+    pub persona: String,
     pub mouth: &'static str,
     pub prosody: bool,
     pub aec: bool,
@@ -127,10 +129,11 @@ impl Report {
     pub fn table(&self) -> String {
         let mut lines = Vec::new();
         lines.push(format!(
-            "soak minutes={} ticks={} seed={:#x} persona=samantha mouth={} prosody={} aec={} turns={}",
+            "soak minutes={} ticks={} seed={:#x} persona={} mouth={} prosody={} aec={} turns={}",
             self.minutes,
             self.ticks,
             self.seed,
+            self.persona,
             self.mouth,
             self.prosody,
             self.aec,
