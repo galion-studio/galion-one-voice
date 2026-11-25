@@ -41,6 +41,9 @@ Nothing added here is Linux-only. Paths use `std::path`. The persona root baked 
 |---|---|
 | `cargo test --manifest-path horbm/Cargo.toml -p horbm-persona --test persona` | 16 passed |
 | `cargo test --manifest-path horbm/Cargo.toml -p horbm --test persona` | 5 passed |
-| `cargo clippy --manifest-path horbm/Cargo.toml -p horbm-persona -p horbm --all-targets -- -D warnings` | clean |
+| `cargo test --manifest-path horbm/Cargo.toml --workspace` | 57 suites, 282 passed, 0 failed, 2 ignored |
+| `cargo clippy --manifest-path horbm/Cargo.toml --workspace --all-targets -- -D warnings` | clean |
+| `cargo test --workspace` | 114 suites, 1069 passed, 0 failed, 5 ignored |
+| `cargo clippy --workspace --all-targets -- -D warnings` | clean |
 
-Workspace totals are filled after the merge of current `main` and the full run.
+The two ignored horbm tests are `timed_scan_of_one_thousand_rows` and `real_card_folder_is_read_and_not_written`. `cargo test` at the repo root rewrote `voice-stack/Cargo.lock` while resolving horbm's path dependencies. That file is outside this change and was restored. No `Cargo.toml` and no lockfile is committed. Current `main` at the test run was `26239c9` (PR #327, the brain plan), merged into this branch before the workspace run.
