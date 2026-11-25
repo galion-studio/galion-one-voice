@@ -199,7 +199,7 @@ pub trait RetrievedCells: Send + Sync {
 /// F3's mapped int8 arena. [`RetrievalThread`] does not call this trait.
 /// A granted ask with a key file calls [`DiaryScan::scan_selected_into`].
 /// An unset key file calls `search_lexical` instead.
-/// [`crate::keys`] still implements this for a version-1 `StringKeyArena`
+/// [`crate::StringKeyArena`] still implements this for a version-1 arena
 /// and returns the raw `i32` dot.
 pub trait Int8Scorer: Send + Sync {
     /// `None` when the arena has no row for `item_id`.
@@ -223,8 +223,8 @@ pub struct RetrievalConfig {
 }
 
 impl RetrievalConfig {
-    /// `GALION_HORBM_REMEMBER=grant` grants. Any other value, including an
-    /// unset variable, denies. `GALION_HORBM_KNOWLEDGE` is the card directory
+    /// `GALION_HORBM_REMEMBER=grant` grants. Any other value, including when
+    /// the name is unset, denies. `GALION_HORBM_KNOWLEDGE` is the card directory
     /// when it is set. When it is unset, [`WINDOWS_KNOWLEDGE_DIR`] is used
     /// only if that directory already exists. `GALION_HORBM_KEYS` is the HKB1
     /// path when it is set and non-empty. It is not opened here.

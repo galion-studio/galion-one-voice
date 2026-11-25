@@ -6,14 +6,26 @@ Perpetual Open MIT License. (c) 2026 Galion Labs.
 |---|---|
 | Base | `main` `b8f33bb7b097210c04156eb050e97618cbcc0531` |
 | Kind | Research and build plan. This file does not change code, manifests, or locks. |
-| Persona | Samantha is the only development persona. `personas/aria.toml` stays in the tree and stays inactive. |
+| Persona | Boot loads the configured development persona (`GALION_HORBM_DEV_PERSONA`, else `horbm/crates/horbm-persona/development.toml`, through `Persona::load_development` / `is_configured_boot`). There is no `allows_development_boot`. `personas/aria.toml` stays in the tree and is not selected unless that config names it. |
 | Ear | Prosody sensing starts on. `LOCKS.toml` `[consent.ear_prosody] sense = "allow"`. `GALION_EAR_SENSE=0\|off\|deny` is the off switch. |
 | Research cards | Our own private research and development cards, on the laptop only, through `GALION_HORBM_RESEARCH_DIR`. None of those files belong in this repo. |
-| Voice output | Whatever 7881 speaks today stays as it is. This plan does not retune Piper, the mouth, or the socket. |
+| Voice output | S82 (`voice-stack/local-server`) is the live host. This plan does not retune Piper, the mouth, or the socket, and it does not restart the process on 7881. |
 
 `docs/horbm/` has no README and no index. This plan is the only new file.
 
 Claim marks: **Found** means the file cited in this pass shows it. **Inferred** means a conclusion from those files. **Unknown** means this pass did not see it.
+
+## Gates
+
+Every brain PR runs these on rustc 1.85, Linux, next to the test, clippy, and soak commands. The 128 KiB soak RSS gate is never raised.
+
+- Test: `cargo test --manifest-path horbm/Cargo.toml --workspace`
+- Clippy: `cargo clippy --manifest-path horbm/Cargo.toml --workspace --all-targets -- -D warnings`
+- Soak: `cargo test --manifest-path horbm/Cargo.toml -p horbm-soak`
+- Rustdoc, required for every brain PR: `RUSTDOCFLAGS='-D warnings' cargo doc --manifest-path horbm/Cargo.toml -p horbm --no-deps`
+- Voice-stack lock: `cargo metadata --locked --manifest-path voice-stack/Cargo.toml`
+
+`scripts/check-locks.sh` and `scripts/check-research-boundary.sh` stay required. The root workspace test and clippy, and the voice-stack package test and clippy in the laptop gate, stay required too. The rustdoc command is not a step in `.github/workflows/voice-stack-horbm-router.yml` until the private link in `horbm/crates/horbm/src/brain.rs` (PR #342) is gone.
 
 ## The model
 
@@ -41,7 +53,7 @@ The build below glues those pieces. It adds no new engine, no new runtime, and n
 
 **On main.** `LearnPass::write_clause` swaps `live` / `next` / `retiring` and refuses a denied config. **Found** (`learn.rs`). Nothing in `Brain::turn` names `LearnPass`. **Found** (`lib.rs` says the pass is outside the order; `brain.rs` has no learn call — **Inferred** from the turn body read in this pass, which steps empathy, Samantha, memory, gather, style, and dialogue).
 
-**Gap.** There is no session edge that holds one clause in RAM and writes it once when the session ends. **Found** (`F7-learn-deep-dive.md` §9: wiring a session-end hook is later work). Who may grant learn, and encryption at rest, are still open. **Found** (same section, Q2, Q3, Q5).
+**Gap.** `SessionSeal` keeps one clause in RAM and writes it when the host calls `seal`. `Brain::turn` does not call it. **Found** (`learn.rs`). In development, S82's dev profile grants learn and remember. Outside development they stay off unless granted. No encryption for now. The horbm crates stay deny.
 
 **Evidence.** `phase7_gate_fresh_writes_nothing_granted_writes_one_sourced_row_withdrawal_leaves_no_row` in `horbm/crates/horbm/tests/learn.rs`. **Found.**
 
@@ -57,11 +69,11 @@ The build below glues those pieces. It adds no new engine, no new runtime, and n
 
 ### Persona
 
-**Must.** Boot loads Samantha. `never_fabricate = true`. Unknown line is `I don't know.` Aria's file stays in the repo and boot does not load it. **Found** (`F-persona.md`, `personas/samantha.toml`).
+**Must.** Boot loads the configured development persona. There is no `allows_development_boot`, and boot does not load one named persona. `never_fabricate = true`. Unknown line is `I don't know.` `personas/aria.toml` stays in the repo and boot does not load it unless the config names that id. **Found** for the miss line and the parked file (`F-persona.md`).
 
-**On main.** `Persona::samantha()` and `Brain::boot(None)` load Samantha. `Persona::load` accepts `aria.toml` (the schema tests require that). `Brain::boot(Some(path))` installs whatever valid file the path names, including an id other than `samantha`. **Found** (`horbm-persona`, `brain.rs` `boot`, `lib.rs`: an explicit path replaces Samantha). `admit_move` checks boundary tokens. `StyleHook` (`brevity` 0.55, `warmth` 0.8, `max_sentences` 2 in Samantha's file; `rate = 1 - 0.15 * brevity`) is not read by `apply_prosody`. **Found** (`style.rs` `BREVITY_RATE`, `samantha.toml`, `brain.rs` `apply_prosody` multiplies `lean.rate` only).
+**On main.** `Persona::load_development` and `Brain::boot(None)` load the configured development persona. `Persona::load` accepts `personas/aria.toml`. `Brain::boot(Some(path))` installs the file the path names and does not check the configured id. **Found** (`horbm-persona`, `brain.rs` `boot`). `admit_move` checks boundary tokens. `StyleHook` (`brevity` 0.55, `warmth` 0.8, `max_sentences` 2 in the persona file the development config names; `rate = 1 - 0.15 * brevity`) is not read by `apply_prosody`. **Found** (`style.rs` `BREVITY_RATE`, `brain.rs` `apply_prosody` multiplies `lean.rate` only).
 
-**Gap.** An explicit path can boot Aria. Style numbers do not enter the turn. Changing `MoodMeta.rate` would change what 7881 already sends the mouth (`HorbmTurn` copies `mood_meta.rate`). **Found** (`horbm-voice/src/brain.rs`). That rate change is out of this plan.
+**Gap.** An explicit path installs the file it names, including `personas/aria.toml`. Style numbers do not enter the turn. Changing `MoodMeta.rate` would change what the live host already sends the mouth (`HorbmTurn` copies `mood_meta.rate`). **Found** (`horbm-voice/src/brain.rs`). That rate change is out of this plan.
 
 **Evidence.** `development_default_is_samantha`, `boot_without_a_file_loads_samantha`, `aria_keeps_warmth_and_adds_precision`. **Found.**
 
@@ -126,7 +138,7 @@ Every swarm leaves these untouched. They are not assigned to a swarm in any roun
 | `scripts/check-research-boundary.sh` | The corpus gate. |
 | `voice-stack/Cargo.toml`, `voice-stack/Cargo.lock` | Voice workspace. |
 | `voice-stack/horbm-bridge/Cargo.toml`, `voice-stack/horbm-bridge/Cargo.lock` | Bridge manifest. No new dependency. |
-| `voice-stack/local-server/**` | 7881 process, including `PiperMouth`. Speech stays as it is. |
+| `voice-stack/local-server/**` | S82, the live host, including `PiperMouth`. Other swarms leave it. Speech stays as it is. Do not restart the process on 7881. |
 | `horbm/Cargo.lock` | Assigned in round 4 only, to swarm R4-A. Rounds 1–3 leave it untouched. |
 
 A swarm edits a crate manifest only when the table below names that manifest. No swarm adds a dependency except R4-A, and that dependency is the existing `horbm-ear` crate by path.
@@ -173,15 +185,15 @@ No swarm edits `horbm/crates/horbm`. No swarm edits a workspace manifest.
 
 **Depends on.** Nothing.
 
-### R1-D — Boot id is Samantha
+### R1-D — Boot id is the configured development persona
 
-**Goal.** Add `Persona::allows_development_boot(&self) -> bool`, true only when the id is `samantha`. `Persona::load` of `aria.toml` still succeeds. Do not delete `personas/aria.toml`.
+**Goal.** Superseded. Do not add `Persona::allows_development_boot`. `Persona::load` of `personas/aria.toml` still succeeds. Do not delete that file. Development boot loads the configured development persona (`Persona::load_development`, `Persona::is_configured_boot`).
 
 **Owns.** `horbm/crates/horbm-persona/**`
 
-**Acceptance.** `cargo test --manifest-path horbm/Cargo.toml -p horbm-persona --test persona aria_file_loads_and_is_not_a_development_boot`. `development_default_is_samantha` still passes.
+**Acceptance.** `cargo test --manifest-path horbm/Cargo.toml -p horbm-persona --test persona`. `personas/aria.toml` still loads. It is a development boot only when the config names its id.
 
-**Serves the brain.** Samantha is the only persona the turn may install. Aria remains a schema fixture.
+**Serves the brain.** The turn installs the configured development persona. `personas/aria.toml` remains a schema fixture.
 
 **Depends on.** Nothing.
 
@@ -268,6 +280,8 @@ No path is marked in two columns.
 
 ## Round 3 — the turn, the second router, the moment lock, the learn export
 
+Boot does not use `allows_development_boot` and does not load one named persona. `Brain::boot` with no path, `try_open`, and `try_with_cards` load the configured development persona. An explicit path installs that file and does not check the configured id. `with_cards` and `open` install the configured persona when configuration is present, and the stand-in fixture when it is not. In development, S82 (`voice-stack/local-server`), the live host, defaults `GALION_HORBM_LEARN` and `GALION_HORBM_REMEMBER` to grant in its dev profile. Outside development those stay off unless granted. The horbm crates and `LOCKS.toml` stay deny.
+
 ### R3-A — `Brain::turn` takes an ear and keeps the clause
 
 **Goal.**
@@ -276,7 +290,7 @@ No path is marked in two columns.
 - `turn_with_ear` passes the `Heard` into `Perceived`. `None` keeps today's word path.
 - Add `ear_sense_from_flag(Option<&str>) -> bool` with the same rule as `Ear::from_env`: unset, empty, `1`, `on`, and `allow` are on; `0`, `off`, and `deny` are off; trim and ignore case. `with_cards` uses that function on `GALION_EAR_SENSE` instead of the literal `false`. Add `ear_sense(&self) -> bool`. The test calls the pure function and does not set the process environment.
 - `Brain::open` uses `EpisodicStore::open_from_flag`.
-- `boot` / `install_persona` refuses a persona for which `allows_development_boot` is false. `with_cards` still installs Samantha.
+- `boot` with no path loads the configured development persona (`Persona::load_development` / `is_configured_boot`). Do not call `allows_development_boot`. An explicit path installs that file. `with_cards` installs the configured persona when configuration is present, and the stand-in fixture when it is not.
 - Call `decide_held` with `note.lean().hold_topic` in place of `decide`.
 - After `reply` and `first_clause` are fixed, call `inner_turn` and do not write its result into those strings, the empathy mood, or the baseline.
 - Do not call `step_moment`, `LearnPass`, or `SessionSeal`. Do not change `apply_prosody`. Do not cut a clause to `max_sentences`.
@@ -284,11 +298,11 @@ No path is marked in two columns.
 
 **Owns.** `horbm/crates/horbm/src/brain.rs`, `horbm/crates/horbm/tests/turn.rs`, `horbm/crates/horbm/tests/samantha_inner.rs`, `horbm/crates/horbm/tests/moment.rs`, `horbm/crates/horbm/tests/persona.rs`
 
-**Acceptance.** `cargo test --manifest-path horbm/Cargo.toml -p horbm --test turn --test samantha_inner --test moment --test persona`. New tests: `text_only_kettle_clause_is_unchanged`, `a_sad_ear_does_not_replace_a_card_clause`, `ear_sense_from_flag_defaults_on`, `boot_refuses_a_persona_whose_id_is_not_samantha`. The kettle line stays `The kettle is on the hob.` with first clause `The kettle`, which is what `horbm-brain` already asserts for that fixture. **Found** (`horbm-brain/src/lib.rs` test `a_turn_produces_the_fixture_clause`).
+**Acceptance.** `cargo test --manifest-path horbm/Cargo.toml -p horbm --test turn --test samantha_inner --test moment --test persona`. New tests: `text_only_kettle_clause_is_unchanged`, `a_sad_ear_does_not_replace_a_card_clause`, `ear_sense_from_flag_defaults_on`, `boot_installs_the_persona_the_env_names`, `boot_refuses_when_nothing_is_configured`. The kettle line stays `The kettle is on the hob.` with first clause `The kettle`, which is what `horbm-brain` already asserts for that fixture. **Found** (`horbm-brain/src/lib.rs` test `a_turn_produces_the_fixture_clause`).
 
-**Serves the brain.** This is the one function a host already calls. After this round it can see an ear, it installs only Samantha, it opens the person file on the real grant, and the spoken clause stays the lookup.
+**Serves the brain.** This is the one function a host already calls. After this round it can see an ear, it installs the configured development persona, it opens the person file on the real grant, and the spoken clause stays the lookup.
 
-**Depends on.** R1-B, R1-D, R2-B, R2-C. It does not edit `retrieve.rs`. An unset `keys_path` keeps 7881 on lexical search.
+**Depends on.** R1-B, R1-D, R2-B, R2-C. It does not edit `retrieve.rs`. An unset `keys_path` keeps the live host on lexical search.
 
 ### R3-B — The bridge router uses the same turn
 
@@ -298,7 +312,7 @@ No path is marked in two columns.
 
 **Acceptance.** `cargo test --manifest-path voice-stack/Cargo.toml -p galion-sam-horbm`. A deep question returns `I don't know.` on this call's reply text when the local cards miss. The test does not require a network listener.
 
-**Serves the brain.** 7881's `CardEngine` already uses `Brain::turn`. `ReasoningRouter` is the remaining entry that can speak a gateway body inside the call.
+**Serves the brain.** The live host's `CardEngine` already uses `Brain::turn`. `ReasoningRouter` is the remaining entry that can speak a gateway body inside the call.
 
 **Depends on.** The `Brain::turn` that is already on main. It does not need R3-A's new method. Developed in parallel with R3-A, it keeps calling `turn(&str)`.
 
@@ -346,9 +360,9 @@ No path is marked in two columns.
 
 `tests/moment.rs` and `tests/moment_split.rs` are different files. `brain.rs` and `lib.rs` are different files.
 
-## Round 4 — hosts pass the point; 7881's mouth stays
+## Round 4 — hosts pass the point; the mouth stays
 
-No swarm edits `voice-stack/local-server/**`. No swarm edits `mouth.rs`, `piper_mouth.rs`, or `moment_voice.rs`.
+S82 (`voice-stack/local-server`) is the live host. Swarms R4-A through R4-D do not edit that tree, `mouth.rs`, `piper_mouth.rs`, or `moment_voice.rs`, and they do not restart the process on 7881. In development, S82's dev profile defaults `GALION_HORBM_LEARN` and `GALION_HORBM_REMEMBER` to grant. Outside development nothing turns them on unless granted. The horbm crates and `LOCKS.toml` stay deny (`remember = "deny"`, `learn = "deny"`, `learn_in_band = false`). No encryption. `RetrievalConfig.keys_path` stays unset by default.
 
 ### R4-A — Duplex stores an ear frame on the brain it already shares
 
@@ -370,31 +384,31 @@ No swarm edits `voice-stack/local-server/**`. No swarm edits `mouth.rs`, `piper_
 
 **Acceptance.** `cargo test --manifest-path horbm/Cargo.toml -p horbm-voice --test ear --test end_of_turn`. New tests `energy_ear_does_not_invent_a_heard_point` and `end_session_without_a_source_writes_nothing`.
 
-**Serves the brain.** 7881's text turn stays a `&str`. A later host can pass a real point through the same trait, and learn still waits for an explicit session end.
+**Serves the brain.** The live host's text turn stays a `&str`. A later host can pass a real point through the same trait, and learn still waits for an explicit session end. S82 owns that host.
 
 **Depends on.** R3-A, R3-D, R1-B.
 
 ### R4-C — The eval gate locks the brain, not the mouth
 
-**Goal.** Add `tests/brain_model.rs`. Assert the miss text is `I don't know.`, the development persona id is `samantha`, `ear_sense()` is true when the flag function is given `None`, and a text turn's reply matches the card clause for the kettle fixture. Do not edit `thresholds.toml`, `real.rs`, `speech.rs`, or `prosody.rs`. Do not change a WER number or a mouth score.
+**Goal.** Add `tests/brain_model.rs`. Assert the miss text is `I don't know.`, the development persona is the configured development persona (not a hard-coded id), `ear_sense()` is true when the flag function is given `None`, and a text turn's reply matches the card clause for the kettle fixture. Do not edit `thresholds.toml`, `real.rs`, `speech.rs`, or `prosody.rs`. Do not change a WER number or a mouth score.
 
 **Owns.** `horbm/crates/horbm-eval/src/gate.rs`, `horbm/crates/horbm-eval/src/score.rs`, `horbm/crates/horbm-eval/src/turn.rs`, `horbm/crates/horbm-eval/tests/gate.rs`, `horbm/crates/horbm-eval/tests/turn_gate.rs`, `horbm/crates/horbm-eval/tests/brain_model.rs` (new). Edit `gate.rs` / `score.rs` / `turn.rs` only if the new test cannot call the public `horbm` API without them. Prefer the new test file alone.
 
 **Acceptance.** `cargo test --manifest-path horbm/Cargo.toml -p horbm-eval --test brain_model --test gate --test turn_gate`
 
-**Serves the brain.** The eval crate already scores `Brain::turn`. This lock is the model (lookup, miss line, Samantha, ear default), separate from the mouth round-trip.
+**Serves the brain.** The eval crate already scores `Brain::turn`. This lock is the model (lookup, miss line, the configured development persona, ear default), separate from the mouth round-trip.
 
 **Depends on.** R3-A (`ear_sense()` and `turn_with_ear` exist; the test may call `turn(&str)` only).
 
-### R4-D — 7881's card engine opens the person file on the same grant
+### R4-D — The live host's card engine opens the person file on the same grant
 
-**Goal.** In `brain_from_dir` / `CardEngine::open`, attach `EpisodicStore::open_from_flag` for the memory path the function already receives. Unset grant: no file, and `turn(&str)` stays the call. Do not pass a `Heard`. Do not set `keys_path`. `HorbmEngine::open` calls `brain_from_dir`, so it picks up the same attach without an edit to `linked.rs`.
+**Goal.** In `brain_from_dir` / `CardEngine::open`, attach `EpisodicStore::open_from_flag` for the memory path the function already receives. Unset, empty, or any value other than `grant` stays deny in the library: no file, and `turn(&str)` stays the call. The development grant is S82's dev profile, not a default inside `horbm`. Do not pass a `Heard`. Do not set `keys_path`. `HorbmEngine::open` calls `brain_from_dir`, so it picks up the same attach without an edit to `linked.rs`.
 
 **Owns.** `voice-stack/horbm-bridge/src/cards.rs`, `voice-stack/horbm-bridge/tests/diary.rs` (new).
 
 **Acceptance.** `cargo test --manifest-path voice-stack/Cargo.toml -p galion-sam-horbm --test diary --test bridge`. With the grant unset, the kettle reply is unchanged and no person-diary file is created.
 
-**Serves the brain.** `HorbmMind` in the 7881 server calls `CardEngine::open`. **Found** (`voice-stack/local-server/src/brain.rs`). The person diary becomes reachable there on the existing grant, and the mouth is not in this diff.
+**Serves the brain.** `HorbmMind` in the live host (S82, `voice-stack/local-server`) calls `CardEngine::open`. **Found** (`voice-stack/local-server/src/brain.rs`). The person diary becomes reachable there when remember is granted. In development the dev profile grants it. The mouth is not in this diff.
 
 **Depends on.** R2-B. It does not depend on R4-A, R4-B, or R4-C.
 
@@ -454,7 +468,7 @@ These are recommendations. This PR does not move or delete them.
 
 **Already archived.** `archive/2026-11-25/crates/galion-live-demo/`, `archive/2026-11-24/crates/galion-v2-live/`, `archive/2026-11-24/voice-stack/horbm-bridge/seam/horbm/`. Each has an `ARCHIVED.md`. **Found.**
 
-**Keep, because 7881 still speaks through them.** `voice-stack/local-server` `PiperMouth` (`mouth.rs` documents the Piper path). `runtimes/galion-piper-rt`. The research-gateway library (`RESEARCH_CAP`). `galion-conductor`, which duplex uses to call `BrainHandle`. `galion-heartbeat` stays; `FP-first-principles-audit.md` step 8 says so, and this plan does not retune its constants. **Found.**
+**Keep, because the live host still speaks through them.** S82 is `voice-stack/local-server`. `PiperMouth` (`mouth.rs` documents the Piper path). `runtimes/galion-piper-rt`. The research-gateway library (`RESEARCH_CAP`). `galion-conductor`, which duplex uses to call `BrainHandle`. `galion-heartbeat` stays; `FP-first-principles-audit.md` step 8 says so, and this plan does not retune its constants. **Found.**
 
 **Keep, because the brain still uses them.** `horbm-brain` `MemoryRetriever` and the clause fixture: `gather` still calls `pick` on the idle path. **Found** (`brain.rs` `gather`). `personas/aria.toml`: inactive schema fixture. **Found** (`F-persona.md`).
 
@@ -464,6 +478,6 @@ These are recommendations. This PR does not move or delete them.
 
 ## Questions only Mate can answer
 
-1. Who may set `GALION_HORBM_LEARN=grant`, and is the learn pack encrypted at rest? The bit name and the default deny are already in `LOCKS.toml`. Q2, Q3, and Q5 in the R4 note are still open. **Found** (`F7-learn-deep-dive.md` §9).
-2. Is there an `HKB1` file on the laptop the retrieval thread should open, and under which existing variable? This plan adds `RetrievalConfig.keys_path` with no default and no new variable. 7881 leaves it unset and stays on `search_lexical`.
-3. Should a host call `HorbmTurn::end_session` at process shutdown? The method is the hook. This plan does not edit the 7881 server, so nothing calls it until you say so.
+1. Who may set `GALION_HORBM_LEARN=grant`, and is the learn pack encrypted at rest? In development, S82's dev profile defaults learn and remember to grant. Outside development nothing turns them on unless granted. No encryption for now. The horbm crates still default deny and do not read the dev profile. **Found** for the deny default (`F7-learn-deep-dive.md` §9, `LOCKS.toml`).
+2. Is there an `HKB1` file on the laptop the retrieval thread should open, and under which existing variable? This plan adds `RetrievalConfig.keys_path` with no default and no new variable. The live host leaves it unset and stays on `search_lexical`.
+3. Should a host call `HorbmTurn::end_session` at process shutdown? The method is the hook. S82 owns the live host. This plan's Round 4 swarms do not edit it, so nothing here calls the hook.
