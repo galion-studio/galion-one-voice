@@ -8,7 +8,7 @@
 use crate::clause::{prepare_text, split_clauses};
 use crate::mood::Prosody;
 use crate::session::Session;
-use crate::tts::{Pad, PcmChunk, SpeakReport, Tts, TtsError};
+use crate::tts::{Pad, PcmChunk, SpeakParts, SpeakReport, Tts, TtsError};
 use sha2::{Digest, Sha256};
 use std::fs::File;
 use std::io::Read;
@@ -355,17 +355,17 @@ impl Tts for PiperTts {
             }
         };
         self.calls += 1;
-        Ok(SpeakReport::from_parts(
-            "piper",
-            rate,
+        Ok(SpeakReport::from_parts(SpeakParts {
+            backend: "piper",
+            sample_rate: rate,
             cold,
-            Some(out.pid),
-            out.cold_spawn_to_first_pcm_ms,
-            out.samples,
-            out.wall_ms,
-            out.events,
-            out.detail,
-        ))
+            pid: Some(out.pid),
+            cold_spawn_to_first_pcm_ms: out.cold_spawn_to_first_pcm_ms,
+            samples: out.samples,
+            wall_ms: out.wall_ms,
+            events: out.events,
+            detail: out.detail,
+        }))
     }
 }
 

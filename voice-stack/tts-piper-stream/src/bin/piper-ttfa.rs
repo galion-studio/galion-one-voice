@@ -152,7 +152,7 @@ fn run(voice: &PiperVoice, sha_ms: u32, wav: Option<&std::path::Path>) -> Result
             "  \"note\": \"cold_spawn_to_first_pcm_ms and cold_wall_rtf include model load. cold_piper_rtf is the child infer/audio for that first line. warm_submit_to_first_pcm_ms is the warm time-to-first-audio. Piper VITS emits a whole clause at once. warm_under_80ms compares this host warm median to the 80 ms heartbeat and is not a portable guarantee. wall_rtf is speak wall divided by audio duration. piper_rtf is the child infer/audio line.\"\n",
             "}}\n"
         ),
-        runtime = json_str(&voice.runtime.file_name().and_then(|s| s.to_str()).unwrap_or("piper")),
+        runtime = json_str(voice.runtime.file_name().and_then(|s| s.to_str()).unwrap_or("piper")),
         runtime_path = json_str(&voice.runtime.display().to_string()),
         model_path = json_str(&voice.model.display().to_string()),
         rate = voice.sample_rate,

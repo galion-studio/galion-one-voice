@@ -271,7 +271,13 @@ pub fn summarize(reps: &[Rep]) -> Vec<StageStat> {
     fn col(reps: &[Rep], f: impl Fn(&Rep) -> u64) -> Vec<u64> {
         reps.iter().map(f).collect()
     }
-    let specs: [(&str, &str, ClockKind, fn(&Rep) -> u64); 8] = [
+    type StageSpec = (
+        &'static str,
+        &'static str,
+        ClockKind,
+        fn(&Rep) -> u64,
+    );
+    let specs: [StageSpec; 8] = [
         ("vad_us", "vad (offline buffer)", ClockKind::Measured, |r| {
             r.vad_us
         }),

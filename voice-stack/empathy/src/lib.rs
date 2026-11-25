@@ -76,7 +76,11 @@ mod tests {
         assert_eq!(FRAME_MS, 80);
         assert_eq!(FRAME_MS, galion_emotion::rika::FRAME_MS);
         assert_eq!(FRAME_MS, galion_emotion_in::FRAME_MS);
-        assert!(!galion_emotion::CANNED_EMPATHY);
+        // The lock is a const. The assertion stays so flipping it fails this test.
+        #[allow(clippy::assertions_on_constants)]
+        {
+            assert!(!galion_emotion::CANNED_EMPATHY);
+        }
         assert_eq!(MoodPoint::RESTING.arousal, 0.3);
         assert_eq!(MoodPoint::RESTING.valence, 0.25);
         assert_eq!(MoodPoint::RESTING.dominance, 0.5);

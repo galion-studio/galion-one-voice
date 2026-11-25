@@ -13,6 +13,7 @@ use galion_tts_piper::{Pad as PiperPad, Tts};
 use crate::backchannel::render;
 use crate::brain::SpokenLine;
 use crate::clock::FRAME_MS;
+use crate::moment_voice::{shape_sentence, VoiceControls};
 use crate::mouth::{AudioFrame, BackchannelPlay, Mouth, MouthPull};
 
 /// One [`Tts`] sliced into conductor frames.
@@ -22,6 +23,7 @@ pub struct PiperMouth<T> {
     rate: u32,
     pending_first: bool,
     error: Option<String>,
+    controls: VoiceControls,
 }
 
 impl<T: Tts> PiperMouth<T> {
@@ -33,11 +35,16 @@ impl<T: Tts> PiperMouth<T> {
             rate,
             pending_first: false,
             error: None,
+            controls: VoiceControls::unsteered(),
         }
     }
 
     pub fn last_error(&self) -> Option<&str> {
         self.error.as_deref()
+    }
+
+    pub fn controls(&self) -> VoiceControls {
+        self.controls
     }
 }
 
@@ -54,10 +61,15 @@ impl<T: Tts> Mouth for PiperMouth<T> {
         if line.text.trim().is_empty() {
             return;
         }
-        let pad = PiperPad {
-            arousal: line.mood.arousal,
-            valence: line.mood.valence,
-            dominance: line.mood.dominance,
+        let steered = !self.controls.parked;
+        let pad = if steered {
+            PiperPad::RESTING
+        } else {
+            PiperPad {
+                arousal: line.mood.arousal,
+                valence: line.mood.valence,
+                dominance: line.mood.dominance,
+            }
         };
         let mut pcm = Vec::new();
         if let Err(err) = self.tts.speak(&line.text, pad, &mut |chunk| {
@@ -65,6 +77,9 @@ impl<T: Tts> Mouth for PiperMouth<T> {
         }) {
             self.error = Some(err.to_string());
             return;
+        }
+        if steered && !self.controls.is_neutral_shape() {
+            pcm = shape_sentence(&pcm, self.rate, self.controls);
         }
         let width = frame_width(self.rate);
         if pcm.is_empty() || width == 0 {
@@ -99,6 +114,10 @@ impl<T: Tts> Mouth for PiperMouth<T> {
 
     fn speaking(&self) -> bool {
         !self.queue.is_empty()
+    }
+
+    fn feel(&mut self, controls: VoiceControls) {
+        self.controls = controls;
     }
 
     fn listen_backchannel(&mut self, play: &BackchannelPlay) -> AudioFrame {
