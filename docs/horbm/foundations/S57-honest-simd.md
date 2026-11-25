@@ -6,7 +6,7 @@ Perpetual Open MIT License. (c) 2026 Galion Labs.
 |---|---|
 | Swarm | HORBM S57, honest hardware detection in `galion-tensor` |
 | Written | 2026-11-25. No benchmark claim, no weight download, no voice audio, no paid API, no merge. |
-| Base | `main` `5d14d7b6c589884691f1b9e001f00f7664a219ea` |
+| Base | started at `main` `5d14d7b6c589884691f1b9e001f00f7664a219ea`, then merged `main` `3c6751141f510f4c6538cd1cb07bafa2f63a98b5` |
 | Gap | `docs/horbm/foundations/F3-compute-audit.md` §1 and §12.3. `cpu_supports(Avx512)` is `avx512f` only. The int8 kernel also needs `avx512bw`. `features::report()` could print `selected=avx512` while `dot_i8_for(selected())` ran AVX2. |
 | This change | `crates/galion-tensor` and this note. `LOCKS.toml` was not edited. `SOUL.md` is not in this tree. |
 | Not edited | `horbm/crates/horbm-brain` (another swarm), `crates/horbm-keys`, `LEDGER.md`, root `Cargo.toml` members, `.github/workflows/*`. |
