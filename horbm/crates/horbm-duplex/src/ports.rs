@@ -7,6 +7,7 @@
 //! | [`Recognizer`] | `AsrRecognizer` over `galion_sam_asr::Asr` | `--features vosk`, off by default |
 //! | [`Emotion`] | `CoreAffect` over `galion_emotion_core::EmotionCore` | always |
 //! | [`EarSense`] | `ProsodyEar`, energy and pitch | on by default. `Duplex::set_prosody(false)` turns it off |
+//! | echo | `PlaybackEcho` over `fdaf-aec` | on by default. `Duplex::set_aec(false)` bypasses it |
 //! | [`Persona`] | `SamanthaPersona` | always. Aria is parked |
 //! | [`Breath`] | stand-in until the breath crate lands | always |
 //! | mouth | `NativeMouth` over `horbm_voice::FakeMouth`. `PiperMouth` is opt-in | always. `--features piper` adds the worker |

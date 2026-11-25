@@ -1,9 +1,11 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 Galion Labs
-# Layer 5 router, the localhost research gateway, the duplex loop, and the
-# moment-to-mouth glue. Linux only. No model download. The duplex gate keeps
-# the synthetic tone mouth. `--features piper` on horbm-duplex does not fetch
-# a pack; the stock-voice measurement skips when the cache is empty. The
+# Layer 5 router, the localhost research gateway, and the duplex loop.
+# Linux only. The end-to-end smoke may fetch the pinned Vosk small-en model
+# into a cache outside the checkout. A failed fetch leaves asr=stub.
+# The router tests do not download a model. The duplex gate keeps the
+# synthetic tone mouth. `--features piper` on horbm-duplex does not fetch a
+# pack; the stock-voice measurement skips when the cache is empty. The
 # horbm-voice piper feature test does not spawn Piper.
 
 name: voice-stack horbm router
@@ -24,12 +26,14 @@ jobs:
           components: clippy
       - name: cargo build
         run: |
-          cargo build --manifest-path horbm/Cargo.toml -p horbm
+          cargo build --manifest-path horbm/Cargo.toml -p horbm -p horbm-eval
           cargo build --manifest-path horbm/Cargo.toml -p horbm-voice --features piper
           cargo build --manifest-path voice-stack/Cargo.toml -p galion-sam-horbm -p samantha-local-server
       - name: cargo test
         run: |
-          cargo test --manifest-path horbm/Cargo.toml -p horbm
+          cargo test --manifest-path horbm/Cargo.toml -p horbm -p horbm-eval
+          # Fake closed gate. The real Linux ear (`--features real`) is opt-in.
+          cargo run --manifest-path horbm/Cargo.toml -p horbm-eval --bin horbm-eval --quiet
           cargo test --manifest-path horbm/Cargo.toml -p horbm-duplex
           cargo test --manifest-path horbm/Cargo.toml -p horbm-duplex --features piper
           cargo test --manifest-path horbm/Cargo.toml -p horbm-voice --features piper
@@ -37,9 +41,11 @@ jobs:
           cargo test --manifest-path voice-stack/Cargo.toml -p galion-sam-horbm --features horbm
       - name: cargo clippy
         run: |
-          cargo clippy --manifest-path horbm/Cargo.toml -p horbm --all-targets -- -D warnings
+          cargo clippy --manifest-path horbm/Cargo.toml -p horbm -p horbm-eval --all-targets -- -D warnings
           cargo clippy --manifest-path horbm/Cargo.toml -p horbm-duplex --all-targets -- -D warnings
           cargo clippy --manifest-path horbm/Cargo.toml -p horbm-duplex --all-targets --features piper -- -D warnings
           cargo clippy --manifest-path horbm/Cargo.toml -p horbm-voice --all-targets --features piper -- -D warnings
           cargo clippy --manifest-path voice-stack/Cargo.toml -p galion-research-gateway -p galion-sam-horbm -p samantha-local-server --all-targets --no-deps -- -D warnings
           cargo clippy --manifest-path voice-stack/Cargo.toml -p galion-sam-horbm --all-targets --no-deps --features horbm -- -D warnings
+      - name: HORBM end-to-end smoke
+        run: bash scripts/horbm-e2e-smoke.sh

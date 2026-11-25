@@ -220,6 +220,18 @@ pub struct DotStats {
     pub max_step_us: f32,
 }
 
+/// One heartbeat frame for [`DotConsole::frame_marked`].
+/// The frame still computes the same viz, stats, and glyph row.
+pub struct MarkedFrame<'a> {
+    pub out: &'a FrameOut,
+    pub you_pcm: &'a [f32],
+    pub me_pcm: &'a [f32],
+    pub me_voiced: bool,
+    pub snap: &'a LiveSnapshot,
+    pub step_us: f32,
+    pub mark: Option<DotMark>,
+}
+
 /// Fanout + glyph history + panel renderer.
 pub struct DotConsole {
     pub fanout: Fanout,
@@ -252,22 +264,30 @@ impl DotConsole {
     /// Feed one heartbeat frame: builds the `VizFrame`, presents it on every surface,
     /// updates glyph history and stats. `step_us` = measured `Heartbeat::step` time.
     pub fn frame(&mut self, out: &FrameOut, you_pcm: &[f32], me_pcm: &[f32], me_voiced: bool, snap: &LiveSnapshot, step_us: f32) -> &VizFrame {
-        self.frame_marked(out, you_pcm, me_pcm, me_voiced, snap, step_us, None)
+        self.frame_marked(MarkedFrame {
+            out,
+            you_pcm,
+            me_pcm,
+            me_voiced,
+            snap,
+            step_us,
+            mark: None,
+        })
     }
 
     /// Same as [`Self::frame`], then the symphony one-dot mark wins.
     /// A pause holds the mark the wire already chose. This still runs after
     /// `Heartbeat::step`, never inside it.
-    pub fn frame_marked(
-        &mut self,
-        out: &FrameOut,
-        you_pcm: &[f32],
-        me_pcm: &[f32],
-        me_voiced: bool,
-        snap: &LiveSnapshot,
-        step_us: f32,
-        mark: Option<DotMark>,
-    ) -> &VizFrame {
+    pub fn frame_marked(&mut self, frame: MarkedFrame<'_>) -> &VizFrame {
+        let MarkedFrame {
+            out,
+            you_pcm,
+            me_pcm,
+            me_voiced,
+            snap,
+            step_us,
+            mark,
+        } = frame;
         let mut viz = viz_from_heartbeat(out, you_pcm, me_pcm, me_voiced, snap);
         if let Some(mark) = mark {
             apply_sector_dot(&mut viz, mark);

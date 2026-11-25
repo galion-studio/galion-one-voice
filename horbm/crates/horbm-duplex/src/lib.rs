@@ -13,9 +13,11 @@
 //! with `--features piper` and the host asks for [`PiperMouth`]. Emotion is
 //! [`CoreAffect`] (`galion-emotion-core`). Each frame with a moment is handed
 //! to the mouth. Prosody sensing is on unless [`Duplex::set_prosody`] turns
-//! it off. The recognizer is [`SilentRecognizer`] unless the crate is built
-//! with `--features vosk`. Breath is still a stand-in. The virtual-clock
-//! integration test keeps its own stand-ins and is the CI gate.
+//! it off. Echo cancellation is [`PlaybackEcho`] over `fdaf-aec` unless
+//! [`Duplex::set_aec`] bypasses it, or the crate is built with
+//! `--no-default-features`. The recognizer is [`SilentRecognizer`] unless
+//! the crate is built with `--features vosk`. Breath is still a stand-in.
+//! The virtual-clock integration test keeps its own stand-ins and is the CI gate.
 //!
 //! This tick is not the heartbeat frame step. It does not read a wall clock,
 //! open a socket, or load a weight.
@@ -29,6 +31,7 @@
 mod brain;
 mod breath;
 mod duplex;
+mod echo;
 mod emotion;
 mod live;
 mod mouth;
@@ -42,6 +45,7 @@ mod report;
 
 pub use breath::SpeakingBreath;
 pub use duplex::{Duplex, Floor, FrameOut, LoopEvent, Parts};
+pub use echo::{PlaybackEcho, AEC_CRATE, AEC_LICENSE, AEC_VERSION};
 pub use emotion::CoreAffect;
 pub use horbm_voice::{FRAME_MS, FRAME_SAMPLES, SAMPLE_RATE};
 pub use live::FramePump;

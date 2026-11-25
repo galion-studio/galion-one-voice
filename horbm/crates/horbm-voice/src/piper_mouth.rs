@@ -10,10 +10,11 @@ use std::collections::VecDeque;
 
 use galion_tts_piper::{Pad as PiperPad, Tts};
 
+use crate::backchannel::render;
 use crate::brain::SpokenLine;
 use crate::clock::FRAME_MS;
 use crate::moment_voice::{shape_sentence, VoiceControls};
-use crate::mouth::{AudioFrame, Mouth, MouthPull};
+use crate::mouth::{AudioFrame, BackchannelPlay, Mouth, MouthPull};
 
 /// One [`Tts`] sliced into conductor frames.
 pub struct PiperMouth<T> {
@@ -118,6 +119,44 @@ impl<T: Tts> Mouth for PiperMouth<T> {
     fn feel(&mut self, controls: VoiceControls) {
         self.controls = controls;
     }
+
+    fn listen_backchannel(&mut self, play: &BackchannelPlay) -> AudioFrame {
+        // The reply queue stays put. A nod is not a turn.
+        let pad = PiperPad {
+            arousal: 0.3,
+            valence: 0.25,
+            dominance: 0.5,
+        };
+        let mut pcm = Vec::new();
+        let spoke = self
+            .tts
+            .speak(play.text, pad, &mut |chunk| {
+                pcm.extend_from_slice(chunk.samples);
+            })
+            .is_ok();
+        let gain = if play.energy.is_finite() {
+            play.energy.clamp(0.22, 0.55)
+        } else {
+            0.30
+        };
+        if !spoke || pcm.is_empty() {
+            return AudioFrame {
+                samples: render(play.kind, gain, frame_width(self.rate).max(1), self.rate),
+                sample_rate: self.rate,
+                first: true,
+            };
+        }
+        let samples: Vec<i16> = pcm
+            .into_iter()
+            .take(frame_width(self.rate).max(1))
+            .map(|sample| (f32::from(sample) * gain).round() as i16)
+            .collect();
+        AudioFrame {
+            samples,
+            sample_rate: self.rate,
+            first: true,
+        }
+    }
 }
 
 fn frame_width(rate: u32) -> usize {
@@ -129,7 +168,7 @@ mod tests {
     use super::*;
     use crate::brain::kettle_turn;
     use crate::ear::{EarEvent, FakeEar};
-    use crate::mouth::Mouth;
+    use crate::mouth::{Mouth, MouthPull};
     use crate::turn::VoiceLoop;
     use galion_tts_piper::FakeTts;
 
@@ -149,5 +188,69 @@ mod tests {
         assert!(frame.first);
         assert!(!frame.samples.is_empty());
         assert!(frame.samples.iter().any(|sample| *sample != 0));
+    }
+
+    #[test]
+    fn a_nod_uses_piper_and_stays_quieter_than_the_reply() {
+        use crate::backchannel::{BackchannelKind, ListenCue, ListenMood};
+        use crate::mouth::BackchannelPlay;
+        use crate::turn::{TickEvent, TurnMsg};
+
+        let mut mouth = PiperMouth::new(FakeTts::new());
+        let nod = mouth.listen_backchannel(&BackchannelPlay {
+            text: "mm-hm",
+            kind: BackchannelKind::MmHm,
+            energy: 0.40,
+        });
+        assert!(!mouth.speaking(), "a nod does not open a turn");
+        let nod_peak = peak(&nod.samples);
+        assert!(nod_peak > 0);
+
+        let mut reply_mouth = PiperMouth::new(FakeTts::new());
+        reply_mouth.start(&crate::brain::SpokenLine {
+            text: "The kettle is on the hob.".into(),
+            mood: horbm::Pad::RESTING,
+            rate: 1.0,
+            energy: 1.0,
+            pitch_st: 0.0,
+            pause_ms: 0.0,
+        });
+        let MouthPull::Frame(reply) = reply_mouth.pull() else {
+            panic!("reply frame");
+        };
+        let reply_peak = peak(&reply.samples);
+        assert!(nod_peak < reply_peak, "nod {nod_peak} reply {reply_peak}");
+
+        let mut voice = VoiceLoop::new(
+            FakeEar::script([
+                EarEvent::partial("I walked down to the market"),
+                EarEvent::quiet(),
+                EarEvent::partial("and the stall was still open"),
+            ]),
+            PiperMouth::new(FakeTts::new()),
+            kettle_turn(),
+        );
+        let _ = voice.tick_listen(&[], TurnMsg::Hold, ListenCue::None, ListenMood::resting());
+        let heard = voice.tick_listen(
+            &[],
+            TurnMsg::Hold,
+            ListenCue::ClauseFall,
+            ListenMood::resting(),
+        );
+        assert_eq!(heard.event, TickEvent::ListenBackchannel);
+        assert!(!heard.cancel);
+        assert!(!heard.speaking);
+        assert!(heard.reply.is_none());
+        assert!(!voice.mouth().speaking());
+        let next = voice.tick_listen(&[], TurnMsg::Hold, ListenCue::None, ListenMood::resting());
+        assert_ne!(next.event, TickEvent::BargeIn);
+        assert!(!next.cancel);
+        assert_eq!(next.epoch, heard.epoch);
+    }
+
+    fn peak(samples: &[i16]) -> i16 {
+        samples
+            .iter()
+            .fold(0i16, |acc, sample| acc.max(sample.abs()))
     }
 }
