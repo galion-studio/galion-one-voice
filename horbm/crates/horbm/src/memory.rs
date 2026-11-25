@@ -9,6 +9,9 @@
 //!
 //! `remember` defaults to deny. Denied means this type does not open the
 //! file, does not call the sink, and does not run [`horbm_memory::summarise_session`].
+//! [`EpisodicStore::open_from_flag`] grants only when the trimmed flag is
+//! the word `grant`.
+//!
 //! Forget copies the row into the diary archive and drops it from search.
 //! The archive is the tombstone. This module has no delete of that table.
 
@@ -64,6 +67,17 @@ impl EpisodicStore {
             issued: HashMap::new(),
             writes: 0,
             extractions: 0,
+        }
+    }
+
+    /// `grant` after trim is the only grant. Any other flag, including
+    /// `None`, calls [`Self::open`] with deny. The file is not created here.
+    /// This does not read the process environment.
+    pub fn open_from_flag(path: impl AsRef<Path>, flag: Option<&str>) -> Self {
+        if flag.map(str::trim) == Some("grant") {
+            Self::open(path, true)
+        } else {
+            Self::open(path, false)
         }
     }
 
