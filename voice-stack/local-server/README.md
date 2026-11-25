@@ -77,6 +77,8 @@ GALION_SAMANTHA_WS='[::1]:7881' cargo run --release -- --ui ui
 
 `0.0.0.0` and any non-loopback address refuse to start. `--addr` overrides `GALION_SAMANTHA_WS`.
 
+That command is a foreground process. When it exits, the process stays down. Linux supervision for the built `samantha-local` binary is [`deploy/linux/README.md`](../../deploy/linux/README.md): a systemd user unit, or a restart loop when the user session has no systemd. Paths come from an env file. The supervised bind is `127.0.0.1` only. Repeated failed `GET /health` checks restart the process.
+
 ```bash
 cargo test
 ```

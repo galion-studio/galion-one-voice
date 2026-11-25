@@ -12,6 +12,7 @@ rust-version = "1.85"
 
 [dependencies]
 horbm-brain = { path = "../horbm-brain" }
+horbm-inner = { path = "../horbm-inner" }
 horbm-keys = { path = "../../../crates/horbm-keys", default-features = false }
 galion-research-gateway = { path = "../../../voice-stack/research-gateway" }
 galion-sam-empathy = { path = "../../../voice-stack/empathy" }

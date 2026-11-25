@@ -6,7 +6,7 @@ use std::path::Path;
 use std::time::Instant;
 
 use galion_emotion_core::{
-    ConductorCue, EmotionCore, InnerLife, InnerTurn, IntentMsg, MomentState,
+    ConductorCue, EmotionCore, InnerLife, InnerTurn, IntentMsg, MomentState, VoiceBaseline,
 };
 use galion_sam_empathy::{Empathy, PronounClass, TickIn, FRAME_MS};
 use horbm_persona::{MoveClaim, MoveVerdict, Persona, PersonaError};
@@ -14,6 +14,7 @@ use horbm_persona::{MoveClaim, MoveVerdict, Persona, PersonaError};
 use horbm_brain::{
     classify, pick, split_clause, Answer, Heuristic, Retrieved, Retriever, SidebandMark,
 };
+use horbm_inner::{DialogueLean, Heard, InnerMsg, Perceived, SamanthaInner, Verb};
 
 use crate::cards::ResearchRoot;
 use crate::dialogue::{DecideIn, Decision, Dialogue, DialogueConsent, Move, ReplyPlan, TurnSnap};
@@ -82,6 +83,8 @@ pub struct Brain {
     emotion: EmotionCore,
     inner: InnerLife,
     persona: Persona,
+    samantha: SamanthaInner,
+    ear_sense: bool,
     retrieval: Option<RetrievalThread>,
     retrieval_epoch: u64,
     dialogue: Dialogue,
@@ -207,6 +210,8 @@ impl Brain {
             emotion,
             inner,
             persona,
+            samantha: SamanthaInner::new(),
+            ear_sense: false,
             retrieval: None,
             retrieval_epoch: 0,
             dialogue: Dialogue::new(),
@@ -344,6 +349,13 @@ impl Brain {
         &self.emotion
     }
 
+    /// Who is speaking. The moment starts on this baseline. Empathy, cards,
+    /// and the inner life stay as they are. Later [`Self::step_moment`] calls
+    /// still do not write the baseline.
+    pub fn seat(&mut self, baseline: VoiceBaseline) {
+        self.emotion = EmotionCore::from_baseline(baseline);
+    }
+
     /// One 80 ms emotion frame. Does not change the empathy mood.
     pub fn step_moment(
         &mut self,
@@ -362,9 +374,49 @@ impl Brain {
         self.persona.verdict(claim)
     }
 
-    /// The inner life. Memory is not stored here.
+    /// The token inner life. Memory is not stored here.
     pub fn inner(&self) -> &InnerLife {
         &self.inner
+    }
+
+    /// Samantha's slower goals. Session only. Not the baseline, not the moment.
+    pub fn samantha(&self) -> &SamanthaInner {
+        &self.samantha
+    }
+
+    /// Ear switch for [`Self::turn`]. Default off. Words still count.
+    pub fn set_ear_sense(&mut self, on: bool) {
+        self.ear_sense = on;
+    }
+
+    /// Pace and topic gate from the latest inner note.
+    pub fn dialogue_lean(&self) -> DialogueLean {
+        self.samantha.last().lean()
+    }
+
+    /// False while she is waiting or on a check-in. Do not open a new topic.
+    pub fn may_open_topic(&self) -> bool {
+        !self.dialogue_lean().hold_topic
+    }
+
+    /// One inner turn, then one moment frame, using her GEMI note.
+    ///
+    /// Does not write the baseline. Does not keep `words`.
+    pub fn samantha_nudge(
+        &mut self,
+        words: &str,
+        ear: Option<Heard>,
+        sense: bool,
+    ) -> Result<InnerMsg, galion_emotion_core::CoreError> {
+        let seen = Perceived {
+            t_ms: self.emotion.next_ms(),
+            words,
+            ear,
+            sense,
+        };
+        let note = self.samantha.nudge(&mut self.emotion, seen)?;
+        self.apply_prosody(note.lean());
+        Ok(note)
     }
 
     fn install_persona(&mut self, persona: Persona) {
@@ -421,6 +473,8 @@ impl Brain {
             frame_ms: FRAME_MS,
         });
         self.meta = meta_of(&tick);
+        let note = self.samantha.tick(FRAME_MS, true);
+        self.apply_prosody(note.lean());
         self.meta
     }
 
@@ -445,6 +499,13 @@ impl Brain {
             frame_ms: FRAME_MS,
         });
         self.meta = meta_of(&tick);
+        let note = self.samantha.turn(Perceived {
+            t_ms: self.emotion.next_ms(),
+            words: heard,
+            ear: None,
+            sense: self.ear_sense,
+        });
+        self.apply_prosody(note.lean());
         let prep = self.empathy.prepare_lookup(heard);
         let query = if prep.query.trim().is_empty() {
             heard
@@ -548,14 +609,20 @@ impl Brain {
                 return Gathered { spoke, gap: None };
             }
         }
-        let routed = match self.research.as_mut() {
-            Some(port) => route_heard(
-                query,
-                self.cards.as_ref(),
-                Some(port.as_mut()),
-                self.speakable,
-            ),
-            None => route_heard(query, self.cards.as_ref(), None, self.speakable),
+        // Comfort stays with them. The research ask does not open.
+        let comfort = self.dialogue_lean().verb == Verb::Comfort;
+        let routed = if comfort {
+            route_heard(query, self.cards.as_ref(), None, self.speakable)
+        } else {
+            match self.research.as_mut() {
+                Some(port) => route_heard(
+                    query,
+                    self.cards.as_ref(),
+                    Some(port.as_mut()),
+                    self.speakable,
+                ),
+                None => route_heard(query, self.cards.as_ref(), None, self.speakable),
+            }
         };
         Gathered {
             gap: routed.gap,
@@ -663,6 +730,17 @@ impl Brain {
             rest,
             sideband,
         }
+    }
+}
+
+fn apply_prosody(meta: &mut MoodMeta, lean: DialogueLean) {
+    meta.rate = (meta.rate * lean.rate).clamp(0.80, 1.30);
+    meta.pause_ms = (meta.pause_ms + lean.pause_ms).clamp(0.0, 400.0);
+}
+
+impl Brain {
+    fn apply_prosody(&mut self, lean: DialogueLean) {
+        apply_prosody(&mut self.meta, lean);
     }
 }
 

@@ -1,0 +1,59 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Galion Labs
+# User unit for samantha-local. Linux only.
+# install.sh copies this to ~/.config/systemd/user/samantha-local.service.
+# Not a system unit. No User=. No sudo. Presence in the tree does not install it.
+# The env file holds the binary, the UI directory, the work directory, and the bind.
+# supervise.sh refuses a bind other than 127.0.0.1:PORT.
+# Sandbox keys match the WSL user unit galion-one-voice.service.
+# MemoryMax is 2G, the same cap as that unit, so the public packs fit.
+# Boot autostart is WantedBy=default.target plus systemctl --user enable.
+# A user session has to be up at boot (loginctl enable-linger). This file does not do that.
+# WSL needs systemd=true under [boot] in /etc/wsl.conf. This file does not edit it.
+
+[Unit]
+Description=Samantha local voice server (loopback)
+After=network.target
+StartLimitIntervalSec=120
+StartLimitBurst=8
+
+[Service]
+Type=simple
+Environment=SAMANTHA_ENV_FILE=%h/.config/galion/samantha-local.env
+EnvironmentFile=%h/.config/galion/samantha-local.env
+ExecStart=%h/.local/bin/samantha-local-supervise --systemd
+Restart=on-failure
+RestartSec=2
+RestartPreventExitStatus=2
+TimeoutStopSec=15
+KillMode=control-group
+SyslogIdentifier=samantha-supervise
+StandardInput=null
+StandardOutput=journal
+StandardError=journal
+MemoryMax=2G
+NoNewPrivileges=yes
+PrivateTmp=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+ProtectSystem=strict
+ProtectHome=yes
+ReadOnlyPaths=%h/.local/bin/samantha-local-supervise
+ReadOnlyPaths=%h/.config/galion/samantha-local.env
+IPAddressDeny=any
+IPAddressAllow=localhost
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+SystemCallArchitectures=native
+UMask=0077
+
+[Install]
+WantedBy=default.target
