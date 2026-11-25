@@ -1,0 +1,23 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Galion Labs
+
+[package]
+name = "horbm-device"
+description = "HORBM device profile. Boot detects the processor and writes one versioned profile. CPU unless a GPU is opted in."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+# sysinfo 0.36.1 declares rust 1.75. CI for this repo is 1.85. sysinfo 0.37 needs 1.88, so the pin stays.
+rust-version = "1.75"
+
+[features]
+default = []
+# NVIDIA management library, Linux only at the call site. Off unless a
+# build opts in. A missing library leaves the profile on CPU.
+nvml = ["dep:nvml-wrapper"]
+
+[dependencies]
+# Exact pin: 0.37 raises the compiler floor past this repo's 1.85 CI toolchain.
+sysinfo = { version = "=0.36.1", default-features = false, features = ["system"] }
+nvml-wrapper = { version = "=0.13.0", optional = true }

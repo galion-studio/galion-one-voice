@@ -259,6 +259,8 @@ dependencies = [
 name = "horbm-voice"
 version = "0.0.1"
 dependencies = [
+ "galion-emotion-core",
+ "galion-sam-prosody",
  "horbm",
 ]
 

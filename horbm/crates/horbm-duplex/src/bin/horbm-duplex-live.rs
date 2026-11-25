@@ -10,7 +10,9 @@
 //! tones. That script is not an acoustic path, so echo removal is bypassed
 //! there. `--no-prosody` turns ear sensing off. `--no-aec` is the echo
 //! bypass on the device path. `--json` prints one JSON object per voice
-//! onset and per barge-in.
+//! onset and per barge-in. With `--features piper`, `--json` also prints
+//! the warm-mouth measurements when a stock pack is already on disk.
+//! `--piper` selects that mouth. The default stays the tone.
 //!
 //! Build: `cargo run --manifest-path horbm/Cargo.toml -p horbm-duplex --features live --bin horbm-duplex-live`
 //! The recognizer is the stand-in unless this bin is also built with `--features vosk`.
@@ -28,6 +30,10 @@ use horbm_duplex::{
     PlaybackEcho, RecogError, Recognizer, SamanthaPersona, SpeakingBreath, FRAME_SAMPLES,
     SAMPLE_RATE,
 };
+use horbm_voice::{Mouth, MouthPull, SpokenLine, VoiceControls};
+
+#[cfg(feature = "piper")]
+use horbm_duplex::PiperMouth;
 
 const HELP: &str = "\
 horbm-duplex-live
@@ -42,6 +48,8 @@ horbm-duplex-live
   --help          this text
 
 Linux: the audio host is ALSA through cpal. There is no Windows CI job.
+The piper mouth is a separate feature. This build keeps the tone mouth
+unless that feature is on and --piper is passed.
 ";
 
 struct NoCards;
@@ -61,14 +69,20 @@ fn main() -> ExitCode {
     let mut prosody = true;
     let mut aec = true;
     let mut self_test = false;
+    let mut piper = false;
     for arg in std::env::args().skip(1) {
         match arg.as_str() {
             "--json" => json = true,
             "--no-prosody" => prosody = false,
             "--no-aec" => aec = false,
             "--self-test" => self_test = true,
+            "--piper" => piper = true,
             "--help" | "-h" => {
                 println!("{HELP}");
+                #[cfg(feature = "piper")]
+                println!(
+                    "  --piper         stock en_US-ljspeech mouth. Off unless this flag is set."
+                );
                 return ExitCode::SUCCESS;
             }
             other => {
@@ -81,10 +95,15 @@ fn main() -> ExitCode {
     if self_test {
         return run_self_test(json, prosody);
     }
+    #[cfg(not(feature = "piper"))]
+    if piper {
+        eprintln!("duplex s34 --piper needs the piper feature");
+        return ExitCode::from(2);
+    }
     #[cfg(feature = "vosk")]
     {
         match horbm_duplex::AsrRecognizer::from_env() {
-            Ok(recognizer) => run_devices(json, prosody, aec, recognizer),
+            Ok(recognizer) => run_devices(json, prosody, aec, recognizer, piper),
             Err(err) => {
                 eprintln!("duplex s28 recognizer {err}");
                 ExitCode::from(1)
@@ -93,13 +112,27 @@ fn main() -> ExitCode {
     }
     #[cfg(not(feature = "vosk"))]
     {
-        run_devices(json, prosody, aec, SilentRecognizer::new())
+        run_devices(json, prosody, aec, SilentRecognizer::new(), piper)
     }
 }
 
-fn run_devices<R: Recognizer>(json: bool, prosody: bool, aec: bool, recognizer: R) -> ExitCode {
+fn run_devices<R: Recognizer>(
+    json: bool,
+    prosody: bool,
+    aec: bool,
+    recognizer: R,
+    piper: bool,
+) -> ExitCode {
     let name = recognizer.name().to_string();
-    let mut duplex = match build(recognizer, prosody, aec) {
+    let mouth = match open_live(piper) {
+        Ok(mouth) => mouth,
+        Err(err) => {
+            eprintln!("duplex s34 {err}");
+            return ExitCode::from(1);
+        }
+    };
+    let mouth_name = mouth.name().to_string();
+    let mut duplex = match build(recognizer, prosody, aec, mouth) {
         Ok(duplex) => duplex,
         Err(err) => {
             eprintln!("duplex s28 {err}");
@@ -118,7 +151,7 @@ fn run_devices<R: Recognizer>(json: bool, prosody: bool, aec: bool, recognizer: 
         }
     };
     eprintln!(
-        "duplex s28 host={} recognizer={name} emotion=galion-emotion-core prosody={} aec={} persona=samantha mouth=native breath=stand-in network=none",
+        "duplex s28 host={} recognizer={name} emotion=galion-emotion-core prosody={} aec={} persona=samantha mouth={mouth_name} breath=stand-in network=none",
         session.info().host,
         on_off(duplex.prosody_enabled()),
         aec_label(duplex.aec_enabled()),
@@ -161,6 +194,7 @@ fn run_self_test(json: bool, prosody: bool) -> ExitCode {
         Script::new(&["where is the kettle", "yeah", "stop now"]),
         prosody,
         false,
+        NativeMouth::new(),
     ) {
         Ok(duplex) => duplex,
         Err(err) => {
@@ -220,29 +254,32 @@ fn run_self_test(json: bool, prosody: bool) -> ExitCode {
         }
     }
     let report = duplex.report();
-    if report.voice_ms == Some(160)
+    let tone_ok = report.voice_ms == Some(160)
         && report.barge_ms == Some(160)
-        && report.backchannel_cancels == 0
-    {
-        ExitCode::SUCCESS
-    } else {
+        && report.backchannel_cancels == 0;
+    if !tone_ok {
         eprintln!("{}", report.turn_text("barge"));
-        ExitCode::from(1)
+        return ExitCode::from(1);
     }
+    if !publish_piper(json) {
+        return ExitCode::from(1);
+    }
+    ExitCode::SUCCESS
 }
 
-fn build<R: Recognizer>(
+fn build<R: Recognizer, M: Mouth>(
     recognizer: R,
     prosody: bool,
     aec: bool,
-) -> Result<Duplex<R, CoreAffect, SpeakingBreath, SamanthaPersona, NativeMouth>, String> {
+    mouth: M,
+) -> Result<Duplex<R, CoreAffect, SpeakingBreath, SamanthaPersona, M>, String> {
     let mut duplex = Duplex::new(
         Parts {
             recognizer,
             emotion: CoreAffect::samantha(),
             breath: SpeakingBreath,
             persona: SamanthaPersona,
-            mouth: NativeMouth::new(),
+            mouth,
         },
         NoCards,
     )
@@ -252,6 +289,49 @@ fn build<R: Recognizer>(
     }
     duplex.set_aec(aec);
     Ok(duplex)
+}
+
+fn publish_piper(json: bool) -> bool {
+    #[cfg(not(feature = "piper"))]
+    {
+        let _ = json;
+        true
+    }
+    #[cfg(feature = "piper")]
+    {
+        match horbm_duplex::discover_piper() {
+            Some(paths) => match horbm_duplex::measure_piper(&paths) {
+                Ok(stats) => {
+                    if json {
+                        println!("{}", stats.json());
+                    } else {
+                        println!("{}", stats.text());
+                    }
+                    if stats.barge_to_silence_ms > 160 {
+                        eprintln!(
+                            "duplex s34 barge_to_silence_ms={} over 160",
+                            stats.barge_to_silence_ms
+                        );
+                        false
+                    } else {
+                        true
+                    }
+                }
+                Err(err) => {
+                    eprintln!("duplex s34 piper {err}");
+                    false
+                }
+            },
+            None => {
+                if json {
+                    println!("{}", horbm_duplex::piper_skipped_json());
+                } else {
+                    println!("duplex s34 piper skipped=stock-voice-absent cpu=1");
+                }
+                true
+            }
+        }
+    }
 }
 
 fn publish(json: bool, event: LoopEvent, report: &horbm_duplex::LatencyReport) {
@@ -284,6 +364,96 @@ fn on_off(on: bool) -> &'static str {
     } else {
         "off"
     }
+}
+
+enum LiveMouth {
+    Native(NativeMouth),
+    #[cfg(feature = "piper")]
+    Piper(Box<PiperMouth>),
+}
+
+impl LiveMouth {
+    fn name(&self) -> &'static str {
+        match self {
+            Self::Native(_) => "native",
+            #[cfg(feature = "piper")]
+            Self::Piper(_) => "piper",
+        }
+    }
+
+    fn last(&self) -> &[i16] {
+        match self {
+            Self::Native(mouth) => mouth.last(),
+            #[cfg(feature = "piper")]
+            Self::Piper(mouth) => mouth.last(),
+        }
+    }
+}
+
+impl Mouth for LiveMouth {
+    fn id(&self) -> &str {
+        self.name()
+    }
+
+    fn start(&mut self, line: &SpokenLine) {
+        match self {
+            Self::Native(mouth) => mouth.start(line),
+            #[cfg(feature = "piper")]
+            Self::Piper(mouth) => mouth.start(line),
+        }
+    }
+
+    fn pull(&mut self) -> MouthPull {
+        match self {
+            Self::Native(mouth) => mouth.pull(),
+            #[cfg(feature = "piper")]
+            Self::Piper(mouth) => mouth.pull(),
+        }
+    }
+
+    fn cancel(&mut self) {
+        match self {
+            Self::Native(mouth) => mouth.cancel(),
+            #[cfg(feature = "piper")]
+            Self::Piper(mouth) => mouth.cancel(),
+        }
+    }
+
+    fn speaking(&self) -> bool {
+        match self {
+            Self::Native(mouth) => mouth.speaking(),
+            #[cfg(feature = "piper")]
+            Self::Piper(mouth) => mouth.speaking(),
+        }
+    }
+
+    fn feel(&mut self, controls: VoiceControls) {
+        match self {
+            Self::Native(mouth) => mouth.feel(controls),
+            #[cfg(feature = "piper")]
+            Self::Piper(mouth) => mouth.feel(controls),
+        }
+    }
+}
+
+fn open_live(piper: bool) -> Result<LiveMouth, String> {
+    if !piper {
+        return Ok(LiveMouth::Native(NativeMouth::new()));
+    }
+    open_piper()
+}
+
+#[cfg(feature = "piper")]
+fn open_piper() -> Result<LiveMouth, String> {
+    let paths = horbm_duplex::discover_piper().ok_or("stock piper voice is not on disk")?;
+    let mut mouth = PiperMouth::open(&paths)?;
+    mouth.prepare()?;
+    Ok(LiveMouth::Piper(Box::new(mouth)))
+}
+
+#[cfg(not(feature = "piper"))]
+fn open_piper() -> Result<LiveMouth, String> {
+    Err("piper mouth is not in this build".into())
 }
 
 fn aec_label(on: bool) -> &'static str {

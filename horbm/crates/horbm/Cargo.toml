@@ -12,10 +12,11 @@ rust-version = "1.85"
 
 [dependencies]
 horbm-brain = { path = "../horbm-brain" }
-galion-emotion-core = { path = "../../../crates/galion-emotion-core" }
+horbm-inner = { path = "../horbm-inner" }
 horbm-keys = { path = "../../../crates/horbm-keys", default-features = false }
 galion-research-gateway = { path = "../../../voice-stack/research-gateway" }
 galion-sam-empathy = { path = "../../../voice-stack/empathy" }
+galion-emotion-core = { path = "../../../crates/galion-emotion-core" }
 horbm-persona = { path = "../horbm-persona" }
 # In-process diary. Root manifest of galion-knowledge; not a vendored copy.
 horbm-memory = { git = "https://github.com/galion-studio/galion-knowledge.git", rev = "974e594444448597741372fef578142c46d28566" }

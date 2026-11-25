@@ -60,6 +60,13 @@
 //! thread. Do not call [`Brain::turn`] from `Heartbeat::step`: the turn waits
 //! for the cell. [`Int8Scorer`] is implemented for the mapped key arena and
 //! is not called by the retrieval thread.
+//!
+//! [`Brain::samantha`] is the slower layer: care, curiosity, help, and
+//! expect. [`Brain::turn`] lets that layer bias the pace and, when the act
+//! is comfort, skips the research ask. It does not replace the spoken
+//! clause. [`Brain::samantha_nudge`] steps the same GEMI note on the moment
+//! clock. [`Brain::tick_frame`] decays the goals and counts silence. It
+//! still does not step the moment.
 
 #![forbid(unsafe_code)]
 
@@ -88,6 +95,11 @@ pub use galion_emotion_core::{
 pub use galion_research_gateway::RESEARCH_CAP;
 pub use galion_sam_empathy::{Intent, PronounClass, FRAME_MS};
 pub use horbm_brain::{Answer, Heuristic, MarkKind, SidebandMark};
+pub use horbm_inner::{
+    DialogueLean, Heard, InnerMsg, MsgDir, Perceived, SamanthaInner, Verb, CARE_HOME,
+    CHECKIN_GAP_MS, CHECKIN_MS, CURIOSITY_HOME, EXPECT_HOME, HELP_HOME, PERSONA as SAMANTHA_INNER,
+    REMEMBER_LOCK, TICK_MS, WAIT_MS,
+};
 pub use horbm_keys::StringKeyArena;
 pub use horbm_persona::{
     LegalMovePort, MoveClaim, MoveVerdict, Persona, PersonaError, StyleHook, UNKNOWN_LINE,

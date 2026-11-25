@@ -3,7 +3,7 @@
 
 [package]
 name = "horbm-eval"
-description = "Closed HORBM evaluation gate. Fake mode is the default. Real mode is an opt-in Linux ear and mouth."
+description = "Closed HORBM evaluation gate, plus the Samantha turn-taking eval. Fake mode is the default. Real mode is an opt-in Linux ear and mouth."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -29,8 +29,13 @@ default = []
 # The default build does not, so CI stays on FakeEar and FakeMouth.
 real = ["dep:galion-asr-vosk", "dep:galion-ml-voice", "galion-ml-voice/speech"]
 
+[[bin]]
+name = "horbm-turn-eval"
+path = "src/bin/horbm-turn-eval.rs"
+
 [dependencies]
 horbm = { path = "../horbm" }
+horbm-duplex = { path = "../horbm-duplex" }
 horbm-voice = { path = "../horbm-voice" }
 galion-conductor = { path = "../../../crates/galion-conductor" }
 galion-emotion = { path = "../../../galion-emotion" }
