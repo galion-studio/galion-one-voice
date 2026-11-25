@@ -11,9 +11,11 @@
 //! Coefficients are the Audio EQ Cookbook forms that crate already ships.
 //!
 //! [`TractBaseline`] is the steady voice (where F1 and F2 sit at rest).
-//! [`MouthControls`] is the moment: tension, breathiness, openness, nasal
-//! coupling, and exhale noise. [`MouthControls::from_moment`] reads a
-//! [`VoiceBaseline`] and a [`MomentState`] and does not write either one.
+//! [`MouthControls`] is what this stage renders: tilt, formant shift, nasal
+//! dips, and exhale noise. It does not compute glottal open quotient,
+//! breathiness, or mouth openness. Those numbers belong to `horbm-breath`
+//! (PR 278). [`MouthControls::from_moment`] only turns an exhale into noise
+//! and copies a caller velum. It does not write the baseline or the moment.
 //! Neutral controls leave every sample alone.
 //!
 //! Samantha is the only persona the speech stack will run this on.

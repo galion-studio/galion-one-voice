@@ -367,8 +367,9 @@ fn the_moment_does_not_move_the_tract_baseline() {
     filter.set_moment(&voice, &moment, Breath::rest(), 0.0);
     assert_eq!(filter.baseline().f1_hz.to_bits(), before.f1_hz.to_bits());
     assert_eq!(filter.baseline().f2_hz.to_bits(), before.f2_hz.to_bits());
-    assert!(filter.controls().openness > 0.0);
-    assert!(filter.controls().tension > 0.0);
+    assert_eq!(filter.controls().openness, 0.0);
+    assert_eq!(filter.controls().tension, 0.0);
+    assert_eq!(filter.controls().breathiness, 0.0);
     assert_eq!(voice.identity_bits(), bits);
 }
 

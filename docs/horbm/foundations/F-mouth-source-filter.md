@@ -17,17 +17,29 @@ Piper or flite has already spoken. This stage does not synthesise a word and it 
 
 `TractBaseline` is the steady voice. `TractBaseline::SAMANTHA` anchors F1 at 431.512 Hz and F2 at 1857.581 Hz, the Burg medians already written in `ARTICULATION-LAYER.md`. They are the frequencies an openness delta moves. They are not a new measurement. Bandwidths are not taken from that note.
 
-`MouthControls` is the moment. `MouthControls::from_moment` reads a `VoiceBaseline` and a `MomentState` and does not write either. The emotion-core stand-in's persona bytes are not the product persona, so the filter does not look at them. The stack's persona gate is the one that decides whether Samantha is speaking.
+`MouthControls` is what the filters render. `MouthControls::from_moment` reads a `VoiceBaseline` and a `MomentState` and does not write either, and it does not turn those axes into glottal or mouth targets. The emotion-core stand-in's persona bytes are not the product persona, so the filter does not look at them. The stack's persona gate is the one that decides whether Samantha is speaking.
 
-The deltas are knobs. None is a z against this speaker's own neutral.
+The filter knobs are not a z against this speaker's own neutral. The control law for open quotient, breathiness, nasal coupling, and mouth openness is `horbm-breath` (PR 278, not this crate).
 
-| Control | What the knob does | Where it comes from |
+| Control | What the knob does | Where the number comes from |
 |---|---|---|
-| Tension | Raises spectral tilt, up to `TENSION_DB` (9 dB) at full scale. Low shelf down, high shelf up, corner 1 kHz. | Arousal and dominance above rest, and only the positive side. |
-| Breathiness | Lowers that same tilt, up to `BREATHINESS_DB` (8 dB). It does not add noise. | The negative side of the same glottal slope, so one step does not push both. |
-| Openness | Moves F1 by up to `F1_SHIFT` (0.70) and F2 by up to `F2_SHIFT` (0.30), and lowers Q as the tract opens (`OPEN_Q_SCALE` 1.5). Depth is `FORMANT_DB` (12 dB) once openness leaves rest. | Arousal relative to rest. Valence does not open the jaw. |
-| Nasal | Antiresonances at 250 Hz and 1.5 kHz, depth up to `NASAL_DEPTH_DB` (18 dB). | The caller's velum, 0 to 1. Feeling does not set it. The nose planner's feeling gain is still zero. |
+| Tension | Raises spectral tilt, up to `TENSION_DB` (9 dB) at full scale. Low shelf down, high shelf up, corner 1 kHz. | The caller. `from_moment` leaves it at 0. |
+| Breathiness | Lowers that same tilt, up to `BREATHINESS_DB` (8 dB). It does not add noise. | The caller, from `horbm-breath`'s breathiness once that frame is wired. `from_moment` leaves it at 0. |
+| Openness | Moves F1 by up to `F1_SHIFT` (0.70) and F2 by up to `F2_SHIFT` (0.30), and lowers Q as the tract opens (`OPEN_Q_SCALE` 1.5). Depth is `FORMANT_DB` (12 dB) once openness leaves rest. | The caller, from that crate's mouth openness. `from_moment` leaves it at 0. |
+| Nasal | Antiresonances at 250 Hz and 1.5 kHz, depth up to `NASAL_DEPTH_DB` (18 dB). | The caller's velum, copied through. The health mix stays in `horbm-breath`. |
 | Breath noise | Band-limited noise, centre `BREATH_CENTER_HZ` (700 Hz), mixed on the way out. | Breath phase `exhale` only. Speech, inhale, hold, and rest add none. |
+
+## What overlaps PR 278
+
+PR 278 (`horbm-breath`, branch `cursor/horbm-breath-s20-5330`) adds glottal open quotient (Fant Rd), breathiness, nasal coupling, and mouth openness on the lungs frame. It does not filter speech PCM. This crate does not recompute those four. One source of truth for the numbers: `horbm-breath`. One source of truth for shaping Piper and flite: this filter.
+
+| Concern | Owner |
+|---|---|
+| Lung phase, volume, flow, pressure, phrase pauses, inhale noise | `horbm-breath` (already on main) |
+| Fant open quotient, breathiness from Rd, nasal coupling, mouth openness | `horbm-breath` when PR 278 lands |
+| Spectral tilt, F1/F2 shift, nasal dips, exhale noise on TTS PCM | `galion-source-filter` |
+
+`from_moment` still maps an exhale onto breath noise. That is the contract `horbm-breath` already names. Inhale noise stays in `horbm-breath` (`Lungs::write_inhale`). This filter does not write a second inhale.
 
 A rest moment, a closed velum, and any phase but exhale produce `MouthControls::neutral()`.
 
@@ -46,7 +58,7 @@ Unoptimized, one run, same probe: neutral 75 ns/frame (RTF 9.38×10⁻⁷); full
 
 ## Tests
 
-`cargo test -p galion-source-filter` — 20 tests, all passing (9 in the crate, 10 probes, 1 alloc counter).
+`cargo test -p galion-source-filter` — 19 tests (8 in the crate, 10 probes, 1 alloc counter).
 
 `cargo test -p galion-ml-voice --features speech` — the new stack test is `samantha_source_filter_sits_between_tts_and_the_playback_buffer`. Neutral Samantha matches the engine buffer. Tension moves the Piper-class buffer. Openness moves the flite buffer. Jarvis with every control set matches the engine buffer. The existing clone landing test still requires the playback buffer to equal the packet.
 

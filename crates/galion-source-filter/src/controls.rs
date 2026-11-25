@@ -6,7 +6,7 @@
 //! The rest formants are the Burg medians already written down for this
 //! speaker. They are anchors for the shift, not a new measurement.
 
-use galion_emotion_core::{Breath, BreathPhase, MomentState, VoiceBaseline, AROUSAL, DOMINANCE};
+use galion_emotion_core::{Breath, BreathPhase, MomentState, VoiceBaseline};
 
 /// The only persona this mouth shapes.
 pub const PERSONA: &str = "samantha";
@@ -143,24 +143,25 @@ impl MouthControls {
             && self.breath_noise.abs() < SECTION_EPS
     }
 
-    /// Deltas from this speaker's rest. Does not write `voice` or `moment`.
+    /// Exhale noise, and a nasal amount the caller already chose.
     ///
-    /// Tension and breathiness share one glottal slope and sit on opposite
-    /// sides of it, so a single arousal step does not push both. Openness
-    /// follows arousal only. Valence and approach do not move a knob: a
-    /// smile is an intent, and this crate does not invent one. Nasal coupling
-    /// is `velum` alone. The emotion core has no nasalance, and the nose
-    /// planner's feeling gain ships at zero. Breath noise is the exhale
-    /// phase, including when the feeling is still on the baseline.
+    /// Does not write `voice` or `moment`. Does not turn arousal, dominance,
+    /// fatigue, or health into glottal tension, breathiness, or mouth
+    /// openness. Those numbers belong to `horbm-breath`'s articulation frame
+    /// (Fant open quotient and the rest, PR 278). This filter renders
+    /// [`MouthControls`] and does not compute a second set.
+    ///
+    /// `velum` is copied into [`Self::nasal`] when it is finite. The health
+    /// mix on nasal coupling stays in that breath crate. Breath noise follows
+    /// the exhale phase, including when the feeling is still on the baseline.
     pub fn from_moment(
         voice: &VoiceBaseline,
         moment: &MomentState,
         breath: Breath,
         velum: f32,
     ) -> Self {
-        let d_ar = axis_delta(moment.pos[AROUSAL], voice.pos[AROUSAL]);
-        let d_dom = axis_delta(moment.pos[DOMINANCE], voice.pos[DOMINANCE]);
-        let raw = finite_clamp(d_ar + 0.5 * d_dom, -1.0, 1.0);
+        let _baseline = voice;
+        let _moment = moment;
         let breath_noise = match breath.phase {
             BreathPhase::Exhale => {
                 let outward = if breath.flow.is_finite() && breath.flow < 0.0 {
@@ -175,9 +176,9 @@ impl MouthControls {
             }
         };
         Self {
-            tension: raw.max(0.0),
-            breathiness: (-raw).max(0.0),
-            openness: finite_clamp(d_ar, -1.0, 1.0),
+            tension: 0.0,
+            breathiness: 0.0,
+            openness: 0.0,
             nasal: finite_clamp(velum, 0.0, 1.0),
             breath_noise,
         }
@@ -196,15 +197,6 @@ pub(crate) fn section_eps() -> f32 {
     SECTION_EPS
 }
 
-fn axis_delta(moment: f32, rest: f32) -> f32 {
-    let d = moment - rest;
-    if d.is_finite() {
-        d
-    } else {
-        0.0
-    }
-}
-
 fn finite_clamp(x: f32, lo: f32, hi: f32) -> f32 {
     if x.is_finite() {
         x.clamp(lo, hi)
@@ -216,7 +208,9 @@ fn finite_clamp(x: f32, lo: f32, hi: f32) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use galion_emotion_core::{Breath, BreathPhase, MomentState, VoiceBaseline, APPROACH, VALENCE};
+    use galion_emotion_core::{
+        Breath, BreathPhase, MomentState, VoiceBaseline, APPROACH, AROUSAL, VALENCE,
+    };
 
     fn rest_moment() -> (VoiceBaseline, MomentState) {
         let voice = VoiceBaseline::standin();
@@ -236,21 +230,16 @@ mod tests {
     }
 
     #[test]
-    fn arousal_splits_tension_openness_and_breathiness() {
+    fn the_moment_does_not_invent_glottal_or_mouth_controls() {
         let (voice, mut moment) = rest_moment();
-        moment.pos[AROUSAL] = (voice.pos[AROUSAL] + 0.25).min(1.0);
-        let up = MouthControls::from_moment(&voice, &moment, Breath::rest(), 0.0);
-        assert!(up.tension > 0.0);
-        assert!(up.openness > 0.0);
-        assert_eq!(up.breathiness, 0.0);
-        assert_eq!(up.nasal, 0.0);
-        assert_eq!(up.breath_noise, 0.0);
-
-        moment.pos[AROUSAL] = (voice.pos[AROUSAL] - 0.20).max(0.0);
-        let down = MouthControls::from_moment(&voice, &moment, Breath::rest(), 0.0);
-        assert_eq!(down.tension, 0.0);
-        assert!(down.breathiness > 0.0);
-        assert!(down.openness < 0.0);
+        moment.pos[1] = 1.0;
+        moment.pos[2] = 1.0;
+        let controls = MouthControls::from_moment(&voice, &moment, Breath::rest(), 0.0);
+        assert_eq!(controls.tension, 0.0);
+        assert_eq!(controls.breathiness, 0.0);
+        assert_eq!(controls.openness, 0.0);
+        assert_eq!(controls.nasal, 0.0);
+        assert_eq!(controls.breath_noise, 0.0);
     }
 
     #[test]
@@ -260,16 +249,6 @@ mod tests {
         moment.pos[APPROACH] = -0.8;
         let controls = MouthControls::from_moment(&voice, &moment, Breath::rest(), 0.0);
         assert!(controls.is_neutral(), "{controls:?}");
-    }
-
-    #[test]
-    fn dominance_presses_without_opening_the_jaw() {
-        let (voice, mut moment) = rest_moment();
-        moment.pos[DOMINANCE] = (voice.pos[DOMINANCE] + 0.40).min(1.0);
-        let controls = MouthControls::from_moment(&voice, &moment, Breath::rest(), 0.0);
-        assert!(controls.tension > 0.0);
-        assert_eq!(controls.openness, 0.0);
-        assert_eq!(controls.breathiness, 0.0);
     }
 
     #[test]
