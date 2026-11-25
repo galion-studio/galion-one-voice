@@ -154,6 +154,28 @@ fn invalid_persona_refused_at_boot() {
 }
 
 #[test]
+fn boot_installs_any_valid_persona_file() {
+    let _env = hold(None, None);
+    let root = scratch("northwind");
+    std::fs::create_dir(&root).unwrap();
+    let knowledge = root.join("knowledge");
+    let text = std::fs::read_to_string(samantha())
+        .unwrap()
+        .replace("id = \"samantha\"", "id = \"northwind\"")
+        .replace("voice = \"samantha\"", "voice = \"northwind\"");
+    let file = root.join("northwind.toml");
+    std::fs::write(&file, text).unwrap();
+    let explicit = Brain::boot(&root, &knowledge, &root.join("cases"), Some(&file)).unwrap();
+    assert!(!knowledge.exists());
+    assert_eq!(explicit.persona().id(), "northwind");
+
+    let configured = Brain::boot(&root, &knowledge, &root.join("cases"), None).unwrap();
+    assert!(configured.is_configured_boot());
+    assert!(!configured.persona().id().is_empty());
+    let _ = std::fs::remove_dir_all(&root);
+}
+
+#[test]
 fn boot_without_a_file_loads_samantha() {
     let _env = hold(None, None);
     let root = scratch("none");

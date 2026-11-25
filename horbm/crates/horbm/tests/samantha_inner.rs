@@ -52,7 +52,7 @@ fn a_sad_line_comforts_without_a_script_or_a_lookup() {
     let out = brain.turn("why am I so sad?");
     assert_eq!(out.reply, UNKNOWN_REPLY);
     assert_eq!(brain.dialogue_lean().verb, Verb::Comfort);
-    assert!(brain.samantha().care() > SamanthaInner::new().care());
+    assert!(brain.persona_inner().care() > SamanthaInner::new().care());
     assert!(out.mood_meta.rate < 1.0);
     assert!(out.mood_meta.pause_ms >= 120.0);
     assert!(!brain.dialogue_lean().hold_topic);
@@ -62,7 +62,7 @@ fn a_sad_line_comforts_without_a_script_or_a_lookup() {
     assert_eq!(calls.load(Ordering::SeqCst), 0);
     assert_eq!(brain.gaps().last().unwrap().reason, GapReason::ResearchOff);
     assert!(brain.emotion().persisted_baseline().is_none());
-    assert!(!brain.samantha().keeps_user_facts());
+    assert!(!brain.persona_inner().keeps_user_facts());
 }
 
 #[test]
@@ -72,7 +72,7 @@ fn a_question_still_speaks_the_card_and_expects_an_answer() {
     assert_eq!(out.reply, "The kettle is on the hob.");
     assert_eq!(out.first_clause, "The kettle");
     assert_eq!(brain.dialogue_lean().verb, Verb::Answer);
-    assert!(brain.samantha().expect() > SamanthaInner::new().expect());
+    assert!(brain.persona_inner().expect() > SamanthaInner::new().expect());
     assert!(brain.may_open_topic());
 }
 
@@ -108,7 +108,7 @@ fn the_moment_warms_on_her_note_and_the_baseline_stays() {
     let start_a = brain.conductor_cue().arousal();
     for _ in 0..24 {
         let note = brain
-            .samantha_nudge("I feel really sad", None, false)
+            .persona_nudge("I feel really sad", None, false)
             .expect("nudge");
         assert_eq!(note.verb, Verb::Comfort);
     }
@@ -142,7 +142,7 @@ fn horbm_inner_remember_mask() -> u8 {
 fn sense_off_still_hears_the_words_and_drops_the_ear() {
     let mut brain = Brain::with_cards(Cards, None);
     let ignored = brain
-        .samantha_nudge(
+        .persona_nudge(
             "hello",
             Some(Heard {
                 valence: -0.6,
@@ -154,16 +154,27 @@ fn sense_off_still_hears_the_words_and_drops_the_ear() {
         .expect("words");
     assert_eq!(ignored.verb, Verb::With);
     assert_eq!(
-        brain.samantha().care().to_bits(),
+        brain.persona_inner().care().to_bits(),
         SamanthaInner::new().care().to_bits()
     );
 
     let mut brain = Brain::with_cards(Cards, None);
     let words = brain
-        .samantha_nudge("I feel sad", None, false)
+        .persona_nudge("I feel sad", None, false)
         .expect("sad words");
     assert_eq!(words.verb, Verb::Comfort);
-    assert!(brain.samantha().care() > SamanthaInner::new().care());
+    assert!(brain.persona_inner().care() > SamanthaInner::new().care());
+}
+
+#[test]
+#[allow(deprecated)]
+fn deprecated_names_forward_to_the_installed_persona() {
+    let mut brain = Brain::with_cards(Cards, None);
+    assert!(std::ptr::eq(brain.samantha(), brain.persona_inner()));
+    let forwarded = brain
+        .samantha_nudge("where is the kettle", None, true)
+        .expect("forward");
+    assert_eq!(forwarded.verb, Verb::Answer);
 }
 
 #[test]

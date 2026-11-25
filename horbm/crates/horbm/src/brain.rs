@@ -11,12 +11,13 @@ use galion_emotion_core::{
     ConductorCue, EmotionCore, InnerLife, InnerTurn, IntentMsg, MomentState, VoiceBaseline,
 };
 use galion_sam_empathy::{Empathy, PronounClass, TickIn, FRAME_MS};
-use horbm_persona::{MoveClaim, MoveVerdict, Persona, PersonaError};
+use horbm_persona::{BootConfig, MoveClaim, MoveVerdict, Persona, PersonaError};
 
 use horbm_brain::{
     classify, pick, split_clause, Answer, Heuristic, Retrieved, Retriever, SidebandMark,
 };
-use horbm_inner::{DialogueLean, Heard, InnerMsg, Perceived, SamanthaInner, Verb};
+use horbm_inner::SamanthaInner as PersonaInner;
+use horbm_inner::{DialogueLean, Heard, InnerMsg, Perceived, Verb};
 
 use galion_emotion_core::standins::memory::{PersonMemory, PersonState, TrackedName};
 
@@ -79,6 +80,12 @@ impl CardLookup for EmptyCards {
 /// Newest card misses kept on [`Brain`]. Older ones are dropped.
 const GAP_CAP: usize = 32;
 
+/// Ear prosody. Unset stays on. `0`, `off`, and `deny` turn it off.
+const EAR_SENSE_ENV: &str = "GALION_EAR_SENSE";
+
+/// Person diary. Only the word `grant` opens the file.
+const REMEMBER_ENV: &str = "GALION_HORBM_REMEMBER";
+
 /// The linked brain. `open` reads the knowledge directory when it already
 /// exists and does not create it. The person-diary path is kept and is not
 /// opened: `remember` is denied. The live server passes the same read-only
@@ -94,8 +101,12 @@ pub struct Brain {
     emotion: EmotionCore,
     inner: InnerLife,
     persona: Persona,
-    samantha: SamanthaInner,
+    persona_inner: PersonaInner,
     ear_sense: bool,
+    /// Unit tests only. The word path cannot hold a topic, so a test can
+    /// force the flag [`Self::turn_with_ear`] passes to `decide_held`.
+    #[cfg(test)]
+    forced_hold: Option<bool>,
     retrieval: Option<RetrievalThread>,
     retrieval_epoch: u64,
     dialogue: Dialogue,
@@ -275,6 +286,7 @@ impl Retriever for CardRetriever<'_> {
 
 impl Brain {
     /// Cards and an already loaded persona. Does not read configuration.
+    /// Ear prosody starts on.
     pub fn with_persona(
         cards: impl CardLookup + Send + 'static,
         research: Option<Box<dyn ResearchAsk + Send>>,
@@ -293,8 +305,10 @@ impl Brain {
             emotion,
             inner,
             persona,
-            samantha: SamanthaInner::new(),
-            ear_sense: false,
+            persona_inner: PersonaInner::new(),
+            ear_sense: true,
+            #[cfg(test)]
+            forced_hold: None,
             retrieval: None,
             retrieval_epoch: 0,
             dialogue: Dialogue::new(),
@@ -315,19 +329,24 @@ impl Brain {
         cards: impl CardLookup + Send + 'static,
         research: Option<Box<dyn ResearchAsk + Send>>,
     ) -> Result<Self, PersonaError> {
-        Ok(Self::with_persona(cards, research, development_persona()?))
+        let mut brain = Self::with_persona(cards, research, development_persona()?);
+        brain.apply_configured_ear();
+        Ok(brain)
     }
 
     /// Same cards as [`Self::try_with_cards`].
     ///
     /// When configuration is present, the persona is that one. When it is
-    /// missing, the stand-in fixture is installed. This does not panic.
+    /// missing, the stand-in fixture is installed. Ear prosody follows
+    /// `GALION_EAR_SENSE`. This does not panic.
     pub fn with_cards(
         cards: impl CardLookup + Send + 'static,
         research: Option<Box<dyn ResearchAsk + Send>>,
     ) -> Self {
         let persona = development_persona().unwrap_or_else(|_| Persona::standin());
-        Self::with_persona(cards, research, persona)
+        let mut brain = Self::with_persona(cards, research, persona);
+        brain.apply_configured_ear();
+        brain
     }
 
     /// Dialogue cards. Empty unless a research root was attached. They are
@@ -394,12 +413,9 @@ impl Brain {
             Some(path) => Persona::load(path)?,
             None => development_persona()?,
         };
-        Ok(Self::open_with_persona(
-            memory_db,
-            knowledge_dir,
-            cases,
-            persona,
-        ))
+        let mut brain = Self::open_with_persona(memory_db, knowledge_dir, cases, persona);
+        brain.apply_configured_ear();
+        Ok(brain)
     }
 
     /// [`Self::open_with_persona`] after loading the configured persona.
@@ -410,31 +426,62 @@ impl Brain {
         cases: &Path,
     ) -> Result<Self, PersonaError> {
         let persona = development_persona()?;
-        Ok(Self::open_with_persona(
-            memory_db,
-            knowledge_dir,
-            cases,
-            persona,
-        ))
+        let mut brain = Self::open_with_persona(memory_db, knowledge_dir, cases, persona);
+        brain.apply_configured_ear();
+        Ok(brain)
     }
 
     /// Read `knowledge_dir` when it is already a directory. A missing path is
-    /// an empty card set. Nothing is created. `memory_db` is kept on a denied
-    /// diary and is not opened. `cases` is not opened.
+    /// an empty card set. Nothing is created. `memory_db` is the person diary.
+    /// The file opens only when `GALION_HORBM_REMEMBER` is the word `grant`.
+    /// `cases` is not opened.
     ///
     /// The persona is the configured one when that load succeeds, and the
-    /// stand-in fixture when it does not. This does not panic.
+    /// stand-in fixture when it does not. Ear prosody follows
+    /// `GALION_EAR_SENSE`. This does not panic.
     pub fn open(memory_db: &Path, knowledge_dir: &Path, cases: &Path) -> Self {
         let persona = development_persona().unwrap_or_else(|_| Persona::standin());
-        Self::open_with_persona(memory_db, knowledge_dir, cases, persona)
+        let mut brain = Self::open_with_persona(memory_db, knowledge_dir, cases, persona);
+        brain.apply_configured_ear();
+        brain
     }
 
-    /// [`Self::open`] with an already loaded persona. Does not read configuration.
+    /// [`Self::open`] with an explicit remember flag.
+    ///
+    /// Does not read `GALION_HORBM_REMEMBER` or `GALION_EAR_SENSE`. Only the
+    /// trimmed word `grant` opens the person file. Ear prosody stays on.
+    pub fn open_with_remember_flag(
+        memory_db: &Path,
+        knowledge_dir: &Path,
+        cases: &Path,
+        remember: Option<&str>,
+    ) -> Self {
+        let persona = development_persona().unwrap_or_else(|_| Persona::standin());
+        Self::open_loaded(memory_db, knowledge_dir, cases, persona, remember)
+    }
+
+    /// [`Self::open`] with an already loaded persona.
+    ///
+    /// The person diary follows `GALION_HORBM_REMEMBER`. Ear prosody is left
+    /// as [`Self::with_persona`] set it.
     pub fn open_with_persona(
         memory_db: &Path,
         knowledge_dir: &Path,
         cases: &Path,
         persona: Persona,
+    ) -> Self {
+        let flag = Self::remember_flag_from_process();
+        Self::open_loaded(memory_db, knowledge_dir, cases, persona, flag.as_deref())
+    }
+
+    /// Cards, persona, and a person diary from an explicit remember flag.
+    /// Does not read `GALION_HORBM_REMEMBER`.
+    fn open_loaded(
+        memory_db: &Path,
+        knowledge_dir: &Path,
+        cases: &Path,
+        persona: Persona,
+        remember: Option<&str>,
     ) -> Self {
         let _ = cases;
         let mut brain = match crate::KnowledgeCards::load(knowledge_dir) {
@@ -450,7 +497,9 @@ impl Brain {
                 Self::with_persona(EmptyCards, None, persona).with_style(ResearchRoot::from_env())
             }
         };
-        brain.memory = Some(Box::new(crate::EpisodicStore::open(memory_db, false)));
+        brain.memory = Some(Box::new(crate::EpisodicStore::open_from_flag(
+            memory_db, remember,
+        )));
         brain
     }
 
@@ -551,30 +600,61 @@ impl Brain {
         &self.inner
     }
 
-    /// Samantha's slower goals. Session only. Not the baseline, not the moment.
-    pub fn samantha(&self) -> &SamanthaInner {
-        &self.samantha
+    /// Slower goals for the installed persona. Session only. Not the baseline,
+    /// not the moment.
+    pub fn persona_inner(&self) -> &horbm_inner::SamanthaInner {
+        &self.persona_inner
     }
 
-    /// Ear switch for [`Self::turn`]. Default off. Words still count.
+    /// Forward to [`Self::persona_inner`].
+    #[deprecated(note = "use persona_inner")]
+    pub fn samantha(&self) -> &horbm_inner::SamanthaInner {
+        self.persona_inner()
+    }
+
+    /// Ear switch for [`Self::turn`]. On unless `GALION_EAR_SENSE` closes it.
+    /// Words still count when it is off.
     pub fn set_ear_sense(&mut self, on: bool) {
         self.ear_sense = on;
     }
 
-    /// Pace and topic gate from the latest inner note.
-    pub fn dialogue_lean(&self) -> DialogueLean {
-        self.samantha.last().lean()
+    /// Whether ear prosody is applied on [`Self::turn_with_ear`].
+    pub fn ear_sense(&self) -> bool {
+        self.ear_sense
     }
 
-    /// False while she is waiting or on a check-in. Do not open a new topic.
+    /// Same rule as the ear crate. Unset, empty, `1`, `on`, and `allow` are
+    /// on. `0`, `off`, and `deny` are off. Trimmed, case-insensitive. This
+    /// does not read the process environment.
+    pub fn ear_sense_from_flag(flag: Option<&str>) -> bool {
+        !matches!(
+            flag.map(|value| value.trim().to_ascii_lowercase())
+                .as_deref(),
+            Some("0" | "off" | "deny")
+        )
+    }
+
+    /// True when the installed persona is the one development boot names.
+    pub fn is_configured_boot(&self) -> bool {
+        BootConfig::from_process()
+            .ok()
+            .is_some_and(|cfg| self.persona.is_configured_boot(&cfg))
+    }
+
+    /// Pace and topic gate from the latest inner note.
+    pub fn dialogue_lean(&self) -> DialogueLean {
+        self.persona_inner.last().lean()
+    }
+
+    /// False while waiting or on a check-in. Do not open a new topic.
     pub fn may_open_topic(&self) -> bool {
         !self.dialogue_lean().hold_topic
     }
 
-    /// One inner turn, then one moment frame, using her GEMI note.
+    /// One inner turn, then one moment frame, using the installed persona's note.
     ///
     /// Does not write the baseline. Does not keep `words`.
-    pub fn samantha_nudge(
+    pub fn persona_nudge(
         &mut self,
         words: &str,
         ear: Option<Heard>,
@@ -586,9 +666,20 @@ impl Brain {
             ear,
             sense,
         };
-        let note = self.samantha.nudge(&mut self.emotion, seen)?;
+        let note = self.persona_inner.nudge(&mut self.emotion, seen)?;
         self.apply_prosody(note.lean());
         Ok(note)
+    }
+
+    /// Forward to [`Self::persona_nudge`].
+    #[deprecated(note = "use persona_nudge")]
+    pub fn samantha_nudge(
+        &mut self,
+        words: &str,
+        ear: Option<Heard>,
+        sense: bool,
+    ) -> Result<InnerMsg, galion_emotion_core::CoreError> {
+        self.persona_nudge(words, ear, sense)
     }
 
     /// One dialogue turn of cares, wants, and expects. Emits a GEMI intent
@@ -638,7 +729,7 @@ impl Brain {
             frame_ms: FRAME_MS,
         });
         self.meta = meta_of(&tick);
-        let note = self.samantha.tick(FRAME_MS, true);
+        let note = self.persona_inner.tick(FRAME_MS, true);
         self.apply_prosody(note.lean());
         self.meta
     }
@@ -657,8 +748,19 @@ impl Brain {
     /// Person memory is a different file. It is spoken only for a question
     /// about the person, and never as the source of a world answer. This
     /// waits for the retrieval thread. Do not call it from `Heartbeat::step`.
-    /// Barge-in is not this function.
+    /// Barge-in is not this function. [`Self::turn`] passes no ear point.
     pub fn turn(&mut self, text: &str) -> TurnOut {
+        self.turn_with_ear(text, None)
+    }
+
+    /// [`Self::turn`] with a listener point.
+    ///
+    /// `None` keeps the word path. The point counts only while
+    /// [`Self::ear_sense`] is on. The spoken clause stays the lookup.
+    /// After that clause is fixed, one [`Self::inner_turn`] runs and its
+    /// result is not written into the reply, the first clause, the empathy
+    /// mood, or the baseline.
+    pub fn turn_with_ear(&mut self, text: &str, ear: Option<Heard>) -> TurnOut {
         self.reap_follow();
         let started = Instant::now();
         let heard = text.trim();
@@ -670,10 +772,10 @@ impl Brain {
             frame_ms: FRAME_MS,
         });
         self.meta = meta_of(&tick);
-        let note = self.samantha.turn(Perceived {
+        let note = self.persona_inner.turn(Perceived {
             t_ms: self.emotion.next_ms(),
             words: heard,
-            ear: None,
+            ear,
             sense: self.ear_sense,
         });
         self.apply_prosody(note.lean());
@@ -688,13 +790,14 @@ impl Brain {
             prep.query.as_str()
         };
         if query.is_empty() {
-            return self.finish(
+            let out = self.finish(
                 query,
                 started,
                 Spoke::empty(),
                 &Decision::pass(),
                 FollowHook::idle(),
             );
+            return self.record_inner(heard, out);
         }
         let query_owned = query.to_string();
         let memory_hit = self.person_hit(heard);
@@ -714,9 +817,9 @@ impl Brain {
         let style = if self.style.is_empty() {
             crate::research_style::StyleSearch::none()
         } else {
-            self.style.search(StylePersona::Samantha, &query_owned)
+            self.style.search(StylePersona::Active, &query_owned)
         };
-        let mut decision = self.dialogue.decide(DecideIn {
+        let input = DecideIn {
             heard,
             intent: self.meta.intent,
             reply: &reply,
@@ -726,7 +829,15 @@ impl Brain {
             valence: self.meta.valence,
             dominance: self.meta.dominance,
             e: self.meta.e,
-        });
+        };
+        // Held topics use `decide_held`. A clear topic stays on `decide`,
+        // which is that call with the hold flag clear, so the entry stays live.
+        let hold_topic = self.topic_hold(note.lean());
+        let mut decision = if hold_topic {
+            self.dialogue.decide_held(input, hold_topic)
+        } else {
+            self.dialogue.decide(input)
+        };
         if let Some(chosen) = decision.chosen {
             let (spoken, spoken_sources) = match &decision.plan {
                 ReplyPlan::Keep => (reply.as_str(), sources.as_slice()),
@@ -773,7 +884,7 @@ impl Brain {
             // The clause is already in `out`. The worker blocks until `out` is dropped.
             out.follow = self.arm_follow(&query_owned);
         }
-        out
+        self.record_inner(heard, out)
     }
 
     /// The research result, if the worker has finished. Does not block.
@@ -1111,6 +1222,36 @@ impl Brain {
         }
         self.gaps.push(gap);
     }
+
+    /// The reply and the first clause are already fixed. One inner turn
+    /// updates cares, wants, and expects. Its result is dropped.
+    fn record_inner(&mut self, heard: &str, out: TurnOut) -> TurnOut {
+        let _ignored = self.inner_turn(self.emotion.next_ms(), heard, None);
+        out
+    }
+
+    fn topic_hold(&self, lean: DialogueLean) -> bool {
+        #[cfg(test)]
+        if let Some(forced) = self.forced_hold {
+            return forced;
+        }
+        lean.hold_topic
+    }
+
+    fn apply_configured_ear(&mut self) {
+        self.ear_sense = Self::ear_sense_from_process();
+    }
+
+    fn ear_sense_from_process() -> bool {
+        match std::env::var(EAR_SENSE_ENV) {
+            Ok(value) => Self::ear_sense_from_flag(Some(&value)),
+            Err(_) => Self::ear_sense_from_flag(None),
+        }
+    }
+
+    fn remember_flag_from_process() -> Option<String> {
+        std::env::var(REMEMBER_ENV).ok()
+    }
 }
 
 fn person_state(empathy: &Empathy, meta: MoodMeta) -> PersonState {
@@ -1365,6 +1506,28 @@ mod tests {
             horbm_brain::Heuristic::committed().miss_text(),
             UNKNOWN_REPLY
         );
+    }
+
+    /// The word path does not hold a topic, so the flag is forced. A hold
+    /// turns the offer into ask and does not speak the topic line.
+    #[test]
+    fn a_hold_blocks_offer_topic_in_the_turn() {
+        let mut open = Brain::with_cards(cards(), None);
+        let primed = open.turn("where is the kettle");
+        assert_eq!(primed.reply, "The kettle is on the hob.");
+        let offered = open.turn("something else");
+        assert_eq!(offered.reply, "Back to kettle?");
+        assert_eq!(offered.arm, "offer_topic");
+
+        let mut held = Brain::with_cards(cards(), None);
+        let primed = held.turn("where is the kettle");
+        assert_eq!(primed.reply, "The kettle is on the hob.");
+        held.forced_hold = Some(true);
+        let blocked = held.turn("something else");
+        assert_eq!(blocked.arm, "ask");
+        assert_eq!(blocked.reply, UNKNOWN_REPLY);
+        assert!(!blocked.reply.contains("Back to"));
+        assert!(!blocked.first_clause.contains("Back to"));
     }
 
     fn scratch_dir(name: &str) -> std::path::PathBuf {
