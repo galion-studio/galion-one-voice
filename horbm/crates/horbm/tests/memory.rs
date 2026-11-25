@@ -496,11 +496,18 @@ fn script(dir: &Path) -> Snapshot {
     let name = store.recall("person-alpha", "what is my name");
     let session = store.recall("person-alpha", "quiet mornings");
     assert_eq!(colour.len(), 1, "{colour:?}");
-    // The transcript and the extractor's candidate sit beside the diary rows.
+    // A preference candidate can still sit beside the summary. The name
+    // candidate must not sit beside the tracker row for the same name.
     let name_row = name
         .iter()
         .find(|hit| hit.source == "state-tracker" && hit.text.contains("Nia"))
         .unwrap_or_else(|| panic!("name row missing: {name:?}"));
+    assert!(
+        name.iter()
+            .all(|hit| hit.source != "session-ring"
+                || !hit.text.to_ascii_lowercase().contains("nia")),
+        "name candidate still beside the tracker row: {name:?}"
+    );
     let session_row = session
         .iter()
         .find(|hit| hit.source == "session-summary")
