@@ -13,6 +13,7 @@
 
 use galion_tensor::gemv::{gemv_f32_into_with, gemv_t_f32_into};
 use galion_tensor::gemv_i8::{gemv_i8_into_with, quantize_row_i8, QuantRowsI8};
+use galion_tensor::simd::{axpy_level, dot_i8_level, dot_level};
 use galion_tensor::{features, Exec, SimdLevel};
 use std::hint::black_box;
 use std::time::{Duration, Instant};
@@ -78,19 +79,19 @@ fn main() {
                 assert!(y.iter().zip(&r).all(|(p, q)| (p - q).abs() <= 1e-4 * (1.0 + q.abs())), "{lv:?} f32 mismatch");
                 let ns = time_it(budget, || gemv_f32_into_with(lv, black_box(&a), m, k, black_box(&x), Some(&b), &mut y, exec).unwrap());
                 if lv == SimdLevel::Scalar && exec == Exec::Scalar { base[0] = ns; }
-                row(&shape, &format!("f32 dot/{}", lv.name()), exec, ns, flops, (m * k * 4) as f64, base[0]);
+                row(&shape, &format!("f32 dot/{}", dot_level(lv).name()), exec, ns, flops, (m * k * 4) as f64, base[0]);
                 // int8 W8A8
                 gemv_i8_into_with(lv, &w.data, &w.scales, m, k, &xq, xs, Some(&b), &mut y, exec).unwrap();
                 assert_eq!(y, ri8, "{lv:?} i8 mismatch");
                 let ns = time_it(budget, || gemv_i8_into_with(lv, black_box(&w.data), &w.scales, m, k, black_box(&xq), xs, Some(&b), &mut y, exec).unwrap());
                 if lv == SimdLevel::Scalar && exec == Exec::Scalar { base[1] = ns; }
-                row(&shape, &format!("i8 w8a8/{}", lv.name()), exec, ns, flops, (m * k + 4 * m) as f64, base[1]);
+                row(&shape, &format!("i8 w8a8/{}", dot_i8_level(lv).name()), exec, ns, flops, (m * k + 4 * m) as f64, base[1]);
                 // f32 transposed (matmul rows==1 with [k,n] B)
                 gemv_t_f32_into(lv, &xt, &a, m, k, None, &mut yt, exec).unwrap();
                 assert_eq!(yt, rt, "{lv:?} gemv_t mismatch");
                 let ns = time_it(budget, || gemv_t_f32_into(lv, black_box(&xt), black_box(&a), m, k, None, &mut yt, exec).unwrap());
                 if lv == SimdLevel::Scalar && exec == Exec::Scalar { base[2] = ns; }
-                row(&shape, &format!("f32 t-axpy/{}", lv.name()), exec, ns, flops, (m * k * 4) as f64, base[2]);
+                row(&shape, &format!("f32 t-axpy/{}", axpy_level(lv).name()), exec, ns, flops, (m * k * 4) as f64, base[2]);
             }
         }
     }
