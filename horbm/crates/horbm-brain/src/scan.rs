@@ -416,6 +416,14 @@ impl DiaryScan {
         }
     }
 
+    /// Same as [`Self::open`] with `k` fixed at [`SCAN_CAP`].
+    ///
+    /// Setup for the retrieval thread. The cap is [`SCAN_CAP`], the same
+    /// value as `horbm::MEMORY_HIT_CAP`, so that call cannot pick another.
+    pub fn open_capped(keys: StoredKeys, diary: DiaryArena, remember: bool) -> Self {
+        Self::open(keys, diary, remember, SCAN_CAP)
+    }
+
     pub fn k(&self) -> usize {
         self.k
     }
@@ -955,6 +963,32 @@ mod tests {
         fn lift(&self, row: usize, _dot: i32, _prepared: PreparedQuery) -> Option<f32> {
             self.native.get(row).copied()
         }
+    }
+
+    #[test]
+    fn open_capped_uses_scan_cap() {
+        let mut capped = DiaryScan::open_capped(sample_keys(), sample_diary(), true);
+        assert_eq!(capped.k(), SCAN_CAP);
+        assert!(capped.remember());
+
+        let mut opened = DiaryScan::open(sample_keys(), sample_diary(), true, SCAN_CAP);
+        assert_eq!(opened.k(), capped.k());
+
+        let query = "alpha token shared";
+        let mut wide = [ScanHit::default(); SCAN_CAP + 4];
+        let n = capped.scan_selected_into(query, &mut wide);
+        assert!(n > 0);
+        assert!(n <= SCAN_CAP);
+        let mut expect = [ScanHit::default(); SCAN_CAP + 4];
+        let m = opened.scan_selected_into(query, &mut expect);
+        same(&wide[..n], &expect[..m]);
+        assert!(wide[SCAN_CAP..]
+            .iter()
+            .all(|hit| *hit == ScanHit::default()));
+
+        let denied = DiaryScan::open_capped(sample_keys(), sample_diary(), false);
+        assert_eq!(denied.k(), SCAN_CAP);
+        assert!(!denied.remember());
     }
 
     #[test]
