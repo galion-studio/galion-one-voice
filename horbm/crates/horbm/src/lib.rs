@@ -42,7 +42,12 @@
 //! core. Neither call rewrites the empathy mood or the voice baseline.
 //! Learning a new care stays off while `LOCKS.toml` `[consent] learn` is deny.
 //!
-//! Layer 4 runs after that evidence is in hand and before the reply is split
+//! [`Brain::open`] and [`Brain::boot`] with no path load Samantha, the
+//! development persona. Aria stays in the repo and is not loaded. An explicit
+//! path replaces Samantha. An invalid file is refused. [`Brain::admit_move`]
+//! is the legal-move port.
+//!
+//! Layer 4 runs after the gathered evidence and before the reply is split
 //! into clauses. It picks one move: answer, cite, ask, comfort, offer_topic,
 //! or stop. The heuristic is deterministic. An answer with no sourced card
 //! becomes ask, and the spoken miss stays [`UNKNOWN_REPLY`]. The truth root
@@ -84,6 +89,9 @@ pub use galion_research_gateway::RESEARCH_CAP;
 pub use galion_sam_empathy::{Intent, PronounClass, FRAME_MS};
 pub use horbm_brain::{Answer, Heuristic, MarkKind, SidebandMark};
 pub use horbm_keys::StringKeyArena;
+pub use horbm_persona::{
+    LegalMovePort, MoveClaim, MoveVerdict, Persona, PersonaError, StyleHook, UNKNOWN_LINE,
+};
 pub use memory::{about_the_person, pin_command, EpisodicStore};
 pub use retrieve::{
     search_person_lexical, CellState, HitPool, Int8Scorer, MemoryHit, MemoryHitCell,

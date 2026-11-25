@@ -38,11 +38,11 @@ Recommendations only. This change does not move or delete any of these.
 | `tools/symphony/mouth` | KEEP | Per-frame articulation targets. Not the speaker process. |
 | `tools/symphony/throat`, `lungs`, `listen-back` | KEEP | Organs beside the loop. Not the brain. |
 | `apps/nebula-voice-v2` | KEEP | Visual. Not the speech turn. |
-| `voice-stack/horbm-bridge` | ADAPT | Already calls the brain for the loopback server. Mouth is still Piper or the clone. Point that host at `VoiceLoop` later. |
-| `voice-stack/local-server` | ADAPT | Loopback host. Still chooses Piper or the clone worker. |
+| `voice-stack/horbm-bridge` | KEEP | The 7881 brain still loads cards through it. The turn tick is `VoiceLoop`, not a second brain. |
+| `voice-stack/local-server` | KEEP | Loopback host. Each spoken turn is one `VoiceLoop::tick`. Piper (`--features piper`) and the clone worker are mouth adapters. CPU is the default device. The default build does not link Piper. |
 | `voice-stack/tts-piper-stream` | ADAPT | Optional mouth (`feature = "piper"`). Not a core dependency. |
 | `runtimes/galion-piper-rt` | ADAPT | Stays the out-of-process CPU runtime behind that adapter. Lock pin unchanged. Not linked here. |
-| `voice-stack/samantha-voice-clone` | ADAPT | Optional mouth when a GPU is actually present. Not linked. CPU does not select it. |
+| `voice-stack/samantha-voice-clone` | ADAPT | Mouth adapter on the 7881 server. Selected only for an explicit cuda opt-in. CPU does not select it. |
 | `voice-stack/asr` | ADAPT | Optional ear (`feature = "vosk"`). `FakeAsr` is the test double. |
 | `crates/galion-asr-vosk` | ADAPT | Out-of-process worker. Not linked. |
 | `voice-stack/vad` | ADAPT | Endpoint into the ear. `ort` stays out of this workspace. Not linked. |
@@ -56,3 +56,11 @@ Recommendations only. This change does not move or delete any of these.
 | `crates/galion-v2-live` | ARCHIVE | Out-of-process Piper, Vosk, and LLM lane. The brain is not the center. |
 
 Archive means a later pass moves the tree aside. It does not mean delete. The audit swarm owns that pass.
+
+## Host wiring (S13)
+
+The loopback server now calls `VoiceLoop::tick` for each spoken turn. Piper is a mouth adapter (`--features piper`). The clone worker is the other mouth adapter, and only for an explicit cuda opt-in. The default build's mouth is the in-process tone, so Piper is not in that cargo tree. CPU stays the boot device (`brain` `horbm`, `mouth_device` `cpu`). The `[boot]` table from the open boot pull is not on this branch, so those two values live in the server instead of `LOCKS.toml`.
+
+Nothing was moved to `archive/`. `voice-stack/pipeline-orchestrator` is still the mic endpointer and the gated mouth test. `voice-stack/horbm-bridge` still loads the cards. The unlinked seam and `crates/galion-v2-live` were already unused; the open audit pull moves those, and this branch does not move them again.
+
+S18 moved the socket's energy gate into `horbm-voice` (`EnergyGate` / `EnergyEar`). The 640 ms hang on 7881 is that gate. The orchestrator's `EnergyVad` remains for its own loop. See [F-ear.md](F-ear.md).

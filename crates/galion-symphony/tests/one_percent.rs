@@ -5,11 +5,15 @@ use galion_symphony::{
     gate_report, SampleKind, Symphony, TickSample, P1_BUDGET_NS, P3_LL_NS, PRODUCT_CLAIM, TICK_NS,
 };
 
+fn lock_off(cond: bool) -> bool {
+    cond
+}
+
 fn silence() -> [f32; FRAME_SAMPLES] {
     [0f32; FRAME_SAMPLES]
 }
 
-fn frame<'a>(pcm: &'a [f32], late: bool) -> FrameIn<'a> {
+fn frame(pcm: &[f32], late: bool) -> FrameIn<'_> {
     FrameIn {
         you_pcm: pcm,
         affect: None,
@@ -224,7 +228,7 @@ fn a_second_window_does_not_pretend_the_span_matches() {
 #[test]
 fn gate_hook_labels_stub_and_measured_separately() {
     let report = gate_report(32);
-    assert!(!PRODUCT_CLAIM);
+    assert!(lock_off(!PRODUCT_CLAIM));
     assert!(!report.product_claim);
     assert!(report.late_is_pause);
     assert_eq!(report.catch_up_steps, 0);

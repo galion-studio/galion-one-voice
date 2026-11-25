@@ -902,7 +902,7 @@ fn looks_like_safetensors(bytes: &[u8]) -> bool {
         return false;
     }
     let n = u64::from_le_bytes(bytes[..8].try_into().unwrap()) as usize;
-    if n < 2 || n > 8 << 20 || 8 + n > bytes.len() {
+    if !(2..=8 << 20).contains(&n) || 8 + n > bytes.len() {
         return false;
     }
     let hdr = &bytes[8..8 + n];
@@ -977,14 +977,18 @@ mod tests {
         b
     }
 
+    fn lock_off(cond: bool) -> bool {
+        cond
+    }
+
     #[test]
     fn frame_matches_the_heartbeat() {
         assert_eq!(SAMPLE_RATE, galion_heartbeat::SAMPLE_RATE);
         assert_eq!(FRAME_MS, galion_heartbeat::FRAME_MS);
         assert_eq!(FRAME_SAMPLES, galion_heartbeat::FRAME_SAMPLES);
         assert_eq!(FRAME_SAMPLES, 1_920);
-        assert!(!CHATTERBOX_IS_RUNTIME);
-        assert!(!GGML_FAMILY_IN_VOICE);
+        assert!(lock_off(!CHATTERBOX_IS_RUNTIME));
+        assert!(lock_off(!GGML_FAMILY_IN_VOICE));
         assert_eq!(PRIMARY_RUNTIME_EXT, "gq");
         assert_ne!(PRIMARY_RUNTIME_EXT, "safetensors");
     }

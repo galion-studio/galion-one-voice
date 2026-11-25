@@ -98,7 +98,7 @@ fn yin(x: &[f32; HALF]) -> Pitch {
         }
         if picked.is_none() && cm[tau] < THRESH {
             let mut t = tau;
-            while t + 1 <= tau_max && cm[t + 1] < cm[t] {
+            while t < tau_max && cm[t + 1] < cm[t] {
                 t += 1;
             }
             picked = Some(t);
