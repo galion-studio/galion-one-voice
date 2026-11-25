@@ -24,6 +24,7 @@ fn the_real_linux_ear_and_mouth_round_trip() {
         thresholds: Thresholds::embedded(),
         mode: Mode::Real,
         prosody: true,
+        persona_file: None,
     });
     if report.skipped {
         eprintln!(

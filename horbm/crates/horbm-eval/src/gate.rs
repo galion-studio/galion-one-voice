@@ -6,10 +6,11 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 use galion_conductor::{ClauseBrain, Conductor, Ear as FloorEar, PickedClause, TickEvent};
+use galion_emotion::persona_mood::{Persona as EmotionPersona, PersonaProfile};
 use galion_emotion::text_affect;
 use galion_emotion_core::FRAME_MS as EMOTION_FRAME_MS;
 use galion_emotion_core::{IntentMsg, AROUSAL, VALENCE};
-use horbm::{Brain, KnowledgeCards, TurnOut, EMOTION_FRAME_MS as BRAIN_FRAME_MS};
+use horbm::{Brain, KnowledgeCards, Persona, TurnOut, EMOTION_FRAME_MS as BRAIN_FRAME_MS};
 use horbm_voice::{
     EarEvent, FakeEar, FakeMouth, HorbmTurn, TickEvent as VoiceEvent, VoiceLoop, FRAME_MS,
     FRAME_SAMPLES, SAMPLE_RATE,
@@ -48,12 +49,16 @@ pub struct Config {
     /// Real-ear prosody sensing. On unless the off switch is set.
     /// Fake mode does not read audio, so the flag does not change that run.
     pub prosody: bool,
+    /// Explicit persona file. `None` loads the development persona.
+    pub persona_file: Option<PathBuf>,
 }
 
 #[derive(Debug, Serialize)]
 pub struct Report {
     pub schema: &'static str,
     pub mode: &'static str,
+    /// Id loaded for this run. Empty when the file could not be resolved.
+    pub persona: String,
     pub pass: bool,
     /// The real ear was not run. The binary exits 2. This is not a score miss.
     pub skipped: bool,
@@ -96,7 +101,17 @@ pub fn run() -> Report {
         thresholds: Thresholds::embedded(),
         mode: Mode::Fake,
         prosody: true,
+        persona_file: None,
     })
+}
+
+/// Load `path` when it is set, otherwise the development persona.
+pub(crate) fn resolve_persona(path: Option<&Path>) -> Result<Persona, String> {
+    match path {
+        Some(path) => Persona::load(path),
+        None => Persona::load_development(),
+    }
+    .map_err(|err| err.to_string())
 }
 
 pub fn run_with(config: Config) -> Report {
@@ -104,21 +119,26 @@ pub fn run_with(config: Config) -> Report {
         return fail(
             config.mode,
             "set",
+            "",
             "GALION_HORBM_RESEARCH_DIR is set; the truth root is the only answer source",
         );
     }
+    let persona = match resolve_persona(config.persona_file.as_deref()) {
+        Ok(persona) => persona,
+        Err(err) => return fail(config.mode, "unset", "", &err),
+    };
     let result = match config.mode {
-        Mode::Fake => execute(&config.thresholds).map_err(crate::real::GateErr::fail),
-        Mode::Real => crate::real::execute(&config),
+        Mode::Fake => execute(&config.thresholds, &persona).map_err(crate::real::GateErr::fail),
+        Mode::Real => crate::real::execute(&config, &persona),
     };
     match result {
         Ok(report) => report,
-        Err(err) if err.skip => skip(config.mode, &err.message),
-        Err(err) => fail(config.mode, "unset", &err.message),
+        Err(err) if err.skip => skip(config.mode, persona.id(), &err.message),
+        Err(err) => fail(config.mode, "unset", persona.id(), &err.message),
     }
 }
 
-fn fail(mode: Mode, research_dir: &'static str, error: &str) -> Report {
+fn fail(mode: Mode, research_dir: &'static str, persona_id: &str, error: &str) -> Report {
     let broken = ScoreOut {
         pass: false,
         failures: vec![error.to_string()],
@@ -127,11 +147,12 @@ fn fail(mode: Mode, research_dir: &'static str, error: &str) -> Report {
     Report {
         schema: "horbm-eval-report/1",
         mode: mode.as_str(),
+        persona: persona_id.to_string(),
         pass: false,
         skipped: false,
         research_dir,
         truth_cards: Vec::new(),
-        stand_ins: stand_ins(mode),
+        stand_ins: stand_ins(mode, persona_id),
         scores: Scores {
             grounded: broken.clone(),
             unknown: broken.clone(),
@@ -144,23 +165,26 @@ fn fail(mode: Mode, research_dir: &'static str, error: &str) -> Report {
     }
 }
 
-fn skip(mode: Mode, error: &str) -> Report {
-    let mut report = fail(mode, "unset", error);
+fn skip(mode: Mode, persona_id: &str, error: &str) -> Report {
+    let mut report = fail(mode, "unset", persona_id, error);
     report.skipped = true;
     report
 }
 
-fn stand_ins(mode: Mode) -> Vec<String> {
+fn stand_ins(mode: Mode, persona_id: &str) -> Vec<String> {
     match mode {
         Mode::Fake => vec![
             "ear:FakeEar (Vosk is not linked)".into(),
             "mouth:FakeMouth (Piper is not linked)".into(),
             "research:OfflineClient (GALION_HORBM_RESEARCH_DIR unset)".into(),
         ],
-        Mode::Real => vec![
-            "research:OfflineClient (GALION_HORBM_RESEARCH_DIR unset)".into(),
-            "persona:samantha (Aria inactive)".into(),
-        ],
+        Mode::Real => {
+            let mut rows = vec!["research:OfflineClient (GALION_HORBM_RESEARCH_DIR unset)".into()];
+            if !persona_id.is_empty() {
+                rows.push(format!("persona:{persona_id}"));
+            }
+            rows
+        }
     }
 }
 
@@ -224,7 +248,7 @@ impl Drop for TempDir {
     }
 }
 
-fn execute(thresholds: &Thresholds) -> Result<Report, String> {
+fn execute(thresholds: &Thresholds, persona: &Persona) -> Result<Report, String> {
     if thresholds.emotion.frame_ms != EMOTION_FRAME_MS || thresholds.emotion.frame_ms != FRAME_MS {
         return Err("threshold frame does not match the emotion core and the voice clock".into());
     }
@@ -246,7 +270,7 @@ fn execute(thresholds: &Thresholds) -> Result<Report, String> {
     let mut eager_ms = Vec::new();
     let mut research_merged = false;
     for (query, expect) in SCRIPT {
-        let turn = one_turn(&truth.cards, query, *expect, &pcm)?;
+        let turn = one_turn(&truth.cards, query, *expect, &pcm, persona)?;
         research_merged |= turn.research_merged;
         eager_ms.push(turn.voice_gap_ms);
         eager_ms.push(turn.conductor_gap_ms);
@@ -254,12 +278,12 @@ fn execute(thresholds: &Thresholds) -> Result<Report, String> {
         spoken.push(turn.spoken);
     }
 
-    let emotion = measure_emotion(thresholds)?;
+    let emotion = measure_emotion(thresholds, persona)?;
     let barge_voice = barge_voice(&truth.cards, &pcm)?;
-    let barge_conductor = barge_conductor(&truth.cards)?;
+    let barge_conductor = barge_conductor(&truth.cards, persona)?;
     let backchannel_cancel =
-        backchannel_voice(&truth.cards, &pcm)? || backchannel_conductor(&truth.cards)?;
-    let (clock_advanced_ms, wall_sleep_ms) = clock_ignores_wall(&truth.cards);
+        backchannel_voice(&truth.cards, &pcm)? || backchannel_conductor(&truth.cards, persona)?;
+    let (clock_advanced_ms, wall_sleep_ms) = clock_ignores_wall(&truth.cards, persona);
 
     let grounded = score_grounding(
         &spoken,
@@ -279,7 +303,7 @@ fn execute(thresholds: &Thresholds) -> Result<Report, String> {
             .failures
             .push("conductor merged a research clause".into());
     }
-    let persona = score_persona(&voices, samantha_window(), anchors(), &thresholds.persona);
+    let persona_score = voice_check(&voices, persona.id());
     let emotion_check = score_emotion(&emotion.sample, &thresholds.emotion);
     let latency = score_latency(
         &LatencySample {
@@ -292,34 +316,38 @@ fn execute(thresholds: &Thresholds) -> Result<Report, String> {
         &thresholds.latency,
     );
 
-    let pass = grounded.pass && unknown.pass && persona.pass && emotion_check.pass && latency.pass;
+    let pass = grounded.pass
+        && unknown.pass
+        && persona_allows_gate(&persona_score)
+        && emotion_check.pass
+        && latency.pass;
     Ok(Report {
         schema: "horbm-eval-report/1",
         mode: Mode::Fake.as_str(),
+        persona: persona.id().to_string(),
         pass,
         skipped: false,
         research_dir: "unset",
         truth_cards: truth.ids,
-        stand_ins: stand_ins(Mode::Fake),
+        stand_ins: stand_ins(Mode::Fake, persona.id()),
         scores: Scores {
             grounded: out(
                 &grounded,
                 serde_json::json!({
                     "hits": spoken.iter().filter(|turn| turn.expect_id.is_some()).count(),
+                    "lines": reply_lines(&spoken, true),
                 }),
             ),
             unknown: out(
                 &unknown,
                 serde_json::json!({
                     "misses": spoken.iter().filter(|turn| turn.expect_id.is_none()).count(),
+                    "lines": reply_lines(&spoken, false),
                 }),
             ),
             persona: out(
-                &persona,
-                serde_json::json!({
-                    "id": thresholds.persona.id,
-                    "turns": voices.len(),
-                }),
+                &persona_score,
+                voice_detail(persona.id(), voices.len(), &persona_score),
             ),
             emotion: out(
                 &emotion_check,
@@ -373,15 +401,16 @@ fn one_turn(
     query: &str,
     expect: Option<&str>,
     pcm: &[i16],
+    persona: &Persona,
 ) -> Result<TurnDone, String> {
-    let mut brain = Brain::with_cards(cards.clone(), None);
+    let mut brain = Brain::with_persona(cards.clone(), None, *persona);
     let before = brain.emotion().baseline().identity_bits();
     let out = brain.turn(query);
     if brain.emotion().baseline().identity_bits() != before {
         return Err(format!("{query}: the turn rewrote the voice baseline"));
     }
     let voice_gap_ms = voice_gap(cards, query, &out.reply, pcm)?;
-    let (conductor_gap_ms, research_merged, clause) = conductor_gap(cards, query)?;
+    let (conductor_gap_ms, research_merged, clause) = conductor_gap(cards, query, persona)?;
     if clause != out.reply {
         return Err(format!(
             "{query}: conductor spoke {clause:?}, brain spoke {:?}",
@@ -390,7 +419,7 @@ fn one_turn(
     }
     Ok(TurnDone {
         voice: VoiceTurn {
-            persona: "samantha".into(),
+            persona: persona.id().to_string(),
             rate: out.mood_meta.rate,
             energy: out.mood_meta.energy,
             pitch_st: out.mood_meta.pitch_st,
@@ -453,8 +482,9 @@ fn voice_gap(cards: &KnowledgeCards, query: &str, reply: &str, pcm: &[i16]) -> R
 pub(crate) fn conductor_gap(
     cards: &KnowledgeCards,
     query: &str,
+    persona: &Persona,
 ) -> Result<(u32, bool, String), String> {
-    let mut conductor = Conductor::new(LinkedBrain::new(cards.clone()));
+    let mut conductor = Conductor::new(LinkedBrain::new(cards.clone(), persona));
     let _ = conductor.tick(FloorEar::Speech(query), None);
     let _ = conductor.tick(FloorEar::Speech(query), None);
     let eager = conductor.tick(FloorEar::Quiet, None);
@@ -490,9 +520,9 @@ struct LinkedBrain {
 }
 
 impl LinkedBrain {
-    fn new(cards: KnowledgeCards) -> Self {
+    fn new(cards: KnowledgeCards, persona: &Persona) -> Self {
         Self {
-            inner: RefCell::new(Brain::with_cards(cards, None)),
+            inner: RefCell::new(Brain::with_persona(cards, None, *persona)),
         }
     }
 }
@@ -535,8 +565,8 @@ fn barge_voice(cards: &KnowledgeCards, pcm: &[i16]) -> Result<u32, String> {
     u32::try_from(ms).map_err(|_| "barge time does not fit u32".into())
 }
 
-fn barge_conductor(cards: &KnowledgeCards) -> Result<u32, String> {
-    let mut conductor = Conductor::new(LinkedBrain::new(cards.clone()));
+fn barge_conductor(cards: &KnowledgeCards, persona: &Persona) -> Result<u32, String> {
+    let mut conductor = Conductor::new(LinkedBrain::new(cards.clone(), persona));
     let _ = conductor.tick(FloorEar::Speech("where is the kettle"), None);
     let _ = conductor.tick(FloorEar::Speech("where is the kettle"), None);
     let _ = conductor.tick(FloorEar::Quiet, None);
@@ -592,8 +622,8 @@ fn backchannel_voice(cards: &KnowledgeCards, pcm: &[i16]) -> Result<bool, String
     Ok(cancel)
 }
 
-fn backchannel_conductor(cards: &KnowledgeCards) -> Result<bool, String> {
-    let mut conductor = Conductor::new(LinkedBrain::new(cards.clone()));
+fn backchannel_conductor(cards: &KnowledgeCards, persona: &Persona) -> Result<bool, String> {
+    let mut conductor = Conductor::new(LinkedBrain::new(cards.clone(), persona));
     let _ = conductor.tick(FloorEar::Speech("where is the kettle"), None);
     let _ = conductor.tick(FloorEar::Speech("where is the kettle"), None);
     let _ = conductor.tick(FloorEar::Quiet, None);
@@ -610,8 +640,8 @@ fn backchannel_conductor(cards: &KnowledgeCards) -> Result<bool, String> {
     Ok(cancel)
 }
 
-fn clock_ignores_wall(cards: &KnowledgeCards) -> (u32, u32) {
-    let mut conductor = Conductor::new(LinkedBrain::new(cards.clone()));
+fn clock_ignores_wall(cards: &KnowledgeCards, persona: &Persona) -> (u32, u32) {
+    let mut conductor = Conductor::new(LinkedBrain::new(cards.clone(), persona));
     let wall_sleep_ms = 30u32;
     std::thread::sleep(Duration::from_millis(u64::from(wall_sleep_ms)));
     let frame = conductor.tick(FloorEar::Quiet, None);
@@ -623,13 +653,16 @@ pub(crate) struct EmotionRun {
     pub sample: EmotionSample,
 }
 
-pub(crate) fn measure_emotion(thresholds: &Thresholds) -> Result<EmotionRun, String> {
+pub(crate) fn measure_emotion(
+    thresholds: &Thresholds,
+    persona: &Persona,
+) -> Result<EmotionRun, String> {
     let frames = thresholds.emotion.frames;
-    let (mut rest, rest_us) = step_script(frames, |_| {})?;
-    let (tired, tired_us) = step_script(frames, |msg| {
+    let (mut rest, rest_us) = step_script(frames, persona, |_| {})?;
+    let (tired, tired_us) = step_script(frames, persona, |msg| {
         msg.fatigue = 0.90;
     })?;
-    let (lifted, lift_us) = step_script(frames, |msg| {
+    let (lifted, lift_us) = step_script(frames, persona, |msg| {
         msg.strength = 1.0;
         msg.set_pull(VALENCE, 1.0)
             .map_err(|_| "valence pull was rejected".to_string())
@@ -654,13 +687,13 @@ pub(crate) fn measure_emotion(thresholds: &Thresholds) -> Result<EmotionRun, Str
         == lifted.emotion().moment().pos[VALENCE].to_bits()
         && cue.moment[AROUSAL].to_bits() == lifted.emotion().moment().pos[AROUSAL].to_bits()
         && cue.t_ms == lifted.emotion().moment().t_ms;
-    if lifted
+    if !lifted
         .emotion()
         .baseline()
         .persona_id()
-        .eq_ignore_ascii_case("jarvis")
+        .eq_ignore_ascii_case(persona.id())
     {
-        return Err("emotion baseline persona is jarvis".into());
+        return Err("emotion baseline persona is not the configured persona".into());
     }
     Ok(EmotionRun {
         sample: EmotionSample {
@@ -675,8 +708,12 @@ pub(crate) fn measure_emotion(thresholds: &Thresholds) -> Result<EmotionRun, Str
     })
 }
 
-fn step_script(frames: u32, edit: impl Fn(&mut IntentMsg)) -> Result<(Brain, Vec<u32>), String> {
-    let mut brain = Brain::with_cards(KnowledgeCards::empty(), None);
+fn step_script(
+    frames: u32,
+    persona: &Persona,
+    edit: impl Fn(&mut IntentMsg),
+) -> Result<(Brain, Vec<u32>), String> {
+    let mut brain = Brain::with_persona(KnowledgeCards::empty(), None, *persona);
     let bits = brain.emotion().baseline().identity_bits();
     let mut times = Vec::with_capacity(frames as usize);
     for index in 0..frames {
@@ -697,8 +734,12 @@ fn step_script(frames: u32, edit: impl Fn(&mut IntentMsg)) -> Result<(Brain, Vec
     Ok((brain, times))
 }
 
-pub(crate) fn samantha_window() -> VoiceWindow {
-    let voice = &galion_emotion::SAMANTHA.voice;
+/// Spoken when [`EmotionPersona::parse`] has no profile for this id.
+pub(crate) const NO_VOICE_PROFILE: &str = "no voice profile";
+
+/// Window from the configured persona's emotion profile.
+pub(crate) fn persona_window(profile: &PersonaProfile) -> VoiceWindow {
+    let voice = &profile.voice;
     VoiceWindow {
         pitch_max: voice.pitch_bound_st,
         rate_lo: voice.length_bounds.0,
@@ -708,21 +749,83 @@ pub(crate) fn samantha_window() -> VoiceWindow {
     }
 }
 
-pub(crate) fn anchors() -> VoiceAnchors {
-    let samantha = &galion_emotion::SAMANTHA.voice;
-    let jarvis = &galion_emotion::JARVIS.voice;
+pub(crate) fn anchors(profile: &PersonaProfile) -> VoiceAnchors {
+    let voice = &profile.voice;
+    let other = EmotionPersona::ALL
+        .into_iter()
+        .find(|item| *item != profile.persona)
+        .map(EmotionPersona::profile)
+        .map(|item| {
+            (
+                item.voice.base_length_scale,
+                item.voice.base_energy,
+                item.voice.base_pitch_st,
+            )
+        })
+        .unwrap_or((
+            voice.base_length_scale,
+            voice.base_energy,
+            voice.base_pitch_st,
+        ));
     VoiceAnchors {
-        samantha: (
-            samantha.base_length_scale,
-            samantha.base_energy,
-            samantha.base_pitch_st,
+        persona: (
+            voice.base_length_scale,
+            voice.base_energy,
+            voice.base_pitch_st,
         ),
-        jarvis: (
-            jarvis.base_length_scale,
-            jarvis.base_energy,
-            jarvis.base_pitch_st,
-        ),
+        other,
     }
+}
+
+/// A missing profile is not a pass and does not use another persona's window.
+pub(crate) fn voice_check(turns: &[VoiceTurn], persona_id: &str) -> Check {
+    match EmotionPersona::parse(persona_id).map(EmotionPersona::profile) {
+        Some(profile) => {
+            score_persona(turns, persona_window(profile), anchors(profile), persona_id)
+        }
+        None => {
+            let mut check = Check {
+                pass: false,
+                failures: vec![NO_VOICE_PROFILE.to_string()],
+            };
+            if turns.is_empty() {
+                check.failures.push("no voice turn".to_string());
+            }
+            for turn in turns {
+                if turn.persona != persona_id {
+                    check
+                        .failures
+                        .push(format!("persona {} is not {persona_id}", turn.persona));
+                }
+            }
+            check
+        }
+    }
+}
+
+/// The gate still passes when the only voice result is [`NO_VOICE_PROFILE`].
+/// That score itself stays a failure, and no other profile is consulted.
+pub(crate) fn persona_allows_gate(check: &Check) -> bool {
+    check.pass || (check.failures.len() == 1 && check.failures[0] == NO_VOICE_PROFILE)
+}
+
+pub(crate) fn voice_detail(persona_id: &str, turns: usize, check: &Check) -> serde_json::Value {
+    let mut detail = serde_json::json!({
+        "id": persona_id,
+        "turns": turns,
+    });
+    if check.failures.iter().any(|line| line == NO_VOICE_PROFILE) {
+        detail["voice"] = serde_json::Value::String(NO_VOICE_PROFILE.to_string());
+    }
+    detail
+}
+
+pub(crate) fn reply_lines(spoken: &[Spoken], grounded: bool) -> Vec<&str> {
+    spoken
+        .iter()
+        .filter(|turn| turn.expect_id.is_some() == grounded)
+        .map(|turn| turn.reply.as_str())
+        .collect()
 }
 
 fn tone_frame(rate: u32, frame_ms: u32) -> Result<Vec<i16>, String> {

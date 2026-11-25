@@ -2,7 +2,7 @@
 // Copyright (c) 2026 Galion Labs
 //! Run the closed HORBM gate and print the JSON report.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use horbm_eval::{ear_prosody_enabled, run_with, Config, Mode, Thresholds};
@@ -11,6 +11,7 @@ fn main() -> ExitCode {
     let mut args = std::env::args().skip(1);
     let mut out_path = None;
     let mut thresholds_path = None;
+    let mut persona_file = None;
     let mut real = false;
     let mut no_prosody = false;
     while let Some(arg) = args.next() {
@@ -21,6 +22,10 @@ fn main() -> ExitCode {
             },
             "--thresholds" => match args.next() {
                 Some(path) => thresholds_path = Some(path),
+                None => return usage(),
+            },
+            "--persona" => match args.next() {
+                Some(path) => persona_file = Some(PathBuf::from(path)),
                 None => return usage(),
             },
             "--real" => real = true,
@@ -47,6 +52,7 @@ fn main() -> ExitCode {
         thresholds,
         mode: if real { Mode::Real } else { Mode::Fake },
         prosody: ear_prosody_enabled(no_prosody),
+        persona_file,
     });
     let json = report.to_json();
     println!("{json}");
@@ -67,8 +73,9 @@ fn main() -> ExitCode {
 
 fn usage() -> ExitCode {
     eprintln!(
-        "horbm-eval [--thresholds FILE] [--out FILE] [--real] [--no-prosody]\n\
-         Default is the fake closed gate. --real needs --features real and Linux."
+        "horbm-eval [--persona FILE] [--thresholds FILE] [--out FILE] [--real] [--no-prosody]\n\
+         Default is the fake closed gate. The persona is --persona, else the development boot.\n\
+         --real needs --features real and Linux."
     );
     ExitCode::from(2)
 }

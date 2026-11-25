@@ -6,7 +6,6 @@
 schema = "horbm-eval/1"
 
 [persona]
-id = "samantha"
 
 [grounding]
 unknown_reply = "I don't know."

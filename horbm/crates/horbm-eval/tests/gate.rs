@@ -7,7 +7,7 @@ use horbm_eval::{research_dir_is_unset, run, Thresholds};
 fn embedded_thresholds_are_the_r4_gate() {
     let thresholds = Thresholds::embedded();
     assert_eq!(thresholds.schema, "horbm-eval/1");
-    assert_eq!(thresholds.persona.id, "samantha");
+    assert_eq!(thresholds.persona.id, None);
     assert_eq!(thresholds.grounding.unknown_reply, "I don't know.");
     assert_eq!(thresholds.grounding.card_prefix, "card:");
     assert_eq!(thresholds.grounding.research_prefix, "research:");
@@ -39,6 +39,7 @@ fn a_set_research_dir_is_not_an_answer_source() {
         thresholds: Thresholds::embedded(),
         mode: horbm_eval::Mode::Fake,
         prosody: true,
+        persona_file: None,
     });
     assert!(!report.pass);
     assert_eq!(report.research_dir, "set");

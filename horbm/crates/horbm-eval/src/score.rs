@@ -2,9 +2,7 @@
 // Copyright (c) 2026 Galion Labs
 //! Pure comparisons against the threshold file. The live run fills the samples.
 
-use crate::thresholds::{
-    EmotionThresholds, GroundingThresholds, LatencyThresholds, PersonaThresholds,
-};
+use crate::thresholds::{EmotionThresholds, GroundingThresholds, LatencyThresholds};
 use serde::Serialize;
 
 #[derive(Clone, Debug)]
@@ -40,12 +38,12 @@ pub struct VoiceWindow {
     pub energy_hi: f32,
 }
 
-/// Rest (rate, energy, pitch) of the two voices. Neutral lines must sit
-/// closer to Samantha than to Jarvis.
+/// Rest (rate, energy, pitch). Neutral lines must sit closer to this
+/// persona than to the other catalogued voice.
 #[derive(Clone, Copy, Debug)]
 pub struct VoiceAnchors {
-    pub samantha: (f32, f32, f32),
-    pub jarvis: (f32, f32, f32),
+    pub persona: (f32, f32, f32),
+    pub other: (f32, f32, f32),
 }
 
 #[derive(Clone, Debug)]
@@ -200,7 +198,7 @@ pub fn score_persona(
     turns: &[VoiceTurn],
     window: VoiceWindow,
     anchors: VoiceAnchors,
-    thresholds: &PersonaThresholds,
+    persona_id: &str,
 ) -> Check {
     let mut check = Check::ok();
     if turns.is_empty() {
@@ -209,11 +207,8 @@ pub fn score_persona(
     }
     let mut neutral: Option<(u32, u32, u32)> = None;
     for turn in turns {
-        if turn.persona != thresholds.id {
-            check.push(format!("persona {} is not {}", turn.persona, thresholds.id));
-        }
-        if turn.persona.eq_ignore_ascii_case("jarvis") {
-            check.push("jarvis spoke");
+        if turn.persona != persona_id {
+            check.push(format!("persona {} is not {persona_id}", turn.persona));
         }
         if !turn.pitch_st.is_finite()
             || !turn.rate.is_finite()
@@ -223,14 +218,14 @@ pub fn score_persona(
             || !(window.energy_lo..=window.energy_hi).contains(&turn.energy)
         {
             check.push(format!(
-                "voice left the Samantha window (rate {} energy {} pitch {})",
+                "voice left the persona window (rate {} energy {} pitch {})",
                 turn.rate, turn.energy, turn.pitch_st
             ));
         }
         if turn.neutral {
             let here = (turn.rate, turn.energy, turn.pitch_st);
-            if distance(here, anchors.samantha) >= distance(here, anchors.jarvis) {
-                check.push("neutral voice is closer to jarvis than to samantha");
+            if distance(here, anchors.persona) >= distance(here, anchors.other) {
+                check.push("neutral voice is closer to the other voice than to this persona");
             }
             let bits = (
                 turn.rate.to_bits(),
@@ -495,10 +490,10 @@ mod tests {
             neutral: true,
         };
         let anchors = VoiceAnchors {
-            samantha: (1.0, 1.0, 0.0),
-            jarvis: (1.04, 0.92, -0.3),
+            persona: (1.0, 1.0, 0.0),
+            other: (1.04, 0.92, -0.3),
         };
-        let check = score_persona(&[turn], window, anchors, &thresholds().persona);
+        let check = score_persona(&[turn], window, anchors, "northwind");
         assert!(!check.pass);
     }
 

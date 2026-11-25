@@ -15,8 +15,8 @@
 //! [`std::env::consts`]; nothing is hard-coded as a Windows `.exe`.
 //!
 //! Models are downloaded into the cache on demand and are not written into
-//! the repository. `GALION_HORBM_RESEARCH_DIR` is not opened. Samantha is
-//! the persona. A clone mouth, including Aria, is refused.
+//! the repository. `GALION_HORBM_RESEARCH_DIR` is not opened. The persona is
+//! the one the gate loaded. A clone mouth is refused.
 
 use crate::gate::{Config, Report};
 
@@ -41,10 +41,10 @@ impl GateErr {
     }
 }
 
-pub(crate) fn execute(config: &Config) -> Result<Report, GateErr> {
+pub(crate) fn execute(config: &Config, persona: &horbm::Persona) -> Result<Report, GateErr> {
     #[cfg(not(feature = "real"))]
     {
-        let _ = config;
+        let _ = (config, persona);
         Err(GateErr::skip(
             "real ear and mouth are not compiled into this binary. Rebuild horbm-eval with --features real. The default gate stays on FakeEar and FakeMouth.",
         ))
@@ -54,7 +54,7 @@ pub(crate) fn execute(config: &Config) -> Result<Report, GateErr> {
         not(all(target_os = "linux", target_arch = "x86_64"))
     ))]
     {
-        let _ = config;
+        let _ = (config, persona);
         Err(GateErr::skip(format!(
             "skip: real ear and mouth run on Linux x86_64. This process is {} {}. The pinned libvosk archive and the Piper runtime are Linux x86_64. The fake gate is unchanged.",
             std::env::consts::OS,
@@ -63,7 +63,7 @@ pub(crate) fn execute(config: &Config) -> Result<Report, GateErr> {
     }
     #[cfg(all(feature = "real", target_os = "linux", target_arch = "x86_64"))]
     {
-        linux::execute(config)
+        linux::execute(config, persona)
     }
 }
 
@@ -71,12 +71,12 @@ pub(crate) fn execute(config: &Config) -> Result<Report, GateErr> {
 mod linux {
     use super::GateErr;
     use crate::gate::{
-        self, anchors, conductor_gap, load_truth, measure_emotion, out, samantha_window, Config,
-        Mode, Report, Scores, SCRIPT,
+        self, conductor_gap, load_truth, measure_emotion, out, persona_allows_gate, reply_lines,
+        voice_check, voice_detail, Config, Mode, Report, Scores, SCRIPT,
     };
     use crate::score::{
-        mean_wer, percentile, score_emotion, score_grounding, score_latency, score_persona,
-        score_unknown, score_wer, wer_tokens, LatencySample, Spoken, VoiceTurn,
+        mean_wer, percentile, score_emotion, score_grounding, score_latency, score_unknown,
+        score_wer, wer_tokens, LatencySample, Spoken, VoiceTurn,
     };
     use galion_asr_vosk::{clean_transcript, VoskClient, Word, SAMPLE_RATE};
     use galion_emotion::text_affect;
@@ -157,17 +157,7 @@ mod linux {
         "who is at the door",
     ];
 
-    pub(super) fn execute(config: &Config) -> Result<Report, GateErr> {
-        if !config
-            .thresholds
-            .persona
-            .id
-            .eq_ignore_ascii_case("samantha")
-        {
-            return Err(GateErr::fail(
-                "Samantha is the only persona. Aria stays inactive.",
-            ));
-        }
+    pub(super) fn execute(config: &Config, persona: &horbm::Persona) -> Result<Report, GateErr> {
         let root = repo_root();
         let bin = ensure_vosk_bin(&root)?;
         let cache = cache_dir();
@@ -178,21 +168,20 @@ mod linux {
         let _held = lock.lock().unwrap_or_else(|err| err.into_inner());
         let model_bytes = vosk.model_bytes;
         let (ear, mouth, _env) = open_pair(&bin, &vosk, piper.as_ref(), config.prosody)?;
-        run_gate(config, ear, mouth, model_bytes)
+        run_gate(config, persona, ear, mouth, model_bytes)
     }
 
     fn run_gate(
         config: &Config,
+        persona: &horbm::Persona,
         mut ear: VoskEar,
         mut mouth: StackMouth,
         model_bytes: u64,
     ) -> Result<Report, GateErr> {
         let voice_name = mouth.voice_name();
         let mouth_id = mouth.id().to_string();
-        if mouth_id == "clone-worker" || voice_name.to_ascii_lowercase().contains("aria") {
-            return Err(GateErr::fail(
-                "a clone mouth is not the eval mouth. Aria stays inactive. Samantha is the persona.",
-            ));
+        if mouth_id == "clone-worker" {
+            return Err(GateErr::fail("a clone mouth is not the eval mouth"));
         }
         mouth.warm();
         let truth = load_truth().map_err(GateErr::fail)?;
@@ -209,7 +198,7 @@ mod linux {
             if *query == "where is the kettle" {
                 kettle_hyp = Some(hyp.clone());
             }
-            let turn = one_turn(&truth, query, *expect, &hyp, &mut ear, &mut mouth)?;
+            let turn = one_turn(&truth, query, *expect, &hyp, &mut ear, &mut mouth, persona)?;
             research_merged |= turn.research_merged;
             eager_ms.push(turn.eager_ms);
             voices.push(turn.voice);
@@ -248,7 +237,7 @@ mod linux {
         }
         let held_ms = ear.decode_ms[held_at..].to_vec();
         let held_audio = ear.audio_ms[held_at..].to_vec();
-        let emotion = measure_emotion(&config.thresholds).map_err(GateErr::fail)?;
+        let emotion = measure_emotion(&config.thresholds, persona).map_err(GateErr::fail)?;
         if config.prosody && ear.sensed_frames == 0 {
             return Err(GateErr::fail(
                 "ear prosody sensing is on and saw no frame. It was not switched off.",
@@ -273,12 +262,7 @@ mod linux {
                 .failures
                 .push("conductor merged a research clause".into());
         }
-        let persona = score_persona(
-            &voices,
-            samantha_window(),
-            anchors(),
-            &config.thresholds.persona,
-        );
+        let persona_score = voice_check(&voices, persona.id());
         let emotion_check = score_emotion(&emotion.sample, &config.thresholds.emotion);
         let latency = score_latency(
             &LatencySample {
@@ -302,7 +286,7 @@ mod linux {
         let (rss_kb, hwm_kb) = worker_mem_kb();
         let pass = grounded.pass
             && unknown.pass
-            && persona.pass
+            && persona_allows_gate(&persona_score)
             && emotion_check.pass
             && latency.pass
             && wer_check.pass;
@@ -312,6 +296,7 @@ mod linux {
         Ok(Report {
             schema: "horbm-eval-report/1",
             mode: Mode::Real.as_str(),
+            persona: persona.id().to_string(),
             pass,
             skipped: false,
             research_dir: "unset",
@@ -320,7 +305,7 @@ mod linux {
                 format!("ear:galion-asr-vosk ({MODEL_NAME}, free decode + keyword spot)"),
                 format!("mouth:{mouth_id} ({voice_name})"),
                 "research:OfflineClient (GALION_HORBM_RESEARCH_DIR unset)".into(),
-                "persona:samantha (Aria inactive)".into(),
+                format!("persona:{}", persona.id()),
                 format!("prosody:{prosody}"),
                 "platform:linux-x86_64".into(),
             ],
@@ -329,20 +314,19 @@ mod linux {
                     &grounded,
                     serde_json::json!({
                         "hits": spoken.iter().filter(|turn| turn.expect_id.is_some()).count(),
+                        "lines": reply_lines(&spoken, true),
                     }),
                 ),
                 unknown: out(
                     &unknown,
                     serde_json::json!({
                         "misses": spoken.iter().filter(|turn| turn.expect_id.is_none()).count(),
+                        "lines": reply_lines(&spoken, false),
                     }),
                 ),
                 persona: out(
-                    &persona,
-                    serde_json::json!({
-                        "id": config.thresholds.persona.id,
-                        "turns": voices.len(),
-                    }),
+                    &persona_score,
+                    voice_detail(persona.id(), voices.len(), &persona_score),
                 ),
                 emotion: out(
                     &emotion_check,
@@ -421,8 +405,9 @@ mod linux {
         hyp: &str,
         ear: &mut VoskEar,
         mouth: &mut StackMouth,
+        persona: &horbm::Persona,
     ) -> Result<TurnDone, GateErr> {
-        let mut brain = Brain::with_cards(truth.cards.clone(), None);
+        let mut brain = Brain::with_persona(truth.cards.clone(), None, *persona);
         let before = brain.emotion().baseline().identity_bits();
         let scored = brain.turn(hyp);
         if brain.emotion().baseline().identity_bits() != before {
@@ -431,7 +416,7 @@ mod linux {
             )));
         }
         let (_gap, research_merged, clause) =
-            conductor_gap(&truth.cards, hyp).map_err(GateErr::fail)?;
+            conductor_gap(&truth.cards, hyp, persona).map_err(GateErr::fail)?;
         if clause != scored.reply {
             return Err(GateErr::fail(format!(
                 "{query}: conductor spoke {clause:?}, brain spoke {:?}",
@@ -481,7 +466,7 @@ mod linux {
         *mouth = next_mouth;
         Ok(TurnDone {
             voice: VoiceTurn {
-                persona: "samantha".into(),
+                persona: persona.id().to_string(),
                 rate: scored.mood_meta.rate,
                 energy: scored.mood_meta.energy,
                 pitch_st: scored.mood_meta.pitch_st,
@@ -977,7 +962,7 @@ mod linux {
         let stack = SpeechStack::detect();
         if matches!(stack.backend, SpeechBackend::Clone { .. }) {
             return Err(GateErr::fail(
-                "clone mouth was selected. The eval mouth is Piper or Flite. Aria stays inactive.",
+                "clone mouth was selected. The eval mouth is Piper or Flite.",
             ));
         }
         if !stack.can_speak() {
@@ -1079,7 +1064,7 @@ mod linux {
             return Ok(path);
         }
         // A private target dir, not the one `cargo test` has locked and not
-        // `$CARGO_TARGET_DIR` if that variable points at the locked dir.
+        // `$CARGO_TARGET_DIR` if that name points at the locked dir.
         let target_dir = cache_dir().join("vosk-target");
         let built = target_dir.join("debug").join(&name);
         if built.is_file() {

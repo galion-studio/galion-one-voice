@@ -4,7 +4,7 @@
 //!
 //! Sensing is on unless the caller passes the off switch or
 //! `GALION_EAR_PROSODY` is `0` or `off`. Any other value, including an unset
-//! variable, leaves it on. This does not change `galion-emotion-in`'s
+//! environment value, leaves it on. This does not change `galion-emotion-in`'s
 //! session, which stays deny until a caller grants sense.
 
 /// `switch_off` is the CLI `--no-prosody` flag.
