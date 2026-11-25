@@ -25,9 +25,11 @@
 //! denied frame has no offer. [`Ear::push`] does not step the core, and
 //! neither does that read.
 //! [`link::push_frame`] steps it with an inbound intent that mixes only when
-//! adapt is granted as well. [`listen::hear_frame`] is Samantha's path: a
-//! separate listener reading, then her own response. It does not write her
-//! baseline.
+//! adapt is granted as well. [`listen::hear_frame`] is the configured
+//! persona's path: a separate listener reading, then that persona's own
+//! response. It does not write the baseline. An id with no emotion profile
+//! is not given another persona's profile. The caller then keeps the reading
+//! on the persona-neutral [`listen::UNIVERSAL`] path only.
 //!
 //! [`eot::Scorer`] turns those scalars, plus the latest ASR partial, into a
 //! [`eot::TurnMsg`]. Thresholds are `eot.toml`, compiled in. A denied frame

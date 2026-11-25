@@ -29,7 +29,7 @@ use crate::{FrameOut, ProsodyFrame};
 /// What one frame tells the turn taker. No audio, no transcript.
 ///
 /// `galion-conductor` and `horbm-voice` are separate workspaces, so each
-/// keeps a copy of these three variants and the host maps one to the other.
+/// keeps a copy of these three messages and the host maps one to the other.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TurnMsg {
     /// Sensing is off. The caller keeps its pause-only rule.
