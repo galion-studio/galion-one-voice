@@ -542,6 +542,8 @@ dependencies = [
  "galion-sam-audio-io",
  "horbm",
  "horbm-voice",
+ "num-complex",
+ "rustfft",
 ]
 
 [[package]]
@@ -606,6 +608,17 @@ dependencies = [
  "galion-emotion-core",
  "serde",
  "toml",
+]
+
+[[package]]
+name = "horbm-soak"
+version = "0.0.1"
+dependencies = [
+ "galion-emotion-core",
+ "galion-ml-voice",
+ "horbm",
+ "horbm-duplex",
+ "horbm-voice",
 ]
 
 [[package]]

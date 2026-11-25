@@ -502,6 +502,70 @@ fn a_persona_other_than_samantha_is_refused() {
 }
 
 #[test]
+fn a_second_barge_matches_the_first_after_she_listens_again() {
+    let mut duplex = Duplex::new(
+        Parts {
+            recognizer: Scripted::new(&[
+                "where is the kettle",
+                "stop now",
+                "where is the kettle",
+                "stop now",
+            ]),
+            emotion: SamanthaAffect,
+            breath: ExhaleBreath,
+            persona: Samantha,
+            mouth: ToneMouth::new(24),
+        },
+        Kettle,
+    )
+    .expect("samantha");
+    duplex.set_aec(false);
+
+    let first = one_barge(&mut duplex);
+    for _ in 0..4 {
+        let frame = tick(&mut duplex, &silence());
+        assert_ne!(frame.event, LoopEvent::BargeIn);
+    }
+    let listening = tick(&mut duplex, &silence());
+    assert_eq!(listening.floor, Floor::Listening);
+    assert!(!listening.yielded);
+    let second = one_barge(&mut duplex);
+    assert_eq!(first, 160);
+    assert_eq!(second, first);
+}
+
+fn one_barge(
+    duplex: &mut Duplex<Scripted, SamanthaAffect, ExhaleBreath, Samantha, ToneMouth>,
+) -> u64 {
+    for _ in 0..5 {
+        let _ = tick(duplex, &tone());
+    }
+    let mut heard = false;
+    for _ in 0..6 {
+        let frame = tick(duplex, &silence());
+        if frame.me_audible {
+            heard = true;
+            break;
+        }
+    }
+    assert!(heard, "the mouth did not start");
+    let onset = tick(duplex, &tone());
+    let onset_ms = onset.t_ms;
+    assert!(onset.me_audible, "the onset frame still plays");
+    assert_ne!(onset.event, LoopEvent::BargeIn);
+    let mut last = onset;
+    for _ in 0..6 {
+        last = tick(duplex, &tone());
+        if last.event == LoopEvent::BargeIn {
+            break;
+        }
+    }
+    assert_eq!(last.event, LoopEvent::BargeIn);
+    assert!(last.me_silent);
+    last.t_ms - onset_ms
+}
+
+#[test]
 fn stand_in_cancel_drops_the_open_hypothesis() {
     let mut ear = Scripted::new(&["where is the kettle"]);
     let frame = silence();

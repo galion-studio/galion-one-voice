@@ -16,9 +16,12 @@ default = ["prosody", "aec"]
 # out. `Duplex::set_prosody(false)` is the runtime switch when this is on.
 prosody = []
 # Acoustic echo cancellation in front of the ear. On by default.
-# `fdaf-aec` (MIT) is the canceller. `--no-default-features` compiles it
-# out. `Duplex::set_aec(false)` is the runtime bypass when this is on.
-aec = ["dep:fdaf-aec"]
+# The steps are the published `fdaf-aec` 0.1.0 filter, run on buffers
+# kept for the life of the call. `FdafAec::process` allocates a scratch
+# `Vec` on every block, and that churn is what grows RSS. 
+# `--no-default-features` compiles it out. `Duplex::set_aec(false)` is
+# the runtime bypass when this is on.
+aec = ["dep:fdaf-aec", "dep:rustfft", "dep:num-complex"]
 # Recognizer over `galion_sam_asr::Asr`. Off in CI. Does not load a model
 # unless the host opens one. The contract tests use `FakeAsr`.
 vosk = ["dep:galion-sam-asr"]
@@ -38,6 +41,8 @@ galion-sam-asr = { path = "../../../voice-stack/asr", optional = true }
 galion-sam-audio-io = { path = "../../../voice-stack/audio-io", optional = true }
 galion-ml-voice = { path = "../../../crates/galion-ml-voice", optional = true, default-features = false, features = ["speech"] }
 fdaf-aec = { version = "0.1.0", optional = true }
+rustfft = { version = "6.4.1", optional = true }
+num-complex = { version = "0.4", optional = true }
 
 [dev-dependencies]
 horbm = { path = "../horbm" }

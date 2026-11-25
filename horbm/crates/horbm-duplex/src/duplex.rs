@@ -117,6 +117,12 @@ pub struct Duplex<R, E, B, P, M> {
     me_started: bool,
     yielded: bool,
     skip_pull: bool,
+    /// Quiet frames since the mouth queue emptied. Sixteen frames is
+    /// 1.28 s, past the end-to-end smoke's 800 ms tail, so a finished
+    /// clip does not drop the floor before that script's barge.
+    mouth_quiet: u32,
+    /// Clear `partial` after this frame's output has copied it.
+    release_partial: bool,
     first_voiced_ms: Option<u64>,
     last_voiced_ms: Option<u64>,
     eager_ms: Option<u64>,
@@ -161,6 +167,8 @@ where
             me_started: false,
             yielded: false,
             skip_pull: false,
+            mouth_quiet: 0,
+            release_partial: false,
             first_voiced_ms: None,
             last_voiced_ms: None,
             eager_ms: None,
@@ -221,6 +229,12 @@ where
         &self.mouth
     }
 
+    /// The emotion port. The soak reads the moment from here.
+    #[must_use]
+    pub fn emotion(&self) -> &E {
+        &self.emotion
+    }
+
     /// One 80 ms frame. A short buffer leaves the clock where it was.
     pub fn tick(&mut self, pcm: &[i16]) -> Result<FrameOut, LoopError> {
         if pcm.len() != FRAME_SAMPLES {
@@ -231,7 +245,8 @@ where
         }
         let t_ms = self.conductor.t_ms();
         let t32 = u32::try_from(t_ms).unwrap_or(u32::MAX);
-        let cleaned = self.echo.cancel(pcm)?;
+        let mut cleaned = [0i16; FRAME_SAMPLES];
+        self.echo.cancel_into(pcm, &mut cleaned)?;
         let cue = self.sense.hear(&cleaned);
         self.last_cue = cue;
         let voiced = if cue.enabled {
@@ -245,6 +260,7 @@ where
         if voiced {
             self.last_voiced_ms = Some(t_ms);
         }
+        self.release_mouth_if_quiet(voiced);
         self.take_hypothesis(&cleaned, voiced, t_ms)?;
         let affect = self.emotion.step(t32);
         self.steer();
@@ -252,6 +268,10 @@ where
         self.note_onset(voiced, t_ms);
 
         let heard = self.partial.clone();
+        if self.release_partial {
+            self.partial.clear();
+            self.release_partial = false;
+        }
         let ear = if voiced && !heard.is_empty() {
             ConductorEar::Speech(&heard)
         } else {
@@ -320,6 +340,12 @@ where
 
         let speaking = me_audible || (self.mouth.speaking() && !self.yielded);
         let breath = self.breath.cue(t32, speaking);
+        if self.yielded && matches!(out.floor, ConductorFloor::Listening) {
+            self.yielded = false;
+            self.me_started = false;
+            self.skip_pull = false;
+            self.partial.clear();
+        }
         Ok(FrameOut {
             t_ms: out.t_ms,
             event,
@@ -343,6 +369,27 @@ where
         })
     }
 
+    fn release_mouth_if_quiet(&mut self, voiced: bool) {
+        if self.yielded || !self.me_started || self.mouth.speaking() {
+            self.mouth_quiet = 0;
+            return;
+        }
+        if voiced {
+            self.mouth_quiet = 0;
+            return;
+        }
+        self.mouth_quiet = self.mouth_quiet.saturating_add(1);
+        // 16 frames is 1.28 s, past the end-to-end smoke's 800 ms tail.
+        if self.mouth_quiet < 16 {
+            return;
+        }
+        self.conductor.mouth_idle();
+        self.me_started = false;
+        self.skip_pull = false;
+        self.partial.clear();
+        self.mouth_quiet = 0;
+    }
+
     fn take_hypothesis(&mut self, pcm: &[i16], voiced: bool, t_ms: u64) -> Result<(), LoopError> {
         if voiced {
             let hyps = self.recognizer.push_frame(pcm).map_err(LoopError::from)?;
@@ -361,6 +408,9 @@ where
         if self.you_open {
             let _final = self.recognizer.finish().map_err(LoopError::from)?;
             self.you_open = false;
+            // The conductor already stored this partial. The frame output
+            // still needs it; `tick` clears the field after the copy.
+            self.release_partial = true;
         }
         Ok(())
     }
