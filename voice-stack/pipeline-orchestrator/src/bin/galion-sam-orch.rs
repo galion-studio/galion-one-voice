@@ -8,8 +8,8 @@ use std::net::SocketAddr;
 use std::time::Duration;
 
 use galion_sam_orch::demo::{self, MOOD, REPLY};
-use galion_sam_orch::samantha_traits::{FakeReply, FakeTts, WaitGate};
 use galion_sam_orch::ui::DotServer;
+use galion_sam_orch::voice_traits::{FakeReply, FakeTts, WaitGate};
 
 fn main() {
     let ui = std::env::args().any(|arg| arg == "--ui");
@@ -21,7 +21,7 @@ fn main() {
     runtime.block_on(async move {
         println!(
             "reference_present={}",
-            galion_sam_orch::samantha_ref_from_env().is_some()
+            galion_sam_orch::voice_ref_from_env().is_some()
         );
         if ui {
             run_ui().await;

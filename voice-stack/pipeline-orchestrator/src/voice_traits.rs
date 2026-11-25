@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Galion Labs
 
-//! Stage traits for the Samantha loop, plus fakes.
+//! Stage traits for the configured persona's conversation loop, plus fakes.
 //!
 //! Other sectors implement these. This sector runs them. The shapes follow
 //! the code already in the repo:
@@ -17,8 +17,9 @@
 //! * [`AudioIn`] / [`AudioOut`] — mic and speaker. Capture is 16 kHz.
 //!   Playback is 24 kHz.
 //!
-//! [`GALION_SAMANTHA_REF`](SAMANTHA_REF_ENV) is a filesystem path. Nothing
-//! in this module reads the bytes into the tree.
+//! [`VOICE_REF_ENV`] is a filesystem path. The old variable is read only as
+//! a fallback in the alias helper below. Nothing in this module reads the
+//! bytes into the tree.
 
 use crate::clock::{CAPTURE_FRAME_MS, CAPTURE_FRAME_SAMPLES, CAPTURE_RATE_HZ};
 use std::future::Future;
@@ -29,18 +30,94 @@ use std::thread;
 use std::time::Duration;
 use tokio::sync::mpsc;
 
-/// Env var for Samantha's reference clip. Loaded by a TTS adapter at runtime.
+/// Env var for the configured persona's reference clip.
+///
+/// A TTS adapter loads it at runtime. This module only checks that the path
+/// is a file.
+pub const VOICE_REF_ENV: &str = "GALION_VOICE_REF";
+
+/// One resolved reference path, and at most one alias warning.
+///
+/// `warning` is a single line. It names [`VOICE_REF_ENV`] when the old
+/// variable was read.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct VoiceRefChoice<'a> {
+    pub value: Option<&'a str>,
+    pub warning: Option<&'static str>,
+}
+
+/// Alias helper. Doc-deprecated forwards. No `#[deprecated]` attribute:
+/// other crates still name the old module and the old function.
+///
+/// [`VOICE_REF_ENV`] wins. [`SAMANTHA_REF_ENV`] is read only when the new
+/// variable is unset. When both are set and differ, the new one wins and
+/// `warning` is one line.
 pub const SAMANTHA_REF_ENV: &str = "GALION_SAMANTHA_REF";
 
-/// Path from the environment when it names a file. Does not open the file.
-pub fn samantha_ref_from_env() -> Option<PathBuf> {
-    let raw = std::env::var_os(SAMANTHA_REF_ENV)?;
-    let path = PathBuf::from(raw);
-    if path.is_file() {
-        Some(path)
-    } else {
-        None
+const FALLBACK_WARNING: &str = "GALION_SAMANTHA_REF is a fallback; set GALION_VOICE_REF";
+
+const DIFFER_WARNING: &str = "GALION_VOICE_REF wins over GALION_SAMANTHA_REF";
+
+/// Pick the reference path from the new variable and the old one.
+///
+/// Empty strings count as unset. This function does not read the process
+/// environment and does not touch the filesystem.
+pub fn voice_ref_choice<'a>(
+    new_name: Option<&'a str>,
+    old_name: Option<&'a str>,
+) -> VoiceRefChoice<'a> {
+    let new_name = nonempty(new_name);
+    let old_name = nonempty(old_name);
+    let (value, warning) = match (new_name, old_name) {
+        (None, None) => (None, None),
+        (Some(value), None) => (Some(value), None),
+        (None, Some(value)) => (Some(value), Some(FALLBACK_WARNING)),
+        (Some(value), Some(old)) if value == old => (Some(value), None),
+        (Some(value), Some(_)) => (Some(value), Some(DIFFER_WARNING)),
+    };
+    VoiceRefChoice { value, warning }
+}
+
+fn nonempty(value: Option<&str>) -> Option<&str> {
+    match value {
+        Some(text) if !text.is_empty() => Some(text),
+        _ => None,
     }
+}
+
+/// Path from the environment when it names a file. Does not open the file.
+///
+/// Logs one warning to stderr when [`SAMANTHA_REF_ENV`] is the fallback or
+/// when both names are set and differ. [`VOICE_REF_ENV`] wins.
+pub fn voice_ref_from_env() -> Option<PathBuf> {
+    let new_raw = nonempty_os(VOICE_REF_ENV);
+    let old_raw = nonempty_os(SAMANTHA_REF_ENV);
+    let (value, warning) = match (&new_raw, &old_raw) {
+        (None, None) => (None, None),
+        (Some(value), None) => (Some(value), None),
+        (None, Some(value)) => (Some(value), Some(FALLBACK_WARNING)),
+        (Some(value), Some(old)) if value == old => (Some(value), None),
+        (Some(value), Some(_)) => (Some(value), Some(DIFFER_WARNING)),
+    };
+    if let Some(warning) = warning {
+        eprintln!("{warning}");
+    }
+    let path = PathBuf::from(value?.as_os_str());
+    path.is_file().then_some(path)
+}
+
+fn nonempty_os(key: &str) -> Option<std::ffi::OsString> {
+    let raw = std::env::var_os(key)?;
+    if raw.is_empty() {
+        None
+    } else {
+        Some(raw)
+    }
+}
+
+/// Doc-deprecated forward of [`voice_ref_from_env`].
+pub fn samantha_ref_from_env() -> Option<PathBuf> {
+    voice_ref_from_env()
 }
 
 /// One capture quantum. Default size is the Vosk frame.
@@ -674,6 +751,10 @@ mod tests {
 
     #[test]
     fn reference_env_name_is_the_runtime_path() {
+        assert_eq!(VOICE_REF_ENV, "GALION_VOICE_REF");
         assert_eq!(SAMANTHA_REF_ENV, "GALION_SAMANTHA_REF");
+        let chosen = voice_ref_choice(Some("new"), Some("old"));
+        assert_eq!(chosen.value, Some("new"));
+        assert_eq!(chosen.warning, Some(DIFFER_WARNING));
     }
 }

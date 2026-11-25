@@ -13,7 +13,7 @@ use galion_sam_horbm::{
 use galion_sam_orch::clause::clauses;
 use galion_sam_orch::clock::VAD_HANG_MS;
 use galion_sam_orch::demo::{send_frames, wait_report};
-use galion_sam_orch::samantha_traits::{
+use galion_sam_orch::voice_traits::{
     mic_channel, EnergyVad, FakeAsr, FakeTts, HoldMood, MemorySpeaker, Pad,
 };
 use galion_sam_orch::{asr_to_piper_lines, Pipeline, RouterMouth};

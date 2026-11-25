@@ -22,8 +22,8 @@ use crate::clock::{
     MAX_UTTERANCE_MS, TURN_CHANNEL_BOUND,
 };
 // Demo uses these without naming the stage-trait module.
-pub(crate) use crate::samantha_traits::{mic_channel, WaitGate};
-use crate::samantha_traits::{
+pub(crate) use crate::voice_traits::{mic_channel, WaitGate};
+use crate::voice_traits::{
     Asr, AudioFrame, AudioIn, AudioOut, MoodTick, Pad, ReplyEngine, Tts, Vad, VadEvent,
 };
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
