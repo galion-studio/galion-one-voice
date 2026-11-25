@@ -3,16 +3,16 @@
 //! Read-only HORBM knowledge cards.
 //!
 //! `open` reads `.md` and `.json` files. It does not create the directory
-//! or write a card. Remember stays deny unless a later dev host profile sets
-//! the grant word. The person diary file is created only then, and only when
-//! a turn writes. A query that shares no word
+//! or write a card. Remember stays deny unless the caller passes the grant
+//! word. The person diary file is created only then, and only when a turn
+//! writes. A query that shares no word
 //! with a card is [`UNKNOWN_REPLY`]. [`CardEngine`] asks [`horbm::Brain`],
 //! which reads these cards first. This engine does not bind a socket and
 //! does not dial the Node desk.
 
 use std::fs::File;
 use std::io::Read;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 use crate::chunks::contains_forbidden;
@@ -221,7 +221,24 @@ impl horbm::ResearchAsk for PortAsk {
 
 /// Read-only cards plus the optional research port, as one `horbm` brain.
 /// Prints one startup line: card count, load time, and manifest state.
+///
+/// Retrieval stays denied. The linked opener calls this and does not pass a
+/// remember word. `GALION_HORBM_REMEMBER` and `GALION_HORBM_KEYS` are not
+/// read here. [`CardEngine::open`] is the edge that reads them.
+///
+/// The linked module is behind the `horbm` feature, so a default build does
+/// not call this function.
+#[cfg_attr(not(feature = "horbm"), allow(dead_code))]
 pub(crate) fn brain_from_dir(knowledge_dir: &Path, bind: Option<&str>) -> horbm::Brain {
+    let config = retrieval_config(None, knowledge_dir, None);
+    brain_with_retrieval(knowledge_dir, bind, config)
+}
+
+fn brain_with_retrieval(
+    knowledge_dir: &Path,
+    bind: Option<&str>,
+    config: horbm::RetrievalConfig,
+) -> horbm::Brain {
     let started = Instant::now();
     let (json, manifest) = match horbm::KnowledgeCards::load(knowledge_dir) {
         Ok(loaded) => (loaded.cards, loaded.report.manifest),
@@ -246,17 +263,14 @@ pub(crate) fn brain_from_dir(knowledge_dir: &Path, bind: Option<&str>) -> horbm:
     let mut brain = horbm::Brain::with_cards(LocalCards { json, prose }, research)
         .with_style(horbm::ResearchRoot::from_env());
     brain.set_speakable(speakable_line);
-    attach_retrieval(brain, knowledge_dir)
+    attach_retrieval(brain, config)
 }
 
-/// The 7881 turn reads the retrieval cell. Remember stays deny. This library
-/// does not set `GALION_HORBM_REMEMBER`, and `LOCKS.toml` `[consent] remember`
-/// stays deny. A later dev host profile is what passes the word `grant`.
-/// A denied spawn does not open the diary.
-fn attach_retrieval(brain: horbm::Brain, knowledge_dir: &Path) -> horbm::Brain {
-    let mut config = horbm::RetrievalConfig::from_env();
-    config.knowledge_dir = Some(knowledge_dir.to_path_buf());
-    config.fixture_rows = 0;
+/// Spawn the retrieval thread from the typed config. This does not read
+/// `GALION_HORBM_REMEMBER` or `GALION_HORBM_KEYS`. A denied config does not
+/// open the retrieval store. `LOCKS.toml` `[consent] remember` stays deny.
+/// This library does not set the grant word.
+fn attach_retrieval(brain: horbm::Brain, config: horbm::RetrievalConfig) -> horbm::Brain {
     match horbm::RetrievalThread::spawn(config) {
         Ok(thread) => brain.with_retrieval(thread),
         Err(err) => {
@@ -266,18 +280,45 @@ fn attach_retrieval(brain: horbm::Brain, knowledge_dir: &Path) -> horbm::Brain {
     }
 }
 
+/// [`horbm::RetrievalConfig::from_flags`] grants only the trimmed word
+/// `grant`. The card directory is the path the caller passed, not
+/// `GALION_HORBM_KNOWLEDGE`. `fixture_rows` stays 0. `keys` is
+/// `GALION_HORBM_KEYS` only when [`CardEngine::open`] read it. Empty and
+/// whitespace leave `keys_path` unset.
+fn retrieval_config(
+    remember: Option<&str>,
+    knowledge_dir: &Path,
+    keys: Option<&str>,
+) -> horbm::RetrievalConfig {
+    let shown = knowledge_dir.to_string_lossy();
+    let mut config = horbm::RetrievalConfig::from_flags(remember, Some(shown.as_ref()));
+    config.knowledge_dir = Some(knowledge_dir.to_path_buf());
+    config.fixture_rows = 0;
+    config.keys_path = keys_path(keys);
+    config
+}
+
+fn keys_path(raw: Option<&str>) -> Option<PathBuf> {
+    let raw = raw?.trim();
+    if raw.is_empty() {
+        None
+    } else {
+        Some(PathBuf::from(raw))
+    }
+}
+
 /// HORBM reply engine. A turn is [`horbm::Brain::turn`]: the retrieval cell
 /// when `remember` is granted, otherwise cards and the clause fixture, then
 /// the gateway, then [`UNKNOWN_REPLY`]. The memory path is the person diary,
-/// attached with [`horbm::EpisodicStore::open_from_flag`].
+/// attached with [`horbm::EpisodicStore::open`].
 ///
 /// Library defaults stay deny, and `LOCKS.toml` `[consent] remember` stays
-/// deny. This engine does not grant remember or learn. A later dev host
-/// profile is what sets `GALION_HORBM_REMEMBER`. Only the trimmed word
-/// `grant` lets a later turn create the diary file. That is the same word
-/// [`horbm::RetrievalConfig::from_env`] reads for the retrieval thread.
-/// [`CardEngine::open`] reads it once. Any other value does not
-/// create the file. The cases path is accepted so the `Brain::open` shape
+/// deny. This engine does not grant remember or learn. A host passes the
+/// word `grant`. Only that trimmed word lets a later turn create the diary
+/// file, and it is the same word the retrieval thread is given. Any other
+/// value does not create the file and leaves the cell [`horbm::CellState::Idle`].
+/// [`CardEngine::open`] is the only read of `GALION_HORBM_REMEMBER` and
+/// `GALION_HORBM_KEYS`. The cases path is accepted so the `Brain::open` shape
 /// stays, and it is not opened.
 pub struct CardEngine {
     brain: horbm::Brain,
@@ -286,19 +327,29 @@ pub struct CardEngine {
 }
 
 impl CardEngine {
-    /// Read `GALION_HORBM_REMEMBER` once and open the engine.
-    /// Unset stays deny. This does not grant consent.
-    /// [`Self::open_with_remember`] is the same path with the flag passed in.
+    /// Read `GALION_HORBM_REMEMBER` and `GALION_HORBM_KEYS` once and open
+    /// the engine. Unset remember stays deny. This does not grant consent.
+    /// An empty key path is left unset. These two reads are the only
+    /// retrieval-consent environment reads. When the key path is unset this
+    /// calls [`Self::open_with_remember`].
     pub fn open(memory_db: &Path, knowledge_dir: &Path, cases: &Path) -> Self {
         let remember = std::env::var("GALION_HORBM_REMEMBER").ok();
-        Self::open_with_remember(memory_db, knowledge_dir, cases, remember.as_deref())
+        let keys = std::env::var("GALION_HORBM_KEYS").ok();
+        if keys.as_deref().is_none_or(|raw| raw.trim().is_empty()) {
+            return Self::open_with_remember(memory_db, knowledge_dir, cases, remember.as_deref());
+        }
+        let config = retrieval_config(remember.as_deref(), knowledge_dir, keys.as_deref());
+        Self::open_with_retrieval(memory_db, knowledge_dir, cases, config)
     }
 
     /// [`Self::open`] with an explicit remember flag.
     ///
-    /// This does not read `GALION_HORBM_REMEMBER` and does not grant consent.
-    /// `None` and any value other than the trimmed word `grant` leave the
-    /// diary file uncreated. Learn consent is a different flag and is not read.
+    /// This does not read `GALION_HORBM_REMEMBER` or `GALION_HORBM_KEYS`,
+    /// and it does not grant consent. `None` and any value other than the
+    /// trimmed word `grant` leave the diary file uncreated and the retrieval
+    /// cell idle. Learn consent is a different flag and is not read.
+    /// `keys_path` stays unset. The config is the one
+    /// [`Self::open_with_retrieval`] would be given for this word.
     pub fn open_with_remember(
         memory_db: &Path,
         knowledge_dir: &Path,
@@ -314,6 +365,28 @@ impl CardEngine {
         )
     }
 
+    /// Fully typed opener. `config` is given to the retrieval thread as it
+    /// stands. `knowledge_dir` is the card directory for the turn's card
+    /// lookup, which can differ from `config.knowledge_dir`.
+    ///
+    /// This does not read the process environment and does not rewrite
+    /// `config`. The diary uses `config.remember`, so the two gates agree.
+    /// The 7881 host keeps calling [`Self::open_with_remember`].
+    pub fn open_with_retrieval(
+        memory_db: &Path,
+        knowledge_dir: &Path,
+        cases: &Path,
+        config: horbm::RetrievalConfig,
+    ) -> Self {
+        Self::open_from_config(
+            memory_db,
+            knowledge_dir,
+            cases,
+            research::bind_from_env().as_deref(),
+            config,
+        )
+    }
+
     fn open_bound(
         memory_db: &Path,
         knowledge_dir: &Path,
@@ -321,9 +394,21 @@ impl CardEngine {
         bind: Option<&str>,
         remember: Option<&str>,
     ) -> Self {
+        let config = retrieval_config(remember, knowledge_dir, None);
+        Self::open_from_config(memory_db, knowledge_dir, cases, bind, config)
+    }
+
+    fn open_from_config(
+        memory_db: &Path,
+        knowledge_dir: &Path,
+        cases: &Path,
+        bind: Option<&str>,
+        config: horbm::RetrievalConfig,
+    ) -> Self {
         let _ = cases;
-        let brain = brain_from_dir(knowledge_dir, bind)
-            .with_memory(horbm::EpisodicStore::open_from_flag(memory_db, remember));
+        let granted = config.remember;
+        let brain = brain_with_retrieval(knowledge_dir, bind, config)
+            .with_memory(horbm::EpisodicStore::open(memory_db, granted));
         let cards = brain.cards();
         Self {
             brain,
