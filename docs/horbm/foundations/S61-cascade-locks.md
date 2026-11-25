@@ -75,7 +75,11 @@ Unix speech workers are unchanged from S52: Piper, Flite, and the Vosk parent ru
 | `cargo test -p galion-cascade --lib` | 97 passed |
 | `cargo test -p galion-cascade --features cascade --lib` | 135 passed |
 | `cargo test -p galion-console --features phone-turn --lib turn_worker` | 10 passed |
+| `cargo test --workspace` | 1067 passed, 5 ignored, 0 failed |
+| `cargo test --manifest-path horbm/Cargo.toml --workspace` | 267 passed, 2 ignored, 0 failed |
 | `cargo clippy -p galion-cascade --all-targets -- -D warnings` | clean |
 | `cargo clippy -p galion-cascade --features cascade --all-targets -- -D warnings` | clean |
+| `cargo clippy --workspace --all-targets -- -D warnings` | clean |
+| `cargo clippy --manifest-path horbm/Cargo.toml --workspace --all-targets -- -D warnings` | clean |
 
-Workspace totals are in the PR body after `cargo test --workspace` and `cargo clippy --workspace --all-targets -- -D warnings`, plus the same two commands with `--manifest-path horbm/Cargo.toml`.
+`cargo test --workspace` uses default features, so it runs the lock check and the stub-lane timing. It does not compile `phone.rs`. The `--features cascade` line does. The console line is the worker that formats `{kind}: {e}`.
