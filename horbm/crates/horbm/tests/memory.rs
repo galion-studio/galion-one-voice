@@ -169,6 +169,61 @@ fn consent_deny_means_zero_writes() {
 }
 
 #[test]
+fn only_the_grant_word_opens_the_person_file() {
+    let denied = [
+        None,
+        Some("yes"),
+        Some("true"),
+        Some("granted"),
+        Some("GRANT"),
+        Some("Grant"),
+        Some("deny"),
+        Some(""),
+        Some("  "),
+    ];
+    for (index, flag) in denied.into_iter().enumerate() {
+        let dir = scratch(&format!("flag-deny-{index}"));
+        let path = dir.join("person-memory.sqlite");
+        let mut store = EpisodicStore::open_from_flag(&path, flag);
+        assert!(!store.remember_granted(), "{flag:?}");
+        assert_eq!(store.path(), path.as_path(), "{flag:?}");
+        assert!(!path.exists(), "denied open creates no file: {flag:?}");
+        assert_eq!(
+            store.pin("person-alpha", "my favourite colour is blue", "t000001"),
+            WriteOutcome::Refused,
+            "{flag:?}"
+        );
+        assert!(!path.exists(), "{flag:?}");
+        assert!(
+            sqlite_names(&dir).is_empty(),
+            "{flag:?} {:?}",
+            sqlite_names(&dir)
+        );
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    for (index, flag) in [Some("grant"), Some(" grant ")].into_iter().enumerate() {
+        let dir = scratch(&format!("flag-grant-{index}"));
+        let path = dir.join("person-memory.sqlite");
+        let mut store = EpisodicStore::open_from_flag(&path, flag);
+        assert!(store.remember_granted(), "{flag:?}");
+        assert_eq!(store.path(), path.as_path(), "{flag:?}");
+        assert!(
+            !path.exists(),
+            "the grant opens the store; the file waits for a write: {flag:?}"
+        );
+        store
+            .pin("person-alpha", "my favourite colour is blue", "t000001")
+            .ok_stored();
+        assert!(path.is_file(), "{flag:?}");
+        let recalled = store.recall("person-alpha", "what is my favourite colour");
+        assert_eq!(recalled.len(), 1, "{flag:?} {recalled:?}");
+        assert_eq!(recalled[0].text, "my favourite colour is blue");
+        let _ = fs::remove_dir_all(&dir);
+    }
+}
+
+#[test]
 fn a_denied_brain_does_not_call_the_diary() {
     let calls = Arc::new(AtomicUsize::new(0));
     let mut brain = horbm::Brain::with_cards(EmptyCards, None).with_memory(Calls {
