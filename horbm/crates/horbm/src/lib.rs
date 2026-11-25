@@ -49,7 +49,9 @@
 //! Learning a new care stays off while `LOCKS.toml` `[consent] learn` is deny.
 //!
 //! [`Brain::boot`], [`Brain::try_open`], and [`Brain::try_with_cards`] load
-//! the configured development persona. The id comes from
+//! the configured development persona. The active persona id is
+//! `Brain::persona().id()`, loaded from `GALION_HORBM_DEV_PERSONA` /
+//! `development.toml` or an explicit persona file. The id comes from
 //! `GALION_HORBM_DEV_PERSONA` when that value is non-empty, otherwise from
 //! `development.toml`. Persona files are read from `GALION_HORBM_PERSONA_DIR`
 //! when that value is non-empty, otherwise from the `persona_dir` key in
@@ -81,15 +83,17 @@
 //! [`Int8Scorer`] is implemented for the mapped key arena and is not called
 //! by the retrieval thread.
 //!
-//! [`Brain::samantha`] is the slower layer: care, curiosity, help, and
+//! The configured persona's slower layer holds care, curiosity, help, and
 //! expect. [`Brain::turn`] lets that layer bias the pace and, when the act
 //! is comfort, does not arm the research ask. It does not replace the spoken
-//! clause. [`Brain::samantha_nudge`] steps the same GEMI note on the moment
-//! clock. [`Brain::tick_frame`] decays the goals and counts silence. It
-//! still does not step the moment.
+//! clause. The same GEMI note is stepped on the moment clock.
+//! [`Brain::tick_frame`] decays the goals and counts silence. It still does
+//! not step the moment.
 //!
 //! [`LearnPass`] is not part of that order. It is the offline learn pass.
 //! Learn consent is [`LearnConfig::granted`]. [`Brain::turn`] does not call it.
+//! [`SessionSeal`] keeps one clause until the host calls [`SessionSeal::seal`].
+//! The turn does not note or seal it.
 
 #![forbid(unsafe_code)]
 
@@ -122,16 +126,16 @@ pub use galion_sam_empathy::{Intent, PronounClass, FRAME_MS};
 pub use horbm_brain::{Answer, Heuristic, MarkKind, SidebandMark};
 pub use horbm_inner::{
     DialogueLean, Heard, InnerMsg, MsgDir, Perceived, SamanthaInner, Verb, CARE_HOME,
-    CHECKIN_GAP_MS, CHECKIN_MS, CURIOSITY_HOME, EXPECT_HOME, HELP_HOME, PERSONA as SAMANTHA_INNER,
-    REMEMBER_LOCK, TICK_MS, WAIT_MS,
+    CHECKIN_GAP_MS, CHECKIN_MS, CURIOSITY_HOME, EXPECT_HOME, HELP_HOME, REMEMBER_LOCK, TICK_MS,
+    WAIT_MS,
 };
 pub use horbm_keys::StringKeyArena;
 pub use horbm_persona::{
     LegalMovePort, MoveClaim, MoveVerdict, Persona, PersonaError, StyleHook, UNKNOWN_LINE,
 };
 pub use learn::{
-    ClauseSource, LearnAudit, LearnConfig, LearnError, LearnPass, LearnedRow, LEARN_PACK_DB,
-    LEARN_PACK_LIVE, LEARN_PACK_NEXT, LEARN_PACK_RETIRING,
+    ClauseSource, LearnAudit, LearnConfig, LearnError, LearnPass, LearnedRow, SessionSeal,
+    LEARN_PACK_DB, LEARN_PACK_LIVE, LEARN_PACK_NEXT, LEARN_PACK_RETIRING,
 };
 pub use memory::{about_the_person, pin_command, EpisodicStore};
 pub use research_style::{
