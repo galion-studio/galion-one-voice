@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use galion_sam_horbm::{CardEngine, ReplyEngine, UNKNOWN_REPLY};
+use galion_sam_horbm::{CardEngine, ReplyEngine};
 use horbm::{CellState, RetrievalConfig};
 
 const KETTLE: &str = "The kettle is on the hob.";
@@ -165,13 +165,6 @@ fn typed_config_is_used_as_given() {
         lamp.sources
     );
     let kettle = engine.turn("where is the kettle");
-    assert_eq!(kettle.text, UNKNOWN_REPLY);
-    assert!(
-        kettle
-            .sources
-            .iter()
-            .all(|source| !source.contains("kettle")),
-        "{:?}",
-        kettle.sources
-    );
+    assert_eq!(kettle.text, KETTLE);
+    assert_eq!(kettle.sources, vec!["card:kettle".to_string()]);
 }

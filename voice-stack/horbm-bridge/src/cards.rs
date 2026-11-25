@@ -5,9 +5,10 @@
 //! `open` reads `.md` and `.json` files. It does not create the directory
 //! or write a card. Remember stays deny unless the caller passes the grant
 //! word. The person diary file is created only then, and only when a turn
-//! writes. A query that shares no word
-//! with a card is [`UNKNOWN_REPLY`]. [`CardEngine`] asks [`horbm::Brain`],
-//! which reads these cards first. This engine does not bind a socket and
+//! writes. A granted retrieval miss still speaks a loaded card.
+//! [`UNKNOWN_REPLY`] is spoken only when nothing matched: the retrieval cell
+//! missed and no card matches, or remember is denied and the card path misses.
+//! [`CardEngine`] asks [`horbm::Brain`]. This engine does not bind a socket and
 //! does not dial the Node desk.
 
 use std::fs::File;
@@ -161,6 +162,7 @@ impl CardBrain {
 /// Cards the 7881 router reads. JSON uses the galion-knowledge loader.
 /// Markdown cards, including the shipped kettle note, answer when JSON has
 /// no hit.
+#[derive(Clone)]
 struct LocalCards {
     json: horbm::KnowledgeCards,
     prose: CardBrain,
@@ -231,14 +233,14 @@ impl horbm::ResearchAsk for PortAsk {
 #[cfg_attr(not(feature = "horbm"), allow(dead_code))]
 pub(crate) fn brain_from_dir(knowledge_dir: &Path, bind: Option<&str>) -> horbm::Brain {
     let config = retrieval_config(None, knowledge_dir, None);
-    brain_with_retrieval(knowledge_dir, bind, config)
+    brain_with_retrieval(knowledge_dir, bind, config).0
 }
 
 fn brain_with_retrieval(
     knowledge_dir: &Path,
     bind: Option<&str>,
     config: horbm::RetrievalConfig,
-) -> horbm::Brain {
+) -> (horbm::Brain, LocalCards) {
     let started = Instant::now();
     let (json, manifest) = match horbm::KnowledgeCards::load(knowledge_dir) {
         Ok(loaded) => (loaded.cards, loaded.report.manifest),
@@ -260,10 +262,11 @@ fn brain_with_retrieval(
     eprintln!("{}", report.log_line());
     let research = research::research_port(bind)
         .map(|port| Box::new(PortAsk(port)) as Box<dyn horbm::ResearchAsk + Send>);
-    let mut brain = horbm::Brain::with_cards(LocalCards { json, prose }, research)
+    let loaded = LocalCards { json, prose };
+    let mut brain = horbm::Brain::with_cards(loaded.clone(), research)
         .with_style(horbm::ResearchRoot::from_env());
     brain.set_speakable(speakable_line);
-    attach_retrieval(brain, config)
+    (attach_retrieval(brain, config), loaded)
 }
 
 /// Spawn the retrieval thread from the typed config. This does not read
@@ -317,13 +320,17 @@ fn keys_path(raw: Option<&str>) -> Option<PathBuf> {
 /// word `grant`. Only that trimmed word lets a later turn create the diary
 /// file, and it is the same word the retrieval thread is given. Any other
 /// value does not create the file and leaves the cell [`horbm::CellState::Idle`].
-/// [`CardEngine::open`] is the only read of `GALION_HORBM_REMEMBER` and
-/// `GALION_HORBM_KEYS`. The cases path is accepted so the `Brain::open` shape
-/// stays, and it is not opened.
+/// A granted miss ([`horbm::CellState::Miss`]) still speaks a loaded card.
+/// [`UNKNOWN_REPLY`] remains only when that card also misses. [`CardEngine::open`]
+/// is the only read of `GALION_HORBM_REMEMBER` and `GALION_HORBM_KEYS`. The
+/// cases path is accepted so the `Brain::open` shape stays, and it is not opened.
 pub struct CardEngine {
     brain: horbm::Brain,
     knowledge_dir: std::path::PathBuf,
     cards: usize,
+    /// Same cards the brain loaded. A granted retrieval miss reads this
+    /// instead of saying [`UNKNOWN_REPLY`] when a card matches.
+    loaded: LocalCards,
 }
 
 impl CardEngine {
@@ -407,13 +414,14 @@ impl CardEngine {
     ) -> Self {
         let _ = cases;
         let granted = config.remember;
-        let brain = brain_with_retrieval(knowledge_dir, bind, config)
-            .with_memory(horbm::EpisodicStore::open(memory_db, granted));
+        let (brain, loaded) = brain_with_retrieval(knowledge_dir, bind, config);
+        let brain = brain.with_memory(horbm::EpisodicStore::open(memory_db, granted));
         let cards = brain.cards();
         Self {
             brain,
             knowledge_dir: knowledge_dir.to_path_buf(),
             cards,
+            loaded,
         }
     }
 
@@ -445,10 +453,42 @@ impl CardEngine {
     }
 }
 
+impl CardEngine {
+    /// A granted retrieval miss does not mean the shipped card is absent.
+    /// The cell stays `Miss`. The spoken line is the card when one matches.
+    /// No card match keeps [`UNKNOWN_REPLY`].
+    fn card_after_retrieval_miss(&self, mut reply: Reply, text: &str) -> Reply {
+        let Some(hit) = card_match(&self.loaded, text) else {
+            return reply;
+        };
+        let Some(spoken) = speakable_line(&hit.gist) else {
+            return reply;
+        };
+        if spoken.trim().is_empty() {
+            return reply;
+        }
+        let source = format!("card:{}", hit.id);
+        reply.text = spoken;
+        reply.sources = vec![source.clone()];
+        reply.evidence = vec![source];
+        reply
+    }
+
+    fn retrieval_missed(&self) -> bool {
+        matches!(
+            self.brain
+                .retrieval_cell()
+                .as_deref()
+                .map(|cell| cell.state),
+            Some(horbm::CellState::Miss)
+        )
+    }
+}
+
 impl ReplyEngine for CardEngine {
     fn turn(&mut self, text: &str) -> Reply {
         let out = self.brain.turn(text);
-        Reply {
+        let reply = Reply {
             text: out.reply,
             mood: Pad::new(out.mood.arousal, out.mood.valence, out.mood.dominance),
             sources: out.sources,
@@ -457,6 +497,11 @@ impl ReplyEngine for CardEngine {
             violations: out.violations,
             lookup_us: out.lookup_us,
             took_us: out.took_us,
+        };
+        if self.retrieval_missed() && reply.text == UNKNOWN_REPLY {
+            self.card_after_retrieval_miss(reply, text)
+        } else {
+            reply
         }
     }
 
