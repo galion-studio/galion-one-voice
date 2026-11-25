@@ -3,7 +3,7 @@
 
 [package]
 name = "galion-sam-horbm"
-description = "Samantha HORBM bridge: ReplyEngine, read-only cards, and the linked horbm turn."
+description = "The HORBM bridge: ReplyEngine, read-only cards, and the linked horbm turn."
 version = "0.0.1"
 edition = "2021"
 license = "MIT"

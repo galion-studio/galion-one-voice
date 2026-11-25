@@ -6,7 +6,7 @@ edition = "2021"
 license = "MIT"
 publish = false
 rust-version = "1.85"
-description = "Samantha mouth: an 80 ms source-filter on Piper and flite PCM. Glottal, nasal, and mouth numbers come from horbm-breath."
+description = "The configured persona's mouth: an 80 ms source-filter on Piper and flite PCM. Glottal, nasal, and mouth numbers come from horbm-breath."
 
 [dependencies]
 # MIT OR Apache-2.0. Direct Form 1 biquads, retuned each frame. This crate is glue.

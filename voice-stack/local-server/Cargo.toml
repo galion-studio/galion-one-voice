@@ -7,7 +7,7 @@ version = "0.1.0"
 edition = "2021"
 license = "MIT"
 publish = false
-description = "Loopback WebSocket server for the Samantha voice UI (swarm 16, sector S10)"
+description = "Loopback WebSocket server for the local voice UI (swarm 16, sector S10)"
 readme = "README.md"
 
 [[bin]]

@@ -3,7 +3,7 @@
 # Standalone crate. Not a member of the repository workspace.
 [package]
 name = "galion-eval-golden"
-description = "Samantha end-to-end voice quality gates: rollout WER/ECAPA/emotion, golden scripts, persona lint, Piper round-trip."
+description = "End-to-end voice quality gates for the configured persona: rollout WER/ECAPA/emotion, golden scripts, persona lint, Piper round-trip."
 version = "0.0.1"
 edition = "2021"
 license = "MIT"

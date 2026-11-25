@@ -9,7 +9,7 @@ edition = "2021"
 license = "MIT"
 publish = false
 rust-version = "1.85"
-description = "Map a live HORBM Pad onto Samantha's speaking parameters. One 80 ms tick slews the voice. No audio, no model calls."
+description = "Map a live HORBM Pad onto the configured persona's speaking parameters. One 80 ms tick slews the voice. No audio, no model calls."
 
 [[bin]]
 name = "galion-sam-prosody"

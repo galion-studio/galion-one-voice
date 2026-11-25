@@ -3,7 +3,7 @@
 
 [package]
 name = "horbm-soak"
-description = "Long-call soak of Samantha's duplex loop on the virtual 80 ms clock."
+description = "Long-call soak of the configured persona's duplex loop on the virtual 80 ms clock."
 version.workspace = true
 edition.workspace = true
 license.workspace = true

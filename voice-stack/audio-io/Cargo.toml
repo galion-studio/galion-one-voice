@@ -7,7 +7,7 @@ version = "0.0.1"
 edition = "2021"
 license = "MIT"
 publish = false
-description = "S01 mic capture and speaker playback for the Samantha voice stack. CPU only."
+description = "S01 mic capture and speaker playback for the local voice stack. CPU only."
 readme = "README.md"
 rust-version = "1.85"
 

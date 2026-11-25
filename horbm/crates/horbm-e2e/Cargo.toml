@@ -8,7 +8,7 @@
 
 [package]
 name = "horbm-e2e"
-description = "Samantha end-to-end duplex smoke. Loopback and energy by default. Optional Linux ALSA output and Silero VAD."
+description = "End-to-end duplex smoke for the configured persona. Loopback and energy by default. Optional Linux ALSA output and Silero VAD."
 version = "0.0.1"
 edition = "2021"
 license = "MIT"
