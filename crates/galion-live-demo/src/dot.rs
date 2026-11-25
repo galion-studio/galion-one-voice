@@ -3,7 +3,7 @@
 //! Pure presentation — runs after `step_live`, never inside `Heartbeat::step`. Writes a PNG
 //! sequence (+ `latest.png`) under `<out>/dot/`. Window surface is unsupported upstream.
 use crate::{FrameRecord, FrameSink, Summary};
-use galion_console::dotviz::{DemoPump, DotConsole};
+use galion_console::dotviz::{DemoPump, DotConsole, MarkedFrame};
 use galion_console::live::{StubAffect, StubTiming};
 use galion_heartbeat::symphony::DotMark;
 use galion_heartbeat::SAMPLE_RATE;
@@ -52,7 +52,15 @@ impl FrameSink for DotSink {
     fn on_heartbeat(&mut self, hb: &galion_heartbeat::FrameOut, you: &[f32], me: &[f32], me_voiced: bool, step_us: f32) {
         let hb = galion_heartbeat::FrameOut { index: hb.index + self.base, ..*hb };
         let snap = self.pump.pump(hb.index as u64, you, SAMPLE_RATE);
-        self.dc.frame_marked(&hb, you, me, me_voiced, &snap, step_us, self.mark);
+        self.dc.frame_marked(MarkedFrame {
+            out: &hb,
+            you_pcm: you,
+            me_pcm: me,
+            me_voiced,
+            snap: &snap,
+            step_us,
+            mark: self.mark,
+        });
     }
     fn finish(&mut self, s: &Summary) {
         self.base += s.frames;

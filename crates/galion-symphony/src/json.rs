@@ -71,7 +71,7 @@ pub fn parse(text: &str) -> Result<J> {
     Ok(v)
 }
 
-impl<'a> P<'a> {
+impl P<'_> {
     fn skip(&mut self) {
         while self.i < self.s.len() && self.s[self.i].is_ascii_whitespace() {
             self.i += 1;

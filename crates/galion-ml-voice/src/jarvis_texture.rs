@@ -693,10 +693,10 @@ mod tests {
     fn clean_speech(sample_rate: u32) -> Vec<f32> {
         let n = sample_rate as usize * 1440 / 1000;
         let mut x = vec![0.0f32; n];
-        for i in 0..n {
+        for (i, slot) in x.iter_mut().enumerate() {
             if in_phrase(i, sample_rate) {
                 let t = i as f32 / sample_rate as f32;
-                x[i] = speech_sample(t);
+                *slot = speech_sample(t);
             }
         }
         x
@@ -705,13 +705,13 @@ mod tests {
     fn hub_layer(sample_rate: u32) -> Vec<f32> {
         let n = sample_rate as usize * 1440 / 1000;
         let mut x = vec![0.0f32; n];
-        for i in 0..n {
+        for (i, slot) in x.iter_mut().enumerate() {
             let t = i as f32 / sample_rate as f32;
             if alarm_on(i, sample_rate) {
-                x[i] += 0.18 * (2.0 * core::f32::consts::PI * ALARM_HZ * t).sin();
+                *slot += 0.18 * (2.0 * core::f32::consts::PI * ALARM_HZ * t).sin();
             }
-            x[i] += 0.07 * (2.0 * core::f32::consts::PI * 90.0 * t).sin();
-            x[i] += 0.035 * (2.0 * core::f32::consts::PI * 180.0 * t).sin();
+            *slot += 0.07 * (2.0 * core::f32::consts::PI * 90.0 * t).sin();
+            *slot += 0.035 * (2.0 * core::f32::consts::PI * 180.0 * t).sin();
         }
         let step = sample_rate as usize * 80 / 1000;
         let mut i = step / 2;
@@ -755,9 +755,9 @@ mod tests {
         }
         for i in w..x.len() - w {
             let mut abs = Vec::with_capacity(w * 2);
-            for k in (i - w)..=(i + w) {
+            for (k, sample) in x.iter().enumerate().take(i + w + 1).skip(i - w) {
                 if k != i {
-                    abs.push(x[k].abs());
+                    abs.push(sample.abs());
                 }
             }
             abs.sort_by(|a, b| a.total_cmp(b));
