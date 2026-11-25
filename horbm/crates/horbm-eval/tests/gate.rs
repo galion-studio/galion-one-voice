@@ -20,6 +20,13 @@ fn embedded_thresholds_are_the_r4_gate() {
     assert_eq!(thresholds.latency.eager_to_voice_p95_max_ms, 240);
     assert_eq!(thresholds.latency.barge_in_max_ms, 200);
     assert!(!thresholds.latency.backchannel_cancels);
+    assert_eq!(thresholds.asr.wer_max, 0.02);
+    assert_eq!(thresholds.real.latency.clock, "wall");
+    assert_eq!(thresholds.real.latency.frame_ms, 80);
+    assert_eq!(thresholds.real.latency.eager_to_voice_p50_max_ms, 200);
+    assert_eq!(thresholds.real.latency.eager_to_voice_p95_max_ms, 240);
+    assert_eq!(thresholds.real.latency.barge_in_max_ms, 500);
+    assert!(!thresholds.real.latency.backchannel_cancels);
 }
 
 #[test]
@@ -30,6 +37,8 @@ fn a_set_research_dir_is_not_an_answer_source() {
     let report = horbm_eval::run_with(horbm_eval::Config {
         research_dir: Some("notes".into()),
         thresholds: Thresholds::embedded(),
+        mode: horbm_eval::Mode::Fake,
+        prosody: true,
     });
     assert!(!report.pass);
     assert_eq!(report.research_dir, "set");
@@ -60,4 +69,23 @@ fn the_binary_exits_zero() {
     assert!(output.status.success(), "{stdout}");
     assert!(stdout.contains("\"pass\": true"), "{stdout}");
     assert!(stdout.contains("\"research_dir\": \"unset\""), "{stdout}");
+    assert!(stdout.contains("\"mode\": \"fake\""), "{stdout}");
+}
+
+#[cfg(not(feature = "real"))]
+#[test]
+fn real_flag_without_the_feature_does_not_pretend() {
+    let exe = env!("CARGO_BIN_EXE_horbm-eval");
+    let output = std::process::Command::new(exe)
+        .arg("--real")
+        .output()
+        .expect("run horbm-eval --real");
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let both = format!("{stderr}{stdout}");
+    assert!(
+        both.contains("features real") || both.contains("not compiled"),
+        "{both}"
+    );
 }
