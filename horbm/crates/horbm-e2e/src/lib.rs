@@ -2,8 +2,10 @@
 // Copyright (c) 2026 Galion Labs
 //! One Linux smoke of Samantha's live loop.
 //!
-//! Ear, brain, emotion, mouth, and an in-process output buffer. There is no
-//! microphone and no speaker. The input WAV is written under the system temp
+//! Ear, brain, emotion, mouth, and an output sink. Playback is the in-process
+//! loopback unless this crate is built with `alsa` on Linux and a device
+//! opens. Voice activity is the energy gate unless this crate is built with
+//! `silero` and the official model loads. The input WAV is written under the system temp
 //! directory at run time and removed before the function returns. Nothing
 //! here dials a socket.
 //!
@@ -22,6 +24,7 @@ mod buffer;
 mod corpus;
 mod model;
 mod mouth;
+mod output;
 mod probe;
 mod recognizer;
 mod report;
@@ -29,6 +32,9 @@ mod run;
 mod stages;
 mod vad;
 mod wav;
+
+#[cfg(feature = "silero")]
+mod silero;
 
 pub use corpus::SENTENCES;
 pub use galion_emotion_core::{EmotionCore, IntentMsg, FRAME_MS as EMOTION_FRAME_MS};

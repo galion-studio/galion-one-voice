@@ -8,12 +8,25 @@
 
 [package]
 name = "horbm-e2e"
-description = "Samantha end-to-end duplex smoke. No mic, no speaker, no committed audio."
+description = "Samantha end-to-end duplex smoke. Loopback and energy by default. Optional Linux ALSA output and Silero VAD."
 version = "0.0.1"
 edition = "2021"
 license = "MIT"
 publish = false
 rust-version = "1.85"
+
+# `alsa` is the Linux cpal output. The dependency is Linux-only; other targets
+# keep the loopback buffer. `silero` loads the official ONNX at test time.
+# Neither feature is on by default.
+[features]
+default = []
+alsa = ["dep:galion-sam-audio-io"]
+silero = [
+    "dep:voice_activity_detector",
+    "dep:ort",
+    "dep:ureq",
+    "dep:cpu-time",
+]
 
 [dependencies]
 horbm = { path = "../horbm" }
@@ -25,3 +38,15 @@ galion-sam-asr = { path = "../../../voice-stack/asr" }
 galion-tts-piper = { path = "../../../voice-stack/tts-piper-stream" }
 galion-ml-voice = { path = "../../../crates/galion-ml-voice", default-features = false, features = ["speech"] }
 sha2 = "0.10.9"
+voice_activity_detector = { version = "=0.2.1", optional = true }
+# Defaults stay on because voice_activity_detector asks for them. The
+# workspace patch below swaps ort-sys's downloader from native-tls to rustls.
+ort = { version = "=2.0.0-rc.10", optional = true, default-features = false, features = ["std", "ndarray", "download-binaries", "copy-dylibs"] }
+ureq = { version = "2.12", optional = true, default-features = false, features = ["tls"] }
+cpu-time = { version = "1", optional = true }
+
+[patch.crates-io]
+ort-sys = { path = "vendor/ort-sys" }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+galion-sam-audio-io = { path = "../../../voice-stack/audio-io", optional = true }

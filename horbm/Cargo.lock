@@ -80,6 +80,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "biquad"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8dee8f423f64504139bdc53d7fbe6a1cd8eff4f354be3652e7cf26385c9f1cb4"
+dependencies = [
+ "num-traits",
+]
+
+[[package]]
 name = "bitflags"
 version = "1.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -373,6 +382,7 @@ dependencies = [
  "galion-cores",
  "galion-emotion",
  "galion-heartbeat",
+ "galion-source-filter",
  "galion-tensor",
 ]
 
@@ -418,6 +428,15 @@ name = "galion-sam-prosody"
 version = "0.0.1"
 dependencies = [
  "galion-emotion",
+]
+
+[[package]]
+name = "galion-source-filter"
+version = "0.1.0"
+dependencies = [
+ "biquad",
+ "galion-emotion-core",
+ "horbm-breath",
 ]
 
 [[package]]
@@ -722,6 +741,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "libm"
+version = "0.2.16"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b6d2cec3eae94f9f509c767b45932f1ada8350c4bdb85af2fcab4a3c14807981"
+
+[[package]]
 name = "libsqlite3-sys"
 version = "0.30.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -881,6 +906,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "071dfc062690e90b734c0b2273ce72ad0ffa95f0c74596bc250dcfd960262841"
 dependencies = [
  "autocfg",
+ "libm",
 ]
 
 [[package]]

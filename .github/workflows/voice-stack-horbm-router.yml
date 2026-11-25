@@ -2,8 +2,11 @@
 # Copyright (c) 2026 Galion Labs
 # Layer 5 router, the localhost research gateway, the duplex loop, and the
 # moment-to-mouth glue. Linux only. The synthetic tone is not a voice.
-# The end-to-end smoke may fetch the pinned Vosk small-en model into a
-# cache outside the checkout. A failed fetch leaves asr=stub.
+# The end-to-end smoke may fetch the pinned Vosk small-en model and the
+# Silero VAD ONNX (MIT, not a voice) into a cache outside the checkout.
+# A failed fetch leaves asr=stub. The Silero runtime is downloaded with
+# rustls, so this job does not install libssl-dev. g++ supplies libstdc++,
+# which that CPU build links.
 # The router tests do not download a model. The duplex gate keeps the
 # synthetic tone mouth. `--features piper` on horbm-duplex does not fetch a
 # pack; the stock-voice measurement skips when the cache is empty. The
@@ -25,6 +28,8 @@ jobs:
       - uses: dtolnay/rust-toolchain@1.85.0
         with:
           components: clippy
+      - name: ALSA headers
+        run: sudo apt-get update && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y libasound2-dev pkg-config libflite1 g++
       - name: cargo build
         run: |
           cargo build --manifest-path horbm/Cargo.toml -p horbm -p horbm-eval
@@ -54,5 +59,6 @@ jobs:
           cargo clippy --manifest-path horbm/Cargo.toml -p horbm-voice --all-targets --features piper -- -D warnings
           cargo clippy --manifest-path voice-stack/Cargo.toml -p galion-research-gateway -p galion-sam-horbm -p samantha-local-server --all-targets --no-deps -- -D warnings
           cargo clippy --manifest-path voice-stack/Cargo.toml -p galion-sam-horbm --all-targets --no-deps --features horbm -- -D warnings
+          cargo clippy --manifest-path voice-stack/audio-io/Cargo.toml --all-targets --no-deps -- -D warnings
       - name: HORBM end-to-end smoke
         run: bash scripts/horbm-e2e-smoke.sh
