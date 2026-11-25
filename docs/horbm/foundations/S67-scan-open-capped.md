@@ -1,0 +1,29 @@
+# S67 — Diary scan opens at SCAN_CAP
+
+Perpetual Open MIT License. (c) 2026 Galion Labs.
+
+| Field | Value |
+|---|---|
+| Swarm | HORBM S67, brain plan round 1, R1-A |
+| Written | 2026-11-25. No weight download, no voice audio, no paid API, no merge. |
+| Base | `main` `46d6bba0d7289ff6f7ff75a3bb45f01e58576de9` (PR #321) |
+| Spec | `docs/horbm/PLAN-brain.md` section R1-A, on `cursor/s66-horbm-brain-plan-4194` (PR #327, not merged) |
+| Gap | `DiaryScan::open` takes a caller-chosen `k`. The retrieval thread could pass a cap other than `SCAN_CAP`. |
+| This change | `horbm/crates/horbm-brain` and this note. No new dependency. |
+| Not edited | `horbm/crates/horbm`, `horbm/crates/horbm-inner`, `crates/horbm-ear`, `horbm/crates/horbm-persona`, `LOCKS.toml`, `SOUL.md`, `LEDGER.md`, workflows, root and horbm workspace manifests, `Cargo.lock`. `SOUL.md` is not in this tree. |
+
+## What it decides
+
+`DiaryScan::open_capped(keys, diary, remember)` calls the existing `DiaryScan::open` with `k` set to `SCAN_CAP` (4). That is the same number as `horbm::MEMORY_HIT_CAP`. The scratch built at setup is that length. A later query still writes into the caller's buffer through `scan_selected_into`, which is unchanged. After setup, a query does not allocate.
+
+`remember` is forwarded. `false` still matches `LOCKS.toml` `[consent] remember = "deny"` and leaves the diary out of the merge. `learn = "deny"` and `learn_in_band = false` are unchanged. Samantha stays the persona. No research card was added.
+
+The turn crate still calls `DiaryScan::open(..., SCAN_CAP)`. This swarm does not edit that call. Round 2 is the one that switches the thread onto `open_capped`.
+
+## Tests
+
+`open_capped_uses_scan_cap` builds a scan with `open_capped` and one with `open(..., SCAN_CAP)`. Both report `k() == SCAN_CAP`. The same query into a buffer longer than `SCAN_CAP` returns the same hits, and nothing past `SCAN_CAP` is written. `remember` false still stores deny and the same cap.
+
+`tests/scan_alloc.rs` is unchanged. It still opens with `DiaryScan::open` and checks that a query does not allocate.
+
+Nothing added here is Linux-only. The tests ran on Linux, rustc 1.85.
