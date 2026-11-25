@@ -30,7 +30,7 @@ pub use conv_stream::CausalConv1dStream;
 pub use conv_resample::{ConvTranspose1dStream, StridedConv1dStream};
 pub use dtype::{Bf16, DType};
 pub use error::{Result, TensorError};
-pub use features::SimdLevel;
+pub use features::{kernel_level, startup_line, Kernel, SimdLevel};
 pub use gemv::{gemv, gemv_f32_into, gemv_t_f32_into};
 pub use gemv_i8::{gemv_i8_f32x_into, gemv_i8_into, quantize_row_i8, QuantRowsI8};
 pub use kv::KvRing;
