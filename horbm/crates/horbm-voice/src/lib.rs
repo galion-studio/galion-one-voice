@@ -57,7 +57,7 @@ pub use device::{place, select_place, Place};
 pub use ear::{Ear, EarEvent, FakeEar};
 pub use energy::{EnergyEar, EnergyGate, GateEvent};
 pub use horbm::Pad;
-pub use lexicon::is_listed_backchannel;
+pub use lexicon::{is_listed_backchannel, listed_backchannels};
 pub use moment_voice::{
     aria_baseline, instant, is_aria, is_samantha, render_tone, samantha_baseline, shape_sentence,
     BreathPlace, MomentView, MomentVoice, Rendered, VoiceControls, AFFECT_TO_VOICE_FRAMES,
