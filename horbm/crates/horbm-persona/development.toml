@@ -3,3 +3,6 @@
 # Any schema-valid persona file with this id is bootable.
 # GALION_HORBM_DEV_PERSONA overrides this file. Blank is not configured.
 development_persona = "samantha"
+# Directory of <id>.toml files, relative to this file.
+# GALION_HORBM_PERSONA_DIR overrides it. Blank is not configured.
+persona_dir = "personas"

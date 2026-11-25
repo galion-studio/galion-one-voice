@@ -35,9 +35,6 @@ pub const TOKEN_BYTES: usize = 16;
 pub const BOUNDARY_BYTES: usize = 24;
 /// The spoken miss. The same sentence the turn already uses.
 pub const UNKNOWN_LINE: &str = "I don't know.";
-/// Bytes of the shipped `personas/samantha.toml` file. [`Persona::samantha`] parses them.
-/// Which id may boot is [`BootConfig`], not this constant.
-pub const SAMANTHA_TOML: &str = include_str!("../personas/samantha.toml");
 /// Heap allocations [`Persona::verdict`] and [`Persona::style`] may make.
 pub const TURN_ALLOC_BUDGET: usize = 0;
 
@@ -117,7 +114,8 @@ pub struct Persona {
 
 impl Persona {
     /// The emotion-core fixture: `VoiceBaseline::standin` and the seeded
-    /// inner life, plus the honesty rules. HORBM boot loads [`Self::samantha`].
+    /// inner life, plus the honesty rules. HORBM boot loads
+    /// [`Self::load_development`], not this fixture.
     pub const fn standin() -> Self {
         let base = VoiceBaseline::standin();
         let style = style::hook(0.5, 0.4, 2);
@@ -158,17 +156,49 @@ impl Persona {
         }
     }
 
-    /// Parse [`SAMANTHA_TOML`]. Development boot uses [`BootConfig`], not this name.
-    pub fn samantha() -> Result<Self, PersonaError> {
-        Self::parse(SAMANTHA_TOML)
-    }
-
     pub fn load(path: &std::path::Path) -> Result<Self, PersonaError> {
         load::load(path)
     }
 
     pub fn parse(text: &str) -> Result<Self, PersonaError> {
         load::parse(text)
+    }
+
+    /// `<dir>/<id>.toml`, where `id` is [`BootConfig::id`].
+    ///
+    /// The id inside the file must pass [`Self::is_configured_boot`].
+    /// A missing file is [`PersonaError::Unreadable`].
+    pub fn load_configured(dir: &std::path::Path, cfg: &BootConfig) -> Result<Self, PersonaError> {
+        let path = dir.join(cfg.id()).with_extension("toml");
+        let persona = Self::load(&path)?;
+        if persona.is_configured_boot(cfg) {
+            Ok(persona)
+        } else {
+            Err(PersonaError::Invalid(
+                "persona file id is not the configured id",
+            ))
+        }
+    }
+
+    /// Development persona for this process.
+    ///
+    /// [`BootConfig::ENV`] names the id when it is non-empty. Otherwise the
+    /// boot file does. Persona files are read from [`BootConfig::DIR`] when
+    /// that value is non-empty, otherwise from `persona_dir` in the boot
+    /// file, relative to that file. A blank id, a missing directory, or a
+    /// missing file is an error.
+    pub fn load_development() -> Result<Self, PersonaError> {
+        let env = std::env::var(BootConfig::ENV).ok();
+        if let Some(dir) = BootConfig::env_dir() {
+            let text = BootConfig::boot_text_near(&dir)?;
+            let cfg = BootConfig::resolve(env.as_deref(), text.as_deref())?;
+            return Self::load_configured(&dir, &cfg);
+        }
+        let toml_path = BootConfig::locate()?;
+        let text = std::fs::read_to_string(&toml_path).map_err(|_| PersonaError::Unreadable)?;
+        let dir = BootConfig::files_from_toml(&toml_path)?;
+        let cfg = BootConfig::resolve(env.as_deref(), Some(&text))?;
+        Self::load_configured(&dir, &cfg)
     }
 
     pub fn to_toml(&self) -> String {

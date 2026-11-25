@@ -64,8 +64,9 @@ fn fact(has_card: bool) -> MoveClaim<'static> {
 
 #[test]
 fn development_default_is_samantha() {
-    let shipped = Persona::samantha().unwrap();
-    let file = load_example("samantha.toml");
+    let cfg = BootConfig::shipped().unwrap();
+    let shipped = Persona::load_configured(&examples(), &cfg).unwrap();
+    let file = load_example(&format!("{}.toml", cfg.id()));
     assert_eq!(shipped, file);
     assert_eq!(shipped.id(), "samantha");
     let aria = load_example("aria.toml");
@@ -159,6 +160,135 @@ fn unset_boot_config_refuses() {
         BootConfig::resolve(Some(""), Some(file)).unwrap().id(),
         "maple"
     );
+}
+
+#[test]
+fn crate_directory_matches_the_shipped_boot_file() {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    assert_eq!(
+        BootConfig::from_dir(&root, None).unwrap(),
+        BootConfig::shipped().unwrap()
+    );
+    assert_eq!(
+        BootConfig::from_dir(&root, Some("")).unwrap(),
+        BootConfig::shipped().unwrap()
+    );
+    let cfg = BootConfig::from_dir(&root, None).unwrap();
+    let files = BootConfig::files_from_toml(&root.join("development.toml")).unwrap();
+    assert_eq!(files, examples());
+    let persona = Persona::load_configured(&files, &cfg).unwrap();
+    assert!(persona.is_configured_boot(&cfg));
+    assert_eq!(persona.id(), cfg.id());
+    assert_eq!(
+        BootConfig::resolve_root(None, Some(&root.join("development.toml"))).unwrap(),
+        examples()
+    );
+    let elsewhere = root.join("elsewhere");
+    assert_eq!(
+        BootConfig::resolve_root(Some(&elsewhere), Some(&root.join("development.toml"))).unwrap(),
+        elsewhere
+    );
+}
+
+#[test]
+fn a_directory_without_configuration_refuses() {
+    let unset = PersonaError::Invalid("development persona is not configured");
+    let root = std::env::temp_dir().join(format!(
+        "horbm-persona-boot-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos()
+    ));
+    std::fs::create_dir(&root).unwrap();
+    assert_eq!(BootConfig::from_dir(&root, None).unwrap_err(), unset);
+    assert_eq!(BootConfig::from_dir(&root, Some("  ")).unwrap_err(), unset);
+    std::fs::write(
+        root.join("development.toml"),
+        "development_persona = \"\"\n",
+    )
+    .unwrap();
+    assert_eq!(BootConfig::from_dir(&root, None).unwrap_err(), unset);
+    std::fs::write(
+        root.join("development.toml"),
+        "development_persona = \"cedar\"\n",
+    )
+    .unwrap();
+    assert_eq!(BootConfig::from_dir(&root, None).unwrap().id(), "cedar");
+    assert_eq!(
+        BootConfig::from_dir(&root, Some("maple")).unwrap().id(),
+        "maple"
+    );
+    let cfg = BootConfig::from_id("cedar").unwrap();
+    assert_eq!(
+        Persona::load_configured(&root, &cfg).unwrap_err(),
+        PersonaError::Unreadable
+    );
+    let personas = root.join("personas");
+    std::fs::create_dir(&personas).unwrap();
+    let mismatched = VALID.replace("id = \"sample\"", "id = \"maple\"");
+    std::fs::write(personas.join("cedar.toml"), mismatched).unwrap();
+    assert_eq!(
+        Persona::load_configured(&personas, &cfg).unwrap_err(),
+        PersonaError::Invalid("persona file id is not the configured id")
+    );
+    let matched = VALID
+        .replace("id = \"sample\"", "id = \"cedar\"")
+        .replace("voice = \"sample\"", "voice = \"cedar\"")
+        .replace("valence = 0.1", "valence = 0.0");
+    std::fs::write(personas.join("cedar.toml"), &matched).unwrap();
+    let loaded = Persona::load_configured(&personas, &cfg).unwrap();
+    assert!(loaded.is_configured_boot(&cfg));
+    assert_eq!(loaded.id(), "cedar");
+    assert_ne!(
+        loaded.baseline().identity_bits(),
+        Persona::load(&examples().join(format!("{}.toml", BootConfig::shipped().unwrap().id())))
+            .unwrap()
+            .baseline()
+            .identity_bits()
+    );
+    std::fs::write(
+        root.join("development.toml"),
+        "development_persona = \"cedar\"\npersona_dir = \"voices\"\n",
+    )
+    .unwrap();
+    let voices = root.join("voices");
+    std::fs::create_dir(&voices).unwrap();
+    assert_eq!(
+        BootConfig::files_from_toml(&root.join("development.toml")).unwrap(),
+        voices
+    );
+    std::fs::write(voices.join("cedar.toml"), &matched).unwrap();
+    let from_key = Persona::load_configured(&voices, &cfg).unwrap();
+    assert_eq!(from_key.id(), "cedar");
+    let abs = std::env::temp_dir();
+    std::fs::write(
+        root.join("development.toml"),
+        format!(
+            "development_persona = \"cedar\"\npersona_dir = \"{}\"\n",
+            abs.display()
+        ),
+    )
+    .unwrap();
+    assert_eq!(
+        BootConfig::files_from_toml(&root.join("development.toml")).unwrap_err(),
+        PersonaError::Invalid("persona directory must be a relative path")
+    );
+    std::fs::write(
+        root.join("development.toml"),
+        "development_persona = \"cedar\"\n",
+    )
+    .unwrap();
+    assert_eq!(
+        BootConfig::files_from_toml(&root.join("development.toml")).unwrap_err(),
+        PersonaError::Invalid("development persona directory is not configured")
+    );
+    assert_eq!(
+        BootConfig::resolve_root(None, None).unwrap_err(),
+        PersonaError::Invalid("development persona directory is not configured")
+    );
+    let _ = std::fs::remove_dir_all(&root);
 }
 
 #[test]

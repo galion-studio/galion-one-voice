@@ -48,10 +48,18 @@
 //! core. Neither call rewrites the empathy mood or the voice baseline.
 //! Learning a new care stays off while `LOCKS.toml` `[consent] learn` is deny.
 //!
-//! [`Brain::open`] and [`Brain::boot`] with no path load Samantha, the
-//! development persona. Aria stays in the repo and is not loaded. An explicit
-//! path replaces Samantha. An invalid file is refused. [`Brain::admit_move`]
-//! is the legal-move port. Layer 4 calls it with the chosen move.
+//! [`Brain::boot`], [`Brain::try_open`], and [`Brain::try_with_cards`] load
+//! the configured development persona. The id comes from
+//! `GALION_HORBM_DEV_PERSONA` when that value is non-empty, otherwise from
+//! `development.toml`. Persona files are read from `GALION_HORBM_PERSONA_DIR`
+//! when that value is non-empty, otherwise from the `persona_dir` key in
+//! `development.toml`, relative to that file. A missing directory, a blank
+//! id, or a missing file is an error and no brain is built. An explicit path
+//! passed to [`Brain::boot`] replaces that file. [`Brain::with_cards`] and
+//! [`Brain::open`] keep their existing signatures. They install the same
+//! persona when configuration is present, and the stand-in fixture when it
+//! is not. They do not panic. [`Brain::admit_move`] is the legal-move port.
+//! Layer 4 calls it with the chosen move.
 //!
 //! Layer 4 runs after that evidence is in hand and before the reply is split
 //! into clauses. It picks one move: answer, cite, ask, comfort, offer_topic,
