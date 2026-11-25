@@ -30,7 +30,7 @@ pub const PIPER_HZ: u32 = 22_050;
 const _: () = assert!(FRAME_MS == 80);
 const _: () = assert!(SAMPLE_RATE_HZ == 24_000);
 const _: () = assert!(FRAME_SAMPLES == 1_920);
-const _: () = assert!(FRAME_MS as u32 * FRAME_HZ_TENTHS == 10_000);
+const _: () = assert!(FRAME_MS * FRAME_HZ_TENTHS == 10_000);
 const _: () = assert!(BAR_US == 80_000);
 const _: () = assert!(STEP_BUDGET_US == 800);
 
@@ -74,14 +74,14 @@ pub fn resample_to_frame(src: &[i16], in_rate: u32, out: &mut [f32]) {
         return;
     }
     if in_rate == SAMPLE_RATE_HZ {
-        for i in 0..FRAME_SAMPLES {
+        for (i, slot) in out.iter_mut().enumerate() {
             let s = src.get(i).copied().unwrap_or(0);
-            out[i] = s as f32 / 32768.0;
+            *slot = s as f32 / 32768.0;
         }
         return;
     }
     let ratio = (in_rate as f64) / (SAMPLE_RATE_HZ as f64);
-    for i in 0..FRAME_SAMPLES {
+    for (i, slot) in out.iter_mut().enumerate() {
         let x = (i as f64) * ratio;
         let j = x.floor() as usize;
         let frac = (x - (j as f64)) as f32;
@@ -89,7 +89,7 @@ pub fn resample_to_frame(src: &[i16], in_rate: u32, out: &mut [f32]) {
         let b_s = src.get(j + 1).copied().unwrap_or(a_s);
         let a = i16_to_f(a_s);
         let b = i16_to_f(b_s);
-        out[i] = a + (b - a) * frac;
+        *slot = a + (b - a) * frac;
     }
 }
 
@@ -108,7 +108,7 @@ pub fn heartbeat_play_us(frame_arrived_us: u64, first_pcm_us: u64) -> u64 {
         return first_pcm_us;
     }
     let delta = frame_arrived_us - first_pcm_us;
-    let steps = (delta + BAR_US - 1) / BAR_US;
+    let steps = delta.div_ceil(BAR_US);
     first_pcm_us + steps * BAR_US
 }
 

@@ -226,6 +226,10 @@ fn prepend_child_lib(cmd: &mut Command, dir: &Path) {
         };
         cmd.env("PATH", joined);
     }
+    #[cfg(not(any(unix, windows)))]
+    {
+        let _ = (cmd, dir);
+    }
 }
 
 #[derive(Debug)]

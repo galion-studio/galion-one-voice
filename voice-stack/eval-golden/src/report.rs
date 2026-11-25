@@ -81,7 +81,7 @@ fn turn_json(turn: &TurnReport) -> J {
         ),
         (
             "notes",
-            J::Arr(turn.notes.iter().map(|n| J::str(n)).collect()),
+            J::Arr(turn.notes.iter().map(J::str).collect()),
         ),
         ("mood_arousal", J::Num(f64::from(turn.arousal))),
         ("mood_valence", J::Num(f64::from(turn.valence))),
@@ -108,7 +108,7 @@ fn trip_json(trip: &RoundTrip) -> J {
         ("asr_first_partial", check_json(&trip.asr_first_partial)),
         (
             "notes",
-            J::Arr(trip.notes.iter().map(|n| J::str(n)).collect()),
+            J::Arr(trip.notes.iter().map(J::str).collect()),
         ),
     ])
 }

@@ -505,7 +505,7 @@ impl Brain {
         };
         let reply = effective_reply(&gathered.spoke).to_string();
         let sources = gathered.spoke.sources.clone();
-        let decision = self.dialogue.decide(DecideIn {
+        let mut decision = self.dialogue.decide(DecideIn {
             heard,
             intent: self.meta.intent,
             reply: &reply,
@@ -515,6 +515,30 @@ impl Brain {
             dominance: self.meta.dominance,
             e: self.meta.e,
         });
+        if let Some(chosen) = decision.chosen {
+            let (spoken, spoken_sources) = match &decision.plan {
+                ReplyPlan::Keep => (reply.as_str(), sources.as_slice()),
+                ReplyPlan::Replace { reply, sources, .. } => (reply.as_str(), sources.as_slice()),
+            };
+            let claims_fact = matches!(chosen, Move::Answer | Move::Cite);
+            let verdict = self.admit_move(MoveClaim {
+                tag: chosen.as_str().as_bytes(),
+                claims_fact,
+                has_card: claims_fact && fact_backed(spoken, spoken_sources),
+                sympathy_script: sympathy_script(spoken),
+            });
+            if verdict == MoveVerdict::Forbid {
+                decision = Decision {
+                    chosen: Some(Move::Ask),
+                    plan: ReplyPlan::Replace {
+                        reply: UNKNOWN_REPLY.to_string(),
+                        sources: vec!["honest:unknown".to_string()],
+                        evidence: Vec::new(),
+                    },
+                    propensity: 0.4,
+                };
+            }
+        }
         if matches!(decision.plan(), ReplyPlan::Keep) {
             if let Some(gap) = gathered.gap {
                 self.gaps.push(gap);
@@ -824,6 +848,34 @@ fn meta_of(tick: &galion_sam_empathy::TickOut) -> MoodMeta {
         pause_ms: tick.prosody.speaking.pre_pause_ms,
         named: tick.named.map(|name| name.word()),
     }
+}
+
+fn fact_backed(reply: &str, sources: &[String]) -> bool {
+    let reply = reply.trim();
+    if reply.is_empty() || reply == UNKNOWN_REPLY {
+        return false;
+    }
+    sources.iter().any(|source| {
+        ["card:", "retrieve:", "fixture:", "research:"]
+            .iter()
+            .any(|prefix| source.starts_with(prefix) && source.len() > prefix.len())
+    })
+}
+
+fn sympathy_script(reply: &str) -> bool {
+    let trimmed = reply.trim().trim_end_matches(['.', '!', '?']).trim();
+    matches!(
+        trimmed.to_ascii_lowercase().as_str(),
+        "i hear you"
+            | "that sounds so hard"
+            | "i'm here for you no matter what"
+            | "i feel that in my soul"
+            | "that sounds hard"
+            | "i'm so sorry you're going through this"
+            | "let's slow down"
+            | "i know how you feel"
+            | "that must be so difficult"
+    )
 }
 
 fn elapsed_us(elapsed: std::time::Duration) -> u32 {

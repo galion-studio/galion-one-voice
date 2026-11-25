@@ -523,7 +523,18 @@ impl Drop for Session {
         self.stdin.take();
         let _ = self.child.kill();
         let _ = self.child.wait();
-        if let Io::Thread { joins, .. } = &mut self.io {
+        // `Poll` exists only on Linux, so a bare `if let Thread` is irrefutable elsewhere.
+        #[cfg(target_os = "linux")]
+        {
+            if let Io::Thread { joins, .. } = &mut self.io {
+                for h in joins.drain(..) {
+                    let _ = h.join();
+                }
+            }
+        }
+        #[cfg(not(target_os = "linux"))]
+        {
+            let Io::Thread { joins, .. } = &mut self.io;
             for h in joins.drain(..) {
                 let _ = h.join();
             }
@@ -686,6 +697,8 @@ fn maybe_affinity(cmd: &mut Command) {
 }
 
 /// `"6-7"`, `"7"`, `"0,2-3"` -> cpu list. `None` on any parse error.
+/// Affinity is applied on Linux. Tests still parse the list on every target.
+#[cfg(any(target_os = "linux", test))]
 pub(crate) fn parse_cpus(s: &str) -> Option<Vec<usize>> {
     let mut v = Vec::new();
     for part in s.split(',').map(str::trim).filter(|p| !p.is_empty()) {

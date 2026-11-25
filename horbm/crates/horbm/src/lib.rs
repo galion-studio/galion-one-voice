@@ -45,9 +45,9 @@
 //! [`Brain::open`] and [`Brain::boot`] with no path load Samantha, the
 //! development persona. Aria stays in the repo and is not loaded. An explicit
 //! path replaces Samantha. An invalid file is refused. [`Brain::admit_move`]
-//! is the legal-move port.
+//! is the legal-move port. Layer 4 calls it with the chosen move.
 //!
-//! Layer 4 runs after the gathered evidence and before the reply is split
+//! Layer 4 runs after that evidence is in hand and before the reply is split
 //! into clauses. It picks one move: answer, cite, ask, comfort, offer_topic,
 //! or stop. The heuristic is deterministic. An answer with no sourced card
 //! becomes ask, and the spoken miss stays [`UNKNOWN_REPLY`]. The truth root

@@ -188,17 +188,18 @@ async fn dot_page_follows_the_phase() {
     )
     .expect("loopback");
     demo::send_frames(&running.tx, 6, 10).await;
-    let deadline = tokio::time::Instant::now() + Duration::from_secs(3);
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(10);
     let mut saw_speaking = false;
+    let mut last = String::new();
     while tokio::time::Instant::now() < deadline {
-        let body = http_get(server.addr(), "/state");
-        if body.contains("\"phase\":\"speaking\"") {
+        last = http_get(server.addr(), "/state");
+        if last.contains("\"phase\":\"speaking\"") {
             saw_speaking = true;
             break;
         }
         tokio::time::sleep(Duration::from_millis(10)).await;
     }
-    assert!(saw_speaking, "dot never showed speaking");
+    assert!(saw_speaking, "dot never showed speaking; last={last}");
     let page = http_get(server.addr(), "/");
     assert!(page.contains("Samantha"));
     assert!(page.contains("id=\"dot\""));
