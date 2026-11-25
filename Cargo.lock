@@ -280,6 +280,7 @@ dependencies = [
  "galion-heartbeat",
  "galion-source-filter",
  "galion-tensor",
+ "libc",
 ]
 
 [[package]]
