@@ -11,13 +11,13 @@ use crate::plan::{plan_pauses, Plan};
 use crate::{
     depth_fraction, flow_of, group_limit_s, inhale_frames, loudness_db, loudness_gain,
     subglottal_pressure, BreathError, Drive, Frame, Pause, EXHALE_FRAMES, FRAME_S, NOISE_SEED,
-    OPEN_PRESSURE, PAUSE_CAP, SAMANTHA, VOLUME_FLOOR, VOLUME_SPAN,
+    OPEN_PRESSURE, PAUSE_CAP, VOLUME_FLOOR, VOLUME_SPAN,
 };
 
 const FLOOR_MARGIN: f32 = 0.02;
 const QUIET_STEP: f32 = 0.05;
 
-/// Lung volume and the open phrase. Samantha only.
+/// Lung volume and the open phrase. One body for every configured persona.
 pub struct Lungs {
     volume: f32,
     phase: BreathPhase,
@@ -43,21 +43,26 @@ pub struct Lungs {
 }
 
 impl Lungs {
-    /// Samantha. The only persona this layer speaks as.
+    /// Deprecated forward. Same body as [`Self::open`] for any configured id.
+    /// There is no `deprecated` attribute this round: the end-to-end runner
+    /// still calls this.
     #[must_use]
     pub fn samantha() -> Self {
-        Self::new()
+        Self::with_body()
     }
 
-    /// Refuse any id other than [`SAMANTHA`].
+    /// Any configured persona id. The body is the neutral constructor until a
+    /// persona file carries breath values. This does not read that file.
+    /// A blank or illegal token is [`BreathError::Persona`].
     pub fn open(persona_id: &str) -> Result<Self, BreathError> {
-        if persona_id != SAMANTHA {
+        if !configured_id(persona_id) {
             return Err(BreathError::Persona);
         }
-        Ok(Self::new())
+        Ok(Self::with_body())
     }
 
-    fn new() -> Self {
+    /// Neutral body. Same numbers for every persona this round.
+    fn with_body() -> Self {
         Self {
             volume: VOLUME_REST,
             phase: BreathPhase::Rest,
@@ -343,6 +348,18 @@ fn clamp01(x: f32) -> f32 {
     } else {
         VOLUME_REST
     }
+}
+
+/// Short token, the shape a configured persona id has: 1 to 16 bytes, a
+/// lowercase letter, then lowercase letters, digits, or hyphens.
+fn configured_id(id: &str) -> bool {
+    let id = id.trim();
+    let bytes = id.as_bytes();
+    (1..=16).contains(&bytes.len())
+        && bytes[0].is_ascii_lowercase()
+        && bytes[1..]
+            .iter()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || *c == b'-')
 }
 
 fn fingerprint(text: &str) -> u64 {

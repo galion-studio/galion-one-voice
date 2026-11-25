@@ -292,7 +292,7 @@ fn aria_is_parked_and_the_baseline_does_not_move() {
     let aria = aria_baseline();
     assert!(is_aria(&aria));
     assert!(!is_samantha(&aria));
-    let mut voice = MomentVoice::new(aria);
+    let mut voice = MomentVoice::for_persona(aria, true);
     let bits = voice.identity();
     let excited = moment_at(samantha_baseline(), 0.4, 0.5, 0.2, 0.3);
     let inhale = Breath {
@@ -457,22 +457,35 @@ fn inner_life_moves_the_moment_and_not_who_she_is() {
     );
     assert!(!controls.parked);
 
-    let mut parked = HorbmTurn::with_cards(NoCards);
-    parked.seat(aria_baseline());
-    let aria_bits = parked.brain().emotion().baseline().identity_bits();
-    parked.brain_mut().inner_nudge("what?", None).unwrap();
-    assert_eq!(parked.brain().inner().learned_count(), 0);
+    let mut seated = HorbmTurn::with_cards(NoCards);
+    seated.seat(aria_baseline());
+    let aria_bits = seated.brain().emotion().baseline().identity_bits();
+    seated.brain_mut().inner_nudge("what?", None).unwrap();
+    assert_eq!(seated.brain().inner().learned_count(), 0);
     assert_eq!(
-        parked.brain().emotion().baseline().identity_bits(),
+        seated.brain().emotion().baseline().identity_bits(),
         aria_bits
     );
-    let mut voice = VoiceLoop::new(FakeEar::script([]), FakeMouth::new(), parked);
+    let baseline = seated.brain().emotion().baseline();
+    let moment = seated.brain().emotion().moment();
+    let cue = seated.brain().conductor_cue();
+    let breath = Breath {
+        phase: cue.breath_phase,
+        volume: cue.lung_volume,
+        flow: cue.air_flow,
+    };
+    let expect = instant(baseline, moment, breath);
+    let mut voice = VoiceLoop::new(FakeEar::script([]), FakeMouth::new(), seated);
     let _ = voice.tick(&[]);
     let _ = voice.tick(&[]);
     let controls = voice.mouth().controls();
-    assert!(controls.parked);
-    assert!(controls.is_neutral_shape());
-    assert_eq!(controls.noise_scale, 0.0);
+    assert!(!controls.parked);
+    assert_eq!(controls.energy.to_bits(), expect.energy.to_bits());
+    assert_eq!(
+        controls.length_scale.to_bits(),
+        expect.length_scale.to_bits()
+    );
+    assert_eq!(controls.persona, aria_baseline().persona);
     assert_eq!(
         controls.pitch_centre_hz.to_bits(),
         aria_baseline().pitch_centre_hz.to_bits()
@@ -490,4 +503,261 @@ fn seating_does_not_rewrite_empathy() {
     assert_eq!(brain.mood_meta(), mood);
     assert_eq!(brain.emotion().baseline().persona_id(), "aria");
     assert_eq!(brain.inner().learned_count(), 0);
+}
+
+fn id_slot(id: &str) -> [u8; 16] {
+    let mut out = [0u8; 16];
+    let bytes = id.as_bytes();
+    let n = bytes.len().min(15);
+    out[..n].copy_from_slice(&bytes[..n]);
+    out
+}
+
+fn northwind_baseline() -> galion_emotion_core::VoiceBaseline {
+    let dev = samantha_baseline();
+    galion_emotion_core::VoiceBaseline {
+        persona: id_slot("northwind"),
+        voice: id_slot("northwind-e0"),
+        pos: dev.pos,
+        pitch_centre_hz: dev.pitch_centre_hz,
+    }
+}
+
+#[test]
+fn northwind_baseline_moves_its_voice() {
+    let base = northwind_baseline();
+    let moment = moment_at(base, 0.20, 0.25, 0.0, 0.10);
+    let controls = instant(base, moment, Breath::rest());
+    let rest = instant(base, MomentState::at(base.pos), Breath::rest());
+    assert!(!controls.parked);
+    assert!(controls.in_bounds());
+    assert_ne!(controls.length_scale.to_bits(), rest.length_scale.to_bits());
+    assert_ne!(controls.energy.to_bits(), rest.energy.to_bits());
+    assert_eq!(controls.persona, id_slot("northwind"));
+    assert_ne!(controls.persona, samantha_baseline().persona);
+
+    let dev = samantha_baseline();
+    let dev_controls = instant(dev, moment_at(dev, 0.20, 0.25, 0.0, 0.10), Breath::rest());
+    assert_eq!(
+        controls.length_scale.to_bits(),
+        dev_controls.length_scale.to_bits()
+    );
+    assert_eq!(controls.energy.to_bits(), dev_controls.energy.to_bits());
+    assert_eq!(controls.pitch_st.to_bits(), dev_controls.pitch_st.to_bits());
+    assert_eq!(
+        controls.noise_scale.to_bits(),
+        dev_controls.noise_scale.to_bits()
+    );
+    assert_eq!(
+        controls.pre_pause_ms.to_bits(),
+        dev_controls.pre_pause_ms.to_bits()
+    );
+}
+
+/// Bits of `instant` on the development baseline, taken from main before
+/// the map stopped gating on a persona id. A retune of the mouth changes
+/// these. No audio.
+#[test]
+fn dev_persona_controls_bit_identical() {
+    let base = samantha_baseline();
+    let rows = [
+        row(
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            Snap {
+                length: 0x3f80_0000,
+                noise: 0x3f2a_c083,
+                noise_w: 0x3f4c_cccd,
+                silence: 0x3e4c_cccd,
+                pitch: 0x0000_0000,
+                energy: 0x3f80_0000,
+                pause: 0x0000_0000,
+                rate: 0x3f80_0000,
+            },
+        ),
+        row(
+            0.20,
+            0.10,
+            -0.05,
+            0.0,
+            Snap {
+                length: 0x3f75_c28f,
+                noise: 0x3f34_fdf3,
+                noise_w: 0x3f54_7ae1,
+                silence: 0x3e33_3334,
+                pitch: 0x3f0a_3d70,
+                energy: 0x3f83_c0ec,
+                pause: 0x0000_0000,
+                rate: 0x3f85_5556,
+            },
+        ),
+        row(
+            0.30,
+            0.50,
+            0.10,
+            0.20,
+            Snap {
+                length: 0x3f4c_cccd,
+                noise: 0x3f54_fdf4,
+                noise_w: 0x3f73_3334,
+                silence: 0x3da3_d70a,
+                pitch: 0x3fca_3d71,
+                energy: 0x3f99_999a,
+                pause: 0x0000_0000,
+                rate: 0x3f99_999a,
+            },
+        ),
+        row(
+            0.0,
+            -0.30,
+            -0.10,
+            -0.10,
+            Snap {
+                length: 0x3f90_0000,
+                noise: 0x3f13_b646,
+                noise_w: 0x3f35_c290,
+                silence: 0x3e8c_cccd,
+                pitch: 0xbf28_f5c3,
+                energy: 0x3f55_844e,
+                pause: 0x4348_0000,
+                rate: 0x3f63_8e39,
+            },
+        ),
+        row(
+            0.0,
+            0.0,
+            0.0,
+            0.40,
+            Snap {
+                length: 0x3f7a_e148,
+                noise: 0x3f2a_c083,
+                noise_w: 0x3f4c_cccd,
+                silence: 0x3e4c_cccd,
+                pitch: 0x0000_0000,
+                energy: 0x3f82_8f5c,
+                pause: 0x0000_0000,
+                rate: 0x3f82_9cbc,
+            },
+        ),
+    ];
+    for (dv, da, dd, dapp, expect) in rows {
+        let moment = moment_at(base, dv, da, dd, dapp);
+        let controls = instant(base, moment, Breath::rest());
+        assert_eq!(controls.breath, BreathPlace::None);
+        assert_eq!(controls.breath_ms, 0);
+        assert_snap(&controls, &base, expect);
+        let landed = arrived(base, moment, Breath::rest());
+        assert_eq!(landed.breath, BreathPlace::None);
+        assert_eq!(landed.breath_ms, 0);
+        assert_snap(&landed, &base, expect);
+    }
+
+    let inhale = instant(
+        base,
+        MomentState::at(base.pos),
+        Breath {
+            phase: BreathPhase::Inhale,
+            volume: 0.8,
+            flow: 0.4,
+        },
+    );
+    assert_snap(
+        &inhale,
+        &base,
+        Snap {
+            length: 0x3f80_0000,
+            noise: 0x3f2a_c083,
+            noise_w: 0x3f4c_cccd,
+            silence: 0x3e4c_cccd,
+            pitch: 0x0000_0000,
+            energy: 0x3f80_0000,
+            pause: 0x0000_0000,
+            rate: 0x3f80_0000,
+        },
+    );
+    assert_eq!(inhale.breath, BreathPlace::Before);
+    assert_eq!(inhale.breath_ms, 80);
+
+    let exhale = instant(
+        base,
+        MomentState::at(base.pos),
+        Breath {
+            phase: BreathPhase::Exhale,
+            volume: 0.4,
+            flow: -0.3,
+        },
+    );
+    assert_eq!(exhale.length_scale.to_bits(), 0x3f80_0000);
+    assert_eq!(exhale.breath, BreathPlace::After);
+    assert_eq!(exhale.breath_ms, 80);
+    assert!(!exhale.parked);
+}
+
+#[test]
+fn parked_flag_gives_the_parked_packet() {
+    let base = northwind_baseline();
+    let mut voice = MomentVoice::for_persona(base, true);
+    let moment = moment_at(base, 0.40, 0.50, 0.20, 0.30);
+    let inhale = Breath {
+        phase: BreathPhase::Inhale,
+        volume: 0.9,
+        flow: 0.8,
+    };
+    let first = voice.tick(moment, inhale);
+    let second = voice.tick(moment, Breath::rest());
+    let packet = VoiceControls::unsteered();
+    assert!(first.parked && second.parked);
+    assert!(first.is_neutral_shape() && second.is_neutral_shape());
+    assert_eq!(first.noise_scale, 0.0);
+    assert_eq!(first.noise_w, 0.0);
+    assert_eq!(first.length_scale.to_bits(), packet.length_scale.to_bits());
+    assert_eq!(first.energy.to_bits(), packet.energy.to_bits());
+    assert_eq!(first.pitch_st.to_bits(), packet.pitch_st.to_bits());
+    assert_eq!(first.breath, BreathPlace::None);
+    assert_eq!(first.breath_ms, 0);
+    assert_eq!(first.persona, base.persona);
+    assert_eq!(first.voice, base.voice);
+    assert_eq!(
+        first.pitch_centre_hz.to_bits(),
+        base.pitch_centre_hz.to_bits()
+    );
+    assert_eq!(voice.baseline().identity_bits(), base.identity_bits());
+    assert_eq!(voice.baseline().pos, base.pos);
+    assert_eq!(first.length_scale.to_bits(), second.length_scale.to_bits());
+}
+
+#[derive(Clone, Copy)]
+struct Snap {
+    length: u32,
+    noise: u32,
+    noise_w: u32,
+    silence: u32,
+    pitch: u32,
+    energy: u32,
+    pause: u32,
+    rate: u32,
+}
+
+fn row(dv: f32, da: f32, dd: f32, dapp: f32, snap: Snap) -> (f32, f32, f32, f32, Snap) {
+    (dv, da, dd, dapp, snap)
+}
+
+fn assert_snap(controls: &VoiceControls, base: &galion_emotion_core::VoiceBaseline, expect: Snap) {
+    assert!(!controls.parked);
+    assert_eq!(controls.length_scale.to_bits(), expect.length);
+    assert_eq!(controls.noise_scale.to_bits(), expect.noise);
+    assert_eq!(controls.noise_w.to_bits(), expect.noise_w);
+    assert_eq!(controls.sentence_silence_s.to_bits(), expect.silence);
+    assert_eq!(controls.pitch_st.to_bits(), expect.pitch);
+    assert_eq!(controls.energy.to_bits(), expect.energy);
+    assert_eq!(controls.pre_pause_ms.to_bits(), expect.pause);
+    assert_eq!(controls.rate.to_bits(), expect.rate);
+    assert_eq!(controls.persona, base.persona);
+    assert_eq!(controls.voice, base.voice);
+    assert_eq!(
+        controls.pitch_centre_hz.to_bits(),
+        base.pitch_centre_hz.to_bits()
+    );
 }
