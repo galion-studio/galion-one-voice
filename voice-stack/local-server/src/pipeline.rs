@@ -18,6 +18,9 @@ use crate::reply::{may_speak_piper, Pad, ReplyEngine, UnlinkedBrain};
 pub(crate) enum FeedMsg {
     /// One speaker slice. Full slices are 80 ms. A short tail is kept.
     Slice(Vec<i16>),
+    /// One JSON text frame for the socket. The native mouth uses this for
+    /// the clause it is speaking. There is no PCM in the frame.
+    Text(String),
     End,
     Failed(String),
 }
@@ -91,6 +94,7 @@ impl TurnProduct {
         while let Some(msg) = rx.blocking_recv() {
             match msg {
                 FeedMsg::Slice(samples) => self.pcm.extend(samples),
+                FeedMsg::Text(line) => self.events.push(line),
                 FeedMsg::End => break,
                 FeedMsg::Failed(code) => {
                     self.events.push(error_json(&code));
@@ -407,6 +411,8 @@ mod tests {
                 prosody_energy: 1.0,
                 prosody_pitch_st: 0.0,
                 prosody_pause_ms: 0.0,
+                first_clause: String::new(),
+                rest: String::new(),
             })
         }
     }

@@ -236,6 +236,16 @@ pub fn turn_json(turn: &crate::reply::TurnOut) -> String {
     )
 }
 
+/// One spoken piece on the socket the dot page already shows.
+/// `reply` is `TurnOut.first_clause` or `TurnOut.rest`. There is no PCM.
+pub fn spoken_text_json(text: &str, mood: Pad) -> String {
+    format!(
+        "{{\"schema\":\"{SCHEMA}\",\"type\":\"turn\",\"reply\":\"{}\",\"intent\":null,\"arm\":null,\"propensity\":0,\"evidence\":[],\"sources\":[],\"violations\":0,\"lookup_us\":0,\"took_us\":0,\"mood\":{},\"empathy_e\":0,\"prosody\":{{\"rate\":1,\"energy\":1,\"pitch_st\":0,\"pause_ms\":0}}}}",
+        escape(text),
+        pad_json(mood)
+    )
+}
+
 fn json_or_null(raw: &str) -> String {
     let s = raw.trim();
     if s.is_empty() {

@@ -534,6 +534,8 @@ struct Pace {
     deadline: Option<Tick>,
     seq: u16,
     speaking: bool,
+    /// The native mouth sent clause text and no PCM.
+    captioned: bool,
     /// When the previous slice was handed to the writer. `None` until the first.
     last_sent: Option<Tick>,
     feed: Option<AudioFeed>,
@@ -547,6 +549,7 @@ impl Default for Pace {
             deadline: None,
             seq: 0,
             speaking: false,
+            captioned: false,
             last_sent: None,
             feed: None,
             rate: crate::audio::SPEAKER_RATE,
@@ -610,6 +613,7 @@ async fn stop_audio(
     pace.pending.clear();
     pace.deadline = None;
     pace.speaking = false;
+    pace.captioned = false;
     pace.last_sent = None;
     pace.feed = None;
     pipe.stop();
@@ -628,6 +632,7 @@ async fn emit_turn(
         pace.pending.clear();
         pace.deadline = None;
         pace.speaking = false;
+        pace.captioned = false;
         pace.last_sent = None;
         pace.feed = None;
         pace.rate = product.rate;
@@ -740,11 +745,16 @@ async fn on_feed(
 ) -> bool {
     match msg {
         Some(FeedMsg::Slice(samples)) => accept_slice(tx, pace, &samples).await,
+        Some(FeedMsg::Text(line)) => {
+            pace.captioned = true;
+            send_line(tx, line).await
+        }
         Some(FeedMsg::Failed(code)) => {
             pace.pending.clear();
             pace.deadline = None;
             pace.feed = None;
             pace.speaking = false;
+            pace.captioned = false;
             pace.last_sent = None;
             pipe.utterance_done();
             send_line(tx, error_json(&code)).await
@@ -753,8 +763,9 @@ async fn on_feed(
         Some(FeedMsg::End) | None => {
             pace.feed = None;
             if pace.pending.is_empty() && pace.deadline.is_none() {
-                let was = pace.speaking;
+                let was = pace.speaking || pace.captioned;
                 pace.speaking = false;
+                pace.captioned = false;
                 pace.last_sent = None;
                 pipe.utterance_done();
                 if was {

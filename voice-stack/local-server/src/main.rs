@@ -33,7 +33,8 @@ fn real_main() -> Result<(), String> {
                      GALION_SAMANTHA_REF is reported as set, missing, or unset.\n\
                      Turns run through horbm-voice. brain=horbm and mouth_device=cpu unless cuda is explicit.\n\
                      The CPU mouth is Piper LJ Speech only when this binary was built with --features piper.\n\
-                     Otherwise the CPU mouth is an in-process tone. The s711 mouth reads the wav only when\n\
+                     Otherwise the CPU mouth is an in-process tone. GALION_MOUTH=native speaks the turn\n\
+                     text on this socket and returns no PCM. The s711 mouth reads the wav only when\n\
                      GALION_SAMANTHA_WEIGHTS is a local directory and GALION_SAMANTHA_DEVICE=cuda."
                 );
                 return Ok(());

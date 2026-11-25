@@ -49,6 +49,8 @@ impl ReplyEngine for Fixed {
             prosody_energy: 1.0,
             prosody_pitch_st: 0.0,
             prosody_pause_ms: 0.0,
+            first_clause: String::new(),
+            rest: String::new(),
         })
     }
 }
