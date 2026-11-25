@@ -122,23 +122,80 @@ fn nonempty(value: Option<&str>) -> Option<&str> {
 
 /// Path from the environment when it names a file. Does not open the file.
 ///
-/// Logs one warning to stderr when [`SAMANTHA_REF_ENV`] is the fallback or
-/// when both names are set and differ. [`VOICE_REF_ENV`] wins.
+/// [`VOICE_REF_ENV`] wins. A repeated call with the same variable values
+/// returns the remembered path and does not stat again. The one fallback
+/// warning is written off this thread, so a turn does not take the stderr lock.
 pub fn voice_ref_from_env() -> Option<std::path::PathBuf> {
     let new_raw = nonempty_os(VOICE_REF_ENV);
     let old_raw = nonempty_os(SAMANTHA_REF_ENV);
+    if let Some(path) = remembered(&new_raw, &old_raw) {
+        return path;
+    }
     let (value, warning) = match (&new_raw, &old_raw) {
         (None, None) => (None, None),
-        (Some(value), None) => (Some(value), None),
-        (None, Some(value)) => (Some(value), Some(FALLBACK_WARNING)),
-        (Some(value), Some(old)) if value == old => (Some(value), None),
-        (Some(value), Some(_)) => (Some(value), Some(DIFFER_WARNING)),
+        (Some(value), None) => (Some(value.as_os_str()), None),
+        (None, Some(value)) => (Some(value.as_os_str()), Some(FALLBACK_WARNING)),
+        (Some(value), Some(old)) if value == old => (Some(value.as_os_str()), None),
+        (Some(value), Some(_)) => (Some(value.as_os_str()), Some(DIFFER_WARNING)),
     };
     if let Some(warning) = warning {
-        eprintln!("{warning}");
+        warn_once(warning);
     }
-    let path = std::path::PathBuf::from(value?.as_os_str());
-    path.is_file().then_some(path)
+    let path = value.and_then(|raw| {
+        let path = std::path::PathBuf::from(raw);
+        path.is_file().then_some(path)
+    });
+    remember(new_raw, old_raw, path.clone());
+    path
+}
+
+struct RememberedRef {
+    new_name: Option<std::ffi::OsString>,
+    old_name: Option<std::ffi::OsString>,
+    path: Option<std::path::PathBuf>,
+}
+
+fn remembered(
+    new_name: &Option<std::ffi::OsString>,
+    old_name: &Option<std::ffi::OsString>,
+) -> Option<Option<std::path::PathBuf>> {
+    let guard = ref_cache().lock().unwrap_or_else(|err| err.into_inner());
+    let seen = guard.as_ref()?;
+    if &seen.new_name == new_name && &seen.old_name == old_name {
+        Some(seen.path.clone())
+    } else {
+        None
+    }
+}
+
+fn remember(
+    new_name: Option<std::ffi::OsString>,
+    old_name: Option<std::ffi::OsString>,
+    path: Option<std::path::PathBuf>,
+) {
+    let mut guard = ref_cache().lock().unwrap_or_else(|err| err.into_inner());
+    *guard = Some(RememberedRef {
+        new_name,
+        old_name,
+        path,
+    });
+}
+
+fn ref_cache() -> &'static std::sync::Mutex<Option<RememberedRef>> {
+    static CACHE: std::sync::Mutex<Option<RememberedRef>> = std::sync::Mutex::new(None);
+    &CACHE
+}
+
+fn warn_once(line: &'static str) {
+    static WARNED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+    if WARNED.swap(true, std::sync::atomic::Ordering::Relaxed) {
+        return;
+    }
+    let _ = std::thread::Builder::new()
+        .name("voice-ref-warn".into())
+        .spawn(move || {
+            eprintln!("{line}");
+        });
 }
 
 fn nonempty_os(key: &str) -> Option<std::ffi::OsString> {
