@@ -24,3 +24,6 @@ serde_json = "1"
 sha2 = "0.10"
 # In-memory BM25 for dialogue style examples. Apache-2.0. Not the truth index.
 tantivy = "0.22"
+
+[dev-dependencies]
+horbm-brain = { path = "../horbm-brain" }

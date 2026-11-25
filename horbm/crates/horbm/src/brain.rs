@@ -1346,6 +1346,7 @@ mod tests {
             remember: true,
             knowledge_dir: Some(scratch.clone()),
             fixture_rows: 1_000,
+            keys_path: None,
         })
         .unwrap();
         let mut brain = Brain::with_cards(EmptyCards, None).with_retrieval(thread);
@@ -1374,6 +1375,7 @@ mod tests {
             remember: true,
             knowledge_dir: None,
             fixture_rows: 1_000,
+            keys_path: None,
         })
         .unwrap();
         let mut brain = Brain::with_cards(
@@ -1403,6 +1405,7 @@ mod tests {
             remember: false,
             knowledge_dir: Some(scratch.clone()),
             fixture_rows: 1_000,
+            keys_path: None,
         })
         .unwrap();
         let mut brain = Brain::with_cards(EmptyCards, None).with_retrieval(thread);
@@ -1425,6 +1428,7 @@ mod tests {
             remember: false,
             knowledge_dir: None,
             fixture_rows: 0,
+            keys_path: None,
         })
         .unwrap();
         struct Stove;
@@ -1448,5 +1452,114 @@ mod tests {
             brain.retrieval_cell().unwrap().state,
             crate::CellState::Idle
         );
+    }
+
+    fn bowl_card() -> String {
+        r#"{
+  "id": "bowl",
+  "title": "The blue bowl is in the cupboard.",
+  "section": "horbm",
+  "category": "fixture",
+  "summary": "The blue bowl is in the cupboard.",
+  "body": "The blue bowl is in the cupboard.",
+  "claim_type": "fact",
+  "sources": [],
+  "evidence_strength": "strong",
+  "said_by": "horbm",
+  "as_of_date": "2026-11-25",
+  "status": "draft",
+  "contested_views": [],
+  "related": []
+}
+"#
+        .to_string()
+    }
+
+    fn bowl_dirs() -> (std::path::PathBuf, std::path::PathBuf) {
+        let root = scratch_dir("bowl");
+        let cards = root.join("cards");
+        std::fs::create_dir(&cards).unwrap();
+        std::fs::write(cards.join("bowl.json"), bowl_card()).unwrap();
+        let mut lane = [0i8; 8];
+        horbm_brain::encode_query_into("where is the blue bowl", &mut lane);
+        let pack = horbm_brain::StoredPack {
+            k: 8,
+            keys: lane.to_vec(),
+            clause_id: vec![1],
+            allow: vec![true],
+            source: vec![1],
+            item_id: vec!["bowl".to_string()],
+            scale: vec![1],
+        };
+        let keys = root.join("keys.hkb");
+        pack.write(&keys).unwrap();
+        (cards, keys)
+    }
+
+    /// The scan is the turn's retrieval. A fixture built in the test scores.
+    /// A query that covers nothing stays the persona miss.
+    #[test]
+    fn a_scanned_turn_speaks_the_fixture_and_a_miss_stays_i_dont_know() {
+        let (cards, keys) = bowl_dirs();
+        let thread = crate::RetrievalThread::spawn(crate::RetrievalConfig {
+            remember: true,
+            knowledge_dir: Some(cards.clone()),
+            fixture_rows: 0,
+            keys_path: Some(keys.clone()),
+        })
+        .unwrap();
+        let mut brain = Brain::with_cards(EmptyCards, None).with_retrieval(thread);
+        let out = brain.turn("where is the blue bowl");
+        let cell = brain.retrieval_cell().unwrap();
+        assert_eq!(cell.state, crate::CellState::Hits);
+        assert!(cell.answer.is_empty(), "{}", cell.answer);
+        assert!(
+            cell.hits
+                .iter()
+                .any(|hit| hit.item_id == "bowl" && hit.pool == crate::HitPool::Memory),
+            "{:?}",
+            cell.hits
+        );
+        assert!(
+            cell.hits
+                .iter()
+                .any(|hit| hit.item_id == "bowl" && hit.pool == crate::HitPool::Knowledge),
+            "{:?}",
+            cell.hits
+        );
+        assert_eq!(out.reply, "The blue bowl is in the cupboard.");
+        assert_eq!(out.sources, vec!["retrieve:bowl".to_string()]);
+        assert!(out.first_clause.split_whitespace().count() <= 2);
+
+        let missed = brain.turn("zzznomatchtoken");
+        assert_eq!(missed.reply, "I don't know.");
+        assert_eq!(missed.sources, vec!["honest:unknown".to_string()]);
+        let miss = brain.retrieval_cell().unwrap();
+        assert_eq!(miss.state, crate::CellState::Miss);
+        assert!(miss.hits.is_empty());
+        assert_eq!(miss.answer, "I don't know.");
+        let _ = std::fs::remove_dir_all(cards.parent().unwrap());
+    }
+
+    /// `remember` denied does not open the diary or the key file.
+    #[test]
+    fn a_denied_turn_does_not_speak_the_scanned_diary() {
+        let (cards, keys) = bowl_dirs();
+        let thread = crate::RetrievalThread::spawn(crate::RetrievalConfig {
+            remember: false,
+            knowledge_dir: Some(cards.clone()),
+            fixture_rows: 0,
+            keys_path: Some(keys),
+        })
+        .unwrap();
+        let mut brain = Brain::with_cards(EmptyCards, None).with_retrieval(thread);
+        let out = brain.turn("where is the blue bowl");
+        assert_ne!(out.reply, "The blue bowl is in the cupboard.");
+        assert_eq!(out.reply, "I don't know.");
+        let cell = brain.retrieval_cell().unwrap();
+        assert_eq!(cell.state, crate::CellState::Idle);
+        assert!(cell.is_empty());
+        assert!(cell.hits.iter().all(|hit| hit.item_id != "bowl"));
+        let _ = std::fs::remove_dir_all(cards.parent().unwrap());
     }
 }

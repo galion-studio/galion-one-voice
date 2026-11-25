@@ -66,9 +66,12 @@
 //! consent is granted. Callbacks are stored only when remember is granted.
 //!
 //! [`RetrievalThread`] links `horbm-memory` in-process, off the heartbeat
-//! thread. Do not call [`Brain::turn`] from `Heartbeat::step`: the turn waits
-//! for the cell. [`Int8Scorer`] is implemented for the mapped key arena and
-//! is not called by the retrieval thread.
+//! thread, and scores a granted ask with [`horbm_brain::DiaryScan`]. The
+//! scan is built when the consent grant opens the store and dropped when
+//! the grant falls. `remember` denied does not open it. Do not call
+//! [`Brain::turn`] from `Heartbeat::step`: the turn waits for the cell.
+//! [`Int8Scorer`] is implemented for the mapped key arena and is not called
+//! by the retrieval thread.
 //!
 //! [`Brain::samantha`] is the slower layer: care, curiosity, help, and
 //! expect. [`Brain::turn`] lets that layer bias the pace and, when the act

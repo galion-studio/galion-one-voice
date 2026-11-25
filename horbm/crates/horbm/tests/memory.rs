@@ -390,6 +390,7 @@ fn person_memory_is_a_different_file_from_truth_cards() {
         remember: true,
         knowledge_dir: Some(cards),
         fixture_rows: 0,
+        keys_path: None,
     })
     .expect("thread");
     thread.ask_wait("favourite colour blue", 1, 1).expect("ask");
