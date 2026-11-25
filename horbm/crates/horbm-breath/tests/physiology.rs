@@ -28,12 +28,35 @@ fn long_reply() -> String {
 }
 
 #[test]
-fn only_samantha_opens() {
-    assert!(Lungs::open(SAMANTHA).is_ok());
-    assert!(matches!(Lungs::open("aria"), Err(BreathError::Persona)));
+fn lungs_open_accepts_any_configured_id() {
+    let named = Lungs::samantha();
+    let dev = Lungs::open(SAMANTHA).expect("development id");
+    let aria = Lungs::open("aria").expect("aria");
+    let north = Lungs::open("northwind").expect("northwind");
+    let hyphen = Lungs::open("north-wind").expect("hyphen");
+    assert_eq!(named.volume(), dev.volume());
+    assert_eq!(dev.volume(), aria.volume());
+    assert_eq!(aria.volume(), north.volume());
+    assert_eq!(north.volume(), hyphen.volume());
     assert!(matches!(Lungs::open("Samantha"), Err(BreathError::Persona)));
     assert!(matches!(Lungs::open(""), Err(BreathError::Persona)));
-    let _ = Lungs::samantha();
+    assert!(matches!(Lungs::open("  "), Err(BreathError::Persona)));
+    assert!(matches!(Lungs::open("9lives"), Err(BreathError::Persona)));
+    assert!(matches!(
+        Lungs::open("this-name-is-too-long"),
+        Err(BreathError::Persona)
+    ));
+
+    let drive = Drive::rest();
+    let mut from_forward = Lungs::samantha();
+    let mut from_id = Lungs::open("northwind").expect("northwind");
+    for i in 0..6 {
+        let speaking = i % 2 == 0;
+        assert_eq!(
+            from_forward.tick(drive, speaking),
+            from_id.tick(drive, speaking)
+        );
+    }
 }
 
 #[test]

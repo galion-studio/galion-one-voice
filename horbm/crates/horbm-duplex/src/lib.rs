@@ -3,9 +3,9 @@
 //! Closed full-duplex loop for HORBM.
 //!
 //! One call to [`Duplex::tick`] is one 80 ms frame at 16 kHz. The you band
-//! and the me band are both stepped on that call. Samantha can be speaking
-//! while a new frame is still recognized. A listed backchannel does not
-//! cancel her. Any other overlap stops the me band on the frame that starts
+//! and the me band are both stepped on that call. The configured persona can
+//! be speaking while a new frame is still recognized. A listed backchannel
+//! does not cancel that turn. Any other overlap stops the me band on the frame that starts
 //! at 160 ms, inside the 200 ms lock.
 //!
 //! The brain is [`horbm::Brain`]. The floor is [`galion_conductor::Conductor`].
@@ -51,7 +51,7 @@ pub use horbm_voice::{FRAME_MS, FRAME_SAMPLES, SAMPLE_RATE};
 pub use live::FramePump;
 pub use mouth::NativeMouth;
 pub use persona::{
-    open_persona, SamanthaPersona, ARIA_ACTIVE, ARIA_ID, SAMANTHA_BREVITY, SAMANTHA_SENTENCES,
+    open_persona, ConfiguredPersona, SamanthaPersona, SAMANTHA_BREVITY, SAMANTHA_SENTENCES,
     SAMANTHA_WARMTH,
 };
 #[cfg(feature = "piper")]

@@ -17,7 +17,7 @@ use crate::brain::BrainHandle;
 use crate::echo::PlaybackEcho;
 use crate::ports::{
     Affect, Breath, BreathCue, EarSense, Emotion, Hypothesis, Persona, ProsodyCue, Recognizer,
-    Style, DEV_PERSONA,
+    Style,
 };
 use crate::prosody::ProsodyEar;
 use crate::report::LatencyReport;
@@ -40,7 +40,7 @@ pub enum LoopEvent {
     Committed,
     FirstAudio,
     Backchannel,
-    /// Samantha nodded while the user kept the floor. Not a barge-in.
+    /// A backchannel while the user kept the floor. Not a barge-in.
     ListenBackchannel,
     BargeIn,
     TurnResumed,
@@ -131,7 +131,7 @@ pub struct Duplex<R, E, B, P, M> {
     last_cue: ProsodyCue,
     echo: PlaybackEcho,
     report: LatencyReport,
-    /// Samantha's ramp onto the moment. None until the emotion port has a view.
+    /// Ramp onto the moment. None until the emotion port has a view.
     moment: Option<MomentVoice>,
 }
 
@@ -143,14 +143,14 @@ where
     P: Persona,
     M: Mouth,
 {
-    /// Samantha, a local brain, and an offline side band.
+    /// The configured persona, a local brain, and an offline side band.
     ///
     /// `cards` is the only lookup. Nothing is downloaded and nothing is dialed.
     pub fn new(
         parts: Parts<R, E, B, P, M>,
         cards: impl horbm::CardLookup + Send + 'static,
     ) -> Result<Self, LoopError> {
-        let style = accept_samantha(&parts.persona)?;
+        let style = accept_configured(&parts.persona)?;
         let brain = BrainHandle::with_cards(cards);
         let conductor = Conductor::with_reaction(brain.clone(), ReactionKind::Silence);
         Ok(Self {
@@ -543,10 +543,12 @@ struct Pulled {
     first: bool,
 }
 
-fn accept_samantha(persona: &impl Persona) -> Result<Style, LoopError> {
-    if persona.id() != DEV_PERSONA || persona.voice() != DEV_PERSONA {
+fn accept_configured(persona: &impl Persona) -> Result<Style, LoopError> {
+    let configured = horbm::Persona::load_development()
+        .map_err(|_| LoopError::Persona("the configured persona is not loaded"))?;
+    if persona.id() != configured.id() || persona.voice() != configured.voice() {
         return Err(LoopError::Persona(
-            "dev phase speaks as samantha and with the samantha voice",
+            "the loop speaks as the configured persona and with that voice",
         ));
     }
     if persona.unknown_line() != UNKNOWN_REPLY {

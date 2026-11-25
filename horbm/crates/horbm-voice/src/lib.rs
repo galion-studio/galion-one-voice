@@ -17,9 +17,9 @@
 //! the token only when that feature is on. `GALION_BACKCHANNEL=0|off` closes
 //! the nod. A denied ear (`PauseOnly`) does not nod.
 //!
-//! Before the ear, one 80 ms moment is mapped onto the mouth. Samantha's
-//! baseline stays put. Aria is parked. A new feeling is on the voice two
-//! frames later.
+//! Before the ear, one 80 ms moment is mapped onto the mouth. The baseline
+//! the brain installed stays put. A parked seat keeps the unsteered packet.
+//! A new feeling is on the voice two frames later.
 //!
 //! # Safety
 //!
