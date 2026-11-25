@@ -2,10 +2,13 @@
 // Copyright (c) 2026 Galion Labs
 //! Acoustic echo removal in front of the ear.
 //!
-//! The canceller is `fdaf_aec::FdafAec` (crate `fdaf-aec` 0.1.0, MIT),
-//! used as published. This module only slices the 80 ms duplex frame into
-//! that crate's blocks, keeps the mouth frame from the previous tick as
-//! the far-end reference, and can pass the microphone through unchanged.
+//! The canceller is the published `fdaf-aec` 0.1.0 overlap-save NLMS
+//! (MIT), run here on buffers that live for the whole call.
+//! `FdafAec::process` builds a new scratch `Vec` on every FFT, and that
+//! steady-path churn is what grows the resident set. This module slices
+//! the 80 ms duplex frame into the same 256-sample blocks, keeps the
+//! mouth frame from the previous tick as the far-end reference, and can
+//! pass the microphone through unchanged.
 //!
 //! The reference is one clock behind the microphone. The live loop plays
 //! a mouth frame at the end of a tick, and the next captured frame is what
@@ -47,7 +50,7 @@ pub struct PlaybackEcho {
     #[cfg(feature = "aec")]
     mic_buf: Vec<f32>,
     #[cfg(feature = "aec")]
-    inner: fdaf_aec::FdafAec,
+    inner: InPlaceAec,
 }
 
 impl Default for PlaybackEcho {
@@ -68,7 +71,7 @@ impl PlaybackEcho {
             #[cfg(feature = "aec")]
             mic_buf: vec![0.0; BLOCK],
             #[cfg(feature = "aec")]
-            inner: fdaf_aec::FdafAec::new(FFT_SIZE, STEP),
+            inner: InPlaceAec::new(STEP),
         }
     }
 
@@ -93,19 +96,36 @@ impl PlaybackEcho {
     /// The far end is whatever [`Self::note_playback`] stored on the
     /// previous tick. A disabled filter returns the same samples.
     pub fn cancel(&mut self, mic: &[i16]) -> Result<Vec<i16>, LoopError> {
-        if mic.len() != FRAME_SAMPLES {
+        let mut out = vec![0i16; FRAME_SAMPLES];
+        self.cancel_into(mic, &mut out)?;
+        Ok(out)
+    }
+
+    /// Same as [`Self::cancel`], writing into `out`.
+    ///
+    /// `out` must already be one frame. This does not allocate that frame.
+    /// Echo removal writes into buffers stored on this filter.
+    pub fn cancel_into(&mut self, mic: &[i16], out: &mut [i16]) -> Result<(), LoopError> {
+        if mic.len() != FRAME_SAMPLES || out.len() != FRAME_SAMPLES {
+            let got = if mic.len() != FRAME_SAMPLES {
+                mic.len()
+            } else {
+                out.len()
+            };
             return Err(LoopError::Frame {
-                got: mic.len(),
+                got,
                 expected: FRAME_SAMPLES,
             });
         }
         if self.enabled() {
             #[cfg(feature = "aec")]
             {
-                return Ok(self.filter(mic));
+                self.filter_into(mic, out);
+                return Ok(());
             }
         }
-        Ok(mic.to_vec())
+        out.copy_from_slice(mic);
+        Ok(())
     }
 
     /// Far-end frame that pairs with the next microphone frame.
@@ -140,8 +160,7 @@ impl PlaybackEcho {
     }
 
     #[cfg(feature = "aec")]
-    fn filter(&mut self, mic: &[i16]) -> Vec<i16> {
-        let mut out = vec![0i16; FRAME_SAMPLES];
+    fn filter_into(&mut self, mic: &[i16], out: &mut [i16]) {
         let mut offset = 0;
         while offset < FRAME_SAMPLES {
             for index in 0..BLOCK {
@@ -149,13 +168,121 @@ impl PlaybackEcho {
                 self.far_buf[index] = f32::from(self.queued[sample]) / 32768.0;
                 self.mic_buf[index] = f32::from(mic[sample]) / 32768.0;
             }
-            let cleaned = self.inner.process(&self.far_buf, &self.mic_buf);
+            let cleaned = self.inner.process_block(&self.far_buf, &self.mic_buf);
             for (index, sample) in cleaned.iter().enumerate() {
                 out[offset + index] = unit_to_pcm(*sample);
             }
             offset += BLOCK;
         }
-        out
+    }
+}
+
+/// `fdaf-aec` 0.1.0 `FdafAec::process`, with the FFT scratch and the
+/// block vectors stored on the struct. `Fft::process` allocates that
+/// scratch on every call; `process_with_scratch` does not.
+#[cfg(feature = "aec")]
+struct InPlaceAec {
+    fft: std::sync::Arc<dyn rustfft::Fft<f32>>,
+    ifft: std::sync::Arc<dyn rustfft::Fft<f32>>,
+    scratch: Vec<num_complex::Complex<f32>>,
+    weights: Vec<num_complex::Complex<f32>>,
+    far: Vec<f32>,
+    psd: Vec<f32>,
+    x: Vec<num_complex::Complex<f32>>,
+    y: Vec<num_complex::Complex<f32>>,
+    e: Vec<num_complex::Complex<f32>>,
+    error: Vec<f32>,
+    mu: f32,
+}
+
+#[cfg(feature = "aec")]
+impl InPlaceAec {
+    fn new(step: f32) -> Self {
+        let mut planner = rustfft::FftPlanner::<f32>::new();
+        let fft = planner.plan_fft_forward(FFT_SIZE);
+        let ifft = planner.plan_fft_inverse(FFT_SIZE);
+        let scratch_len = fft
+            .get_inplace_scratch_len()
+            .max(ifft.get_inplace_scratch_len());
+        let zero = num_complex::Complex::new(0.0, 0.0);
+        Self {
+            fft,
+            ifft,
+            scratch: vec![zero; scratch_len],
+            weights: vec![zero; FFT_SIZE],
+            far: vec![0.0; FFT_SIZE],
+            psd: vec![1.0; FFT_SIZE],
+            x: vec![zero; FFT_SIZE],
+            y: vec![zero; FFT_SIZE],
+            e: vec![zero; FFT_SIZE],
+            error: vec![0.0; BLOCK],
+            mu: step,
+        }
+    }
+
+    fn process_block(&mut self, far_end: &[f32], mic: &[f32]) -> &[f32] {
+        self.far.copy_within(BLOCK.., 0);
+        self.far[BLOCK..].copy_from_slice(far_end);
+        for (slot, sample) in self.x.iter_mut().zip(self.far.iter()) {
+            *slot = num_complex::Complex::new(*sample, 0.0);
+        }
+        self.fft
+            .process_with_scratch(&mut self.x, &mut self.scratch);
+
+        let smooth = 0.98f32;
+        for index in 0..FFT_SIZE {
+            let power = self.x[index].norm_sqr();
+            self.psd[index] = smooth * self.psd[index] + (1.0 - smooth) * power;
+            self.y[index] = self.weights[index] * self.x[index];
+        }
+        self.ifft
+            .process_with_scratch(&mut self.y, &mut self.scratch);
+
+        let scale = FFT_SIZE as f32;
+        for (index, (err, sample)) in self.error.iter_mut().zip(mic).enumerate() {
+            let echo = self.y[BLOCK + index].re / scale;
+            *err = *sample - echo;
+        }
+
+        let zero = num_complex::Complex::new(0.0, 0.0);
+        self.e.fill(zero);
+        for (slot, sample) in self.e[BLOCK..].iter_mut().zip(self.error.iter()) {
+            *slot = num_complex::Complex::new(*sample, 0.0);
+        }
+        self.fft
+            .process_with_scratch(&mut self.e, &mut self.scratch);
+
+        let step = num_complex::Complex::new(self.mu, 0.0);
+        for index in 0..FFT_SIZE {
+            let gradient = self.x[index].conj() * self.e[index] / (self.psd[index] + 1e-10);
+            self.weights[index] += gradient * step;
+        }
+        &self.error
+    }
+}
+
+#[cfg(all(test, feature = "aec"))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn reused_buffers_match_the_published_fdaf() {
+        let mut published = fdaf_aec::FdafAec::new(FFT_SIZE, STEP);
+        let mut local = InPlaceAec::new(STEP);
+        let mut state = 0x1234_5678u32;
+        for _ in 0..12 {
+            let mut far = [0.0f32; BLOCK];
+            let mut mic = [0.0f32; BLOCK];
+            for sample in far.iter_mut().chain(mic.iter_mut()) {
+                state = state.wrapping_mul(1664525).wrapping_add(1013904223);
+                *sample = (state >> 8) as f32 / 16_777_216.0 - 0.5;
+            }
+            let theirs = published.process(&far, &mic);
+            let ours = local.process_block(&far, &mic);
+            for (left, right) in ours.iter().zip(theirs.iter()) {
+                assert!((left - right).abs() < 1.0e-5, "{left} vs {right}");
+            }
+        }
     }
 }
 

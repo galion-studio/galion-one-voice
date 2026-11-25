@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Galion Labs
+
+[package]
+name = "horbm-soak"
+description = "Long-call soak of Samantha's duplex loop on the virtual 80 ms clock."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+horbm = { path = "../horbm" }
+horbm-duplex = { path = "../horbm-duplex" }
+horbm-voice = { path = "../horbm-voice" }
+galion-emotion-core = { path = "../../../crates/galion-emotion-core" }
+galion-ml-voice = { path = "../../../crates/galion-ml-voice", features = ["speech"] }

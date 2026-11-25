@@ -188,19 +188,32 @@ async fn dot_page_follows_the_phase() {
     )
     .expect("loopback");
     demo::send_frames(&running.tx, 6, 10).await;
+    // Polling the dot with a blocking socket on this worker starves the
+    // speak task: the reply mood is published, and the phase stays
+    // `thinking` until the deadline. Wait on the watch first. The gate
+    // holds `speaking` until the page has been read.
     let deadline = tokio::time::Instant::now() + Duration::from_secs(10);
-    let mut saw_speaking = false;
-    let mut last = String::new();
-    while tokio::time::Instant::now() < deadline {
-        last = http_get(server.addr(), "/state");
-        if last.contains("\"phase\":\"speaking\"") {
-            saw_speaking = true;
-            break;
+    while running.handle.phase() != Phase::Speaking {
+        if tokio::time::Instant::now() > deadline {
+            panic!(
+                "did not reach speaking; phase={:?} phases={:?}",
+                running.handle.phase(),
+                running.handle.phases()
+            );
         }
-        tokio::time::sleep(Duration::from_millis(10)).await;
+        tokio::time::sleep(Duration::from_millis(5)).await;
     }
-    assert!(saw_speaking, "dot never showed speaking; last={last}");
-    let page = http_get(server.addr(), "/");
+    let addr = server.addr();
+    let last = tokio::task::spawn_blocking(move || http_get(addr, "/state"))
+        .await
+        .unwrap_or_default();
+    assert!(
+        last.contains("\"phase\":\"speaking\""),
+        "dot never showed speaking; last={last}"
+    );
+    let page = tokio::task::spawn_blocking(move || http_get(addr, "/"))
+        .await
+        .unwrap_or_default();
     assert!(page.contains("Samantha"));
     assert!(page.contains("id=\"dot\""));
     gate.release

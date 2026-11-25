@@ -71,6 +71,9 @@ impl CardLookup for EmptyCards {
     }
 }
 
+/// Newest card misses kept on [`Brain`]. Older ones are dropped.
+const GAP_CAP: usize = 32;
+
 /// The linked brain. `open` reads the knowledge directory when it already
 /// exists and does not create it. The person-diary path is kept and is not
 /// opened: `remember` is denied. The live server passes the same read-only
@@ -602,6 +605,13 @@ impl Brain {
         }
         if matches!(decision.plan(), ReplyPlan::Keep) {
             if let Some(gap) = gathered.gap {
+                // A duplex prefetch asks on every partial. "where" and
+                // "where is" miss before "where is the kettle" hits, and
+                // nothing drains this queue. A long call kept every miss.
+                // The newest misses are the ones a host can still act on.
+                if self.gaps.len() == GAP_CAP {
+                    self.gaps.remove(0);
+                }
                 self.gaps.push(gap);
             }
         }
@@ -1039,6 +1049,20 @@ mod tests {
         assert!(!out.reply.to_ascii_lowercase().contains("tired"));
         assert!(!out.reply.to_ascii_lowercase().contains("sorry"));
         assert_eq!(brain.gaps()[0].reason, GapReason::NoCard);
+    }
+
+    #[test]
+    fn the_gap_queue_keeps_the_newest_misses() {
+        let mut brain = Brain::with_cards(cards(), None);
+        for n in 0..40 {
+            brain.turn(&format!("missing number {n}"));
+        }
+        assert_eq!(brain.gaps().len(), GAP_CAP);
+        assert_eq!(brain.gaps()[0].heard, "missing number 8");
+        assert_eq!(
+            brain.gaps().last().expect("newest").heard,
+            "missing number 39"
+        );
     }
 
     #[test]
