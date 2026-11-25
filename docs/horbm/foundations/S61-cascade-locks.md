@@ -5,8 +5,8 @@ Perpetual Open MIT License. (c) 2026 Galion Labs.
 | Field | Value |
 |---|---|
 | Swarm | HORBM S61, galion-cascade fallback lane |
-| Written | 2026-11-25. No voice audio committed, no weights, no paid API, no merge. |
-| Base | `main` `3c6751141f510f4c6538cd1cb07bafa2f63a98b5` |
+| Written | 2026-11-25. No voice audio committed, no weights, no paid API. The PR is not merged. |
+| Base | `main` `3c6751141f510f4c6538cd1cb07bafa2f63a98b5`, then merged `origin/main` `b8f33bb` (S57 tensor SIMD) before the final test run |
 | Gaps | `docs/horbm/foundations/F1-cascade-audit.md`: `ONSET_P50_BUDGET_MS` was 800 against `LOCKS.toml` `onset_p50_max_ms` 300, and a failed turn's error did not carry the partial stamp sheet. |
 | This change | `crates/galion-cascade` and this note. No new dependency. `Cargo.lock` is unchanged. |
 | Not edited | `LOCKS.toml`, `SOUL.md`, `LEDGER.md`, root workspace members, `.github/workflows/*`, `crates/galion-console`, `horbm/crates/horbm`, `horbm-soak`, `galion-gates`, `galion-tensor`. |
@@ -75,7 +75,7 @@ Unix speech workers are unchanged from S52: Piper, Flite, and the Vosk parent ru
 | `cargo test -p galion-cascade --lib` | 97 passed |
 | `cargo test -p galion-cascade --features cascade --lib` | 135 passed |
 | `cargo test -p galion-console --features phone-turn --lib turn_worker` | 10 passed |
-| `cargo test --workspace` | 1067 passed, 5 ignored, 0 failed |
+| `cargo test --workspace` | 1073 passed, 5 ignored, 0 failed |
 | `cargo test --manifest-path horbm/Cargo.toml --workspace` | 267 passed, 2 ignored, 0 failed |
 | `cargo clippy -p galion-cascade --all-targets -- -D warnings` | clean |
 | `cargo clippy -p galion-cascade --features cascade --all-targets -- -D warnings` | clean |
