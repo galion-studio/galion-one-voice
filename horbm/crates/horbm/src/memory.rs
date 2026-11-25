@@ -400,7 +400,17 @@ impl EpisodicStore {
     /// Drop session-ring twins on the hit list, before the recall cap.
     /// A live name line in `name_row` counts even when this query did not
     /// return that row. Forgotten lines count through the in-memory sets.
-    fn drop_duplicate_candidates(&self, person_id: &str, items: &mut Vec<MemoryItem>) {
+    ///
+    /// Search keeps only [`crate::MEMORY_HIT_CAP`] rows, and a pin outranks a
+    /// diary name line. The candidate can fill that window while the name
+    /// line is left out. After the candidate is dropped, put the name line
+    /// back when it still covers the query.
+    fn drop_duplicate_candidates(
+        &self,
+        person_id: &str,
+        items: &mut Vec<MemoryItem>,
+        terms: &[String],
+    ) {
         let mut live_names = Vec::new();
         if let Some((_, line)) = self.name_row.get(person_id) {
             live_names.extend(names_named_by(line));
@@ -442,6 +452,41 @@ impl EpisodicStore {
             }
             true
         });
+        self.restore_covered_name(person_id, items, terms);
+    }
+
+    /// The live state-tracker name line, when this query covers it and search
+    /// did not already return that id.
+    fn restore_covered_name(&self, person_id: &str, items: &mut Vec<MemoryItem>, terms: &[String]) {
+        let Some((id, line)) = self
+            .name_row
+            .get(person_id)
+            .map(|(id, line)| (id.clone(), line.clone()))
+        else {
+            return;
+        };
+        if items.iter().any(|item| item.id == id) {
+            return;
+        }
+        let haystack = format!("{line} {person_id} {SOURCE_STATE}");
+        if !covers(&haystack, terms) {
+            return;
+        }
+        let at = self
+            .store
+            .as_ref()
+            .and_then(|store| store.document_of(&id).ok().flatten())
+            .and_then(|document| json_string(&document, "date"))
+            .unwrap_or_default();
+        items.push(item_from(
+            id,
+            person_id,
+            MemoryKind::Name,
+            &line,
+            &at,
+            SOURCE_STATE,
+            false,
+        ));
     }
 }
 
@@ -750,15 +795,10 @@ impl PersonMemory for EpisodicStore {
             .filter(|hit| covers(&haystack(hit), &terms))
             .map(item_from_hit)
             .collect();
-        items.sort_by(|left, right| {
-            right
-                .pinned
-                .cmp(&left.pinned)
-                .then_with(|| overlap(&right.text, &terms).cmp(&overlap(&left.text, &terms)))
-                .then_with(|| left.id.cmp(&right.id))
-        });
+        rank_hits(&mut items, &terms);
         items.dedup_by(|left, right| left.id == right.id);
-        self.drop_duplicate_candidates(person_id, &mut items);
+        self.drop_duplicate_candidates(person_id, &mut items, &terms);
+        rank_hits(&mut items, &terms);
         items.truncate(crate::MEMORY_HIT_CAP);
         items
     }
@@ -1051,11 +1091,25 @@ fn overlap(text: &str, terms: &[String]) -> usize {
 }
 
 fn json_said_by(document: &str) -> Option<String> {
+    json_string(document, "said_by")
+}
+
+fn json_string(document: &str, key: &str) -> Option<String> {
     let value: serde_json::Value = serde_json::from_str(document).ok()?;
     value
-        .get("said_by")
+        .get(key)
         .and_then(|field| field.as_str())
         .map(str::to_string)
+}
+
+fn rank_hits(items: &mut [MemoryItem], terms: &[String]) {
+    items.sort_by(|left, right| {
+        right
+            .pinned
+            .cmp(&left.pinned)
+            .then_with(|| overlap(&right.text, terms).cmp(&overlap(&left.text, terms)))
+            .then_with(|| left.id.cmp(&right.id))
+    });
 }
 
 pub(crate) fn name_line(names: &[TrackedName]) -> Option<String> {
