@@ -522,6 +522,10 @@ dependencies = [
 [[package]]
 name = "horbm-brain"
 version = "0.0.1"
+dependencies = [
+ "galion-tensor",
+ "horbm-keys",
+]
 
 [[package]]
 name = "horbm-breath"
