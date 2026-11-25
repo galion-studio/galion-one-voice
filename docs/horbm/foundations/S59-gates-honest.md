@@ -89,6 +89,12 @@ If the snapshot is deterministic and `NullSurface` accepted every frame, and the
 
 `sha256sum` is used when it exists. `shasum -a 256` is the fallback. This host has `sha256sum`.
 
+## G6
+
+The same rustc 1.85 run recorded `G6 SOFTFAIL — structural: no SENSE guard`. The guard is in `galion-emotion/src/rika.rs` (`consent_bits::SENSE` before `#[cfg(test)]`). The script did `echo "$CODE" | grep -q ...` under `set -o pipefail`. `grep -q` exits at the first match and closes the pipe. `echo` then dies with SIGPIPE, the pipeline's status is non-zero, and a present guard is reported missing. It is a race: a later run of the same script reached the cargo step instead.
+
+The structural checks now use here-strings. Five runs of `g6-rika.sh` on rustc 1.85.0 each exited 0: `R1–R9 pass (9 passed, 0 failed)` and the SENSE and ADAPT guards. The crate was not edited. G6 stays a soft gate.
+
 ## R0–R3
 
 `vps_mode` in `galion-gates/gates_lib.sh` returns `remote` when `GALION_VPS_HOST` is non-empty, and `skip` when it is unset or empty. `run-gates.sh` then marks R0, R1, R2, and R3:
@@ -112,6 +118,20 @@ bash galion-gates/run-gates.sh --self-test
 
 No cargo, no network, no microphone. It scans this repo (exit 0, so `frames.rs:596` is not a hit) and temp trees. The load planted at `crates/example/tests/evil.rs` as `std::fs::read("model.gguf")` exits 1. So does that load with the allow-marker on the line, and so does `refuse(...); std::fs::read("model.gguf");` on one line. The `frames.rs` shape exits 0. `rustc_at_least_185` accepts 1.85 and 2.0 and rejects 1.83 and 1.84.
 
+## Measured
+
+rustc 1.85.0 on Linux, `GALION_VPS_HOST` unset. `cargo test --workspace`: 1062 passed, 0 failed. `cargo clippy --workspace --all-targets -- -D warnings`: clean. `cargo test --manifest-path horbm/Cargo.toml --workspace`: 267 passed, 0 failed (one ignored card test stays ignored unless `GALION_HORBM_REMEMBER=grant`). `cargo clippy --manifest-path horbm/Cargo.toml --workspace --all-targets -- -D warnings`: clean.
+
+After the G6 here-string fix, `galion-gates/run-gates.sh` exited 0:
+
+```text
+G0=PASS G1=PASS (cargo test 1062 passed, 0 failed) G2=PASS G3=PASS
+G4=PASS G6=PASS PS=PASS LK=PASS DG=PASS LV=PASS V1=PASS OP=PASS SY=PASS RG=PASS
+R0-R3=SKIP skipped (no VPS)  fails=0
+```
+
+G4 sha `618a6b2646da5d8dd13ef6ba89f7ca65ef1fccd04e4daf2fa31edfdf5ddc21dd`, p99 10903 ns. `bash galion-gates/run-gates.sh --self-test` exited 0.
+
 ## Files
 
 - `galion-gates/g2_scan.py` — G2 rule
@@ -119,6 +139,7 @@ No cargo, no network, no microphone. It scans this repo (exit 0, so `frames.rs:5
 - `galion-gates/selftest.sh` — the cases above
 - `galion-gates/run-gates.sh` — calls the scanner; R0–R3 skip when no host is set
 - `galion-gates/g4-render.sh` — toolchain selection, one p99 retry, `shasum` fallback
+- `galion-gates/g6-rika.sh` — structural checks read the source with here-strings so `pipefail` cannot turn a present SENSE guard into a miss
 - this note
 
 Not edited: `crates/**` (including `crates/horbm-ear`), `horbm/**`, `galion-render/**`, `LEDGER.md`, root `Cargo.toml`, `Cargo.lock`, `.github/workflows/*`, `LOCKS.toml`, `SOUL.md`. No new dependency.
