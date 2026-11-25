@@ -13,7 +13,7 @@ Perpetual Open MIT License. (c) 2026 Galion Labs.
 
 The microphone is a generated sine while the script is speaking, and zeros in the pauses. There is no recording and no model. Prosody stays on (the default). Echo cancellation stays on. The emotion port is `CoreAffect` (`EmotionCore::step`). The brain is the duplex brain. The mouth writes each utterance into a fixed output ring and the pull takes one frame back.
 
-A turn can follow another turn. When the mouth finishes, the floor listens again. After a barge, three quiet frames (240 ms) do the same. The partial is cleared when the utterance closes, so a residual does not look like a new sentence. The barge measurement is the virtual time from the first interrupting frame to silence. It was 160 ms on every sample, at the start and at the end.
+A turn can follow another turn. When the mouth queue is empty and the caller has been quiet for 1.28 s, the floor listens again. That wait is longer than the end-to-end smoke's 800 ms tail, so a finished clip can still be barged. After a barge, three quiet frames (240 ms) listen again. The partial is cleared when the utterance closes, so a residual does not look like a new sentence. The barge measurement is the virtual time from the first interrupting frame to silence. It was 160 ms on every sample, at the start and at the end.
 
 `GALION_SOAK_FULL=1` runs the hour. Any other value, including unset, runs five minutes. The Ubuntu job `voice-stack horbm router` runs the five-minute test and does not set the flag.
 

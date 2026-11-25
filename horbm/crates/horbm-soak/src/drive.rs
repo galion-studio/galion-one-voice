@@ -330,6 +330,11 @@ fn bucket(action: &Action, frame: &FrameOut) -> Bucket {
     if frame.me_audible {
         return Bucket::Play;
     }
+    // The mouth queue can be empty while the floor is still hers. Those
+    // frames still clone the committed clause, so they are not idle.
+    if matches!(frame.floor, Floor::Speaking | Floor::Ducked) {
+        return Bucket::Boundary;
+    }
     if !frame.you_voiced {
         return Bucket::Idle;
     }
