@@ -493,6 +493,107 @@ fn default_is_on_and_only_the_off_switch_closes_it() {
     assert!(!ACTIVITY_MARK.chars().any(|c| c.is_ascii_digit()));
 }
 
+fn offer_at(valence: f32, arousal: f32, strength: f32) -> horbm_ear::ListenerOffer {
+    let mut point = [0.0f32; 4];
+    point[VALENCE] = valence;
+    point[AROUSAL] = arousal;
+    horbm_ear::ListenerOffer {
+        t_ms: 0,
+        consent: SENSE,
+        point,
+        strength,
+    }
+}
+
+#[test]
+fn a_heard_frame_exposes_axes_and_a_denied_frame_does_not() {
+    let core = EmotionCore::at_rest();
+    assert_eq!(core.frames(), 0);
+
+    let mut ear = Ear::new();
+    assert!(ear.sensing(), "sensing starts on");
+    let mut tone = [0.0f32; FRAME_SAMPLES];
+    fill_sine(&mut tone, 180.0, 0.2);
+    let frame = heard(&mut ear, &tone);
+    assert!(frame.voiced, "a 180 Hz sine was unvoiced");
+    close_hz(frame.f0_hz, 180.0);
+
+    let axes = frame
+        .offer
+        .heard_axes()
+        .expect("a heard frame exposes valence, arousal, and strength");
+    assert_eq!(axes.0.to_bits(), frame.offer.valence().to_bits());
+    assert_eq!(axes.1.to_bits(), frame.offer.arousal().to_bits());
+    assert_eq!(axes.2.to_bits(), frame.offer.strength.to_bits());
+    assert!(axes.0.is_finite() && (-1.0..=1.0).contains(&axes.0));
+    assert!(axes.1.is_finite() && (0.0..=1.0).contains(&axes.1));
+    assert!(axes.2.is_finite() && (0.0..=1.0).contains(&axes.2));
+
+    let mut quiet_ear = Ear::new();
+    let quiet = heard(&mut quiet_ear, &[0.0; FRAME_SAMPLES]);
+    let quiet_axes = quiet
+        .offer
+        .heard_axes()
+        .expect("a granted quiet frame still has a point");
+    assert!(
+        axes.1 > quiet_axes.1 + 0.2,
+        "tone arousal {} quiet {}",
+        axes.1,
+        quiet_axes.1
+    );
+    assert!(
+        axes.2 > quiet_axes.2,
+        "tone strength {} quiet {}",
+        axes.2,
+        quiet_axes.2
+    );
+    assert_eq!(
+        core.frames(),
+        0,
+        "heard_axes must not call EmotionCore::step"
+    );
+
+    for (valence, arousal, strength) in [
+        (f32::NAN, 0.4, 0.5),
+        (0.2, f32::NAN, 0.5),
+        (0.2, 0.4, f32::NAN),
+        (f32::INFINITY, 0.4, 0.5),
+        (0.2, f32::NEG_INFINITY, 0.5),
+        (0.2, 0.4, f32::INFINITY),
+    ] {
+        assert!(
+            offer_at(valence, arousal, strength).heard_axes().is_none(),
+            "non-finite ({valence}, {arousal}, {strength}) must be None"
+        );
+    }
+
+    let mut aside = offer_at(0.2, 0.4, 0.5);
+    aside.point[horbm_ear::port::DOMINANCE] = f32::NAN;
+    aside.point[horbm_ear::port::APPROACH] = f32::INFINITY;
+    assert_eq!(aside.heard_axes(), Some((0.2, 0.4, 0.5)));
+    assert_eq!(core.frames(), 0);
+
+    for off in ["0", "off", "deny"] {
+        let mut shut = Ear::from_env(Some(off));
+        assert!(!shut.sensing(), "{off} left the ear open");
+        match shut.push(&tone) {
+            FrameOut::Denied => {}
+            other => panic!("{off} exposed a frame {other:?}"),
+        }
+        assert_eq!(shut.frames_analysed(), 0);
+        assert_eq!(shut.retained_samples(), 0);
+    }
+
+    ear.deny();
+    assert!(!ear.sensing());
+    match ear.push(&tone) {
+        FrameOut::Denied => {}
+        other => panic!("a denied frame exposed {other:?}"),
+    }
+    assert_eq!(ear.frames_analysed(), 0);
+    assert_eq!(core.frames(), 0);
+}
+
 struct CueLog {
     cues: Vec<FloorCue>,
 }

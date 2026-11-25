@@ -20,7 +20,10 @@
 //! period it returned. Energy, pause, the speaking-rate estimate, jitter, and
 //! shimmer are the rest of the glue. The open-space point is a fixed coupling,
 //! not a category list. [`port::ListenerOffer`] is the acoustic point the
-//! emotion core can take later. [`Ear::push`] does not step the core.
+//! emotion core can take later. [`ListenerOffer::heard_axes`] reads valence,
+//! arousal, and strength, or nothing when one of them is non-finite. A
+//! denied frame has no offer. [`Ear::push`] does not step the core, and
+//! neither does that read.
 //! [`link::push_frame`] steps it with an inbound intent that mixes only when
 //! adapt is granted as well. [`listen::hear_frame`] is Samantha's path: a
 //! separate listener reading, then her own response. It does not write her
