@@ -289,6 +289,7 @@ fn retrieval_never_puts_a_research_card_at_hits_zero() {
         remember: true,
         knowledge_dir: Some(dir.clone()),
         fixture_rows: 0,
+        keys_path: None,
     })
     .unwrap();
     thread.ask_wait("where is the kettle", 1, 1).unwrap();

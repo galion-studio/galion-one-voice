@@ -2,8 +2,9 @@
 // Copyright (c) 2026 Galion Labs
 //! [`crate::Int8Scorer`] for the mapped int8 arena.
 //!
-//! The retrieval thread does not call this. Asks still use `search_lexical`.
-//! `None` means the arena has no allowed row for that string `item_id`.
+//! The retrieval thread does not call this. A granted ask uses
+//! `horbm_brain::DiaryScan` in `retrieve`. `None` means the arena has no
+//! allowed row for that string `item_id`.
 
 use horbm_keys::StringKeyArena;
 

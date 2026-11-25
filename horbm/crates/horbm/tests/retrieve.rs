@@ -62,6 +62,7 @@ fn remember_denied_publishes_an_empty_cell_and_writes_nothing() {
         remember: false,
         knowledge_dir: Some(scratch.clone()),
         fixture_rows: 1_000,
+        keys_path: None,
     })
     .expect("spawn denied");
     assert!(thread.cell().is_empty());
@@ -99,6 +100,7 @@ fn fixture_of_one_thousand_rows_returns_and_withdraw_clears_the_cell() {
         remember: true,
         knowledge_dir: Some(scratch.clone()),
         fixture_rows: 1_000,
+        keys_path: None,
     })
     .expect("spawn fixture");
 
@@ -170,11 +172,10 @@ fn stopwords_alone_are_a_miss_and_write_nothing() {
         remember: true,
         knowledge_dir: Some(scratch.clone()),
         fixture_rows: 1_000,
+        keys_path: None,
     })
     .expect("spawn");
-    thread
-        .ask_wait("the and of", 1, 1)
-        .expect("stopword ask");
+    thread.ask_wait("the and of", 1, 1).expect("stopword ask");
     let cell = thread.cell();
     assert_eq!(cell.state, CellState::Miss);
     assert!(cell.hits.is_empty());
@@ -183,6 +184,42 @@ fn stopwords_alone_are_a_miss_and_write_nothing() {
     assert!(!scratch.join("revisions.sqlite").exists());
     drop(thread);
     let _ = fs::remove_dir_all(&scratch);
+}
+
+#[test]
+fn deny_does_not_open_a_missing_key_file() {
+    let missing = scratch("no-keys").join("keys.hkb");
+    let thread = RetrievalThread::spawn(RetrievalConfig {
+        remember: false,
+        knowledge_dir: None,
+        fixture_rows: 0,
+        keys_path: Some(missing.clone()),
+    })
+    .expect("deny does not open keys");
+    thread.ask_wait("blue bowl", 1, 1).expect("ask");
+    assert!(thread.cell().is_empty());
+    assert!(!missing.exists());
+    drop(thread);
+    let _ = fs::remove_dir_all(missing.parent().unwrap());
+}
+
+#[test]
+fn a_missing_key_file_fails_the_grant() {
+    let missing = scratch("bad-keys").join("absent.hkb");
+    let spawned = RetrievalThread::spawn(RetrievalConfig {
+        remember: true,
+        knowledge_dir: None,
+        fixture_rows: 0,
+        keys_path: Some(missing.clone()),
+    });
+    let err = match spawned {
+        Err(err) => err,
+        Ok(_) => panic!("grant opened a missing key file"),
+    };
+    assert!(!err.message().is_empty());
+    assert!(!err.message().contains("blue bowl"));
+    assert!(!missing.exists());
+    let _ = fs::remove_dir_all(missing.parent().unwrap());
 }
 
 #[test]
