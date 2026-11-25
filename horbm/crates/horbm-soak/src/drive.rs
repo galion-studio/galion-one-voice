@@ -12,8 +12,8 @@ use std::time::Instant;
 use galion_emotion_core::{MomentState, AROUSAL, AXES, DOMINANCE, VEL_LIMIT};
 use horbm::{CardHit, CardLookup};
 use horbm_duplex::{
-    CoreAffect, Duplex, EarSense, Emotion, Floor, FrameOut, LoopEvent, Parts, PlaybackEcho,
-    ProsodyEar, SamanthaPersona, SpeakingBreath, FRAME_SAMPLES, SAMPLE_RATE,
+    CoreAffect, Duplex, EarSense, Emotion, Floor, FrameOut, LoopEvent, Parts, Persona,
+    PlaybackEcho, ProsodyEar, SamanthaPersona, SpeakingBreath, FRAME_SAMPLES, SAMPLE_RATE,
 };
 use horbm_voice::Mouth;
 
@@ -455,7 +455,7 @@ pub fn ticks_for(minutes: u64) -> u64 {
     minutes.saturating_mul(60).saturating_mul(1_000) / 80
 }
 
-pub fn run(minutes: u64, allocs: &dyn Fn() -> u64) -> Report {
+pub fn run(minutes: u64, allocs: &dyn Fn() -> u64, touch_mappings: &dyn Fn()) -> Report {
     let ticks = ticks_for(minutes);
     let probed = probes(allocs);
     let line = Rc::new(RefCell::new(EMPTY));
@@ -475,7 +475,7 @@ pub fn run(minutes: u64, allocs: &dyn Fn() -> u64) -> Report {
         },
         Kettle,
     )
-    .expect("samantha");
+    .expect("duplex");
 
     let mut machine = Machine::new();
     let mut watch = Watch::new();
@@ -552,6 +552,10 @@ pub fn run(minutes: u64, allocs: &dyn Fn() -> u64) -> Report {
             }
         }
         if tick == WARMUP_TICKS {
+            // Fault file pages that exist now, including libraries opened
+            // while the mouth was built, so a later reclaim-and-refault is
+            // not counted as growth. Anonymous growth is what remains.
+            touch_mappings();
             rss_warm = Some(vm_rss_kib());
         }
         if walls.len() == WINDOW_TICKS as usize {
@@ -569,6 +573,7 @@ pub fn run(minutes: u64, allocs: &dyn Fn() -> u64) -> Report {
         }
         windows.push(close_window(windows.len() as u32, &mut walls));
     }
+    touch_mappings();
     let rss_end = vm_rss_kib();
     if !machine.end_probe {
         machine
@@ -581,6 +586,7 @@ pub fn run(minutes: u64, allocs: &dyn Fn() -> u64) -> Report {
             .push("the opening barge probe did not run".to_string());
     }
 
+    let persona = duplex.persona().id().to_string();
     let mouth_name = duplex.mouth().id();
     let desync = duplex.mouth().desync();
     let mouth_label = if mouth_name == "flite" {
@@ -594,6 +600,7 @@ pub fn run(minutes: u64, allocs: &dyn Fn() -> u64) -> Report {
         minutes,
         ticks,
         seed: SEED,
+        persona,
         mouth: mouth_label,
         prosody: duplex.prosody_enabled(),
         aec: duplex.aec_enabled(),

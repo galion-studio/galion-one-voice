@@ -22,7 +22,7 @@ enum Engine {
     Stub,
 }
 
-/// Samantha's mouth for this process. The persona is still Samantha.
+/// Mouth for this process. The persona is whoever the duplex loaded.
 pub struct SoakMouth {
     engine: Engine,
     name: &'static str,
@@ -36,15 +36,23 @@ impl SoakMouth {
     #[must_use]
     pub fn open(buffer: Rc<RefCell<OutputBuffer>>) -> Self {
         match FliteTts::open_default() {
-            Ok(tts) => Self {
-                engine: Engine::Flite(tts),
-                name: "flite",
-                pending: VecDeque::new(),
-                pending_first: false,
-                buffer,
-                desync: 0,
-            },
-            Err(_) => Self::stub(buffer),
+            Ok(tts) => {
+                let mut mouth = Self {
+                    engine: Engine::Flite(tts),
+                    name: "flite",
+                    pending: VecDeque::new(),
+                    pending_first: false,
+                    buffer,
+                    desync: 0,
+                };
+                mouth.prime();
+                mouth
+            }
+            Err(_) => {
+                let mut mouth = Self::stub(buffer);
+                mouth.prime();
+                mouth
+            }
         }
     }
 
@@ -63,6 +71,19 @@ impl SoakMouth {
     #[must_use]
     pub fn desync(&self) -> u64 {
         self.desync
+    }
+
+    /// Two full renders before the duplex clock starts.
+    ///
+    /// The first large waveform is often a fresh mapping. Freeing it raises
+    /// the process malloc threshold, and the second render is the one the
+    /// heap keeps. Doing both here, on a line at least as long as a soak
+    /// reply, means a later utterance of the same shape does not extend the
+    /// resident set after the warm sample. The samples are discarded.
+    fn prime(&mut self) {
+        let line = "The kettle is on the hob. The kettle is on the hob.";
+        drop(self.render(line));
+        drop(self.render(line));
     }
 
     fn render(&mut self, text: &str) -> Vec<i16> {
