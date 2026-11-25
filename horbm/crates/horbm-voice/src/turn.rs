@@ -14,6 +14,8 @@ use crate::mouth::{AudioFrame, BackchannelPlay, Mouth, MouthPull};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TickEvent {
     None,
+    /// The ear heard speech start on this frame.
+    Onset,
     EndOfSpeech,
     FirstAudio,
     Backchannel,
@@ -74,6 +76,8 @@ pub struct VoiceLoop<E, M, B> {
     eot_ms: Option<u64>,
     first_audio_ms: Option<u64>,
     barge_ms: Option<u64>,
+    /// Mouth samples from the previous frame. The ear treats a copy as echo.
+    played: Vec<i16>,
     last_partial: String,
     frame_question: bool,
     listen: ListenPolicy,
@@ -105,6 +109,7 @@ where
             eot_ms: None,
             first_audio_ms: None,
             barge_ms: None,
+            played: Vec::new(),
             last_partial: String::new(),
             frame_question: false,
             listen: ListenPolicy::new(),
@@ -157,7 +162,10 @@ where
     }
 
     /// Advance one virtual frame. Pause-only: an ASR final ends the turn.
-    /// Does not read a wall clock.
+    ///
+    /// The previous mouth frame is handed to the ear first, so a copy of her
+    /// own voice is echo. Then the ear, then the brain on a transcript, then
+    /// one mouth frame. Does not read a wall clock.
     pub fn tick(&mut self, pcm: &[i16]) -> TickOut {
         self.tick_turn(pcm, TurnMsg::PauseOnly)
     }
@@ -187,6 +195,11 @@ where
         mood: ListenMood,
     ) -> TickOut {
         let t_ms = self.clock.t_ms();
+        if self.speaking {
+            self.ear.note_playback(&self.played);
+        } else {
+            self.ear.note_playback(&[]);
+        }
         let heard = self.ear.poll(pcm);
         if self.silence_next {
             let out = self.yield_floor(t_ms);
@@ -205,7 +218,11 @@ where
                 }
             }
         }
-        self.on_ear(heard, t_ms, turn, &mut event, &mut reply);
+        if self.on_ear(heard, t_ms, turn, &mut event, &mut reply) {
+            let out = self.yield_floor(t_ms);
+            self.clock.advance();
+            return out;
+        }
 
         let mut audio = None;
         let mut backchannel = None;
@@ -228,6 +245,11 @@ where
                 }));
             }
         }
+        if let Some(frame) = &audio {
+            self.played = frame.samples.clone();
+        } else if !self.speaking {
+            self.played.clear();
+        }
 
         let out = TickOut {
             t_ms,
@@ -246,6 +268,8 @@ where
         out
     }
 
+    /// `true` means yield the floor on this frame. The ear has already decided
+    /// the overlap is a barge-in, so the silent frame is this one.
     fn on_ear(
         &mut self,
         heard: EarEvent,
@@ -253,20 +277,50 @@ where
         turn: TurnMsg,
         event: &mut TickEvent,
         reply: &mut Option<String>,
-    ) {
+    ) -> bool {
         if let EarEvent::Partial(ref text) | EarEvent::End(ref text) = heard {
             let trimmed = text.trim();
             if !trimmed.is_empty() {
                 self.last_partial = trimmed.to_string();
             }
         }
+        match &heard {
+            EarEvent::Onset => {
+                if *event == TickEvent::None {
+                    *event = TickEvent::Onset;
+                }
+                return false;
+            }
+            EarEvent::User => return false,
+            EarEvent::Backchannel => {
+                self.overlap_ms = 0;
+                self.overlap_origin_ms = None;
+                if self.speaking && *event == TickEvent::None {
+                    *event = TickEvent::Backchannel;
+                }
+                return false;
+            }
+            EarEvent::Barge => {
+                if !self.speaking {
+                    return false;
+                }
+                let back = u64::from(FRAME_MS) * 2;
+                self.overlap_origin_ms = Some(t_ms.saturating_sub(back));
+                self.overlap_ms = FRAME_MS.saturating_mul(3);
+                return true;
+            }
+            EarEvent::Quiet | EarEvent::Fault(_) | EarEvent::Partial(_) | EarEvent::End(_) => {}
+        }
         if self.speaking {
             let text = match &heard {
-                EarEvent::Quiet | EarEvent::Fault(_) => return,
+                EarEvent::Quiet | EarEvent::Fault(_) => return false,
                 EarEvent::Partial(text) | EarEvent::End(text) => text.trim(),
+                EarEvent::Onset | EarEvent::User | EarEvent::Barge | EarEvent::Backchannel => {
+                    return false;
+                }
             };
             if text.is_empty() {
-                return;
+                return false;
             }
             if is_listed_backchannel(text) {
                 if *event == TickEvent::None {
@@ -275,31 +329,40 @@ where
             } else {
                 self.arm_overlap(t_ms);
             }
-            return;
+            return false;
         }
         match turn {
             TurnMsg::Hold => {}
             TurnMsg::PauseOnly => {
                 if let EarEvent::End(text) = &heard {
                     let text = text.trim();
-                    if !text.is_empty() {
+                    if text.is_empty() {
+                        if *event == TickEvent::None {
+                            *event = TickEvent::EndOfSpeech;
+                            self.eot_ms = Some(t_ms);
+                        }
+                    } else {
                         self.begin_turn(text, t_ms, event, reply);
                     }
                 }
             }
             TurnMsg::Yield { question } => {
                 let owned = match &heard {
-                    EarEvent::Fault(_) => return,
+                    EarEvent::Fault(_) => return false,
                     EarEvent::Partial(text) | EarEvent::End(text) => text.trim().to_string(),
                     EarEvent::Quiet => self.last_partial.clone(),
+                    EarEvent::Onset | EarEvent::User | EarEvent::Barge | EarEvent::Backchannel => {
+                        return false;
+                    }
                 };
                 if owned.is_empty() {
-                    return;
+                    return false;
                 }
                 self.frame_question = question;
                 self.begin_turn(&owned, t_ms, event, reply);
             }
         }
+        false
     }
 
     fn begin_turn(
@@ -366,6 +429,7 @@ where
         self.silence_next = false;
         self.overlap_ms = 0;
         self.overlap_origin_ms = None;
+        self.played.clear();
         self.epoch = self.epoch.wrapping_add(1);
         TickOut {
             t_ms,

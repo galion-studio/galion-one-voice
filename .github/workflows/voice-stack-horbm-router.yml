@@ -1,6 +1,9 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 Galion Labs
-# Layer 5 router and the localhost research gateway. No model download.
+# Layer 5 router and the localhost research gateway.
+# The end-to-end smoke may fetch the pinned Vosk small-en model into a
+# cache outside the checkout. A failed fetch leaves asr=stub.
+# The router tests do not download a model.
 
 name: voice-stack horbm router
 
@@ -35,3 +38,5 @@ jobs:
           cargo clippy --manifest-path horbm/Cargo.toml -p horbm-duplex --all-targets -- -D warnings
           cargo clippy --manifest-path voice-stack/Cargo.toml -p galion-research-gateway -p galion-sam-horbm -p samantha-local-server --all-targets --no-deps -- -D warnings
           cargo clippy --manifest-path voice-stack/Cargo.toml -p galion-sam-horbm --all-targets --no-deps --features horbm -- -D warnings
+      - name: HORBM end-to-end smoke
+        run: bash scripts/horbm-e2e-smoke.sh

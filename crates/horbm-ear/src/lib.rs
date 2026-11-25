@@ -19,8 +19,12 @@
 //! is not a 0..=1 score, so voicing is the normalised autocorrelation at the
 //! period it returned. Energy, pause, the speaking-rate estimate, jitter, and
 //! shimmer are the rest of the glue. The open-space point is a fixed coupling,
-//! not a category list. [`port::ListenerOffer`] is what the emotion core can
-//! take later. This crate does not call [`port::EmotionCore::step`].
+//! not a category list. [`port::ListenerOffer`] is the acoustic point the
+//! emotion core can take later. [`Ear::push`] does not step the core.
+//! [`link::push_frame`] steps it with an inbound intent that mixes only when
+//! adapt is granted as well. [`listen::hear_frame`] is Samantha's path: a
+//! separate listener reading, then her own response. It does not write her
+//! baseline.
 //!
 //! [`eot::Scorer`] turns those scalars, plus the latest ASR partial, into a
 //! [`eot::TurnMsg`]. Thresholds are `eot.toml`, compiled in. A denied frame
@@ -34,6 +38,7 @@
 mod dsp;
 pub mod eot;
 pub mod link;
+pub mod listen;
 pub mod port;
 
 pub use eot::{EotConfig, ListenCue, ProsodyCue, Scorer, TurnMsg};
