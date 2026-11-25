@@ -8,17 +8,26 @@
 //! A miss speaks the stored persona clause. Lookup and Action turns are
 //! marked for Galion Research and are not posted.
 //!
+//! [`StoredKeys`] reads an `HKB1` file. Version 2 stores the string table
+//! and a per-key int8 scale in the file. Version 1 still loads: there is
+//! no string table, and every scale is `1`. The dot is `galion-tensor`'s,
+//! so the scalar and SIMD scores stay the same bits.
+//!
 //! No weights, no network, no audio file, no `unsafe`.
 
 #![forbid(unsafe_code)]
 
 mod adapt;
 mod fixture;
+mod hkb;
 mod pick;
 mod retrieve;
 
 pub use adapt::{KeyAdapter, RetrievalAdapter};
 pub use fixture::Fixture;
+pub use hkb::{
+    dequant_score, HkbError, KeyPrefault, SimdLevel, StoredKeys, StoredPack, STORED_VERSION,
+};
 pub use pick::{classify, pick, split_clause, Answer, Heuristic, MarkKind, SidebandMark, HIT_CAP};
 pub use retrieve::{MemoryRetriever, Retrieved, Retriever, StoredClause};
 
