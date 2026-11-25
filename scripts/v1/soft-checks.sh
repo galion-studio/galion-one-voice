@@ -18,16 +18,16 @@ echo "== V1 soft checks · $(date '+%Y-%m-%d %H:%M %Z') · $OUT" | tee -a "$SUM"
 # speech WAV: V1-03 turn or EN cascade fallback
 SP_WAV="$(ls "$OUT"/speech/*.wav "$OUT"/cascade/en-cascade.wav 2>/dev/null | head -n1)"
 [ -n "$SP_WAV" ] && chk C0 PASS "speech turn WAV: ${SP_WAV#$OUT/} ($KIND_IN)" || chk C0 FAIL "no speech turn WAV (V1-03 hook and EN cascade both failed — see run log)"
-# C1 live showcase
-miss=""; for v in default opener workplace; do for a in live_output_stereo.wav console_capture.txt; do [ -s "$OUT/live/$v/$a" ] || miss+=" $v/$a"; done; done
-[ -z "$miss" ] && chk C1 PASS "live 80 ms heartbeat: default/opener/workplace stereo + capture" || chk C1 FAIL "missing:$miss"
-# C2 Rika lean-in
-LI="$(grep -o 'lean_in_latency=[^ ]*' "$OUT/live/opener/console_capture.txt" 2>/dev/null | tail -n1)"
-case "$LI" in *=160*) chk C2 PASS "Rika opener ${LI} ms (2 frames)";; "") chk C2 FAIL "no Rika summary in opener capture";; *) chk C2 WARN "Rika opener ${LI} (expected 160 ms on synthetic input)";; esac
-# C3 consent hard-OFF
-if cmp -s "$OUT/live/default/live_output_stereo.wav" "$OUT/live/workplace/live_output_stereo.wav" 2>/dev/null \
-   && grep -q 'OFF(Gate(DenyProhibitedPurpose))' "$OUT/live/workplace/console_capture.txt" 2>/dev/null
-then chk C3 PASS "workplace hard-OFF (me band == default, DenyProhibitedPurpose)"; else chk C3 FAIL "workplace not hard-OFF"; fi
+# C1 live loop. Showcase WAVs belonged to galion-live-demo. The replacement is horbm-duplex.
+if grep -q 'live-demo: PASS duplex horbm-duplex' "$OUT/live.log" 2>/dev/null; then
+  chk C1 PASS "horbm-duplex tests passed (galion-live-demo archived; no showcase WAVs)"
+else
+  chk C1 FAIL "horbm-duplex did not pass (see live.log)"
+fi
+# C2 Rika lean-in capture retired with the demo crate. The heartbeat tests still own 160 ms.
+chk C2 INFO "Rika opener capture retired with galion-live-demo; lean-in stays in galion-heartbeat tests"
+# C3 workplace hard-OFF showcase retired with the demo crate. The deny stays in galion-heartbeat.
+chk C3 INFO "workplace hard-OFF showcase retired with galion-live-demo; deny stays in galion-heartbeat tests"
 # C4 audio format
 if command -v python3 >/dev/null; then
   R="$(python3 - "$OUT" <<'PY'
@@ -45,12 +45,13 @@ else chk C4 SKIP "python3 missing"; fi
 # C5 one-dot screen frames
 NPNG="$(ls "$OUT"/screen/frame_*.png 2>/dev/null | wc -l)"; NLD="$(ls "$OUT"/live/opener/dot/*.png 2>/dev/null | wc -l)"
 if [ -s "$OUT/screen/latest.png" ] || [ "$NLD" -gt 0 ]; then chk C5 PASS "one-dot frames: screen=$NPNG live/opener=$NLD"
-elif [ -f "$OUT/state.json" ]; then chk C5 PASS "one-dot served live (state.json present; web mode)"
+elif [ -f "$OUT/state.json" ]; then chk C5 PASS "one-dot state recorded (state.json). The live web feed is archived."
 else chk C5 FAIL "no one-dot frames"; fi
 # C6 V4 locks (one dot, 80 ms, consent deny)
 LK="$(scripts/check-locks.sh 2>&1 | tail -n1)"; case "$LK" in OK*) chk C6 PASS "$LK";; *) chk C6 FAIL "$LK";; esac
 # C7 words (FRXDEL Q2: must say actual words). V1-03 JSON: reply_kind=speech; speech_backend=system-flite (interim)
-KIND=tone; J="$(ls "$OUT"/speech/*.json "$OUT"/cascade/en-cascade.json 2>/dev/null | head -n1)"
+KIND=tone; SB=""; A21=""; ST=""
+J="$(ls "$OUT"/speech/*.json "$OUT"/cascade/en-cascade.json 2>/dev/null | head -n1)"
 case "$KIND_IN" in *words*) KIND=words;; esac
 if [ -n "$J" ]; then
   grep -Eq '"(reply_kind)" *: *"speech"|"(tts|tts_kind|speech|kind)" *: *"words"' "$J" && KIND=words
@@ -65,14 +66,12 @@ PIPER="weights/runtime/piper/piper"   # cwd = repo root
 if [ "${SB:-}" = a21-weights ] && [ -x "$PIPER" ] && ls weights/tts/*.onnx >/dev/null 2>&1; then chk C11 PASS "A21 runtime present (weights/runtime/piper + weights/tts/*.onnx, CPU)"
 elif { PATH="$PATH:/sbin:/usr/sbin" ldconfig -p 2>/dev/null | grep -q 'libflite.so.1'; } || ls /usr/lib/*/libflite.so.1 /usr/lib/libflite.so.1 /usr/lib64/libflite.so.1 >/dev/null 2>&1; then chk C11 PASS "libflite1 present (fallback; A21 pack missing — scripts/a21/fetch-a21.sh)"
 else chk C11 SOFTFAIL "no speech backend — EN cascade exits 3 (scripts/a21/fetch-a21.sh, or apt install libflite1)"; fi
-# C12 (FP-04) EN turn: the reply words sit in the ME band (dot "speaking"), not the you band
-EL="$OUT/live/en-turn/console_capture.txt"
-if [ -f "$EL" ] && grep -q "voice=reply-wav" "$EL"; then chk C12 PASS "EN turn me band = reply words (voice=reply-wav)"
-else chk C12 SOFTFAIL "EN turn me band is not the reply words (no voice=reply-wav in en-turn capture)"; fi
+# C12 EN-turn reply-wav capture retired with galion-live-demo. The me band on the live path is horbm-duplex.
+chk C12 INFO "EN turn reply-wav capture retired with galion-live-demo; me band on the live path is horbm-duplex"
 # C8 brand
 B="FRXDEL"" STUDIOS"
 BH="$(grep -RIl --exclude-dir=target --exclude=V1-SUMMARY.txt -- "$B" docs/V1-DEMO.md docs/agent-v1-demo/PROGRESS.md docs/agent-v1-demo/V1-0*-STATUS.md \
-      crates/galion-console crates/galion-live-demo scripts/v1 galion-demo/v1 "$OUT" 2>/dev/null || true)"
+      crates/galion-console archive/2026-11-25/crates/galion-live-demo scripts/v1 galion-demo/v1 "$OUT" 2>/dev/null || true)"
 [ -z "$BH" ] && chk C8 PASS "brand: Galion Voice only on V1 surfaces" || chk C8 FAIL "brand hit in: $(echo $BH)"
 if [ "${A21:-absent}" = present-verified ]; then chk C9 INFO "A21 cascade TTS built: Piper CPU weights present-verified (sha256); me band = these words (--reply); Mimi codec still IS_STUB (--mimi off); counsel sign-off pending"
 else chk C9 INFO "A21 weights ${A21:-absent} (docs/agent-v1-demo/A21-BLOCKERS.md); fetch with scripts/a21/fetch-a21.sh; speech falls back to flite; Mimi IS_STUB"; fi

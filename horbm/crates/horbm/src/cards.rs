@@ -12,8 +12,10 @@
 //!
 //! This directory is the truth root. A card with `research_only: true`, or
 //! `not_for` containing `answer`, is not indexed and cannot be spoken as a
-//! fact. Dialogue cards belong in [`ResearchRoot`], which stays empty unless
-//! `GALION_HORBM_RESEARCH_DIR` is a directory that already exists.
+//! fact. Dialogue style examples belong in [`ResearchRoot`]: our own private
+//! research and development cards (laptop only), to be published later
+//! through knowledge.galion.app. That root stays empty unless
+//! `GALION_HORBM_RESEARCH_DIR` is set. It is not this directory.
 //!
 //! The field rules follow `v2/memory/src/card.rs` and `v2/data/schema.json`
 //! in `galion-studio/galion-knowledge`. The optional manifest is
@@ -247,140 +249,6 @@ impl CardLookup for KnowledgeCards {
     }
 }
 
-/// Optional dialogue cards. Not a fact source. Unset means [`Self::empty`].
-///
-/// A card is kept only when it is `research_only`, `claim_type` is
-/// `interpretation`, `use_for` names `style`, `empathy`, or `moves`, and
-/// `not_for` names both `answer` and `cite`. Lookup returns the id. It does
-/// not return the gist, so the line cannot be spoken as a sourced fact.
-#[derive(Clone, Debug, Default)]
-pub struct ResearchRoot {
-    cards: Vec<StyleCard>,
-    postings: HashMap<String, Vec<u32>>,
-}
-
-#[derive(Clone, Debug)]
-struct StyleCard {
-    id: String,
-    n_tokens: usize,
-}
-
-/// The dialogue card that matched. The id is a style mark, not a clause.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct StyleHint {
-    pub id: String,
-}
-
-impl ResearchRoot {
-    pub fn empty() -> Self {
-        Self::default()
-    }
-
-    pub fn len(&self) -> usize {
-        self.cards.len()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.cards.is_empty()
-    }
-
-    /// `GALION_HORBM_RESEARCH_DIR` when that path is already a directory.
-    /// Unset, empty, missing, or unreadable is [`Self::empty`]. Nothing is
-    /// created.
-    pub fn from_env() -> Self {
-        Self::from_flag(std::env::var("GALION_HORBM_RESEARCH_DIR").ok().as_deref())
-    }
-
-    pub fn from_flag(flag: Option<&str>) -> Self {
-        let Some(dir) = knowledge_dir_from_env(flag) else {
-            return Self::empty();
-        };
-        match Self::load(&dir) {
-            Ok(root) => root,
-            Err(err) => {
-                eprintln!("horbm research cards: {err}");
-                Self::empty()
-            }
-        }
-    }
-
-    /// Read dialogue cards from `dir`. Fact cards in the same directory are
-    /// ignored. The directory is not created and nothing is written.
-    pub fn load(dir: &Path) -> Result<Self, CardError> {
-        if !dir.is_dir() {
-            return Err(CardError::NotADirectory(dir.display().to_string()));
-        }
-        let mut files = Vec::new();
-        collect_json(dir, dir, &mut files)?;
-        files.sort_by(|a, b| a.rel.cmp(&b.rel));
-        let mut parsed = Vec::new();
-        for file in &files {
-            parsed.extend(cards_in_file(file)?);
-        }
-        parsed.retain(|card| card.dialogue);
-        parsed.sort_by(|a, b| a.id.cmp(&b.id));
-        Ok(Self::index(parsed))
-    }
-
-    fn index(parsed: Vec<Parsed>) -> Self {
-        let mut cards = Vec::with_capacity(parsed.len());
-        let mut postings: HashMap<String, Vec<u32>> = HashMap::new();
-        for card in parsed {
-            let idx = u32::try_from(cards.len()).unwrap_or(u32::MAX);
-            let tokens = haystack_tokens(&card);
-            let n_tokens = tokens.len();
-            for token in tokens {
-                postings.entry(token).or_default().push(idx);
-            }
-            cards.push(StyleCard {
-                id: card.id,
-                n_tokens,
-            });
-        }
-        Self { cards, postings }
-    }
-
-    /// Covering lookup. A tie is no style. The gist is not returned.
-    pub fn lookup(&self, query: &str) -> Option<StyleHint> {
-        let terms = index_tokens(query);
-        if terms.is_empty() || self.cards.is_empty() {
-            return None;
-        }
-        let mut lists: Vec<&[u32]> = Vec::with_capacity(terms.len());
-        for term in &terms {
-            match self.postings.get(term) {
-                Some(list) if !list.is_empty() => lists.push(list),
-                _ => return None,
-            }
-        }
-        lists.sort_by_key(|list| list.len());
-        let mut hits = lists[0].to_vec();
-        for list in lists.iter().skip(1) {
-            hits.retain(|idx| list.binary_search(idx).is_ok());
-            if hits.is_empty() {
-                return None;
-            }
-        }
-        hits.sort_by(|&a, &b| {
-            let left = &self.cards[a as usize];
-            let right = &self.cards[b as usize];
-            left.n_tokens
-                .cmp(&right.n_tokens)
-                .then_with(|| left.id.cmp(&right.id))
-        });
-        if hits.len() >= 2 {
-            let left = &self.cards[hits[0] as usize];
-            let right = &self.cards[hits[1] as usize];
-            if left.n_tokens == right.n_tokens {
-                return None;
-            }
-        }
-        Some(StyleHint {
-            id: self.cards[hits[0] as usize].id.clone(),
-        })
-    }
-}
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CardError {
     NotADirectory(String),
@@ -418,8 +286,6 @@ struct Parsed {
     hay: String,
     /// `research_only` or `not_for` contains `answer`. Not an answer card.
     blocks_answer: bool,
-    /// Dialogue card. Style only. Never a fact source.
-    dialogue: bool,
 }
 
 /// True when a card must not be spoken as an answer or a citation.
@@ -429,30 +295,6 @@ pub fn blocks_answer(research_only: bool, not_for: &[String]) -> bool {
         || not_for
             .iter()
             .any(|item| item.trim().eq_ignore_ascii_case("answer"))
-}
-
-fn is_dialogue_card(
-    research_only: bool,
-    claim: &str,
-    use_for: &[String],
-    not_for: &[String],
-) -> bool {
-    if !research_only || claim != "interpretation" {
-        return false;
-    }
-    let allows = use_for.iter().any(|item| {
-        matches!(
-            item.trim().to_ascii_lowercase().as_str(),
-            "style" | "empathy" | "moves"
-        )
-    });
-    let bars_answer = not_for
-        .iter()
-        .any(|item| item.trim().eq_ignore_ascii_case("answer"));
-    let bars_cite = not_for
-        .iter()
-        .any(|item| item.trim().eq_ignore_ascii_case("cite"));
-    allows && bars_answer && bars_cite
 }
 
 /// Ids in `dir` that must not become `Hits[0]` for an answer. A missing
@@ -814,7 +656,6 @@ fn one_card(value: &Value, file: &RawFile, check_name: bool) -> Result<Option<Pa
         hay.push_str(view_summary);
     }
     let research_only = matches!(obj.get("research_only"), Some(Value::Bool(true)));
-    let use_for = string_list(obj.get("use_for"));
     let not_for = string_list(obj.get("not_for"));
     Ok(Some(Parsed {
         id,
@@ -822,7 +663,6 @@ fn one_card(value: &Value, file: &RawFile, check_name: bool) -> Result<Option<Pa
         origin: file.rel.clone(),
         hay,
         blocks_answer: blocks_answer(research_only, &not_for),
-        dialogue: is_dialogue_card(research_only, &claim, &use_for, &not_for),
     }))
 }
 
@@ -977,7 +817,7 @@ fn first_str(obj: &serde_json::Map<String, Value>, keys: &[&str]) -> Option<Stri
     None
 }
 
-fn valid_id(id: &str) -> bool {
+pub(crate) fn valid_id(id: &str) -> bool {
     let bytes = id.as_bytes();
     if bytes.is_empty() {
         return false;
@@ -1048,7 +888,7 @@ fn haystack_tokens(card: &Parsed) -> std::collections::BTreeSet<String> {
     index_tokens(&card.hay).into_iter().collect()
 }
 
-fn index_tokens(raw: &str) -> Vec<String> {
+pub(crate) fn index_tokens(raw: &str) -> Vec<String> {
     let mut out = Vec::new();
     let mut cur = String::new();
     for ch in raw.chars() {

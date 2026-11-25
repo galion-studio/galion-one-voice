@@ -669,6 +669,8 @@ mod tests {
         assert!(text.contains("student_on_tick = false"));
         assert!(text.contains("miss = \"I don't know.\""));
         assert!(text.contains("remember_grant = \"GALION_HORBM_REMEMBER=grant\""));
+        assert!(text.contains("research_style = \"deny\""));
+        assert!(text.contains("research_style_dir = \"GALION_HORBM_RESEARCH_DIR\""));
         assert_eq!(UNKNOWN_REPLY, "I don't know.");
     }
 

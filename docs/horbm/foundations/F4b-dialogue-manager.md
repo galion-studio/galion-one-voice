@@ -36,7 +36,7 @@ The state tracker reuses `galion_sam_empathy::NameBook` (32 names). A ring of 32
 
 The knowledge directory is the truth root. It is the only card source for `answer` and `cite`. **[D]**
 
-`GALION_HORBM_RESEARCH_DIR` is the research root. Unset, empty, or not an existing directory means no research cards, and the turn matches the truth-only path. A dialogue card has `research_only: true`, `use_for` of `style`, `empathy`, and `moves`, `not_for` of `answer` and `cite`, and `claim_type: interpretation`. It may mark comfort, offer_topic, and ask with `style:{id}` on `evidence`. It is not spoken, and it is not a source. Comfort still says `I don't know.` when no truth card covers the line.
+`GALION_HORBM_RESEARCH_DIR` is our own private research and development cards (laptop only), to be published later through knowledge.galion.app. Unset, empty, or not an existing directory means no research cards, no bundle reads, and the turn matches the truth-only path. There is no default directory. Cards live under `<root>/cards/diary/dialogue/<dataset>/`. A bundle larger than 246 KiB is not opened. A card is kept only when `not_for` names `answer` and `cite` and a `licence` (or `license`) string is set. Hits are ranked with tantivy in RAM, capped at 3, and near-duplicates collapse. An English query does not open a Chinese LCCC bundle. Every hit is tagged `not_for` answer and cite. Samantha may mark comfort, offer_topic, and ask with `style:{id}` on `evidence`. Aria does not search. The example text is not spoken and is not a source. Comfort still says `I don't know.` when no truth card covers the line. `[consent] research_style` stays `"deny"`. No dataset text is in this repository. A test that needs the laptop cards reads that directory and returns without failing when the variable is unset.
 
 A card with `research_only: true`, or `not_for` containing `answer`, is dropped from the truth index. The retrieval cell drops the same ids before it publishes, so that card is never `Hits[0]` even when the truth root is pointed at it. The gateway prefix `research:` is the off-tick port, not this directory.
 
@@ -52,9 +52,9 @@ The policy is the heuristic. Same lines, same move, same words. `TurnOut.arm` is
 
 Remember here is the callback list, not the retrieval diary. `note_callback` returns false and stores nothing when remember is denied. Withdrawal clears the callbacks and the ring. A callback is spoken only when remember is granted, check-ins are on, and the line is a short greeting with no sourced clause. The words are the stored text (`how did the interview go?` only if that string was stored). The layer does not invent it.
 
-Learn follows the grant string from PR #255 (`GALION_HORBM_LEARN=grant`). This layer does not parse `LOCKS.toml`. On this branch `[consent]` has no `learn` key yet. That key is PR #255. The code defaults deny anyway.
+Learn follows the grant string from PR #255 (`GALION_HORBM_LEARN=grant`). This layer does not parse `LOCKS.toml`. `[consent] learn` stays `"deny"`. The code defaults deny anyway.
 
-`LOCKS.toml` was not edited. `SOUL.md` is not in this tree and was not created.
+`LOCKS.toml` `[consent] research_style` is `"deny"`. `[horbm] research_style_dir` names `GALION_HORBM_RESEARCH_DIR`. Neither key is an EmotionWire bit. `sense`, `adapt`, `remember`, `share`, and `learn` stay deny. `SOUL.md` is not in this tree and was not created.
 
 ## Gate
 
@@ -66,4 +66,4 @@ cargo test --manifest-path horbm/Cargo.toml
 cargo test --workspace
 ```
 
-The dialogue test is the layer gate: each move in its scenario, no answer without a card, consent denied stores no callback and no bandit count, check-ins off by default, and two runs of the same lines match. The roots test uses synthetic cards written in the test, not a dataset file. No audio file. No network in the turn.
+The dialogue test is the layer gate: each move in its scenario, no answer without a card, consent denied stores no callback and no bandit count, check-ins off by default, and two runs of the same lines match. A research card the refusal test needs is built in memory. Tests that read the laptop cards skip when `GALION_HORBM_RESEARCH_DIR` is unset. No dataset text is committed. No audio file. No network in the turn.

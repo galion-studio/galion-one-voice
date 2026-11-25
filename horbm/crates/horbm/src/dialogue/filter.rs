@@ -7,6 +7,7 @@
 //! always legal, and it is what an illegal answer becomes.
 
 use super::moves::Move;
+use crate::research_style::ResearchHit;
 use crate::UNKNOWN_REPLY;
 
 /// Stock comfort lines from `docs/galion-voice-v2/personas/GALION-ONE.md`.
@@ -53,13 +54,76 @@ pub fn real_source(sources: &[String]) -> Option<&str> {
         .map(String::as_str)
 }
 
-/// True when `reply` is a stored clause and a real source is attached.
-pub fn is_sourced(reply: &str, sources: &[String]) -> bool {
+/// A truth source that is not a style-example hit. A research hit never counts.
+pub fn is_sourced_truth(reply: &str, sources: &[String], hits: &[ResearchHit]) -> bool {
+    if research_blocks_speech(reply, sources, hits) {
+        return false;
+    }
     let reply = reply.trim();
     if reply.is_empty() || reply == UNKNOWN_REPLY || is_scripted_comfort(reply) {
         return false;
     }
-    real_source(sources).is_some()
+    sources
+        .iter()
+        .any(|source| is_real_source(source) && !source_is_research(source, hits))
+}
+
+/// The reply is the style example, or the only card source is that hit.
+/// An independent truth source keeps its own clause.
+pub fn research_blocks_speech(reply: &str, sources: &[String], hits: &[ResearchHit]) -> bool {
+    if hits.is_empty() || has_independent(sources, hits) {
+        return false;
+    }
+    let uses_example = hits.iter().any(|hit| reply_uses_example(reply, hit));
+    let names_hit = sources
+        .iter()
+        .any(|source| source_is_research(source, hits));
+    uses_example || names_hit
+}
+
+pub fn source_is_research(source: &str, hits: &[ResearchHit]) -> bool {
+    if source.starts_with("style:") {
+        return true;
+    }
+    let Some(id) = source_id(source) else {
+        return false;
+    };
+    hits.iter().any(|hit| hit.id == id)
+}
+
+pub fn reply_uses_example(reply: &str, hit: &ResearchHit) -> bool {
+    let reply = reply.trim();
+    let text = hit.text.trim();
+    if text.is_empty() || reply.is_empty() || reply == UNKNOWN_REPLY {
+        return false;
+    }
+    if reply.eq_ignore_ascii_case(text) {
+        return true;
+    }
+    if crate::cards::index_tokens(text).len() >= 3 {
+        let reply_l = reply.to_ascii_lowercase();
+        let text_l = text.to_ascii_lowercase();
+        return reply_l.contains(&text_l);
+    }
+    false
+}
+
+fn has_independent(sources: &[String], hits: &[ResearchHit]) -> bool {
+    sources
+        .iter()
+        .any(|source| is_real_source(source) && !source_is_research(source, hits))
+}
+
+fn source_id(source: &str) -> Option<&str> {
+    const PREFIXES: &[&str] = &["card:", "retrieve:", "fixture:", "research:", "style:"];
+    for prefix in PREFIXES {
+        if let Some(id) = source.strip_prefix(prefix) {
+            if !id.is_empty() && !id.contains(':') {
+                return Some(id);
+            }
+        }
+    }
+    None
 }
 
 pub struct Legal {
@@ -97,19 +161,26 @@ mod tests {
 
     #[test]
     fn answer_needs_a_real_source_and_a_stock_comfort_line_is_not_one() {
-        assert!(!is_sourced("I don't know.", &["honest:unknown".into()]));
-        assert!(!is_sourced(
-            "The kettle is on the hob.",
-            &["honest:unknown".into()]
+        assert!(!is_sourced_truth(
+            "I don't know.",
+            &["honest:unknown".into()],
+            &[]
         ));
-        assert!(is_sourced(
+        assert!(!is_sourced_truth(
             "The kettle is on the hob.",
-            &["card:kettle".into()]
+            &["honest:unknown".into()],
+            &[]
+        ));
+        assert!(is_sourced_truth(
+            "The kettle is on the hob.",
+            &["card:kettle".into()],
+            &[]
         ));
         assert!(!is_real_source("style:soft-pace"));
-        assert!(!is_sourced(
+        assert!(!is_sourced_truth(
             "Keep the line short.",
-            &["style:soft-pace".into()]
+            &["style:soft-pace".into()],
+            &[]
         ));
         assert!(is_scripted_comfort("I hear you."));
         assert!(!is_scripted_comfort("I don't know."));

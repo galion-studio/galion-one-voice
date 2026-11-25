@@ -272,6 +272,12 @@ impl StoredKeys {
         Ok(self.item_id.get(row).map(String::as_str))
     }
 
+    /// Row of a version-2 id. `None` when the id is absent. A version-1 file
+    /// has an empty index, so every id is `None`.
+    pub fn row_of(&self, item_id: &str) -> Option<usize> {
+        self.index.get(item_id).copied()
+    }
+
     pub fn row(&self, index: usize) -> Result<&[i8], HkbError> {
         if index >= self.len() {
             return Err(self.row_err(index));

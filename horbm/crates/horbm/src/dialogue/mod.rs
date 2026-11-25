@@ -21,6 +21,8 @@ mod topic;
 
 use galion_sam_empathy::{NameBook, PronounClass};
 
+use crate::research_style::ResearchHit;
+
 pub use moves::{flag_granted, DialogueConsent, Move, TurnSnap, RING_CAP};
 pub use policy::{OfflineBandit, ReplyPlan};
 
@@ -35,6 +37,8 @@ pub struct DecideIn<'a> {
     pub intent: &'a str,
     pub reply: &'a str,
     pub sources: &'a [String],
+    /// Style examples already retrieved. They are not answer content.
+    pub research: &'a [ResearchHit],
     pub arousal: f32,
     pub valence: f32,
     pub dominance: f32,
@@ -164,6 +168,7 @@ impl Dialogue {
             intent: input.intent,
             reply: input.reply,
             sources: input.sources,
+            research: input.research,
             current_topic: current.as_deref(),
             ring_source: prior.as_ref().map(|item| item.source.as_str()),
             ring_clause: prior.as_ref().map(|item| item.clause.as_str()),

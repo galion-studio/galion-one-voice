@@ -13,6 +13,11 @@
 //! no string table, and every scale is `1`. The dot is `galion-tensor`'s,
 //! so the scalar and SIMD scores stay the same bits.
 //!
+//! [`DiaryScan`] scores one query against that file and a person-diary
+//! arena. Both implement [`Int8Scorer`]. A consent-denied row is not dotted.
+//! `remember` false leaves the diary out of the merge. After setup the scan
+//! writes into a buffer the caller already owns.
+//!
 //! No weights, no network, no audio file, no `unsafe`.
 
 #![forbid(unsafe_code)]
@@ -22,6 +27,7 @@ mod fixture;
 mod hkb;
 mod pick;
 mod retrieve;
+mod scan;
 
 pub use adapt::{KeyAdapter, RetrievalAdapter};
 pub use fixture::Fixture;
@@ -30,6 +36,10 @@ pub use hkb::{
 };
 pub use pick::{classify, pick, split_clause, Answer, Heuristic, MarkKind, SidebandMark, HIT_CAP};
 pub use retrieve::{MemoryRetriever, Retrieved, Retriever, StoredClause};
+pub use scan::{
+    embed_diary_into, encode_query_into, DiaryArena, DiaryEmbed, DiaryRow, DiaryScan, Int8Scorer,
+    PreparedQuery, ScanError, ScanHit, ScanPool, DIARY_DIM, SCAN_CAP, SCAN_RRF_K,
+};
 
 #[cfg(test)]
 mod tests {

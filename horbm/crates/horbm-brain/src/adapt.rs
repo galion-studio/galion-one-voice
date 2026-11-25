@@ -4,9 +4,10 @@
 //!
 //! The live link is crate `horbm`, not this crate. `Brain::turn` reads
 //! `horbm::RetrievalThread`. `horbm::Int8Scorer` is implemented for
-//! `horbm_keys::StringKeyArena`. These adapters stay function pointers so a
-//! fixture test can pass a retriever through without a path dependency and
-//! without a network call.
+//! `horbm_keys::StringKeyArena`. The scan that thread still does not call
+//! is [`crate::DiaryScan`], which scores through [`crate::Int8Scorer`].
+//! These adapters stay function pointers so a fixture test can pass a
+//! retriever through without a path dependency and without a network call.
 //!
 //! Cargo features `retrieval` and `keys` compile the notes below. `retrieval`
 //! does not link a diary crate. `keys` does not change the pick. Every build

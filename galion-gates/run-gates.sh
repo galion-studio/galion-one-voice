@@ -15,7 +15,7 @@
 #   PS presence replay  : galion-gates/ps-presence.sh (A13; galion-presence on Mock, specs/presence*.json)
 #   LK Eureka locks     : scripts/check-locks.sh (A1)
 #   DG demo golden      : galion-demo/golden.sh (A14; canned demo sha256 vs galion-gates/golden/demo.sha256)
-#   LV live demo smoke  : galion-gates/lv-live-demo.sh (W21-05; scripts/run-live-demo.sh headless, SKIP if absent)
+#   LV live loop smoke  : galion-gates/lv-live-demo.sh (scripts/run-live-demo.sh runs horbm-duplex; galion-live-demo is archived)
 #   V1 V1 demo smoke    : galion-gates/v1-demo.sh (V1-04; scripts/run-v1-demo.sh --headless, SKIP if absent)
 #   OP one-percent      : galion-gates/op-one-percent.sh (V6 engine account; stub vs measured)
 #   SY symphony frame   : galion-gates/sy-frame.sh (80 ms tick + 1% stub-step ceiling; GALION_GATES_NO_SY=1 skips)
@@ -171,7 +171,7 @@ soft G6 "$HERE/g6-rika.sh"
 export GALION_GATES_TS="$TS"; soft PS "$HERE/ps-presence.sh"   # A13 presence replay (S8), reports results/<ts>.presence*.json
 soft LK "$ROOT/scripts/check-locks.sh"
 soft DG "$ROOT/galion-demo/golden.sh"   # A14 canned demo golden (galion-gates/golden/demo.sha256)
-[ "${GALION_GATES_NO_LV:-0}" = 1 ] && mark LV SKIP "GALION_GATES_NO_LV=1" || soft LV "$HERE/lv-live-demo.sh"   # W21-05 live demo smoke (headless)
+[ "${GALION_GATES_NO_LV:-0}" = 1 ] && mark LV SKIP "GALION_GATES_NO_LV=1" || soft LV "$HERE/lv-live-demo.sh"   # horbm-duplex via run-live-demo.sh; crate archived
 [ "${GALION_GATES_NO_V1:-0}" = 1 ] && mark V1 SKIP "GALION_GATES_NO_V1=1" || soft V1 "$HERE/v1-demo.sh"   # V1-04 V1 demo smoke (headless)
 [ "${GALION_GATES_NO_OP:-0}" = 1 ] && mark OP SKIP "GALION_GATES_NO_OP=1" || soft OP "$HERE/op-one-percent.sh"   # V6 one-percent engine (symphony)
 [ "${GALION_GATES_NO_SY:-0}" = 1 ] && mark SY SKIP "GALION_GATES_NO_SY=1" || soft SY "$HERE/sy-frame.sh"   # symphony 80 ms / 1% tick

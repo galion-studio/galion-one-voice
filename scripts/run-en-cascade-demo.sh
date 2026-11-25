@@ -13,7 +13,8 @@
 #                                       [--pin en] [--hint en] [--emotion neutral] [--allow-tones 1]
 # Env:   GALION_DEMO_OUT (default: <repo>/target/galion-demo)
 #
-# Stable outputs (live-demo hook; scripts/run-live-demo.sh should read these):
+# Stable outputs of this cascade script. galion-live-demo is archived and does not read them.
+# The live loop is horbm-duplex / scripts/horbm-e2e-smoke.sh, not this WAV.
 #   $GALION_DEMO_OUT/en-cascade.wav          reply as SPOKEN WORDS, 24 kHz mono PCM16, 80 ms frames
 #   $GALION_DEMO_OUT/en-cascade-speech.wav   same speech (explicit name)
 #   $GALION_DEMO_OUT/en-cascade-earcon.wav   diagnostic earcon (tones; NOT the reply)
