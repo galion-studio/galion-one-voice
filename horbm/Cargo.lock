@@ -469,6 +469,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "horbm-ear"
+version = "0.0.1"
+dependencies = [
+ "galion-emotion",
+ "galion-emotion-core",
+ "pitch-detection",
+]
+
+[[package]]
 name = "horbm-eval"
 version = "0.0.1"
 dependencies = [
@@ -492,6 +501,7 @@ dependencies = [
  "galion-sam-asr",
  "galion-tts-piper",
  "horbm",
+ "horbm-ear",
 ]
 
 [[package]]
@@ -807,6 +817,15 @@ name = "pin-project-lite"
 version = "0.2.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c938015719552d665fd0553b90d96cd7ff58e83e4c061ca99e6bb78865a72752"
+
+[[package]]
+name = "pitch-detection"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e086e70dfcfd46cd6097c501a66fb07cd73ee8c27844b0941d9b2b3e43dfbf92"
+dependencies = [
+ "rustfft",
+]
 
 [[package]]
 name = "pkg-config"

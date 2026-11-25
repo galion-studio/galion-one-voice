@@ -273,6 +273,7 @@ fn event_name(event: LoopEvent) -> Option<&'static str> {
         | LoopEvent::EagerEndOfTurn
         | LoopEvent::Committed
         | LoopEvent::Backchannel
+        | LoopEvent::ListenBackchannel
         | LoopEvent::TurnResumed => None,
     }
 }

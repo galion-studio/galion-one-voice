@@ -29,7 +29,9 @@
 //! [`eot::Scorer`] turns those scalars, plus the latest ASR partial, into a
 //! [`eot::TurnMsg`]. Thresholds are `eot.toml`, compiled in. A denied frame
 //! is [`eot::TurnMsg::PauseOnly`], which is the conductor's existing hang.
-//! Nothing in the scorer reads a weight or a sound file.
+//! [`eot::ListenCue`] marks a clause-final fall that is still a hold, a
+//! question rise, or a filler. Nothing in the scorer reads a weight or a
+//! sound file, and it does not play a backchannel.
 
 #![forbid(unsafe_code)]
 
@@ -39,7 +41,7 @@ pub mod link;
 pub mod listen;
 pub mod port;
 
-pub use eot::{EotConfig, ProsodyCue, Scorer, TurnMsg};
+pub use eot::{EotConfig, ListenCue, ProsodyCue, Scorer, TurnMsg};
 pub use galion_emotion::consent_bits;
 pub use galion_emotion::Purpose;
 pub use port::{ListenerOffer, ListenerPort};
