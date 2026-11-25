@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Galion Labs
-//! Samantha's slower goals. No audio, no user store, no second persona.
+//! Standalone inner goals. No audio, no user store, no named persona.
 
 use std::time::Instant;
 
@@ -8,9 +8,9 @@ use galion_emotion::consent_bits::{ADAPT, REMEMBER, SENSE, SHARE};
 use galion_emotion::SAMANTHA;
 use galion_emotion_core::{EmotionCore, IntentMsg, IntentSource, AROUSAL, DOMINANCE, VALENCE};
 use horbm_inner::{
-    remember_denied, Heard, InnerMsg, MsgDir, Perceived, SamanthaInner, Verb, CARE_HOME, CARE_SAD,
+    remember_denied, Heard, InnerMsg, MsgDir, Perceived, PersonaInner, Verb, CARE_HOME, CARE_SAD,
     CHECKIN_GAP_MS, CHECKIN_MS, CURIOSITY_HOME, DECAY_KEEP_DEN, DECAY_KEEP_NUM, EAR_CONFIDENCE,
-    EXPECT_HOME, PERSONA, REMEMBER_LOCK, TICK_MS, WAIT_MS,
+    EXPECT_HOME, REMEMBER_LOCK, TICK_MS, WAIT_MS,
 };
 
 fn seen(words: &str, ear: Option<Heard>, sense: bool) -> Perceived<'_> {
@@ -31,13 +31,11 @@ fn sad_ear() -> Heard {
 }
 
 #[test]
-fn she_is_samantha_and_the_homes_come_from_her_rest() {
-    assert_eq!(PERSONA, "samantha");
-    assert_eq!(SAMANTHA.persona.as_str(), PERSONA);
+fn standalone_home_matches_the_old_rest_and_names_nobody() {
     assert_eq!(REMEMBER_LOCK, "deny");
     assert!(remember_denied());
     let rest = std::hint::black_box(SAMANTHA.dynamics.rest.valence);
-    assert!(rest > 0.0, "her rest is warm");
+    assert!(rest > 0.0, "the rest valence is warm");
     assert!((CARE_HOME - (0.30 + rest)).abs() < 1.0e-6);
     let half_life = std::hint::black_box(SAMANTHA.dynamics.half_life_ms);
     assert!((half_life - 20_000.0).abs() < 1.0);
@@ -48,7 +46,8 @@ fn she_is_samantha_and_the_homes_come_from_her_rest() {
         "decay keep {keep} vs half-life {ideal}"
     );
     assert_eq!(TICK_MS, 80);
-    let life = SamanthaInner::new();
+    let life = PersonaInner::new();
+    assert_eq!(life.persona_id(), "");
     assert!(!life.keeps_user_facts());
     assert_eq!(life.care().to_bits(), CARE_HOME.to_bits());
     assert_eq!(life.curiosity().to_bits(), CURIOSITY_HOME.to_bits());
@@ -57,7 +56,7 @@ fn she_is_samantha_and_the_homes_come_from_her_rest() {
 
 #[test]
 fn a_sad_listener_raises_care_and_warms_the_moment() {
-    let mut life = SamanthaInner::new();
+    let mut life = PersonaInner::new();
     let msg = life.turn(seen("I feel really sad", None, false));
     assert!(
         life.care() > CARE_HOME + 0.1,
@@ -110,7 +109,7 @@ fn a_sad_listener_raises_care_and_warms_the_moment() {
 
 #[test]
 fn a_question_raises_expect_and_the_answer_intent() {
-    let mut life = SamanthaInner::new();
+    let mut life = PersonaInner::new();
     let msg = life.turn(seen("where did you go?", None, false));
     assert!(
         life.expect() > EXPECT_HOME + 0.2,
@@ -126,7 +125,7 @@ fn a_question_raises_expect_and_the_answer_intent() {
 
 #[test]
 fn silence_waits_then_checks_in_once() {
-    let mut life = SamanthaInner::new();
+    let mut life = PersonaInner::new();
     let mut saw_wait = false;
     let mut checkins = 0u32;
     let frames = CHECKIN_MS / TICK_MS;
@@ -165,7 +164,7 @@ fn silence_waits_then_checks_in_once() {
 
     // She speaks, so the stretch ends. The gap has not elapsed yet: do that
     // on a fresh clock by ticking only a little after the check-in.
-    let mut life = SamanthaInner::new();
+    let mut life = PersonaInner::new();
     for _ in 0..(CHECKIN_MS / TICK_MS) {
         let _ = life.tick(TICK_MS, true);
     }
@@ -212,18 +211,18 @@ fn a_low_confidence_ear_is_no_claim() {
     assert_eq!(claimed.arousal.to_bits(), 0.28f32.to_bits());
     assert_eq!(claimed.confidence.to_bits(), EAR_CONFIDENCE.to_bits());
 
-    let mut from_words = SamanthaInner::new();
+    let mut from_words = PersonaInner::new();
     let heard = from_words.turn(seen("I feel sad", Heard::from_axes(0.8, 0.8, shy), true));
     assert_eq!(heard.verb, Verb::Comfort);
     assert!(from_words.care() > CARE_HOME + 0.1);
 
-    let mut quiet = SamanthaInner::new();
+    let mut quiet = PersonaInner::new();
     let ignored = quiet.turn(seen("", Heard::from_axes(-0.55, 0.28, shy), true));
     assert_ne!(ignored.verb, Verb::Comfort);
     assert_eq!(quiet.care().to_bits(), CARE_HOME.to_bits());
     assert_eq!(quiet.turns(), 0);
 
-    let mut sensed = SamanthaInner::new();
+    let mut sensed = PersonaInner::new();
     let ear_only = sensed.turn(seen(
         "",
         Heard::from_axes(-0.55, 0.28, EAR_CONFIDENCE),
@@ -235,12 +234,12 @@ fn a_low_confidence_ear_is_no_claim() {
 
 #[test]
 fn ear_off_ignores_the_listener_and_still_reads_the_words() {
-    let mut from_ear = SamanthaInner::new();
+    let mut from_ear = PersonaInner::new();
     let ignored = from_ear.turn(seen("", Some(sad_ear()), false));
     assert_ne!(ignored.verb, Verb::Comfort);
     assert_eq!(from_ear.care().to_bits(), CARE_HOME.to_bits());
 
-    let mut from_words = SamanthaInner::new();
+    let mut from_words = PersonaInner::new();
     let heard = from_words.turn(seen(
         "I feel sad",
         Some(Heard {
@@ -253,7 +252,7 @@ fn ear_off_ignores_the_listener_and_still_reads_the_words() {
     assert_eq!(heard.verb, Verb::Comfort);
     assert!(from_words.care() > CARE_HOME + 0.1);
 
-    let mut sensed = SamanthaInner::new();
+    let mut sensed = PersonaInner::new();
     let ear_only = sensed.turn(seen("", Some(sad_ear()), true));
     assert_eq!(ear_only.verb, Verb::Comfort);
     assert!(sensed.care() > CARE_HOME);
@@ -275,14 +274,14 @@ fn an_inbound_heard_note_is_the_same_gemi_record() {
     assert_eq!(parsed.verb, Verb::Heard);
     assert_eq!(parsed.care, 0.0, "goals do not ride the 72-byte record");
 
-    let mut life = SamanthaInner::new();
+    let mut life = PersonaInner::new();
     let answer = life.hear(&inbound, "where did you go?");
     assert_eq!(answer.verb, Verb::Answer);
     assert_eq!(life.care().to_bits(), CARE_HOME.to_bits());
     assert!(life.expect() > EXPECT_HOME);
 
     inbound.consent = SENSE;
-    let mut life = SamanthaInner::new();
+    let mut life = PersonaInner::new();
     let comfort = life.hear(&inbound, "");
     assert_eq!(comfort.verb, Verb::Comfort);
     assert!(life.care() > CARE_HOME);
@@ -297,7 +296,7 @@ fn an_inbound_heard_note_is_the_same_gemi_record() {
 
 #[test]
 fn the_note_is_json_and_has_no_transcript_field() {
-    let mut life = SamanthaInner::new();
+    let mut life = PersonaInner::new();
     let _ = life.turn(seen("my password is secret and I feel sad", None, false));
     let msg = life.last();
     let json = msg.to_json().expect("json");
@@ -322,13 +321,13 @@ fn the_note_is_json_and_has_no_transcript_field() {
 
 #[test]
 fn curiosity_asks_and_a_greeting_stays_with_them() {
-    let mut life = SamanthaInner::new();
+    let mut life = PersonaInner::new();
     let ask = life.turn(seen("I wonder about the river", None, false));
     assert_eq!(ask.verb, Verb::Ask);
     assert!(life.curiosity() > CURIOSITY_HOME);
     assert_eq!(ask.to_gemi().expect("gemi").verb_str(), "ask");
 
-    let mut life = SamanthaInner::new();
+    let mut life = PersonaInner::new();
     let with = life.turn(seen("hello", None, false));
     assert_eq!(with.verb, Verb::With);
     assert_eq!(with.to_gemi().expect("gemi").verb_str(), "with");
@@ -339,7 +338,7 @@ fn curiosity_asks_and_a_greeting_stays_with_them() {
 
 #[test]
 fn goals_decay_toward_home_and_do_not_fall_through_it() {
-    let mut life = SamanthaInner::new();
+    let mut life = PersonaInner::new();
     let _ = life.turn(seen("I feel really sad", None, false));
     let peak = life.care();
     for _ in 0..250 {
@@ -356,7 +355,7 @@ fn goals_decay_toward_home_and_do_not_fall_through_it() {
 
 #[test]
 fn a_refused_step_does_not_commit_the_turn() {
-    let life = SamanthaInner::new();
+    let life = PersonaInner::new();
     let (next, msg) = life.preview(seen("I feel really sad", None, false));
     let mut core = EmotionCore::at_rest();
     let err = core
@@ -377,7 +376,7 @@ fn a_refused_step_does_not_commit_the_turn() {
         EmotionCore::at_rest().baseline().identity_bits()
     );
 
-    let mut life = SamanthaInner::new();
+    let mut life = PersonaInner::new();
     let mut core = EmotionCore::at_rest();
     let note = life
         .nudge(&mut core, seen("I feel really sad", None, false))
@@ -389,7 +388,7 @@ fn a_refused_step_does_not_commit_the_turn() {
 
 #[test]
 fn one_tick_is_cheap() {
-    let mut life = SamanthaInner::new();
+    let mut life = PersonaInner::new();
     for _ in 0..32 {
         black_box_tick(&mut life);
     }
@@ -404,7 +403,7 @@ fn one_tick_is_cheap() {
     assert!(per < 100.0, "tick {per:.3} us");
 }
 
-fn black_box_tick(life: &mut SamanthaInner) {
+fn black_box_tick(life: &mut PersonaInner) {
     let msg = life.tick(TICK_MS, true);
     std::hint::black_box(msg);
 }
