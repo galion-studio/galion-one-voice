@@ -11,6 +11,11 @@ const PHRASES: &[&str] = &[
     "okay", "ok", "right", "da", "aha", "oh", "uh", "huh", "quite",
 ];
 
+/// The backchannel list. Callers that bias a recognizer use this rather than a second copy.
+pub fn listed_backchannels() -> &'static [&'static str] {
+    PHRASES
+}
+
 /// Two words or fewer, every word on the list, or the whole phrase on the list.
 pub fn is_listed_backchannel(text: &str) -> bool {
     let norm = normalize(text);
@@ -57,5 +62,15 @@ mod tests {
         assert!(!is_listed_backchannel("stop talking now"));
         assert!(!is_listed_backchannel("yeah stop"));
         assert!(!is_listed_backchannel("hello"));
+    }
+
+    #[test]
+    fn the_exported_list_is_what_the_matcher_accepts() {
+        assert!(listed_backchannels().contains(&"yeah"));
+        assert!(listed_backchannels().contains(&"yep"));
+        assert!(listed_backchannels().contains(&"yea"));
+        for phrase in listed_backchannels() {
+            assert!(is_listed_backchannel(phrase), "{phrase}");
+        }
     }
 }
