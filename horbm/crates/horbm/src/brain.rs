@@ -279,7 +279,8 @@ impl Brain {
         research: Option<Box<dyn ResearchAsk + Send>>,
     ) -> Self {
         let card_count = cards.len();
-        let (emotion, inner, persona) = install(development_persona());
+        let (emotion, inner, persona) =
+            install(development_persona().expect("development persona"));
         Self {
             empathy: Empathy::new(),
             cards: Box::new(cards),
@@ -356,8 +357,9 @@ impl Brain {
 
     /// Read the persona file once, then open cards the way [`Self::open`] does.
     ///
-    /// `None` loads Samantha. An explicit path replaces her. An unreadable or
-    /// invalid file returns the error and does not build a brain.
+    /// `None` loads the configured development persona. An explicit path
+    /// replaces it. An unreadable file, an invalid file, or a missing
+    /// configuration returns the error and does not build a brain.
     pub fn boot(
         memory_db: &Path,
         knowledge_dir: &Path,
@@ -366,7 +368,7 @@ impl Brain {
     ) -> Result<Self, PersonaError> {
         let persona = match persona_file {
             Some(path) => Persona::load(path)?,
-            None => development_persona(),
+            None => development_persona()?,
         };
         let mut brain = Self::open(memory_db, knowledge_dir, cases);
         brain.install_persona(persona);
@@ -1089,8 +1091,13 @@ impl Brain {
     }
 }
 
-fn development_persona() -> Persona {
-    Persona::samantha().expect("samantha.toml is the development persona")
+/// Configured development persona.
+///
+/// `GALION_HORBM_DEV_PERSONA` names the id when it is non-empty. Otherwise
+/// `development.toml` does. The file is `personas/<id>.toml`. A blank id or
+/// a missing file is an error.
+fn development_persona() -> Result<Persona, PersonaError> {
+    Persona::load_development()
 }
 
 fn install(persona: Persona) -> (EmotionCore, InnerLife, Persona) {

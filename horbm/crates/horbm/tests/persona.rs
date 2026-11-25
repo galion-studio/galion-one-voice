@@ -2,12 +2,61 @@
 // Copyright (c) 2026 Galion Labs
 //! Boot reads the persona once. An invalid file is refused.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::sync::{Mutex, MutexGuard};
 
 use horbm::{
-    Brain, CardHit, CardLookup, InnerLife, MoveClaim, MoveVerdict, PersonaError, VoiceBaseline,
-    UNKNOWN_LINE, UNKNOWN_REPLY,
+    Brain, CardHit, CardLookup, InnerLife, MoveClaim, MoveVerdict, Persona, PersonaError,
+    VoiceBaseline, UNKNOWN_LINE, UNKNOWN_REPLY,
 };
+
+const DEV_PERSONA_ENV: &str = "GALION_HORBM_DEV_PERSONA";
+const PERSONA_DIR_ENV: &str = "GALION_HORBM_PERSONA_DIR";
+
+static ENV_LOCK: Mutex<()> = Mutex::new(());
+
+struct EnvVar {
+    key: &'static str,
+    prev: Option<std::ffi::OsString>,
+}
+
+impl EnvVar {
+    fn set(key: &'static str, value: Option<&str>) -> Self {
+        let prev = std::env::var_os(key);
+        match value {
+            Some(value) => std::env::set_var(key, value),
+            None => std::env::remove_var(key),
+        }
+        Self { key, prev }
+    }
+}
+
+impl Drop for EnvVar {
+    fn drop(&mut self) {
+        match &self.prev {
+            Some(value) => std::env::set_var(self.key, value),
+            None => std::env::remove_var(self.key),
+        }
+    }
+}
+
+/// The lock is the last field, so it drops after the variables are restored.
+struct HeldEnv {
+    _id: EnvVar,
+    _dir: EnvVar,
+    _lock: MutexGuard<'static, ()>,
+}
+
+fn hold(id: Option<&str>, dir: Option<&Path>) -> HeldEnv {
+    let lock = ENV_LOCK.lock().unwrap_or_else(|err| err.into_inner());
+    let id = EnvVar::set(DEV_PERSONA_ENV, id);
+    let dir = EnvVar::set(PERSONA_DIR_ENV, dir.and_then(|path| path.to_str()));
+    HeldEnv {
+        _id: id,
+        _dir: dir,
+        _lock: lock,
+    }
+}
 
 struct NoCards;
 
@@ -43,6 +92,13 @@ fn boot_err(
     }
 }
 
+fn boot_unset(root: &std::path::Path, knowledge: &std::path::Path) -> PersonaError {
+    match Brain::boot(root, knowledge, &root.join("cases"), None) {
+        Err(err) => err,
+        Ok(_) => panic!("boot accepted a missing configuration"),
+    }
+}
+
 fn bare() -> MoveClaim<'static> {
     MoveClaim {
         tag: b"fact",
@@ -54,6 +110,7 @@ fn bare() -> MoveClaim<'static> {
 
 #[test]
 fn invalid_persona_refused_at_boot() {
+    let _env = hold(None, None);
     let root = scratch("bad");
     std::fs::create_dir(&root).unwrap();
     let bad = root.join("bad.toml");
@@ -84,6 +141,7 @@ fn invalid_persona_refused_at_boot() {
 
 #[test]
 fn boot_without_a_file_loads_samantha() {
+    let _env = hold(None, None);
     let root = scratch("none");
     std::fs::create_dir(&root).unwrap();
     let knowledge = root.join("knowledge");
@@ -109,6 +167,7 @@ fn boot_without_a_file_loads_samantha() {
 
 #[test]
 fn boot_loads_samantha_and_keeps_her_while_the_moment_swings() {
+    let _env = hold(None, None);
     let root = scratch("sam");
     std::fs::create_dir(&root).unwrap();
     let knowledge = root.join("knowledge");
@@ -150,5 +209,90 @@ fn boot_loads_samantha_and_keeps_her_while_the_moment_swings() {
         focused.inner().care(0).unwrap().token_str(),
         InnerLife::seeded().care(0).unwrap().token_str()
     );
+    let _ = std::fs::remove_dir_all(&root);
+}
+
+#[test]
+fn boot_installs_the_persona_the_env_names() {
+    let root = scratch("env");
+    let personas = root.join("personas");
+    std::fs::create_dir_all(&personas).unwrap();
+    let shipped_text = std::fs::read_to_string(samantha()).unwrap();
+    let text = shipped_text
+        .replace("id = \"samantha\"", "id = \"cedar\"")
+        .replace("voice = \"samantha\"", "voice = \"cedar\"")
+        .replace("valence = 0.28", "valence = 0.0");
+    assert_ne!(text, shipped_text);
+    std::fs::write(personas.join("cedar.toml"), text).unwrap();
+    let _env = hold(Some("cedar"), Some(&root));
+    let knowledge = root.join("knowledge");
+    let brain = Brain::boot(&root, &knowledge, &root.join("cases"), None).unwrap();
+    assert!(!knowledge.exists());
+    assert_eq!(brain.persona().id(), "cedar");
+    let shipped = Persona::load(&samantha()).unwrap();
+    assert_eq!(shipped.id(), "samantha");
+    assert_ne!(brain.persona().id(), shipped.id());
+    assert_ne!(
+        brain.emotion().baseline().identity_bits(),
+        shipped.baseline().identity_bits()
+    );
+    assert_ne!(
+        brain.persona().valence().to_bits(),
+        shipped.valence().to_bits()
+    );
+    let cards = Brain::with_cards(NoCards, None);
+    assert_eq!(cards.persona().id(), "cedar");
+    let explicit = Brain::boot(&root, &knowledge, &root.join("cases"), Some(&samantha())).unwrap();
+    assert_eq!(explicit.persona().id(), shipped.id());
+    assert_eq!(
+        explicit.emotion().baseline().identity_bits(),
+        shipped.baseline().identity_bits()
+    );
+    let _ = std::fs::remove_dir_all(&root);
+}
+
+#[test]
+fn boot_refuses_when_nothing_is_configured() {
+    let root = scratch("unset");
+    std::fs::create_dir(&root).unwrap();
+    let _env = hold(None, Some(&root));
+    let knowledge = root.join("knowledge");
+    let unset = PersonaError::Invalid("development persona is not configured");
+    assert_eq!(boot_unset(&root, &knowledge), unset);
+    assert!(!knowledge.exists());
+
+    std::fs::write(
+        root.join("development.toml"),
+        "development_persona = \"\"\n",
+    )
+    .unwrap();
+    assert_eq!(boot_unset(&root, &knowledge), unset);
+
+    std::fs::write(
+        root.join("development.toml"),
+        "development_persona = \"   \"\n",
+    )
+    .unwrap();
+    assert_eq!(boot_unset(&root, &knowledge), unset);
+
+    std::fs::write(
+        root.join("development.toml"),
+        "development_persona = \"cedar\"\n",
+    )
+    .unwrap();
+    assert_eq!(boot_unset(&root, &knowledge), PersonaError::Unreadable);
+
+    let personas = root.join("personas");
+    std::fs::create_dir(&personas).unwrap();
+    let mismatched = std::fs::read_to_string(samantha())
+        .unwrap()
+        .replace("id = \"samantha\"", "id = \"maple\"")
+        .replace("voice = \"samantha\"", "voice = \"maple\"");
+    std::fs::write(personas.join("cedar.toml"), mismatched).unwrap();
+    assert_eq!(
+        boot_unset(&root, &knowledge),
+        PersonaError::Invalid("persona file id is not the configured id")
+    );
+    assert!(!knowledge.exists());
     let _ = std::fs::remove_dir_all(&root);
 }

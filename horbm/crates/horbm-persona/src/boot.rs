@@ -5,6 +5,8 @@
 //! The id comes from [`BootConfig::ENV`] or from `development.toml`.
 //! Nothing in this module names a persona. A blank source is an error.
 
+use std::path::{Path, PathBuf};
+
 use serde::Deserialize;
 
 use crate::load::pack_name;
@@ -25,6 +27,10 @@ impl BootConfig {
     /// Process environment that names the persona id. Wins over the file.
     pub const ENV: &str = "GALION_HORBM_DEV_PERSONA";
 
+    /// Directory that holds `development.toml` and `personas/<id>.toml`.
+    /// A non-empty value replaces this crate's directory. Blank is ignored.
+    pub const DIR: &str = "GALION_HORBM_PERSONA_DIR";
+
     /// One persona id. Blank is not configured. Any other illegal token is refused.
     pub fn from_id(id: &str) -> Result<Self, PersonaError> {
         let id = id.trim();
@@ -36,7 +42,7 @@ impl BootConfig {
         })
     }
 
-    /// `development_persona = "<id>"`. A missing or blank id is not configured.
+    /// The `development_persona` key. A missing or blank id is not configured.
     pub fn from_toml(text: &str) -> Result<Self, PersonaError> {
         let raw: RawBoot = toml::from_str(text).map_err(|_| PersonaError::Invalid(BAD_FILE))?;
         match raw.development_persona {
@@ -66,6 +72,31 @@ impl BootConfig {
     pub fn from_process() -> Result<Self, PersonaError> {
         let env = std::env::var(Self::ENV).ok();
         Self::resolve(env.as_deref(), Some(SHIPPED_BOOT_TOML))
+    }
+
+    /// `env_value` wins when it is a non-empty id. Otherwise
+    /// `root/development.toml`. A missing file is not configured.
+    /// Any other read failure is [`PersonaError::Unreadable`].
+    pub fn from_dir(root: &Path, env_value: Option<&str>) -> Result<Self, PersonaError> {
+        if nonempty(env_value).is_some() {
+            return Self::resolve(env_value, None);
+        }
+        let path = root.join("development.toml");
+        match std::fs::read_to_string(&path) {
+            Ok(text) => Self::from_toml(&text),
+            Err(err) if err.kind() == std::io::ErrorKind::NotFound => {
+                Err(PersonaError::Invalid(UNSET))
+            }
+            Err(_) => Err(PersonaError::Unreadable),
+        }
+    }
+
+    /// [`Self::DIR`] when it is a non-empty path, otherwise this crate.
+    pub fn root() -> PathBuf {
+        match std::env::var(Self::DIR) {
+            Ok(value) if !value.trim().is_empty() => PathBuf::from(value.trim()),
+            _ => PathBuf::from(env!("CARGO_MANIFEST_DIR")),
+        }
     }
 
     pub fn id(&self) -> &str {
