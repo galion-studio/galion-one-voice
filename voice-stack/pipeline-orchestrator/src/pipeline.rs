@@ -609,7 +609,6 @@ fn emit_turn(turns: &TurnMailbox, floor: &Floor, buf: &mut Vec<AudioFrame>, next
     }
 }
 
-/// What [`Pipeline::spawn`] hands the think task. One struct keeps the task under clippy's argument limit.
 struct ThinkIn<A, R, M> {
     asr: A,
     reply: R,
@@ -621,7 +620,7 @@ struct ThinkIn<A, R, M> {
     shutdown: watch::Receiver<bool>,
 }
 
-async fn think<A: Asr, R: ReplyEngine, M: MoodTick>(task: ThinkIn<A, R, M>) {
+async fn think<A: Asr, R: ReplyEngine, M: MoodTick>(inn: ThinkIn<A, R, M>) {
     let ThinkIn {
         mut asr,
         mut reply,
@@ -631,7 +630,7 @@ async fn think<A: Asr, R: ReplyEngine, M: MoodTick>(task: ThinkIn<A, R, M>) {
         mood,
         reports,
         mut shutdown,
-    } = task;
+    } = inn;
     loop {
         let heard = tokio::select! {
             changed = shutdown.changed() => {

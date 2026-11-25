@@ -34,8 +34,9 @@ pub fn resample_frame(input: &[f32], _in_rate: u32, out: &mut [f32; FRAME_SAMPLE
         return;
     }
     let last = input.len() - 1;
+    let span = FRAME_SAMPLES as f32 - 1.0;
     for (i, slot) in out.iter_mut().enumerate() {
-        let src = (i as f32) * (last as f32) / (FRAME_SAMPLES as f32 - 1.0);
+        let src = (i as f32) * (last as f32) / span;
         let j = (src.floor() as usize).min(last);
         let frac = src - j as f32;
         let a = input[j];

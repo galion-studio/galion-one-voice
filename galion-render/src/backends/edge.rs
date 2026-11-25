@@ -4,6 +4,7 @@
 //! exact CORS, foreign-Origin rejection, loopback bind, a short-lived
 //! session token, and Art. 50 disclosure strings. No secrets.
 
+use std::fmt::Write;
 use std::net::IpAddr;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
@@ -288,7 +289,11 @@ pub(crate) fn mint_token() -> String {
     let mut b = [0u8; 32];
     if let Ok(mut f) = std::fs::File::open("/dev/urandom") {
         if std::io::Read::read_exact(&mut f, &mut b).is_ok() {
-            return b.iter().map(|x| format!("{x:02x}")).collect();
+            let mut out = String::with_capacity(b.len() * 2);
+            for x in b {
+                let _ = write!(out, "{x:02x}");
+            }
+            return out;
         }
     }
     static N: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);

@@ -6,7 +6,6 @@
 
 use galion_ml_voice::speech::clone_worker::{worker_script, CloneModel, CloneWorker};
 use galion_ml_voice::speech::gqvoice::{self, GqVoice};
-use std::path::PathBuf;
 
 #[test]
 fn chatterbox_worker_bytes_compile_before_playback() {
@@ -47,7 +46,7 @@ fn chatterbox_worker_bytes_compile_before_playback() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
-fn land(script: &std::path::Path, dir: &PathBuf, persona: &str, model: CloneModel, text: &str) {
+fn land(script: &std::path::Path, dir: &std::path::Path, persona: &str, model: CloneModel, text: &str) {
     // Outside `dir`: the test counts landed packet names in that directory.
     let ref_root = std::env::temp_dir().join(format!(
         "galion-gqvoice-refroot-{}-{}",

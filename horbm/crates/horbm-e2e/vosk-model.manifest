@@ -1,0 +1,16 @@
+# Pinned Vosk small English model for the Linux end-to-end smoke.
+# License: Apache-2.0 (Alpha Cephei / Kaldi).
+# The zip is fetched into a cache outside this repository. It is not committed.
+# Source: https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip
+model_name=vosk-model-small-en-us-0.15
+model_sha256=30f26242c4eb449f948e42cb302dd7a686cb29a3423a8367f99ff41780942498
+model_url=https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip
+license=Apache-2.0
+
+# libvosk 0.3.45. The pinned zip is Linux x86_64 only and is not fetched on
+# other targets. A system libvosk is tried when the zip is unavailable.
+# License: Apache-2.0.
+# Source: https://github.com/alphacep/vosk-api/releases/download/v0.3.45/vosk-linux-x86_64-0.3.45.zip
+lib_sha256=bbdc8ed85c43979f6443142889770ea95cbfbc56cffb5c5dcd73afa875c5fbb2
+lib_url=https://github.com/alphacep/vosk-api/releases/download/v0.3.45/vosk-linux-x86_64-0.3.45.zip
+lib_file=libvosk.so

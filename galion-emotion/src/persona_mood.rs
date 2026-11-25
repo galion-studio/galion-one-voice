@@ -698,6 +698,11 @@ mod tests {
         UserObservation { valence: v, arousal: a, dominance: d, confidence: c, source: ObsSource::Fused }
     }
 
+    /// Keeps a positive-coefficient lock from folding into `assert!(true)`.
+    fn above_zero(v: f32) -> bool {
+        v > 0.0
+    }
+
     #[test]
     fn mood_evolves_with_inertia_and_decays() {
         let mut m = PersonaMood::new(Persona::Samantha);
@@ -881,8 +886,8 @@ mod tests {
         let p = s.conditioning(1_800).piper();
         assert_eq!(p.noise_scale, ns);
         assert_eq!(p.noise_w, nw);
-        assert!(SAMANTHA.voice.noise_per_arousal > 0.0);
-        assert!(SAMANTHA.voice.noise_w_per_arousal > 0.0);
+        assert!(above_zero(SAMANTHA.voice.noise_per_arousal));
+        assert!(above_zero(SAMANTHA.voice.noise_w_per_arousal));
 
         let tired = EmotionFrame { seq: 1, t_ms: 80, dur_ms: 80, valence: -0.6, arousal: 0.2, dominance: 0.4, confidence: 1.0 };
         j.observe(&UserObservation::from_frame(&tired), 80);
