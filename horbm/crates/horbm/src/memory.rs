@@ -12,6 +12,12 @@
 //! [`EpisodicStore::open_from_flag`] grants only when the trimmed flag is
 //! the word `grant`.
 //!
+//! [`EpisodicStore::note_turn`] only pushes the line into RAM. There is no
+//! SQLite on that path. [`EpisodicStore::end_session`], when `remember` is
+//! granted and the buffer has turns, writes them once through
+//! [`horbm_memory::Store::push_turn`] and [`horbm_memory::Store::drain`],
+//! then writes the extractive summary the same way as before.
+//!
 //! Forget copies the row into the diary archive and drops it from search.
 //! The archive is the tombstone. This module has no delete of that table.
 
@@ -44,11 +50,36 @@ pub struct EpisodicStore {
     extractions: u64,
 }
 
+/// One `session_turns` row read back from the diary file.
+#[derive(Debug)]
+pub struct TranscriptTurn {
+    pub id: String,
+    pub text: String,
+    pub said_by: String,
+}
+
+/// A read of `session_turns` after reopening the diary.
+///
+/// `ring_len` is [`horbm_memory::Store::session_len`], the RAM ring, empty
+/// on a fresh open. `rows` is [`horbm_memory::Store::transcript_len`].
+/// `extracted` is [`horbm_memory::Store::count_extracted`], candidate item
+/// rows that `push_turn` queues. `turns` are the query hits, sorted by turn id.
+#[derive(Debug)]
+pub struct TranscriptFile {
+    pub ring_len: usize,
+    pub rows: usize,
+    pub extracted: usize,
+    pub turns: Vec<TranscriptTurn>,
+}
+
 struct BufferedTurn {
     person_id: String,
     said_by: String,
     text: String,
     at: String,
+    /// Already written to `session_turns`. A later `end_session` does not
+    /// append it again.
+    flushed: bool,
 }
 
 impl EpisodicStore {
@@ -135,10 +166,49 @@ impl EpisodicStore {
         ok
     }
 
+    /// Diary rows share this key: the person id. It is not per call.
+    /// [`Self::transcript_session_id`] is the transcript key, so two calls do not
+    /// land in one `session_turns` session.
     fn arm_session(&mut self, person_id: &str) {
         if let Some(store) = self.store.as_mut() {
             let _ = store.set_session(person_id);
         }
+    }
+
+    /// Write this call's buffered lines into `session_turns`, then wait for
+    /// that worker. Lines already flushed are left as they are. The caller
+    /// has already connected. The summary write comes after this returns.
+    fn flush_transcript(&mut self, person_id: &str, at: &str) -> bool {
+        let pending: Vec<(String, String, String)> = self
+            .turns
+            .iter()
+            .filter(|turn| turn.person_id == person_id && !turn.flushed)
+            .map(|turn| (turn.text.clone(), turn.said_by.clone(), turn.at.clone()))
+            .collect();
+        if pending.is_empty() {
+            return true;
+        }
+        let session_id = Self::transcript_session_id(person_id, at);
+        let Some(store) = self.store.as_mut() else {
+            return false;
+        };
+        if store.set_session(&session_id).is_err() {
+            return false;
+        }
+        for (text, said_by, when) in pending {
+            store.push_turn(text, said_by, when);
+        }
+        let drained = store.drain().is_ok();
+        store.pause_worker();
+        if !drained {
+            return false;
+        }
+        for turn in &mut self.turns {
+            if turn.person_id == person_id {
+                turn.flushed = true;
+            }
+        }
+        true
     }
 
     fn emit(&mut self, item: &MemoryItem) {
@@ -190,6 +260,44 @@ impl EpisodicStore {
         }
         self.issued.insert(id.clone(), person_id.to_string());
         Some(id)
+    }
+
+    /// Transcript session for one [`PersonMemory::end_session`]. The diary key is the
+    /// person id alone, which would merge every call from that person. The
+    /// stamp is the `at` argument of `end_session`, not a turn's own time.
+    pub fn transcript_session_id(person_id: &str, at: &str) -> String {
+        format!("{person_id}@{at}")
+    }
+
+    /// Reopen `path` with [`horbm_memory::Store`] and read `session_turns`.
+    ///
+    /// This does not write. `None` is an open or read error.
+    pub fn read_transcript_file(path: &Path, query: &str) -> Option<TranscriptFile> {
+        let store = horbm_memory::Store::open(path).ok()?;
+        let ring_len = store.session_len();
+        let rows = store.transcript_len().ok()?;
+        let extracted = store.count_extracted().ok()?;
+        let response = store.search_transcript(query).ok()?;
+        let mut turns: Vec<TranscriptTurn> = response
+            .hits
+            .into_iter()
+            .map(|hit| TranscriptTurn {
+                id: hit.item_id,
+                text: hit.text,
+                said_by: hit.said_by,
+            })
+            .collect();
+        turns.sort_by(|left, right| {
+            turn_ord(&left.id)
+                .cmp(&turn_ord(&right.id))
+                .then_with(|| left.id.cmp(&right.id))
+        });
+        Some(TranscriptFile {
+            ring_len,
+            rows,
+            extracted,
+            turns,
+        })
     }
 }
 
@@ -361,6 +469,7 @@ impl PersonMemory for EpisodicStore {
             said_by: said_by.to_string(),
             text: text.to_string(),
             at: at.to_string(),
+            flushed: false,
         });
         WriteOutcome::Stored { id: String::new() }
     }
@@ -388,6 +497,9 @@ impl PersonMemory for EpisodicStore {
             return WriteOutcome::Skipped;
         }
         if !self.connect(true) {
+            return WriteOutcome::Failed;
+        }
+        if !self.flush_transcript(person_id, at) {
             return WriteOutcome::Failed;
         }
         let summary = horbm_memory::summarise_session(person_id, &turns);
@@ -514,6 +626,12 @@ impl PersonMemory for EpisodicStore {
                 reason: row.reason,
             })
     }
+}
+
+fn turn_ord(id: &str) -> u64 {
+    id.rsplit_once('-')
+        .and_then(|(_, tail)| tail.parse().ok())
+        .unwrap_or(0)
 }
 
 /// The line is about the person themself. A world question is not.

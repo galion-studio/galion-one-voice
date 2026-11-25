@@ -496,8 +496,15 @@ fn script(dir: &Path) -> Snapshot {
     let name = store.recall("person-alpha", "what is my name");
     let session = store.recall("person-alpha", "quiet mornings");
     assert_eq!(colour.len(), 1, "{colour:?}");
-    assert_eq!(name.len(), 1, "{name:?}");
-    assert_eq!(session.len(), 1, "{session:?}");
+    // The transcript and the extractor's candidate sit beside the diary rows.
+    let name_row = name
+        .iter()
+        .find(|hit| hit.source == "state-tracker" && hit.text.contains("Nia"))
+        .unwrap_or_else(|| panic!("name row missing: {name:?}"));
+    let session_row = session
+        .iter()
+        .find(|hit| hit.source == "session-summary")
+        .unwrap_or_else(|| panic!("summary missing: {session:?}"));
     assert_eq!(store.extractions(), 1);
     Snapshot {
         pin,
@@ -505,10 +512,135 @@ fn script(dir: &Path) -> Snapshot {
         summary,
         colour_text: colour[0].text.clone(),
         colour_at: colour[0].at.clone(),
-        name_text: name[0].text.clone(),
-        session_text: session[0].text.clone(),
+        name_text: name_row.text.clone(),
+        session_text: session_row.text.clone(),
         extractions: store.extractions(),
     }
+}
+
+#[test]
+fn end_session_writes_every_buffered_turn_to_session_turns() {
+    let dir = scratch("turns");
+    let path = dir.join("person-memory.sqlite");
+    let mut store = EpisodicStore::open(&path, true);
+    let lines = [
+        ("northwind", "quillmark my name is Northwind", "t000001"),
+        ("guest", "quillmark I prefer cedar tea", "t000002"),
+        ("northwind", "quillmark stays outside", "t000003"),
+    ];
+    for (said_by, text, at) in lines {
+        store.note_turn("northwind", said_by, text, at).ok_stored();
+        assert!(!path.exists(), "note_turn opened the file");
+    }
+    store.end_session("northwind", "t000099").ok_stored();
+    assert_eq!(store.buffered_turns(), 0);
+    drop(store);
+    let saved =
+        EpisodicStore::read_transcript_file(&path, "quillmark").expect("reopen session_turns");
+    assert_eq!(
+        saved.ring_len, 0,
+        "session_len is the RAM ring and is empty on reopen"
+    );
+    assert_eq!(saved.rows, 3, "transcript_len");
+    assert_eq!(
+        saved.extracted, 2,
+        "push_turn's extractor added a name candidate and a prefer candidate"
+    );
+    let texts: Vec<&str> = saved.turns.iter().map(|turn| turn.text.as_str()).collect();
+    assert_eq!(
+        texts,
+        [
+            "quillmark my name is Northwind",
+            "quillmark I prefer cedar tea",
+            "quillmark stays outside",
+        ]
+    );
+    let speakers: Vec<&str> = saved
+        .turns
+        .iter()
+        .map(|turn| turn.said_by.as_str())
+        .collect();
+    assert_eq!(speakers, ["northwind", "guest", "northwind"]);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn denied_end_session_writes_nothing() {
+    let dir = scratch("denied-end");
+    let path = dir.join("person-memory.sqlite");
+    let mut store = EpisodicStore::open(&path, false);
+    assert_eq!(
+        store.note_turn("northwind", "northwind", "quillmark alpha", "t000001"),
+        WriteOutcome::Refused
+    );
+    assert_eq!(
+        store.end_session("northwind", "t000099"),
+        WriteOutcome::Refused
+    );
+    assert_eq!(store.buffered_turns(), 0);
+    assert!(!path.exists());
+    assert!(sqlite_names(&dir).is_empty(), "{:?}", sqlite_names(&dir));
+    drop(store);
+    assert!(!path.exists());
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn two_sessions_do_not_merge() {
+    let dir = scratch("split-sessions");
+    let path = dir.join("person-memory.sqlite");
+    let mut store = EpisodicStore::open(&path, true);
+    store
+        .note_turn("northwind", "northwind", "quillmark alphaone", "t000001")
+        .ok_stored();
+    store.end_session("northwind", "t000099").ok_stored();
+    store
+        .note_turn("northwind", "northwind", "quillmark bravotwo", "t000002")
+        .ok_stored();
+    store.end_session("northwind", "t000199").ok_stored();
+    drop(store);
+    let saved =
+        EpisodicStore::read_transcript_file(&path, "quillmark").expect("reopen session_turns");
+    assert_eq!(saved.ring_len, 0);
+    assert_eq!(saved.rows, 2, "{:?}", saved.turns);
+    let texts: Vec<&str> = saved.turns.iter().map(|turn| turn.text.as_str()).collect();
+    assert_eq!(texts, ["quillmark alphaone", "quillmark bravotwo"]);
+    let bytes = fs::read(&path).expect("diary bytes");
+    let first = EpisodicStore::transcript_session_id("northwind", "t000099");
+    let second = EpisodicStore::transcript_session_id("northwind", "t000199");
+    assert!(
+        bytes
+            .windows(first.len())
+            .any(|window| window == first.as_bytes()),
+        "missing {first}"
+    );
+    assert!(
+        bytes
+            .windows(second.len())
+            .any(|window| window == second.as_bytes()),
+        "missing {second}"
+    );
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn note_turn_does_no_io() {
+    let dir = scratch("ram-only");
+    let path = dir.join("person-memory.sqlite");
+    let mut store = EpisodicStore::open(&path, true);
+    store
+        .note_turn("northwind", "northwind", "quillmark alpha", "t000001")
+        .ok_stored();
+    store
+        .note_turn("northwind", "guest", "quillmark bravo", "t000002")
+        .ok_stored();
+    assert_eq!(store.buffered_turns(), 2);
+    assert!(!path.exists());
+    assert!(sqlite_names(&dir).is_empty(), "{:?}", sqlite_names(&dir));
+    drop(store);
+    assert!(!path.exists());
+    assert!(sqlite_names(&dir).is_empty(), "{:?}", sqlite_names(&dir));
+    let _ = fs::remove_dir_all(&dir);
 }
 
 trait OutcomeExt {
