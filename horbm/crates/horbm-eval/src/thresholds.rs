@@ -23,7 +23,9 @@ pub struct Thresholds {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct PersonaThresholds {
-    pub id: String,
+    /// Not the scored id. The gate loads the persona at run time.
+    #[serde(default)]
+    pub id: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -113,7 +115,12 @@ impl Thresholds {
         {
             return Err("sample rate does not divide an 80 ms frame".into());
         }
-        if self.persona.id.trim().is_empty() {
+        if self
+            .persona
+            .id
+            .as_deref()
+            .is_some_and(|id| id.trim().is_empty())
+        {
             return Err("persona id is empty".into());
         }
         Ok(())

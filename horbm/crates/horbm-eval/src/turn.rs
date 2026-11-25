@@ -5,10 +5,10 @@
 //! Pause takeover, turn-taking latency, and backchannel shape follow
 //! Lin et al., arXiv:2503.04721. Stop time and resume-versus-yield follow
 //! Full-Duplex-Bench v1.5, arXiv:2507.23159. Overlap ratio is the share of
-//! Samantha's audible frames that are also user-voiced. The papers time
+//! the speaker's audible frames that are also user-voiced. The papers time
 //! overlap with stop latency; this ratio is the two-band count on the same
-//! timeline. False barge-ins are her own echo, which the canceller has to
-//! remove before the ear.
+//! timeline. False barge-ins are the speaker's own echo, which the canceller
+//! has to remove before the ear.
 //!
 //! Latency gates sit one frame (80 ms) off the measured p50. Rate gates sit
 //! 0.05 past the measured p95. A stub stage has no number and no gate.
@@ -85,6 +85,8 @@ impl Gate {
 
 pub struct Report {
     pub speech: &'static str,
+    /// Id of the persona this report was asked to name.
+    pub persona: String,
     pub scenarios: usize,
     pub samples: usize,
     pub end_of_turn: StageState,
@@ -110,8 +112,8 @@ impl Report {
     pub fn text(&self) -> String {
         let mut out = String::new();
         out.push_str(&format!(
-            "turn-eval s43 clock=virtual persona=samantha speech={} scenarios={} samples={} cite=arxiv:2503.04721,arxiv:2507.23159\n",
-            self.speech, self.scenarios, self.samples
+            "turn-eval s43 clock=virtual persona={} speech={} scenarios={} samples={} cite=arxiv:2503.04721,arxiv:2507.23159\n",
+            self.persona, self.speech, self.scenarios, self.samples
         ));
         out.push_str(&format!(
             "stage end_of_turn={} wired={} pr=295 gate={}\n",
@@ -168,7 +170,7 @@ impl Report {
     }
 }
 
-pub fn score(trials: &[Trial], speech: &'static str) -> Report {
+pub fn score(trials: &[Trial], speech: &'static str, persona_id: &str) -> Report {
     let mut misses = Vec::new();
     let eot_probe_took_floor = trials
         .iter()
@@ -257,6 +259,7 @@ pub fn score(trials: &[Trial], speech: &'static str) -> Report {
 
     Report {
         speech,
+        persona: persona_id.to_string(),
         scenarios: trials.len(),
         samples: trials.iter().map(|trial| trial.samples).sum(),
         end_of_turn,

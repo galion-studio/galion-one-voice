@@ -3,7 +3,7 @@
 
 [package]
 name = "horbm-eval"
-description = "Closed HORBM evaluation gate, plus the Samantha turn-taking eval. Fake mode is the default. Real mode is an opt-in Linux ear and mouth."
+description = "Closed HORBM evaluation gate, plus the turn-taking eval. Fake mode is the default. Real mode is an opt-in Linux ear and mouth."
 version.workspace = true
 edition.workspace = true
 license.workspace = true

@@ -18,8 +18,9 @@
 //!
 //! Answers and citations come from the truth-root cards only.
 //! `GALION_HORBM_RESEARCH_DIR` must be unset; the runner does not open it.
-//! Research stays the conductor's offline client. Samantha is the persona.
-//! Ear prosody sensing stays on unless `--no-prosody` or
+//! Research stays the conductor's offline client. The persona is loaded at
+//! run time from `--persona`, `Persona::load_development`, or an explicit
+//! persona file. Ear prosody sensing stays on unless `--no-prosody` or
 //! `GALION_EAR_PROSODY=0`.
 //!
 //! The emotion frame budget is the 80 ms lock, measured around
@@ -68,8 +69,25 @@ pub fn research_dir_is_unset(value: Option<&str>) -> bool {
 
 /// Run the closed turn-taking set with the in-memory stand-in.
 /// Piper is not invoked: this tree has no voice model, and the eval does not download one.
+///
+/// The report names the development persona. The duplex engine in `drive`
+/// is unchanged.
 #[must_use]
 pub fn run_stand_in() -> TurnReport {
+    run_stand_in_for(None)
+}
+
+/// [`run_stand_in`] naming `persona_file`, or the development persona when
+/// `persona_file` is `None`.
+///
+/// The duplex engine in `drive` still uses its built-in speaker. This only
+/// names the report.
+#[must_use]
+pub fn run_stand_in_for(persona_file: Option<&std::path::Path>) -> TurnReport {
+    let (persona_id, load_error) = match gate::resolve_persona(persona_file) {
+        Ok(persona) => (persona.id().to_string(), None),
+        Err(err) => ("unconfigured".to_string(), Some(err)),
+    };
     let gaps = scenario::pause_gaps_ms();
     assert!(
         gaps.len() == 6 && gaps.iter().all(|gap| (400..=1_000).contains(gap)),
@@ -80,7 +98,11 @@ pub fn run_stand_in() -> TurnReport {
     assert!(speech::rms_db(&speech::falling()) > speech::EAR_FLOOR_DB);
     let scenarios = scenario::catalog();
     let trials = drive::run_all(&scenarios);
-    turn::score(&trials, "stand-in")
+    let mut report = turn::score(&trials, "stand-in", &persona_id);
+    if let Some(err) = load_error {
+        report.misses.push(err);
+    }
+    report
 }
 
 #[cfg(test)]
