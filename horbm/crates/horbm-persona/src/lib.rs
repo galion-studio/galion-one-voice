@@ -176,6 +176,12 @@ impl Persona {
         as_str(&self.id)
     }
 
+    /// Development boot is the id `samantha` only.
+    #[must_use]
+    pub fn allows_development_boot(&self) -> bool {
+        self.id() == "samantha"
+    }
+
     pub fn voice(&self) -> &str {
         as_str(&self.voice)
     }

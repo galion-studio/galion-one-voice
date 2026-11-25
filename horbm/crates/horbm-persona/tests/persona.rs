@@ -75,6 +75,25 @@ fn development_default_is_samantha() {
 }
 
 #[test]
+fn aria_file_loads_and_is_not_a_development_boot() {
+    let path = examples().join("aria.toml");
+    let aria = Persona::load(&path).expect("aria.toml loads");
+    assert_eq!(aria.id(), "aria");
+    assert!(!aria.allows_development_boot());
+    let shipped = Persona::samantha().unwrap();
+    assert_eq!(shipped.id(), "samantha");
+    assert!(shipped.allows_development_boot());
+    assert!(load_example("samantha.toml").allows_development_boot());
+    let renamed = Persona::parse(&VALID.replace("id = \"sample\"", "id = \"samantha\"")).unwrap();
+    assert!(renamed.allows_development_boot());
+    let near = Persona::parse(&VALID.replace("id = \"sample\"", "id = \"samantha2\"")).unwrap();
+    assert_eq!(near.id(), "samantha2");
+    assert!(!near.allows_development_boot());
+    assert!(!Persona::standin().allows_development_boot());
+    assert!(!Persona::parse(VALID).unwrap().allows_development_boot());
+}
+
+#[test]
 fn load_roundtrip() {
     for name in ["samantha.toml", "aria.toml"] {
         let persona = load_example(name);
