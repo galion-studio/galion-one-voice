@@ -30,6 +30,11 @@
 //! GEMI intent. [`Brain::inner_nudge`] steps that message through the moment
 //! core. Neither call rewrites the empathy mood or the voice baseline.
 //! Learning a new care stays off while `LOCKS.toml` `[consent] learn` is deny.
+//!
+//! [`Brain::open`] and [`Brain::boot`] with no path load Samantha, the
+//! development persona. Aria stays in the repo and is not loaded. An explicit
+//! path replaces Samantha. An invalid file is refused. [`Brain::admit_move`]
+//! is the legal-move port.
 
 #![forbid(unsafe_code)]
 
@@ -49,6 +54,9 @@ pub use galion_emotion_core::{
 pub use galion_research_gateway::RESEARCH_CAP;
 pub use galion_sam_empathy::{Intent, PronounClass, FRAME_MS};
 pub use horbm_brain::{Answer, Heuristic, MarkKind, SidebandMark};
+pub use horbm_persona::{
+    LegalMovePort, MoveClaim, MoveVerdict, Persona, PersonaError, StyleHook, UNKNOWN_LINE,
+};
 pub use route::{
     is_deep_question, route_heard, AskOutcome, CardHit, CardLookup, Gap, GapReason, ResearchAsk,
     RouteKind, RouteOut, Speakable, GAP_ADVICE, UNKNOWN_REPLY,

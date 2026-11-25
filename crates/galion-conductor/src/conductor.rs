@@ -8,6 +8,7 @@
 //! for a lookup. The ask itself returns on this frame. A later frame merges
 //! the result when its virtual arrival is inside the cap.
 
+use crate::backchannel::{Backchannel, BackchannelConfig, ListenCue, ListenMood, ListenPolicy};
 use crate::brain::{ClauseBrain, PickedClause};
 use crate::clock::{
     VirtualClock, COMMIT_SILENCE_FRAMES, DUCK_MS, FRAME_MS, HANG_FRAMES, PAUSE_MS,
@@ -66,6 +67,8 @@ pub enum TickEvent {
     Committed,
     Backchannel,
     BargeIn,
+    /// Samantha nodded while the user kept the floor. Not a barge-in.
+    ListenBackchannel,
 }
 
 struct Held {
@@ -110,6 +113,8 @@ pub struct Conductor<B: ClauseBrain, R: ResearchClient = OfflineClient> {
     side_cancels: u32,
     /// Set for the frame that took a rising-pitch yield. Cleared each tick.
     frame_question: bool,
+    /// Listening nods. Default on, Samantha. Does not own the floor.
+    listen: ListenPolicy,
 }
 
 /// One frame of output. `t_ms` is the virtual frame start.
@@ -137,6 +142,8 @@ pub struct TickOut {
     pub side_log_line: Option<String>,
     /// True when this frame's yield was a rising terminal contour.
     pub end_question: bool,
+    /// A listening nod on this frame. The floor stays with the user.
+    pub backchannel: Option<Backchannel>,
 }
 
 impl<B: ClauseBrain> Conductor<B, OfflineClient> {
@@ -185,7 +192,27 @@ impl<B: ClauseBrain, R: ResearchClient> Conductor<B, R> {
             side_log: Vec::new(),
             side_cancels: 0,
             frame_question: false,
+            listen: ListenPolicy::new(),
         }
+    }
+
+    /// Listening nods. Default is on. `GALION_BACKCHANNEL=0|off` is
+    /// [`BackchannelConfig::from_env`], applied here by the host.
+    pub fn set_backchannel_config(&mut self, config: BackchannelConfig) {
+        self.listen.enabled = config.enabled;
+    }
+
+    pub fn backchannel_enabled(&self) -> bool {
+        self.listen.enabled
+    }
+
+    /// Only `samantha` nods. Aria and clone-pack ids stay quiet.
+    pub fn set_persona(&mut self, persona: impl Into<String>) {
+        self.listen.set_persona(persona);
+    }
+
+    pub fn persona(&self) -> &str {
+        self.listen.persona()
     }
 
     pub fn epoch(&self) -> u64 {
@@ -225,7 +252,26 @@ impl<B: ClauseBrain, R: ResearchClient> Conductor<B, R> {
     /// Speaking and ducked frames ignore `turn`, so barge-in stays the
     /// overlap rule. A yield on a quiet listening frame starts the brain and
     /// releases the clause on that same frame. A hold does neither.
+    /// This path does not nod: the host passes a listening cue to
+    /// [`Self::tick_listen`].
     pub fn tick_turn(&mut self, ear: Ear<'_>, intent: Option<&Document>, turn: TurnMsg) -> TickOut {
+        self.tick_listen(ear, intent, turn, ListenCue::None, ListenMood::resting())
+    }
+
+    /// [`Self::tick_turn`] plus a listening cue and Samantha's moment.
+    ///
+    /// A nod fires only while the user holds, on the quiet frame after a
+    /// clause-final fall, and it does not take the floor. Yield, a question
+    /// rise, a filler, and a denied ear (`PauseOnly`) do not nod. The nod is
+    /// not a barge-in and it does not cancel the user's turn.
+    pub fn tick_listen(
+        &mut self,
+        ear: Ear<'_>,
+        intent: Option<&Document>,
+        turn: TurnMsg,
+        cue: ListenCue,
+        mood: ListenMood,
+    ) -> TickOut {
         let t_ms = self.clock.t_ms();
         let t_us = self.clock.t_us();
         self.side_note = SideBandView::Idle;
@@ -233,9 +279,27 @@ impl<B: ClauseBrain, R: ResearchClient> Conductor<B, R> {
         self.frame_question = false;
         let mut event = TickEvent::None;
         let me_silent = self.apply_armed_silence(&mut event);
+        let user_has_floor = matches!(self.floor, Floor::Listening | Floor::Speculating);
+        if user_has_floor {
+            if let Ear::Speech(text) = ear {
+                if !text.trim().is_empty() {
+                    self.listen.note_voiced(t_ms);
+                }
+            }
+        }
+        let quiet = matches!(ear, Ear::Quiet);
         match ear {
             Ear::Quiet => self.on_quiet(t_us, &mut event, turn),
             Ear::Speech(text) => self.on_speech(text, &mut event),
+        }
+        let holding = quiet
+            && matches!(turn, TurnMsg::Hold)
+            && self.floor == Floor::Listening
+            && event == TickEvent::None
+            && !self.cancel;
+        let backchannel = self.listen.consider(t_ms, quiet, holding, cue, mood);
+        if backchannel.is_some() {
+            event = TickEvent::ListenBackchannel;
         }
         if !self.cancel {
             self.poll_research(t_ms);
@@ -266,6 +330,7 @@ impl<B: ClauseBrain, R: ResearchClient> Conductor<B, R> {
             research_clause: self.merged.clone(),
             side_log_line: self.frame_log.clone(),
             end_question: self.frame_question,
+            backchannel,
         };
         self.clock.advance();
         out

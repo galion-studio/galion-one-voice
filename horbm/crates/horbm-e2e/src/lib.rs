@@ -2,12 +2,12 @@
 // Copyright (c) 2026 Galion Labs
 //! One Linux smoke of Samantha's live loop.
 //!
-//! Ear, brain, emotion, mouth, and an output sink. There is no microphone.
-//! Playback is the in-process loopback unless this crate is built with
-//! `alsa` on Linux and a device opens. Voice activity is the energy gate
-//! unless this crate is built with `silero` and the official model loads.
-//! The input WAV is written under the system temp directory at run time and
-//! removed before the function returns. Nothing here dials a socket.
+//! Ear, brain, emotion, mouth, and an output sink. Playback is the in-process
+//! loopback unless this crate is built with `alsa` on Linux and a device
+//! opens. Voice activity is the energy gate unless this crate is built with
+//! `silero` and the official model loads. The input WAV is written under the system temp
+//! directory at run time and removed before the function returns. Nothing
+//! here dials a socket.
 //!
 //! Stages that are still open pull requests are not given a timing. When
 //! their source is on the tree, the smoke calls it. Until then the report
@@ -20,6 +20,8 @@
 #![forbid(unsafe_code)]
 
 mod buffer;
+mod corpus;
+mod model;
 mod mouth;
 mod output;
 mod probe;
@@ -33,6 +35,7 @@ mod wav;
 #[cfg(feature = "silero")]
 mod silero;
 
+pub use corpus::SENTENCES;
 pub use galion_emotion_core::{EmotionCore, IntentMsg, FRAME_MS as EMOTION_FRAME_MS};
 pub use report::Report;
 pub use run::{refuse_other_persona, run, Outcome, Sense, SCRIPT, TRIALS};
@@ -142,6 +145,13 @@ mod tests {
         assert_eq!(percentile_nearest(&samples, 0.50), Some(3));
         assert_eq!(percentile_nearest(&samples, 0.95), Some(5));
         assert_eq!(percentile_nearest(&[], 0.50), None);
+    }
+
+    #[test]
+    fn the_generated_set_starts_with_the_kettle_line() {
+        assert_eq!(SENTENCES[0], SCRIPT);
+        assert_eq!(SENTENCES.len(), 11);
+        assert!(SENTENCES.iter().all(|line| !line.is_empty()));
     }
 
     #[test]

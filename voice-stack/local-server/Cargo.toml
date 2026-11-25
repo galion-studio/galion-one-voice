@@ -15,6 +15,12 @@ name = "samantha-local"
 path = "src/main.rs"
 
 # Pinned for rustc 1.83. Newer tokio / hyper-util manifests need edition 2024.
+[features]
+default = []
+# Optional mouth. The default build speaks with the in-process tone or the
+# clone worker. Piper is not a dependency of that build.
+piper = ["dep:galion-tts-piper"]
+
 [dependencies]
 axum = { version = "=0.7.9", features = ["ws"] }
 futures-util = "=0.3.31"
@@ -28,7 +34,9 @@ tower-http = { version = "=0.5.2", features = ["fs"] }
 galion-sam-asr = { path = "../asr" }
 galion-sam-horbm = { path = "../horbm-bridge" }
 galion-sam-orch = { path = "../pipeline-orchestrator" }
-galion-tts-piper = { path = "../tts-piper-stream" }
+galion-tts-piper = { path = "../tts-piper-stream", optional = true }
+horbm = { path = "../../horbm/crates/horbm" }
+horbm-voice = { path = "../../horbm/crates/horbm-voice" }
 samantha-voice-clone = { path = "../samantha-voice-clone" }
 
 [dev-dependencies]

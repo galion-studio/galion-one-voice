@@ -1,10 +1,12 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 Galion Labs
 # Layer 5 router and the localhost research gateway.
-# The end-to-end step downloads the Silero VAD ONNX (MIT, not a voice) into
-# the runner cache. It does not download a voice model. libssl-dev is only
-# there because that ONNX Runtime pin fetches its CPU build over native-tls.
-# g++ supplies libstdc++, which that CPU build links.
+# The end-to-end smoke may fetch the pinned Vosk small-en model and the
+# Silero VAD ONNX (MIT, not a voice) into a cache outside the checkout.
+# A failed Vosk fetch leaves asr=stub. libssl-dev is only there because
+# the ONNX Runtime pin fetches its CPU build over native-tls. g++ supplies
+# libstdc++, which that CPU build links.
+# The router tests do not download a model.
 
 name: voice-stack horbm router
 
@@ -31,7 +33,8 @@ jobs:
       - name: cargo test
         run: |
           cargo test --manifest-path horbm/Cargo.toml -p horbm -p horbm-eval
-          cargo run --manifest-path horbm/Cargo.toml -p horbm-eval --quiet
+          # Fake closed gate. The real Linux ear (`--features real`) is opt-in.
+          cargo run --manifest-path horbm/Cargo.toml -p horbm-eval --bin horbm-eval --quiet
           cargo test --manifest-path horbm/Cargo.toml -p horbm-duplex
           cargo test --manifest-path voice-stack/Cargo.toml -p galion-research-gateway -p galion-sam-horbm -p galion-sam-orch -p samantha-local-server
           cargo test --manifest-path voice-stack/Cargo.toml -p galion-sam-horbm --features horbm

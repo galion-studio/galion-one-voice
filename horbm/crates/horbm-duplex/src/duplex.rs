@@ -40,6 +40,8 @@ pub enum LoopEvent {
     Committed,
     FirstAudio,
     Backchannel,
+    /// Samantha nodded while the user kept the floor. Not a barge-in.
+    ListenBackchannel,
     BargeIn,
     TurnResumed,
 }
@@ -512,6 +514,7 @@ fn map_event(event: ConductorEvent) -> LoopEvent {
         ConductorEvent::EagerEndOfTurn => LoopEvent::EagerEndOfTurn,
         ConductorEvent::Committed => LoopEvent::Committed,
         ConductorEvent::Backchannel => LoopEvent::Backchannel,
+        ConductorEvent::ListenBackchannel => LoopEvent::ListenBackchannel,
         ConductorEvent::BargeIn => LoopEvent::BargeIn,
         ConductorEvent::TurnResumed => LoopEvent::TurnResumed,
     }

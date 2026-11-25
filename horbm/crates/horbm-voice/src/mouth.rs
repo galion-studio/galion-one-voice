@@ -2,9 +2,18 @@
 // Copyright (c) 2026 Galion Labs
 //! Mouth. One pull is one conductor frame. The core does not link Piper.
 
+use crate::backchannel::{render, BackchannelKind};
 use crate::brain::SpokenLine;
 use crate::clock::{FRAME_SAMPLES, SAMPLE_RATE};
 use std::fmt;
+
+/// What the mouth plays for one listening nod. Not a brain line.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct BackchannelPlay {
+    pub text: &'static str,
+    pub kind: BackchannelKind,
+    pub energy: f32,
+}
 
 /// One frame of mono PCM. Generated in memory. Not a recording.
 pub struct AudioFrame {
@@ -40,6 +49,16 @@ pub trait Mouth {
     fn pull(&mut self) -> MouthPull;
     fn cancel(&mut self);
     fn speaking(&self) -> bool;
+
+    /// One short nod. Does not start a turn and does not clear a reply.
+    /// The default is a generated tone. Piper overrides this behind its feature.
+    fn listen_backchannel(&mut self, play: &BackchannelPlay) -> AudioFrame {
+        AudioFrame {
+            samples: render(play.kind, play.energy, FRAME_SAMPLES, SAMPLE_RATE),
+            sample_rate: SAMPLE_RATE,
+            first: true,
+        }
+    }
 }
 
 const SPEAK_FRAMES: u32 = 8;
@@ -52,6 +71,7 @@ pub struct FakeMouth {
     pending_first: bool,
     spoken: Vec<String>,
     cancels: u32,
+    cues: Vec<String>,
 }
 
 impl Default for FakeMouth {
@@ -68,11 +88,17 @@ impl FakeMouth {
             pending_first: false,
             spoken: Vec::new(),
             cancels: 0,
+            cues: Vec::new(),
         }
     }
 
     pub fn spoken(&self) -> &[String] {
         &self.spoken
+    }
+
+    /// Listening nods this mouth has rendered. Not replies.
+    pub fn cues(&self) -> &[String] {
+        &self.cues
     }
 
     pub fn cancels(&self) -> u32 {
@@ -130,5 +156,14 @@ impl Mouth for FakeMouth {
 
     fn speaking(&self) -> bool {
         self.left > 0
+    }
+
+    fn listen_backchannel(&mut self, play: &BackchannelPlay) -> AudioFrame {
+        self.cues.push(play.text.to_string());
+        AudioFrame {
+            samples: render(play.kind, play.energy, FRAME_SAMPLES, SAMPLE_RATE),
+            sample_rate: SAMPLE_RATE,
+            first: true,
+        }
     }
 }

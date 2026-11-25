@@ -323,13 +323,107 @@ pub fn score_latency(sample: &LatencySample, thresholds: &LatencyThresholds) -> 
             sample.backchannel_cancel
         ));
     }
-    if sample.clock_advanced_ms != thresholds.frame_ms {
-        check.push(format!(
-            "virtual clock advanced {} ms after a {} ms wall sleep",
-            sample.clock_advanced_ms, sample.wall_sleep_ms
-        ));
+    match thresholds.clock.as_str() {
+        "virtual" => {
+            if sample.clock_advanced_ms != thresholds.frame_ms {
+                check.push(format!(
+                    "virtual clock advanced {} ms after a {} ms wall sleep",
+                    sample.clock_advanced_ms, sample.wall_sleep_ms
+                ));
+            }
+        }
+        "wall" => {
+            if sample.eager_to_voice_ms.iter().any(|ms| *ms == 0) {
+                check.push("eager-to-voice wall sample was 0 ms");
+            }
+        }
+        other => check.push(format!("latency clock {other} is not virtual or wall")),
     }
     check
+}
+
+/// Tokens for word error rate. Same rule as `galion-eval-golden`: lowercase,
+/// keep ASCII letters, apostrophe, and space, split on whitespace.
+pub fn wer_tokens(text: &str) -> Vec<String> {
+    let low = text.to_lowercase();
+    let mapped: String = low
+        .chars()
+        .map(|ch| {
+            if ch.is_ascii_lowercase() || ch == '\'' || ch == ' ' {
+                ch
+            } else {
+                ' '
+            }
+        })
+        .collect();
+    mapped.split_whitespace().map(str::to_string).collect()
+}
+
+fn edit_distance(reference: &[String], hypothesis: &[String]) -> usize {
+    let n = reference.len();
+    let m = hypothesis.len();
+    let mut prev: Vec<usize> = (0..=m).collect();
+    let mut cur = vec![0; m + 1];
+    for i in 1..=n {
+        cur[0] = i;
+        for j in 1..=m {
+            let cost = usize::from(reference[i - 1] != hypothesis[j - 1]);
+            let sub = prev[j - 1] + cost;
+            cur[j] = (prev[j] + 1).min(cur[j - 1] + 1).min(sub);
+        }
+        std::mem::swap(&mut prev, &mut cur);
+    }
+    prev[m]
+}
+
+/// `None` when the reference has no tokens. A zero is a real match.
+pub fn wer(reference: &str, hypothesis: &str) -> Option<f64> {
+    let reference = wer_tokens(reference);
+    if reference.is_empty() {
+        return None;
+    }
+    let hypothesis = wer_tokens(hypothesis);
+    Some(edit_distance(&reference, &hypothesis) as f64 / reference.len() as f64)
+}
+
+/// Mean of the per-sentence rates. `None` when nothing was scored.
+pub fn mean_wer(pairs: &[(String, String)]) -> Option<f64> {
+    let mut sum = 0.0;
+    let mut n = 0usize;
+    for (reference, hypothesis) in pairs {
+        if let Some(rate) = wer(reference, hypothesis) {
+            sum += rate;
+            n += 1;
+        }
+    }
+    if n == 0 {
+        None
+    } else {
+        Some(sum / n as f64)
+    }
+}
+
+pub fn score_wer(pairs: &[(String, String)], wer_max: f64) -> (Check, f64) {
+    let mut check = Check::ok();
+    if pairs.is_empty() {
+        check.push("no round-trip sentence");
+        return (check, 1.0);
+    }
+    for (reference, hypothesis) in pairs {
+        if wer(reference, hypothesis).is_none() {
+            check.push(format!("empty reference {reference:?}"));
+        }
+    }
+    if !check.pass {
+        return (check, 1.0);
+    }
+    let mean = mean_wer(pairs).unwrap_or(1.0);
+    if mean > wer_max {
+        check.push(format!(
+            "mean word error rate {mean:.4} is over {wer_max:.4}"
+        ));
+    }
+    (check, mean)
 }
 
 /// Nearest rank, the same index as `galion_emotion_in::report::percentile`.
@@ -420,5 +514,35 @@ mod tests {
         let check = score_latency(&sample, &thresholds().latency);
         assert!(!check.pass);
         assert!(check.failures.iter().any(|line| line.contains("p95")));
+    }
+
+    #[test]
+    fn wall_clock_does_not_require_the_virtual_step() {
+        let sample = LatencySample {
+            eager_to_voice_ms: vec![40, 55],
+            barge_in_ms: 30,
+            backchannel_cancel: false,
+            clock_advanced_ms: 0,
+            wall_sleep_ms: 0,
+        };
+        let check = score_latency(&sample, &thresholds().real.latency);
+        assert!(check.pass, "{:?}", check.failures);
+    }
+
+    #[test]
+    fn a_substituted_word_raises_the_rate() {
+        assert_eq!(wer("where is the kettle", "where is the kettle"), Some(0.0));
+        assert_eq!(wer("the cat sat", "the dog sat"), Some(1.0 / 3.0));
+        let pairs = vec![
+            ("where is the kettle".into(), "where is the kettle".into()),
+            ("right here".into(), "right here".into()),
+        ];
+        let (check, mean) = score_wer(&pairs, 0.0);
+        assert!(check.pass, "{:?}", check.failures);
+        assert_eq!(mean, 0.0);
+        let bad = vec![("right here".into(), "write here".into())];
+        let (check, mean) = score_wer(&bad, 0.0);
+        assert!(!check.pass);
+        assert!(mean > 0.0);
     }
 }

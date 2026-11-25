@@ -3,6 +3,7 @@
 //! One line per field. A stub is the word `stub`. An off switch is `off`.
 //! Neither is a timing.
 
+#[cfg(test)]
 use galion_sam_asr::word_error;
 
 #[derive(Clone, Debug, Default)]
@@ -56,7 +57,7 @@ fn sanitize(value: &str) -> String {
     value
         .chars()
         .map(|ch| match ch {
-            '\n' | '\r' | '\t' => '_',
+            '\n' | '\r' | ' ' | '\t' => '_',
             _ => ch,
         })
         .collect()
@@ -64,12 +65,21 @@ fn sanitize(value: &str) -> String {
 
 /// Word error against the script. `None` means no recognizer ran, which is
 /// `stub` and not a zero.
+#[cfg(test)]
 pub fn format_wer(reference: &str, hypothesis: Option<&str>) -> String {
     let Some(hypothesis) = hypothesis else {
         return "stub".into();
     };
-    match word_error(reference, hypothesis).rate() {
+    format_rate(&word_error(reference, hypothesis))
+}
+
+pub fn format_rate(wer: &galion_sam_asr::Wer) -> String {
+    match wer.rate() {
         Some(rate) => format!("{rate:.4}"),
         None => "stub".into(),
     }
+}
+
+pub fn format_ms(us: u64) -> String {
+    format!("{:.3}", us as f64 / 1000.0)
 }

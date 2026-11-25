@@ -3,10 +3,6 @@
 # Own workspace. The root workspace excludes `horbm`, and this package is not
 # a member of the horbm workspace, so `cargo test --workspace` does not build
 # it. `scripts/horbm-e2e-smoke.sh` is the entry.
-#
-# `alsa` is the Linux cpal output. The dependency is Linux-only; other targets
-# keep the loopback buffer. `silero` loads the official ONNX at test time.
-# Neither feature is on by default.
 
 [workspace]
 
@@ -19,13 +15,15 @@ license = "MIT"
 publish = false
 rust-version = "1.85"
 
+# `alsa` is the Linux cpal output. The dependency is Linux-only; other targets
+# keep the loopback buffer. `silero` loads the official ONNX at test time.
+# Neither feature is on by default.
 [features]
 default = []
 alsa = ["dep:galion-sam-audio-io"]
 silero = [
     "dep:voice_activity_detector",
     "dep:ort",
-    "dep:sha2",
     "dep:ureq",
     "dep:cpu-time",
 ]
@@ -38,9 +36,9 @@ galion-emotion-core = { path = "../../../crates/galion-emotion-core" }
 galion-sam-asr = { path = "../../../voice-stack/asr" }
 galion-tts-piper = { path = "../../../voice-stack/tts-piper-stream" }
 galion-ml-voice = { path = "../../../crates/galion-ml-voice", default-features = false, features = ["speech"] }
+sha2 = "0.10.9"
 voice_activity_detector = { version = "=0.2.1", optional = true }
 ort = { version = "=2.0.0-rc.10", optional = true, features = ["ndarray"] }
-sha2 = { version = "0.10", optional = true }
 ureq = { version = "2.12", optional = true, default-features = false, features = ["tls"] }
 cpu-time = { version = "1", optional = true }
 
