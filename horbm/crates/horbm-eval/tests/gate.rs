@@ -1,59 +1,91 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Galion Labs
-//! The virtual-clock gate. Numbers come from `Duplex::tick`, not from a table
-//! that was typed in ahead of a run.
 
-use horbm_eval::{run_stand_in, StageState, FRAME_SAMPLES};
+use horbm_eval::{research_dir_is_unset, run, Thresholds};
 
 #[test]
-fn turn_eval_gates_hold() {
-    let report = run_stand_in();
-    let text = report.text();
-    println!("{text}");
-    assert!(report.passed(), "{text}");
-    assert_eq!(report.speech, "stand-in");
-    assert!(report.scenarios >= 20);
-    assert!(report.samples > 0);
-    assert_eq!(report.samples % FRAME_SAMPLES, 0);
-    assert!(text.contains("persona=samantha"));
-    assert!(text.contains("clock=virtual"));
-    assert!(text.contains("cite=arxiv:2503.04721,arxiv:2507.23159"));
-    assert!(text.contains("result=pass"));
+fn embedded_thresholds_are_the_r4_gate() {
+    let thresholds = Thresholds::embedded();
+    assert_eq!(thresholds.schema, "horbm-eval/1");
+    assert_eq!(thresholds.persona.id, "samantha");
+    assert_eq!(thresholds.grounding.unknown_reply, "I don't know.");
+    assert_eq!(thresholds.grounding.card_prefix, "card:");
+    assert_eq!(thresholds.grounding.research_prefix, "research:");
+    assert_eq!(thresholds.emotion.frame_ms, 80);
+    assert_eq!(thresholds.emotion.frame_budget_us, 80_000);
+    assert_eq!(thresholds.emotion.sample_rate_hz, 16_000);
+    assert_eq!(thresholds.latency.clock, "virtual");
+    assert_eq!(thresholds.latency.frame_ms, 80);
+    assert_eq!(thresholds.latency.eager_to_voice_p50_max_ms, 200);
+    assert_eq!(thresholds.latency.eager_to_voice_p95_max_ms, 240);
+    assert_eq!(thresholds.latency.barge_in_max_ms, 200);
+    assert!(!thresholds.latency.backchannel_cancels);
+    assert_eq!(thresholds.asr.wer_max, 0.20);
+    assert_eq!(thresholds.real.latency.clock, "wall");
+    assert_eq!(thresholds.real.latency.frame_ms, 80);
+    assert_eq!(thresholds.real.latency.eager_to_voice_p50_max_ms, 200);
+    assert_eq!(thresholds.real.latency.eager_to_voice_p95_max_ms, 240);
+    assert_eq!(thresholds.real.latency.barge_in_max_ms, 500);
+    assert!(!thresholds.real.latency.backchannel_cancels);
 }
 
 #[test]
-fn stub_stages_are_named_and_the_report_has_no_transcript() {
-    let report = run_stand_in();
-    let text = report.text();
-    assert_eq!(report.end_of_turn, StageState::Stub);
-    assert_eq!(report.backchannel, StageState::Stub);
-    assert_eq!(report.echo, StageState::Live);
-    assert!(text.contains("stage end_of_turn=stub"));
-    assert!(text.contains("stage backchannel=stub"));
-    assert!(text.contains("stage echo_cancel=live"));
-    assert!(text.contains("metric backchannel_rate_per_s n=2 p50=stub p95=stub gate=off"));
-    assert!(text.contains("metric backchannel_offset_ms n=0 p50=stub p95=stub gate=off"));
-    assert!(text.contains("metric false_barge_in n=2 p50=0.000 p95=0.000 gate=on limit=p95<=0.000"));
-    assert!(text.contains("metric pause_handling_tor"));
-    assert!(text.contains("gate=off"));
-    for word in ["kettle", "hob", "window", "garden", "aria", "yeah", "mm-hm"] {
-        assert!(!text.contains(word), "{word} leaked into\n{text}");
-    }
+fn a_set_research_dir_is_not_an_answer_source() {
+    assert!(research_dir_is_unset(None));
+    assert!(research_dir_is_unset(Some("  ")));
+    assert!(!research_dir_is_unset(Some("/tmp/research")));
+    let report = horbm_eval::run_with(horbm_eval::Config {
+        research_dir: Some("notes".into()),
+        thresholds: Thresholds::embedded(),
+        mode: horbm_eval::Mode::Fake,
+        prosody: true,
+    });
+    assert!(!report.pass);
+    assert_eq!(report.research_dir, "set");
+    assert!(report.truth_cards.is_empty());
 }
 
 #[test]
-fn echo_probe_stays_quiet_when_the_canceller_is_on() {
-    let report = run_stand_in();
-    assert_eq!(report.echo, StageState::Live);
-    assert!(report.echo_wired);
-    assert_eq!(report.echo_probe_ran, 2);
-    assert_eq!(report.echo_probe_opened, report.echo_probe_ran);
-    assert_eq!(report.echo_probe_barged, 0);
-    assert!(report.eot_probe_took_floor);
+fn the_gate_passes() {
+    let report = run();
+    eprintln!("{}", report.to_json());
+    assert!(report.pass, "{}", report.to_json());
+    assert_eq!(report.research_dir, "unset");
+    let latency = report.scores.latency.detail.expect("latency detail");
+    assert!(latency["eager_to_voice_p50_ms"].as_u64().unwrap() <= 200);
+    assert!(latency["eager_to_voice_p95_ms"].as_u64().unwrap() <= 240);
+    assert!(latency["barge_in_ms"].as_u64().unwrap() <= 200);
+    assert_eq!(latency["backchannel_cancel"], false);
+    assert_eq!(latency["clock"], "virtual");
 }
 
 #[test]
-fn the_report_names_samantha() {
-    let report = run_stand_in();
-    assert!(report.text().contains("persona=samantha"));
+fn the_binary_exits_zero() {
+    let exe = env!("CARGO_BIN_EXE_horbm-eval");
+    let output = std::process::Command::new(exe)
+        .output()
+        .expect("run horbm-eval");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(output.status.success(), "{stdout}");
+    assert!(stdout.contains("\"pass\": true"), "{stdout}");
+    assert!(stdout.contains("\"research_dir\": \"unset\""), "{stdout}");
+    assert!(stdout.contains("\"mode\": \"fake\""), "{stdout}");
+}
+
+#[cfg(not(feature = "real"))]
+#[test]
+fn real_flag_without_the_feature_does_not_pretend() {
+    let exe = env!("CARGO_BIN_EXE_horbm-eval");
+    let output = std::process::Command::new(exe)
+        .arg("--real")
+        .output()
+        .expect("run horbm-eval --real");
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let both = format!("{stderr}{stdout}");
+    assert!(
+        both.contains("features real") || both.contains("not compiled"),
+        "{both}"
+    );
 }

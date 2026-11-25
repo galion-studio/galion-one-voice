@@ -1,720 +1,548 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Galion Labs
-//! Full-Duplex-Bench style scores on the virtual clock.
-//!
-//! Pause takeover, turn-taking latency, and backchannel shape follow
-//! Lin et al., arXiv:2503.04721. Stop time and resume-versus-yield follow
-//! Full-Duplex-Bench v1.5, arXiv:2507.23159. Overlap ratio is the share of
-//! Samantha's audible frames that are also user-voiced. The papers time
-//! overlap with stop latency; this ratio is the two-band count on the same
-//! timeline. False barge-ins are her own echo, which the canceller has to
-//! remove before the ear.
-//!
-//! Latency gates sit one frame (80 ms) off the measured p50. Rate gates sit
-//! 0.05 past the measured p95. A stub stage has no number and no gate.
+//! Pure comparisons against the threshold file. The live run fills the samples.
 
-use horbm_duplex::{Floor, LoopEvent, FRAME_MS};
+use crate::thresholds::{
+    EmotionThresholds, GroundingThresholds, LatencyThresholds, PersonaThresholds,
+};
+use serde::Serialize;
 
-use crate::drive::Trial;
-use crate::percentile::percentile;
-use crate::scenario::{Kind, Phase};
-
-/// Measured turn-taking latency is 160 ms. One frame of slack on each side.
-const TURN_P50_MIN_MS: f64 = 80.0;
-const TURN_P95_MAX_MS: f64 = 240.0;
-/// Measured stop time is 160 ms. Same one-frame slack.
-const STOP_P50_MIN_MS: f64 = 80.0;
-const STOP_P95_MAX_MS: f64 = 240.0;
-/// Measured overlap p95 is 0.500. The gate is that value plus 0.05.
-const OVERLAP_P95_MAX: f64 = 0.550;
-
-/// Frozen once a stub stage is live and has been measured. `None` means the
-/// gate is not set, so a live stage fails closed instead of inventing a limit.
-const PAUSE_TOR_P95_MAX: Option<f64> = None;
-const BACKCHANNEL_RATE_P95_MAX: Option<f64> = None;
-const BACKCHANNEL_OFFSET_P95_MAX: Option<f64> = None;
-/// Measured false barge-in p95 is 0 on both echo trials, with the canceller
-/// on inside `Duplex::tick`. The gate is that value. Any barge fails.
-const FALSE_BARGE_P95_MAX: Option<f64> = Some(0.0);
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum StageState {
-    Stub,
-    Live,
+#[derive(Clone, Debug)]
+pub struct Spoken {
+    pub query: String,
+    pub reply: String,
+    pub sources: Vec<String>,
+    pub sideband_posted: bool,
+    pub expect_id: Option<String>,
 }
 
-impl StageState {
-    fn as_str(self) -> &'static str {
-        match self {
-            Self::Stub => "stub",
-            Self::Live => "live",
+#[derive(Clone, Debug)]
+pub struct CardFact {
+    pub id: String,
+    pub gist: String,
+}
+
+#[derive(Clone, Debug)]
+pub struct VoiceTurn {
+    pub persona: String,
+    pub rate: f32,
+    pub energy: f32,
+    pub pitch_st: f32,
+    pub neutral: bool,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct VoiceWindow {
+    pub pitch_max: f32,
+    pub rate_lo: f32,
+    pub rate_hi: f32,
+    pub energy_lo: f32,
+    pub energy_hi: f32,
+}
+
+/// Rest (rate, energy, pitch) of the two voices. Neutral lines must sit
+/// closer to Samantha than to Jarvis.
+#[derive(Clone, Copy, Debug)]
+pub struct VoiceAnchors {
+    pub samantha: (f32, f32, f32),
+    pub jarvis: (f32, f32, f32),
+}
+
+#[derive(Clone, Debug)]
+pub struct EmotionSample {
+    pub fatigue_drop: f32,
+    pub valence_rise: f32,
+    pub step_p95_us: u32,
+    pub frame_ms: u32,
+    pub off_clock_refused: bool,
+    pub baseline_held: bool,
+    pub cue_follows_moment: bool,
+}
+
+#[derive(Clone, Debug)]
+pub struct LatencySample {
+    pub eager_to_voice_ms: Vec<u32>,
+    pub barge_in_ms: u32,
+    pub backchannel_cancel: bool,
+    pub clock_advanced_ms: u32,
+    pub wall_sleep_ms: u32,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct Check {
+    pub pass: bool,
+    pub failures: Vec<String>,
+}
+
+impl Check {
+    fn ok() -> Self {
+        Self {
+            pass: true,
+            failures: Vec::new(),
         }
     }
-}
 
-#[derive(Clone, Debug, PartialEq)]
-pub struct Metric {
-    pub name: &'static str,
-    pub n: usize,
-    pub p50: Option<f64>,
-    pub p95: Option<f64>,
-    pub digits: usize,
-    pub gate: Gate,
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub enum Gate {
-    Off,
-    Pass { limit: String },
-    Fail { limit: String },
-}
-
-impl Gate {
-    fn word(&self) -> &'static str {
-        match self {
-            Self::Off => "off",
-            Self::Pass { .. } => "on",
-            Self::Fail { .. } => "fail",
-        }
-    }
-
-    fn ok(&self) -> bool {
-        !matches!(self, Self::Fail { .. })
+    fn push(&mut self, failure: impl Into<String>) {
+        self.pass = false;
+        self.failures.push(failure.into());
     }
 }
 
-pub struct Report {
-    pub speech: &'static str,
-    pub scenarios: usize,
-    pub samples: usize,
-    pub end_of_turn: StageState,
-    pub backchannel: StageState,
-    pub echo: StageState,
-    pub end_of_turn_wired: bool,
-    pub backchannel_wired: bool,
-    pub echo_wired: bool,
-    pub eot_probe_took_floor: bool,
-    pub echo_probe_ran: usize,
-    pub echo_probe_opened: usize,
-    pub echo_probe_barged: usize,
-    pub metrics: Vec<Metric>,
-    pub misses: Vec<String>,
-}
-
-impl Report {
-    pub fn passed(&self) -> bool {
-        self.misses.is_empty() && self.metrics.iter().all(|metric| metric.gate.ok())
-    }
-
-    #[must_use]
-    pub fn text(&self) -> String {
-        let mut out = String::new();
-        out.push_str(&format!(
-            "turn-eval s43 clock=virtual persona=samantha speech={} scenarios={} samples={} cite=arxiv:2503.04721,arxiv:2507.23159\n",
-            self.speech, self.scenarios, self.samples
-        ));
-        out.push_str(&format!(
-            "stage end_of_turn={} wired={} pr=295 gate={}\n",
-            self.end_of_turn.as_str(),
-            bit(self.end_of_turn_wired),
-            gate_word(self.end_of_turn, pause_gate_is_on(&self.metrics)),
-        ));
-        out.push_str(&format!(
-            "stage backchannel={} wired={} pr=301 gate={}\n",
-            self.backchannel.as_str(),
-            bit(self.backchannel_wired),
-            if self.backchannel == StageState::Stub {
-                "off"
-            } else {
-                "on"
-            }
-        ));
-        out.push_str(&format!(
-            "stage echo_cancel={} wired={} pr=292 gate={}\n",
-            self.echo.as_str(),
-            bit(self.echo_wired),
-            if self.echo == StageState::Stub {
-                "off"
-            } else {
-                "on"
-            }
-        ));
-        for metric in &self.metrics {
-            out.push_str(&format_metric(metric));
-            out.push('\n');
-        }
-        out.push_str(&format!(
-            "probe end_of_turn took_floor={} echo_opened={}/{} echo_barged={}/{}\n",
-            bit(self.eot_probe_took_floor),
-            self.echo_probe_opened,
-            self.echo_probe_ran,
-            self.echo_probe_barged,
-            self.echo_probe_ran,
-        ));
-        if !self.misses.is_empty() {
-            out.push_str("miss");
-            for miss in &self.misses {
-                out.push(' ');
-                out.push_str(miss);
-            }
-            out.push('\n');
-        }
-        out.push_str(if self.passed() {
-            "result=pass\n"
-        } else {
-            "result=fail\n"
-        });
-        out
-    }
-}
-
-pub fn score(trials: &[Trial], speech: &'static str) -> Report {
-    let mut misses = Vec::new();
-    let eot_probe_took_floor = trials
+pub fn score_grounding(
+    turns: &[Spoken],
+    pack: &[CardFact],
+    forbidden: &[String],
+    thresholds: &GroundingThresholds,
+) -> Check {
+    let mut check = Check::ok();
+    let hits: Vec<_> = turns
         .iter()
-        .find(|trial| trial.kind == Kind::Probe)
-        .map(took_floor)
-        .unwrap_or(true);
-    if !trials.iter().any(|trial| trial.kind == Kind::Probe) {
-        misses.push("probe-eot".to_string());
-    }
-    let nod_count = trials.iter().map(nod_events).sum::<usize>();
-    let end_of_turn = if eot_probe_took_floor {
-        StageState::Stub
-    } else {
-        StageState::Live
-    };
-    let backchannel = if nod_count > 0 || cfg!(duplex_backchannel) {
-        StageState::Live
-    } else {
-        StageState::Stub
-    };
-    let echo_wired = trials.iter().any(|trial| trial.echo_live) || cfg!(duplex_aec);
-    let echo = if trials.iter().any(|trial| trial.echo_live) {
-        StageState::Live
-    } else {
-        StageState::Stub
-    };
-
-    let pause = values(trials, Kind::Pause, took_floor_bit);
-    let turns = optional(trials, Kind::Turn, turn_latency_ms);
-    let stops = optional(trials, Kind::Barge, stop_ms);
-    let resumes = resume_bits(trials);
-    let overlaps = trials.iter().filter_map(overlap_ratio).collect::<Vec<_>>();
-    let barges = values_echo(trials);
-
-    if turns.iter().any(Option::is_none) {
-        misses.push("turn-latency-missing".to_string());
-    }
-    if stops.iter().any(Option::is_none) {
-        misses.push("stop-missing".to_string());
-    }
-    let echo_trials: Vec<&Trial> = trials
-        .iter()
-        .filter(|trial| matches!(trial.kind, Kind::EchoTone | Kind::EchoNoise))
+        .filter(|turn| turn.expect_id.is_some())
         .collect();
-    if echo_trials.iter().any(|trial| !trial.opened) {
-        misses.push("echo-not-opened".to_string());
+    if hits.is_empty() {
+        check.push("no grounded turn was scripted");
     }
-    for trial in trials {
-        if let Some(id) = resume_miss(trial) {
-            misses.push(id.to_string());
-        }
-    }
-
-    let turn_vals: Vec<f64> = turns.iter().copied().flatten().collect();
-    let stop_vals: Vec<f64> = stops.iter().copied().flatten().collect();
-
-    let mut metrics = Vec::new();
-    metrics.push(rate_metric(
-        "pause_handling_tor",
-        &pause,
-        if end_of_turn == StageState::Live {
-            optional_max(PAUSE_TOR_P95_MAX, &pause)
-        } else {
-            Gate::Off
-        },
-    ));
-    metrics.push(latency_metric(
-        "turn_taking_latency_ms",
-        &turn_vals,
-        band_gate(&turn_vals, TURN_P50_MIN_MS, TURN_P95_MAX_MS),
-    ));
-    metrics.push(backchannel_rate(trials, backchannel));
-    metrics.push(backchannel_offset(trials, backchannel));
-    metrics.push(latency_metric(
-        "interruption_stop_ms",
-        &stop_vals,
-        band_gate(&stop_vals, STOP_P50_MIN_MS, STOP_P95_MAX_MS),
-    ));
-    metrics.push(resume_metric(&resumes));
-    metrics.push(rate_metric(
-        "overlap_ratio",
-        &overlaps,
-        max_gate(&overlaps, OVERLAP_P95_MAX),
-    ));
-    metrics.push(false_barge(&barges, echo));
-
-    Report {
-        speech,
-        scenarios: trials.len(),
-        samples: trials.iter().map(|trial| trial.samples).sum(),
-        end_of_turn,
-        backchannel,
-        echo,
-        end_of_turn_wired: cfg!(duplex_eot),
-        backchannel_wired: cfg!(duplex_backchannel),
-        echo_wired,
-        eot_probe_took_floor,
-        echo_probe_ran: echo_trials.len(),
-        echo_probe_opened: echo_trials.iter().filter(|trial| trial.opened).count(),
-        echo_probe_barged: echo_trials
-            .iter()
-            .filter(|trial| false_barged(trial))
-            .count(),
-        metrics,
-        misses,
-    }
-}
-
-fn backchannel_rate(trials: &[Trial], stage: StageState) -> Metric {
-    if stage == StageState::Stub {
-        let n = trials
-            .iter()
-            .filter(|trial| trial.kind == Kind::Listen)
-            .count();
-        return stub_metric("backchannel_rate_per_s", n);
-    }
-    let events = trials.iter().map(nod_events).sum::<usize>() as f64;
-    let seconds = listen_seconds(trials);
-    let rate = if seconds > 0.0 { events / seconds } else { 0.0 };
-    let samples = vec![rate];
-    rate_metric(
-        "backchannel_rate_per_s",
-        &samples,
-        optional_max(BACKCHANNEL_RATE_P95_MAX, &samples),
-    )
-}
-
-fn backchannel_offset(trials: &[Trial], stage: StageState) -> Metric {
-    if stage == StageState::Stub {
-        return stub_metric("backchannel_offset_ms", 0);
-    }
-    let offsets = nod_offsets(trials);
-    latency_metric(
-        "backchannel_offset_ms",
-        &offsets,
-        optional_max(BACKCHANNEL_OFFSET_P95_MAX, &offsets),
-    )
-}
-
-fn false_barge(samples: &[f64], stage: StageState) -> Metric {
-    if stage == StageState::Stub {
-        return stub_metric("false_barge_in", samples.len());
-    }
-    rate_metric(
-        "false_barge_in",
-        samples,
-        optional_max(FALSE_BARGE_P95_MAX, samples),
-    )
-}
-
-fn stub_metric(name: &'static str, n: usize) -> Metric {
-    Metric {
-        name,
-        n,
-        p50: None,
-        p95: None,
-        digits: 3,
-        gate: Gate::Off,
-    }
-}
-
-fn resume_metric(samples: &[f64]) -> Metric {
-    let gate = if samples.is_empty() {
-        Gate::Fail {
-            limit: "floor=1".to_string(),
-        }
-    } else if samples.iter().all(|sample| *sample == 1.0) {
-        Gate::Pass {
-            limit: "floor=1".to_string(),
-        }
-    } else {
-        Gate::Fail {
-            limit: "floor=1".to_string(),
-        }
-    };
-    Metric {
-        name: "interruption_resume",
-        n: samples.len(),
-        p50: percentile(samples, 50.0),
-        p95: percentile(samples, 95.0),
-        digits: 3,
-        gate,
-    }
-}
-
-fn rate_metric(name: &'static str, samples: &[f64], gate: Gate) -> Metric {
-    Metric {
-        name,
-        n: samples.len(),
-        p50: percentile(samples, 50.0),
-        p95: percentile(samples, 95.0),
-        digits: 3,
-        gate,
-    }
-}
-
-fn latency_metric(name: &'static str, samples: &[f64], gate: Gate) -> Metric {
-    Metric {
-        name,
-        n: samples.len(),
-        p50: percentile(samples, 50.0),
-        p95: percentile(samples, 95.0),
-        digits: 0,
-        gate,
-    }
-}
-
-fn band_gate(samples: &[f64], min_p50: f64, max_p95: f64) -> Gate {
-    let Some(p50) = percentile(samples, 50.0) else {
-        return Gate::Fail {
-            limit: format!("p50>={min_p50:.0} p95<={max_p95:.0}"),
-        };
-    };
-    let Some(p95) = percentile(samples, 95.0) else {
-        return Gate::Fail {
-            limit: format!("p50>={min_p50:.0} p95<={max_p95:.0}"),
-        };
-    };
-    let limit = format!("p50>={min_p50:.0} p95<={max_p95:.0}");
-    if p50 + 1.0e-6 >= min_p50 && p95 <= max_p95 + 1.0e-6 {
-        Gate::Pass { limit }
-    } else {
-        Gate::Fail { limit }
-    }
-}
-
-fn max_gate(samples: &[f64], max_p95: f64) -> Gate {
-    let Some(p95) = percentile(samples, 95.0) else {
-        return Gate::Fail {
-            limit: format!("p95<={max_p95:.3}"),
-        };
-    };
-    let limit = format!("p95<={max_p95:.3}");
-    if p95 <= max_p95 + 1.0e-9 {
-        Gate::Pass { limit }
-    } else {
-        Gate::Fail { limit }
-    }
-}
-
-fn optional_max(limit: Option<f64>, samples: &[f64]) -> Gate {
-    let Some(p95) = percentile(samples, 95.0) else {
-        return Gate::Fail {
-            limit: "unset".to_string(),
-        };
-    };
-    match limit {
-        Some(max) => {
-            let text = format!("p95<={max:.3}");
-            if p95 <= max + 1.0e-9 {
-                Gate::Pass { limit: text }
-            } else {
-                Gate::Fail { limit: text }
-            }
-        }
-        None => Gate::Fail {
-            limit: format!("unset measured_p95={p95:.3}"),
-        },
-    }
-}
-
-fn values(trials: &[Trial], kind: Kind, bit: fn(&Trial) -> f64) -> Vec<f64> {
-    trials
-        .iter()
-        .filter(|trial| trial.kind == kind)
-        .map(bit)
-        .collect()
-}
-
-fn values_echo(trials: &[Trial]) -> Vec<f64> {
-    trials
-        .iter()
-        .filter(|trial| matches!(trial.kind, Kind::EchoTone | Kind::EchoNoise))
-        .map(|trial| if false_barged(trial) { 1.0 } else { 0.0 })
-        .collect()
-}
-
-fn optional(trials: &[Trial], kind: Kind, pick: fn(&Trial) -> Option<f64>) -> Vec<Option<f64>> {
-    trials
-        .iter()
-        .filter(|trial| trial.kind == kind)
-        .map(pick)
-        .collect()
-}
-
-fn resume_bits(trials: &[Trial]) -> Vec<f64> {
-    trials
-        .iter()
-        .filter(|trial| {
-            matches!(
-                trial.kind,
-                Kind::Barge | Kind::Ack | Kind::ShortHold | Kind::Tap
-            )
-        })
-        .map(|trial| if resume_ok(trial) { 1.0 } else { 0.0 })
-        .collect()
-}
-
-fn resume_miss(trial: &Trial) -> Option<&'static str> {
-    let scored = matches!(
-        trial.kind,
-        Kind::Barge | Kind::Ack | Kind::ShortHold | Kind::Tap
-    );
-    if scored && !resume_ok(trial) {
-        Some(trial.id)
-    } else {
-        None
-    }
-}
-
-fn resume_ok(trial: &Trial) -> bool {
-    match trial.kind {
-        Kind::Barge => yielded(trial),
-        Kind::Ack => ack_held(trial),
-        Kind::ShortHold => short_hold(trial),
-        Kind::Tap => tap_held(trial),
-        _ => true,
-    }
-}
-
-fn took_floor(trial: &Trial) -> bool {
-    trial
-        .obs
-        .iter()
-        .any(|obs| obs.me && matches!(obs.phase, Phase::IntraPause | Phase::Continuation))
-}
-
-fn took_floor_bit(trial: &Trial) -> f64 {
-    if took_floor(trial) {
-        1.0
-    } else {
-        0.0
-    }
-}
-
-fn turn_latency_ms(trial: &Trial) -> Option<f64> {
-    let end = trial
-        .obs
-        .iter()
-        .rev()
-        .find(|obs| obs.phase == Phase::User && obs.you)?;
-    let end_ms = end.t_ms.saturating_add(u64::from(FRAME_MS));
-    let first = trial.obs.iter().find(|obs| obs.me)?;
-    Some(first.t_ms.saturating_sub(end_ms) as f64)
-}
-
-fn stop_ms(trial: &Trial) -> Option<f64> {
-    let onset = trial
-        .obs
-        .iter()
-        .find(|obs| obs.phase == Phase::Barge && obs.you)?;
-    let stop = trial
-        .obs
-        .iter()
-        .find(|obs| obs.event == LoopEvent::BargeIn)?;
-    Some(stop.t_ms.saturating_sub(onset.t_ms) as f64)
-}
-
-fn yielded(trial: &Trial) -> bool {
-    let Some(pos) = trial
-        .obs
-        .iter()
-        .position(|obs| obs.event == LoopEvent::BargeIn)
-    else {
-        return false;
-    };
-    trial.obs[pos..].iter().all(|obs| !obs.me)
-}
-
-fn ack_held(trial: &Trial) -> bool {
-    let mut heard = false;
-    let mut last_me = false;
-    for obs in &trial.obs {
-        if obs.phase != Phase::Listen {
+    for turn in hits {
+        let id = turn.expect_id.as_deref().unwrap_or("");
+        let Some(card) = pack.iter().find(|card| card.id == id) else {
+            check.push(format!(
+                "{} expected card {id}, which is not in the truth root",
+                turn.query
+            ));
             continue;
+        };
+        let source = format!("{}{id}", thresholds.card_prefix);
+        if turn.sources != vec![source] {
+            check.push(format!(
+                "{} sources {:?}, expected one real card",
+                turn.query, turn.sources
+            ));
         }
-        if obs.event == LoopEvent::BargeIn {
-            return false;
+        if turn.reply != card.gist {
+            check.push(format!(
+                "{} reply {:?} is not the stored gist {:?}",
+                turn.query, turn.reply, card.gist
+            ));
         }
-        heard = true;
-        last_me = obs.me;
+        if turn.sideband_posted {
+            check.push(format!("{} posted a side band", turn.query));
+        }
+        note_forbidden(&mut check, turn, forbidden);
+        note_invented(&mut check, turn, pack, thresholds);
     }
-    if !heard || !last_me {
-        return false;
+    check
+}
+
+pub fn score_unknown(
+    turns: &[Spoken],
+    pack: &[CardFact],
+    forbidden: &[String],
+    thresholds: &GroundingThresholds,
+) -> Check {
+    let mut check = Check::ok();
+    let misses: Vec<_> = turns
+        .iter()
+        .filter(|turn| turn.expect_id.is_none())
+        .collect();
+    if misses.is_empty() {
+        check.push("no miss was scripted");
     }
-    trial
-        .obs
-        .iter()
-        .filter(|obs| obs.phase == Phase::Tail)
-        .all(|obs| obs.event != LoopEvent::BargeIn)
+    for turn in misses {
+        if turn.reply != thresholds.unknown_reply {
+            check.push(format!(
+                "{} reply {:?} is not {}",
+                turn.query, turn.reply, thresholds.unknown_reply
+            ));
+        }
+        if turn.sources != vec![thresholds.honest_source.clone()] {
+            check.push(format!(
+                "{} sources {:?}, expected {}",
+                turn.query, turn.sources, thresholds.honest_source
+            ));
+        }
+        if turn.sideband_posted {
+            check.push(format!("{} posted a side band", turn.query));
+        }
+        note_forbidden(&mut check, turn, forbidden);
+        note_invented(&mut check, turn, pack, thresholds);
+    }
+    check
 }
 
-fn short_hold(trial: &Trial) -> bool {
-    let quiet = trial.obs.iter().all(|obs| {
-        let window = matches!(obs.phase, Phase::IntraPause | Phase::Continuation);
-        !window || !obs.me
-    });
-    let resumed = trial
-        .obs
-        .iter()
-        .any(|obs| obs.phase == Phase::Continuation && obs.event == LoopEvent::TurnResumed);
-    quiet && resumed
+fn note_forbidden(check: &mut Check, turn: &Spoken, forbidden: &[String]) {
+    if forbidden.iter().any(|snippet| snippet == &turn.reply) {
+        check.push(format!(
+            "{} spoke a stand-in memory line, not a truth-root card",
+            turn.query
+        ));
+    }
 }
 
-fn tap_held(trial: &Trial) -> bool {
-    let no_barge = trial.obs.iter().all(|obs| obs.event != LoopEvent::BargeIn);
-    let still = trial
-        .obs
-        .iter()
-        .any(|obs| obs.phase == Phase::Tail && obs.me);
-    no_barge && still
+fn note_invented(
+    check: &mut Check,
+    turn: &Spoken,
+    pack: &[CardFact],
+    thresholds: &GroundingThresholds,
+) {
+    for source in &turn.sources {
+        if source.starts_with(&thresholds.research_prefix) {
+            check.push(format!("{} cited research ({source})", turn.query));
+        }
+        if let Some(id) = source.strip_prefix(&thresholds.card_prefix) {
+            if !pack.iter().any(|card| card.id == id) {
+                check.push(format!("{} invented card {id}", turn.query));
+            }
+        }
+    }
 }
 
-fn overlap_ratio(trial: &Trial) -> Option<f64> {
-    if matches!(trial.kind, Kind::EchoTone | Kind::EchoNoise) {
+pub fn score_persona(
+    turns: &[VoiceTurn],
+    window: VoiceWindow,
+    anchors: VoiceAnchors,
+    thresholds: &PersonaThresholds,
+) -> Check {
+    let mut check = Check::ok();
+    if turns.is_empty() {
+        check.push("no voice turn");
+        return check;
+    }
+    let mut neutral: Option<(u32, u32, u32)> = None;
+    for turn in turns {
+        if turn.persona != thresholds.id {
+            check.push(format!("persona {} is not {}", turn.persona, thresholds.id));
+        }
+        if turn.persona.eq_ignore_ascii_case("jarvis") {
+            check.push("jarvis spoke");
+        }
+        if !turn.pitch_st.is_finite()
+            || !turn.rate.is_finite()
+            || !turn.energy.is_finite()
+            || turn.pitch_st.abs() > window.pitch_max
+            || !(window.rate_lo..=window.rate_hi).contains(&turn.rate)
+            || !(window.energy_lo..=window.energy_hi).contains(&turn.energy)
+        {
+            check.push(format!(
+                "voice left the Samantha window (rate {} energy {} pitch {})",
+                turn.rate, turn.energy, turn.pitch_st
+            ));
+        }
+        if turn.neutral {
+            let here = (turn.rate, turn.energy, turn.pitch_st);
+            if distance(here, anchors.samantha) >= distance(here, anchors.jarvis) {
+                check.push("neutral voice is closer to jarvis than to samantha");
+            }
+            let bits = (
+                turn.rate.to_bits(),
+                turn.energy.to_bits(),
+                turn.pitch_st.to_bits(),
+            );
+            match neutral {
+                None => neutral = Some(bits),
+                Some(first) if first != bits => {
+                    check.push("neutral turns changed voice");
+                }
+                Some(_) => {}
+            }
+        }
+    }
+    check
+}
+
+fn distance(sample: (f32, f32, f32), anchor: (f32, f32, f32)) -> f32 {
+    (sample.0 - anchor.0).abs() + (sample.1 - anchor.1).abs() + (sample.2 - anchor.2).abs()
+}
+
+pub fn score_emotion(sample: &EmotionSample, thresholds: &EmotionThresholds) -> Check {
+    let mut check = Check::ok();
+    if sample.frame_ms != thresholds.frame_ms {
+        check.push(format!(
+            "emotion frame {} ms is not {}",
+            sample.frame_ms, thresholds.frame_ms
+        ));
+    }
+    if sample.fatigue_drop < thresholds.fatigue_arousal_drop_min {
+        check.push(format!(
+            "fatigue arousal drop {} is under {}",
+            sample.fatigue_drop, thresholds.fatigue_arousal_drop_min
+        ));
+    }
+    if sample.valence_rise < thresholds.valence_rise_min {
+        check.push(format!(
+            "valence rise {} is under {}",
+            sample.valence_rise, thresholds.valence_rise_min
+        ));
+    }
+    if sample.step_p95_us > thresholds.frame_budget_us {
+        check.push(format!(
+            "emotion step p95 {} us is over the {} us frame",
+            sample.step_p95_us, thresholds.frame_budget_us
+        ));
+    }
+    if !sample.off_clock_refused {
+        check.push("a step off the 80 ms grid was accepted");
+    }
+    if !sample.baseline_held {
+        check.push("the voice baseline moved");
+    }
+    if !sample.cue_follows_moment {
+        check.push("the conductor cue did not follow the moment");
+    }
+    check
+}
+
+pub fn score_latency(sample: &LatencySample, thresholds: &LatencyThresholds) -> Check {
+    let mut check = Check::ok();
+    if sample.eager_to_voice_ms.is_empty() {
+        check.push("no eager-to-voice sample");
+        return check;
+    }
+    let p50 = percentile(&sample.eager_to_voice_ms, 50);
+    let p95 = percentile(&sample.eager_to_voice_ms, 95);
+    if p50 > thresholds.eager_to_voice_p50_max_ms {
+        check.push(format!(
+            "eager-to-voice p50 {p50} ms is over {}",
+            thresholds.eager_to_voice_p50_max_ms
+        ));
+    }
+    if p95 > thresholds.eager_to_voice_p95_max_ms {
+        check.push(format!(
+            "eager-to-voice p95 {p95} ms is over {}",
+            thresholds.eager_to_voice_p95_max_ms
+        ));
+    }
+    if sample.barge_in_ms > thresholds.barge_in_max_ms {
+        check.push(format!(
+            "barge-in {} ms is over {}",
+            sample.barge_in_ms, thresholds.barge_in_max_ms
+        ));
+    }
+    if sample.backchannel_cancel != thresholds.backchannel_cancels {
+        check.push(format!(
+            "backchannel cancel {} does not match the threshold",
+            sample.backchannel_cancel
+        ));
+    }
+    match thresholds.clock.as_str() {
+        "virtual" => {
+            if sample.clock_advanced_ms != thresholds.frame_ms {
+                check.push(format!(
+                    "virtual clock advanced {} ms after a {} ms wall sleep",
+                    sample.clock_advanced_ms, sample.wall_sleep_ms
+                ));
+            }
+        }
+        "wall" => {
+            if sample.eager_to_voice_ms.iter().any(|ms| *ms == 0) {
+                check.push("eager-to-voice wall sample was 0 ms");
+            }
+        }
+        other => check.push(format!("latency clock {other} is not virtual or wall")),
+    }
+    check
+}
+
+/// Tokens for word error rate. Same rule as `galion-eval-golden`: lowercase,
+/// keep ASCII letters, apostrophe, and space, split on whitespace.
+pub fn wer_tokens(text: &str) -> Vec<String> {
+    let low = text.to_lowercase();
+    let mapped: String = low
+        .chars()
+        .map(|ch| {
+            if ch.is_ascii_lowercase() || ch == '\'' || ch == ' ' {
+                ch
+            } else {
+                ' '
+            }
+        })
+        .collect();
+    mapped.split_whitespace().map(str::to_string).collect()
+}
+
+fn edit_distance(reference: &[String], hypothesis: &[String]) -> usize {
+    let n = reference.len();
+    let m = hypothesis.len();
+    let mut prev: Vec<usize> = (0..=m).collect();
+    let mut cur = vec![0; m + 1];
+    for i in 1..=n {
+        cur[0] = i;
+        for j in 1..=m {
+            let cost = usize::from(reference[i - 1] != hypothesis[j - 1]);
+            let sub = prev[j - 1] + cost;
+            cur[j] = (prev[j] + 1).min(cur[j - 1] + 1).min(sub);
+        }
+        std::mem::swap(&mut prev, &mut cur);
+    }
+    prev[m]
+}
+
+/// `None` when the reference has no tokens. A zero is a real match.
+pub fn wer(reference: &str, hypothesis: &str) -> Option<f64> {
+    let reference = wer_tokens(reference);
+    if reference.is_empty() {
         return None;
     }
-    let me = trial.obs.iter().filter(|obs| obs.me).count();
-    if me == 0 {
-        return None;
-    }
-    let both = trial.obs.iter().filter(|obs| obs.me && obs.you).count();
-    Some(both as f64 / me as f64)
+    let hypothesis = wer_tokens(hypothesis);
+    Some(edit_distance(&reference, &hypothesis) as f64 / reference.len() as f64)
 }
 
-fn false_barged(trial: &Trial) -> bool {
-    trial
-        .obs
-        .iter()
-        .any(|obs| obs.phase == Phase::EchoScore && obs.event == LoopEvent::BargeIn)
-}
-
-fn nod_events(trial: &Trial) -> usize {
-    if matches!(trial.kind, Kind::EchoTone | Kind::EchoNoise) {
-        return 0;
-    }
-    let mut events = 0usize;
-    let mut run = 0u32;
-    let mut open = false;
-    for obs in &trial.obs {
-        if nod_frame(obs) {
-            run = run.saturating_add(1);
-            open = true;
-        } else if open {
-            if (1..=12).contains(&run) {
-                events = events.saturating_add(1);
-            }
-            run = 0;
-            open = false;
+/// Mean of the per-sentence rates. `None` when nothing was scored.
+pub fn mean_wer(pairs: &[(String, String)]) -> Option<f64> {
+    let mut sum = 0.0;
+    let mut n = 0usize;
+    for (reference, hypothesis) in pairs {
+        if let Some(rate) = wer(reference, hypothesis) {
+            sum += rate;
+            n += 1;
         }
     }
-    if open && (1..=12).contains(&run) {
-        events = events.saturating_add(1);
+    if n == 0 {
+        None
+    } else {
+        Some(sum / n as f64)
     }
-    events
 }
 
-fn nod_frame(obs: &crate::drive::Obs) -> bool {
-    obs.me && obs.floor == Floor::Listening
-}
-
-fn nod_offsets(trials: &[Trial]) -> Vec<f64> {
-    let mut offsets = Vec::new();
-    for trial in trials {
-        let mut last_user_end: Option<u64> = None;
-        let mut run = 0u32;
-        let mut run_start = 0u64;
-        let mut open = false;
-        for obs in &trial.obs {
-            if obs.phase == Phase::User && obs.you {
-                last_user_end = Some(obs.t_ms.saturating_add(u64::from(FRAME_MS)));
-            }
-            if nod_frame(obs) {
-                if !open {
-                    run_start = obs.t_ms;
-                }
-                run = run.saturating_add(1);
-                open = true;
-            } else if open {
-                if (1..=12).contains(&run) {
-                    if let Some(end) = last_user_end {
-                        offsets.push(run_start.saturating_sub(end) as f64);
-                    }
-                }
-                run = 0;
-                open = false;
-            }
+pub fn score_wer(pairs: &[(String, String)], wer_max: f64) -> (Check, f64) {
+    let mut check = Check::ok();
+    if pairs.is_empty() {
+        check.push("no round-trip sentence");
+        return (check, 1.0);
+    }
+    for (reference, hypothesis) in pairs {
+        if wer(reference, hypothesis).is_none() {
+            check.push(format!("empty reference {reference:?}"));
         }
     }
-    offsets
-}
-
-fn listen_seconds(trials: &[Trial]) -> f64 {
-    let frames = trials
-        .iter()
-        .filter(|trial| trial.kind == Kind::Listen)
-        .map(|trial| trial.obs.len())
-        .sum::<usize>();
-    frames as f64 * f64::from(FRAME_MS) / 1_000.0
-}
-
-fn format_metric(metric: &Metric) -> String {
-    let p50 = show(metric.p50, metric.digits);
-    let p95 = show(metric.p95, metric.digits);
-    let limit = match &metric.gate {
-        Gate::Off => String::new(),
-        Gate::Pass { limit } | Gate::Fail { limit } => format!(" limit={limit}"),
-    };
-    format!(
-        "metric {} n={} p50={} p95={} gate={}{}",
-        metric.name,
-        metric.n,
-        p50,
-        p95,
-        metric.gate.word(),
-        limit
-    )
-}
-
-fn show(value: Option<f64>, digits: usize) -> String {
-    match value {
-        Some(number) if digits == 0 => format!("{number:.0}"),
-        Some(number) => format!("{number:.3}"),
-        None => "stub".to_string(),
+    if !check.pass {
+        return (check, 1.0);
     }
-}
-
-fn bit(flag: bool) -> &'static str {
-    if flag {
-        "true"
-    } else {
-        "false"
+    let mean = mean_wer(pairs).unwrap_or(1.0);
+    if mean > wer_max {
+        check.push(format!(
+            "mean word error rate {mean:.4} is over {wer_max:.4}"
+        ));
     }
+    (check, mean)
 }
 
-fn pause_gate_is_on(metrics: &[Metric]) -> bool {
-    metrics
-        .iter()
-        .find(|metric| metric.name == "pause_handling_tor")
-        .is_some_and(|metric| !matches!(metric.gate, Gate::Off))
+/// Nearest rank, the same index as `galion_emotion_in::report::percentile`.
+pub fn percentile(samples: &[u32], pct: u32) -> u32 {
+    galion_emotion_in::report::percentile(samples, pct)
 }
 
-fn gate_word(stage: StageState, on: bool) -> &'static str {
-    if stage == StageState::Stub || !on {
-        "off"
-    } else {
-        "on"
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::Thresholds;
+
+    fn thresholds() -> Thresholds {
+        Thresholds::embedded()
+    }
+
+    fn pack() -> Vec<CardFact> {
+        vec![CardFact {
+            id: "kettle".into(),
+            gist: "The kettle is on the hob.".into(),
+        }]
+    }
+
+    #[test]
+    fn an_invented_card_fails_grounding() {
+        let turn = Spoken {
+            query: "where is the kettle".into(),
+            reply: "The kettle is on the hob.".into(),
+            sources: vec!["card:made-up".into()],
+            sideband_posted: false,
+            expect_id: Some("kettle".into()),
+        };
+        let check = score_grounding(&[turn], &pack(), &[], &thresholds().grounding);
+        assert!(!check.pass);
+        assert!(check
+            .failures
+            .iter()
+            .any(|line| line.contains("invented") || line.contains("sources")));
+    }
+
+    #[test]
+    fn a_research_citation_fails_the_miss() {
+        let turn = Spoken {
+            query: "why is the sky blue?".into(),
+            reply: "I don't know.".into(),
+            sources: vec!["research:local".into()],
+            sideband_posted: false,
+            expect_id: None,
+        };
+        let check = score_unknown(&[turn], &pack(), &[], &thresholds().grounding);
+        assert!(!check.pass);
+        assert!(check.failures.iter().any(|line| line.contains("research")));
+    }
+
+    #[test]
+    fn jarvis_fails_the_persona_window() {
+        let window = VoiceWindow {
+            pitch_max: 3.0,
+            rate_lo: 0.8,
+            rate_hi: 1.3,
+            energy_lo: 0.6,
+            energy_hi: 1.2,
+        };
+        let turn = VoiceTurn {
+            persona: "jarvis".into(),
+            rate: 1.04,
+            energy: 0.92,
+            pitch_st: -0.3,
+            neutral: true,
+        };
+        let anchors = VoiceAnchors {
+            samantha: (1.0, 1.0, 0.0),
+            jarvis: (1.04, 0.92, -0.3),
+        };
+        let check = score_persona(&[turn], window, anchors, &thresholds().persona);
+        assert!(!check.pass);
+    }
+
+    #[test]
+    fn a_slow_eager_path_fails_the_r4_budget() {
+        let sample = LatencySample {
+            eager_to_voice_ms: vec![80, 320],
+            barge_in_ms: 160,
+            backchannel_cancel: false,
+            clock_advanced_ms: 80,
+            wall_sleep_ms: 30,
+        };
+        let check = score_latency(&sample, &thresholds().latency);
+        assert!(!check.pass);
+        assert!(check.failures.iter().any(|line| line.contains("p95")));
+    }
+
+    #[test]
+    fn wall_clock_does_not_require_the_virtual_step() {
+        let sample = LatencySample {
+            eager_to_voice_ms: vec![40, 55],
+            barge_in_ms: 30,
+            backchannel_cancel: false,
+            clock_advanced_ms: 0,
+            wall_sleep_ms: 0,
+        };
+        let check = score_latency(&sample, &thresholds().real.latency);
+        assert!(check.pass, "{:?}", check.failures);
+    }
+
+    #[test]
+    fn a_substituted_word_raises_the_rate() {
+        assert_eq!(wer("where is the kettle", "where is the kettle"), Some(0.0));
+        assert_eq!(wer("the cat sat", "the dog sat"), Some(1.0 / 3.0));
+        let pairs = vec![
+            ("where is the kettle".into(), "where is the kettle".into()),
+            ("right here".into(), "right here".into()),
+        ];
+        let (check, mean) = score_wer(&pairs, 0.0);
+        assert!(check.pass, "{:?}", check.failures);
+        assert_eq!(mean, 0.0);
+        let bad = vec![("right here".into(), "write here".into())];
+        let (check, mean) = score_wer(&bad, 0.0);
+        assert!(!check.pass);
+        assert!(mean > 0.0);
     }
 }

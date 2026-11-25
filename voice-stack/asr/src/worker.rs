@@ -263,7 +263,7 @@ pub fn encode_utterance(rate: u32, pcm: &[i16]) -> String {
 
 #[allow(dead_code)]
 pub fn decode_utterance(line: &str) -> Result<(u32, Vec<i16>), AsrError> {
-    let value = parse(line.trim()).map_err(|err| AsrError::new(err))?;
+    let value = parse(line.trim()).map_err(AsrError::new)?;
     let rate = value.get("rate").and_then(Json::as_f64).unwrap_or(0.0) as u32;
     let b64 = value
         .get("pcm_b64")

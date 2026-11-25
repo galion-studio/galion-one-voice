@@ -3,18 +3,46 @@
 
 [package]
 name = "horbm-eval"
-description = "Closed full-duplex turn-taking eval for Samantha. Virtual 80 ms clock. No audio files."
+description = "Closed HORBM evaluation gate, plus the Samantha turn-taking eval. Fake mode is the default. Real mode is an opt-in Linux ear and mouth."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 publish.workspace = true
 rust-version.workspace = true
+default-run = "horbm-eval"
+
+[[bin]]
+name = "horbm-eval"
+path = "src/main.rs"
+
+# Same worker source as crates/galion-asr-vosk. Built only with `--features real`,
+# so `cargo test` on a clean target produces it and sets CARGO_BIN_EXE_galion-asr-vosk.
+# The default gate does not build this binary.
+[[bin]]
+name = "galion-asr-vosk"
+path = "../../../crates/galion-asr-vosk/src/main.rs"
+required-features = ["real"]
+
+[features]
+default = []
+# Opt-in. Links galion-asr-vosk and the galion-ml-voice Piper/Flite worker.
+# The default build does not, so CI stays on FakeEar and FakeMouth.
+real = ["dep:galion-asr-vosk", "dep:galion-ml-voice", "galion-ml-voice/speech"]
+
+[[bin]]
+name = "horbm-turn-eval"
+path = "src/bin/horbm-turn-eval.rs"
 
 [dependencies]
 horbm = { path = "../horbm" }
 horbm-duplex = { path = "../horbm-duplex" }
 horbm-voice = { path = "../horbm-voice" }
-
-[[bin]]
-name = "horbm-turn-eval"
-path = "src/bin/horbm-turn-eval.rs"
+galion-conductor = { path = "../../../crates/galion-conductor" }
+galion-emotion = { path = "../../../galion-emotion" }
+galion-emotion-core = { path = "../../../crates/galion-emotion-core" }
+galion-emotion-in = { path = "../../../voice-stack/emotion-in" }
+galion-asr-vosk = { path = "../../../crates/galion-asr-vosk", optional = true }
+galion-ml-voice = { path = "../../../crates/galion-ml-voice", optional = true, default-features = false }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"

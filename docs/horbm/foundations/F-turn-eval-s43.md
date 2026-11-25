@@ -6,7 +6,7 @@ Perpetual Open MIT License. (c) 2026 Galion Labs.
 |---|---|
 | Swarm | HORBM S43. Closed full-duplex turn-taking eval for Samantha. |
 | Crate | `horbm/crates/horbm-eval`. Member of the `horbm` workspace. |
-| Base | Merged `main` at `bd2aac9e` (#286, #282, #292). Echo cancellation is inside `Duplex::tick`. |
+| Base | Merged `main` at `14280abd` (#276 and earlier, including #292). Main's `horbm-eval` gate stays. The turn-taking scores sit on top of it. Echo cancellation is inside `Duplex::tick`. |
 | Clock | Virtual. One `Duplex::tick` is 80 ms, 16 kHz, 1280 samples. No wall clock in the score. |
 | Persona | Samantha. `open_persona("aria")` still refuses her. |
 | Speech | In-memory stand-in, generated when the eval runs. Not Piper: this tree has no voice model, and the eval does not download one. No audio file is written. |
