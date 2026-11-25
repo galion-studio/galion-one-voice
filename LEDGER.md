@@ -126,6 +126,8 @@
 
 **2026-11-05 22:54 CET · Cloning V2 emotion blend · Samantha coherent-rotation promoted.** Maciej Grajczyk. Admin Slavik (relayed by owner Mate, t765u) accepted MOS 4.13→~3.88 to restore emotion. Root cause: cbx ONNX LM conditioning sees only the first 6 s / 10 s of reference features; Samantha happy evidence sits ~9.9–12.4 s. Shared tooling lands under `tools/cloning-v2/` (pipeline emotion-blend-ref, cbx-clone-voice `--blend-preserve`, cbx-add-voice `--emotion-blend`, cbx-v2-timbre, galion-voicecheck, voice-defaults) and `docs/galion-voice-v2/symphony/EMOTION-BLEND.md`. Samantha 12-line T0: WER 0.01455, ECAPA 0.7081, emo dist 0.437251, MOS 3.8757 (gate PASS). Jarvis coherent-rotation failed its guard and was not promoted. No voice WAVs or `.cbxvoice` in git. `LOCKS.toml` not edited. Piper remains live call TTS; cbx clone worker voice store switched separately.
 
+**2026-11-24 19:15 · HORBM phase 7 learn consent.** Owner: `LOCKS.toml` may be edited when the architecture needs it. `[consent]` gains `learn = "deny"` and `learn_in_band = false`. The EmotionWire bits stay `sense`, `adapt`, `remember`, `share` (byte 7 masked to `0x0f`). Learn is the offline pack-write grant and is distinct from `remember`. The process grant is `GALION_HORBM_LEARN=grant`. `scripts/check-locks.sh` requires the new keys. `SOUL.md` is not in this tree and was not created. No merge.
+
 
 ---
 

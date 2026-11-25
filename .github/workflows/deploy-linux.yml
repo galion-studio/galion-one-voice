@@ -1,0 +1,30 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Galion Labs
+# Linux supervision smoke for deploy/linux. ubuntu-24.04 only.
+# No Windows runner. No model download. No deploy.
+
+name: deploy linux supervise
+
+on:
+  pull_request:
+    paths:
+      - 'deploy/linux/**'
+      - '.github/workflows/deploy-linux.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'deploy/linux/**'
+      - '.github/workflows/deploy-linux.yml'
+
+jobs:
+  smoke:
+    name: shellcheck and supervise smoke
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: shellcheck, curl, systemd
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck curl systemd
+      - name: smoke
+        run: deploy/linux/ci/smoke.sh

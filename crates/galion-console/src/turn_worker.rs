@@ -450,16 +450,16 @@ fn respond_voice_stack(
         Ok(heard) => heard,
         Err(PhoneError::Superseded) => return None,
         Err(e) => {
-            return Some(lane_error(
-                job.id,
+            return Some(lane_error(LaneFail {
+                id: job.id,
                 persona,
                 in_ms,
                 t0,
-                e,
-                String::new(),
-                "none",
-                "none",
-            ))
+                err: e,
+                text: String::new(),
+                asr: "none",
+                llm: "none",
+            }))
         }
     };
     let Some(cue) = research_cue(&transcript) else {
@@ -494,7 +494,16 @@ fn respond_voice_stack(
     let mut reply = match result {
         Ok(turn) => pack_ok(job.id, RESEARCH_VOICE, in_ms, t0, turn),
         Err(PhoneError::Superseded) => return None,
-        Err(e) => lane_error(job.id, RESEARCH_VOICE, in_ms, t0, e, spoken, asr.id(), llm),
+        Err(e) => lane_error(LaneFail {
+            id: job.id,
+            persona: RESEARCH_VOICE,
+            in_ms,
+            t0,
+            err: e,
+            text: spoken,
+            asr: asr.id(),
+            llm,
+        }),
     };
     if reply.error.is_none() {
         reply.stages = format!("research=handoff {}", reply.stages);
@@ -516,16 +525,16 @@ fn pack_phone(
     match result {
         Ok(turn) => Some(pack_ok(id, persona, in_ms, t0, turn)),
         Err(PhoneError::Superseded) => None,
-        Err(e) => Some(lane_error(
+        Err(e) => Some(lane_error(LaneFail {
             id,
             persona,
             in_ms,
             t0,
-            e,
-            String::new(),
-            "none",
-            "none",
-        )),
+            err: e,
+            text: String::new(),
+            asr: "none",
+            llm: "none",
+        })),
     }
 }
 
@@ -563,16 +572,28 @@ fn pack_ok(
     }
 }
 
-fn lane_error(
+struct LaneFail {
     id: u64,
     persona: &'static str,
     in_ms: u32,
     t0: Instant,
-    e: PhoneError,
+    err: PhoneError,
     text: String,
     asr: &'static str,
     llm: &'static str,
-) -> TurnReply {
+}
+
+fn lane_error(fail: LaneFail) -> TurnReply {
+    let LaneFail {
+        id,
+        persona,
+        in_ms,
+        t0,
+        err: e,
+        text,
+        asr,
+        llm,
+    } = fail;
     let kind = match &e {
         PhoneError::AsrUnratified(_) => "AsrUnratified (set GALION_ASR=vosk and place the small-en model; docs/asr/VOSK.md)",
         PhoneError::AsrUnavailable(_) => "AsrUnavailable (Vosk model or worker missing; typed text still works; no transcript invented)",
@@ -623,7 +644,16 @@ fn respond_seamed(
         Ok(v) => v,
         Err(PhoneError::Superseded) => return None,
         Err(e) => {
-            return Some(lane_error(id, persona, in_ms, t0, e, String::new(), "none", "none"))
+            return Some(lane_error(LaneFail {
+                id,
+                persona,
+                in_ms,
+                t0,
+                err: e,
+                text: String::new(),
+                asr: "none",
+                llm: "none",
+            }))
         }
     };
     let asr_label = asr.id();
@@ -652,7 +682,16 @@ fn respond_seamed(
         }
         Err(PhoneError::Superseded) => None,
         Err(e) => {
-            let mut reply = lane_error(id, persona, in_ms, t0, e, String::new(), asr_label, "none");
+            let mut reply = lane_error(LaneFail {
+                id,
+                persona,
+                in_ms,
+                t0,
+                err: e,
+                text: String::new(),
+                asr: asr_label,
+                llm: "none",
+            });
             reply.stages = token;
             Some(reply)
         }

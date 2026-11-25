@@ -110,6 +110,10 @@ pub struct StyleSearch {
 }
 
 impl StyleSearch {
+    pub(crate) fn none() -> Self {
+        Self::empty(0)
+    }
+
     fn empty(skipped_size: usize) -> Self {
         Self {
             hits: Vec::new(),

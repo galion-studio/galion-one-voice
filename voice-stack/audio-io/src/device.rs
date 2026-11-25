@@ -37,6 +37,9 @@ pub struct SessionConfig {
     pub input_name: Option<String>,
     pub output_name: Option<String>,
     pub direction: Direction,
+    /// Playback ring length in samples. `0` keeps the 32768-sample default
+    /// (about 1.36 s at 24 kHz).
+    pub playback_samples: usize,
 }
 
 impl SessionConfig {
@@ -45,6 +48,7 @@ impl SessionConfig {
             input_name: env_name("GALION_AUDIO_IN"),
             output_name: env_name("GALION_AUDIO_OUT"),
             direction,
+            playback_samples: 0,
         }
     }
 }
@@ -221,7 +225,11 @@ pub fn host_report() -> HostReport {
 
 pub fn open(config: &SessionConfig) -> Result<AudioSession, AudioError> {
     let host = platform_host()?;
-    let playback = Playback::default();
+    let samples = match config.playback_samples {
+        0 => 32_768,
+        n => n,
+    };
+    let playback = Playback::new(samples);
     let capture = CaptureQueue::new(32);
     let heartbeat = HeartbeatIn::new("mic");
     let errors = Arc::new(Mutex::new(None));

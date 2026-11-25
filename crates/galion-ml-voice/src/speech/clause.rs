@@ -31,15 +31,10 @@ impl ClauseBuf {
 
     fn take(&mut self, finish: bool) -> Vec<String> {
         let mut out = Vec::new();
-        loop {
-            match split_first_clause(&self.pending, finish) {
-                Some((clause, rest)) => {
-                    self.pending = rest;
-                    if !clause.is_empty() { out.push(clause); }
-                    if self.pending.is_empty() { break; }
-                }
-                None => break,
-            }
+        while let Some((clause, rest)) = split_first_clause(&self.pending, finish) {
+            self.pending = rest;
+            if !clause.is_empty() { out.push(clause); }
+            if self.pending.is_empty() { break; }
         }
         out
     }

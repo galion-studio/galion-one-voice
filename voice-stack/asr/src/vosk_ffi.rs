@@ -201,6 +201,10 @@ fn prepend_lib_dir(dir: &Path) {
         }
         set_dll_directory(Path::new(&dir));
     }
+    #[cfg(not(any(unix, windows)))]
+    {
+        let _ = dir;
+    }
 }
 
 #[cfg(unix)]
@@ -302,4 +306,25 @@ extern "system" {
     fn GetProcAddress(module: *mut c_void, name: *const c_char) -> *mut c_void;
     fn SetDllDirectoryW(path: *const u16) -> i32;
     fn GetLastError() -> u32;
+}
+
+#[cfg(not(any(unix, windows)))]
+fn load_library(path: &Path) -> Result<*mut c_void, AsrError> {
+    let _ = path;
+    Err(AsrError::new(
+        "libvosk is loaded on unix and Windows only. No transcript was invented.",
+    ))
+}
+
+#[cfg(not(any(unix, windows)))]
+fn raw_sym(_handle: *mut c_void, _name: *const c_char) -> *mut c_void {
+    std::ptr::null_mut()
+}
+
+#[cfg(not(any(unix, windows)))]
+fn clear_error() {}
+
+#[cfg(not(any(unix, windows)))]
+fn last_error() -> String {
+    "libvosk is loaded on unix and Windows only".into()
 }

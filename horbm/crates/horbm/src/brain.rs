@@ -6,19 +6,24 @@ use std::path::Path;
 use std::time::Instant;
 
 use galion_emotion_core::{
-    ConductorCue, EmotionCore, InnerLife, InnerTurn, IntentMsg, MomentState,
+    ConductorCue, EmotionCore, InnerLife, InnerTurn, IntentMsg, MomentState, VoiceBaseline,
 };
 use galion_sam_empathy::{Empathy, PronounClass, TickIn, FRAME_MS};
+use horbm_persona::{MoveClaim, MoveVerdict, Persona, PersonaError};
 
 use horbm_brain::{
     classify, pick, split_clause, Answer, Heuristic, Retrieved, Retriever, SidebandMark,
 };
+use horbm_inner::{DialogueLean, Heard, InnerMsg, Perceived, SamanthaInner, Verb};
+
+use galion_emotion_core::standins::memory::{PersonMemory, PersonState, TrackedName};
 
 use crate::dialogue::{DecideIn, Decision, Dialogue, DialogueConsent, Move, ReplyPlan, TurnSnap};
+use crate::memory::{about_the_person, pin_command};
 use crate::research_style::{ResearchHit, ResearchRoot, StylePersona};
 use crate::retrieve::{CellState, MemoryHitCell, RetrievalThread, RetrievedCells};
 use crate::route::{accept_line, route_heard, CardLookup, Gap, ResearchAsk, Speakable};
-use crate::{Pad, TurnOut, UNKNOWN_REPLY};
+use crate::{MemoryItem, Pad, TurnOut, UNKNOWN_REPLY};
 
 /// Mood and the prosody knobs that belong on the turn. Not a sentence.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -66,10 +71,13 @@ impl CardLookup for EmptyCards {
     }
 }
 
+/// Newest card misses kept on [`Brain`]. Older ones are dropped.
+const GAP_CAP: usize = 32;
+
 /// The linked brain. `open` reads the knowledge directory when it already
-/// exists and does not create it. Memory and case paths are not opened.
-/// The live server passes the same read-only loader and may attach a
-/// [`RetrievalThread`]. That thread is not started here.
+/// exists and does not create it. The person-diary path is kept and is not
+/// opened: `remember` is denied. The live server passes the same read-only
+/// loader and may attach a [`RetrievalThread`]. That thread is not started here.
 pub struct Brain {
     empathy: Empathy,
     cards: Box<dyn CardLookup + Send>,
@@ -80,10 +88,16 @@ pub struct Brain {
     card_count: usize,
     emotion: EmotionCore,
     inner: InnerLife,
+    persona: Persona,
+    samantha: SamanthaInner,
+    ear_sense: bool,
     retrieval: Option<RetrievalThread>,
     retrieval_epoch: u64,
     dialogue: Dialogue,
     style: ResearchRoot,
+    memory: Option<Box<dyn PersonMemory>>,
+    person_id: String,
+    memory_tick: u64,
 }
 
 struct Spoke {
@@ -208,6 +222,7 @@ impl Brain {
         research: Option<Box<dyn ResearchAsk + Send>>,
     ) -> Self {
         let card_count = cards.len();
+        let (emotion, inner, persona) = install(development_persona());
         Self {
             empathy: Empathy::new(),
             cards: Box::new(cards),
@@ -216,12 +231,18 @@ impl Brain {
             gaps: Vec::new(),
             meta: resting_meta(),
             card_count,
-            emotion: EmotionCore::at_rest(),
-            inner: InnerLife::seeded(),
+            emotion,
+            inner,
+            persona,
+            samantha: SamanthaInner::new(),
+            ear_sense: false,
             retrieval: None,
             retrieval_epoch: 0,
             dialogue: Dialogue::new(),
             style: ResearchRoot::empty(),
+            memory: None,
+            person_id: "person".to_string(),
+            memory_tick: 0,
         }
     }
 
@@ -230,6 +251,31 @@ impl Brain {
     pub fn with_style(mut self, style: ResearchRoot) -> Self {
         self.style = style;
         self
+    }
+
+    /// Person diary. Replaces a diary already attached, including the denied
+    /// one from [`Brain::open`].
+    pub fn with_memory(mut self, memory: impl PersonMemory + 'static) -> Self {
+        self.memory = Some(Box::new(memory));
+        self
+    }
+
+    /// Whose diary this turn reads and writes. Empty is ignored.
+    pub fn set_person(&mut self, person_id: &str) {
+        let person_id = person_id.trim();
+        if person_id.is_empty() {
+            return;
+        }
+        self.person_id = person_id.to_string();
+    }
+
+    pub fn person_id(&self) -> &str {
+        &self.person_id
+    }
+
+    /// The port the dialogue manager and the inner life call.
+    pub fn person_memory(&mut self) -> Option<&mut (dyn PersonMemory + 'static)> {
+        self.memory.as_deref_mut()
     }
 
     /// Chat turns read this thread's cell. `Idle` keeps the card and fixture
@@ -249,12 +295,31 @@ impl Brain {
         self.card_count
     }
 
+    /// Read the persona file once, then open cards the way [`Self::open`] does.
+    ///
+    /// `None` loads Samantha. An explicit path replaces her. An unreadable or
+    /// invalid file returns the error and does not build a brain.
+    pub fn boot(
+        memory_db: &Path,
+        knowledge_dir: &Path,
+        cases: &Path,
+        persona_file: Option<&Path>,
+    ) -> Result<Self, PersonaError> {
+        let persona = match persona_file {
+            Some(path) => Persona::load(path)?,
+            None => development_persona(),
+        };
+        let mut brain = Self::open(memory_db, knowledge_dir, cases);
+        brain.install_persona(persona);
+        Ok(brain)
+    }
+
     /// Read `knowledge_dir` when it is already a directory. A missing path is
-    /// an empty card set. Nothing is created. Memory and case paths are not
-    /// opened.
+    /// an empty card set. Nothing is created. `memory_db` is kept on a denied
+    /// diary and is not opened. `cases` is not opened.
     pub fn open(memory_db: &Path, knowledge_dir: &Path, cases: &Path) -> Self {
-        let _ = (memory_db, cases);
-        match crate::KnowledgeCards::load(knowledge_dir) {
+        let _ = cases;
+        let mut brain = match crate::KnowledgeCards::load(knowledge_dir) {
             Ok(loaded) => {
                 eprintln!("{}", loaded.report.log_line());
                 Self::with_cards(loaded.cards, None).with_style(ResearchRoot::from_env())
@@ -266,7 +331,9 @@ impl Brain {
                 eprintln!("horbm cards: {err}");
                 Self::with_cards(EmptyCards, None).with_style(ResearchRoot::from_env())
             }
-        }
+        };
+        brain.memory = Some(Box::new(crate::EpisodicStore::open(memory_db, false)));
+        brain
     }
 
     pub fn set_speakable(&mut self, speakable: Speakable) {
@@ -336,6 +403,13 @@ impl Brain {
         &self.emotion
     }
 
+    /// Who is speaking. The moment starts on this baseline. Empathy, cards,
+    /// and the inner life stay as they are. Later [`Self::step_moment`] calls
+    /// still do not write the baseline.
+    pub fn seat(&mut self, baseline: VoiceBaseline) {
+        self.emotion = EmotionCore::from_baseline(baseline);
+    }
+
     /// One 80 ms emotion frame. Does not change the empathy mood.
     pub fn step_moment(
         &mut self,
@@ -344,9 +418,66 @@ impl Brain {
         self.emotion.step(intent)
     }
 
-    /// The inner life. Persona and memory are not stored here.
+    /// The character loaded at boot. The moment step does not write it.
+    pub fn persona(&self) -> &Persona {
+        &self.persona
+    }
+
+    /// Legal-move port. The dialogue manager calls this with one candidate.
+    pub fn admit_move(&self, claim: MoveClaim<'_>) -> MoveVerdict {
+        self.persona.verdict(claim)
+    }
+
+    /// The token inner life. Memory is not stored here.
     pub fn inner(&self) -> &InnerLife {
         &self.inner
+    }
+
+    /// Samantha's slower goals. Session only. Not the baseline, not the moment.
+    pub fn samantha(&self) -> &SamanthaInner {
+        &self.samantha
+    }
+
+    /// Ear switch for [`Self::turn`]. Default off. Words still count.
+    pub fn set_ear_sense(&mut self, on: bool) {
+        self.ear_sense = on;
+    }
+
+    /// Pace and topic gate from the latest inner note.
+    pub fn dialogue_lean(&self) -> DialogueLean {
+        self.samantha.last().lean()
+    }
+
+    /// False while she is waiting or on a check-in. Do not open a new topic.
+    pub fn may_open_topic(&self) -> bool {
+        !self.dialogue_lean().hold_topic
+    }
+
+    /// One inner turn, then one moment frame, using her GEMI note.
+    ///
+    /// Does not write the baseline. Does not keep `words`.
+    pub fn samantha_nudge(
+        &mut self,
+        words: &str,
+        ear: Option<Heard>,
+        sense: bool,
+    ) -> Result<InnerMsg, galion_emotion_core::CoreError> {
+        let seen = Perceived {
+            t_ms: self.emotion.next_ms(),
+            words,
+            ear,
+            sense,
+        };
+        let note = self.samantha.nudge(&mut self.emotion, seen)?;
+        self.apply_prosody(note.lean());
+        Ok(note)
+    }
+
+    fn install_persona(&mut self, persona: Persona) {
+        let (emotion, inner, persona) = install(persona);
+        self.emotion = emotion;
+        self.inner = inner;
+        self.persona = persona;
     }
 
     /// One dialogue turn of cares, wants, and expects. Emits a GEMI intent
@@ -396,19 +527,24 @@ impl Brain {
             frame_ms: FRAME_MS,
         });
         self.meta = meta_of(&tick);
+        let note = self.samantha.tick(FRAME_MS, true);
+        self.apply_prosody(note.lean());
         self.meta
     }
 
-    /// Empathy mood, then the retrieval cell when a thread is attached,
-    /// then cards, then the fixture on an idle cell, then the gateway.
-    /// Layer 4 then picks the move. [`Self::finish`] splits the clause.
+    /// Empathy mood, then the person diary when `remember` is granted, then
+    /// the retrieval cell when a thread is attached, then cards, then the
+    /// fixture on an idle cell, then the gateway. Layer 4 then picks the move.
+    /// [`Self::finish`] splits the clause.
     ///
-    /// A granted hit speaks [`crate::MemoryHit::clause`]. A granted miss
+    /// A granted card hit speaks [`crate::MemoryHit::clause`]. A granted miss
     /// speaks [`crate::UNKNOWN_REPLY`] and does not call research. `Idle`
-    /// means `remember` is denied: the diary is not opened, and the committed
-    /// fixture still answers when the cards miss. This waits for the retrieval
-    /// thread. Do not call it from `Heartbeat::step`. Barge-in is not this
-    /// function.
+    /// means the truth-card `remember` bit is denied: that diary is not
+    /// opened, and the committed fixture still answers when the cards miss.
+    /// Person memory is a different file. It is spoken only for a question
+    /// about the person, and never as the source of a world answer. This
+    /// waits for the retrieval thread. Do not call it from `Heartbeat::step`.
+    /// Barge-in is not this function.
     pub fn turn(&mut self, text: &str) -> TurnOut {
         let started = Instant::now();
         let heard = text.trim();
@@ -420,6 +556,17 @@ impl Brain {
             frame_ms: FRAME_MS,
         });
         self.meta = meta_of(&tick);
+        let note = self.samantha.turn(Perceived {
+            t_ms: self.emotion.next_ms(),
+            words: heard,
+            ear: None,
+            sense: self.ear_sense,
+        });
+        self.apply_prosody(note.lean());
+        if self.memory_granted() && !heard.is_empty() {
+            let at = self.stamp();
+            self.observe_memory(heard, &at);
+        }
         let prep = self.empathy.prepare_lookup(heard);
         let query = if prep.query.trim().is_empty() {
             heard
@@ -430,11 +577,22 @@ impl Brain {
             return self.finish(query, started, Spoke::empty(), &Decision::pass());
         }
         let query_owned = query.to_string();
-        let gathered = self.gather(&query_owned);
+        let memory_hit = self.person_hit(heard);
+        let gathered = match memory_hit {
+            Some(spoke) => Gathered { spoke, gap: None },
+            None => self.gather(&query_owned),
+        };
         let reply = effective_reply(&gathered.spoke).to_string();
         let sources = gathered.spoke.sources.clone();
-        let style = self.style.search(StylePersona::Samantha, &query_owned);
-        let decision = self.dialogue.decide(DecideIn {
+        // An unset research root does not enter the index. The duplex soak
+        // measures resident memory after warmup, and opening the search
+        // library there looks like a leak.
+        let style = if self.style.is_empty() {
+            crate::research_style::StyleSearch::none()
+        } else {
+            self.style.search(StylePersona::Samantha, &query_owned)
+        };
+        let mut decision = self.dialogue.decide(DecideIn {
             heard,
             intent: self.meta.intent,
             reply: &reply,
@@ -445,8 +603,39 @@ impl Brain {
             dominance: self.meta.dominance,
             e: self.meta.e,
         });
+        if let Some(chosen) = decision.chosen {
+            let (spoken, spoken_sources) = match &decision.plan {
+                ReplyPlan::Keep => (reply.as_str(), sources.as_slice()),
+                ReplyPlan::Replace { reply, sources, .. } => (reply.as_str(), sources.as_slice()),
+            };
+            let claims_fact = matches!(chosen, Move::Answer | Move::Cite);
+            let verdict = self.admit_move(MoveClaim {
+                tag: chosen.as_str().as_bytes(),
+                claims_fact,
+                has_card: claims_fact && fact_backed(spoken, spoken_sources),
+                sympathy_script: sympathy_script(spoken),
+            });
+            if verdict == MoveVerdict::Forbid {
+                decision = Decision {
+                    chosen: Some(Move::Ask),
+                    plan: ReplyPlan::Replace {
+                        reply: UNKNOWN_REPLY.to_string(),
+                        sources: vec!["honest:unknown".to_string()],
+                        evidence: Vec::new(),
+                    },
+                    propensity: 0.4,
+                };
+            }
+        }
         if matches!(decision.plan(), ReplyPlan::Keep) {
             if let Some(gap) = gathered.gap {
+                // A duplex prefetch asks on every partial. "where" and
+                // "where is" miss before "where is the kettle" hits, and
+                // nothing drains this queue. A long call kept every miss.
+                // The newest misses are the ones a host can still act on.
+                if self.gaps.len() == GAP_CAP {
+                    self.gaps.remove(0);
+                }
                 self.gaps.push(gap);
             }
         }
@@ -455,6 +644,19 @@ impl Brain {
             spoke.evidence.push(format!("style:{id}"));
         }
         self.finish(&query_owned, started, spoke, &decision)
+    }
+
+    /// Person diary hit, only when the line is about the person. A world
+    /// question still reads the diary and then drops the hits.
+    fn person_hit(&mut self, heard: &str) -> Option<Spoke> {
+        if !self.memory_granted() {
+            return None;
+        }
+        let recalled = self.recall_person(heard);
+        if !about_the_person(heard) {
+            return None;
+        }
+        self.memory_spoke(heard, &recalled)
     }
 
     /// Retrieval, cards, the idle fixture, then the gateway. No reply split.
@@ -491,14 +693,20 @@ impl Brain {
                 return Gathered { spoke, gap: None };
             }
         }
-        let routed = match self.research.as_mut() {
-            Some(port) => route_heard(
-                query,
-                self.cards.as_ref(),
-                Some(port.as_mut()),
-                self.speakable,
-            ),
-            None => route_heard(query, self.cards.as_ref(), None, self.speakable),
+        // Comfort stays with them. The research ask does not open.
+        let comfort = self.dialogue_lean().verb == Verb::Comfort;
+        let routed = if comfort {
+            route_heard(query, self.cards.as_ref(), None, self.speakable)
+        } else {
+            match self.research.as_mut() {
+                Some(port) => route_heard(
+                    query,
+                    self.cards.as_ref(),
+                    Some(port.as_mut()),
+                    self.speakable,
+                ),
+                None => route_heard(query, self.cards.as_ref(), None, self.speakable),
+            }
         };
         Gathered {
             gap: routed.gap,
@@ -510,6 +718,77 @@ impl Brain {
                 picked: None,
             },
         }
+    }
+
+    fn memory_granted(&self) -> bool {
+        self.memory
+            .as_ref()
+            .map(|memory| memory.remember_granted())
+            .unwrap_or(false)
+    }
+
+    fn stamp(&mut self) -> String {
+        self.memory_tick = self.memory_tick.saturating_add(1);
+        format!("t{:06}", self.memory_tick)
+    }
+
+    fn observe_memory(&mut self, heard: &str, at: &str) {
+        if heard.is_empty() || !self.memory_granted() {
+            return;
+        }
+        let person = self.person_id.clone();
+        let state = person_state(&self.empathy, self.meta);
+        let Some(memory) = self.memory.as_mut() else {
+            return;
+        };
+        memory.note_turn(&person, &person, heard, at);
+        if let Some(text) = pin_command(heard) {
+            memory.pin(&person, text, at);
+        }
+        memory.note_state(&person, &state, at);
+    }
+
+    fn recall_person(&mut self, heard: &str) -> Vec<MemoryItem> {
+        if !self.memory_granted() {
+            return Vec::new();
+        }
+        let person = self.person_id.clone();
+        let Some(memory) = self.memory.as_mut() else {
+            return Vec::new();
+        };
+        memory.recall(&person, heard)
+    }
+
+    /// Spoken only when `query` is about the person. The caller drops `hits`
+    /// for a world question, so they never become sources.
+    fn memory_spoke(&self, query: &str, hits: &[MemoryItem]) -> Option<Spoke> {
+        if !about_the_person(query) {
+            return None;
+        }
+        let hit = hits.iter().find(|hit| !hit.text.trim().is_empty())?;
+        let spoken = (self.speakable)(hit.text.trim())?;
+        if spoken.trim().is_empty() {
+            return None;
+        }
+        let (first, rest) = split_clause(&spoken, false);
+        let source = format!("memory:{}", hit.id);
+        Some(Spoke {
+            reply: String::new(),
+            sources: vec![source.clone()],
+            evidence: vec![source],
+            lookup_us: 0,
+            picked: Some(Answer {
+                id: hit.id.clone(),
+                clause: spoken,
+                first,
+                rest,
+                hit: true,
+                mark: classify(query).map(|kind| SidebandMark {
+                    kind,
+                    posted: false,
+                }),
+            }),
+        })
     }
 
     /// `Some` for `Hits` and `Miss`. `None` for `Idle`, which is deny.
@@ -609,6 +888,44 @@ impl Brain {
     }
 }
 
+fn person_state(empathy: &Empathy, meta: MoodMeta) -> PersonState {
+    PersonState {
+        names: empathy
+            .names()
+            .people()
+            .map(|(name, class)| TrackedName {
+                name: name.to_string(),
+                class_label: class.as_str().to_string(),
+            })
+            .collect(),
+        arousal: meta.arousal,
+        valence: meta.valence,
+        dominance: meta.dominance,
+        feeling: meta.named.map(|word| word.to_string()),
+    }
+}
+
+fn apply_prosody(meta: &mut MoodMeta, lean: DialogueLean) {
+    meta.rate = (meta.rate * lean.rate).clamp(0.80, 1.30);
+    meta.pause_ms = (meta.pause_ms + lean.pause_ms).clamp(0.0, 400.0);
+}
+
+impl Brain {
+    fn apply_prosody(&mut self, lean: DialogueLean) {
+        apply_prosody(&mut self.meta, lean);
+    }
+}
+
+fn development_persona() -> Persona {
+    Persona::samantha().expect("samantha.toml is the development persona")
+}
+
+fn install(persona: Persona) -> (EmotionCore, InnerLife, Persona) {
+    let emotion = EmotionCore::from_baseline(persona.baseline());
+    let inner = persona.inner_life();
+    (emotion, inner, persona)
+}
+
 fn resting_meta() -> MoodMeta {
     let tick = Empathy::new().tick(TickIn {
         inbound: None,
@@ -633,6 +950,34 @@ fn meta_of(tick: &galion_sam_empathy::TickOut) -> MoodMeta {
         pause_ms: tick.prosody.speaking.pre_pause_ms,
         named: tick.named.map(|name| name.word()),
     }
+}
+
+fn fact_backed(reply: &str, sources: &[String]) -> bool {
+    let reply = reply.trim();
+    if reply.is_empty() || reply == UNKNOWN_REPLY {
+        return false;
+    }
+    sources.iter().any(|source| {
+        ["card:", "retrieve:", "fixture:", "research:"]
+            .iter()
+            .any(|prefix| source.starts_with(prefix) && source.len() > prefix.len())
+    })
+}
+
+fn sympathy_script(reply: &str) -> bool {
+    let trimmed = reply.trim().trim_end_matches(['.', '!', '?']).trim();
+    matches!(
+        trimmed.to_ascii_lowercase().as_str(),
+        "i hear you"
+            | "that sounds so hard"
+            | "i'm here for you no matter what"
+            | "i feel that in my soul"
+            | "that sounds hard"
+            | "i'm so sorry you're going through this"
+            | "let's slow down"
+            | "i know how you feel"
+            | "that must be so difficult"
+    )
 }
 
 fn elapsed_us(elapsed: std::time::Duration) -> u32 {
@@ -718,6 +1063,20 @@ mod tests {
         assert!(!out.reply.to_ascii_lowercase().contains("tired"));
         assert!(!out.reply.to_ascii_lowercase().contains("sorry"));
         assert_eq!(brain.gaps()[0].reason, GapReason::NoCard);
+    }
+
+    #[test]
+    fn the_gap_queue_keeps_the_newest_misses() {
+        let mut brain = Brain::with_cards(cards(), None);
+        for n in 0..40 {
+            brain.turn(&format!("missing number {n}"));
+        }
+        assert_eq!(brain.gaps().len(), GAP_CAP);
+        assert_eq!(brain.gaps()[0].heard, "missing number 8");
+        assert_eq!(
+            brain.gaps().last().expect("newest").heard,
+            "missing number 39"
+        );
     }
 
     #[test]

@@ -8,6 +8,10 @@
 //! is `horbm-memory` (`Store::open_in_memory` and `Store::search_lexical`).
 //! `Stack::open` is not used: it creates `revisions.sqlite`.
 //!
+//! Person memory is a second diary. [`search_person_lexical`] reads that
+//! file. This thread's store stays the truth-card diary. The two are not
+//! mixed. A hit whose pool is not memory is dropped from the person search.
+//!
 //! `LOCKS.toml` `[consent] remember = "deny"`. `[horbm] remember_grant` names
 //! the only grant string. This module does not read the lock file. The
 //! default matches it. `GALION_HORBM_REMEMBER=grant` is the explicit grant
@@ -579,9 +583,30 @@ fn asked(
     }
 }
 
+/// Lexical FTS5 search of a person-memory diary.
+///
+/// Pass the person file, not the truth-card diary. Hits whose pool is not
+/// memory are dropped, so a card that landed in the wrong file is not a
+/// person hit.
+pub fn search_person_lexical(
+    store: &horbm_memory::Store,
+    query: &str,
+) -> Result<Vec<MemoryHit>, RetrieveError> {
+    let response = store.search_lexical(query).map_err(RetrieveError::memory)?;
+    let mut hits = Vec::new();
+    for hit in &response.hits {
+        let mapped = MemoryHit::from_hit(hit);
+        if mapped.pool != HitPool::Memory {
+            continue;
+        }
+        hits.push(mapped);
+    }
+    Ok(hits)
+}
+
 /// Same predicate as `horbm-memory` `stack.rs` `covers`: every content token
 /// of the query is in the hit haystack. An empty term list does not match.
-fn covers(haystack: &str, terms: &[String]) -> bool {
+pub(crate) fn covers(haystack: &str, terms: &[String]) -> bool {
     if terms.is_empty() {
         return false;
     }
@@ -681,6 +706,31 @@ mod tests {
         assert_eq!(miss.answer, UNKNOWN_REPLY);
         assert!(miss.hits.is_empty());
         assert_eq!(miss.state, CellState::Miss);
+    }
+
+    #[test]
+    fn person_search_keeps_memory_and_drops_truth_cards() {
+        let mut store = horbm_memory::Store::open_in_memory().expect("diary");
+        store
+            .upsert_cards(&[horbm_memory::synthetic_card(7)])
+            .expect("card");
+        store
+            .remember(
+                "my favourite colour is blue",
+                "person-alpha",
+                "t000001",
+                "pin",
+            )
+            .expect("pin");
+        store.drain().expect("drain");
+        let people = search_person_lexical(&store, "favourite colour").expect("person search");
+        assert!(!people.is_empty());
+        assert!(people.iter().all(|hit| hit.pool == HitPool::Memory));
+        assert!(people.iter().all(|hit| hit.item_id != "sample-7"));
+        assert!(people.iter().any(|hit| hit.text.contains("blue")));
+        let cards = store.search_lexical("marker m7").expect("card search");
+        assert!(cards.hits.iter().any(|hit| hit.item_id == "sample-7"));
+        assert!(cards.hits.iter().all(|hit| !hit.text.contains("favourite")));
     }
 
     #[test]

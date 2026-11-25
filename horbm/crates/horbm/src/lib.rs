@@ -7,7 +7,13 @@
 //! 1. Empathy (layer 3) steps the mood from the heard line and rewrites the
 //!    lookup. The feeling name, when one is invited, stays on the mood
 //!    metadata. It is not spoken.
-//! 2. When a [`RetrievalThread`] is attached, [`Brain::turn`] asks it and
+//! 2. Person memory, when a diary is attached and `remember` is granted.
+//!    The diary is a second file, kept apart from the truth cards. A pin, a name or mood
+//!    line, and the session buffer are written there. The turn then reads
+//!    that file. A stored line is spoken only when the utterance is about
+//!    the person. A world question drops those hits and does not cite them.
+//!    Denied `remember` does not open the file.
+//! 3. When a [`RetrievalThread`] is attached, [`Brain::turn`] asks it and
 //!    reads the [`MemoryHitCell`]. `Hits` speaks [`MemoryHit::clause`]. `Miss`
 //!    speaks [`UNKNOWN_REPLY`] and does not call research. `Idle` is deny or
 //!    withdraw: the diary is not read. The card pick runs, and if that misses
@@ -21,10 +27,10 @@
 //!    and does not bind a socket. There is no knowledge-ro server in this
 //!    repository. Port 7900 is not used here. The 7881 bridge calls this loader
 //!    and attaches the retrieval thread.
-//! 3. A deep miss on the idle or unthreaded path may ask the research gateway.
+//! 4. A deep miss on the idle or unthreaded path may ask the research gateway.
 //!    The caller passes [`RESEARCH_CAP`] (3 seconds). This crate dials nothing
 //!    itself. A retrieval `Miss` does not.
-//! 4. Anything still unanswered is exactly [`UNKNOWN_REPLY`]. No gap filler.
+//! 5. Anything still unanswered is exactly [`UNKNOWN_REPLY`]. No gap filler.
 //!
 //! Beside that turn, [`Brain::step_moment`] advances the moment-to-moment
 //! emotion core one 80 ms frame. Empathy mood and the moment are separate:
@@ -35,6 +41,11 @@
 //! GEMI intent. [`Brain::inner_nudge`] steps that message through the moment
 //! core. Neither call rewrites the empathy mood or the voice baseline.
 //! Learning a new care stays off while `LOCKS.toml` `[consent] learn` is deny.
+//!
+//! [`Brain::open`] and [`Brain::boot`] with no path load Samantha, the
+//! development persona. Aria stays in the repo and is not loaded. An explicit
+//! path replaces Samantha. An invalid file is refused. [`Brain::admit_move`]
+//! is the legal-move port. Layer 4 calls it with the chosen move.
 //!
 //! Layer 4 runs after that evidence is in hand and before the reply is split
 //! into clauses. It picks one move: answer, cite, ask, comfort, offer_topic,
@@ -52,6 +63,16 @@
 //! thread. Do not call [`Brain::turn`] from `Heartbeat::step`: the turn waits
 //! for the cell. [`Int8Scorer`] is implemented for the mapped key arena and
 //! is not called by the retrieval thread.
+//!
+//! [`Brain::samantha`] is the slower layer: care, curiosity, help, and
+//! expect. [`Brain::turn`] lets that layer bias the pace and, when the act
+//! is comfort, skips the research ask. It does not replace the spoken
+//! clause. [`Brain::samantha_nudge`] steps the same GEMI note on the moment
+//! clock. [`Brain::tick_frame`] decays the goals and counts silence. It
+//! still does not step the moment.
+//!
+//! [`LearnPass`] is not part of that order. It is the offline learn pass.
+//! Learn consent is [`LearnConfig::granted`]. [`Brain::turn`] does not call it.
 
 #![forbid(unsafe_code)]
 
@@ -59,6 +80,8 @@ mod brain;
 mod cards;
 mod dialogue;
 mod keys;
+mod learn;
+mod memory;
 mod research_style;
 mod retrieve;
 mod route;
@@ -69,6 +92,10 @@ pub use cards::{
     WINDOWS_KNOWLEDGE_DIR,
 };
 pub use dialogue::{flag_granted, DialogueConsent, Move, OfflineBandit, TurnSnap, RING_CAP};
+pub use galion_emotion_core::standins::memory::{
+    DenyMemory, MemoryItem, MemoryKind, MemorySink, PersonMemory, PersonState, Tombstone,
+    TrackedName, WriteOutcome,
+};
 pub use galion_emotion_core::{
     ConductorCue, CoreError as EmotionError, EmotionCore, InnerLife, InnerTurn, IntentMsg,
     MomentState, VoiceBaseline, FRAME_MS as EMOTION_FRAME_MS,
@@ -76,14 +103,27 @@ pub use galion_emotion_core::{
 pub use galion_research_gateway::RESEARCH_CAP;
 pub use galion_sam_empathy::{Intent, PronounClass, FRAME_MS};
 pub use horbm_brain::{Answer, Heuristic, MarkKind, SidebandMark};
+pub use horbm_inner::{
+    DialogueLean, Heard, InnerMsg, MsgDir, Perceived, SamanthaInner, Verb, CARE_HOME,
+    CHECKIN_GAP_MS, CHECKIN_MS, CURIOSITY_HOME, EXPECT_HOME, HELP_HOME, PERSONA as SAMANTHA_INNER,
+    REMEMBER_LOCK, TICK_MS, WAIT_MS,
+};
 pub use horbm_keys::StringKeyArena;
+pub use horbm_persona::{
+    LegalMovePort, MoveClaim, MoveVerdict, Persona, PersonaError, StyleHook, UNKNOWN_LINE,
+};
+pub use learn::{
+    ClauseSource, LearnAudit, LearnConfig, LearnError, LearnPass, LearnedRow, LEARN_PACK_DB,
+    LEARN_PACK_LIVE, LEARN_PACK_NEXT, LEARN_PACK_RETIRING,
+};
+pub use memory::{about_the_person, pin_command, EpisodicStore};
 pub use research_style::{
     MemoryExample, ResearchHit, ResearchRoot, StyleHint, StylePersona, StyleSearch,
     MAX_RESEARCH_BUNDLE_BYTES, STYLE_HIT_CAP,
 };
 pub use retrieve::{
-    CellState, HitPool, Int8Scorer, MemoryHit, MemoryHitCell, RetrievalConfig, RetrievalThread,
-    RetrieveError, RetrievedCells, MEMORY_HIT_CAP,
+    search_person_lexical, CellState, HitPool, Int8Scorer, MemoryHit, MemoryHitCell,
+    RetrievalConfig, RetrievalThread, RetrieveError, RetrievedCells, MEMORY_HIT_CAP,
 };
 pub use route::{
     is_deep_question, route_heard, AskOutcome, CardHit, CardLookup, Gap, GapReason, ResearchAsk,

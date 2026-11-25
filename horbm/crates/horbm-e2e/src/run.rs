@@ -1,0 +1,777 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Galion Labs
+//! Scripted duplex run. The input is a temp WAV. The mouth is Piper, flite,
+//! or an untuned tone. Only a real mouth is timed.
+
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::time::Instant;
+
+use galion_emotion_core::{EmotionCore, IntentMsg, AROUSAL, DOMINANCE, VALENCE};
+use horbm::{CardHit, CardLookup};
+use horbm_breath::{Drive, Lungs};
+use horbm_duplex::{
+    Affect, Breath, BreathCue, BreathPhase, Duplex, Emotion, LoopError, LoopEvent, Parts, Persona,
+    Style, DEV_PERSONA, FRAME_SAMPLES,
+};
+use horbm_voice::SAMPLE_RATE;
+
+use crate::corpus::{self, EarPlan};
+use crate::mouth::{self, EngineKind, LiveMouth};
+use crate::percentile_nearest;
+use crate::percentile_nearest_f64;
+use crate::recognizer::EarRec;
+use crate::report::{self, Report};
+use crate::stages;
+use crate::vad::{self, Energy};
+use crate::wav;
+
+pub const SCRIPT: &str = "where is the kettle";
+const KETTLE_REPLY: &str = "The kettle is on the hob.";
+pub const TRIALS: u32 = 11;
+const BARGE: &str = "stop now";
+const LINES: [&str; 3] = [SCRIPT, "yeah", BARGE];
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Sense {
+    On,
+    Off,
+}
+
+pub struct Outcome {
+    pub report: Report,
+    pub mouth_real: bool,
+    pub asr_real: bool,
+    pub spoke_kettle: bool,
+    pub wav_removed: bool,
+    pub first_audio_p50_us: Option<u64>,
+    pub first_audio_p95_us: Option<u64>,
+    pub barge_stop_ns: Option<u64>,
+    pub rtf: Option<f64>,
+    pub conductor_barge_ms: Option<u64>,
+    pub voiced_frames: u32,
+    pub brain_query: String,
+    pub brain_from_script: bool,
+    pub kettle_hyp: String,
+}
+
+struct TempTree {
+    dir: PathBuf,
+}
+
+impl TempTree {
+    fn new() -> Result<Self, String> {
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0);
+        let dir = std::env::temp_dir().join(format!("horbm-e2e-{}-{nanos}", std::process::id()));
+        fs::create_dir_all(&dir).map_err(|err| format!("temp dir: {err}"))?;
+        Ok(Self { dir })
+    }
+}
+
+impl Drop for TempTree {
+    fn drop(&mut self) {
+        if self.dir.starts_with(std::env::temp_dir()) {
+            let _ = fs::remove_dir_all(&self.dir);
+        }
+    }
+}
+
+struct Kettle;
+
+impl CardLookup for Kettle {
+    fn lookup(&self, query: &str) -> Option<CardHit> {
+        if query.to_ascii_lowercase().contains("kettle") {
+            Some(CardHit {
+                id: "kettle".into(),
+                gist: "The kettle is on the hob.".into(),
+            })
+        } else {
+            None
+        }
+    }
+
+    fn len(&self) -> usize {
+        1
+    }
+}
+
+struct CoreEmotion {
+    core: EmotionCore,
+}
+
+impl Emotion for CoreEmotion {
+    fn step(&mut self, t_ms: u32) -> Affect {
+        let msg = IntentMsg::steady(t_ms);
+        let moment = self.core.step(&msg).unwrap_or_else(|err| {
+            panic!("emotion step at {t_ms} ms failed: {err:?}");
+        });
+        Affect {
+            valence: moment.pos[VALENCE],
+            arousal: moment.pos[AROUSAL],
+            dominance: moment.pos[DOMINANCE],
+        }
+    }
+}
+
+struct LiveBreath {
+    lungs: Lungs,
+    core: EmotionCore,
+    planned: bool,
+}
+
+impl LiveBreath {
+    fn samantha() -> Self {
+        Self {
+            lungs: Lungs::samantha(),
+            core: EmotionCore::at_rest(),
+            planned: false,
+        }
+    }
+}
+
+impl Breath for LiveBreath {
+    fn cue(&mut self, t_ms: u32, speaking: bool) -> BreathCue {
+        let msg = IntentMsg::steady(t_ms);
+        let _ = self.core.step(&msg);
+        let reply = if self.planned {
+            None
+        } else {
+            self.planned = true;
+            Some(KETTLE_REPLY)
+        };
+        let frame = self.lungs.frame(&self.core, speaking, reply);
+        let phase = match frame.phase {
+            horbm_breath::BreathPhase::Inhale => BreathPhase::Inhale,
+            horbm_breath::BreathPhase::Hold | horbm_breath::BreathPhase::Rest => BreathPhase::Hold,
+            horbm_breath::BreathPhase::Speech | horbm_breath::BreathPhase::Exhale => {
+                BreathPhase::Exhale
+            }
+        };
+        let _ = std::hint::black_box(frame.lungs());
+        BreathCue { phase, speaking }
+    }
+}
+
+struct Samantha;
+
+impl Persona for Samantha {
+    fn id(&self) -> &str {
+        DEV_PERSONA
+    }
+
+    fn voice(&self) -> &str {
+        DEV_PERSONA
+    }
+
+    fn style(&self) -> Style {
+        Style::from_brevity(0.55, 0.8, 2)
+    }
+
+    fn unknown_line(&self) -> &str {
+        horbm::UNKNOWN_REPLY
+    }
+}
+
+struct Other;
+
+impl Persona for Other {
+    fn id(&self) -> &str {
+        "aria"
+    }
+
+    fn voice(&self) -> &str {
+        "aria"
+    }
+
+    fn style(&self) -> Style {
+        Style::from_brevity(0.4, 0.7, 2)
+    }
+
+    fn unknown_line(&self) -> &str {
+        horbm::UNKNOWN_REPLY
+    }
+}
+
+struct Trial {
+    first_audio_us: Option<u64>,
+    barge_ns: Option<u64>,
+    queued: usize,
+    rtf: Option<f64>,
+    conductor_barge_ms: Option<u64>,
+    spoken: Vec<String>,
+    brain_query: String,
+    from_script: bool,
+    output_name: &'static str,
+    output_device: Option<String>,
+}
+
+pub fn run(sense: Sense) -> Result<Outcome, String> {
+    let tree = TempTree::new()?;
+    let kind = mouth::detect();
+    let ear = corpus::plan()?;
+    let (question, barge, brain_from_script, kettle_hyp) = match ear.as_ref() {
+        EarPlan::Live {
+            kettle,
+            stop,
+            kettle_hyp,
+            ..
+        } => (kettle.clone(), stop.clone(), false, kettle_hyp.clone()),
+        EarPlan::Stub { .. } => {
+            let question = utterance(kind, SCRIPT)?.unwrap_or_else(|| tone_words(4));
+            let barge = utterance(kind, BARGE)?.unwrap_or_else(|| tone_words(2));
+            (question, barge, true, String::new())
+        }
+    };
+    let pcm = with_tail(question);
+    let path = tree.dir.join("input.wav");
+    wav::write_wav(&path, SAMPLE_RATE, &pcm)?;
+    let (rate, read) = wav::read_wav(&path)?;
+    if rate != SAMPLE_RATE || read != pcm {
+        return Err("input wav did not round-trip".into());
+    }
+    let scored = vad::score(&read);
+    if scored.energy_voiced == 0 || scored.energy_quiet == 0 {
+        return Err("energy vad did not hear both speech and silence in the input wav".into());
+    }
+    if scored.backend == "silero" && (scored.voiced == 0 || scored.quiet == 0) {
+        return Err(format!(
+            "silero voiced {} quiet {} on the generated wav",
+            scored.voiced, scored.quiet
+        ));
+    }
+    let question_frames = gate_frames(&read);
+    let stop_frames = take_voiced(&barge, 3);
+    let yeah = loud_frame();
+    let asr_real = matches!(ear.as_ref(), EarPlan::Live { .. });
+
+    let mut first_audio = Vec::new();
+    let mut barge_ns = Vec::new();
+    let mut rtfs = Vec::new();
+    let mut conductor = Vec::new();
+    let mut spoke_kettle = false;
+    let mut brain_query = String::new();
+    let mut queued = 0usize;
+    let mut output_name = "loopback";
+    let mut output_device = None;
+
+    for trial in 0..TRIALS {
+        let one = drive(
+            kind,
+            ear.as_ref(),
+            sense,
+            &question_frames,
+            &yeah,
+            &stop_frames,
+        )?;
+        output_name = one.output_name;
+        output_device = one.output_device.clone();
+        if trial == 0 {
+            brain_query = one.brain_query;
+            if one.from_script != brain_from_script {
+                return Err("the ear source did not match the plan".into());
+            }
+        }
+        if one
+            .spoken
+            .iter()
+            .any(|line| line.to_ascii_lowercase().contains("kettle"))
+        {
+            spoke_kettle = true;
+        }
+        if let Some(us) = one.first_audio_us {
+            first_audio.push(us);
+        }
+        if let Some(ns) = one.barge_ns {
+            barge_ns.push(ns);
+            queued = queued.max(one.queued);
+        }
+        if let Some(rtf) = one.rtf {
+            rtfs.push(rtf);
+        }
+        if let Some(ms) = one.conductor_barge_ms {
+            conductor.push(ms);
+        }
+    }
+
+    let mouth_real = kind != EngineKind::Stub;
+    if mouth_real && (first_audio.len() != TRIALS as usize || barge_ns.len() != TRIALS as usize) {
+        return Err(format!(
+            "a real mouth did not time first audio and barge-in on every trial (first {} of {TRIALS}, barge {} of {TRIALS})",
+            first_audio.len(),
+            barge_ns.len()
+        ));
+    }
+    if !mouth_real && (!first_audio.is_empty() || !barge_ns.is_empty()) {
+        return Err("a stub mouth was timed".into());
+    }
+    if !asr_real && conductor.len() != TRIALS as usize {
+        return Err("the conductor did not barge on a scripted trial".into());
+    }
+
+    let wav_removed = remove_tree(&tree.dir);
+    let mut report = Report::new();
+    report.push("persona", DEV_PERSONA);
+    report.push(
+        "profile",
+        if cfg!(debug_assertions) {
+            "debug"
+        } else {
+            "release"
+        },
+    );
+    report.push(
+        "prosody_sense",
+        if sense == Sense::On { "on" } else { "off" },
+    );
+    report.push("trials", TRIALS.to_string());
+    report.push("vad", scored.backend);
+    report.push("vad_voiced_frames", scored.voiced.to_string());
+    report.push("vad_quiet_frames", scored.quiet.to_string());
+    report.push(
+        "vad_energy_voiced_frames",
+        scored.energy_voiced.to_string(),
+    );
+    report.push("vad_energy_quiet_frames", scored.energy_quiet.to_string());
+    push_measured(
+        &mut report,
+        "vad_silero_voiced_frames",
+        scored.silero_voiced.map(|n| n.to_string()),
+    );
+    push_measured(
+        &mut report,
+        "vad_silero_quiet_frames",
+        scored.silero_quiet.map(|n| n.to_string()),
+    );
+    push_measured(
+        &mut report,
+        "vad_frame_cpu_p50_ns",
+        scored.frame_cpu_p50_ns.map(|n| n.to_string()),
+    );
+    push_measured(
+        &mut report,
+        "vad_frame_cpu_p95_ns",
+        scored.frame_cpu_p95_ns.map(|n| n.to_string()),
+    );
+    push_measured(
+        &mut report,
+        "vad_model_cpu_p50_ns",
+        scored.model_cpu_p50_ns.map(|n| n.to_string()),
+    );
+    push_measured(
+        &mut report,
+        "vad_model_cpu_p95_ns",
+        scored.model_cpu_p95_ns.map(|n| n.to_string()),
+    );
+    push_measured(
+        &mut report,
+        "vad_warm_cpu_ns",
+        scored.warm_cpu_ns.map(|n| n.to_string()),
+    );
+    if let Some(sha) = scored.sha256 {
+        report.push("vad_model_sha256", sha);
+    }
+    if let Some(reason) = scored.fallback {
+        report.push("vad_fallback", reason);
+    }
+    push_ear(&mut report, ear.as_ref());
+    report.push("prosody", "stub");
+    report.push("end_of_turn", "stub");
+    report.push("brain", "real");
+    report.push(
+        "brain_from",
+        if brain_from_script {
+            "script"
+        } else {
+            "recognised"
+        },
+    );
+    report.push("brain_query", brain_query.as_str());
+    report.push("brain_spoke_kettle", if spoke_kettle { "1" } else { "0" });
+    report.push("dialogue", "stub");
+    report.push("person_memory", "stub");
+    report.push("listener_feeling", "stub");
+    report.push("emotion", "real");
+    report.push("mood_into_voice", "stub");
+    let times = horbm_breath::measure_ticks();
+    let mut planned = Lungs::samantha();
+    let plan = planned.plan_reply(KETTLE_REPLY, Drive::rest());
+    report.push("breath", "real");
+    report.push("breath_ns", times.p50_ns.to_string());
+    report.push("breath_p50_us", format!("{:.3}", times.p50_us()));
+    report.push("breath_p99_us", format!("{:.3}", times.p99_us()));
+    report.push("breath_pauses", plan.count.to_string());
+    report.push("breath_group_ms", plan.group_ms.to_string());
+    report.push("mouth", kind.name());
+    report.push("piper_duplex", "stub");
+    if mouth_real {
+        report.push("output", output_name);
+        if let Some(device) = output_device {
+            report.push("output_device", device);
+        }
+        report.push("output_samples", queued.to_string());
+    } else {
+        report.push("output", "stub");
+    }
+    push_audio(&mut report, mouth_real, &first_audio, &barge_ns, &rtfs);
+    match percentile_nearest(&sorted(&conductor), 0.50) {
+        Some(ms) => {
+            report.push("conductor_barge_ms", ms.to_string());
+            report.push("conductor_barge_clock", "virtual");
+        }
+        None => report.push("conductor_barge_ms", "stub"),
+    }
+    stages::fill(&mut report, sense, SCRIPT)?;
+
+    Ok(Outcome {
+        report,
+        mouth_real,
+        asr_real,
+        spoke_kettle,
+        wav_removed,
+        first_audio_p50_us: stat(&first_audio, 0.50),
+        first_audio_p95_us: stat(&first_audio, 0.95),
+        barge_stop_ns: stat(&barge_ns, 0.50),
+        rtf: percentile_nearest_f64(rtfs.clone(), 0.50),
+        conductor_barge_ms: stat(&conductor, 0.50),
+        voiced_frames: scored.voiced,
+        brain_query,
+        brain_from_script,
+        kettle_hyp,
+    })
+}
+
+fn push_measured(report: &mut Report, key: &str, value: Option<String>) {
+    report.push(key, value.unwrap_or_else(|| "not measured".to_string()));
+}
+
+fn push_audio(report: &mut Report, mouth_real: bool, first: &[u64], barge: &[u64], rtfs: &[f64]) {
+    if !mouth_real {
+        report.push("first_audio_p50_ms", "stub");
+        report.push("first_audio_p95_ms", "stub");
+        report.push("barge_in_stop_ns", "stub");
+        report.push("rtf", "stub");
+        return;
+    }
+    let p50 = stat(first, 0.50).unwrap_or(0);
+    let p95 = stat(first, 0.95).unwrap_or(0);
+    report.push("first_audio_p50_ms", format!("{:.3}", p50 as f64 / 1000.0));
+    report.push("first_audio_p95_ms", format!("{:.3}", p95 as f64 / 1000.0));
+    report.push(
+        "barge_in_stop_ns",
+        stat(barge, 0.50).unwrap_or(0).to_string(),
+    );
+    let rtf = percentile_nearest_f64(rtfs.to_vec(), 0.50).unwrap_or(0.0);
+    report.push("rtf", format!("{rtf:.4}"));
+    report.push("rtf_def", "wall/audio");
+}
+
+fn stat(samples: &[u64], quantile: f64) -> Option<u64> {
+    percentile_nearest(&sorted(samples), quantile)
+}
+
+fn sorted(samples: &[u64]) -> Vec<u64> {
+    let mut copy = samples.to_vec();
+    copy.sort_unstable();
+    copy
+}
+
+fn push_ear(report: &mut Report, ear: &EarPlan) {
+    match ear {
+        EarPlan::Stub { reason } => {
+            report.push("asr", "stub");
+            report.push("asr_skip", *reason);
+            report.push("asr_p50_ms", "stub");
+            report.push("asr_p95_ms", "stub");
+            report.push("wer", "stub");
+        }
+        EarPlan::Live {
+            utts,
+            overall,
+            model_name,
+            ..
+        } => {
+            report.push("asr", "vosk");
+            report.push("asr_model", model_name.as_str());
+            report.push("asr_device", "cpu");
+            report.push("asr_utts", utts.len().to_string());
+            let walls: Vec<u64> = utts.iter().map(|utt| utt.wall_us).collect();
+            report.push(
+                "asr_p50_ms",
+                stat(&walls, 0.50)
+                    .map(report::format_ms)
+                    .unwrap_or_else(|| "stub".into()),
+            );
+            report.push(
+                "asr_p95_ms",
+                stat(&walls, 0.95)
+                    .map(report::format_ms)
+                    .unwrap_or_else(|| "stub".into()),
+            );
+            report.push("wer", report::format_rate(overall));
+            report.push("wer_words", overall.reference_words.to_string());
+            report.push("wer_errors", overall.errors().to_string());
+            for (index, utt) in utts.iter().enumerate() {
+                let n = index + 1;
+                report.push(format!("utt_{n:02}_ref"), utt.reference.as_str());
+                report.push(format!("utt_{n:02}_hyp"), utt.hypothesis.as_str());
+                report.push(format!("utt_{n:02}_wer"), report::format_rate(&utt.wer));
+                report.push(format!("utt_{n:02}_ms"), report::format_ms(utt.wall_us));
+            }
+        }
+    }
+}
+
+fn drive(
+    kind: EngineKind,
+    ear: &EarPlan,
+    sense: Sense,
+    question: &[Vec<i16>],
+    yeah: &[i16],
+    stop: &[Vec<i16>],
+) -> Result<Trial, String> {
+    let recognizer = match ear {
+        EarPlan::Live {
+            kettle_hyp,
+            stop_hyp,
+            ..
+        } => EarRec::recognised(&[kettle_hyp.as_str(), "yeah", stop_hyp.as_str()]),
+        EarPlan::Stub { .. } => EarRec::scripted(&LINES),
+    };
+    let from_script = recognizer.is_script();
+    let mut duplex = Duplex::new(
+        Parts {
+            recognizer,
+            emotion: CoreEmotion {
+                core: EmotionCore::at_rest(),
+            },
+            breath: LiveBreath::samantha(),
+            persona: Samantha,
+            mouth: LiveMouth::open(kind)?,
+        },
+        Kettle,
+    )
+    .map_err(|err| err.to_string())?;
+    // The scripted WAV is not a microphone hearing the mouth. Echo
+    // cancellation would treat the barge as playback. Prosody follows the
+    // ear switch: off means a non-zero sample is voiced again.
+    duplex.set_aec(false);
+    duplex.set_prosody(sense == Sense::On);
+
+    let mut speech_end = None;
+    let mut heard_voice = false;
+    let mut first_audio = None;
+    let mut playing = false;
+    let mut barge_onset = None;
+    let mut conductor_barge_ms = None;
+    let mut brain_query = None;
+
+    for frame in question {
+        note_end(frame, &mut heard_voice, &mut speech_end);
+        let out = duplex.tick(frame).map_err(|err| err.to_string())?;
+        note_query(&out, &mut brain_query);
+        note_audio(&mut first_audio, speech_end, duplex.mouth().buffered_at());
+        if out.me_first || out.event == LoopEvent::FirstAudio {
+            playing = true;
+        }
+        note_barge(&out, &mut barge_onset, &mut conductor_barge_ms);
+    }
+    // A stub mouth never stamps a wall-clock buffer time. Waiting on that
+    // stamp pulls the tone dry before the barge. Stop once a mouth frame
+    // has actually played.
+    let mut extra = 0u32;
+    while !playing && extra < 8 {
+        let silence = vec![0i16; FRAME_SAMPLES];
+        note_end(&silence, &mut heard_voice, &mut speech_end);
+        let out = duplex.tick(&silence).map_err(|err| err.to_string())?;
+        note_query(&out, &mut brain_query);
+        note_audio(&mut first_audio, speech_end, duplex.mouth().buffered_at());
+        if out.me_first || out.event == LoopEvent::FirstAudio {
+            playing = true;
+        }
+        note_barge(&out, &mut barge_onset, &mut conductor_barge_ms);
+        extra += 1;
+    }
+    for _ in 0..6 {
+        let out = duplex.tick(yeah).map_err(|err| err.to_string())?;
+        note_query(&out, &mut brain_query);
+        note_barge(&out, &mut barge_onset, &mut conductor_barge_ms);
+    }
+    let silence = vec![0i16; FRAME_SAMPLES];
+    let out = duplex.tick(&silence).map_err(|err| err.to_string())?;
+    note_query(&out, &mut brain_query);
+    note_barge(&out, &mut barge_onset, &mut conductor_barge_ms);
+    for frame in stop {
+        let out = duplex.tick(frame).map_err(|err| err.to_string())?;
+        note_query(&out, &mut brain_query);
+        note_barge(&out, &mut barge_onset, &mut conductor_barge_ms);
+    }
+
+    if let Some(err) = duplex.mouth().error() {
+        return Err(err.to_string());
+    }
+    let mouth_real = duplex.mouth().real();
+    if !mouth_real {
+        first_audio = None;
+    }
+    Ok(Trial {
+        first_audio_us: first_audio,
+        barge_ns: if mouth_real {
+            duplex.mouth().stop_ns()
+        } else {
+            None
+        },
+        queued: duplex.mouth().queued_at_barge(),
+        rtf: if mouth_real {
+            duplex.mouth().rtf()
+        } else {
+            None
+        },
+        conductor_barge_ms,
+        spoken: duplex.mouth().spoken().to_vec(),
+        brain_query: brain_query.unwrap_or_default(),
+        from_script,
+        output_name: duplex.mouth().output_name(),
+        output_device: duplex.mouth().output_device().map(str::to_string),
+    })
+}
+
+fn note_query(out: &horbm_duplex::FrameOut, brain_query: &mut Option<String>) {
+    if brain_query.is_none() && out.event == LoopEvent::EagerEndOfTurn {
+        *brain_query = Some(out.partial.clone());
+    }
+}
+
+fn note_end(frame: &[i16], heard_voice: &mut bool, speech_end: &mut Option<Instant>) {
+    let voiced = frame.iter().any(|sample| *sample != 0);
+    if voiced {
+        *heard_voice = true;
+    } else if *heard_voice && speech_end.is_none() {
+        *speech_end = Some(Instant::now());
+    }
+}
+
+fn note_audio(first: &mut Option<u64>, speech_end: Option<Instant>, buffered: Option<Instant>) {
+    if first.is_some() {
+        return;
+    }
+    if let (Some(start), Some(at)) = (speech_end, buffered) {
+        *first = Some(
+            u64::try_from(at.saturating_duration_since(start).as_micros()).unwrap_or(u64::MAX),
+        );
+    }
+}
+
+fn note_barge(out: &horbm_duplex::FrameOut, onset: &mut Option<u64>, barge: &mut Option<u64>) {
+    if onset.is_none()
+        && out.you_voiced
+        && out.me_audible
+        && out
+            .partial
+            .split_whitespace()
+            .any(|word| word.eq_ignore_ascii_case("stop"))
+    {
+        *onset = Some(out.t_ms);
+    }
+    if out.event == LoopEvent::BargeIn {
+        if let Some(start) = *onset {
+            *barge = Some(out.t_ms.saturating_sub(start));
+        }
+    }
+}
+
+fn utterance(kind: EngineKind, text: &str) -> Result<Option<Vec<i16>>, String> {
+    mouth::speak_16k(kind, text)
+}
+
+fn with_tail(mut pcm: Vec<i16>) -> Vec<i16> {
+    let tail = usize::try_from(SAMPLE_RATE).unwrap_or(16_000) * 800 / 1000;
+    pcm.extend(std::iter::repeat(0).take(tail));
+    pcm
+}
+
+fn gate_frames(pcm: &[i16]) -> Vec<Vec<i16>> {
+    let mut energy = Energy::default();
+    let mut frames = Vec::new();
+    let mut offset = 0;
+    while offset < pcm.len() {
+        let mut frame = vec![0i16; FRAME_SAMPLES];
+        let end = (offset + FRAME_SAMPLES).min(pcm.len());
+        frame[..end - offset].copy_from_slice(&pcm[offset..end]);
+        if !vad::eighty_ms_voiced(&mut energy, &frame) {
+            frame.fill(0);
+        }
+        frames.push(frame);
+        offset += FRAME_SAMPLES;
+    }
+    frames
+}
+
+fn take_voiced(pcm: &[i16], count: usize) -> Vec<Vec<i16>> {
+    let voiced: Vec<Vec<i16>> = gate_frames(pcm)
+        .into_iter()
+        .filter(|frame| frame.iter().any(|sample| *sample != 0))
+        .collect();
+    (0..count)
+        .map(|index| {
+            if voiced.is_empty() {
+                loud_frame()
+            } else {
+                voiced[index % voiced.len()].clone()
+            }
+        })
+        .collect()
+}
+
+fn tone_words(words: usize) -> Vec<i16> {
+    let mut out = Vec::new();
+    let rate = usize::try_from(SAMPLE_RATE).unwrap_or(16_000);
+    for _ in 0..words {
+        let n = rate * 180 / 1000;
+        for index in 0..n {
+            let t = index as f32 / rate as f32;
+            let sample = (t * 220.0 * std::f32::consts::TAU).sin();
+            out.push((sample * 8_000.0) as i16);
+        }
+        out.extend(std::iter::repeat(0).take(rate * 40 / 1000));
+    }
+    out
+}
+
+fn loud_frame() -> Vec<i16> {
+    let mut frame = vec![0i16; FRAME_SAMPLES];
+    let rate = SAMPLE_RATE as f32;
+    for (index, sample) in frame.iter_mut().enumerate() {
+        let t = index as f32 / rate;
+        *sample = ((t * 180.0 * std::f32::consts::TAU).sin() * 8_000.0) as i16;
+    }
+    frame
+}
+
+fn remove_tree(dir: &Path) -> bool {
+    if dir.starts_with(std::env::temp_dir()) {
+        let _ = fs::remove_dir_all(dir);
+    }
+    !dir.exists()
+}
+
+pub fn refuse_other_persona() -> Result<(), String> {
+    match Duplex::new(
+        Parts {
+            recognizer: EarRec::scripted(&[]),
+            emotion: CoreEmotion {
+                core: EmotionCore::at_rest(),
+            },
+            breath: LiveBreath::samantha(),
+            persona: Other,
+            mouth: LiveMouth::open(EngineKind::Stub)?,
+        },
+        Kettle,
+    ) {
+        Ok(_) => Err("a persona other than samantha was accepted".into()),
+        Err(LoopError::Persona(_)) => Ok(()),
+        Err(err) => Err(err.to_string()),
+    }
+}

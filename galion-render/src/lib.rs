@@ -66,14 +66,13 @@ pub use backends::window::{FrameMailbox, WindowSurface};
 pub use backends::web::{MicTap, ReplyBox, Turn, TurnFormat, TurnInbox, WebSurface};
 
 /// Returns the surface kinds compiled into this build, in preference order.
-#[allow(unused_mut)]
 pub fn compiled_surfaces() -> Vec<SurfaceKind> {
-    let mut v = Vec::new();
-    #[cfg(feature = "terminal")]
-    v.push(SurfaceKind::Terminal);
-    #[cfg(feature = "window")]
-    v.push(SurfaceKind::Window);
-    #[cfg(feature = "web")]
-    v.push(SurfaceKind::Web);
-    v
+    vec![
+        #[cfg(feature = "terminal")]
+        SurfaceKind::Terminal,
+        #[cfg(feature = "window")]
+        SurfaceKind::Window,
+        #[cfg(feature = "web")]
+        SurfaceKind::Web,
+    ]
 }

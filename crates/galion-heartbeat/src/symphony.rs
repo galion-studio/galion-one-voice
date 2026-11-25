@@ -280,7 +280,7 @@ impl SymphonyWire {
         frame: &FrameOut,
         bands: BandView<'_>,
         me_out: &mut [f32],
-        mut nano: Option<&mut NanoPcmRing>,
+        nano: Option<&mut NanoPcmRing>,
     ) -> SectorOut {
         let paused = frame.paused || me_out.len() != FRAME_SAMPLES;
         let release = frame.yield_now();
@@ -288,7 +288,7 @@ impl SymphonyWire {
         let mut copied = 0usize;
         let mut nano_frame = false;
         if emit {
-            if let Some(ring) = nano.as_deref_mut() {
+            if let Some(ring) = nano {
                 let n = ring.drain_frame(me_out);
                 if n > 0 {
                     copied = usize::from(n);

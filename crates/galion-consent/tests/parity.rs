@@ -12,6 +12,7 @@ mod common;
 
 use common::{wav_bytes, Tree};
 use galion_consent::{evaluate, persona_of, Env, Gate};
+use std::fmt::Write;
 use std::fs;
 use std::path::Path;
 use std::process::Command;
@@ -181,7 +182,10 @@ fn cli_fields_match() {
     let bin = env!("CARGO_BIN_EXE_galion-consent");
     let r = Command::new(bin).arg("fields").output().unwrap();
     assert!(r.status.success());
-    let want: String = galion_consent::REQUIRED.iter().map(|k| format!("{k}\n")).collect();
+    let mut want = String::new();
+    for k in galion_consent::REQUIRED {
+        let _ = writeln!(want, "{k}");
+    }
     assert_eq!(String::from_utf8_lossy(&r.stdout), want);
     if python() {
         let p = Command::new("python3").arg(legacy()).arg("fields").output().unwrap();
