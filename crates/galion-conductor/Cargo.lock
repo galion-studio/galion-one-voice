@@ -19,6 +19,7 @@ name = "galion-conductor"
 version = "0.0.1"
 dependencies = [
  "galion-mne-contract",
+ "galion-sideband",
  "horbm-ear",
 ]
 
@@ -42,6 +43,10 @@ dependencies = [
  "serde_json",
  "toml",
 ]
+
+[[package]]
+name = "galion-sideband"
+version = "0.0.1"
 
 [[package]]
 name = "hashbrown"

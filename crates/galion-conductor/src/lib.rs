@@ -8,7 +8,10 @@
 //! A deeper question may also ask Galion Research. The local brain answers
 //! first. The side-band result is merged only when it arrives within
 //! [`clock::SIDE_BAND_CAP_MS`] on the virtual frame clock. The default client
-//! is offline and reports unavailable on the ask.
+//! is offline and reports unavailable on the ask. A session that has not
+//! denied the mark posts a start when that request opens and an end when it
+//! merges, drops, or is cancelled. Remember, learn, and in-band learning stay
+//! denied.
 //!
 //! While the user holds the turn, [`Conductor::tick_listen`] may nod: one
 //! short backchannel on the quiet frame after a clause-final fall. That nod
@@ -50,6 +53,10 @@ pub use clock::{
     MIXER_RESUME_QUIET_MS, MIXER_YIELD_MS, PAUSE_MS, SIDE_BAND_CAP_MS, STABLE_TICKS,
 };
 pub use conductor::{Conductor, Ear, Floor, TickEvent, TickOut, TurnMsg};
+pub use galion_sideband::{
+    MarkEdge, MarkKind, SidebandConsent, SidebandMark, LEARN_IN_BAND, LEARN_LOCK, MARK_SOURCE,
+    REMEMBER_LOCK,
+};
 pub use lexicon::is_listed_backchannel;
 pub use mne::{read_back, stand_in_listen_intent};
 pub use reaction::{clip, synthetic_clip, Reaction, ReactionKind, REACTION_SAMPLES};

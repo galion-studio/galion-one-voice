@@ -342,6 +342,7 @@ name = "galion-conductor"
 version = "0.0.1"
 dependencies = [
  "galion-mne-contract",
+ "galion-sideband",
 ]
 
 [[package]]
@@ -429,6 +430,10 @@ version = "0.0.1"
 dependencies = [
  "galion-emotion",
 ]
+
+[[package]]
+name = "galion-sideband"
+version = "0.0.1"
 
 [[package]]
 name = "galion-source-filter"

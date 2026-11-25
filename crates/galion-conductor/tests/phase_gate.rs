@@ -258,6 +258,7 @@ fn crate_sources_do_not_call_the_frame_step_or_read_a_wall_clock() {
             "target_feature",
             "Hermes",
             "hermes",
+            "SidebandClient",
         ] {
             assert!(
                 !text.contains(banned),
