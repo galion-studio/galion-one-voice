@@ -2,14 +2,19 @@
 // Copyright (c) 2026 Galion Labs
 //! Listener readings from generated sines. No audio file is read or written.
 
+use std::sync::{Mutex, MutexGuard};
 use std::time::Instant;
 
 use horbm_ear::consent_bits::{REMEMBER, SENSE};
 use horbm_ear::link::{FloorCue, FloorTick};
 use horbm_ear::listen::{
-    hear_frame, response_intent, ListenerFeel, DIMENSIONS, PERSONA, RESPONSE_VERB, UNIVERSAL,
+    appraise, configured_profile, hear_frame, listener_feel, profile_from_env, response_intent,
+    ListenerFeel, ObsSource, Persona, PersonaProfile, Reading, UserObservation, DEV_PERSONA_ENV,
+    DIMENSIONS, RESPONSE_VERB, UNIVERSAL,
 };
-use horbm_ear::port::{EmotionCore, IntentMsg, IntentSource, VoiceBaseline, AROUSAL, VALENCE};
+use horbm_ear::port::{
+    EmotionCore, IntentMsg, IntentSource, VoiceBaseline, APPROACH, AROUSAL, DOMINANCE, VALENCE,
+};
 use horbm_ear::{
     Ear, EarConfig, FrameOut, ProsodyFrame, Purpose, FRAME_MS, FRAME_SAMPLES, SAMPLE_RATE,
 };
@@ -106,6 +111,7 @@ struct Taken {
 }
 
 fn drive(cue: Cue) -> Taken {
+    let profile = wired_profile();
     let mut ear = Ear::new();
     let mut core = EmotionCore::at_rest();
     let mut floor = Sink;
@@ -113,7 +119,8 @@ fn drive(cue: Cue) -> Taken {
     let mut last = None;
     for i in 0..N {
         render(cue, i, &mut buf);
-        let out = hear_frame(&mut ear, &mut core, &mut floor, &buf, cue.words()).expect("hear");
+        let out =
+            hear_frame(&mut ear, &mut core, &mut floor, &buf, cue.words(), profile).expect("hear");
         let FrameOut::Heard(frame) = out.frame else {
             panic!("expected a heard frame");
         };
@@ -143,9 +150,146 @@ fn heard_frame(out_frame: FrameOut) -> ProsodyFrame {
     }
 }
 
+/// Id from the committed boot file. Not a name written into this test.
+fn boot_persona_id() -> String {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../horbm/crates/horbm-persona/development.toml");
+    let text = std::fs::read_to_string(&path)
+        .unwrap_or_else(|err| panic!("development config {}: {err}", path.display()));
+    for line in text.lines() {
+        let line = line.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        let Some((key, value)) = line.split_once('=') else {
+            continue;
+        };
+        if key.trim() != "development_persona" {
+            continue;
+        }
+        let value = value.trim().trim_matches('"');
+        assert!(!value.is_empty(), "development persona id is blank");
+        return value.to_string();
+    }
+    panic!("development config has no persona id");
+}
+
+/// The profile this layer used to hard-wire, looked up from the boot id.
+fn wired_profile() -> &'static PersonaProfile {
+    let id = boot_persona_id();
+    configured_profile(Some(&id)).unwrap_or_else(|| {
+        panic!("configured id {id} has no emotion profile and must not fall back")
+    })
+}
+
+fn feel_at(cue: Cue, index: usize) -> ListenerFeel {
+    let mut ear = Ear::new();
+    let mut buf = [0.0f32; FRAME_SAMPLES];
+    let mut feel = ListenerFeel::neutral();
+    for i in 0..=index {
+        render(cue, i, &mut buf);
+        let frame = heard_frame(ear.push(&buf));
+        feel = listener_feel(&frame, cue.words());
+    }
+    feel
+}
+
+fn cue_named(name: &str) -> Cue {
+    [
+        Cue::Sad,
+        Cue::Excited,
+        Cue::Stressed,
+        Cue::Flat,
+        Cue::Neutral,
+    ]
+    .into_iter()
+    .find(|cue| cue.name() == name)
+    .unwrap_or_else(|| panic!("missing fixture {name}"))
+}
+
+/// Pulls [`response_intent`] must match, from [`appraise`] of the same reading.
+fn predicted_pulls(profile: &PersonaProfile, feel: &ListenerFeel) -> [f32; 4] {
+    let obs = UserObservation {
+        valence: feel.valence.value,
+        arousal: feel.arousal.value,
+        dominance: 0.5,
+        confidence: feel.valence.confidence,
+        source: ObsSource::Fused,
+    };
+    let mood = appraise(profile, &obs);
+    let rest = profile.dynamics.rest;
+    let clamp = 2.0;
+    let valence = (mood.valence - rest.valence - 0.10 * feel.fatigue.value).clamp(-clamp, clamp);
+    let arousal = (mood.arousal - rest.arousal + 0.20 * feel.tension.value
+        - 0.12 * feel.fatigue.value)
+        .clamp(-clamp, clamp);
+    let dominance = (mood.dominance - rest.dominance).clamp(-clamp, clamp);
+    let approach = if feel.valence.value < -0.15 {
+        (0.30 * (-feel.valence.value)).clamp(0.0, clamp)
+    } else if feel.valence.value > 0.20 {
+        (0.15 * feel.valence.value).clamp(0.0, clamp)
+    } else {
+        0.0
+    };
+    let mut pulls = [0.0; 4];
+    pulls[VALENCE] = valence;
+    pulls[AROUSAL] = arousal;
+    pulls[DOMINANCE] = dominance;
+    pulls[APPROACH] = approach;
+    pulls
+}
+
+fn decode_hex(text: &str) -> [u8; 72] {
+    assert_eq!(text.len(), 144, "intent hex is 72 bytes");
+    let mut out = [0u8; 72];
+    for (index, byte) in out.iter_mut().enumerate() {
+        *byte = u8::from_str_radix(&text[index * 2..index * 2 + 2], 16)
+            .unwrap_or_else(|_| panic!("bad hex at {index}"));
+    }
+    out
+}
+
+static ENV_LOCK: Mutex<()> = Mutex::new(());
+
+struct EnvVar {
+    prev: Option<std::ffi::OsString>,
+}
+
+impl EnvVar {
+    fn set(value: Option<&str>) -> Self {
+        let prev = std::env::var_os(DEV_PERSONA_ENV);
+        match value {
+            Some(value) => std::env::set_var(DEV_PERSONA_ENV, value),
+            None => std::env::remove_var(DEV_PERSONA_ENV),
+        }
+        Self { prev }
+    }
+}
+
+impl Drop for EnvVar {
+    fn drop(&mut self) {
+        match &self.prev {
+            Some(value) => std::env::set_var(DEV_PERSONA_ENV, value),
+            None => std::env::remove_var(DEV_PERSONA_ENV),
+        }
+    }
+}
+
+struct HeldEnv {
+    _var: EnvVar,
+    _lock: MutexGuard<'static, ()>,
+}
+
+fn hold_env(value: Option<&str>) -> HeldEnv {
+    let lock = ENV_LOCK.lock().unwrap_or_else(|err| err.into_inner());
+    HeldEnv {
+        _var: EnvVar::set(value),
+        _lock: lock,
+    }
+}
+
 #[test]
 fn dimensions_are_axes_not_a_category_list() {
-    assert_eq!(PERSONA, "samantha");
     assert_eq!(RESPONSE_VERB, "with");
     assert_eq!(
         DIMENSIONS,
@@ -167,6 +311,7 @@ fn cases_separate_and_flat_fine_follows_the_tone() {
     let flat = drive(Cue::Flat);
     let neutral = drive(Cue::Neutral);
     let excited_words = {
+        let profile = wired_profile();
         let mut ear = Ear::new();
         let mut core = EmotionCore::at_rest();
         let mut floor = Sink;
@@ -174,7 +319,8 @@ fn cases_separate_and_flat_fine_follows_the_tone() {
         let mut last = None;
         for i in 0..N {
             render(Cue::Excited, i, &mut buf);
-            let out = hear_frame(&mut ear, &mut core, &mut floor, &buf, "I'm fine").expect("hear");
+            let out = hear_frame(&mut ear, &mut core, &mut floor, &buf, "I'm fine", profile)
+                .expect("hear");
             last = Some(out.listener);
         }
         last.expect("frames")
@@ -336,11 +482,14 @@ fn sustained_cues_move_her_without_touching_baseline_or_body() {
     fill_sine(&mut low, 100.0, 0.045);
     fill_sine(&mut high, 260.0, 0.22);
 
+    let profile = wired_profile();
     let mut sad_feel = ListenerFeel::neutral();
     let mut hot_feel = ListenerFeel::neutral();
     for i in 0..8 {
-        let sad = hear_frame(&mut sad_ear, &mut sad_core, &mut floor, &low, "").expect("sad");
-        let hot = hear_frame(&mut hot_ear, &mut hot_core, &mut floor, &high, "").expect("hot");
+        let sad =
+            hear_frame(&mut sad_ear, &mut sad_core, &mut floor, &low, "", profile).expect("sad");
+        let hot =
+            hear_frame(&mut hot_ear, &mut hot_core, &mut floor, &high, "", profile).expect("hot");
         sad_feel = sad.listener;
         hot_feel = hot.listener;
         let msg = IntentMsg::hold(i * FRAME_MS);
@@ -400,6 +549,7 @@ fn a_cue_moves_her_within_two_frames() {
 fn reaction(excited: bool) -> (u32, u32) {
     const WARM: usize = 16;
     const TAIL: usize = 8;
+    let profile = wired_profile();
     let mut ear = Ear::new();
     let mut core = EmotionCore::at_rest();
     let mut hold = EmotionCore::at_rest();
@@ -415,7 +565,7 @@ fn reaction(excited: bool) -> (u32, u32) {
         } else {
             fill_sine(&mut buf, 100.0, 0.045);
         }
-        let out = hear_frame(&mut ear, &mut core, &mut floor, &buf, "").expect("hear");
+        let out = hear_frame(&mut ear, &mut core, &mut floor, &buf, "", profile).expect("hear");
         let moment = out.moment.expect("step");
         let control = hold
             .step(&IntentMsg::hold(i as u32 * FRAME_MS))
@@ -465,12 +615,13 @@ fn the_off_switch_is_neutral_and_does_not_step() {
 
 fn expect_off(ear: &mut Ear, pcm: &[f32]) {
     assert!(!ear.sensing());
+    let profile = wired_profile();
     let mut core = EmotionCore::at_rest();
     let bits = core.baseline().identity_bits();
     let start = core.moment();
     let mut floor = CueLog { cues: Vec::new() };
     for _ in 0..4 {
-        let out = hear_frame(ear, &mut core, &mut floor, pcm, "I'm fine").expect("off");
+        let out = hear_frame(ear, &mut core, &mut floor, pcm, "I'm fine", profile).expect("off");
         assert!(matches!(out.frame, FrameOut::Denied));
         assert_eq!(out.listener, ListenerFeel::neutral());
         assert!(out.moment.is_none());
@@ -501,9 +652,11 @@ fn silence_while_sensing_does_not_pull_and_a_bad_buffer_does_not_step() {
     let mut core = EmotionCore::at_rest();
     let mut hold = EmotionCore::at_rest();
     let mut floor = Sink;
+    let profile = wired_profile();
     let quiet = [0.0f32; FRAME_SAMPLES];
     for i in 0..6 {
-        let out = hear_frame(&mut ear, &mut core, &mut floor, &quiet, "I'm fine").expect("quiet");
+        let out = hear_frame(&mut ear, &mut core, &mut floor, &quiet, "I'm fine", profile)
+            .expect("quiet");
         assert_eq!(out.listener, ListenerFeel::neutral());
         let moment = out.moment.expect("quiet still steps");
         let control = hold.step(&IntentMsg::hold(i * FRAME_MS)).expect("hold");
@@ -512,7 +665,10 @@ fn silence_while_sensing_does_not_pull_and_a_bad_buffer_does_not_step() {
     }
 
     let before = core.frames();
-    let rejected = hear_frame(&mut ear, &mut core, &mut floor, &[0.0; 4], "I'm fine").expect("bad");
+    let rejected = hear_frame(
+        &mut ear, &mut core, &mut floor, &[0.0; 4], "I'm fine", profile,
+    )
+    .expect("bad");
     assert!(matches!(rejected.frame, FrameOut::Rejected));
     assert_eq!(rejected.listener, ListenerFeel::neutral());
     assert!(rejected.moment.is_none());
@@ -527,7 +683,15 @@ fn remember_on_the_ear_does_not_store_the_listener() {
     let mut floor = Sink;
     let mut buf = [0.0f32; FRAME_SAMPLES];
     fill_sine(&mut buf, 180.0, 0.16);
-    let out = hear_frame(&mut ear, &mut core, &mut floor, &buf, "I'm fine").expect("hear");
+    let out = hear_frame(
+        &mut ear,
+        &mut core,
+        &mut floor,
+        &buf,
+        "I'm fine",
+        wired_profile(),
+    )
+    .expect("hear");
     let msg_consent = core.consent();
     assert_eq!(msg_consent & REMEMBER, 0);
     assert!(core.persisted_baseline().is_none());
@@ -541,7 +705,7 @@ fn remember_on_the_ear_does_not_store_the_listener() {
 #[test]
 fn her_response_is_her_own_intent() {
     let feel = ListenerFeel::neutral();
-    let msg = response_intent(&feel, 0).expect("intent");
+    let msg = response_intent(&feel, 0, wired_profile()).expect("intent");
     assert_eq!(msg.source, IntentSource::Own);
     assert_eq!(msg.verb_str(), RESPONSE_VERB);
     assert_eq!(msg.factor_mask, 0);
@@ -557,16 +721,17 @@ fn one_hear_stays_inside_the_frame_budget() {
     let mut core = EmotionCore::at_rest();
     let mut floor = Sink;
     let mut buf = [0.0f32; FRAME_SAMPLES];
+    let profile = wired_profile();
     fill_sine(&mut buf, 200.0, 0.2);
     for _ in 0..8 {
-        let _ = hear_frame(&mut ear, &mut core, &mut floor, &buf, "I'm fine");
+        let _ = hear_frame(&mut ear, &mut core, &mut floor, &buf, "I'm fine", profile);
     }
     let mut sum = 0u128;
     let mut max_us = 0u128;
     let n = 40u128;
     for _ in 0..n {
         let t = Instant::now();
-        let _ = hear_frame(&mut ear, &mut core, &mut floor, &buf, "I'm fine");
+        let _ = hear_frame(&mut ear, &mut core, &mut floor, &buf, "I'm fine", profile);
         let us = t.elapsed().as_micros();
         sum += us;
         if us > max_us {
@@ -582,6 +747,169 @@ fn one_hear_stays_inside_the_frame_budget() {
         "max frame {max_us} us exceeds the 60 ms budget"
     );
 }
+
+#[test]
+fn configured_profile_is_the_named_one() {
+    assert!(!Persona::ALL.is_empty());
+    for persona in Persona::ALL {
+        let id = persona.as_str();
+        let profile =
+            configured_profile(Some(id)).unwrap_or_else(|| panic!("{id} has no emotion profile"));
+        assert!(std::ptr::eq(profile, persona.profile()));
+        assert_eq!(profile.persona.as_str(), id);
+        let upper = id.to_ascii_uppercase();
+        let folded = configured_profile(Some(&upper))
+            .unwrap_or_else(|| panic!("{upper} did not resolve through parse"));
+        assert!(std::ptr::eq(folded, profile));
+    }
+}
+
+#[test]
+fn unknown_persona_has_no_profile_and_no_fallback() {
+    for id in [Some("northwind"), Some(""), None] {
+        assert!(
+            configured_profile(id).is_none(),
+            "{id:?} resolved to a profile"
+        );
+    }
+}
+
+#[test]
+fn response_intent_follows_the_profile() {
+    let mut feel = ListenerFeel::neutral();
+    feel.valence = Reading {
+        value: -0.55,
+        confidence: 0.8,
+    };
+    feel.arousal = Reading {
+        value: 0.82,
+        confidence: 0.7,
+    };
+    feel.tension = Reading {
+        value: 0.45,
+        confidence: 0.7,
+    };
+    feel.fatigue = Reading {
+        value: 0.35,
+        confidence: 0.6,
+    };
+    let profiles: Vec<&'static PersonaProfile> = Persona::ALL
+        .into_iter()
+        .map(|persona| configured_profile(Some(persona.as_str())).expect("built-in profile"))
+        .collect();
+    assert!(profiles.len() >= 2, "two built-in profiles are required");
+    let mut encoded = Vec::new();
+    for profile in &profiles {
+        let msg = response_intent(&feel, 80, profile).expect("intent");
+        let predicted = predicted_pulls(profile, &feel);
+        for (axis, expected) in predicted.iter().enumerate() {
+            assert_eq!(msg.pull[axis].to_bits(), expected.to_bits(), "axis {axis}");
+        }
+        encoded.push(msg.encode().expect("encode"));
+    }
+    assert_ne!(encoded[0], encoded[1]);
+}
+
+#[test]
+fn same_profile_same_bits_as_before() {
+    let profile = wired_profile();
+    let rest = response_intent(&ListenerFeel::neutral(), 0, profile)
+        .expect("intent")
+        .encode()
+        .expect("encode");
+    assert_eq!(rest, decode_hex(REST_INTENT));
+
+    for (name, index, expected) in FIXTURE_INTENTS {
+        let feel = feel_at(cue_named(name), *index);
+        let t_ms = *index as u32 * FRAME_MS;
+        let bytes = response_intent(&feel, t_ms, profile)
+            .expect("intent")
+            .encode()
+            .expect("encode");
+        assert_eq!(bytes, decode_hex(expected), "{name} frame {index}");
+    }
+}
+
+#[test]
+fn profile_from_env_reads_the_configured_id_once_and_does_not_fall_back() {
+    let known = Persona::ALL[0];
+    {
+        let _held = hold_env(Some(known.as_str()));
+        let got = profile_from_env().expect("known id");
+        assert!(std::ptr::eq(got, known.profile()));
+        let again = profile_from_env().expect("second read");
+        assert!(std::ptr::eq(again, got));
+    }
+    {
+        let _held = hold_env(Some("northwind"));
+        assert!(profile_from_env().is_none());
+    }
+    {
+        let _held = hold_env(Some(""));
+        assert!(profile_from_env().is_none());
+    }
+    {
+        let _held = hold_env(None);
+        assert!(profile_from_env().is_none());
+    }
+}
+
+/// Pre-change encoding of a neutral reading at t = 0.
+const REST_INTENT: &str = "47454d4901000001000000007769746800000000000000000000000000000000000000003c0ad73d00000000000000000f0000003333333fcdcc4c3d0000803fcdcc0c3f00000000";
+
+/// Pre-change encodings of the sine fixtures at frame 0 and frame 24.
+const FIXTURE_INTENTS: &[(&str, usize, &str)] = &[
+    (
+        "sad-low-slow",
+        0,
+        "47454d49010000010000000077697468000000000000000000000000feff7f3f675c90be0e7246bea0a37bbc85ee083e0f0000003333333fcdcc4c3d0000803fcdcc0c3f00000000",
+    ),
+    (
+        "sad-low-slow",
+        24,
+        "47454d49010000018007000077697468000000000000000000000000feff7f3fb39b8bbef8093bbea0a37bbc85ee083e0f0000003333333fcdcc4c3d0000803fcdcc0c3f00000000",
+    ),
+    (
+        "excited-high-fast",
+        0,
+        "47454d4901000001000000007769746800000000000000000000000050df7f3f60a8363e324a993e0000000098af893d0f0000003333333fcdcc4c3d0000803fcdcc0c3f00000000",
+    ),
+    (
+        "excited-high-fast",
+        24,
+        "47454d4901000001800700007769746800000000000000000000000050df7f3f1ac77b3e7800ad3e00000000d6b9a03d0f0000003333333fcdcc4c3d0000803fcdcc0c3f00000000",
+    ),
+    (
+        "stressed-tense",
+        0,
+        "47454d49010000010000000077697468000000000000000000000000069c773f000000005449943e00000000000000000f0000003333333fcdcc4c3d0000803fcdcc0c3f00000000",
+    ),
+    (
+        "stressed-tense",
+        24,
+        "47454d49010000018007000077697468000000000000000000000000069c773f000000005449943e00000000000000000f0000003333333fcdcc4c3d0000803fcdcc0c3f00000000",
+    ),
+    (
+        "flat-im-fine",
+        0,
+        "47454d490100000100000000776974680000000000000000000000006cfc7f3f90e890bed99f40be40137bbc36c3083e0f0000003333333fcdcc4c3d0000803fcdcc0c3f00000000",
+    ),
+    (
+        "flat-im-fine",
+        24,
+        "47454d490100000180070000776974680000000000000000000000006cfc7f3f90e890bed99f40be40137bbc36c3083e0f0000003333333fcdcc4c3d0000803fcdcc0c3f00000000",
+    ),
+    (
+        "neutral",
+        0,
+        "47454d4901000001000000007769746800000000000000000000000068ff7f3f0044e6b9b684dc3d00000000000000000f0000003333333fcdcc4c3d0000803fcdcc0c3f00000000",
+    ),
+    (
+        "neutral",
+        24,
+        "47454d4901000001800700007769746800000000000000000000000068ff7f3f0044e6b9b684dc3d00000000000000000f0000003333333fcdcc4c3d0000803fcdcc0c3f00000000",
+    ),
+];
 
 #[test]
 fn sources_do_not_name_aria_ort_or_a_research_dir() {

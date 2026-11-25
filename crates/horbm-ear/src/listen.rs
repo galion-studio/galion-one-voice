@@ -1,45 +1,53 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Galion Labs
-//! How the listener feels, and how Samantha answers it.
+//! How the listener feels, and how the configured persona answers it.
 //!
-//! The reading is not her [`galion_emotion_core::MomentState`] and not her
-//! [`galion_emotion_core::VoiceBaseline`]. Five continuous dimensions, each
-//! with its own confidence. A universal score map is a view of valence and
-//! arousal. It is not a category and it does not drive the step.
+//! The reading is not that persona's [`galion_emotion_core::MomentState`] and
+//! not that persona's [`galion_emotion_core::VoiceBaseline`]. Five continuous
+//! dimensions, each with its own confidence. A universal score map is a view
+//! of valence and arousal. It is not a category and it does not drive the step.
 //!
 //! Words are [`galion_emotion::text_affect`] and the `LEXICON` table beside
 //! it. That table is Perpetual Open MIT, (c) 2026 Galion Labs, used as
 //! published. It is a cue list, not a model. When the word and the tone
 //! disagree in sign, the tone wins.
 //!
-//! [`hear_frame`] steps the core with her own intent. The ear's inbound
-//! offer is left for [`crate::link::push_frame`]. Adapt stays off, so that
-//! offer still does not mix. This path never sets adapt, remember, or share.
-//! Nothing is written. Samantha is the only persona this layer calls.
+//! [`hear_frame`] steps the core with the configured persona's own intent.
+//! The ear's inbound offer is left for [`crate::link::push_frame`]. Adapt
+//! stays off, so that offer still does not mix. This path never sets adapt,
+//! remember, or share. Nothing is written. The persona is whatever
+//! [`configured_profile`] resolves. An id with no emotion profile is
+//! [`None`]. This layer does not substitute another persona's profile. The
+//! caller then keeps the listener reading on the persona-neutral
+//! [`UNIVERSAL`] path only.
 //!
 //! The map below is a fixed coupling. It was not fit on a corpus. Louder,
 //! higher, and faster raise arousal, which is the direction Juslin and
 //! Laukka (Psychological Bulletin, 2003) treat as the reliable vocal cue.
 //! Roughness raises tension. A low, quiet voice raises fatigue and lowers
-//! valence. Her design pitch (216 Hz on the stand-in baseline) is not the
-//! listener's neutral.
+//! valence. The stand-in baseline centre (216 Hz) is not the listener's
+//! neutral.
 
 use galion_emotion::consent_bits;
-use galion_emotion::persona_mood::{appraise, text_affect, ObsSource, UserObservation, SAMANTHA};
+use galion_emotion::persona_mood::text_affect;
 use galion_emotion_core::{
     project_universal, CoreError, EmotionCore, IntentMsg, IntentSource, MomentState, APPROACH,
     AROUSAL, DOMINANCE, UNIVERSAL_LEN, VALENCE,
 };
 
+pub use galion_emotion::persona_mood::{
+    appraise, ObsSource, Persona, PersonaProfile, UserObservation,
+};
 pub use galion_emotion_core::UNIVERSAL;
 
 use crate::link::{FloorCue, FloorTick};
 use crate::{Ear, FrameOut, ProsodyFrame};
 
-/// This layer is Samantha. No other persona is wired.
-pub const PERSONA: &str = "samantha";
+/// Process environment that names the persona id. [`profile_from_env`] reads
+/// it once per call. Unset means no profile.
+pub const DEV_PERSONA_ENV: &str = "GALION_HORBM_DEV_PERSONA";
 
-/// Verb on her own response. Not an emotion name.
+/// Verb on the persona's own response. Not an emotion name.
 pub const RESPONSE_VERB: &str = "with";
 
 /// Dimension names. A new axis would be another name here, not a new emotion.
@@ -52,7 +60,7 @@ const PULL_CLAMP: f32 = 2.0;
 /// is unvoiced, there is no listener evidence.
 const ACOUSTIC_FLOOR: f32 = 0.012;
 
-/// Listener pitch band, hertz. Not her baseline centre.
+/// Listener pitch band, hertz. Not the persona baseline centre.
 const F0_LO: f32 = 90.0;
 const F0_HI: f32 = 280.0;
 /// Unit pitch of a neutral adult tone inside [`F0_LO`]..[`F0_HI`].
@@ -91,8 +99,8 @@ impl Reading {
     }
 }
 
-/// The listener, this frame. Not Samantha's moment. Not her baseline.
-/// Not a store: the caller drops it by dropping the value.
+/// The listener, this frame. Not the persona's moment. Not the persona's
+/// baseline. Not a store: the caller drops it by dropping the value.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ListenerFeel {
     /// Pleasure, −1..=1.
@@ -101,7 +109,7 @@ pub struct ListenerFeel {
     pub arousal: Reading,
     /// Pressed, rough, strained. 0..=1.
     pub tension: Reading,
-    /// Low, quiet, drawn out. 0..=1. Not her body's fatigue factor.
+    /// Low, quiet, drawn out. 0..=1. Not the persona's body fatigue factor.
     pub fatigue: Reading,
     /// How assured the voice sounds, 0..=1. [`Reading::confidence`] is how
     /// sure the reading is, which is a different number.
@@ -199,10 +207,39 @@ pub fn listener_feel(frame: &ProsodyFrame, words: &str) -> ListenerFeel {
     }
 }
 
-/// Her own intent for this reading. Factor mask stays 0: the listener's
-/// fatigue is not written into her body. Consent is the sense bit only.
-pub fn response_intent(feel: &ListenerFeel, t_ms: u32) -> Result<IntentMsg, CoreError> {
-    debug_assert_eq!(SAMANTHA.persona.as_str(), PERSONA);
+/// Emotion profile for a configured persona id.
+///
+/// Pure. Resolves `id` through [`Persona::parse`] and [`Persona::profile`].
+/// [`None`], a blank id, and an id with no emotion profile are [`None`].
+/// There is no fallback to another persona. When this returns [`None`], the
+/// caller keeps [`listener_feel`] on the persona-neutral [`UNIVERSAL`] path
+/// and does not invent a profile for [`response_intent`] or [`hear_frame`].
+pub fn configured_profile(id: Option<&str>) -> Option<&'static PersonaProfile> {
+    let id = id?;
+    Persona::parse(id).map(Persona::profile)
+}
+
+/// [`configured_profile`] of [`DEV_PERSONA_ENV`], read once per call.
+///
+/// Unset, blank, or an id with no emotion profile is [`None`]. This does not
+/// read a file and does not substitute another persona's profile. The caller
+/// then keeps the listener reading on the persona-neutral [`UNIVERSAL`] path
+/// only.
+pub fn profile_from_env() -> Option<&'static PersonaProfile> {
+    let id = std::env::var(DEV_PERSONA_ENV).ok();
+    configured_profile(id.as_deref())
+}
+
+/// The persona's own intent for this reading.
+///
+/// `profile` is the configured emotion profile. Factor mask stays 0: the
+/// listener's fatigue is not written into the persona's body. Consent is the
+/// sense bit only.
+pub fn response_intent(
+    feel: &ListenerFeel,
+    t_ms: u32,
+    profile: &PersonaProfile,
+) -> Result<IntentMsg, CoreError> {
     let obs = UserObservation {
         valence: feel.valence.value,
         arousal: feel.arousal.value,
@@ -210,8 +247,8 @@ pub fn response_intent(feel: &ListenerFeel, t_ms: u32) -> Result<IntentMsg, Core
         confidence: feel.valence.confidence,
         source: ObsSource::Fused,
     };
-    let mood = appraise(&SAMANTHA, &obs);
-    let rest = SAMANTHA.dynamics.rest;
+    let mood = appraise(profile, &obs);
+    let rest = profile.dynamics.rest;
     let strength = feel
         .valence
         .confidence
@@ -245,13 +282,15 @@ pub fn response_intent(feel: &ListenerFeel, t_ms: u32) -> Result<IntentMsg, Core
     Ok(msg)
 }
 
-/// Hear one frame, keep the listener reading apart, and step Samantha.
+/// Hear one frame, keep the listener reading apart, and step the persona.
 ///
-/// Sensing off ([`Ear::deny`], [`crate::EarConfig`] with `sense: false`,
-/// [`Ear::from_env`] on `0` / `off` / `deny`) returns [`ListenerFeel::neutral`]
-/// and does not step the core. [`Ear::push`] does not read the samples on
-/// that path. The words are ignored. Workplace and education are already
-/// shut by the ear, so they take the same path.
+/// `profile` is the configured emotion profile ([`configured_profile`],
+/// [`profile_from_env`]). This function does not look up a persona and does
+/// not substitute one. Sensing off ([`Ear::deny`], [`crate::EarConfig`] with
+/// `sense: false`, [`Ear::from_env`] on `0` / `off` / `deny`) returns
+/// [`ListenerFeel::neutral`] and does not step the core. [`Ear::push`] does
+/// not read the samples on that path. The words are ignored. Workplace and
+/// education are already shut by the ear, so they take the same path.
 ///
 /// The baseline is not an argument. The core already holds it, and this
 /// function does not write it.
@@ -261,6 +300,7 @@ pub fn hear_frame(
     floor: &mut dyn FloorTick,
     pcm: &[f32],
     words: &str,
+    profile: &PersonaProfile,
 ) -> Result<HearOut, CoreError> {
     if !ear.sensing() {
         let frame = ear.push(pcm);
@@ -295,7 +335,7 @@ pub fn hear_frame(
             } else {
                 FloorCue::Quiet
             };
-            let msg = response_intent(&listener, core.next_ms())?;
+            let msg = response_intent(&listener, core.next_ms(), profile)?;
             let moment = core.step(&msg)?;
             floor.tick_floor(cue);
             Ok(HearOut {
@@ -474,13 +514,13 @@ mod tests {
     }
 
     #[test]
-    fn her_pitch_centre_is_not_the_listener_zero() {
+    fn standin_pitch_centre_is_not_the_listener_zero() {
         let mid = listener_feel(&tone(176.0, 0.095, 0.4, 0.0, 0.0), "");
-        let hers = listener_feel(&tone(216.0, 0.095, 0.4, 0.0, 0.0), "");
+        let centre = listener_feel(&tone(216.0, 0.095, 0.4, 0.0, 0.0), "");
         assert!(
-            hers.valence.value > mid.valence.value + 0.05,
+            centre.valence.value > mid.valence.value + 0.05,
             "216 Hz {} vs 176 Hz {}",
-            hers.valence.value,
+            centre.valence.value,
             mid.valence.value
         );
     }
