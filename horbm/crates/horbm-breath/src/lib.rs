@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Galion Labs
-//! Samantha's lungs for MnE V2.
+//! The configured persona's lungs for MnE V2.
 //!
 //! Emotion stays an open point on the 80 ms clock. This crate does not
 //! read a category list. The speaker's baseline (persona bytes, voice id,
@@ -49,7 +49,8 @@ pub use glottis::{controls, open_quotient_from_rd, Articulation, GlottisError};
 pub use lungs::Lungs;
 pub use plan::{plan_pauses, Pause, PauseWhy, Plan};
 
-/// Development speaker. Any other id is refused.
+/// Deprecated forward. The development id string. [`Lungs::open`] does not
+/// compare against it.
 pub const SAMANTHA: &str = "samantha";
 
 /// Symphony clock. Same value as `LOCKS.toml` `clock.frame_ms`.
@@ -127,14 +128,14 @@ const _: () = assert!(INHALE_SAMPLES == 80 * 16);
 /// Why a speaker was refused.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum BreathError {
-    /// Development speaks as Samantha only.
+    /// The id is blank or not a short token.
     Persona,
 }
 
 impl std::fmt::Display for BreathError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Persona => f.write_str("dev phase speaks as samantha"),
+            Self::Persona => f.write_str("persona id is not a short token"),
         }
     }
 }
