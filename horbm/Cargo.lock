@@ -544,6 +544,7 @@ dependencies = [
  "galion-emotion-in",
  "galion-ml-voice",
  "horbm",
+ "horbm-duplex",
  "horbm-voice",
  "serde",
  "serde_json",
