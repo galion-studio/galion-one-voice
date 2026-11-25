@@ -7,18 +7,23 @@
 //! 1. Empathy (layer 3) steps the mood from the heard line and rewrites the
 //!    lookup. The feeling name, when one is invited, stays on the mood
 //!    metadata. It is not spoken.
-//! 2. Cards answer first, through [`CardLookup`]. The phase 4 pick in
-//!    `horbm-brain` chooses one stored clause from that lookup: at most two
-//!    spoken words first when the clause allows a cut, then the rest. A miss
-//!    is the stored persona clause [`UNKNOWN_REPLY`]. Lookup and Action turns
-//!    are marked for Galion Research and are not posted. [`KnowledgeCards`]
-//!    reads a directory of galion-knowledge cards, checks the card-bundle
-//!    manifest when one is present, and builds the covering lookup index. It
-//!    does not write a card, does not open `horbm-memory`, and does not bind
-//!    a socket. There is no knowledge-ro server in this repository. Port 7900
-//!    is not used here. The 7881 bridge calls this loader.
-//! 3. A deep miss may ask the research gateway. The caller passes
-//!    [`RESEARCH_CAP`] (3 seconds). This crate dials nothing itself.
+//! 2. When a [`RetrievalThread`] is attached, [`Brain::turn`] asks it and
+//!    reads the [`MemoryHitCell`]. `Hits` speaks [`MemoryHit::clause`]. `Miss`
+//!    speaks [`UNKNOWN_REPLY`] and does not call research. `Idle` is deny or
+//!    withdraw: the diary is not read. The card pick runs, and if that misses
+//!    the committed clause fixture still answers. Without a thread, cards
+//!    answer first through [`CardLookup`]. The phase 4 pick chooses one stored
+//!    clause: at most two spoken words first when the clause allows a cut,
+//!    then the rest. Lookup and Action turns are marked for Galion Research
+//!    and are not posted. [`KnowledgeCards`] reads a directory of
+//!    galion-knowledge cards, checks the card-bundle manifest when one is
+//!    present, and builds the covering lookup index. It does not write a card
+//!    and does not bind a socket. There is no knowledge-ro server in this
+//!    repository. Port 7900 is not used here. The 7881 bridge calls this loader
+//!    and attaches the retrieval thread.
+//! 3. A deep miss on the idle or unthreaded path may ask the research gateway.
+//!    The caller passes [`RESEARCH_CAP`] (3 seconds). This crate dials nothing
+//!    itself. A retrieval `Miss` does not.
 //! 4. Anything still unanswered is exactly [`UNKNOWN_REPLY`]. No gap filler.
 //!
 //! Beside that turn, [`Brain::step_moment`] advances the moment-to-moment
@@ -34,7 +39,21 @@
 //! [`Brain::open`] and [`Brain::boot`] with no path load Samantha, the
 //! development persona. Aria stays in the repo and is not loaded. An explicit
 //! path replaces Samantha. An invalid file is refused. [`Brain::admit_move`]
-//! is the legal-move port.
+//! is the legal-move port. Layer 4 calls it with the chosen move.
+//!
+//! Layer 4 runs after that evidence is in hand and before the reply is split
+//! into clauses. It picks one move: answer, cite, ask, comfort, offer_topic,
+//! or stop. The heuristic is deterministic. An answer with no sourced card
+//! becomes ask, and the spoken miss stays [`UNKNOWN_REPLY`]. The truth root
+//! is the only card source for answer and cite. [`ResearchRoot`] is optional
+//! and unset by default. A research card never becomes that source. Check-ins
+//! are off. The offline bandit is off and does not count a move unless learn
+//! consent is granted. Callbacks are stored only when remember is granted.
+//!
+//! [`RetrievalThread`] links `horbm-memory` in-process, off the heartbeat
+//! thread. Do not call [`Brain::turn`] from `Heartbeat::step`: the turn waits
+//! for the cell. [`Int8Scorer`] is implemented for the mapped key arena and
+//! is not called by the retrieval thread.
 //!
 //! [`LearnPass`] is not part of that order. It is the offline learn pass.
 //! Learn consent is [`LearnConfig::granted`]. [`Brain::turn`] does not call it.
@@ -43,14 +62,18 @@
 
 mod brain;
 mod cards;
+mod dialogue;
+mod keys;
 mod learn;
+mod retrieve;
 mod route;
 
 pub use brain::{Brain, MoodMeta};
 pub use cards::{
-    knowledge_dir_from_env, CardError, KnowledgeCards, LoadReport, LoadedPack,
-    WINDOWS_KNOWLEDGE_DIR,
+    blocks_answer, knowledge_dir_from_env, CardError, KnowledgeCards, LoadReport, LoadedPack,
+    ResearchRoot, WINDOWS_KNOWLEDGE_DIR,
 };
+pub use dialogue::{flag_granted, DialogueConsent, Move, OfflineBandit, TurnSnap, RING_CAP};
 pub use galion_emotion_core::{
     ConductorCue, CoreError as EmotionError, EmotionCore, InnerLife, InnerTurn, IntentMsg,
     MomentState, VoiceBaseline, FRAME_MS as EMOTION_FRAME_MS,
@@ -58,12 +81,17 @@ pub use galion_emotion_core::{
 pub use galion_research_gateway::RESEARCH_CAP;
 pub use galion_sam_empathy::{Intent, PronounClass, FRAME_MS};
 pub use horbm_brain::{Answer, Heuristic, MarkKind, SidebandMark};
+pub use horbm_keys::StringKeyArena;
 pub use horbm_persona::{
     LegalMovePort, MoveClaim, MoveVerdict, Persona, PersonaError, StyleHook, UNKNOWN_LINE,
 };
 pub use learn::{
     ClauseSource, LearnAudit, LearnConfig, LearnError, LearnPass, LearnedRow, LEARN_PACK_DB,
     LEARN_PACK_LIVE, LEARN_PACK_NEXT, LEARN_PACK_RETIRING,
+};
+pub use retrieve::{
+    CellState, HitPool, Int8Scorer, MemoryHit, MemoryHitCell, RetrievalConfig, RetrievalThread,
+    RetrieveError, RetrievedCells, MEMORY_HIT_CAP,
 };
 pub use route::{
     is_deep_question, route_heard, AskOutcome, CardHit, CardLookup, Gap, GapReason, ResearchAsk,

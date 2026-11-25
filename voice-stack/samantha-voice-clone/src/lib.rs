@@ -26,7 +26,7 @@ mod worker;
 
 pub use cache::{cache_dir_is_inside_repo, PhraseCache};
 pub use consent::{Consent, CONSENT_SCOPE};
-pub use device::{probe_compute, python_bin, ComputeKind, ComputeProbe};
+pub use device::{probe_compute, python_bin, resolve_python, ComputeKind, ComputeProbe};
 pub use error::TtsError;
 pub use frames::{frames_of, tail_of, FRAME_MS, FRAME_SAMPLES, SAMPLE_RATE_HZ};
 pub use recipe::{

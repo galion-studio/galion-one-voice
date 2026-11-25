@@ -7,7 +7,8 @@
 
 use crate::error::TtsError;
 use std::path::PathBuf;
-use std::process::Command;
+use std::process::{Command, Stdio};
+use std::sync::OnceLock;
 use std::time::Instant;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -40,11 +41,40 @@ pub fn python_bin() -> String {
             return value.to_string();
         }
     }
-    if cfg!(windows) {
-        "python".to_string()
+    resolve_python()
+}
+
+/// First interpreter on PATH that accepts `--version`.
+/// Windows tries `python`, then `python3`. Everywhere else tries `python3`, then `python`.
+/// The name is cached for this process. A missing interpreter returns the first name anyway.
+pub fn resolve_python() -> String {
+    static FOUND: OnceLock<String> = OnceLock::new();
+    FOUND.get_or_init(find_python).clone()
+}
+
+fn find_python() -> String {
+    let order = if cfg!(windows) {
+        ["python", "python3"]
     } else {
-        "python3".to_string()
+        ["python3", "python"]
+    };
+    for bin in order {
+        if interpreter_runs(bin) {
+            return bin.to_string();
+        }
     }
+    order[0].to_string()
+}
+
+fn interpreter_runs(bin: &str) -> bool {
+    Command::new(bin)
+        .arg("--version")
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .map(|status| status.success())
+        .unwrap_or(false)
 }
 
 /// Ask the local interpreter whether torch can see CUDA.
