@@ -182,9 +182,10 @@ async fn dot_page_follows_the_phase() {
         galion_sam_orch::FakeReply::new(REPLY, MOOD),
         galion_sam_orch::FakeTts::gated(vec![7, 7], gate.clone()),
     );
-    let server = galion_sam_orch::ui::DotServer::bind(
-        "127.0.0.1:0".parse().unwrap(),
+    let server = galion_sam_orch::ui::DotServer::bind_named(
+        loopback_any(),
         running.handle.subscribe(),
+        "northwind",
     )
     .expect("loopback");
     demo::send_frames(&running.tx, 6, 10).await;
@@ -211,13 +212,48 @@ async fn dot_page_follows_the_phase() {
         last.contains("\"phase\":\"speaking\""),
         "dot never showed speaking; last={last}"
     );
+    assert_eq!(
+        running.handle.phase(),
+        Phase::Speaking,
+        "phase moved while the gate still held speaking"
+    );
     let page = tokio::task::spawn_blocking(move || http_get(addr, "/"))
         .await
         .unwrap_or_default();
-    assert!(page.contains("Samantha"));
+    assert!(page.contains("northwind"), "page={page}");
     assert!(page.contains("id=\"dot\""));
     gate.release
         .store(true, std::sync::atomic::Ordering::SeqCst);
+    running.handle.shutdown().await;
+    server.shutdown();
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn dot_page_shows_the_configured_name() {
+    let running = demo::spawn_fake(
+        galion_sam_orch::FakeReply::new(REPLY, MOOD),
+        galion_sam_orch::FakeTts::pcm(vec![1]),
+    );
+    let server = galion_sam_orch::ui::DotServer::bind_named(
+        loopback_any(),
+        running.handle.subscribe(),
+        "northwind",
+    )
+    .expect("loopback");
+    let addr = server.addr();
+    let page = tokio::task::spawn_blocking(move || http_get(addr, "/"))
+        .await
+        .unwrap_or_default();
+    assert!(page.contains("northwind"), "page={page}");
+    assert!(page.contains("<title>northwind</title>"), "page={page}");
+    assert!(
+        page.contains("<div class=\"name\">northwind</div>"),
+        "page={page}"
+    );
+    let lower = page.to_ascii_lowercase();
+    assert!(!lower.contains("samantha"), "page={page}");
+    assert!(!lower.contains("aria"), "page={page}");
+    assert!(!page.contains("GALION_DOT_NAME"), "page={page}");
     running.handle.shutdown().await;
     server.shutdown();
 }
@@ -245,6 +281,10 @@ fn contains_in_order(phases: &[Phase], want: &[Phase]) -> bool {
         }
     }
     false
+}
+
+fn loopback_any() -> SocketAddr {
+    SocketAddr::from((std::net::Ipv4Addr::LOCALHOST, 0))
 }
 
 fn http_get(addr: SocketAddr, path: &str) -> String {

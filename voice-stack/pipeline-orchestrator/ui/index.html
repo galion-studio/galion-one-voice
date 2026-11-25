@@ -5,7 +5,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Samantha</title>
+  <title>GALION_DOT_NAME</title>
   <style>
     html, body {
       margin: 0;
@@ -46,8 +46,8 @@
   </style>
 </head>
 <body>
-  <div id="dot" class="dot" data-phase="idle" role="img" aria-label="idle"></div>
-  <div class="name">Samantha</div>
+  <div id="dot" class="dot" data-phase="idle" role="img"></div>
+  <div class="name">GALION_DOT_NAME</div>
   <script>
     const dot = document.getElementById("dot");
     async function tick() {
@@ -57,10 +57,8 @@
         const body = await res.json();
         const phase = body.phase || "idle";
         dot.dataset.phase = phase;
-        dot.setAttribute("aria-label", phase);
       } catch (err) {
         dot.dataset.phase = "offline";
-        dot.setAttribute("aria-label", "offline");
       }
     }
     tick();
