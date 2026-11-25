@@ -8,7 +8,8 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use horbm::{
-    AskOutcome, Brain, CardHit, CardLookup, GapReason, ResearchAsk, RESEARCH_CAP, UNKNOWN_REPLY,
+    AskOutcome, Brain, CardHit, CardLookup, GapReason, ResearchAsk, ResearchFollowUp, RESEARCH_CAP,
+    UNKNOWN_REPLY,
 };
 
 struct Cards;
@@ -94,7 +95,7 @@ fn gateway_timeout_at_three_seconds_falls_back() {
         Some(Box::new(Gateway {
             calls: Arc::clone(&calls),
             caps: Arc::clone(&caps),
-            sleep_cap: true,
+            sleep_cap: false,
             answer: AskOutcome::Timeout,
         })),
     );
@@ -102,24 +103,45 @@ fn gateway_timeout_at_three_seconds_falls_back() {
     let out = brain.turn("why is the spare fuse missing from the drawer?");
     let elapsed = started.elapsed();
     eprintln!("MEASURE horbm_gateway_timeout_ms={}", elapsed.as_millis());
+    assert_eq!(
+        calls.load(Ordering::SeqCst),
+        0,
+        "research ran inside the turn"
+    );
+    assert!(
+        elapsed < Duration::from_millis(500),
+        "the clause waited on research: {elapsed:?}"
+    );
+    assert_eq!(out.reply, "I don't know.");
+    assert_eq!(out.first_clause, "I don't know.");
+    assert_eq!(out.sources, vec!["honest:unknown".to_string()]);
+    assert!(out.evidence.is_empty());
+    assert!(!out.reply.to_ascii_lowercase().contains("ollama"));
+    assert!(out.mood_meta.intent == "ask" || out.mood_meta.intent == "chat");
+    assert_eq!(brain.gaps().last().unwrap().reason, GapReason::ResearchOff);
+    drop(out);
+    let follow = wait_follow(&mut brain);
     assert_eq!(calls.load(Ordering::SeqCst), 1);
     assert_eq!(caps.lock().unwrap().as_slice(), &[RESEARCH_CAP]);
     assert_eq!(RESEARCH_CAP, Duration::from_secs(3));
-    assert!(
-        elapsed >= Duration::from_millis(2_900),
-        "timeout returned early: {elapsed:?}"
-    );
-    assert!(
-        elapsed < Duration::from_millis(5_000),
-        "timeout did not stop at the cap: {elapsed:?}"
-    );
-    assert_eq!(out.reply, "I don't know.");
-    assert_eq!(out.sources, vec!["honest:unknown".to_string()]);
-    assert!(out.evidence.is_empty());
+    assert_eq!(follow.outcome, AskOutcome::Timeout);
+    assert!(follow.spoken.is_none());
+    assert_eq!(follow.gap.reason, GapReason::ResearchTimeout);
     assert_eq!(
         brain.gaps().last().unwrap().reason,
         GapReason::ResearchTimeout
     );
-    assert!(!out.reply.to_ascii_lowercase().contains("ollama"));
-    assert!(out.mood_meta.intent == "ask" || out.mood_meta.intent == "chat");
+}
+
+fn wait_follow(brain: &mut Brain) -> ResearchFollowUp {
+    let started = Instant::now();
+    loop {
+        if let Some(follow) = brain.research_follow_up() {
+            return follow;
+        }
+        if started.elapsed() > Duration::from_secs(2) {
+            panic!("research follow-up did not arrive");
+        }
+        thread::sleep(Duration::from_millis(5));
+    }
 }

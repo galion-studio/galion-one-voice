@@ -27,10 +27,16 @@
 //!    and does not bind a socket. There is no knowledge-ro server in this
 //!    repository. Port 7900 is not used here. The 7881 bridge calls this loader
 //!    and attaches the retrieval thread.
-//! 4. A deep miss on the idle or unthreaded path may ask the research gateway.
+//! 4. A deep miss on the idle or unthreaded path does not ask Galion Research
+//!    inside the turn. The local clause, including [`UNKNOWN_REPLY`], is
+//!    split and returned first. The ask is armed behind [`ResearchAsk`] and
+//!    starts only after that [`TurnOut`] is dropped. [`Brain::research_follow_up`]
+//!    is the later result. It does not rewrite `reply` or `first_clause`.
 //!    The caller passes [`RESEARCH_CAP`] (3 seconds). This crate dials nothing
-//!    itself. A retrieval `Miss` does not.
-//! 5. Anything still unanswered is exactly [`UNKNOWN_REPLY`]. No gap filler.
+//!    itself. A retrieval `Miss`, a card hit, comfort, and a missing port do not
+//!    arm an ask.
+//! 5. Anything still unanswered on this turn is exactly [`UNKNOWN_REPLY`].
+//!    No gap filler.
 //!
 //! Beside that turn, [`Brain::step_moment`] advances the moment-to-moment
 //! emotion core one 80 ms frame. Empathy mood and the moment are separate:
@@ -63,7 +69,7 @@
 //!
 //! [`Brain::samantha`] is the slower layer: care, curiosity, help, and
 //! expect. [`Brain::turn`] lets that layer bias the pace and, when the act
-//! is comfort, skips the research ask. It does not replace the spoken
+//! is comfort, does not arm the research ask. It does not replace the spoken
 //! clause. [`Brain::samantha_nudge`] steps the same GEMI note on the moment
 //! clock. [`Brain::tick_frame`] decays the goals and counts silence. It
 //! still does not step the moment.
@@ -82,7 +88,7 @@ mod memory;
 mod retrieve;
 mod route;
 
-pub use brain::{Brain, MoodMeta};
+pub use brain::{Brain, MoodMeta, ResearchFollowUp};
 pub use cards::{
     blocks_answer, knowledge_dir_from_env, CardError, KnowledgeCards, LoadReport, LoadedPack,
     ResearchRoot, WINDOWS_KNOWLEDGE_DIR,
@@ -138,7 +144,15 @@ impl Pad {
     };
 }
 
-/// What one turn returns to the voice. `reply` is the only spoken text.
+/// What one turn returns to the voice.
+///
+/// `reply` is the local line. [`Self::first_clause`] is its first spoken
+/// piece. Both are set before Galion Research is asked. A later
+/// [`Brain::research_follow_up`] does not change them.
+///
+/// Dropping this value, including the last clone, releases a pending
+/// research ask when the turn armed one. The ask does not run while any
+/// clone is still held.
 #[derive(Clone, Debug, PartialEq)]
 pub struct TurnOut {
     pub reply: String,
@@ -158,4 +172,7 @@ pub struct TurnOut {
     pub rest: String,
     /// Galion Research side-band mark. `posted` is false until phase 6.
     pub sideband: Option<SidebandMark>,
+    /// Drops the release for a follow-up ask. Not part of the spoken line.
+    #[doc(hidden)]
+    pub(crate) follow: brain::FollowHook,
 }
