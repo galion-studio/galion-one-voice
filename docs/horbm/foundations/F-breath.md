@@ -69,3 +69,16 @@ cargo test --manifest-path horbm/Cargo.toml -p horbm-breath
 cargo clippy --manifest-path horbm/Cargo.toml -p horbm-breath --all-targets --no-deps -- -D warnings
 bash scripts/horbm-e2e-smoke.sh
 ```
+
+## Articulation on the same frame
+
+S20 adds four controls to `Frame`. They do not replace the lungs sample, and they do not change volume, flow, or `pressure`.
+
+| Field | While speaking | Otherwise |
+|---|---|---|
+| `open_quotient` | Fant Rd map. Modal Rd 1 is about 65%. | Abduction: the folds are open for air. |
+| `breathiness` | Rises with Rd. | 1 |
+| `nasal_coupling` | Caller target, reduced when health is low. | Resting leak only. |
+| `mouth_openness` | Caller target, reduced by fatigue above rest. | A small opening for the breath. |
+
+`Lungs::set_articulation` stores the nasal and mouth targets. `controls` is the same function the tick uses. `Articulation::to_bytes` is sixteen little-endian bytes. The baseline voice is still not an input. Category names are still not read. Fatigue's effect on pressure stays the S45 path (depth and group length). The glottal shift is the extra sign: more fatigue, a more open quotient.

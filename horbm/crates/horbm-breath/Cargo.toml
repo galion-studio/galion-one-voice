@@ -3,7 +3,7 @@
 
 [package]
 name = "horbm-breath"
-description = "Samantha's lungs on the 80 ms clock. Volume, phrase pauses, subglottal pressure, and a procedural inhale."
+description = "Samantha's lungs on the 80 ms clock. Volume, phrase pauses, subglottal pressure, a procedural inhale, and glottal, nasal, and mouth controls."
 version.workspace = true
 edition.workspace = true
 license.workspace = true

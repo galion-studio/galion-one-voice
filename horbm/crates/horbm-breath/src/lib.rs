@@ -13,7 +13,9 @@
 //!    would run out, or at a sentence or clause boundary.
 //! 2. [`Lungs::tick`] steps lung volume, phase, pressure, and flow for one
 //!    80 ms frame. `speaking` is the me band. Quiet is the you band on that
-//!    same call: recover, do not spend the speech budget.
+//!    same call: recover, do not spend the speech budget. The same frame
+//!    carries glottal open quotient, breathiness, nasal coupling, and mouth
+//!    openness. Those do not change the lungs sample.
 //!
 //! The lungs sample is [`galion_emotion_core::Breath`]: phase, volume, and
 //! flow. `galion-source-filter` (PR 305) reads that value in
@@ -32,6 +34,7 @@
 
 #![forbid(unsafe_code)]
 
+mod glottis;
 mod lungs;
 mod noise;
 mod plan;
@@ -42,6 +45,7 @@ use galion_emotion_core::{
 };
 
 pub use galion_emotion_core::{Breath, BreathPhase, FRAME_MS as EMOTION_FRAME_MS};
+pub use glottis::{controls, open_quotient_from_rd, Articulation, GlottisError};
 pub use lungs::Lungs;
 pub use plan::{plan_pauses, Pause, PauseWhy, Plan};
 
@@ -317,6 +321,14 @@ pub struct Frame {
     pub loudness_gain: f32,
     /// The me band should not phonate. Air is moving in, or the phrase ended.
     pub pause: bool,
+    /// Fant open quotient while speaking. Abduction otherwise.
+    pub open_quotient: f32,
+    /// 1 when this frame is air. Rd mix while speaking.
+    pub breathiness: f32,
+    /// 0 oral, 1 nasal. Caller target, reduced when health is low.
+    pub nasal_coupling: f32,
+    /// 0 closed, 1 open. Caller target, reduced by fatigue while speaking.
+    pub mouth_openness: f32,
 }
 
 impl Frame {
