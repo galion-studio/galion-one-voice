@@ -5,7 +5,7 @@
 //! The heuristic picks the move. The bandit may count that move when it is
 //! switched on and learn consent is granted. Counting does not change the
 //! next move. [`OfflineBandit::choose_steered`] is the optional count tie-in.
-//! `Dialogue::decide` does not call it.
+//! `Dialogue::decide` and `Dialogue::decide_held` do not call it.
 
 use super::cues::{self, CheckInPhrase};
 use super::filter::{self, Legal};
@@ -62,6 +62,12 @@ enum Offer<'a> {
 /// Heuristic scores, then the persona and truth mask. Higher wins.
 /// Ties keep the earlier move in [`Move::ALL`].
 pub fn choose(choice: &Choice<'_>) -> (Move, ReplyPlan, f32) {
+    choose_held(choice, false)
+}
+
+/// [`choose`] when `hold_topic` is false. A hold that selected
+/// [`Move::OfferTopic`] becomes [`Move::Ask`] before the offer line is built.
+pub(super) fn choose_held(choice: &Choice<'_>, hold_topic: bool) -> (Move, ReplyPlan, f32) {
     let sourced = filter::is_sourced_truth(choice.reply, choice.sources, choice.research);
     let hits = choice.research;
     let stop = cues::is_stop(choice.heard, choice.intent);
@@ -134,7 +140,13 @@ pub fn choose(choice: &Choice<'_>) -> (Move, ReplyPlan, f32) {
             vent,
         },
     );
-    let chosen = argmax(scores);
+    let mut chosen = argmax(scores);
+    // A hold does not open a new topic. The offer was already selected, so
+    // this becomes ask. Comfort can sit just under the offer; do not drop
+    // the offer and take that next score. The offer line is not built.
+    if hold_topic && chosen == Move::OfferTopic {
+        chosen = Move::Ask;
+    }
     let plan = plan_for(chosen, choice, sourced, cite_source, cite_clause, offer);
     (chosen, plan, propensity(chosen))
 }
