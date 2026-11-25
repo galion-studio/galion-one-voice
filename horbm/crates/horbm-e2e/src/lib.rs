@@ -18,6 +18,8 @@
 #![forbid(unsafe_code)]
 
 mod buffer;
+mod corpus;
+mod model;
 mod mouth;
 mod probe;
 mod recognizer;
@@ -27,6 +29,7 @@ mod stages;
 mod vad;
 mod wav;
 
+pub use corpus::SENTENCES;
 pub use galion_emotion_core::{EmotionCore, IntentMsg, FRAME_MS as EMOTION_FRAME_MS};
 pub use report::Report;
 pub use run::{refuse_other_persona, run, Outcome, Sense, SCRIPT, TRIALS};
@@ -136,6 +139,13 @@ mod tests {
         assert_eq!(percentile_nearest(&samples, 0.50), Some(3));
         assert_eq!(percentile_nearest(&samples, 0.95), Some(5));
         assert_eq!(percentile_nearest(&[], 0.50), None);
+    }
+
+    #[test]
+    fn the_generated_set_starts_with_the_kettle_line() {
+        assert_eq!(SENTENCES[0], SCRIPT);
+        assert_eq!(SENTENCES.len(), 11);
+        assert!(SENTENCES.iter().all(|line| !line.is_empty()));
     }
 
     #[test]
