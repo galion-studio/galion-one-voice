@@ -21,6 +21,8 @@ use crate::clock::{
     CHUNK_CHANNEL_BOUND, FRAME_CHANNEL_BOUND, HEARTBEAT_MS, HEARTBEAT_PLAY_SAMPLES,
     MAX_UTTERANCE_MS, TURN_CHANNEL_BOUND,
 };
+// Demo uses these without naming the stage-trait module.
+pub(crate) use crate::samantha_traits::{mic_channel, WaitGate};
 use crate::samantha_traits::{
     Asr, AudioFrame, AudioIn, AudioOut, MoodTick, Pad, ReplyEngine, Tts, Vad, VadEvent,
 };
@@ -604,9 +606,13 @@ fn emit_turn(turns: &TurnMailbox, floor: &Floor, buf: &mut Vec<AudioFrame>, next
         listen_audio_ms,
         ended_at: Instant::now(),
     };
-    if turns.publish(heard) {
-        floor.set_epoch(epoch, Phase::Thinking);
-    }
+    // Thinking has to be on the watch before the turn is visible. `publish`
+    // wakes think on another worker, and that worker can reach Speaking
+    // before this call returns. A later Thinking send replaces Speaking
+    // on the watch while the mouth is still inside the gated speak, so
+    // `/state` and `Handle::phase` both stay on Thinking.
+    let _ = floor.set_epoch(epoch, Phase::Thinking);
+    let _ = turns.publish(heard);
 }
 
 struct ThinkIn<A, R, M> {

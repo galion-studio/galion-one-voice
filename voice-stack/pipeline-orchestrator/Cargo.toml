@@ -3,7 +3,7 @@
 
 [package]
 name = "galion-sam-orch"
-description = "Samantha conversation loop: listen, end of turn, think, speak, barge-in. Package name matches the swarm workspace map. Standalone crate, not a member of the Galion Voice workspace."
+description = "Conversation loop: listen, end of turn, think, speak, barge-in. Package name matches the swarm workspace map. Standalone crate, not a member of the Galion Voice workspace."
 version = "0.0.1"
 edition = "2021"
 license = "MIT"

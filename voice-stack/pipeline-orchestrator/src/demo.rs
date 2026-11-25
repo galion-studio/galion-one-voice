@@ -6,11 +6,8 @@
 //! not turned into extra words.
 
 use crate::clock::{STAGE_BAR_US, VAD_HANG_MS};
-use crate::pipeline::{Handle, Phase, Pipeline, TurnReport};
-use crate::samantha_traits::{
-    mic_channel, AudioFrame, EnergyVad, FakeAsr, FakeReply, FakeTts, HoldMood, MemorySpeaker, Pad,
-    WaitGate,
-};
+use crate::pipeline::{mic_channel, Handle, Phase, Pipeline, TurnReport, WaitGate};
+use crate::{AudioFrame, EnergyVad, FakeAsr, FakeReply, FakeTts, HoldMood, MemorySpeaker, Pad};
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
