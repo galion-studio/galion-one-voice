@@ -67,6 +67,9 @@
 //! clause. [`Brain::samantha_nudge`] steps the same GEMI note on the moment
 //! clock. [`Brain::tick_frame`] decays the goals and counts silence. It
 //! still does not step the moment.
+//!
+//! [`LearnPass`] is not part of that order. It is the offline learn pass.
+//! Learn consent is [`LearnConfig::granted`]. [`Brain::turn`] does not call it.
 
 #![forbid(unsafe_code)]
 
@@ -74,6 +77,7 @@ mod brain;
 mod cards;
 mod dialogue;
 mod keys;
+mod learn;
 mod memory;
 mod retrieve;
 mod route;
@@ -103,6 +107,10 @@ pub use horbm_inner::{
 pub use horbm_keys::StringKeyArena;
 pub use horbm_persona::{
     LegalMovePort, MoveClaim, MoveVerdict, Persona, PersonaError, StyleHook, UNKNOWN_LINE,
+};
+pub use learn::{
+    ClauseSource, LearnAudit, LearnConfig, LearnError, LearnPass, LearnedRow, LEARN_PACK_DB,
+    LEARN_PACK_LIVE, LEARN_PACK_NEXT, LEARN_PACK_RETIRING,
 };
 pub use memory::{about_the_person, pin_command, EpisodicStore};
 pub use retrieve::{

@@ -3,7 +3,7 @@
 
 [package]
 name = "horbm"
-description = "One HORBM turn, and the in-process retrieval thread that publishes a MemoryHit cell."
+description = "One HORBM turn, and the in-process retrieval thread that publishes a MemoryHit cell. Offline learn pass writes a sourced diary row only when learn consent is granted."
 version = "0.0.1"
 edition = "2021"
 license = "MIT"
