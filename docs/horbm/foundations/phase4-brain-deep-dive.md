@@ -75,12 +75,18 @@ cargo test --manifest-path horbm/Cargo.toml -p horbm-brain a_turn_produces_the_f
 cargo test --manifest-path horbm/Cargo.toml -p horbm a_card_hit_is_the_stored_clause_with_a_two_word_lead -- --nocapture
 ```
 
-The phone slot, with Piper left on its existing warm-or-absent path:
+The phone slot, with Piper left on its existing warm-or-absent path. This command is Unix-only. `--features cascade` compiles `galion-cores` and the phone ASR parent, which use `std::os::unix`.
 
 ```text
 cargo test -p galion-cascade --features cascade horbm_chat_turn_is_the_fixture_clause_and_does_not_speak -- --nocapture
 ```
 
-Result on this branch, Linux, rustc 1.85.0: all four commands passed. The chat turn reply was `The kettle is on the hob.` The lead was `The kettle`. The miss was `I don't know.` No audio file was read.
+On Windows the same assertion is the first command above, without `--features cascade`:
 
-Laptop commands are the same ones in the pull request's Laptop test section, run from `G:\galion\work\galion-one-voice`.
+```text
+cargo test -p galion-cascade a_chat_turn_produces_the_fixture_clause -- --nocapture
+```
+
+Result on this branch, Linux, rustc 1.85.0: the four commands that do not need a Windows host passed. The chat turn reply was `The kettle is on the hob.` The lead was `The kettle`. The miss was `I don't know.` No audio file was read.
+
+Laptop commands from `G:\galion\work\galion-one-voice` omit `--features cascade`.

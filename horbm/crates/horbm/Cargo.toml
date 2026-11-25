@@ -3,7 +3,7 @@
 
 [package]
 name = "horbm"
-description = "One HORBM turn: empathy mood, then cards, then the localhost research gateway, then an honest miss."
+description = "One HORBM turn, and the in-process retrieval thread that publishes a MemoryHit cell."
 version = "0.0.1"
 edition = "2021"
 license = "MIT"
@@ -13,9 +13,12 @@ rust-version = "1.85"
 [dependencies]
 horbm-brain = { path = "../horbm-brain" }
 horbm-inner = { path = "../horbm-inner" }
+horbm-keys = { path = "../../../crates/horbm-keys", default-features = false }
 galion-research-gateway = { path = "../../../voice-stack/research-gateway" }
 galion-sam-empathy = { path = "../../../voice-stack/empathy" }
 galion-emotion-core = { path = "../../../crates/galion-emotion-core" }
 horbm-persona = { path = "../horbm-persona" }
+# In-process diary. Root manifest of galion-knowledge; not a vendored copy.
+horbm-memory = { git = "https://github.com/galion-studio/galion-knowledge.git", rev = "974e594444448597741372fef578142c46d28566" }
 serde_json = "1"
 sha2 = "0.10"

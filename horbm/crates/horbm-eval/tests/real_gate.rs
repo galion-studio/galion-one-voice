@@ -41,7 +41,21 @@ fn the_real_linux_ear_and_mouth_round_trip() {
     assert_eq!(latency["clock"], "wall");
     let asr = report.scores.asr.expect("asr score");
     assert!(asr.pass, "{:?}", asr.failures);
-    let prosody = asr.detail.expect("asr detail");
-    assert_eq!(prosody["prosody"], "on");
-    assert!(prosody["sensed_frames"].as_u64().unwrap_or(0) > 0);
+    let detail = asr.detail.expect("asr detail");
+    assert_eq!(detail["prosody"], "on");
+    assert!(detail["sensed_frames"].as_u64().unwrap_or(0) > 0);
+    let wer = detail["held_out_wer"].as_f64().expect("held-out wer");
+    let cap = detail["wer_max"].as_f64().expect("wer max");
+    assert!(wer <= cap, "held-out wer {wer} over {cap}");
+    assert!(detail["held_out_n"].as_u64().unwrap_or(0) >= 20);
+    assert!(detail["script_wer"].as_f64().is_some());
+    assert_eq!(detail["decode"], "free+keyword");
+    assert_eq!(detail["yeah"], "yeah");
+    assert_eq!(detail["sad"], "i am sad");
+    let rtf = detail["rtf"].as_f64().expect("rtf");
+    assert!(rtf < 1.0, "rtf {rtf}");
+    assert!(detail["script_rtf"].as_f64().expect("script rtf") < 1.0);
+    assert!(detail["model_bytes"].as_u64().unwrap_or(0) > 0);
+    let heard = latency["backchannel_heard"].as_str().unwrap_or("");
+    assert_eq!(heard, "yeah");
 }
