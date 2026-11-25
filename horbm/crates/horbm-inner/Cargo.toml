@@ -3,7 +3,7 @@
 
 [package]
 name = "horbm-inner"
-description = "Samantha's inner life: slower cares, wants, and expectations. Speaks the existing GEMI intent. Session only."
+description = "Inner life for any persona: slower cares, wants, and expectations. Speaks the existing GEMI intent. Session only."
 version.workspace = true
 edition.workspace = true
 license.workspace = true

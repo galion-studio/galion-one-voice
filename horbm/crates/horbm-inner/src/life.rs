@@ -1,20 +1,22 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Galion Labs
-//! Samantha's session goals. One turn updates them. One tick decays them.
+//! Session goals for one persona. One turn updates them. One tick decays them.
 //!
-//! The block is four numbers: care, curiosity, help, expect. It does not
-//! store the words, the listener point, or a user id. Learning a new care
-//! stays in the older token layer. Remember stays deny: nothing here is a
-//! fact about the person.
+//! The block is four numbers: care, curiosity, help, expect. The persona id
+//! is a fixed ASCII slot the host filled in. This module does not store the
+//! words, the listener point, or a user id. Learning a new care stays in the
+//! older token layer. Remember stays deny: nothing here is a fact about the
+//! person.
 
 use galion_emotion::text_affect;
 use galion_emotion_core::{CoreError, EmotionCore, IntentMsg};
 
 use crate::msg::{InnerMsg, MsgDir, Verb};
 use crate::{
-    CARE_HOME, CARE_SAD, CHECKIN_GAP_MS, CHECKIN_MS, CURIOSITY_ASK, CURIOSITY_HOME, DECAY_KEEP_DEN,
-    DECAY_KEEP_NUM, EAR_CONFIDENCE, EXPECT_HOME, EXPECT_QUESTION, HELP_HOME, HELP_QUESTION,
-    HELP_SAD, SAD_EAR_VALENCE, SAD_WORD_VALENCE, TICK_MS, TURN_STEP, WAIT_MS,
+    CARE_ABOVE_REST, CARE_HOME, CARE_SAD, CHECKIN_GAP_MS, CHECKIN_MS, CURIOSITY_ASK,
+    CURIOSITY_HOME, DECAY_KEEP_DEN, DECAY_KEEP_NUM, EAR_CONFIDENCE, EXPECT_HOME, EXPECT_QUESTION,
+    HELP_HOME, HELP_QUESTION, HELP_SAD, PERSONA_ID_BYTES, SAD_EAR_VALENCE, SAD_WORD_VALENCE,
+    TICK_MS, TURN_STEP, WAIT_MS,
 };
 
 /// How many 80 ms decay steps one tick will run. A longer `dt` is clipped.
@@ -80,6 +82,7 @@ pub struct DialogueLean {
 }
 
 impl DialogueLean {
+    /// Rest lean at the standalone home.
     pub const fn rest() -> Self {
         Self {
             verb: Verb::Hold,
@@ -119,9 +122,74 @@ impl InnerMsg {
     }
 }
 
-/// Four slower goals and the silence clock. Copy. Session only.
+/// Four home levels. No persona id. The host fills this from baseline numbers.
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct SamanthaInner {
+pub struct InnerHome {
+    pub care: f32,
+    pub curiosity: f32,
+    pub help: f32,
+    pub expect: f32,
+}
+
+impl InnerHome {
+    /// Standalone home. Same bits as the historical `*_HOME` constants.
+    pub const STANDALONE: Self = Self {
+        care: CARE_HOME,
+        curiosity: CURIOSITY_HOME,
+        help: HELP_HOME,
+        expect: EXPECT_HOME,
+    };
+
+    /// Home from a baseline valence and three goal levels.
+    ///
+    /// Care is [`CARE_ABOVE_REST`] plus `valence`, then clamped to `0..=1`.
+    /// `curiosity`, `help`, and `expect` are kept as given when each one is
+    /// finite and inside `0..=1`. A non-finite input, or a goal outside
+    /// `0..=1`, is refused. The value has no persona id.
+    #[must_use]
+    pub const fn from_baseline(
+        valence: f32,
+        curiosity: f32,
+        help: f32,
+        expect: f32,
+    ) -> Option<Self> {
+        if !valence.is_finite()
+            || !curiosity.is_finite()
+            || !help.is_finite()
+            || !expect.is_finite()
+        {
+            return None;
+        }
+        if !in_unit(curiosity) || !in_unit(help) || !in_unit(expect) {
+            return None;
+        }
+        let care = CARE_ABOVE_REST + valence;
+        if !care.is_finite() {
+            return None;
+        }
+        let care = if care < 0.0 {
+            0.0
+        } else if care > 1.0 {
+            1.0
+        } else {
+            care
+        };
+        Some(Self {
+            care,
+            curiosity,
+            help,
+            expect,
+        })
+    }
+}
+
+/// Four slower goals, the home they decay toward, and the silence clock.
+///
+/// Copy. Session only. The persona id is a [`PERSONA_ID_BYTES`] ASCII slot.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct PersonaInner {
+    id: [u8; PERSONA_ID_BYTES],
+    home: InnerHome,
     care: f32,
     curiosity: f32,
     help: f32,
@@ -137,19 +205,50 @@ pub struct SamanthaInner {
     last: InnerMsg,
 }
 
-impl Default for SamanthaInner {
+impl Default for PersonaInner {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl SamanthaInner {
+impl PersonaInner {
+    /// Standalone home, with an empty persona id.
+    ///
+    /// Deprecated: use PersonaInner / InnerHome.
+    /// The four levels match the historical home constants bit for bit.
+    /// A host passes the configured id to [`Self::with_home_for`].
     pub const fn new() -> Self {
+        Self::from_clean([0; PERSONA_ID_BYTES], InnerHome::STANDALONE)
+    }
+
+    /// Session at `home` with an empty persona id.
+    ///
+    /// Finite levels are clamped to `0..=1`. A non-finite level becomes 0.
+    /// In-range finite levels are stored bit for bit.
+    #[must_use]
+    pub fn with_home(home: InnerHome) -> Self {
+        Self::from_clean([0; PERSONA_ID_BYTES], cleaned(home))
+    }
+
+    /// Session for `id` at `home`.
+    ///
+    /// `id` is copied into a [`PERSONA_ID_BYTES`] ASCII slot. Empty is
+    /// allowed. Any other id must fit the slot and use the persona token
+    /// shape: a lowercase letter, then lowercase letters, digits, or `-`.
+    /// Anything else is refused. Tick and turn do not allocate.
+    #[must_use]
+    pub fn with_home_for(id: &str, home: InnerHome) -> Option<Self> {
+        Some(Self::from_clean(pack_id(id)?, cleaned(home)))
+    }
+
+    const fn from_clean(id: [u8; PERSONA_ID_BYTES], home: InnerHome) -> Self {
         Self {
-            care: CARE_HOME,
-            curiosity: CURIOSITY_HOME,
-            help: HELP_HOME,
-            expect: EXPECT_HOME,
+            id,
+            home,
+            care: home.care,
+            curiosity: home.curiosity,
+            help: home.help,
+            expect: home.expect,
             clock_ms: 0,
             quiet_ms: 0,
             last_checkin_ms: None,
@@ -157,8 +256,33 @@ impl SamanthaInner {
             ear_sense: false,
             turns: 0,
             ticks: 0,
-            last: InnerMsg::rest(CARE_HOME, CURIOSITY_HOME, HELP_HOME, EXPECT_HOME),
+            last: InnerMsg::rest(home.care, home.curiosity, home.help, home.expect),
         }
+    }
+
+    /// Id the host passed to [`Self::with_home_for`]. Empty for [`Self::new`].
+    pub fn persona_id(&self) -> &str {
+        let end = self
+            .id
+            .iter()
+            .position(|&byte| byte == 0)
+            .unwrap_or(self.id.len());
+        core::str::from_utf8(&self.id[..end]).unwrap_or_default()
+    }
+
+    /// Home the four goals decay toward.
+    pub const fn home(self) -> InnerHome {
+        self.home
+    }
+
+    /// Put the four goals back on this home. The persona id stays.
+    #[must_use]
+    pub fn reset(&mut self) -> InnerMsg {
+        self.care = self.home.care;
+        self.curiosity = self.home.curiosity;
+        self.help = self.home.help;
+        self.expect = self.home.expect;
+        self.emit(self.clock_ms, Verb::Hold)
     }
 
     pub const fn care(self) -> f32 {
@@ -347,10 +471,10 @@ impl SamanthaInner {
 
     fn decay(&mut self, frames: u32) {
         for _ in 0..frames {
-            self.care = keep(self.care, CARE_HOME);
-            self.curiosity = keep(self.curiosity, CURIOSITY_HOME);
-            self.help = keep(self.help, HELP_HOME);
-            self.expect = keep(self.expect, EXPECT_HOME);
+            self.care = keep(self.care, self.home.care);
+            self.curiosity = keep(self.curiosity, self.home.curiosity);
+            self.help = keep(self.help, self.home.help);
+            self.expect = keep(self.expect, self.home.expect);
         }
     }
 
@@ -375,6 +499,41 @@ impl SamanthaInner {
         self.last = msg;
         msg
     }
+}
+
+const fn in_unit(value: f32) -> bool {
+    value >= 0.0 && value <= 1.0
+}
+
+fn cleaned(home: InnerHome) -> InnerHome {
+    InnerHome {
+        care: unit(home.care),
+        curiosity: unit(home.curiosity),
+        help: unit(home.help),
+        expect: unit(home.expect),
+    }
+}
+
+fn pack_id(id: &str) -> Option<[u8; PERSONA_ID_BYTES]> {
+    let bytes = id.as_bytes();
+    if bytes.len() > PERSONA_ID_BYTES || !id_shape(bytes) {
+        return None;
+    }
+    let mut slot = [0u8; PERSONA_ID_BYTES];
+    slot[..bytes.len()].copy_from_slice(bytes);
+    Some(slot)
+}
+
+fn id_shape(bytes: &[u8]) -> bool {
+    if bytes.is_empty() {
+        return true;
+    }
+    if !bytes[0].is_ascii_lowercase() {
+        return false;
+    }
+    bytes[1..]
+        .iter()
+        .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || *byte == b'-')
 }
 
 fn step_toward(level: f32, target: f32) -> f32 {

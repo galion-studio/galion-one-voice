@@ -6,7 +6,7 @@
 //! emotion core already steps are [`galion_emotion_core::IntentMsg`]: 72
 //! bytes, magic `GEMI`, version 1. [`InnerMsg::to_gemi`] writes that record.
 //! [`InnerMsg::from_gemi`] reads one. Goal levels ride the serde note. They
-//! are not packed into the GEMI factor slots, so a step cannot write her body.
+//! are not packed into the GEMI factor slots, so a step cannot write the baseline.
 
 use galion_emotion::consent_bits::{ADAPT, REMEMBER, SENSE, SHARE};
 use galion_emotion_core::{
@@ -18,7 +18,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum MsgDir {
-    /// Inner life to MnE. Her own intent.
+    /// Inner life to MnE. This layer's own intent.
     Out,
     /// MnE or the ear to inner life. What was perceived.
     In,
@@ -30,13 +30,13 @@ pub enum MsgDir {
 pub enum Verb {
     /// Sad listener. Warmer and softer on the moment.
     Comfort,
-    /// She wants to ask one thing.
+    /// Ask one thing.
     Ask,
     /// Silence. Keep company. Do not open a topic.
     Wait,
     /// Stay with them. The own-intent verb the ear also uses.
     With,
-    /// They asked. She expects to answer.
+    /// They asked. An answer is expected.
     Answer,
     /// One gentle reach after a long quiet. Rate-limited.
     CheckIn,
@@ -77,7 +77,7 @@ impl Verb {
 
 /// One note. Copy. No transcript and no user id.
 ///
-/// On the way out, `valence`..`approach` are pulls from her baseline.
+/// On the way out, `valence`..`approach` are pulls off the voice baseline.
 /// On the way in (`verb` = `heard`), `valence` and `arousal` are the
 /// listener's point and `strength` is how sure that reading is.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]

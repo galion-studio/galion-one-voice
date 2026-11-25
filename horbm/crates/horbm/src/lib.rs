@@ -84,11 +84,12 @@
 //! by the retrieval thread.
 //!
 //! The configured persona's slower layer holds care, curiosity, help, and
-//! expect. [`Brain::turn`] lets that layer bias the pace and, when the act
-//! is comfort, does not arm the research ask. It does not replace the spoken
-//! clause. The same GEMI note is stepped on the moment clock.
-//! [`Brain::tick_frame`] decays the goals and counts silence. It still does
-//! not step the moment.
+//! expect on [`PersonaInner`]. A host fills an [`InnerHome`] from that
+//! persona's baseline numbers and passes the id in. [`Brain::turn`] lets
+//! that layer bias the pace and, when the act is comfort, does not arm the
+//! research ask. It does not replace the spoken clause. The same GEMI note
+//! is stepped on the moment clock. [`Brain::tick_frame`] decays the goals
+//! and counts silence. It still does not step the moment.
 //!
 //! [`LearnPass`] is not part of that order. It is the offline learn pass.
 //! Learn consent is [`LearnConfig::granted`]. [`Brain::turn`] does not call it.
@@ -125,9 +126,9 @@ pub use galion_research_gateway::RESEARCH_CAP;
 pub use galion_sam_empathy::{Intent, PronounClass, FRAME_MS};
 pub use horbm_brain::{Answer, Heuristic, MarkKind, SidebandMark};
 pub use horbm_inner::{
-    DialogueLean, Heard, InnerMsg, MsgDir, Perceived, SamanthaInner, Verb, CARE_HOME,
-    CHECKIN_GAP_MS, CHECKIN_MS, CURIOSITY_HOME, EXPECT_HOME, HELP_HOME, REMEMBER_LOCK, TICK_MS,
-    WAIT_MS,
+    DialogueLean, Heard, InnerHome, InnerMsg, MsgDir, Perceived, PersonaInner, SamanthaInner, Verb,
+    CARE_HOME, CHECKIN_GAP_MS, CHECKIN_MS, CURIOSITY_HOME, EXPECT_HOME, HELP_HOME, REMEMBER_LOCK,
+    TICK_MS, WAIT_MS,
 };
 pub use horbm_keys::StringKeyArena;
 pub use horbm_persona::{
