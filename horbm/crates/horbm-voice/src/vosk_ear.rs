@@ -46,6 +46,74 @@ impl<A: Asr> Ear for VoskEar<A> {
     }
 }
 
+/// Energy endpointer in front of a streaming [`Asr`].
+///
+/// The gate decides the turn. [`Asr::finish`] runs on that turn-end, not on a
+/// separate host signal. Echo frames are not pushed. Compiled only with
+/// `--features vosk`. `FakeAsr` is the test double and does not load a model.
+pub struct StreamingEar<A> {
+    energy: crate::energy::EnergyEar,
+    asr: A,
+}
+
+impl<A> StreamingEar<A> {
+    pub fn new(asr: A) -> Self {
+        Self {
+            energy: crate::energy::EnergyEar::new(),
+            asr,
+        }
+    }
+}
+
+impl<A: Asr> Ear for StreamingEar<A> {
+    fn id(&self) -> &str {
+        self.asr.name()
+    }
+
+    fn note_playback(&mut self, pcm: &[i16]) {
+        self.energy.note_playback(pcm);
+    }
+
+    fn poll(&mut self, pcm: &[i16]) -> EarEvent {
+        let event = self.energy.poll(pcm);
+        let open = self.energy.user_turn_open();
+        match event {
+            EarEvent::Onset => push_keep(&mut self.asr, pcm, EarEvent::Onset),
+            EarEvent::End(_) => finish_turn(&mut self.asr, pcm),
+            EarEvent::Quiet if open => match self.asr.push_pcm(pcm) {
+                Ok(events) => match map_last(&events) {
+                    EarEvent::Quiet => EarEvent::Quiet,
+                    other => other,
+                },
+                Err(err) => EarEvent::Fault(err.message().to_string()),
+            },
+            EarEvent::User | EarEvent::Barge => push_keep(&mut self.asr, pcm, event),
+            other => other,
+        }
+    }
+}
+
+fn push_keep<A: Asr>(asr: &mut A, pcm: &[i16], event: EarEvent) -> EarEvent {
+    match asr.push_pcm(pcm) {
+        Ok(_) => event,
+        Err(err) => EarEvent::Fault(err.message().to_string()),
+    }
+}
+
+fn finish_turn<A: Asr>(asr: &mut A, pcm: &[i16]) -> EarEvent {
+    if let Err(err) = asr.push_pcm(pcm) {
+        return EarEvent::Fault(err.message().to_string());
+    }
+    match asr.finish() {
+        Ok(events) => match map_last(&events) {
+            EarEvent::Quiet => EarEvent::end(""),
+            EarEvent::Partial(text) | EarEvent::End(text) => EarEvent::End(text),
+            other => other,
+        },
+        Err(err) => EarEvent::Fault(err.message().to_string()),
+    }
+}
+
 fn map_last(events: &[AsrEvent]) -> EarEvent {
     let Some(last) = events.last() else {
         return EarEvent::Quiet;
@@ -94,5 +162,19 @@ mod tests {
         assert_eq!(waited, u64::from(FRAME_MS));
         assert_eq!(voice.mouth().id(), "fake");
         assert_eq!(voice.ear_mut().id(), "fake");
+    }
+
+    #[test]
+    fn the_energy_endpointer_closes_the_stream_without_a_host_mark() {
+        let mut ear = StreamingEar::new(FakeAsr::new("where is the kettle"));
+        let quiet = vec![0i16; HEARTBEAT_SAMPLES];
+        let loud = (0..HEARTBEAT_SAMPLES)
+            .map(|index| ((index as f64 * 0.2).sin() * 8000.0) as i16)
+            .collect::<Vec<_>>();
+        assert_eq!(ear.poll(&quiet), EarEvent::Quiet);
+        assert_eq!(ear.poll(&loud), EarEvent::Onset);
+        let mid = ear.poll(&loud);
+        assert!(matches!(mid, EarEvent::Partial(_)), "{mid}");
+        assert_eq!(ear.poll(&quiet), EarEvent::end("where is the kettle"));
     }
 }

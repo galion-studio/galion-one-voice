@@ -9,6 +9,7 @@ use galion_emotion_core::{
     ConductorCue, EmotionCore, InnerLife, InnerTurn, IntentMsg, MomentState,
 };
 use galion_sam_empathy::{Empathy, PronounClass, TickIn, FRAME_MS};
+use horbm_persona::{MoveClaim, MoveVerdict, Persona, PersonaError};
 
 use horbm_brain::{
     classify, pick, split_clause, Answer, Heuristic, Retrieved, Retriever, SidebandMark,
@@ -80,6 +81,7 @@ pub struct Brain {
     card_count: usize,
     emotion: EmotionCore,
     inner: InnerLife,
+    persona: Persona,
     retrieval: Option<RetrievalThread>,
     retrieval_epoch: u64,
     dialogue: Dialogue,
@@ -193,6 +195,7 @@ impl Brain {
         research: Option<Box<dyn ResearchAsk + Send>>,
     ) -> Self {
         let card_count = cards.len();
+        let (emotion, inner, persona) = install(development_persona());
         Self {
             empathy: Empathy::new(),
             cards: Box::new(cards),
@@ -201,8 +204,9 @@ impl Brain {
             gaps: Vec::new(),
             meta: resting_meta(),
             card_count,
-            emotion: EmotionCore::at_rest(),
-            inner: InnerLife::seeded(),
+            emotion,
+            inner,
+            persona,
             retrieval: None,
             retrieval_epoch: 0,
             dialogue: Dialogue::new(),
@@ -232,6 +236,25 @@ impl Brain {
     /// Clauses loaded at `open` or `with_cards`. The example kettle directory is one.
     pub fn cards(&self) -> usize {
         self.card_count
+    }
+
+    /// Read the persona file once, then open cards the way [`Self::open`] does.
+    ///
+    /// `None` loads Samantha. An explicit path replaces her. An unreadable or
+    /// invalid file returns the error and does not build a brain.
+    pub fn boot(
+        memory_db: &Path,
+        knowledge_dir: &Path,
+        cases: &Path,
+        persona_file: Option<&Path>,
+    ) -> Result<Self, PersonaError> {
+        let persona = match persona_file {
+            Some(path) => Persona::load(path)?,
+            None => development_persona(),
+        };
+        let mut brain = Self::open(memory_db, knowledge_dir, cases);
+        brain.install_persona(persona);
+        Ok(brain)
     }
 
     /// Read `knowledge_dir` when it is already a directory. A missing path is
@@ -329,9 +352,26 @@ impl Brain {
         self.emotion.step(intent)
     }
 
-    /// The inner life. Persona and memory are not stored here.
+    /// The character loaded at boot. The moment step does not write it.
+    pub fn persona(&self) -> &Persona {
+        &self.persona
+    }
+
+    /// Legal-move port. The dialogue manager calls this with one candidate.
+    pub fn admit_move(&self, claim: MoveClaim<'_>) -> MoveVerdict {
+        self.persona.verdict(claim)
+    }
+
+    /// The inner life. Memory is not stored here.
     pub fn inner(&self) -> &InnerLife {
         &self.inner
+    }
+
+    fn install_persona(&mut self, persona: Persona) {
+        let (emotion, inner, persona) = install(persona);
+        self.emotion = emotion;
+        self.inner = inner;
+        self.persona = persona;
     }
 
     /// One dialogue turn of cares, wants, and expects. Emits a GEMI intent
@@ -418,7 +458,7 @@ impl Brain {
         let gathered = self.gather(&query_owned);
         let reply = effective_reply(&gathered.spoke).to_string();
         let sources = gathered.spoke.sources.clone();
-        let decision = self.dialogue.decide(DecideIn {
+        let mut decision = self.dialogue.decide(DecideIn {
             heard,
             intent: self.meta.intent,
             reply: &reply,
@@ -428,6 +468,30 @@ impl Brain {
             dominance: self.meta.dominance,
             e: self.meta.e,
         });
+        if let Some(chosen) = decision.chosen {
+            let (spoken, spoken_sources) = match &decision.plan {
+                ReplyPlan::Keep => (reply.as_str(), sources.as_slice()),
+                ReplyPlan::Replace { reply, sources, .. } => (reply.as_str(), sources.as_slice()),
+            };
+            let claims_fact = matches!(chosen, Move::Answer | Move::Cite);
+            let verdict = self.admit_move(MoveClaim {
+                tag: chosen.as_str().as_bytes(),
+                claims_fact,
+                has_card: claims_fact && fact_backed(spoken, spoken_sources),
+                sympathy_script: sympathy_script(spoken),
+            });
+            if verdict == MoveVerdict::Forbid {
+                decision = Decision {
+                    chosen: Some(Move::Ask),
+                    plan: ReplyPlan::Replace {
+                        reply: UNKNOWN_REPLY.to_string(),
+                        sources: vec!["honest:unknown".to_string()],
+                        evidence: Vec::new(),
+                    },
+                    propensity: 0.4,
+                };
+            }
+        }
         if matches!(decision.plan(), ReplyPlan::Keep) {
             if let Some(gap) = gathered.gap {
                 self.gaps.push(gap);
@@ -602,6 +666,16 @@ impl Brain {
     }
 }
 
+fn development_persona() -> Persona {
+    Persona::samantha().expect("samantha.toml is the development persona")
+}
+
+fn install(persona: Persona) -> (EmotionCore, InnerLife, Persona) {
+    let emotion = EmotionCore::from_baseline(persona.baseline());
+    let inner = persona.inner_life();
+    (emotion, inner, persona)
+}
+
 fn resting_meta() -> MoodMeta {
     let tick = Empathy::new().tick(TickIn {
         inbound: None,
@@ -626,6 +700,34 @@ fn meta_of(tick: &galion_sam_empathy::TickOut) -> MoodMeta {
         pause_ms: tick.prosody.speaking.pre_pause_ms,
         named: tick.named.map(|name| name.word()),
     }
+}
+
+fn fact_backed(reply: &str, sources: &[String]) -> bool {
+    let reply = reply.trim();
+    if reply.is_empty() || reply == UNKNOWN_REPLY {
+        return false;
+    }
+    sources.iter().any(|source| {
+        ["card:", "retrieve:", "fixture:", "research:"]
+            .iter()
+            .any(|prefix| source.starts_with(prefix) && source.len() > prefix.len())
+    })
+}
+
+fn sympathy_script(reply: &str) -> bool {
+    let trimmed = reply.trim().trim_end_matches(['.', '!', '?']).trim();
+    matches!(
+        trimmed.to_ascii_lowercase().as_str(),
+        "i hear you"
+            | "that sounds so hard"
+            | "i'm here for you no matter what"
+            | "i feel that in my soul"
+            | "that sounds hard"
+            | "i'm so sorry you're going through this"
+            | "let's slow down"
+            | "i know how you feel"
+            | "that must be so difficult"
+    )
 }
 
 fn elapsed_us(elapsed: std::time::Duration) -> u32 {

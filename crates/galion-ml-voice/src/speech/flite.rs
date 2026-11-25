@@ -47,9 +47,11 @@ type DeleteWaveFn = unsafe extern "C" fn(*mut CstWave);
 
 #[cfg(unix)]
 struct Lib { text_to_wave: TextToWaveFn, delete_wave: DeleteWaveFn, voice: usize }
+#[cfg(unix)]
+type FliteSlot = (String, Result<Lib, String>);
 // Flite is not thread-safe: every call goes through LIBS' mutex.
 #[cfg(unix)]
-static LIBS: OnceLock<Mutex<Vec<(String, Result<Lib, String>)>>> = OnceLock::new();
+static LIBS: OnceLock<Mutex<Vec<FliteSlot>>> = OnceLock::new();
 
 /// Voices shipped by Debian/Ubuntu `libflite1`.
 pub const VOICES: &[&str] = &["slt", "kal16", "awb", "rms", "kal"];
@@ -184,7 +186,7 @@ impl TtsEngine for FliteTts {
             }).map_err(VoiceError::Backend)?;
             if pcm.is_empty() || rate == 0 { return Err(VoiceError::Backend("flite produced no audio".into())); }
             let f: Vec<f32> = pcm.iter().map(|&s| s as f32 / 32768.0).collect();
-            return Ok(Audio { sample_rate: SPEECH_RATE, samples: resample(&f, rate, SPEECH_RATE) });
+            Ok(Audio { sample_rate: SPEECH_RATE, samples: resample(&f, rate, SPEECH_RATE) })
         }
     }
 }

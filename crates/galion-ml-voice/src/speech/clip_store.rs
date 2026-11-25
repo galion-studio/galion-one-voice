@@ -69,6 +69,8 @@ struct Record {
     personas: Vec<String>,
     scope: String,
     public_demo: String,
+    /// The counsel line must be present. Production does not branch on its text.
+    #[cfg_attr(not(test), allow(dead_code))]
     counsel: String,
     counsel_present: bool,
     private_cleared: String,

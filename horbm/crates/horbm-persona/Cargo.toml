@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Galion Labs
+
+[package]
+name = "horbm-persona"
+description = "HORBM persona: the character loaded once at boot. Open traits, honesty, boundaries, and a style hook. CPU only."
+version = "0.0.1"
+edition = "2021"
+license = "MIT"
+publish = false
+rust-version = "1.85"
+
+[dependencies]
+galion-emotion-core = { path = "../../../crates/galion-emotion-core" }
+serde = { version = "1", features = ["derive"] }
+# 0.8.23 compiles with the serde the voice-stack workspace already uses.
+# 0.8.19 does not. galion-mne-contract allows this version.
+toml = "0.8.23"

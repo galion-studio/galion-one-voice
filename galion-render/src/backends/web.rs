@@ -3213,8 +3213,10 @@ mod tests {
         w.present(&VizFrame::default()).unwrap();
         let quiet = get(a, "/dot");
         assert!(quiet.contains("\"sense\":false") && quiet.contains("\"label\":\"neutral\""), "{quiet}");
-        let mut hot = VizFrame::default();
-        hot.t_ms = 800;
+        let mut hot = VizFrame {
+            t_ms: 800,
+            ..VizFrame::default()
+        };
         hot.listen.emotion = crate::frame::Emotion { label: "tense", intensity: 0.82, valence: -0.6 };
         w.present(&hot).unwrap();
         let live = get(a, "/dot");

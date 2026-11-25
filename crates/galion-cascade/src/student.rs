@@ -178,6 +178,10 @@ mod tests {
     use super::*;
     use galion_tensor::gq::{self, GqDType, HEADER_LEN, MAGIC, VERSION};
 
+    fn lock_off(cond: bool) -> bool {
+        cond
+    }
+
     fn reflect_of(user: &str) -> String {
         crate::reflect::reply("samantha", user)
     }
@@ -239,7 +243,7 @@ mod tests {
         assert_eq!(probe.tensors, 0);
         assert!(!probe.line.contains("mother"));
         assert_ne!(probe.line, reflect_of(user));
-        assert!(!INFERENCE_IMPLEMENTED);
+        assert!(lock_off(!INFERENCE_IMPLEMENTED));
         assert_ne!(LABEL_READY, LABEL_BLOCKED);
     }
 

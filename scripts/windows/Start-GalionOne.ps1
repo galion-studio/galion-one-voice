@@ -163,7 +163,7 @@ Push-Location $Repo
 try {
     cargo build --release --manifest-path voice-stack\vad\Cargo.toml --bin vad-ear
     if ($LASTEXITCODE -ne 0) { throw "vad-ear build failed" }
-    cargo build --release --manifest-path voice-stack\Cargo.toml -p samantha-local-server
+    cargo build --release --manifest-path voice-stack\Cargo.toml -p samantha-local-server --features piper
     if ($LASTEXITCODE -ne 0) { throw "samantha-local build failed" }
 }
 finally { Pop-Location }
