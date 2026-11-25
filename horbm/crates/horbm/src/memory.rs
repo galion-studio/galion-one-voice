@@ -50,6 +50,28 @@ pub struct EpisodicStore {
     extractions: u64,
 }
 
+/// One `session_turns` row read back from the diary file.
+#[derive(Debug)]
+pub struct TranscriptTurn {
+    pub id: String,
+    pub text: String,
+    pub said_by: String,
+}
+
+/// A read of `session_turns` after reopening the diary.
+///
+/// `ring_len` is [`horbm_memory::Store::session_len`], the RAM ring, empty
+/// on a fresh open. `rows` is [`horbm_memory::Store::transcript_len`].
+/// `extracted` is [`horbm_memory::Store::count_extracted`], candidate item
+/// rows that `push_turn` queues. `turns` are the query hits, sorted by turn id.
+#[derive(Debug)]
+pub struct TranscriptFile {
+    pub ring_len: usize,
+    pub rows: usize,
+    pub extracted: usize,
+    pub turns: Vec<TranscriptTurn>,
+}
+
 struct BufferedTurn {
     person_id: String,
     said_by: String,
@@ -249,39 +271,33 @@ impl EpisodicStore {
 
     /// Reopen `path` with [`horbm_memory::Store`] and read `session_turns`.
     ///
-    /// The tuple is `(ring_len, rows, extracted, turns)`. `ring_len` is
-    /// [`horbm_memory::Store::session_len`], the RAM ring, empty on a fresh
-    /// open. `rows` is [`horbm_memory::Store::transcript_len`]. `extracted`
-    /// is [`horbm_memory::Store::count_extracted`], candidate item rows that
-    /// `push_turn` queues. `turns` are `(id, text, said_by)` for `query`,
-    /// sorted by turn id. This does not write. `None` is an open or read error.
-    pub fn read_transcript_file(
-        path: &Path,
-        query: &str,
-    ) -> Option<(usize, usize, usize, Vec<(String, String, String)>)> {
+    /// This does not write. `None` is an open or read error.
+    pub fn read_transcript_file(path: &Path, query: &str) -> Option<TranscriptFile> {
         let store = horbm_memory::Store::open(path).ok()?;
         let ring_len = store.session_len();
         let rows = store.transcript_len().ok()?;
         let extracted = store.count_extracted().ok()?;
         let response = store.search_transcript(query).ok()?;
-        let mut turns: Vec<(u64, String, String, String)> = response
+        let mut turns: Vec<TranscriptTurn> = response
             .hits
             .into_iter()
-            .map(|hit| {
-                let ord = hit
-                    .item_id
-                    .rsplit_once('-')
-                    .and_then(|(_, tail)| tail.parse::<u64>().ok())
-                    .unwrap_or(0);
-                (ord, hit.item_id, hit.text, hit.said_by)
+            .map(|hit| TranscriptTurn {
+                id: hit.item_id,
+                text: hit.text,
+                said_by: hit.said_by,
             })
             .collect();
-        turns.sort_by(|left, right| left.0.cmp(&right.0).then_with(|| left.1.cmp(&right.1)));
-        let turns = turns
-            .into_iter()
-            .map(|(_, id, text, said_by)| (id, text, said_by))
-            .collect();
-        Some((ring_len, rows, extracted, turns))
+        turns.sort_by(|left, right| {
+            turn_ord(&left.id)
+                .cmp(&turn_ord(&right.id))
+                .then_with(|| left.id.cmp(&right.id))
+        });
+        Some(TranscriptFile {
+            ring_len,
+            rows,
+            extracted,
+            turns,
+        })
     }
 }
 
@@ -610,6 +626,12 @@ impl PersonMemory for EpisodicStore {
                 reason: row.reason,
             })
     }
+}
+
+fn turn_ord(id: &str) -> u64 {
+    id.rsplit_once('-')
+        .and_then(|(_, tail)| tail.parse().ok())
+        .unwrap_or(0)
 }
 
 /// The line is about the person themself. A world question is not.

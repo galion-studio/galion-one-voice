@@ -535,18 +535,18 @@ fn end_session_writes_every_buffered_turn_to_session_turns() {
     store.end_session("northwind", "t000099").ok_stored();
     assert_eq!(store.buffered_turns(), 0);
     drop(store);
-    let (ring, rows, extracted, turns) =
+    let saved =
         EpisodicStore::read_transcript_file(&path, "quillmark").expect("reopen session_turns");
     assert_eq!(
-        ring, 0,
+        saved.ring_len, 0,
         "session_len is the RAM ring and is empty on reopen"
     );
-    assert_eq!(rows, 3, "transcript_len");
+    assert_eq!(saved.rows, 3, "transcript_len");
     assert_eq!(
-        extracted, 2,
+        saved.extracted, 2,
         "push_turn's extractor added a name candidate and a prefer candidate"
     );
-    let texts: Vec<&str> = turns.iter().map(|(_, text, _)| text.as_str()).collect();
+    let texts: Vec<&str> = saved.turns.iter().map(|turn| turn.text.as_str()).collect();
     assert_eq!(
         texts,
         [
@@ -555,9 +555,10 @@ fn end_session_writes_every_buffered_turn_to_session_turns() {
             "quillmark stays outside",
         ]
     );
-    let speakers: Vec<&str> = turns
+    let speakers: Vec<&str> = saved
+        .turns
         .iter()
-        .map(|(_, _, said_by)| said_by.as_str())
+        .map(|turn| turn.said_by.as_str())
         .collect();
     assert_eq!(speakers, ["northwind", "guest", "northwind"]);
     let _ = fs::remove_dir_all(&dir);
@@ -598,11 +599,11 @@ fn two_sessions_do_not_merge() {
         .ok_stored();
     store.end_session("northwind", "t000199").ok_stored();
     drop(store);
-    let (ring, rows, _, turns) =
+    let saved =
         EpisodicStore::read_transcript_file(&path, "quillmark").expect("reopen session_turns");
-    assert_eq!(ring, 0);
-    assert_eq!(rows, 2, "{turns:?}");
-    let texts: Vec<&str> = turns.iter().map(|(_, text, _)| text.as_str()).collect();
+    assert_eq!(saved.ring_len, 0);
+    assert_eq!(saved.rows, 2, "{:?}", saved.turns);
+    let texts: Vec<&str> = saved.turns.iter().map(|turn| turn.text.as_str()).collect();
     assert_eq!(texts, ["quillmark alphaone", "quillmark bravotwo"]);
     let bytes = fs::read(&path).expect("diary bytes");
     let first = EpisodicStore::transcript_session_id("northwind", "t000099");
