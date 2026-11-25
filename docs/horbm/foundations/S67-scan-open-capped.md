@@ -26,4 +26,15 @@ The turn crate still calls `DiaryScan::open(..., SCAN_CAP)`. This swarm does not
 
 `tests/scan_alloc.rs` is unchanged. It still opens with `DiaryScan::open` and checks that a query does not allocate.
 
-Nothing added here is Linux-only. The tests ran on Linux, rustc 1.85.
+Nothing added here is Linux-only. The run below is Linux, rustc 1.85.0 (`4d91de4e4`, 2025-02-17).
+
+| Command | Result |
+|---|---|
+| `cargo test --manifest-path horbm/Cargo.toml -p horbm-brain --lib open_capped_uses_scan_cap` | 1 passed |
+| `cargo test --manifest-path horbm/Cargo.toml -p horbm-brain --test scan_alloc` | 1 passed |
+| `cargo test --manifest-path horbm/Cargo.toml --workspace` | 273 passed, 0 failed, 2 ignored |
+| `cargo clippy --manifest-path horbm/Cargo.toml --workspace --all-targets -- -D warnings` | clean |
+| `cargo test --workspace` | 1068 passed, 0 failed, 5 ignored |
+| `cargo clippy --workspace --all-targets -- -D warnings` | clean |
+
+The two ignored horbm tests are `timed_scan_of_one_thousand_rows` and `real_card_folder_is_read_and_not_written`. `cargo test` also rewrote `voice-stack/Cargo.lock` (packages added while resolving horbm's path dependencies). That file is not part of this change and was restored. No `Cargo.toml` and no lockfile is committed.
