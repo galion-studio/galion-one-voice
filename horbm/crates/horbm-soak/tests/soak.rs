@@ -2,12 +2,15 @@
 // Copyright (c) 2026 Galion Labs
 //! Counting allocator for the duplex soak. The CI run is five virtual
 //! minutes. `GALION_SOAK_FULL=1` runs sixty.
+//!
+//! The tick gate follows `docs/horbm/foundations/S56-soak-timing.md`:
+//! thread CPU time on Unix, wall time elsewhere, after warmup.
 
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::cell::Cell;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use horbm_soak::{minutes_from_env, run};
+use horbm_soak::{minutes_from_env, run, TickClock};
 
 struct Counting;
 static ALLOCS: AtomicUsize = AtomicUsize::new(0);
@@ -44,8 +47,38 @@ fn allocs() -> u64 {
     ALLOCS.load(Ordering::Relaxed) as u64
 }
 
+fn soak_clock() -> TickClock {
+    #[cfg(unix)]
+    {
+        TickClock::ThreadCpu(thread_cpu_ns)
+    }
+    #[cfg(not(unix))]
+    {
+        TickClock::Wall
+    }
+}
+
 #[test]
 fn samantha_duplex_long_call() {
+    #[cfg(unix)]
+    {
+        let started = thread_cpu_ns();
+        let mut acc = 0u64;
+        for i in 0..200_000u64 {
+            acc = acc.wrapping_add(i);
+        }
+        std::hint::black_box(acc);
+        let stopped = thread_cpu_ns();
+        assert!(
+            stopped > started,
+            "thread cpu clock did not advance ({started} -> {stopped})"
+        );
+        assert!(
+            clock_res_ns() > 0,
+            "CLOCK_THREAD_CPUTIME_ID did not report a resolution"
+        );
+    }
+
     ARMED.with(|armed| armed.set(true));
     let probe = vec![1u8; 8];
     ARMED.with(|armed| armed.set(false));
@@ -58,9 +91,63 @@ fn samantha_duplex_long_call() {
     ARMED.with(|armed| armed.set(true));
 
     let minutes = minutes_from_env(std::env::var("GALION_SOAK_FULL").ok().as_deref());
-    let report = run(minutes, &allocs);
+    let clock = soak_clock();
+    eprintln!("soak-clock name={} res_ns={}", clock.name(), clock_res_ns());
+    let report = run(minutes, &allocs, clock);
     println!("{}", report.table());
     println!("{}", report.stages());
     ARMED.with(|armed| armed.set(false));
+    assert_eq!(report.clock, clock.name());
+    #[cfg(unix)]
+    assert_eq!(report.clock, "thread-cpu");
+    #[cfg(not(unix))]
+    assert_eq!(report.clock, "wall");
     report.enforce().expect("soak gate");
+}
+
+#[cfg(unix)]
+fn clock_res_ns() -> u64 {
+    let mut ts = libc::timespec {
+        tv_sec: 0,
+        tv_nsec: 0,
+    };
+    // SAFETY: `ts` is a live timespec. The call does not retain the pointer.
+    // A failed resolution read is printed as 0. The clock read itself fails closed.
+    let rc = unsafe { libc::clock_getres(libc::CLOCK_THREAD_CPUTIME_ID, &mut ts) };
+    if rc != 0 {
+        return 0;
+    }
+    timespec_ns(ts.tv_sec, ts.tv_nsec).unwrap_or(0)
+}
+
+#[cfg(not(unix))]
+fn clock_res_ns() -> u64 {
+    0
+}
+
+#[cfg(unix)]
+fn thread_cpu_ns() -> u64 {
+    let mut ts = libc::timespec {
+        tv_sec: 0,
+        tv_nsec: 0,
+    };
+    // SAFETY: `ts` is a live timespec. CLOCK_THREAD_CPUTIME_ID is the POSIX
+    // per-thread CPU-time clock. The call does not retain the pointer.
+    let rc = unsafe { libc::clock_gettime(libc::CLOCK_THREAD_CPUTIME_ID, &mut ts) };
+    assert_eq!(
+        rc,
+        0,
+        "clock_gettime(CLOCK_THREAD_CPUTIME_ID): {}",
+        std::io::Error::last_os_error()
+    );
+    timespec_ns(ts.tv_sec, ts.tv_nsec).unwrap_or_else(|| {
+        panic!("negative timespec {}s {}ns", ts.tv_sec, ts.tv_nsec);
+    })
+}
+
+#[cfg(unix)]
+fn timespec_ns(sec: libc::time_t, nsec: libc::c_long) -> Option<u64> {
+    let sec = u64::try_from(sec).ok()?;
+    let nsec = u64::try_from(nsec).ok()?;
+    Some(sec.saturating_mul(1_000_000_000).saturating_add(nsec))
 }
