@@ -11,16 +11,19 @@
 //!
 //! AVX-512 uses stable `asm!` because the `_mm512_*` intrinsics / `avx512f` target feature are
 //! not stable on the pinned toolchain (rustc 1.85). The asm only touches xmm/ymm/zmm 0–5
-//! (declared clobbered) and ends with `vzeroupper`.
+//! (declared clobbered) and ends with `vzeroupper`. The int8 AVX-512 asm also needs AVX-512BW
+//! (`vpmovsxbw`). f32 `dot` and `axpy` need AVX-512F only.
 //!
 //! Safety model: the `*_unchecked` adapters are private and only handed out by
-//! [`dot_for`] / [`dot_i8_for`] / [`axpy_for`] after the runtime CPU check succeeded, so every
-//! public entry point is safe to call on any CPU (unsupported levels resolve to scalar).
+//! [`dot_for`] / [`dot_i8_for`] / [`axpy_for`] after [`crate::features::kernel_level`] says that
+//! kernel can run, so every public entry point is safe to call on any CPU (unsupported levels
+//! resolve to scalar). Scalar stays the bit-exact oracle for int8 and axpy, and the tolerance
+//! oracle for f32 dot.
 //!
 //! f32 dot tolerance (G-T2): for length `k`, `|simd - scalar| ≤ 2·k·ε·Σ|aᵢbᵢ|` (ε = 2⁻²⁴),
 //! the standard recursive-summation bound applied to both sides. See [`dot_tolerance`].
 
-use crate::features::{cpu_supports, SimdLevel};
+use crate::features::{kernel_level, Kernel, SimdLevel};
 
 /// Function-pointer type for an f32 dot kernel.
 pub type DotFn = fn(&[f32], &[f32]) -> f32;
@@ -452,11 +455,10 @@ fn dot_i8_neon_unchecked(a: &[i8], b: &[i8]) -> i32 { unsafe { neon::dot_i8(a, b
 #[cfg(all(feature = "simd-neon", target_arch = "aarch64"))]
 fn axpy_neon_unchecked(al: f32, x: &[f32], y: &mut [f32]) { unsafe { neon::axpy(al, x, y) } }
 
-#[cfg(all(feature = "simd-avx512", target_arch = "x86_64"))]
-fn cpu_avx512bw() -> bool { std::arch::is_x86_feature_detected!("avx512bw") }
-
 // ----------------------------------------------------------------------------------------------
 // Public safe entry points (existing API) — runtime-checked, scalar fallback.
+// The level match below is the only place a private kernel pointer escapes. `kernel_level`
+// has already required the cargo feature, the arch, and the CPU flags that kernel uses.
 // ----------------------------------------------------------------------------------------------
 
 /// AVX2+FMA dot (4×8-lane accumulators). Falls back to scalar if the CPU/arch lacks AVX2+FMA.
@@ -474,21 +476,14 @@ pub fn dot_avx512(a: &[f32], b: &[f32]) -> f32 { dot_for(SimdLevel::Avx512)(a, b
 #[inline]
 pub fn dot_neon(a: &[f32], b: &[f32]) -> f32 { dot_for(SimdLevel::Neon)(a, b) }
 
-/// Resolve an f32 dot kernel for `level`. Levels not compiled in, not implemented for this
-/// arch, or not supported by the running CPU resolve to [`dot_scalar`].
-pub fn dot_for(level: SimdLevel) -> DotFn {
-    match level {
-        #[cfg(all(feature = "simd-avx2", any(target_arch = "x86", target_arch = "x86_64")))]
-        SimdLevel::Avx2 if cpu_supports(SimdLevel::Avx2) => dot_avx2_unchecked,
-        #[cfg(all(feature = "simd-avx512", target_arch = "x86_64"))]
-        SimdLevel::Avx512 if cpu_supports(SimdLevel::Avx512) => dot_avx512_unchecked,
-        #[cfg(all(feature = "simd-neon", target_arch = "aarch64"))]
-        SimdLevel::Neon if cpu_supports(SimdLevel::Neon) => dot_neon_unchecked,
-        _ => {
-            let _ = cpu_supports;
-            dot_scalar
-        }
-    }
+/// Level whose kernel [`dot_for`] will call. f32 dot does not step down to a narrower ISA.
+pub fn dot_level(level: SimdLevel) -> SimdLevel {
+    kernel_level(Kernel::Dot, level)
+}
+
+/// Level whose kernel [`axpy_for`] will call. f32 axpy does not step down to a narrower ISA.
+pub fn axpy_level(level: SimdLevel) -> SimdLevel {
+    kernel_level(Kernel::Axpy, level)
 }
 
 /// Level whose kernel [`dot_i8_for`] will call.
@@ -496,14 +491,20 @@ pub fn dot_for(level: SimdLevel) -> DotFn {
 /// AVX-512 int8 needs AVX-512BW in addition to AVX-512F. Without BW, an AVX-512
 /// request uses AVX2 when that feature is compiled and the CPU has it, otherwise scalar.
 pub fn dot_i8_level(level: SimdLevel) -> SimdLevel {
-    match level {
-        #[cfg(all(feature = "simd-avx512", target_arch = "x86_64"))]
-        SimdLevel::Avx512 if cpu_supports(SimdLevel::Avx512) && cpu_avx512bw() => SimdLevel::Avx512,
+    kernel_level(Kernel::DotI8, level)
+}
+
+/// Resolve an f32 dot kernel for `level`. Levels not compiled in, not implemented for this
+/// arch, or not supported by the running CPU resolve to [`dot_scalar`].
+pub fn dot_for(level: SimdLevel) -> DotFn {
+    match dot_level(level) {
         #[cfg(all(feature = "simd-avx2", any(target_arch = "x86", target_arch = "x86_64")))]
-        SimdLevel::Avx2 | SimdLevel::Avx512 if cpu_supports(SimdLevel::Avx2) => SimdLevel::Avx2,
+        SimdLevel::Avx2 => dot_avx2_unchecked,
+        #[cfg(all(feature = "simd-avx512", target_arch = "x86_64"))]
+        SimdLevel::Avx512 => dot_avx512_unchecked,
         #[cfg(all(feature = "simd-neon", target_arch = "aarch64"))]
-        SimdLevel::Neon if cpu_supports(SimdLevel::Neon) => SimdLevel::Neon,
-        _ => SimdLevel::Scalar,
+        SimdLevel::Neon => dot_neon_unchecked,
+        _ => dot_scalar,
     }
 }
 
@@ -523,13 +524,13 @@ pub fn dot_i8_for(level: SimdLevel) -> DotI8Fn {
 
 /// Resolve an axpy kernel for `level` (all are bit-exact vs [`axpy_scalar`]).
 pub fn axpy_for(level: SimdLevel) -> AxpyFn {
-    match level {
+    match axpy_level(level) {
         #[cfg(all(feature = "simd-avx2", any(target_arch = "x86", target_arch = "x86_64")))]
-        SimdLevel::Avx2 if cpu_supports(SimdLevel::Avx2) => axpy_avx2_unchecked,
+        SimdLevel::Avx2 => axpy_avx2_unchecked,
         #[cfg(all(feature = "simd-avx512", target_arch = "x86_64"))]
-        SimdLevel::Avx512 if cpu_supports(SimdLevel::Avx512) => axpy_avx512_unchecked,
+        SimdLevel::Avx512 => axpy_avx512_unchecked,
         #[cfg(all(feature = "simd-neon", target_arch = "aarch64"))]
-        SimdLevel::Neon if cpu_supports(SimdLevel::Neon) => axpy_neon_unchecked,
+        SimdLevel::Neon => axpy_neon_unchecked,
         _ => axpy_scalar,
     }
 }
@@ -642,10 +643,129 @@ mod tests {
         for l in LEVELS {
             let used = dot_i8_level(l);
             assert!(used <= l);
-            assert!(used.compiled() && cpu_supports(used));
+            assert!(used.compiled() && crate::features::cpu_supports(used));
             assert_eq!(dot_i8_for(l)(&a, &b), dot_i8_scalar(&a, &b));
             assert_eq!(dot_i8_for(used)(&a, &b), dot_i8_scalar(&a, &b));
         }
         assert_eq!(dot_i8_level(SimdLevel::Scalar), SimdLevel::Scalar);
+    }
+
+    /// Concrete kernel for `level`. Cfg arms match `dot_for` / `dot_i8_for` / `axpy_for`.
+    /// A level whose kernel was not compiled resolves to scalar, and the identity test rejects
+    /// a report that still names that level.
+    fn concrete_dot(level: SimdLevel) -> DotFn {
+        match level {
+            #[cfg(all(feature = "simd-avx2", any(target_arch = "x86", target_arch = "x86_64")))]
+            SimdLevel::Avx2 => dot_avx2_unchecked,
+            #[cfg(all(feature = "simd-avx512", target_arch = "x86_64"))]
+            SimdLevel::Avx512 => dot_avx512_unchecked,
+            #[cfg(all(feature = "simd-neon", target_arch = "aarch64"))]
+            SimdLevel::Neon => dot_neon_unchecked,
+            _ => dot_scalar,
+        }
+    }
+    fn concrete_dot_i8(level: SimdLevel) -> DotI8Fn {
+        match level {
+            #[cfg(all(feature = "simd-avx512", target_arch = "x86_64"))]
+            SimdLevel::Avx512 => dot_i8_avx512_unchecked,
+            #[cfg(all(feature = "simd-avx2", any(target_arch = "x86", target_arch = "x86_64")))]
+            SimdLevel::Avx2 => dot_i8_avx2_unchecked,
+            #[cfg(all(feature = "simd-neon", target_arch = "aarch64"))]
+            SimdLevel::Neon => dot_i8_neon_unchecked,
+            _ => dot_i8_scalar,
+        }
+    }
+    fn concrete_axpy(level: SimdLevel) -> AxpyFn {
+        match level {
+            #[cfg(all(feature = "simd-avx2", any(target_arch = "x86", target_arch = "x86_64")))]
+            SimdLevel::Avx2 => axpy_avx2_unchecked,
+            #[cfg(all(feature = "simd-avx512", target_arch = "x86_64"))]
+            SimdLevel::Avx512 => axpy_avx512_unchecked,
+            #[cfg(all(feature = "simd-neon", target_arch = "aarch64"))]
+            SimdLevel::Neon => axpy_neon_unchecked,
+            _ => axpy_scalar,
+        }
+    }
+
+    fn parse_named(line: &str, key: &str) -> SimdLevel {
+        let value = line.split_whitespace().find_map(|token| {
+            let (k, v) = token.split_once('=')?;
+            (k == key).then_some(v)
+        }).unwrap_or_else(|| panic!("missing {key}= in {line}"));
+        match value {
+            "scalar" => SimdLevel::Scalar,
+            "neon" => SimdLevel::Neon,
+            "avx2" => SimdLevel::Avx2,
+            "avx512" => SimdLevel::Avx512,
+            other => panic!("unknown level {other} in {line}"),
+        }
+    }
+
+    macro_rules! assert_running {
+        ($kernel:expr, $running:expr, $reported:expr, $compiled:expr, $scalar:expr $(,)?) => {{
+            let running = $running;
+            let compiled = $compiled;
+            let scalar = $scalar;
+            let reported = $reported;
+            assert!(
+                std::ptr::fn_addr_eq(running, compiled),
+                "{}: report says {:?} but dispatch returned a different function",
+                $kernel, reported
+            );
+            assert_eq!(
+                std::ptr::fn_addr_eq(compiled, scalar),
+                reported == SimdLevel::Scalar,
+                "{}: reported {:?}, compiled kernel is the scalar function={}",
+                $kernel, reported, std::ptr::fn_addr_eq(compiled, scalar)
+            );
+        }};
+    }
+
+    #[test]
+    fn reported_level_matches_the_kernel_that_runs() {
+        let fa = vf(48, 3);
+        let fb = vf(48, 9);
+        let ia = vi8(48, 3);
+        let ib = vi8(48, 9);
+        let oracle = dot_scalar(&fa, &fb);
+        let tol = dot_tolerance(&fa, &fb);
+        let i8_oracle = dot_i8_scalar(&ia, &ib);
+        for req in LEVELS {
+            let d = dot_level(req);
+            let i = dot_i8_level(req);
+            let a = axpy_level(req);
+            assert!(d <= req && i <= req && a <= req, "req={req:?} dot={d:?} i8={i:?} axpy={a:?}");
+            assert_running!("dot", dot_for(req), d, concrete_dot(d), dot_scalar as DotFn);
+            assert_running!("dot_i8", dot_i8_for(req), i, concrete_dot_i8(i), dot_i8_scalar as DotI8Fn);
+            assert_running!("axpy", axpy_for(req), a, concrete_axpy(a), axpy_scalar as AxpyFn);
+            let y = dot_for(req)(&fa, &fb);
+            assert!((y - oracle).abs() <= tol, "req={req:?} dot {y} vs {oracle}");
+            assert_eq!(dot_i8_for(req)(&ia, &ib), i8_oracle, "req={req:?}");
+            let mut got = fb.clone();
+            let mut want = fb.clone();
+            axpy_for(req)(-0.25, &fa, &mut got);
+            axpy_scalar(-0.25, &fa, &mut want);
+            let (gb, wb): (Vec<u32>, Vec<u32>) = (got.iter().map(|v| v.to_bits()).collect(), want.iter().map(|v| v.to_bits()).collect());
+            assert_eq!(gb, wb, "req={req:?}");
+        }
+
+        let line = crate::features::report();
+        let start = crate::features::startup_line();
+        let sel = crate::features::selected();
+        let reported_dot = parse_named(&line, "dot");
+        let reported_i8 = parse_named(&line, "dot_i8");
+        let reported_ax = parse_named(&line, "axpy");
+        assert_eq!(reported_dot, dot_level(sel), "{line}");
+        assert_eq!(reported_i8, dot_i8_level(sel), "{line}");
+        assert_eq!(reported_ax, axpy_level(sel), "{line}");
+        assert_eq!(reported_dot, sel, "f32 dot runs at selected: {line}");
+        assert_eq!(reported_ax, sel, "axpy runs at selected: {line}");
+        assert!(reported_i8 <= sel, "{line}");
+        assert_eq!(parse_named(start, "dot"), reported_dot, "{start}");
+        assert_eq!(parse_named(start, "dot_i8"), reported_i8, "{start}");
+        assert_eq!(parse_named(start, "axpy"), reported_ax, "{start}");
+        assert_running!("dot", dot_for(sel), reported_dot, concrete_dot(reported_dot), dot_scalar as DotFn);
+        assert_running!("dot_i8", dot_i8_for(sel), reported_i8, concrete_dot_i8(reported_i8), dot_i8_scalar as DotI8Fn);
+        assert_running!("axpy", axpy_for(sel), reported_ax, concrete_axpy(reported_ax), axpy_scalar as AxpyFn);
     }
 }
