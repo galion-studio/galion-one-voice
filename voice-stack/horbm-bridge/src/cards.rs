@@ -455,9 +455,11 @@ impl CardEngine {
 
 impl CardEngine {
     /// A granted retrieval miss does not mean the shipped card is absent.
-    /// The cell stays `Miss`. The spoken line is the card when one matches.
-    /// No card match keeps [`UNKNOWN_REPLY`].
-    fn card_after_retrieval_miss(&self, mut reply: Reply, text: &str) -> Reply {
+    /// The spoken line is the card when one matches. No card match keeps
+    /// [`UNKNOWN_REPLY`]. This does not read the retrieval cell: `Brain::turn`
+    /// already waited for the retrieval thread once, and a second blocking
+    /// read stalls the host while that thread still holds the cell lock.
+    fn card_after_unknown(&self, mut reply: Reply, text: &str) -> Reply {
         let Some(hit) = card_match(&self.loaded, text) else {
             return reply;
         };
@@ -472,16 +474,6 @@ impl CardEngine {
         reply.sources = vec![source.clone()];
         reply.evidence = vec![source];
         reply
-    }
-
-    fn retrieval_missed(&self) -> bool {
-        matches!(
-            self.brain
-                .retrieval_cell()
-                .as_deref()
-                .map(|cell| cell.state),
-            Some(horbm::CellState::Miss)
-        )
     }
 }
 
@@ -498,8 +490,8 @@ impl ReplyEngine for CardEngine {
             lookup_us: out.lookup_us,
             took_us: out.took_us,
         };
-        if self.retrieval_missed() && reply.text == UNKNOWN_REPLY {
-            self.card_after_retrieval_miss(reply, text)
+        if reply.text == UNKNOWN_REPLY {
+            self.card_after_unknown(reply, text)
         } else {
             reply
         }
