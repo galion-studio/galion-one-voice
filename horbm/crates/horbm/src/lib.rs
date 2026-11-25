@@ -7,7 +7,13 @@
 //! 1. Empathy (layer 3) steps the mood from the heard line and rewrites the
 //!    lookup. The feeling name, when one is invited, stays on the mood
 //!    metadata. It is not spoken.
-//! 2. When a [`RetrievalThread`] is attached, [`Brain::turn`] asks it and
+//! 2. Person memory, when a diary is attached and `remember` is granted.
+//!    The diary is a second file, kept apart from the truth cards. A pin, a name or mood
+//!    line, and the session buffer are written there. The turn then reads
+//!    that file. A stored line is spoken only when the utterance is about
+//!    the person. A world question drops those hits and does not cite them.
+//!    Denied `remember` does not open the file.
+//! 3. When a [`RetrievalThread`] is attached, [`Brain::turn`] asks it and
 //!    reads the [`MemoryHitCell`]. `Hits` speaks [`MemoryHit::clause`]. `Miss`
 //!    speaks [`UNKNOWN_REPLY`] and does not call research. `Idle` is deny or
 //!    withdraw: the diary is not read. The card pick runs, and if that misses
@@ -21,10 +27,10 @@
 //!    and does not bind a socket. There is no knowledge-ro server in this
 //!    repository. Port 7900 is not used here. The 7881 bridge calls this loader
 //!    and attaches the retrieval thread.
-//! 3. A deep miss on the idle or unthreaded path may ask the research gateway.
+//! 4. A deep miss on the idle or unthreaded path may ask the research gateway.
 //!    The caller passes [`RESEARCH_CAP`] (3 seconds). This crate dials nothing
 //!    itself. A retrieval `Miss` does not.
-//! 4. Anything still unanswered is exactly [`UNKNOWN_REPLY`]. No gap filler.
+//! 5. Anything still unanswered is exactly [`UNKNOWN_REPLY`]. No gap filler.
 //!
 //! Beside that turn, [`Brain::step_moment`] advances the moment-to-moment
 //! emotion core one 80 ms frame. Empathy mood and the moment are separate:
@@ -72,6 +78,7 @@ mod cards;
 mod dialogue;
 mod keys;
 mod learn;
+mod memory;
 mod retrieve;
 mod route;
 
@@ -81,6 +88,10 @@ pub use cards::{
     ResearchRoot, WINDOWS_KNOWLEDGE_DIR,
 };
 pub use dialogue::{flag_granted, DialogueConsent, Move, OfflineBandit, TurnSnap, RING_CAP};
+pub use galion_emotion_core::standins::memory::{
+    DenyMemory, MemoryItem, MemoryKind, MemorySink, PersonMemory, PersonState, Tombstone,
+    TrackedName, WriteOutcome,
+};
 pub use galion_emotion_core::{
     ConductorCue, CoreError as EmotionError, EmotionCore, InnerLife, InnerTurn, IntentMsg,
     MomentState, VoiceBaseline, FRAME_MS as EMOTION_FRAME_MS,
@@ -101,9 +112,10 @@ pub use learn::{
     ClauseSource, LearnAudit, LearnConfig, LearnError, LearnPass, LearnedRow, LEARN_PACK_DB,
     LEARN_PACK_LIVE, LEARN_PACK_NEXT, LEARN_PACK_RETIRING,
 };
+pub use memory::{about_the_person, pin_command, EpisodicStore};
 pub use retrieve::{
-    CellState, HitPool, Int8Scorer, MemoryHit, MemoryHitCell, RetrievalConfig, RetrievalThread,
-    RetrieveError, RetrievedCells, MEMORY_HIT_CAP,
+    search_person_lexical, CellState, HitPool, Int8Scorer, MemoryHit, MemoryHitCell,
+    RetrievalConfig, RetrievalThread, RetrieveError, RetrievedCells, MEMORY_HIT_CAP,
 };
 pub use route::{
     is_deep_question, route_heard, AskOutcome, CardHit, CardLookup, Gap, GapReason, ResearchAsk,

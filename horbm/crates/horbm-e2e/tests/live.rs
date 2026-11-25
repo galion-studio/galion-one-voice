@@ -101,10 +101,37 @@ fn assert_common(outcome: &Outcome, text: &str, sense: Sense) {
         field(text, "prosody_sense"),
         if sense == Sense::On { "on" } else { "off" }
     );
-    assert_eq!(field(text, "vad"), "energy");
+    let vad = field(text, "vad");
+    assert!(vad == "silero" || vad == "energy", "{vad}");
+    if cfg!(feature = "silero") {
+        assert_eq!(vad, "silero");
+    }
     assert!(outcome.voiced_frames > 0);
     assert!(field(text, "vad_voiced_frames").parse::<u32>().unwrap() > 0);
     assert!(field(text, "vad_quiet_frames").parse::<u32>().unwrap() > 0);
+    assert!(field(text, "vad_energy_voiced_frames").parse::<u32>().unwrap() > 0);
+    assert!(field(text, "vad_energy_quiet_frames").parse::<u32>().unwrap() > 0);
+    if vad == "silero" {
+        assert!(field(text, "vad_silero_voiced_frames").parse::<u32>().unwrap() > 0);
+        assert!(field(text, "vad_silero_quiet_frames").parse::<u32>().unwrap() > 0);
+        let p50: u64 = field(text, "vad_frame_cpu_p50_ns").parse().expect("p50");
+        let p95: u64 = field(text, "vad_frame_cpu_p95_ns").parse().expect("p95");
+        assert!(p50 <= p95, "frame cpu p50 {p50} p95 {p95}");
+        let model_p50: u64 = field(text, "vad_model_cpu_p50_ns").parse().expect("model p50");
+        let model_p95: u64 = field(text, "vad_model_cpu_p95_ns").parse().expect("model p95");
+        assert!(
+            model_p50 <= model_p95,
+            "model cpu p50 {model_p50} p95 {model_p95}"
+        );
+        assert_eq!(field(text, "vad_model_sha256").len(), 64);
+    } else {
+        assert_eq!(field(text, "vad_frame_cpu_p50_ns"), "not_measured");
+        assert_eq!(field(text, "vad_frame_cpu_p95_ns"), "not_measured");
+        assert_eq!(field(text, "vad_model_cpu_p50_ns"), "not_measured");
+        assert_eq!(field(text, "vad_model_cpu_p95_ns"), "not_measured");
+        assert_eq!(field(text, "vad_silero_voiced_frames"), "not_measured");
+        assert_eq!(field(text, "vad_silero_quiet_frames"), "not_measured");
+    }
     assert_eq!(field(text, "emotion"), "real");
     assert_eq!(field(text, "emotion_allocs"), "0");
     assert_eq!(field(text, "brain"), "real");
@@ -200,7 +227,11 @@ fn assert_common(outcome: &Outcome, text: &str, sense: Sense) {
     }
     if outcome.mouth_real {
         assert_ne!(field(text, "mouth"), "stub");
-        assert_eq!(field(text, "output_buffer"), "loopback");
+        let output = field(text, "output");
+        assert!(output == "alsa" || output == "loopback", "{output}");
+        if cfg!(all(feature = "alsa", target_os = "linux")) {
+            assert_eq!(output, "alsa");
+        }
         let p50 = outcome.first_audio_p50_us.expect("p50");
         let p95 = outcome.first_audio_p95_us.expect("p95");
         assert!(p50 > 0 && p50 <= p95, "first audio p50 {p50} p95 {p95}");
@@ -213,19 +244,23 @@ fn assert_common(outcome: &Outcome, text: &str, sense: Sense) {
             format!("{:.3}", p95 as f64 / 1000.0)
         );
         let stop = outcome.barge_stop_ns.expect("barge stop");
+        assert!(
+            stop < 1_000_000,
+            "barge_in_stop_ns {stop} is not under 1 ms"
+        );
         assert_eq!(field(text, "barge_in_stop_ns"), stop.to_string());
         let rtf = outcome.rtf.expect("rtf");
         assert!(rtf.is_finite() && rtf > 0.0, "rtf {rtf}");
         assert_eq!(field(text, "rtf_def"), "wall/audio");
         assert!(
-            field(text, "output_buffer_samples")
+            field(text, "output_samples")
                 .parse::<usize>()
                 .unwrap()
                 > 0
         );
     } else {
         assert_eq!(field(text, "mouth"), "stub");
-        assert_eq!(field(text, "output_buffer"), "stub");
+        assert_eq!(field(text, "output"), "stub");
         assert_eq!(field(text, "first_audio_p50_ms"), "stub");
         assert_eq!(field(text, "first_audio_p95_ms"), "stub");
         assert_eq!(field(text, "barge_in_stop_ns"), "stub");

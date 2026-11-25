@@ -199,6 +199,10 @@ sources = ["Q-BRANDING.Q9", "Q-BRANDING.Q10", "Q-BRANDING.Q13"]
 # withdraw still wipes RAM history. This block does not grant remember.
 # The diary opens only when the process is given remember_grant exactly.
 # A student decode is not on the chat-turn hot path.
+# F7 person memory uses this same remember bit. It does not add a bit and
+# does not grant one. The person file is not the truth-card diary. Denied
+# remember writes nothing, runs no callback, and runs no extraction. Forget
+# archives a tombstone. The text stays. There is no hard delete.
 [horbm]
 hot_path = "retrieval"
 student_on_tick = false

@@ -204,6 +204,8 @@ struct Trial {
     spoken: Vec<String>,
     brain_query: String,
     from_script: bool,
+    output_name: &'static str,
+    output_device: Option<String>,
 }
 
 pub fn run(sense: Sense) -> Result<Outcome, String> {
@@ -230,9 +232,15 @@ pub fn run(sense: Sense) -> Result<Outcome, String> {
     if rate != SAMPLE_RATE || read != pcm {
         return Err("input wav did not round-trip".into());
     }
-    let counts = vad::count_frames(&read);
-    if counts.voiced == 0 || counts.quiet == 0 {
-        return Err("vad did not hear both speech and silence in the input wav".into());
+    let scored = vad::score(&read);
+    if scored.energy_voiced == 0 || scored.energy_quiet == 0 {
+        return Err("energy vad did not hear both speech and silence in the input wav".into());
+    }
+    if scored.backend == "silero" && (scored.voiced == 0 || scored.quiet == 0) {
+        return Err(format!(
+            "silero voiced {} quiet {} on the generated wav",
+            scored.voiced, scored.quiet
+        ));
     }
     let question_frames = gate_frames(&read);
     let stop_frames = take_voiced(&barge, 3);
@@ -246,6 +254,8 @@ pub fn run(sense: Sense) -> Result<Outcome, String> {
     let mut spoke_kettle = false;
     let mut brain_query = String::new();
     let mut queued = 0usize;
+    let mut output_name = "loopback";
+    let mut output_device = None;
 
     for trial in 0..TRIALS {
         let one = drive(
@@ -256,6 +266,8 @@ pub fn run(sense: Sense) -> Result<Outcome, String> {
             &yeah,
             &stop_frames,
         )?;
+        output_name = one.output_name;
+        output_device = one.output_device.clone();
         if trial == 0 {
             brain_query = one.brain_query;
             if one.from_script != brain_from_script {
@@ -315,9 +327,55 @@ pub fn run(sense: Sense) -> Result<Outcome, String> {
         if sense == Sense::On { "on" } else { "off" },
     );
     report.push("trials", TRIALS.to_string());
-    report.push("vad", "energy");
-    report.push("vad_voiced_frames", counts.voiced.to_string());
-    report.push("vad_quiet_frames", counts.quiet.to_string());
+    report.push("vad", scored.backend);
+    report.push("vad_voiced_frames", scored.voiced.to_string());
+    report.push("vad_quiet_frames", scored.quiet.to_string());
+    report.push(
+        "vad_energy_voiced_frames",
+        scored.energy_voiced.to_string(),
+    );
+    report.push("vad_energy_quiet_frames", scored.energy_quiet.to_string());
+    push_measured(
+        &mut report,
+        "vad_silero_voiced_frames",
+        scored.silero_voiced.map(|n| n.to_string()),
+    );
+    push_measured(
+        &mut report,
+        "vad_silero_quiet_frames",
+        scored.silero_quiet.map(|n| n.to_string()),
+    );
+    push_measured(
+        &mut report,
+        "vad_frame_cpu_p50_ns",
+        scored.frame_cpu_p50_ns.map(|n| n.to_string()),
+    );
+    push_measured(
+        &mut report,
+        "vad_frame_cpu_p95_ns",
+        scored.frame_cpu_p95_ns.map(|n| n.to_string()),
+    );
+    push_measured(
+        &mut report,
+        "vad_model_cpu_p50_ns",
+        scored.model_cpu_p50_ns.map(|n| n.to_string()),
+    );
+    push_measured(
+        &mut report,
+        "vad_model_cpu_p95_ns",
+        scored.model_cpu_p95_ns.map(|n| n.to_string()),
+    );
+    push_measured(
+        &mut report,
+        "vad_warm_cpu_ns",
+        scored.warm_cpu_ns.map(|n| n.to_string()),
+    );
+    if let Some(sha) = scored.sha256 {
+        report.push("vad_model_sha256", sha);
+    }
+    if let Some(reason) = scored.fallback {
+        report.push("vad_fallback", reason);
+    }
     push_ear(&mut report, ear.as_ref());
     report.push("prosody", "stub");
     report.push("end_of_turn", "stub");
@@ -349,10 +407,13 @@ pub fn run(sense: Sense) -> Result<Outcome, String> {
     report.push("mouth", kind.name());
     report.push("piper_duplex", "stub");
     if mouth_real {
-        report.push("output_buffer", "loopback");
-        report.push("output_buffer_samples", queued.to_string());
+        report.push("output", output_name);
+        if let Some(device) = output_device {
+            report.push("output_device", device);
+        }
+        report.push("output_samples", queued.to_string());
     } else {
-        report.push("output_buffer", "stub");
+        report.push("output", "stub");
     }
     push_audio(&mut report, mouth_real, &first_audio, &barge_ns, &rtfs);
     match percentile_nearest(&sorted(&conductor), 0.50) {
@@ -375,11 +436,15 @@ pub fn run(sense: Sense) -> Result<Outcome, String> {
         barge_stop_ns: stat(&barge_ns, 0.50),
         rtf: percentile_nearest_f64(rtfs.clone(), 0.50),
         conductor_barge_ms: stat(&conductor, 0.50),
-        voiced_frames: counts.voiced,
+        voiced_frames: scored.voiced,
         brain_query,
         brain_from_script,
         kettle_hyp,
     })
+}
+
+fn push_measured(report: &mut Report, key: &str, value: Option<String>) {
+    report.push(key, value.unwrap_or_else(|| "not measured".to_string()));
 }
 
 fn push_audio(report: &mut Report, mouth_real: bool, first: &[u64], barge: &[u64], rtfs: &[f64]) {
@@ -568,6 +633,8 @@ fn drive(
         spoken: duplex.mouth().spoken().to_vec(),
         brain_query: brain_query.unwrap_or_default(),
         from_script,
+        output_name: duplex.mouth().output_name(),
+        output_device: duplex.mouth().output_device().map(str::to_string),
     })
 }
 

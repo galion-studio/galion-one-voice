@@ -143,6 +143,7 @@ fn run_devices<R: Recognizer>(
         input_name: None,
         output_name: None,
         direction: Direction::Duplex,
+        playback_samples: 0,
     }) {
         Ok(session) => session,
         Err(err) => {

@@ -14,6 +14,9 @@
 //! separate lock, `[consent] learn`, default deny.
 //!
 //! CPU only. No model, no audio, no thread. The hot path does not allocate.
+//!
+//! [`standins::memory`] is the person-diary port. The frame step does not
+//! call it. [`may_remember`] is false until the consent bit is set.
 #![forbid(unsafe_code)]
 
 mod axes;
@@ -26,6 +29,7 @@ mod intent;
 mod moment;
 mod project;
 mod standin;
+pub mod standins;
 mod state;
 mod wire;
 

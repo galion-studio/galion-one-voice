@@ -16,11 +16,14 @@ use horbm_brain::{
 };
 use horbm_inner::{DialogueLean, Heard, InnerMsg, Perceived, SamanthaInner, Verb};
 
+use galion_emotion_core::standins::memory::{PersonMemory, PersonState, TrackedName};
+
 use crate::cards::ResearchRoot;
 use crate::dialogue::{DecideIn, Decision, Dialogue, DialogueConsent, Move, ReplyPlan, TurnSnap};
+use crate::memory::{about_the_person, pin_command};
 use crate::retrieve::{CellState, MemoryHitCell, RetrievalThread, RetrievedCells};
 use crate::route::{accept_line, route_heard, CardLookup, Gap, ResearchAsk, Speakable};
-use crate::{Pad, TurnOut, UNKNOWN_REPLY};
+use crate::{MemoryItem, Pad, TurnOut, UNKNOWN_REPLY};
 
 /// Mood and the prosody knobs that belong on the turn. Not a sentence.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -69,9 +72,9 @@ impl CardLookup for EmptyCards {
 }
 
 /// The linked brain. `open` reads the knowledge directory when it already
-/// exists and does not create it. Memory and case paths are not opened.
-/// The live server passes the same read-only loader and may attach a
-/// [`RetrievalThread`]. That thread is not started here.
+/// exists and does not create it. The person-diary path is kept and is not
+/// opened: `remember` is denied. The live server passes the same read-only
+/// loader and may attach a [`RetrievalThread`]. That thread is not started here.
 pub struct Brain {
     empathy: Empathy,
     cards: Box<dyn CardLookup + Send>,
@@ -89,6 +92,9 @@ pub struct Brain {
     retrieval_epoch: u64,
     dialogue: Dialogue,
     style: ResearchRoot,
+    memory: Option<Box<dyn PersonMemory>>,
+    person_id: String,
+    memory_tick: u64,
 }
 
 struct Spoke {
@@ -216,6 +222,9 @@ impl Brain {
             retrieval_epoch: 0,
             dialogue: Dialogue::new(),
             style: ResearchRoot::empty(),
+            memory: None,
+            person_id: "person".to_string(),
+            memory_tick: 0,
         }
     }
 
@@ -224,6 +233,31 @@ impl Brain {
     pub fn with_style(mut self, style: ResearchRoot) -> Self {
         self.style = style;
         self
+    }
+
+    /// Person diary. Replaces a diary already attached, including the denied
+    /// one from [`Brain::open`].
+    pub fn with_memory(mut self, memory: impl PersonMemory + 'static) -> Self {
+        self.memory = Some(Box::new(memory));
+        self
+    }
+
+    /// Whose diary this turn reads and writes. Empty is ignored.
+    pub fn set_person(&mut self, person_id: &str) {
+        let person_id = person_id.trim();
+        if person_id.is_empty() {
+            return;
+        }
+        self.person_id = person_id.to_string();
+    }
+
+    pub fn person_id(&self) -> &str {
+        &self.person_id
+    }
+
+    /// The port the dialogue manager and the inner life call.
+    pub fn person_memory(&mut self) -> Option<&mut (dyn PersonMemory + 'static)> {
+        self.memory.as_deref_mut()
     }
 
     /// Chat turns read this thread's cell. `Idle` keeps the card and fixture
@@ -263,11 +297,11 @@ impl Brain {
     }
 
     /// Read `knowledge_dir` when it is already a directory. A missing path is
-    /// an empty card set. Nothing is created. Memory and case paths are not
-    /// opened.
+    /// an empty card set. Nothing is created. `memory_db` is kept on a denied
+    /// diary and is not opened. `cases` is not opened.
     pub fn open(memory_db: &Path, knowledge_dir: &Path, cases: &Path) -> Self {
-        let _ = (memory_db, cases);
-        match crate::KnowledgeCards::load(knowledge_dir) {
+        let _ = cases;
+        let mut brain = match crate::KnowledgeCards::load(knowledge_dir) {
             Ok(loaded) => {
                 eprintln!("{}", loaded.report.log_line());
                 Self::with_cards(loaded.cards, None).with_style(ResearchRoot::from_env())
@@ -279,7 +313,9 @@ impl Brain {
                 eprintln!("horbm cards: {err}");
                 Self::with_cards(EmptyCards, None).with_style(ResearchRoot::from_env())
             }
-        }
+        };
+        brain.memory = Some(Box::new(crate::EpisodicStore::open(memory_db, false)));
+        brain
     }
 
     pub fn set_speakable(&mut self, speakable: Speakable) {
@@ -478,16 +514,19 @@ impl Brain {
         self.meta
     }
 
-    /// Empathy mood, then the retrieval cell when a thread is attached,
-    /// then cards, then the fixture on an idle cell, then the gateway.
-    /// Layer 4 then picks the move. [`Self::finish`] splits the clause.
+    /// Empathy mood, then the person diary when `remember` is granted, then
+    /// the retrieval cell when a thread is attached, then cards, then the
+    /// fixture on an idle cell, then the gateway. Layer 4 then picks the move.
+    /// [`Self::finish`] splits the clause.
     ///
-    /// A granted hit speaks [`crate::MemoryHit::clause`]. A granted miss
+    /// A granted card hit speaks [`crate::MemoryHit::clause`]. A granted miss
     /// speaks [`crate::UNKNOWN_REPLY`] and does not call research. `Idle`
-    /// means `remember` is denied: the diary is not opened, and the committed
-    /// fixture still answers when the cards miss. This waits for the retrieval
-    /// thread. Do not call it from `Heartbeat::step`. Barge-in is not this
-    /// function.
+    /// means the truth-card `remember` bit is denied: that diary is not
+    /// opened, and the committed fixture still answers when the cards miss.
+    /// Person memory is a different file. It is spoken only for a question
+    /// about the person, and never as the source of a world answer. This
+    /// waits for the retrieval thread. Do not call it from `Heartbeat::step`.
+    /// Barge-in is not this function.
     pub fn turn(&mut self, text: &str) -> TurnOut {
         let started = Instant::now();
         let heard = text.trim();
@@ -506,6 +545,10 @@ impl Brain {
             sense: self.ear_sense,
         });
         self.apply_prosody(note.lean());
+        if self.memory_granted() && !heard.is_empty() {
+            let at = self.stamp();
+            self.observe_memory(heard, &at);
+        }
         let prep = self.empathy.prepare_lookup(heard);
         let query = if prep.query.trim().is_empty() {
             heard
@@ -516,7 +559,11 @@ impl Brain {
             return self.finish(query, started, Spoke::empty(), &Decision::pass());
         }
         let query_owned = query.to_string();
-        let gathered = self.gather(&query_owned);
+        let memory_hit = self.person_hit(heard);
+        let gathered = match memory_hit {
+            Some(spoke) => Gathered { spoke, gap: None },
+            None => self.gather(&query_owned),
+        };
         let reply = effective_reply(&gathered.spoke).to_string();
         let sources = gathered.spoke.sources.clone();
         let mut decision = self.dialogue.decide(DecideIn {
@@ -573,6 +620,19 @@ impl Brain {
             }
             _ => None,
         }
+    }
+
+    /// Person diary hit, only when the line is about the person. A world
+    /// question still reads the diary and then drops the hits.
+    fn person_hit(&mut self, heard: &str) -> Option<Spoke> {
+        if !self.memory_granted() {
+            return None;
+        }
+        let recalled = self.recall_person(heard);
+        if !about_the_person(heard) {
+            return None;
+        }
+        self.memory_spoke(heard, &recalled)
     }
 
     /// Retrieval, cards, the idle fixture, then the gateway. No reply split.
@@ -634,6 +694,77 @@ impl Brain {
                 picked: None,
             },
         }
+    }
+
+    fn memory_granted(&self) -> bool {
+        self.memory
+            .as_ref()
+            .map(|memory| memory.remember_granted())
+            .unwrap_or(false)
+    }
+
+    fn stamp(&mut self) -> String {
+        self.memory_tick = self.memory_tick.saturating_add(1);
+        format!("t{:06}", self.memory_tick)
+    }
+
+    fn observe_memory(&mut self, heard: &str, at: &str) {
+        if heard.is_empty() || !self.memory_granted() {
+            return;
+        }
+        let person = self.person_id.clone();
+        let state = person_state(&self.empathy, self.meta);
+        let Some(memory) = self.memory.as_mut() else {
+            return;
+        };
+        memory.note_turn(&person, &person, heard, at);
+        if let Some(text) = pin_command(heard) {
+            memory.pin(&person, text, at);
+        }
+        memory.note_state(&person, &state, at);
+    }
+
+    fn recall_person(&mut self, heard: &str) -> Vec<MemoryItem> {
+        if !self.memory_granted() {
+            return Vec::new();
+        }
+        let person = self.person_id.clone();
+        let Some(memory) = self.memory.as_mut() else {
+            return Vec::new();
+        };
+        memory.recall(&person, heard)
+    }
+
+    /// Spoken only when `query` is about the person. The caller drops `hits`
+    /// for a world question, so they never become sources.
+    fn memory_spoke(&self, query: &str, hits: &[MemoryItem]) -> Option<Spoke> {
+        if !about_the_person(query) {
+            return None;
+        }
+        let hit = hits.iter().find(|hit| !hit.text.trim().is_empty())?;
+        let spoken = (self.speakable)(hit.text.trim())?;
+        if spoken.trim().is_empty() {
+            return None;
+        }
+        let (first, rest) = split_clause(&spoken, false);
+        let source = format!("memory:{}", hit.id);
+        Some(Spoke {
+            reply: String::new(),
+            sources: vec![source.clone()],
+            evidence: vec![source],
+            lookup_us: 0,
+            picked: Some(Answer {
+                id: hit.id.clone(),
+                clause: spoken,
+                first,
+                rest,
+                hit: true,
+                mark: classify(query).map(|kind| SidebandMark {
+                    kind,
+                    posted: false,
+                }),
+            }),
+        })
     }
 
     /// `Some` for `Hits` and `Miss`. `None` for `Idle`, which is deny.
@@ -730,6 +861,23 @@ impl Brain {
             rest,
             sideband,
         }
+    }
+}
+
+fn person_state(empathy: &Empathy, meta: MoodMeta) -> PersonState {
+    PersonState {
+        names: empathy
+            .names()
+            .people()
+            .map(|(name, class)| TrackedName {
+                name: name.to_string(),
+                class_label: class.as_str().to_string(),
+            })
+            .collect(),
+        arousal: meta.arousal,
+        valence: meta.valence,
+        dominance: meta.dominance,
+        feeling: meta.named.map(|word| word.to_string()),
     }
 }
 
