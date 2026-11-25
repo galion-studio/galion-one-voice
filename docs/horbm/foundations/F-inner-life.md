@@ -14,7 +14,7 @@ The inner life is what the speaker cares about, wants, and expects. It is a fixe
 
 ## State
 
-`InnerLife::seeded` starts from `standins/inner-life.txt`: care `heard`, want `answer`, expect `pause`. Persona (`persona.txt`) and memory (`memory.txt`) stay stand-ins. The intent script (`intent.txt`) stays the closed-eval stream for `EmotionCore::replay`. It is the same message type, not a second format.
+`InnerLife::seeded` starts from `standins/inner-life.txt`: care `heard`, want `answer`, expect `pause`. That seed is this crate's fixture. HORBM boot loads Samantha, whose file uses the same three tokens (`F-persona.md`). Aria is not loaded. Memory (`memory.txt`) stays a stand-in. The intent script (`intent.txt`) stays the closed-eval stream for `EmotionCore::replay`. It is the same message type, not a second format.
 
 `turn` reads the dialogue as ASCII bytes and the emotion point already on the moment. It does not keep the text. Care level steps a quarter of the way toward a target that rises when valence falls (`CARE_LEVEL`, `CARE_VALENCE_GAIN`). A question mark steps the want `answer` upward (`WANT_QUESTION`), and positive approach adds `WANT_APPROACH_GAIN`. These are knobs, not published loadings.
 
