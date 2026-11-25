@@ -328,6 +328,12 @@ fn bucket(action: &Action, frame: &FrameOut) -> Bucket {
         return Bucket::Hold;
     }
     if frame.me_audible {
+        // The frame that closes the utterance still clones the partial.
+        // Echo residue can do that on a scripted silence. Steady playback
+        // is the frames where that string is already gone.
+        if !frame.partial.is_empty() {
+            return Bucket::Boundary;
+        }
         return Bucket::Play;
     }
     // The mouth queue can be empty while the floor is still hers. Those
