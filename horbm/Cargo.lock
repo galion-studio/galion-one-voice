@@ -492,6 +492,7 @@ dependencies = [
  "galion-research-gateway",
  "galion-sam-empathy",
  "horbm-brain",
+ "horbm-inner",
  "horbm-keys",
  "horbm-memory",
  "horbm-persona",
@@ -549,6 +550,16 @@ dependencies = [
  "serde",
  "serde_json",
  "toml",
+]
+
+[[package]]
+name = "horbm-inner"
+version = "0.0.1"
+dependencies = [
+ "galion-emotion",
+ "galion-emotion-core",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
