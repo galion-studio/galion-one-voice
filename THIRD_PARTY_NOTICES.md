@@ -228,6 +228,81 @@ Copyright (c) 2003-2008 Yuta Mori All Rights Reserved.
 
 Yann Collet's and Tino Reichardt's files offer BSD or GPLv2. This project uses BSD. Yuta Mori's `divsufsort.c` is MIT. Its copyright line above is the notice that file requires.
 
+## Live ear closure (S91)
+
+`voice-stack/Cargo.lock` gained these crates when `samantha-local-server` linked `horbm-ear`. Versions, licences, and upstream URLs are from `cargo metadata --locked --manifest-path voice-stack/Cargo.toml`. Each third-party crate below offers MIT or Apache-2.0 as a complete grant. This project uses that grant. The MIT and Apache-2.0 texts are not repeated.
+
+`horbm-ear` 0.0.1 is this repository (`crates/horbm-ear`), MIT, not a third-party crate.
+
+| Crate | Version | Licence | Upstream |
+|---|---|---|---|
+| num-complex | 0.4.6 | MIT OR Apache-2.0 | https://github.com/rust-num/num-complex |
+| num-integer | 0.1.47 | MIT OR Apache-2.0 | https://github.com/rust-num/num-integer |
+| pitch-detection | 0.3.0 | MIT/Apache-2.0 | https://github.com/alesgenova/pitch-detection |
+| primal-check | 0.3.4 | MIT OR Apache-2.0 | https://github.com/huonw/primal |
+| rustfft | 6.4.1 | MIT OR Apache-2.0 | https://github.com/ejmahler/RustFFT |
+| strength_reduce | 0.2.4 | MIT OR Apache-2.0 | https://github.com/ejmahler/strength_reduce |
+| transpose | 0.2.3 | MIT OR Apache-2.0 | https://github.com/ejmahler/transpose |
+
+## BSD, Zlib, and ISC grants already in `voice-stack/Cargo.lock`
+
+These were already locked and were missing from this file. Where MIT or Apache-2.0 is a complete alternative, that grant is the one used, and the other text is not copied. `rust-stemmers` is the exception: its Snowball algorithms are BSD-3-Clause, so that notice is quoted.
+
+### adler2 2.0.1
+
+- Locks: `voice-stack/Cargo.lock`
+- Licence: 0BSD OR MIT OR Apache-2.0
+- Upstream: https://github.com/oyvindln/adler2
+- Used under: MIT or Apache-2.0
+
+### fastdivide 0.4.2
+
+- Locks: `voice-stack/Cargo.lock`
+- Licence: zlib-acknowledgement OR MIT
+- Upstream: https://github.com/fulmicoton/fastdivide
+- Used under: MIT
+
+### mach2 0.4.3
+
+- Locks: `voice-stack/Cargo.lock`
+- Licence: BSD-2-Clause OR MIT OR Apache-2.0
+- Upstream: https://github.com/JohnTitor/mach2
+- Used under: MIT or Apache-2.0
+
+### miniz_oxide 0.8.9
+
+- Locks: `voice-stack/Cargo.lock`
+- Licence: MIT OR Zlib OR Apache-2.0
+- Upstream: https://github.com/Frommi/miniz_oxide/tree/master/miniz_oxide
+- Used under: MIT or Apache-2.0
+
+### num_enum 0.7.6 and num_enum_derive 0.7.6
+
+- Locks: `voice-stack/Cargo.lock`
+- Licence: BSD-3-Clause OR MIT OR Apache-2.0
+- Upstream: https://github.com/illicitonion/num_enum
+- Used under: MIT or Apache-2.0
+
+### rust-stemmers 1.2.0
+
+- Locks: `voice-stack/Cargo.lock`
+- Licence field: MIT/BSD-3-Clause
+- Upstream: https://github.com/CurrySoftware/rust-stemmers
+- The Rust wrapper is MIT (`LICENSE`, Copyright (c) 2017 Jakob Demler). The Snowball algorithms under `algorithms/` are BSD-3-Clause. Both apply. The BSD notice from `algorithms/LICENSE` is:
+
+```
+Copyright (c) 2001, Dr Martin Porter
+Copyright (c) 2004,2005, Richard Boulton
+All rights reserved.
+```
+
+### zerocopy 0.8.65 and zerocopy-derive 0.8.65
+
+- Locks: `voice-stack/Cargo.lock`
+- Licence: BSD-2-Clause OR Apache-2.0 OR MIT
+- Upstream: https://github.com/google/zerocopy
+- Used under: MIT or Apache-2.0
+
 ## Copyleft grants not accepted
 
 These crates name a copyleft licence. Each one also offers a permissive grant that covers the crate. This project uses the permissive grant and does not accept GPL, LGPL, MPL, or AGPL.
