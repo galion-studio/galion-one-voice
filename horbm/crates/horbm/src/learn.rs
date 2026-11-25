@@ -16,10 +16,11 @@
 //! This module does not parse that file. The default matches it. The process
 //! grant does not rewrite the file, and it does not set an EmotionWire bit.
 //!
-//! Do not call [`LearnPass::write_clause`], [`LearnPass::withdraw`], or
-//! [`LearnPass::audit`] from `Heartbeat::step`. The call never waits on this
-//! pass. The pass does not call Galion Research and it does not read or write
-//! audio.
+//! Do not call [`LearnPass::write_clause`], [`LearnPass::withdraw`],
+//! [`LearnPass::audit`], or [`SessionSeal::seal`] from `Heartbeat::step` or
+//! from [`crate::Brain::turn`]. The call never waits on this pass. The pass
+//! does not call Galion Research and it does not read or write audio.
+//! [`SessionSeal`] keeps one clause in RAM. It is not encrypted.
 
 use std::fs;
 use std::io;
@@ -410,6 +411,63 @@ impl LearnPass {
     }
 }
 
+/// One clause held until [`SessionSeal::seal`]. Plain text. Not a diary row.
+struct NotedClause {
+    said_by: String,
+    text: String,
+    source: ClauseSource,
+}
+
+/// One RAM slot in front of [`LearnPass`].
+///
+/// [`SessionSeal::note`] keeps one clause and replaces it on a second note.
+/// [`SessionSeal::seal`] calls [`LearnPass::write_clause`] once and clears
+/// the slot. A later seal, with the slot empty, writes nothing. A denied
+/// pass writes nothing and creates no file. The slot is plain text. This
+/// type does not encrypt. Not called from [`crate::Brain::turn`].
+// Nothing outside this module names this type yet. The allow keeps a
+// non-test build quiet. The learn tests construct it.
+#[cfg_attr(not(test), allow(dead_code))]
+pub struct SessionSeal {
+    pass: LearnPass,
+    slot: Option<NotedClause>,
+}
+
+#[cfg_attr(not(test), allow(dead_code))]
+impl SessionSeal {
+    /// Does not create `pack_dir` and does not open SQLite.
+    pub fn open(config: LearnConfig) -> Self {
+        Self {
+            pass: LearnPass::open(config),
+            slot: None,
+        }
+    }
+
+    /// Keep one clause in RAM. A second call replaces it. Nothing is written.
+    pub fn note(&mut self, said_by: &str, text: &str, source: &ClauseSource) {
+        self.slot = Some(NotedClause {
+            said_by: said_by.to_string(),
+            text: text.to_string(),
+            source: source.clone(),
+        });
+    }
+
+    /// Write the held clause once and clear the slot.
+    ///
+    /// An empty slot returns `Ok(None)` and does not open the pack. A full
+    /// slot calls [`LearnPass::write_clause`] once. The slot is cleared
+    /// either way, so a second call writes nothing. Denial returns
+    /// [`LearnError::is_denied`] and creates no file.
+    pub fn seal(&mut self) -> Result<Option<LearnedRow>, LearnError> {
+        let Some(held) = self.slot.take() else {
+            return Ok(None);
+        };
+        self.pass
+            .write_clause(&held.said_by, &held.text, &held.source)
+            .map(Some)
+    }
+}
+
 fn insert_one(
     db: &Path,
     session: &str,
@@ -563,5 +621,118 @@ mod tests {
         assert!(err.is_refused());
         assert!(!Path::new("learn-pack.sqlite").exists());
         assert!(!Path::new("revisions.sqlite").exists());
+    }
+
+    fn scratch(name: &str) -> PathBuf {
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("clock")
+            .as_nanos();
+        let dir =
+            std::env::temp_dir().join(format!("horbm-seal-{name}-{}-{nanos}", std::process::id()));
+        fs::create_dir_all(&dir).expect("scratch");
+        dir
+    }
+
+    fn sqlite_under(dir: &Path) -> Vec<String> {
+        let mut out = Vec::new();
+        fn walk(dir: &Path, out: &mut Vec<String>) {
+            let Ok(rd) = fs::read_dir(dir) else {
+                return;
+            };
+            for ent in rd.flatten() {
+                let path = ent.path();
+                if path.is_dir() {
+                    walk(&path, out);
+                    continue;
+                }
+                let name = ent.file_name().to_string_lossy().to_ascii_lowercase();
+                if name.contains("sqlite") || name.ends_with(".db") || name.contains("horbm-mem") {
+                    out.push(path.to_string_lossy().into_owned());
+                }
+            }
+        }
+        walk(dir, &mut out);
+        out.sort();
+        out
+    }
+
+    #[test]
+    fn seal_writes_one_row_and_a_second_seal_writes_nothing() {
+        let root = scratch("one");
+        let pack = root.join("pack");
+        let mut first = source();
+        first.turn_id = 4;
+        let mut second = source();
+        second.turn_id = 5;
+        let alpha = "alpha-token the kettle is on the hob.";
+        let beta = "beta-token the kettle is off the hob.";
+
+        let mut seal = SessionSeal::open(LearnConfig::granted(&pack));
+        assert!(seal.seal().expect("empty slot").is_none());
+        assert!(!pack.exists(), "empty seal created {}", pack.display());
+
+        seal.note("user", alpha, &first);
+        seal.note("user", beta, &second);
+        let held = seal.slot.as_ref().expect("one slot");
+        assert_eq!(held.text, beta);
+        assert_eq!(held.said_by, "user");
+        assert_eq!(held.source.turn_id, 5);
+        assert!(!pack.exists(), "note created {}", pack.display());
+        assert!(sqlite_under(&root).is_empty());
+
+        let row = seal.seal().expect("seal").expect("one row");
+        let label = second.label().expect("label");
+        assert_eq!(row.text, beta);
+        assert_eq!(row.source, label);
+        assert_eq!(row.said_by, "user");
+        assert_eq!(row.date, second.time);
+        assert!(!row.text.contains("alpha-token"));
+        assert!(seal.slot.is_none());
+        let audit = seal.pass.audit().expect("audit");
+        assert_eq!(audit.rows.len(), 1);
+        assert_eq!(audit.archived, 0);
+        assert_eq!(audit.rows[0], row);
+        assert!(seal.pass.live_pack().is_file());
+        assert!(!pack.join(LEARN_PACK_NEXT).exists());
+        assert!(!pack.join(LEARN_PACK_RETIRING).exists());
+        assert!(!pack.join("revisions.sqlite").exists());
+
+        let marker = seal.pass.live_pack().with_file_name("kept.txt");
+        fs::write(&marker, b"kept").expect("marker");
+        assert!(seal.seal().expect("second seal").is_none());
+        assert_eq!(fs::read(&marker).expect("marker stayed"), b"kept");
+        let again = seal.pass.audit().expect("audit after second seal");
+        assert_eq!(again.rows.len(), 1);
+        assert_eq!(again.archived, 0);
+        assert_eq!(again.rows[0], row);
+        assert!(!pack.join(LEARN_PACK_NEXT).exists());
+        assert!(!pack.join(LEARN_PACK_RETIRING).exists());
+        assert!(!pack.join("revisions.sqlite").exists());
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn unset_learn_seal_creates_no_pack_file() {
+        let root = scratch("unset");
+        let pack = root.join("pack");
+        let pack_flag = pack.to_str().expect("utf-8 pack path");
+        // None is an unset GALION_HORBM_LEARN. Only the word "grant" may write.
+        let mut seal = SessionSeal::open(LearnConfig::from_flags(None, Some(pack_flag)));
+        assert!(!seal.pass.is_granted());
+        seal.note("user", "The kettle is on the hob.", &source());
+        let err = seal.seal().expect_err("unset learn");
+        assert!(err.is_denied(), "{err}");
+        assert!(seal.slot.is_none(), "a refused seal still clears the slot");
+        assert!(!pack.exists(), "unset learn created {}", pack.display());
+        assert!(
+            sqlite_under(&root).is_empty(),
+            "unset learn left {:?}",
+            sqlite_under(&root)
+        );
+        assert!(seal.seal().expect("empty after deny").is_none());
+        assert!(!pack.exists());
+        assert!(sqlite_under(&root).is_empty());
+        let _ = fs::remove_dir_all(&root);
     }
 }
