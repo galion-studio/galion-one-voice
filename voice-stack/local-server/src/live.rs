@@ -1005,9 +1005,7 @@ impl ProsodyEar {
     }
 
     fn push_frame(&self, frame: &[f32; horbm_ear::FRAME_SAMPLES]) -> Option<horbm::Heard> {
-        if self.join.is_none() {
-            return None;
-        }
+        self.join.as_ref()?;
         let (lock, wake) = &*self.slot;
         let mut slot = lock.lock().unwrap_or_else(|err| err.into_inner());
         slot.frame = *frame;
