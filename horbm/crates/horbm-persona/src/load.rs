@@ -313,7 +313,7 @@ fn pack_word(s: &str) -> Result<[u8; TOKEN_BYTES], PersonaError> {
     Ok(pack_bytes(s.as_bytes()))
 }
 
-fn pack_name(s: &str, reason: &'static str) -> Result<[u8; TOKEN_BYTES], PersonaError> {
+pub(crate) fn pack_name(s: &str, reason: &'static str) -> Result<[u8; TOKEN_BYTES], PersonaError> {
     if !name_ok(s) {
         return Err(PersonaError::Invalid(reason));
     }

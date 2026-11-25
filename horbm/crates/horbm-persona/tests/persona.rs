@@ -7,7 +7,9 @@ use std::path::PathBuf;
 use galion_emotion_core::{
     EmotionCore, InnerLife, IntentMsg, VoiceBaseline, AROUSAL, FRAME_MS, MASK_FATIGUE, VALENCE,
 };
-use horbm_persona::{LegalMovePort, MoveClaim, MoveVerdict, Persona, PersonaError, UNKNOWN_LINE};
+use horbm_persona::{
+    BootConfig, LegalMovePort, MoveClaim, MoveVerdict, Persona, PersonaError, UNKNOWN_LINE,
+};
 
 const VALID: &str = r#"
 schema = "galion-horbm-persona/1"
@@ -74,23 +76,109 @@ fn development_default_is_samantha() {
     assert!(text.contains("Later"));
 }
 
+fn persona_with_id(id: &str) -> Persona {
+    let text = VALID.replace("id = \"sample\"", &format!("id = \"{id}\""));
+    Persona::parse(&text).unwrap_or_else(|err| panic!("parse {id}: {err}"))
+}
+
 #[test]
-fn aria_file_loads_and_is_not_a_development_boot() {
-    let path = examples().join("aria.toml");
-    let aria = Persona::load(&path).expect("aria.toml loads");
-    assert_eq!(aria.id(), "aria");
-    assert!(!aria.allows_development_boot());
-    let shipped = Persona::samantha().unwrap();
-    assert_eq!(shipped.id(), "samantha");
-    assert!(shipped.allows_development_boot());
-    assert!(load_example("samantha.toml").allows_development_boot());
-    let renamed = Persona::parse(&VALID.replace("id = \"sample\"", "id = \"samantha\"")).unwrap();
-    assert!(renamed.allows_development_boot());
-    let near = Persona::parse(&VALID.replace("id = \"sample\"", "id = \"samantha2\"")).unwrap();
-    assert_eq!(near.id(), "samantha2");
-    assert!(!near.allows_development_boot());
-    assert!(!Persona::standin().allows_development_boot());
-    assert!(!Persona::parse(VALID).unwrap().allows_development_boot());
+fn a_configured_id_boots_and_a_different_id_does_not() {
+    let cfg = BootConfig::from_id("cedar").unwrap();
+    let cedar = persona_with_id("cedar");
+    let maple = persona_with_id("maple");
+    assert_eq!(cedar.id(), "cedar");
+    assert!(cedar.is_configured_boot(&cfg));
+    assert!(!maple.is_configured_boot(&cfg));
+    assert!(!Persona::parse(VALID).unwrap().is_configured_boot(&cfg));
+    let aria = Persona::load(&examples().join("aria.toml")).unwrap();
+    assert!(aria.is_configured_boot(&BootConfig::from_id(aria.id()).unwrap()));
+    assert!(!aria.is_configured_boot(&cfg));
+    let standin = Persona::standin();
+    assert!(standin.is_configured_boot(&BootConfig::from_id(standin.id()).unwrap()));
+    assert!(!standin.is_configured_boot(&cfg));
+}
+
+#[test]
+fn a_fresh_persona_boots_when_configured() {
+    let fresh = persona_with_id("northwind");
+    assert_ne!(fresh.id(), "cedar");
+    let cfg = BootConfig::resolve(Some(fresh.id()), None).unwrap();
+    assert!(fresh.is_configured_boot(&cfg));
+    assert!(!persona_with_id("cedar").is_configured_boot(&cfg));
+    let mut files = 0;
+    for entry in std::fs::read_dir(examples()).unwrap() {
+        let path = entry.unwrap().path();
+        if path.extension().and_then(|ext| ext.to_str()) != Some("toml") {
+            continue;
+        }
+        let persona =
+            Persona::load(&path).unwrap_or_else(|err| panic!("{}: {err}", path.display()));
+        let own = BootConfig::from_id(persona.id()).unwrap();
+        assert!(persona.is_configured_boot(&own), "{}", persona.id());
+        assert!(!persona.is_configured_boot(&cfg), "{}", persona.id());
+        files += 1;
+    }
+    assert_eq!(files, 2);
+}
+
+#[test]
+fn unset_boot_config_refuses() {
+    let unset = PersonaError::Invalid("development persona is not configured");
+    assert_eq!(BootConfig::from_id("").unwrap_err(), unset);
+    assert_eq!(BootConfig::from_id("   ").unwrap_err(), unset);
+    assert_eq!(BootConfig::resolve(None, None).unwrap_err(), unset);
+    assert_eq!(BootConfig::resolve(Some(""), None).unwrap_err(), unset);
+    assert_eq!(
+        BootConfig::resolve(Some("  "), Some("")).unwrap_err(),
+        unset
+    );
+    assert_eq!(BootConfig::from_toml("").unwrap_err(), unset);
+    assert_eq!(
+        BootConfig::from_toml("development_persona = \"\"").unwrap_err(),
+        unset
+    );
+    assert_eq!(BootConfig::from_toml("# note\n").unwrap_err(), unset);
+    assert_eq!(
+        BootConfig::from_id("Cedar").unwrap_err(),
+        PersonaError::Invalid("development persona id is not a short token")
+    );
+    assert_eq!(
+        BootConfig::from_toml("note = \"x\"\n").unwrap_err(),
+        PersonaError::Invalid("development persona file does not match the schema")
+    );
+    let file = "development_persona = \"maple\"\n";
+    assert!(BootConfig::resolve(Some("NOPE"), Some(file)).is_err());
+    assert_eq!(BootConfig::resolve(None, Some(file)).unwrap().id(), "maple");
+    assert_eq!(
+        BootConfig::resolve(Some("  cedar  "), Some(file))
+            .unwrap()
+            .id(),
+        "cedar"
+    );
+    assert_eq!(
+        BootConfig::resolve(Some(""), Some(file)).unwrap().id(),
+        "maple"
+    );
+}
+
+#[test]
+fn shipped_boot_file_names_a_persona_that_boots() {
+    let cfg = BootConfig::shipped().unwrap();
+    let path = examples().join(format!("{}.toml", cfg.id()));
+    let persona = Persona::load(&path).expect("shipped boot id has a persona file");
+    assert_eq!(persona.id(), cfg.id());
+    assert!(persona.is_configured_boot(&cfg));
+    let other = persona_with_id("cedar");
+    assert!(!other.is_configured_boot(&cfg));
+    match std::env::var(BootConfig::ENV) {
+        Ok(value) if !value.trim().is_empty() => {
+            assert_eq!(
+                BootConfig::from_process().unwrap(),
+                BootConfig::from_id(&value).unwrap()
+            );
+        }
+        _ => assert_eq!(BootConfig::from_process().unwrap(), cfg),
+    }
 }
 
 #[test]

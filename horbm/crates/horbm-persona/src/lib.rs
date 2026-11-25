@@ -14,12 +14,14 @@
 //! CPU only. No model, no audio, no thread.
 #![forbid(unsafe_code)]
 
+mod boot;
 mod legal;
 mod load;
 mod style;
 
 use galion_emotion_core::{InnerLife, VoiceBaseline, APPROACH, AROUSAL, DOMINANCE, VALENCE};
 
+pub use boot::BootConfig;
 pub use legal::{LegalMovePort, MoveClaim, MoveVerdict, FAKE_SYMPATHY, UNSOURCED_FACT};
 pub use style::{StyleHook, BREVITY_RATE};
 
@@ -33,7 +35,8 @@ pub const TOKEN_BYTES: usize = 16;
 pub const BOUNDARY_BYTES: usize = 24;
 /// The spoken miss. The same sentence the turn already uses.
 pub const UNKNOWN_LINE: &str = "I don't know.";
-/// Shipped development persona. Boot parses this text. Aria is not included.
+/// Bytes of the shipped `personas/samantha.toml` file. [`Persona::samantha`] parses them.
+/// Which id may boot is [`BootConfig`], not this constant.
 pub const SAMANTHA_TOML: &str = include_str!("../personas/samantha.toml");
 /// Heap allocations [`Persona::verdict`] and [`Persona::style`] may make.
 pub const TURN_ALLOC_BUDGET: usize = 0;
@@ -155,7 +158,7 @@ impl Persona {
         }
     }
 
-    /// Samantha, the development persona. The same bytes as `personas/samantha.toml`.
+    /// Parse [`SAMANTHA_TOML`]. Development boot uses [`BootConfig`], not this name.
     pub fn samantha() -> Result<Self, PersonaError> {
         Self::parse(SAMANTHA_TOML)
     }
@@ -176,10 +179,13 @@ impl Persona {
         as_str(&self.id)
     }
 
-    /// Development boot is the id `samantha` only.
+    /// True when this persona's id is the one `cfg` names.
+    ///
+    /// Any schema-valid persona matches. No id is special. An unset config
+    /// never reaches here: [`BootConfig`] refuses to build one.
     #[must_use]
-    pub fn allows_development_boot(&self) -> bool {
-        self.id() == "samantha"
+    pub fn is_configured_boot(&self, cfg: &BootConfig) -> bool {
+        self.id() == cfg.id()
     }
 
     pub fn voice(&self) -> &str {
