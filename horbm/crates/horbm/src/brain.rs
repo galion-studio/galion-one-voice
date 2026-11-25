@@ -20,9 +20,9 @@ use horbm_inner::{DialogueLean, Heard, InnerMsg, Perceived, SamanthaInner, Verb}
 
 use galion_emotion_core::standins::memory::{PersonMemory, PersonState, TrackedName};
 
-use crate::cards::ResearchRoot;
 use crate::dialogue::{DecideIn, Decision, Dialogue, DialogueConsent, Move, ReplyPlan, TurnSnap};
 use crate::memory::{about_the_person, pin_command};
+use crate::research_style::{ResearchHit, ResearchRoot, StylePersona};
 use crate::retrieve::{CellState, MemoryHitCell, RetrievalThread, RetrievedCells};
 use crate::route::{
     accept_line, classify_ask, route_heard, AskOutcome, CardLookup, Gap, GapReason, ResearchAsk,
@@ -211,6 +211,21 @@ impl Spoke {
 struct CardRetriever<'a> {
     cards: &'a dyn CardLookup,
     speakable: Speakable,
+}
+
+/// Style mark for comfort, ask, and offer_topic. The example text stays off
+/// the reply and off the sources.
+fn style_mark(chosen: Option<Move>, hits: &[ResearchHit]) -> Option<String> {
+    match chosen {
+        Some(Move::Comfort | Move::Ask | Move::OfferTopic) => {
+            let hit = hits.first()?;
+            if hit.allows_answer() || hit.allows_cite() || !hit.tagged_not_for_answer_and_cite() {
+                return None;
+            }
+            Some(hit.id.clone())
+        }
+        _ => None,
+    }
 }
 
 fn miss_spoke(lookup_us: u32) -> Spoke {
@@ -641,11 +656,20 @@ impl Brain {
         };
         let reply = effective_reply(&gathered.spoke).to_string();
         let sources = gathered.spoke.sources.clone();
+        // An unset research root does not enter the index. The duplex soak
+        // measures resident memory after warmup, and opening the search
+        // library there looks like a leak.
+        let style = if self.style.is_empty() {
+            crate::research_style::StyleSearch::none()
+        } else {
+            self.style.search(StylePersona::Samantha, &query_owned)
+        };
         let mut decision = self.dialogue.decide(DecideIn {
             heard,
             intent: self.meta.intent,
             reply: &reply,
             sources: &sources,
+            research: &style.hits,
             arousal: self.meta.arousal,
             valence: self.meta.valence,
             dominance: self.meta.dominance,
@@ -689,7 +713,7 @@ impl Brain {
         }
         let research_later = gathered.research_later;
         let mut spoke = apply_plan(gathered.spoke, decision.plan().clone());
-        if let Some(id) = self.style_id(decision.chosen, &query_owned) {
+        if let Some(id) = style_mark(decision.chosen, &style.hits) {
             spoke.evidence.push(format!("style:{id}"));
         }
         let mut out = self.finish(&query_owned, started, spoke, &decision, FollowHook::idle());
@@ -705,16 +729,6 @@ impl Brain {
     pub fn research_follow_up(&mut self) -> Option<ResearchFollowUp> {
         self.reap_follow();
         self.pending_follow.take()
-    }
-
-    /// Style mark for comfort, ask, and offer_topic. Not an answer source.
-    fn style_id(&self, chosen: Option<Move>, query: &str) -> Option<String> {
-        match chosen {
-            Some(Move::Comfort | Move::Ask | Move::OfferTopic) => {
-                self.style.lookup(query).map(|hint| hint.id)
-            }
-            _ => None,
-        }
     }
 
     /// Person diary hit, only when the line is about the person. A world

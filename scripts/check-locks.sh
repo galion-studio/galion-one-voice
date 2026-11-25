@@ -64,6 +64,7 @@ if all(isinstance(x, int) for x in (fm, a2v, a2f)) and a2v > fm * a2f:
 eq("consent.default", "deny")
 for b in ("sense", "adapt", "remember", "share", "learn"): eq(f"consent.{b}", "deny")
 eq("consent.learn", "deny")       # S15: not a fifth EmotionWire bit
+eq("consent.research_style", "deny")  # S35: style examples only; not an EmotionWire bit
 # Owner decision, Mate, 2026-11-24 21:31 CET: ear prosody starts on.
 # The session bits above stay deny. This layer has its own switch.
 eq("consent.ear_prosody.sense", "allow")
@@ -95,6 +96,7 @@ eq("horbm.hot_path", "retrieval")
 eq("horbm.student_on_tick", False)
 eq("horbm.miss", "I don't know.")
 eq("horbm.remember_grant", "GALION_HORBM_REMEMBER=grant")
+eq("horbm.research_style_dir", "GALION_HORBM_RESEARCH_DIR")
 
 # Owner pins. Global foreign_runtime_allowed stays false. These blocks do not widen it.
 eq("formats.exceptions.a21_piper.in_tree_ort", False)

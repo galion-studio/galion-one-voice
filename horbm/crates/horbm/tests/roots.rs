@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Galion Labs
-//! Two card roots. Synthetic fixtures only. Nothing here is a dataset.
+//! Two card roots. Research style cards used here are built in memory.
+//! The laptop research directory is not read.
 
 use std::path::{Path, PathBuf};
 
 use horbm::{
-    blocks_answer, Brain, CardLookup, KnowledgeCards, ResearchRoot, RetrievalConfig,
+    blocks_answer, Brain, CardLookup, KnowledgeCards, MemoryExample, ResearchRoot, RetrievalConfig,
     RetrievalThread, RetrievedCells, UNKNOWN_REPLY,
 };
 
@@ -61,6 +62,8 @@ fn dialogue_card(id: &str, title: &str, body: &str) -> String {
   "research_only": true,
   "use_for": ["style", "empathy", "moves"],
   "not_for": ["answer", "cite"],
+  "licence": "synthetic",
+  "fixture": "synthetic",
   "sources": [],
   "evidence_strength": "none",
   "said_by": "horbm",
@@ -207,36 +210,25 @@ fn comfort_can_take_a_style_mark_and_still_says_the_miss() {
             "The kettle is on the hob.",
         ),
     );
-    let research = temp_dir("research-style");
-    write(
-        &research,
-        "soft-pace.json",
-        &dialogue_card(
-            "soft-pace",
-            "Short line",
-            "When they say i am tired, keep the line short.",
-        ),
-    );
-    write(
-        &research,
-        "ask-plain.json",
-        &dialogue_card(
-            "ask-plain",
-            "Plain ask",
-            "When they ask who won the match, stay plain.",
-        ),
-    );
-    write(
-        &research,
-        "offer-back.json",
-        &dialogue_card(
-            "offer-back",
-            "Offer back",
-            "If they want something else, name the topic they already used.",
-        ),
-    );
-    let style = ResearchRoot::load(&research).unwrap();
+    let style = ResearchRoot::from_examples(&[
+        MemoryExample {
+            id: "soft-pace",
+            text: "When they say i am tired, keep the line short.",
+            licence: "in-memory",
+        },
+        MemoryExample {
+            id: "ask-plain",
+            text: "When they ask who won the match, stay plain.",
+            licence: "in-memory",
+        },
+        MemoryExample {
+            id: "offer-back",
+            text: "If they want something else, name the topic they already used.",
+            licence: "in-memory",
+        },
+    ]);
     assert_eq!(style.len(), 3);
+    assert_eq!(style.files_read(), 0);
     let mut brain =
         Brain::with_cards(KnowledgeCards::load(&truth).unwrap().cards, None).with_style(style);
     let tired = brain.turn("i am so tired");
@@ -270,7 +262,6 @@ fn comfort_can_take_a_style_mark_and_still_says_the_miss() {
     assert_eq!(cited.sources, vec!["card:kettle".to_string()]);
     assert!(!cited.evidence.iter().any(|item| item.starts_with("style:")));
     let _ = std::fs::remove_dir_all(truth);
-    let _ = std::fs::remove_dir_all(research);
 }
 
 #[test]

@@ -22,3 +22,5 @@ horbm-persona = { path = "../horbm-persona" }
 horbm-memory = { git = "https://github.com/galion-studio/galion-knowledge.git", rev = "974e594444448597741372fef578142c46d28566" }
 serde_json = "1"
 sha2 = "0.10"
+# In-memory BM25 for dialogue style examples. Apache-2.0. Not the truth index.
+tantivy = "0.22"
