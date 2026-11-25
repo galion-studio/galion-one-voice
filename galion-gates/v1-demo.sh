@@ -1,13 +1,15 @@
 #!/usr/bin/env bash
 # Galion Voice — Perpetual Open MIT License. Copyright (c) 2026 Galion Labs.
 # V1 — V1 demo smoke (V1-04, soft gate). Runs scripts/run-v1-demo.sh --headless into a temp dir.
-#   rc 0 = PASS, rc 3 = SKIP (script absent), other = SOFTFAIL. No display, no network, no weights.
-#   Speech-as-tone (C7) is reported but only fails here with V1_STRICT=1.
+#   rc 0 = PASS, rc 3 = SKIP (script absent), other = SOFTFAIL. No display, no weights.
+#   The headless run calls scripts/run-live-demo.sh, which tests horbm-duplex.
+#   galion-live-demo is archived and is not built. Default timeout is 900s so a
+#   cold duplex build can finish. Speech-as-tone (C7) fails only with V1_STRICT=1.
 set -uo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 S="$ROOT/scripts/run-v1-demo.sh"
 [ -x "$S" ] || { echo "V1 SKIP — scripts/run-v1-demo.sh not present yet"; exit 3; }
-T="${GALION_V1_TIMEOUT:-300}"
+T="${GALION_V1_TIMEOUT:-900}"
 OUT="$(mktemp -d)"; trap 'rm -rf "$OUT"' EXIT
 env -u DISPLAY -u WAYLAND_DISPLAY GALION_HEADLESS=1 V1_OUT="$OUT/v1" timeout "$T" "$S" --headless --seconds 2 >"$OUT/run.txt" 2>&1; rc=$?
 grep -E '^(C[0-9]+ |== V1 RESULT)' "$OUT/run.txt"

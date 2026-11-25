@@ -1,3 +1,7 @@
+# Archived 2026-11-25. Not a root workspace member. Do not build.
+# Path dependencies are the old sibling paths from crates/galion-live-demo.
+# The live loop is `cargo test --manifest-path horbm/Cargo.toml -p horbm-duplex`
+# and `bash scripts/horbm-e2e-smoke.sh`. See ARCHIVED.md.
 # Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
 [package]
 name = "galion-live-demo"
