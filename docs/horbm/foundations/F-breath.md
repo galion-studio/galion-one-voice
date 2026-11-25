@@ -54,14 +54,15 @@ Both sit under the 80 ms frame. The release smoke on this host, prosody on, prin
 
 ```text
 breath=real
-breath_ns=27
-breath_p50_us=0.027
+breath_ns=26
+breath_p50_us=0.026
 breath_p99_us=0.027
 breath_pauses=0
 breath_group_ms=3360
+prosody_sense=on
 ```
 
-The prosody-off run printed the same breath line: `breath_ns=27`, `breath_p50_us=0.027`, `breath_p99_us=0.027`. Pauses are 0 because "The kettle is on the hob." fits in the 3360 ms group. The smoke calls `Duplex::set_aec(false)`: there is no speaker, so the script is not a microphone echo. Ear prosody is left on.
+The prosody-off run printed `breath_ns=27`, `breath_p50_us=0.027`, `breath_p99_us=0.027`. Pauses are 0 because "The kettle is on the hob." fits in the 3360 ms group. The smoke calls `Duplex::set_aec(false)`: there is no speaker, so the script is not a microphone echo. Ear prosody follows the smoke switch and is on unless that switch is closed.
 
 ```shell
 cargo test --manifest-path horbm/Cargo.toml -p horbm-breath

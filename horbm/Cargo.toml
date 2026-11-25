@@ -8,8 +8,10 @@ resolver = "2"
 members = [
     "crates/horbm",
     "crates/horbm-brain",
+    "crates/horbm-persona",
     "crates/horbm-voice",
     "crates/horbm-duplex",
+    "crates/horbm-eval",
     "crates/horbm-breath",
 ]
 

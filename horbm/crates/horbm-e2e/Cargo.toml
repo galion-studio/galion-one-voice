@@ -24,3 +24,4 @@ galion-emotion-core = { path = "../../../crates/galion-emotion-core" }
 galion-sam-asr = { path = "../../../voice-stack/asr" }
 galion-tts-piper = { path = "../../../voice-stack/tts-piper-stream" }
 galion-ml-voice = { path = "../../../crates/galion-ml-voice", default-features = false, features = ["speech"] }
+sha2 = "0.10.9"

@@ -16,10 +16,11 @@ use horbm_duplex::{
 };
 use horbm_voice::SAMPLE_RATE;
 
+use crate::corpus::{self, EarPlan};
 use crate::mouth::{self, EngineKind, LiveMouth};
 use crate::percentile_nearest;
 use crate::percentile_nearest_f64;
-use crate::recognizer::{self, EarRec};
+use crate::recognizer::EarRec;
 use crate::report::{self, Report};
 use crate::stages;
 use crate::vad::{self, Energy};
@@ -49,6 +50,9 @@ pub struct Outcome {
     pub rtf: Option<f64>,
     pub conductor_barge_ms: Option<u64>,
     pub voiced_frames: u32,
+    pub brain_query: String,
+    pub brain_from_script: bool,
+    pub kettle_hyp: String,
 }
 
 struct TempTree {
@@ -198,15 +202,27 @@ struct Trial {
     rtf: Option<f64>,
     conductor_barge_ms: Option<u64>,
     spoken: Vec<String>,
-    hypothesis: Option<String>,
+    brain_query: String,
+    from_script: bool,
 }
 
 pub fn run(sense: Sense) -> Result<Outcome, String> {
     let tree = TempTree::new()?;
     let kind = mouth::detect();
-    let question = utterance(kind, SCRIPT)?;
-    let barge = utterance(kind, BARGE)?.unwrap_or_else(|| tone_words(2));
-    let question = question.unwrap_or_else(|| tone_words(4));
+    let ear = corpus::plan()?;
+    let (question, barge, brain_from_script, kettle_hyp) = match ear.as_ref() {
+        EarPlan::Live {
+            kettle,
+            stop,
+            kettle_hyp,
+            ..
+        } => (kettle.clone(), stop.clone(), false, kettle_hyp.clone()),
+        EarPlan::Stub { .. } => {
+            let question = utterance(kind, SCRIPT)?.unwrap_or_else(|| tone_words(4));
+            let barge = utterance(kind, BARGE)?.unwrap_or_else(|| tone_words(2));
+            (question, barge, true, String::new())
+        }
+    };
     let pcm = with_tail(question);
     let path = tree.dir.join("input.wav");
     wav::write_wav(&path, SAMPLE_RATE, &pcm)?;
@@ -221,22 +237,30 @@ pub fn run(sense: Sense) -> Result<Outcome, String> {
     let question_frames = gate_frames(&read);
     let stop_frames = take_voiced(&barge, 3);
     let yeah = loud_frame();
-    let want_asr = recognizer::asr_available();
+    let asr_real = matches!(ear.as_ref(), EarPlan::Live { .. });
 
     let mut first_audio = Vec::new();
     let mut barge_ns = Vec::new();
     let mut rtfs = Vec::new();
     let mut conductor = Vec::new();
     let mut spoke_kettle = false;
-    let mut hypothesis = None;
+    let mut brain_query = String::new();
     let mut queued = 0usize;
-    let mut asr_real = false;
 
     for trial in 0..TRIALS {
-        let one = drive(kind, want_asr, &question_frames, &yeah, &stop_frames)?;
+        let one = drive(
+            kind,
+            ear.as_ref(),
+            sense,
+            &question_frames,
+            &yeah,
+            &stop_frames,
+        )?;
         if trial == 0 {
-            hypothesis = one.hypothesis.clone();
-            asr_real = want_asr;
+            brain_query = one.brain_query;
+            if one.from_script != brain_from_script {
+                return Err("the ear source did not match the plan".into());
+            }
         }
         if one
             .spoken
@@ -262,12 +286,16 @@ pub fn run(sense: Sense) -> Result<Outcome, String> {
 
     let mouth_real = kind != EngineKind::Stub;
     if mouth_real && (first_audio.len() != TRIALS as usize || barge_ns.len() != TRIALS as usize) {
-        return Err("a real mouth did not time first audio and barge-in on every trial".into());
+        return Err(format!(
+            "a real mouth did not time first audio and barge-in on every trial (first {} of {TRIALS}, barge {} of {TRIALS})",
+            first_audio.len(),
+            barge_ns.len()
+        ));
     }
     if !mouth_real && (!first_audio.is_empty() || !barge_ns.is_empty()) {
         return Err("a stub mouth was timed".into());
     }
-    if !want_asr && conductor.len() != TRIALS as usize {
+    if !asr_real && conductor.len() != TRIALS as usize {
         return Err("the conductor did not barge on a scripted trial".into());
     }
 
@@ -290,10 +318,19 @@ pub fn run(sense: Sense) -> Result<Outcome, String> {
     report.push("vad", "energy");
     report.push("vad_voiced_frames", counts.voiced.to_string());
     report.push("vad_quiet_frames", counts.quiet.to_string());
-    report.push("asr", if asr_real { "vosk" } else { "stub" });
+    push_ear(&mut report, ear.as_ref());
     report.push("prosody", "stub");
     report.push("end_of_turn", "stub");
     report.push("brain", "real");
+    report.push(
+        "brain_from",
+        if brain_from_script {
+            "script"
+        } else {
+            "recognised"
+        },
+    );
+    report.push("brain_query", brain_query.as_str());
     report.push("brain_spoke_kettle", if spoke_kettle { "1" } else { "0" });
     report.push("dialogue", "stub");
     report.push("person_memory", "stub");
@@ -318,7 +355,6 @@ pub fn run(sense: Sense) -> Result<Outcome, String> {
         report.push("output_buffer", "stub");
     }
     push_audio(&mut report, mouth_real, &first_audio, &barge_ns, &rtfs);
-    report.push("wer", report::format_wer(SCRIPT, hypothesis.as_deref()));
     match percentile_nearest(&sorted(&conductor), 0.50) {
         Some(ms) => {
             report.push("conductor_barge_ms", ms.to_string());
@@ -340,6 +376,9 @@ pub fn run(sense: Sense) -> Result<Outcome, String> {
         rtf: percentile_nearest_f64(rtfs.clone(), 0.50),
         conductor_barge_ms: stat(&conductor, 0.50),
         voiced_frames: counts.voiced,
+        brain_query,
+        brain_from_script,
+        kettle_hyp,
     })
 }
 
@@ -374,18 +413,69 @@ fn sorted(samples: &[u64]) -> Vec<u64> {
     copy
 }
 
+fn push_ear(report: &mut Report, ear: &EarPlan) {
+    match ear {
+        EarPlan::Stub { reason } => {
+            report.push("asr", "stub");
+            report.push("asr_skip", *reason);
+            report.push("asr_p50_ms", "stub");
+            report.push("asr_p95_ms", "stub");
+            report.push("wer", "stub");
+        }
+        EarPlan::Live {
+            utts,
+            overall,
+            model_name,
+            ..
+        } => {
+            report.push("asr", "vosk");
+            report.push("asr_model", model_name.as_str());
+            report.push("asr_device", "cpu");
+            report.push("asr_utts", utts.len().to_string());
+            let walls: Vec<u64> = utts.iter().map(|utt| utt.wall_us).collect();
+            report.push(
+                "asr_p50_ms",
+                stat(&walls, 0.50)
+                    .map(report::format_ms)
+                    .unwrap_or_else(|| "stub".into()),
+            );
+            report.push(
+                "asr_p95_ms",
+                stat(&walls, 0.95)
+                    .map(report::format_ms)
+                    .unwrap_or_else(|| "stub".into()),
+            );
+            report.push("wer", report::format_rate(overall));
+            report.push("wer_words", overall.reference_words.to_string());
+            report.push("wer_errors", overall.errors().to_string());
+            for (index, utt) in utts.iter().enumerate() {
+                let n = index + 1;
+                report.push(format!("utt_{n:02}_ref"), utt.reference.as_str());
+                report.push(format!("utt_{n:02}_hyp"), utt.hypothesis.as_str());
+                report.push(format!("utt_{n:02}_wer"), report::format_rate(&utt.wer));
+                report.push(format!("utt_{n:02}_ms"), report::format_ms(utt.wall_us));
+            }
+        }
+    }
+}
+
 fn drive(
     kind: EngineKind,
-    want_asr: bool,
+    ear: &EarPlan,
+    sense: Sense,
     question: &[Vec<i16>],
     yeah: &[i16],
     stop: &[Vec<i16>],
 ) -> Result<Trial, String> {
-    let recognizer = EarRec::new(&LINES, want_asr);
-    if want_asr && !recognizer.using_asr() {
-        return Err("vosk opened once and then did not".into());
-    }
-    let finals = recognizer.final_handle();
+    let recognizer = match ear {
+        EarPlan::Live {
+            kettle_hyp,
+            stop_hyp,
+            ..
+        } => EarRec::recognised(&[kettle_hyp.as_str(), "yeah", stop_hyp.as_str()]),
+        EarPlan::Stub { .. } => EarRec::scripted(&LINES),
+    };
+    let from_script = recognizer.is_script();
     let mut duplex = Duplex::new(
         Parts {
             recognizer,
@@ -399,40 +489,58 @@ fn drive(
         Kettle,
     )
     .map_err(|err| err.to_string())?;
-    // No speaker. The input is the script, not a microphone echo.
-    // Ear prosody stays at the duplex default, which is on.
+    // The scripted WAV is not a microphone hearing the mouth. Echo
+    // cancellation would treat the barge as playback. Prosody follows the
+    // ear switch: off means a non-zero sample is voiced again.
     duplex.set_aec(false);
+    duplex.set_prosody(sense == Sense::On);
 
     let mut speech_end = None;
     let mut heard_voice = false;
     let mut first_audio = None;
+    let mut playing = false;
     let mut barge_onset = None;
     let mut conductor_barge_ms = None;
+    let mut brain_query = None;
 
     for frame in question {
         note_end(frame, &mut heard_voice, &mut speech_end);
         let out = duplex.tick(frame).map_err(|err| err.to_string())?;
+        note_query(&out, &mut brain_query);
         note_audio(&mut first_audio, speech_end, duplex.mouth().buffered_at());
+        if out.me_first || out.event == LoopEvent::FirstAudio {
+            playing = true;
+        }
         note_barge(&out, &mut barge_onset, &mut conductor_barge_ms);
     }
+    // A stub mouth never stamps a wall-clock buffer time. Waiting on that
+    // stamp pulls the tone dry before the barge. Stop once a mouth frame
+    // has actually played.
     let mut extra = 0u32;
-    while first_audio.is_none() && extra < 30 {
+    while !playing && extra < 8 {
         let silence = vec![0i16; FRAME_SAMPLES];
         note_end(&silence, &mut heard_voice, &mut speech_end);
         let out = duplex.tick(&silence).map_err(|err| err.to_string())?;
+        note_query(&out, &mut brain_query);
         note_audio(&mut first_audio, speech_end, duplex.mouth().buffered_at());
+        if out.me_first || out.event == LoopEvent::FirstAudio {
+            playing = true;
+        }
         note_barge(&out, &mut barge_onset, &mut conductor_barge_ms);
         extra += 1;
     }
     for _ in 0..6 {
         let out = duplex.tick(yeah).map_err(|err| err.to_string())?;
+        note_query(&out, &mut brain_query);
         note_barge(&out, &mut barge_onset, &mut conductor_barge_ms);
     }
     let silence = vec![0i16; FRAME_SAMPLES];
     let out = duplex.tick(&silence).map_err(|err| err.to_string())?;
+    note_query(&out, &mut brain_query);
     note_barge(&out, &mut barge_onset, &mut conductor_barge_ms);
     for frame in stop {
         let out = duplex.tick(frame).map_err(|err| err.to_string())?;
+        note_query(&out, &mut brain_query);
         note_barge(&out, &mut barge_onset, &mut conductor_barge_ms);
     }
 
@@ -443,7 +551,6 @@ fn drive(
     if !mouth_real {
         first_audio = None;
     }
-    let hypothesis = finals.borrow().clone();
     Ok(Trial {
         first_audio_us: first_audio,
         barge_ns: if mouth_real {
@@ -459,8 +566,15 @@ fn drive(
         },
         conductor_barge_ms,
         spoken: duplex.mouth().spoken().to_vec(),
-        hypothesis,
+        brain_query: brain_query.unwrap_or_default(),
+        from_script,
     })
+}
+
+fn note_query(out: &horbm_duplex::FrameOut, brain_query: &mut Option<String>) {
+    if brain_query.is_none() && out.event == LoopEvent::EagerEndOfTurn {
+        *brain_query = Some(out.partial.clone());
+    }
 }
 
 fn note_end(frame: &[i16], heard_voice: &mut bool, speech_end: &mut Option<Instant>) {

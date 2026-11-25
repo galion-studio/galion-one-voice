@@ -259,7 +259,11 @@ fn resolve_lib() -> Option<PathBuf> {
 /// `GALION_VOSK_THREADS` wins. Else the core-map thread count when pinned
 /// (`placed` > 0), else 2.
 fn apply_cpu_env(cmd: &mut Command, placed: u32) {
-    let fallback = if placed > 0 { placed.to_string() } else { "2".into() };
+    let fallback = if placed > 0 {
+        placed.to_string()
+    } else {
+        "2".into()
+    };
     let n = std::env::var("GALION_VOSK_THREADS").unwrap_or(fallback);
     if std::env::var_os("OMP_NUM_THREADS").is_none() {
         cmd.env("OMP_NUM_THREADS", &n);

@@ -7,7 +7,7 @@ use std::alloc::{GlobalAlloc, Layout, System};
 use std::cell::Cell;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use horbm_e2e::{run, EmotionClaim, Outcome, Sense, EMOTION_FRAME_MS};
+use horbm_e2e::{run, EmotionClaim, Outcome, Sense, EMOTION_FRAME_MS, SENTENCES};
 
 struct Counting;
 
@@ -141,15 +141,54 @@ fn assert_common(outcome: &Outcome, text: &str, sense: Sense) {
         assert_eq!(field(text, "prosody"), "off");
         assert!(!text.lines().any(|line| line.starts_with("prosody_ns=")));
     }
+    let heard_kettle = outcome.brain_query.to_ascii_lowercase().contains("kettle");
+    assert_eq!(
+        outcome.spoke_kettle, heard_kettle,
+        "brain query {:?} spoke_kettle {}",
+        outcome.brain_query, outcome.spoke_kettle
+    );
     if outcome.asr_real {
+        assert!(!outcome.brain_from_script);
         assert_eq!(field(text, "asr"), "vosk");
-        if field(text, "wer") != "stub" {
-            let wer: f64 = field(text, "wer").parse().expect("wer");
-            assert!(wer.is_finite());
+        assert_eq!(field(text, "asr_device"), "cpu");
+        assert_eq!(field(text, "asr_model"), "vosk-model-small-en-us-0.15");
+        assert_eq!(field(text, "brain_from"), "recognised");
+        assert_eq!(field(text, "asr_utts"), SENTENCES.len().to_string());
+        let wer: f64 = field(text, "wer").parse().expect("wer");
+        assert!(wer.is_finite() && wer >= 0.0, "wer {wer}");
+        let p50: f64 = field(text, "asr_p50_ms").parse().expect("asr p50");
+        let p95: f64 = field(text, "asr_p95_ms").parse().expect("asr p95");
+        assert!(p50 > 0.0 && p50 <= p95, "asr p50 {p50} p95 {p95}");
+        let flat = |text: &str| text.split_whitespace().collect::<Vec<_>>().join(" ");
+        assert_eq!(
+            flat(&outcome.brain_query),
+            flat(&outcome.kettle_hyp),
+            "the brain did not receive the recognised text"
+        );
+        for (index, sentence) in SENTENCES.iter().enumerate() {
+            let n = index + 1;
+            assert_eq!(
+                field(text, &format!("utt_{n:02}_ref")),
+                sentence.replace(' ', "_")
+            );
+            let line_wer: f64 = field(text, &format!("utt_{n:02}_wer"))
+                .parse()
+                .expect("utt wer");
+            assert!(line_wer.is_finite() && line_wer >= 0.0);
+            let ms: f64 = field(text, &format!("utt_{n:02}_ms"))
+                .parse()
+                .expect("utt ms");
+            assert!(ms > 0.0, "utt {n} latency {ms}");
         }
     } else {
+        assert!(outcome.brain_from_script);
         assert_eq!(field(text, "asr"), "stub");
         assert_eq!(field(text, "wer"), "stub");
+        assert_eq!(field(text, "asr_p50_ms"), "stub");
+        assert_eq!(field(text, "asr_p95_ms"), "stub");
+        assert_eq!(field(text, "brain_from"), "script");
+        let skip = field(text, "asr_skip");
+        assert!(!skip.is_empty() && skip != "stub", "asr_skip {skip}");
         assert!(
             outcome.spoke_kettle,
             "the scripted kettle question had no kettle reply"
