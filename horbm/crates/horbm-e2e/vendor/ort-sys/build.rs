@@ -34,8 +34,8 @@ fn fetch_file(source_url: &str) -> Vec<u8> {
 			.https_only(true)
 			.tls_config(
 				ureq::tls::TlsConfig::builder()
-					.provider(ureq::tls::TlsProvider::NativeTls)
-					.root_certs(ureq::tls::RootCerts::PlatformVerifier)
+					.provider(ureq::tls::TlsProvider::Rustls)
+					.root_certs(ureq::tls::RootCerts::WebPki)
 					.build()
 			)
 			.user_agent(format!(

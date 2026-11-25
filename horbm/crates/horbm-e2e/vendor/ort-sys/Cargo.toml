@@ -110,6 +110,7 @@ optional = true
 version = "3"
 features = [
     "rustls",
+    "socks-proxy",
 ]
 optional = true
 default-features = false
