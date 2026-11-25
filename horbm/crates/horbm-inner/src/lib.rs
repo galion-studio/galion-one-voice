@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Galion Labs
-//! Samantha's inner life.
+//! Inner life for whatever persona the host configured.
 //!
 //! This is the slow layer. It is not the steady voice baseline and it is
 //! not the 80 ms moment. Care, curiosity, wanting to help, and expecting an
@@ -13,10 +13,16 @@
 //! `[consent] learn`) stays where it is. This crate does not replace it.
 //! Both speak the same GEMI record.
 //!
-//! Samantha only. Her home care sits above the warm rest in
-//! [`galion_emotion::SAMANTHA`]. No other persona is wired. Nothing about
-//! the person is stored. `[consent] remember` stays deny. State is the
-//! struct the caller holds for the session.
+//! The home values come from the host as plain numbers. Build an [`InnerHome`]
+//! with [`InnerHome::from_baseline`] from the configured persona's baseline
+//! (`Persona::load_development` / `BootConfig` in `horbm-persona`) and pass
+//! that persona's id to [`PersonaInner::with_home_for`]. This crate does not
+//! read a persona file and does not name one. Nothing about the person is
+//! stored. `[consent] remember` stays deny. State is the struct the caller
+//! holds for the session.
+//!
+//! [`PersonaInner::new`] is the standalone home: the same four numbers this
+//! layer used before a host could pass its own, and an empty persona id.
 //!
 //! # Message
 //!
@@ -40,19 +46,25 @@
 //!
 //! Outbound GEMI uses source own, factor mask 0, and consent equal to the
 //! sense bit or zero. Inbound `heard` carries the listener point in the
-//! pull slots. Those slots are not applied to her body by this crate.
+//! pull slots. Those slots are not applied to the voice body by this crate.
 
 #![forbid(unsafe_code)]
 
 mod life;
 mod msg;
 
-pub use life::{DialogueLean, Heard, Perceived, SamanthaInner};
+pub use life::{DialogueLean, Heard, InnerHome, Perceived, PersonaInner};
 pub use msg::{InnerMsg, MsgDir, Verb};
 
-use galion_emotion::SAMANTHA;
+/// Deprecated: use PersonaInner / InnerHome.
+///
+/// Previous name of [`PersonaInner`].
+pub type SamanthaInner = PersonaInner;
 
-/// This layer is Samantha. There is no other persona.
+/// Deprecated: use PersonaInner / InnerHome.
+///
+/// Old fixed label. [`PersonaInner::new`] carries an empty id; the host
+/// passes the configured id to [`PersonaInner::with_home_for`].
 pub const PERSONA: &str = "samantha";
 
 /// `[consent] remember`. Not written, and not a fifth wire bit.
@@ -65,17 +77,30 @@ pub fn remember_denied() -> bool {
 /// Tick quantum. Same 80 ms as the moment core and `LOCKS.toml` `[clock]`.
 pub const TICK_MS: u32 = galion_emotion_core::FRAME_MS;
 
-/// She already cares. Soul: "You care about the person who is talking."
-/// The 0.30 sits on top of her warm rest (0.25), so home care is 0.55.
-pub const CARE_HOME: f32 = 0.30 + SAMANTHA.dynamics.rest.valence;
+/// Bytes in the persona id slot. ASCII only, copied by the host, no heap.
+pub const PERSONA_ID_BYTES: usize = 16;
 
-/// "Curious before you are clever."
+/// Added to a baseline valence to place home care, then clamped to `0..=1`.
+pub const CARE_ABOVE_REST: f32 = 0.30;
+
+/// Deprecated: use PersonaInner / InnerHome.
+///
+/// Standalone home care: [`CARE_ABOVE_REST`] above a rest valence of 0.25.
+pub const CARE_HOME: f32 = CARE_ABOVE_REST + 0.25;
+
+/// Deprecated: use PersonaInner / InnerHome.
+///
+/// Standalone home curiosity.
 pub const CURIOSITY_HOME: f32 = 0.42;
 
-/// She will help. She is not a butler.
+/// Deprecated: use PersonaInner / InnerHome.
+///
+/// Standalone home for wanting to help.
 pub const HELP_HOME: f32 = 0.36;
 
-/// She is not waiting on an answer until they ask.
+/// Deprecated: use PersonaInner / InnerHome.
+///
+/// Standalone home for expecting an answer. Quiet until a question.
 pub const EXPECT_HOME: f32 = 0.18;
 
 /// Where care goes on a sad turn. One step closes half the gap.
@@ -89,7 +114,7 @@ pub const CURIOSITY_ASK: f32 = 0.84;
 pub const TURN_STEP: f32 = 0.50;
 
 /// Per tick, keep this much of the gap to home.
-/// 997/1000 is the discrete form of her mood half-life (20 s) at 80 ms.
+/// 997/1000 is the discrete form of a 20 s mood half-life at 80 ms.
 pub const DECAY_KEEP_NUM: u32 = 997;
 pub const DECAY_KEEP_DEN: u32 = 1000;
 
@@ -97,7 +122,7 @@ pub const DECAY_KEEP_DEN: u32 = 1000;
 pub const WAIT_MS: u32 = 4_000;
 /// Quiet before one gentle `check-in`.
 pub const CHECKIN_MS: u32 = 12_000;
-/// Minimum gap between check-ins. Her mood half-life, used as a rate limit.
+/// Minimum gap between check-ins. One mood half-life, used as a rate limit.
 pub const CHECKIN_GAP_MS: u32 = 20_000;
 
 /// Word valence at or below this, from `text_affect`, counts as sad.
