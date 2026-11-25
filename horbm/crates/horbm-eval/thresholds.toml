@@ -1,0 +1,51 @@
+# Closed HORBM gate. One file. The runner reads this and does not
+# keep a second copy of the budgets. R4: eager to voice p50 <= 200 ms,
+# p95 <= 240 ms, barge-in <= 200 ms, a listed backchannel does not cancel.
+# Emotion frames are the 80 ms lock. Answers come from the truth root only.
+
+schema = "horbm-eval/1"
+
+[persona]
+id = "samantha"
+
+[grounding]
+unknown_reply = "I don't know."
+card_prefix = "card:"
+research_prefix = "research:"
+honest_source = "honest:unknown"
+
+[emotion]
+frame_ms = 80
+frame_budget_us = 80000
+sample_rate_hz = 16000
+# Same margins the emotion-core moment tests already require.
+fatigue_arousal_drop_min = 0.2
+valence_rise_min = 0.2
+frames = 40
+
+[latency]
+clock = "virtual"
+frame_ms = 80
+eager_to_voice_p50_max_ms = 200
+eager_to_voice_p95_max_ms = 240
+barge_in_max_ms = 200
+backchannel_cancels = false
+
+# Real mode only. Mean per-sentence word error rate of the mouth-to-ear
+# round trip (the seven scripted lines, rendered by this mouth, heard by
+# vosk-model-small-en-us-0.15). The fake gate does not read this.
+[asr]
+wer_max = 0.20
+
+# Real mode wall clock. The virtual R4 lock above is unchanged.
+# Eager-to-voice is the warm Piper/Flite reply, same 200/240 budgets.
+# Barge-in on this path includes one vosk-small decode of the interruption,
+# so its wall budget is wider than the 200 ms frame lock. The virtual
+# overlap is still reported beside it and is not this number.
+[real.latency]
+clock = "wall"
+frame_ms = 80
+eager_to_voice_p50_max_ms = 200
+eager_to_voice_p95_max_ms = 240
+barge_in_max_ms = 500
+backchannel_cancels = false

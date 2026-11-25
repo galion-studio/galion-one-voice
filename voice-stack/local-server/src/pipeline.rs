@@ -48,6 +48,8 @@ pub struct PipeInfo {
     pub voice: &'static str,
     /// Why the clone is or is not the mouth. Not a timing measurement.
     pub clone_status: &'static str,
+    /// `cpu` unless the caller opted into the clone worker.
+    pub mouth_device: &'static str,
     pub mind: String,
     pub vad_backend: &'static str,
     pub vad_ready: bool,
@@ -363,6 +365,7 @@ impl<R: ReplyEngine> Pipeline for FakePipeline<R> {
             mouth: "hold",
             voice: "none",
             clone_status: "off",
+            mouth_device: "cpu",
             mind: self.reply.name().to_string(),
             vad_backend: "energy",
             vad_ready: true,

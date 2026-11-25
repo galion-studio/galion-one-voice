@@ -7,8 +7,10 @@
 //! default plugin is installed. This process does not bind a socket.
 //!
 //! `--self-test` skips the devices and runs the closed script on synthetic
-//! tones. `--no-prosody` is the runtime off switch. `--json` prints one
-//! JSON object per voice onset and per barge-in.
+//! tones. That script is not an acoustic path, so echo removal is bypassed
+//! there. `--no-prosody` turns ear sensing off. `--no-aec` is the echo
+//! bypass on the device path. `--json` prints one JSON object per voice
+//! onset and per barge-in.
 //!
 //! Build: `cargo run --manifest-path horbm/Cargo.toml -p horbm-duplex --features live --bin horbm-duplex-live`
 //! The recognizer is the stand-in unless this bin is also built with `--features vosk`.
@@ -23,7 +25,8 @@ use horbm::{CardHit, CardLookup};
 use horbm_duplex::SilentRecognizer;
 use horbm_duplex::{
     CoreAffect, Duplex, FramePump, Hypothesis, HypothesisKind, LoopEvent, NativeMouth, Parts,
-    RecogError, Recognizer, SamanthaPersona, SpeakingBreath, FRAME_SAMPLES, SAMPLE_RATE,
+    PlaybackEcho, RecogError, Recognizer, SamanthaPersona, SpeakingBreath, FRAME_SAMPLES,
+    SAMPLE_RATE,
 };
 
 const HELP: &str = "\
@@ -32,8 +35,9 @@ horbm-duplex-live
   Opens the default input and the default output. Both bands step on each
   80 ms of captured audio. Nothing is bound to the network.
 
-  --self-test     synthetic tones, no device
+  --self-test     synthetic tones, no device, echo bypassed
   --no-prosody    ear sensing off (any non-zero sample is voiced)
+  --no-aec        echo bypass (the microphone frame reaches the ear)
   --json          one JSON object per voice onset and per barge-in
   --help          this text
 
@@ -55,11 +59,13 @@ impl CardLookup for NoCards {
 fn main() -> ExitCode {
     let mut json = false;
     let mut prosody = true;
+    let mut aec = true;
     let mut self_test = false;
     for arg in std::env::args().skip(1) {
         match arg.as_str() {
             "--json" => json = true,
             "--no-prosody" => prosody = false,
+            "--no-aec" => aec = false,
             "--self-test" => self_test = true,
             "--help" | "-h" => {
                 println!("{HELP}");
@@ -78,7 +84,7 @@ fn main() -> ExitCode {
     #[cfg(feature = "vosk")]
     {
         match horbm_duplex::AsrRecognizer::from_env() {
-            Ok(recognizer) => run_devices(json, prosody, recognizer),
+            Ok(recognizer) => run_devices(json, prosody, aec, recognizer),
             Err(err) => {
                 eprintln!("duplex s28 recognizer {err}");
                 ExitCode::from(1)
@@ -87,13 +93,13 @@ fn main() -> ExitCode {
     }
     #[cfg(not(feature = "vosk"))]
     {
-        run_devices(json, prosody, SilentRecognizer::new())
+        run_devices(json, prosody, aec, SilentRecognizer::new())
     }
 }
 
-fn run_devices<R: Recognizer>(json: bool, prosody: bool, recognizer: R) -> ExitCode {
+fn run_devices<R: Recognizer>(json: bool, prosody: bool, aec: bool, recognizer: R) -> ExitCode {
     let name = recognizer.name().to_string();
-    let mut duplex = match build(recognizer, prosody) {
+    let mut duplex = match build(recognizer, prosody, aec) {
         Ok(duplex) => duplex,
         Err(err) => {
             eprintln!("duplex s28 {err}");
@@ -112,9 +118,10 @@ fn run_devices<R: Recognizer>(json: bool, prosody: bool, recognizer: R) -> ExitC
         }
     };
     eprintln!(
-        "duplex s28 host={} recognizer={name} emotion=galion-emotion-core prosody={} persona=samantha mouth=native breath=stand-in network=none",
+        "duplex s28 host={} recognizer={name} emotion=galion-emotion-core prosody={} aec={} persona=samantha mouth=native breath=stand-in network=none",
         session.info().host,
         on_off(duplex.prosody_enabled()),
+        aec_label(duplex.aec_enabled()),
     );
     let playback = session.playback();
     let capture = session.capture();
@@ -153,6 +160,7 @@ fn run_self_test(json: bool, prosody: bool) -> ExitCode {
     let mut duplex = match build(
         Script::new(&["where is the kettle", "yeah", "stop now"]),
         prosody,
+        false,
     ) {
         Ok(duplex) => duplex,
         Err(err) => {
@@ -161,8 +169,9 @@ fn run_self_test(json: bool, prosody: bool) -> ExitCode {
         }
     };
     eprintln!(
-        "duplex s28 host=self-test recognizer=stand-in emotion=galion-emotion-core prosody={} persona=samantha mouth=native breath=stand-in network=none",
+        "duplex s28 host=self-test recognizer=stand-in emotion=galion-emotion-core prosody={} aec={} persona=samantha mouth=native breath=stand-in network=none",
         on_off(duplex.prosody_enabled()),
+        aec_label(duplex.aec_enabled()),
     );
     let mut pump = FramePump::new();
     let mut feed =
@@ -225,6 +234,7 @@ fn run_self_test(json: bool, prosody: bool) -> ExitCode {
 fn build<R: Recognizer>(
     recognizer: R,
     prosody: bool,
+    aec: bool,
 ) -> Result<Duplex<R, CoreAffect, SpeakingBreath, SamanthaPersona, NativeMouth>, String> {
     let mut duplex = Duplex::new(
         Parts {
@@ -240,6 +250,7 @@ fn build<R: Recognizer>(
     if !prosody {
         duplex.set_prosody(false);
     }
+    duplex.set_aec(aec);
     Ok(duplex)
 }
 
@@ -262,6 +273,7 @@ fn event_name(event: LoopEvent) -> Option<&'static str> {
         | LoopEvent::EagerEndOfTurn
         | LoopEvent::Committed
         | LoopEvent::Backchannel
+        | LoopEvent::ListenBackchannel
         | LoopEvent::TurnResumed => None,
     }
 }
@@ -271,6 +283,16 @@ fn on_off(on: bool) -> &'static str {
         "on"
     } else {
         "off"
+    }
+}
+
+fn aec_label(on: bool) -> &'static str {
+    if !PlaybackEcho::compiled() {
+        "off"
+    } else if on {
+        "on"
+    } else {
+        "bypass"
     }
 }
 
