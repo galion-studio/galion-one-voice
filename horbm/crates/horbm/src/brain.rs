@@ -9,6 +9,7 @@ use galion_emotion_core::{
     ConductorCue, EmotionCore, InnerLife, InnerTurn, IntentMsg, MomentState, VoiceBaseline,
 };
 use galion_sam_empathy::{Empathy, PronounClass, TickIn, FRAME_MS};
+use horbm_persona::{MoveClaim, MoveVerdict, Persona, PersonaError};
 
 use horbm_brain::{classify, pick, split_clause, Retrieved, Retriever, SidebandMark};
 
@@ -74,6 +75,7 @@ pub struct Brain {
     card_count: usize,
     emotion: EmotionCore,
     inner: InnerLife,
+    persona: Persona,
 }
 
 struct Spoke {
@@ -127,6 +129,7 @@ impl Brain {
         research: Option<Box<dyn ResearchAsk + Send>>,
     ) -> Self {
         let card_count = cards.len();
+        let (emotion, inner, persona) = install(development_persona());
         Self {
             empathy: Empathy::new(),
             cards: Box::new(cards),
@@ -135,14 +138,34 @@ impl Brain {
             gaps: Vec::new(),
             meta: resting_meta(),
             card_count,
-            emotion: EmotionCore::at_rest(),
-            inner: InnerLife::seeded(),
+            emotion,
+            inner,
+            persona,
         }
     }
 
     /// Clauses loaded at `open` or `with_cards`. The example kettle directory is one.
     pub fn cards(&self) -> usize {
         self.card_count
+    }
+
+    /// Read the persona file once, then open cards the way [`Self::open`] does.
+    ///
+    /// `None` loads Samantha. An explicit path replaces her. An unreadable or
+    /// invalid file returns the error and does not build a brain.
+    pub fn boot(
+        memory_db: &Path,
+        knowledge_dir: &Path,
+        cases: &Path,
+        persona_file: Option<&Path>,
+    ) -> Result<Self, PersonaError> {
+        let persona = match persona_file {
+            Some(path) => Persona::load(path)?,
+            None => development_persona(),
+        };
+        let mut brain = Self::open(memory_db, knowledge_dir, cases);
+        brain.install_persona(persona);
+        Ok(brain)
     }
 
     /// Read `knowledge_dir` when it is already a directory. A missing path is
@@ -199,9 +222,26 @@ impl Brain {
         self.emotion.step(intent)
     }
 
-    /// The inner life. Persona and memory are not stored here.
+    /// The character loaded at boot. The moment step does not write it.
+    pub fn persona(&self) -> &Persona {
+        &self.persona
+    }
+
+    /// Legal-move port. The dialogue manager calls this with one candidate.
+    pub fn admit_move(&self, claim: MoveClaim<'_>) -> MoveVerdict {
+        self.persona.verdict(claim)
+    }
+
+    /// The inner life. Memory is not stored here.
     pub fn inner(&self) -> &InnerLife {
         &self.inner
+    }
+
+    fn install_persona(&mut self, persona: Persona) {
+        let (emotion, inner, persona) = install(persona);
+        self.emotion = emotion;
+        self.inner = inner;
+        self.persona = persona;
     }
 
     /// One dialogue turn of cares, wants, and expects. Emits a GEMI intent
@@ -367,6 +407,16 @@ impl Brain {
             sideband,
         }
     }
+}
+
+fn development_persona() -> Persona {
+    Persona::samantha().expect("samantha.toml is the development persona")
+}
+
+fn install(persona: Persona) -> (EmotionCore, InnerLife, Persona) {
+    let emotion = EmotionCore::from_baseline(persona.baseline());
+    let inner = persona.inner_life();
+    (emotion, inner, persona)
 }
 
 fn resting_meta() -> MoodMeta {

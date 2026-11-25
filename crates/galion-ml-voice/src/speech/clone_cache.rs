@@ -40,6 +40,7 @@
 
 use super::sha256::{self, Sha256};
 use galion_consent::{Approval, Registry, Verdict};
+use std::fmt::Write;
 use std::path::{Path, PathBuf};
 
 /// Bump when the tensor set or the metadata changes.
@@ -103,7 +104,11 @@ impl CondKey {
     }
 
     pub fn canonical(&self) -> String {
-        self.metadata().into_iter().map(|(k, v)| format!("{k}={v}\n")).collect()
+        let mut out = String::new();
+        for (k, v) in self.metadata() {
+            let _ = writeln!(out, "{k}={v}");
+        }
+        out
     }
 
     pub fn id(&self) -> String {

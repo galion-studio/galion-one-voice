@@ -640,7 +640,7 @@ impl Rika {
             }
             RikaState::Quiet => {
                 if voiced {
-                    self.to_idle();
+                    self.enter_idle();
                 } else if ctx.late {
                     // scheduler artefact: skip the shift test, state unchanged
                 } else if (self.return_pending && present) || self.shift(&f, voiced) {
@@ -661,7 +661,7 @@ impl Rika {
             }
             RikaState::Candidate => {
                 if voiced {
-                    self.to_idle();
+                    self.enter_idle();
                 } else if ctx.late {
                     // hysteresis NOT advanced on a late frame
                 } else if (self.return_pending && present) || self.shift(&f, voiced) {
@@ -725,7 +725,7 @@ impl Rika {
                 }
                 self.refractory_left = self.refractory_left.saturating_sub(1);
                 if self.refractory_left == 0 {
-                    self.to_idle();
+                    self.enter_idle();
                     self.soft_ack_used = false;
                 }
             }
@@ -780,7 +780,7 @@ impl Rika {
         }
     }
 
-    fn to_idle(&mut self) {
+    fn enter_idle(&mut self) {
         self.state = RikaState::Idle;
         self.quiet_run = 0;
         self.hits = 0;

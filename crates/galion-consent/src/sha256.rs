@@ -2,6 +2,8 @@
 // Copyright (c) 2026 Galion Labs.
 //! Minimal streaming SHA-256 (FIPS 180-4) for A21 weight verification. No deps.
 
+use std::fmt::Write;
+
 const K: [u32; 64] = [
     0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
     0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
@@ -89,7 +91,12 @@ impl Sha256 {
         self.buf.extend_from_slice(data);
     }
     pub fn hex(self) -> String {
-        self.digest().iter().map(|b| format!("{b:02x}")).collect()
+        let bytes = self.digest();
+        let mut out = String::with_capacity(bytes.len() * 2);
+        for b in bytes {
+            let _ = write!(out, "{b:02x}");
+        }
+        out
     }
 
     /// Raw digest, big-endian words, same padding as [`hex`](Self::hex).

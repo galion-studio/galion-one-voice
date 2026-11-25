@@ -10,6 +10,12 @@
 //! [`clock::SIDE_BAND_CAP_MS`] on the virtual frame clock. The default client
 //! is offline and reports unavailable on the ask.
 //!
+//! While the user holds the turn, [`Conductor::tick_listen`] may nod: one
+//! short backchannel on the quiet frame after a clause-final fall. That nod
+//! does not take the floor and is not a barge-in. `GALION_BACKCHANNEL=0|off`
+//! closes it. A denied ear (`PauseOnly`) does not nod, because the fall and
+//! the question rise are both pitch.
+//!
 //! Time is a virtual frame counter ([`clock::VirtualClock`]). One tick is
 //! 80 ms, the locked frame. The host runs [`Conductor::tick`] on the turn
 //! worker. It does not run inside the heartbeat frame function.
@@ -23,6 +29,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod backchannel;
 pub mod brain;
 pub mod clock;
 pub mod conductor;
@@ -32,12 +39,17 @@ pub mod reaction;
 pub mod research;
 pub mod stamps;
 
+pub use backchannel::{
+    listener_on_bus, persona_allows, Affect, Backchannel, BackchannelConfig, BackchannelKind,
+    ListenCue, ListenMood, BACKCHANNEL_ENV, BACKCHANNEL_GAP_MS, BACKCHANNEL_PEAK_MAX,
+    SPEECH_PEAK_MIN,
+};
 pub use brain::{ClauseBrain, FakeBrain, PickedClause};
 pub use clock::{
     VirtualClock, BARGE_IN_MAX_MS, COMMIT_SILENCE_FRAMES, DUCK_MS, FRAME_MS, HANG_FRAMES,
     MIXER_RESUME_QUIET_MS, MIXER_YIELD_MS, PAUSE_MS, SIDE_BAND_CAP_MS, STABLE_TICKS,
 };
-pub use conductor::{Conductor, Ear, Floor, TickEvent, TickOut};
+pub use conductor::{Conductor, Ear, Floor, TickEvent, TickOut, TurnMsg};
 pub use lexicon::is_listed_backchannel;
 pub use mne::{read_back, stand_in_listen_intent};
 pub use reaction::{clip, synthetic_clip, Reaction, ReactionKind, REACTION_SAMPLES};

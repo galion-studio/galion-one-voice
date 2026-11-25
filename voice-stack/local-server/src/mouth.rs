@@ -2,11 +2,15 @@
 // Copyright (c) 2026 Galion Labs
 //! Which mouth the 7881 server speaks with.
 //!
-//! Stock speech is Piper `en_US-ljspeech-medium`. The s711 clone is the
-//! Chatterbox worker in `samantha-voice-clone`. It is selected only when
-//! `GALION_SAMANTHA_REF` is a local wav, `GALION_SAMANTHA_WEIGHTS` is a local
-//! checkpoint directory, and `GALION_SAMANTHA_DEVICE=cuda` with CUDA visible
-//! to that crate's probe. `auto` stays on CPU, the same rule as the clone crate.
+//! The turn itself is [`crate::native`]. This module is only the mouth.
+//! Boot default is CPU (`mouth_device = cpu`). The in-process tone is the
+//! mouth when the Piper adapter is not linked. Piper `en_US-ljspeech-medium`
+//! is the mouth only when this crate is built with `--features piper`.
+//! The s711 clone is the Chatterbox worker in `samantha-voice-clone`. It is
+//! selected only when `GALION_SAMANTHA_REF` is a local wav,
+//! `GALION_SAMANTHA_WEIGHTS` is a local checkpoint directory, and
+//! `GALION_SAMANTHA_DEVICE=cuda` with CUDA visible to that crate's probe.
+//! `auto` stays on CPU, the same rule as the clone crate.
 //!
 //! CPU does not select s711. This process has no measured s711 CPU real-time
 //! factor, and a Chatterbox `generate` on CPU is not treated as able to feed
@@ -15,7 +19,8 @@
 
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use galion_tts_piper::{resample_linear, PiperTts, Tts as PiperSpeak};
+#[cfg(feature = "piper")]
+use galion_tts_piper::{PiperTts, Tts as PiperSpeak};
 use samantha_voice_clone::Tts as CloneSpeak;
 
 use crate::audio::SPEAKER_RATE;
@@ -43,13 +48,13 @@ impl MouthCue {
         }
     }
 
-    pub(crate) fn from_turn(turn: &crate::reply::TurnOut) -> Self {
+    pub(crate) fn from_spoken(line: &horbm_voice::SpokenLine) -> Self {
         Self {
-            mood: turn.mood,
-            rate: turn.prosody_rate,
-            energy: turn.prosody_energy,
-            pitch_st: turn.prosody_pitch_st,
-            pause_ms: turn.prosody_pause_ms,
+            mood: crate::native::cue_pad(line.mood),
+            rate: line.rate,
+            energy: line.energy,
+            pitch_st: line.pitch_st,
+            pause_ms: line.pause_ms,
         }
     }
 }
@@ -166,7 +171,7 @@ pub(crate) fn decide(input: &SelectInput) -> Choice {
     }
 }
 
-fn read_input() -> SelectInput {
+pub(crate) fn read_input() -> SelectInput {
     let raw_ref = std::env::var("GALION_SAMANTHA_REF").unwrap_or_default();
     let ref_trimmed = raw_ref.trim();
     let ref_set = !ref_trimmed.is_empty();
@@ -195,32 +200,69 @@ fn log_once(line: &str) {
     ONCE.call_once(|| eprintln!("{line}"));
 }
 
-pub(crate) fn open() -> Box<dyn Mouth> {
-    let choice = decide(&read_input());
+/// Device the selected adapter runs on. CPU unless the caller opted into cuda.
+pub(crate) fn mouth_device(choice: &Choice) -> &'static str {
     match choice {
-        Choice::Piper { clone_status, log } => {
-            if let Some(line) = log {
-                log_once(line);
+        Choice::S711 { .. } => "cuda",
+        Choice::Piper { .. } => crate::native::BOOT_MOUTH_DEVICE,
+    }
+}
+
+/// Name of the mouth this build will construct. Does not open a process.
+#[cfg(test)]
+pub(crate) fn linked_name(choice: &Choice) -> &'static str {
+    match choice {
+        Choice::S711 { .. } => "s711",
+        Choice::Piper { .. } => {
+            #[cfg(feature = "piper")]
+            {
+                "piper"
             }
-            open_piper(clone_status)
+            #[cfg(not(feature = "piper"))]
+            {
+                "fake"
+            }
         }
+    }
+}
+
+pub(crate) fn open_selected(choice: &Choice) -> Box<dyn Mouth> {
+    match *choice {
+        Choice::Piper { clone_status, log } => open_cpu(clone_status, log),
         Choice::S711 { log } => {
             log_once(log);
             match samantha_voice_clone::SamanthaTts::open_from_env() {
                 Ok(tts) => Box::new(S711Mouth { tts }),
                 Err(err) => {
-                    eprintln!(
-                        "samantha-mouth: s711 did not open ({err}). Keeping Piper en_US-ljspeech-medium."
-                    );
-                    open_piper("open-failed")
+                    eprintln!("samantha-mouth: s711 did not open ({err}). Keeping the CPU mouth.");
+                    open_cpu("open-failed", None)
                 }
             }
         }
     }
 }
 
+fn open_cpu(clone_status: &'static str, log: Option<&'static str>) -> Box<dyn Mouth> {
+    #[cfg(feature = "piper")]
+    {
+        if let Some(line) = log {
+            log_once(line);
+        }
+        return open_piper(clone_status);
+    }
+    #[cfg(not(feature = "piper"))]
+    {
+        let _ = log;
+        log_once(
+            "samantha-mouth: Piper is not linked in this build. The CPU mouth is the in-process tone. Not a new timing.",
+        );
+        Box::new(ToneMouth { clone_status })
+    }
+}
+
 /// First clause is handed to `on_pcm` before the next clause starts.
 #[allow(clippy::type_complexity)]
+#[cfg(any(test, feature = "piper"))]
 pub(crate) fn speak_pieces(
     text: &str,
     cancel: &AtomicBool,
@@ -256,6 +298,7 @@ pub(crate) fn speak_pieces(
     Ok(())
 }
 
+#[cfg(feature = "piper")]
 fn open_piper(clone_status: &'static str) -> Box<dyn Mouth> {
     match PiperTts::open_resolved() {
         Ok(tts) => Box::new(PiperMouth { tts, clone_status }),
@@ -263,9 +306,44 @@ fn open_piper(clone_status: &'static str) -> Box<dyn Mouth> {
     }
 }
 
+/// CPU mouth when the Piper adapter is not in this build. A tone, not a voice.
+#[cfg(not(feature = "piper"))]
+struct ToneMouth {
+    clone_status: &'static str,
+}
+
+#[cfg(not(feature = "piper"))]
+impl Mouth for ToneMouth {
+    fn speak(&mut self, text: &str, cue: &MouthCue) -> Result<(Vec<i16>, u32), String> {
+        if text.trim().is_empty() {
+            return Ok((Vec::new(), SPEAKER_RATE));
+        }
+        let tone = crate::audio::hold_tone(cue.mood.valence);
+        Ok((
+            apply_empathy_prosody(&tone, SPEAKER_RATE, cue),
+            SPEAKER_RATE,
+        ))
+    }
+
+    fn mouth(&self) -> &'static str {
+        "fake"
+    }
+
+    fn voice(&self) -> &'static str {
+        "none"
+    }
+
+    fn clone_status(&self) -> &'static str {
+        self.clone_status
+    }
+}
+
+#[cfg(feature = "piper")]
 struct MissingMouth {
     clone_status: &'static str,
 }
+
+#[cfg(feature = "piper")]
 
 impl Mouth for MissingMouth {
     fn speak(&mut self, _: &str, _: &MouthCue) -> Result<(Vec<i16>, u32), String> {
@@ -282,10 +360,13 @@ impl Mouth for MissingMouth {
     }
 }
 
+#[cfg(feature = "piper")]
 struct PiperMouth {
     tts: PiperTts,
     clone_status: &'static str,
 }
+
+#[cfg(feature = "piper")]
 
 impl Mouth for PiperMouth {
     fn speak(&mut self, text: &str, cue: &MouthCue) -> Result<(Vec<i16>, u32), String> {
@@ -440,28 +521,80 @@ pub(crate) fn apply_empathy_prosody(pcm: &[i16], sample_rate: u32, cue: &MouthCu
     } else {
         1.0
     };
-    let shaped = if pitch.abs() < 1.0e-3 && (energy - 1.0).abs() < 1.0e-3 && pause_ms == 0 {
+    let body = if pitch.abs() < 1.0e-3 && (energy - 1.0).abs() < 1.0e-3 {
         pcm.to_vec()
     } else {
-        galion_tts_piper::shape_pcm(
-            pcm,
-            galion_tts_piper::Prosody {
-                pitch_st: pitch,
-                energy,
-                pre_pause_ms: pause_ms,
-            },
-            sample_rate,
-            true,
-        )
+        pitch_gain(pcm, pitch, energy)
     };
     let pause_n = if sample_rate == 0 {
         0
     } else {
         ((u64::from(pause_ms) * u64::from(sample_rate)) / 1000) as usize
     };
-    let pause_n = pause_n.min(shaped.len());
-    let mut out = shaped[..pause_n].to_vec();
-    out.extend(stretch_rate(&shaped[pause_n..], rate));
+    let mut out = vec![0i16; pause_n];
+    out.extend(stretch_rate(&body, rate));
+    out
+}
+
+fn pitch_gain(input: &[i16], pitch_st: f32, energy: f32) -> Vec<i16> {
+    let ratio = (pitch_st.clamp(-6.0, 6.0) / 12.0).exp2();
+    if input.is_empty() {
+        return Vec::new();
+    }
+    if (ratio - 1.0).abs() < 1.0e-6 {
+        return input.iter().map(|sample| knee(*sample, energy)).collect();
+    }
+    let mut out = Vec::new();
+    let mut pos = 0.0f64;
+    let last = input.len() - 1;
+    while pos < input.len() as f64 {
+        let index = pos.floor() as usize;
+        let frac = (pos - index as f64) as f32;
+        let a = f32::from(input[index.min(last)]);
+        let b = f32::from(input[(index + 1).min(last)]);
+        out.push(knee_f(a + (b - a) * frac, energy));
+        pos += f64::from(ratio);
+    }
+    out
+}
+
+fn knee(sample: i16, gain: f32) -> i16 {
+    knee_f(f32::from(sample), gain)
+}
+
+fn knee_f(sample: f32, gain: f32) -> i16 {
+    let y = sample * gain.clamp(0.25, 2.0) / 32768.0;
+    let a = y.abs();
+    let shaped = if a <= 0.8 {
+        y
+    } else {
+        let t = ((a - 0.8) / 0.6).min(1.0);
+        (0.8 + 0.18 * (1.5 * t - 0.5 * t * t * t)) * y.signum()
+    };
+    (shaped * 32767.0).round().clamp(-32768.0, 32767.0) as i16
+}
+
+fn resample_linear(input: &[i16], from: u32, to: u32) -> Vec<i16> {
+    if from == 0 || to == 0 || input.is_empty() || from == to {
+        return input.to_vec();
+    }
+    let out_len =
+        ((input.len() as u64 * u64::from(to) + u64::from(from) / 2) / u64::from(from)) as usize;
+    let last = input.len() - 1;
+    let mut out = Vec::with_capacity(out_len);
+    for i in 0..out_len {
+        let num = i as u64 * u64::from(from);
+        let idx = (num / u64::from(to)) as usize;
+        let frac = (num % u64::from(to)) as f64 / f64::from(to);
+        let a = f64::from(input[idx.min(last)]);
+        let b = f64::from(input[(idx + 1).min(last)]);
+        let value = a + (b - a) * frac;
+        out.push(
+            value
+                .round()
+                .clamp(f64::from(i16::MIN), f64::from(i16::MAX)) as i16,
+        );
+    }
     out
 }
 
@@ -515,6 +648,26 @@ mod tests {
             device,
             cuda_visible: cuda,
         }
+    }
+
+    #[test]
+    fn cpu_boot_does_not_open_a_process_to_name_the_mouth() {
+        let choice = decide(&SelectInput {
+            ref_set: false,
+            ref_is_file: false,
+            weights_is_dir: false,
+            device: DeviceRequest::Cpu,
+            cuda_visible: false,
+        });
+        assert_eq!(mouth_device(&choice), "cpu");
+        #[cfg(not(feature = "piper"))]
+        assert_eq!(linked_name(&choice), "fake");
+        #[cfg(feature = "piper")]
+        assert_eq!(linked_name(&choice), "piper");
+        assert_eq!(
+            linked_name(&decide(&files(DeviceRequest::Cuda, true))),
+            "s711"
+        );
     }
 
     #[test]
