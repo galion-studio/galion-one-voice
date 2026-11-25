@@ -11,7 +11,7 @@ use galion_ml_voice::{LanguageId, TtsEngine};
 use galion_tts_piper::{Pad as PiperPad, PiperTts, Tts};
 use horbm_voice::{AudioFrame, Mouth, MouthPull, SpokenLine, FRAME_SAMPLES, SAMPLE_RATE};
 
-use crate::buffer::Loopback;
+use crate::output::Output;
 use crate::wav::{f32_to_i16, lift_quiet, resample_i16};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -143,7 +143,7 @@ pub struct LiveMouth {
     frames: VecDeque<Vec<i16>>,
     pending_first: bool,
     spoken: Vec<String>,
-    buffer: Loopback,
+    output: Output,
     buffered_at: Option<Instant>,
     synth_wall_ns: u128,
     audio_ns: u128,
@@ -155,13 +155,19 @@ pub struct LiveMouth {
 
 impl LiveMouth {
     pub fn open(kind: EngineKind) -> Result<Self, String> {
-        let (kind, name) = match kind {
+        let (kind, name, real_engine) = match kind {
             EngineKind::Piper => (
                 Kind::Piper(PiperTts::open_resolved().map_err(|err| one_line(&err))?),
                 "piper",
+                true,
             ),
-            EngineKind::Flite => (Kind::Flite(open_flite()?), "flite"),
-            EngineKind::Stub => (Kind::Stub, "stub"),
+            EngineKind::Flite => (Kind::Flite(open_flite()?), "flite", true),
+            EngineKind::Stub => (Kind::Stub, "stub", false),
+        };
+        let output = if real_engine {
+            Output::open()
+        } else {
+            Output::loopback()
         };
         Ok(Self {
             kind,
@@ -169,7 +175,7 @@ impl LiveMouth {
             frames: VecDeque::new(),
             pending_first: false,
             spoken: Vec::new(),
-            buffer: Loopback::default(),
+            output,
             buffered_at: None,
             synth_wall_ns: 0,
             audio_ns: 0,
@@ -196,6 +202,14 @@ impl LiveMouth {
         self.queued_at_barge
     }
 
+    pub fn output_name(&self) -> &'static str {
+        self.output.name()
+    }
+
+    pub fn output_device(&self) -> Option<&str> {
+        self.output.device()
+    }
+
     pub fn real(&self) -> bool {
         self.real
     }
@@ -220,7 +234,10 @@ impl LiveMouth {
         }
         self.audio_ns = (pcm.len() as u128).saturating_mul(1_000_000_000) / u128::from(rate);
         self.synth_wall_ns = wall_ns;
-        self.buffer.push(pcm);
+        if let Err(err) = self.output.push(pcm) {
+            self.error = Some(err);
+            return;
+        }
         self.buffered_at = Some(Instant::now());
         self.real = true;
         for chunk in pcm.chunks(FRAME_SAMPLES) {
@@ -296,8 +313,8 @@ impl Mouth for LiveMouth {
         if !self.real || self.stop_ns.is_some() {
             return;
         }
-        self.queued_at_barge = self.buffer.queued();
-        self.stop_ns = self.buffer.barge();
+        self.queued_at_barge = self.output.queued();
+        self.stop_ns = self.output.barge();
     }
 
     fn speaking(&self) -> bool {

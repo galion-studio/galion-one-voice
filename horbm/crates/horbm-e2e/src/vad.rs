@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Galion Labs
-//! Energy voice activity, the fallback in `voice-stack/vad`.
+//! Voice activity for the smoke.
 //!
-//! `galion-sam-vad` links ONNX Runtime and declares Rust 1.92, so this smoke
-//! does not take that crate as a dependency. The floor, the +12 dB margin,
-//! and the −48 dB clamp are the same numbers as `voice-stack/vad/src/energy.rs`.
-//! Silero is not linked and is not reported as a measured backend.
+//! The energy gate is the fallback from `voice-stack/vad`: floor −60 dB,
+//! +12 dB margin, clamp −48 dB. With the `silero` feature, the same 20 ms
+//! frames also go through Silero when `silero.lock` downloads and matches.
+//! A missing model stays on this gate and is not reported as Silero.
 
 /// 20 ms at 16 kHz. Same hop as `galion-sam-vad`.
 pub const FRAME_SAMPLES: usize = 320;
@@ -58,7 +58,79 @@ pub struct FrameCounts {
     pub quiet: u32,
 }
 
-/// Count 20 ms frames. A short tail is quiet and is not scored.
+/// Both gates on one buffer. Silero fields stay empty when that model did not run.
+#[derive(Clone, Debug)]
+pub struct Score {
+    pub backend: &'static str,
+    pub voiced: u32,
+    pub quiet: u32,
+    pub energy_voiced: u32,
+    pub energy_quiet: u32,
+    pub silero_voiced: Option<u32>,
+    pub silero_quiet: Option<u32>,
+    pub frame_cpu_p50_ns: Option<u64>,
+    pub frame_cpu_p95_ns: Option<u64>,
+    pub model_cpu_p50_ns: Option<u64>,
+    pub model_cpu_p95_ns: Option<u64>,
+    pub warm_cpu_ns: Option<u64>,
+    pub sha256: Option<String>,
+    pub fallback: Option<String>,
+}
+
+/// Energy always. Silero when the feature is on and the official model loads.
+pub fn score(pcm: &[i16]) -> Score {
+    let energy = count_frames(pcm);
+    #[cfg(feature = "silero")]
+    {
+        match crate::silero::ensure_model() {
+            Ok(path) => match crate::silero::score_file(pcm, &path) {
+                Ok(times) => Score {
+                    backend: "silero",
+                    voiced: times.counts.voiced,
+                    quiet: times.counts.quiet,
+                    energy_voiced: energy.voiced,
+                    energy_quiet: energy.quiet,
+                    silero_voiced: Some(times.counts.voiced),
+                    silero_quiet: Some(times.counts.quiet),
+                    frame_cpu_p50_ns: times.frame_cpu_p50_ns,
+                    frame_cpu_p95_ns: times.frame_cpu_p95_ns,
+                    model_cpu_p50_ns: times.model_cpu_p50_ns,
+                    model_cpu_p95_ns: times.model_cpu_p95_ns,
+                    warm_cpu_ns: times.warm_cpu_ns,
+                    sha256: Some(times.sha256),
+                    fallback: None,
+                },
+                Err(err) => energy_score(energy, Some(err)),
+            },
+            Err(err) => energy_score(energy, Some(err)),
+        }
+    }
+    #[cfg(not(feature = "silero"))]
+    {
+        energy_score(energy, None)
+    }
+}
+
+fn energy_score(energy: FrameCounts, fallback: Option<String>) -> Score {
+    Score {
+        backend: "energy",
+        voiced: energy.voiced,
+        quiet: energy.quiet,
+        energy_voiced: energy.voiced,
+        energy_quiet: energy.quiet,
+        silero_voiced: None,
+        silero_quiet: None,
+        frame_cpu_p50_ns: None,
+        frame_cpu_p95_ns: None,
+        model_cpu_p50_ns: None,
+        model_cpu_p95_ns: None,
+        warm_cpu_ns: None,
+        sha256: None,
+        fallback,
+    }
+}
+
+/// Count 20 ms frames with the energy gate. A short tail is not scored.
 pub fn count_frames(pcm: &[i16]) -> FrameCounts {
     let mut energy = Energy::default();
     let mut counts = FrameCounts {
