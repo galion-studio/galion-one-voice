@@ -116,17 +116,20 @@ bash voice-stack/ci/check-no-archived-crate-refs.sh --self-test
 
 ## Tests
 
-Host: rustc 1.85.0 (`4d91de4e4` 2025-02-17), Linux x86_64. Counts are filled in after the run on this branch.
+Host: rustc 1.85.0 (`4d91de4e4` 2025-02-17), Linux x86_64. `horbm` is a virtual workspace, so those lines pass `--workspace`. Toolchain flag on this machine: `cargo +1.85.0`.
 
 | Command | Result |
 |---|---|
 | `bash voice-stack/ci/check-no-archived-crate-refs.sh --self-test` | exit 0. `self-test ok` |
-| `cargo test --workspace` | pending |
-| `cargo clippy --workspace --all-targets -- -D warnings` | pending |
-| `cargo test --manifest-path horbm/Cargo.toml --workspace` | pending |
-| `cargo clippy --manifest-path horbm/Cargo.toml --workspace --all-targets -- -D warnings` | pending |
+| `cargo test --workspace` | 1062 passed, 0 failed, 5 ignored |
+| `cargo clippy --workspace --all-targets -- -D warnings` | clean |
+| `cargo test --manifest-path horbm/Cargo.toml --workspace` | 267 passed, 0 failed, 2 ignored |
+| `cargo clippy --manifest-path horbm/Cargo.toml --workspace --all-targets -- -D warnings` | clean |
+| `cargo test --manifest-path tools/cloning-v2/preclone/Cargo.toml` | 15 passed, 0 failed |
+| `cargo test --manifest-path voice-stack/Cargo.toml -p galion-sam-contract -p galion-sam-audio-io -p galion-sam-orch` | 62 passed, 0 failed |
+| `cargo clippy --manifest-path voice-stack/Cargo.toml -p galion-sam-contract -p galion-sam-audio-io -p galion-sam-orch --all-targets -- -D warnings` | clean |
 
-`horbm` is a virtual workspace, so those lines pass `--workspace`. The voice-stack edits are comments and markdown. They are not members of the root workspace.
+`voice-stack/vad` (`galion-sam-vad`) already requires rustc 1.92 because of `ort`. Its `Cargo.toml` was not edited. The two comment lines in `vad/src/audio.rs` were not compiled on 1.85. `voice-stack/Cargo.lock` is unchanged: a test resolve wanted to refresh it, and that refresh was discarded. Root `Cargo.lock` and `horbm/Cargo.lock` are unchanged.
 
 ## Linux
 
