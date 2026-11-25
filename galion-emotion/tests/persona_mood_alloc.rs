@@ -33,13 +33,30 @@ static A: Counting = Counting;
 fn observe_condition_prosody_text_are_allocation_free() {
     let mut s = PersonaMood::new(Persona::Samantha);
     let mut j = PersonaMood::new(Persona::Jarvis);
-    let voice = EmotionFrame { seq: 1, t_ms: 0, dur_ms: 80, valence: 0.0, arousal: 0.7, dominance: 0.5, confidence: 0.3 };
-    let texts = ["My dog died and I'm so sad.", "This is amazing!!", "not happy", "set a timer"];
+    let voice = EmotionFrame {
+        seq: 1,
+        t_ms: 0,
+        dur_ms: 80,
+        valence: 0.0,
+        arousal: 0.7,
+        dominance: 0.5,
+        confidence: 0.3,
+    };
+    let texts = [
+        "My dog died and I'm so sad.",
+        "This is amazing!!",
+        "not happy",
+        "set a timer",
+    ];
     let uttered = ["Da, može.", "no thanks", "Galion, prestani!", "hmm"];
     let mut gate = DefaultConsentGate::default();
     gate.grant(0, "hr", Purpose::PersonalAssistant);
     let mut store = AffectStore::new(8)
-        .grant(&gate, Purpose::PersonalAssistant, consent_bits::SENSE | consent_bits::ADAPT)
+        .grant(
+            &gate,
+            Purpose::PersonalAssistant,
+            consent_bits::SENSE | consent_bits::ADAPT,
+        )
         .unwrap();
     let mut clock = EmotionClock::new();
     let film = StubFilm::new(4, 0.2);
@@ -47,10 +64,12 @@ fn observe_condition_prosody_text_are_allocation_free() {
     let mut hidden = [0.1f32; 4];
     let live = ALLOCS.load(Ordering::SeqCst);
     drop(std::hint::black_box(Box::new(0u8)));
-    assert!(ALLOCS.load(Ordering::SeqCst) > live, "counting allocator is live");
-    let before = ALLOCS.load(Ordering::SeqCst);
+    assert!(
+        ALLOCS.load(Ordering::SeqCst) > live,
+        "counting allocator is live"
+    );
     let mut acc = 0.0f32;
-    for i in 0..10_000u64 {
+    let mut step = |i: u64| {
         let t = text_affect(texts[(i % 4) as usize]);
         let o = UserObservation::fuse(Some(&voice), false, Some(t));
         s.observe(&o, i * 80);
@@ -59,8 +78,11 @@ fn observe_condition_prosody_text_are_allocation_free() {
         let cj = j.conditioning(i * 80 + 40);
         let felt_s = s.feeling(i * 80 + 40);
         let felt_j = j.feeling(i * 80 + 40);
-        acc += cs.piper().length_scale + cj.piper().pitch_shift_st + cs.to_array()[3];
-        acc += felt_s.e + felt_j.prosody.energy + s.timbre().match_strength + j.timbre().match_strength;
+        let mut n = cs.piper().length_scale + cj.piper().pitch_shift_st + cs.to_array()[3];
+        n += felt_s.e
+            + felt_j.prosody.energy
+            + s.timbre().match_strength
+            + j.timbre().match_strength;
         let frame = o.as_frame();
         store.record(&frame);
         let color = clock.on_frame(store.adapt_target().as_ref());
@@ -72,16 +94,35 @@ fn observe_condition_prosody_text_are_allocation_free() {
         );
         film.condition(Some(&color.target), &mut params);
         apply_film(&mut hidden, &params);
-        acc += if check_counterbalance(&frame, &color.target).is_ok() { 0.01 } else { 0.02 };
-        acc += color.e + lane.e + hidden[0];
-        acc += match spoken::classify(uttered[(i % 4) as usize]) {
+        n += if check_counterbalance(&frame, &color.target).is_ok() {
+            0.01
+        } else {
+            0.02
+        };
+        n += color.e + lane.e + hidden[0];
+        n += match spoken::classify(uttered[(i % 4) as usize]) {
             Heard::Yes => 0.1,
             Heard::No => 0.2,
             Heard::Withdraw => 0.3,
             Heard::Unclear => 0.4,
         };
+        n
+    };
+    // One pass of each of the four lines pays for one-time libm and
+    // case-fold setup. The budget below is the steady path.
+    for i in 0..4u64 {
+        acc += step(i);
+    }
+    let before = ALLOCS.load(Ordering::SeqCst);
+    for i in 4..10_000u64 {
+        acc += step(i);
     }
     let after = ALLOCS.load(Ordering::SeqCst);
     assert!(acc.is_finite());
-    assert_eq!(after - before, 0, "hot path allocated {} times", after - before);
+    assert_eq!(
+        after - before,
+        0,
+        "hot path allocated {} times",
+        after - before
+    );
 }

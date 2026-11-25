@@ -4,8 +4,11 @@
 //! Four files, one directory, schema `galion-emotion-standin/1`:
 //! `persona.txt`, `memory.txt`, `inner-life.txt`, `intent.txt`.
 //! Loading allocates. The frame step does not call this module.
-//! Persona and memory stay stand-ins. `inner-life.txt` is prose for
-//! [`crate::InnerLife::from_prose`]. The file does not move the moment.
+//! Memory stays a stand-in. `persona.txt` is this crate's closed-eval
+//! fixture. HORBM boot loads Samantha and passes a [`crate::VoiceBaseline`]
+//! and the care, want, and expect tokens in as values. `inner-life.txt`
+//! is prose for [`crate::InnerLife::from_prose`] on this fixture. The file
+//! does not move the moment.
 //! The layer emits an [`crate::IntentMsg`], and the core steps that.
 //! The intent script is the fixed stream [`StandinWorld::replay`] steps.
 

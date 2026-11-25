@@ -28,7 +28,7 @@
 use std::io::{IsTerminal, Write};
 use std::time::{Duration, Instant};
 
-use galion_console::dotviz::{demo_band, DemoPump, DemoSeg, DotConsole, PanelOpts};
+use galion_console::dotviz::{demo_band, DemoPump, DemoSeg, DotConsole, MarkedFrame, PanelOpts};
 use galion_console::live::{AffectFeed, StubAffect, StubTiming, TimingFeed};
 use galion_emotion::{DefaultConsentGate, EmotionFrame, Purpose};
 use galion_heartbeat::symphony::{BandView, NanoPcmRing, SymphonyWire};
@@ -293,7 +293,15 @@ fn run<T: TimingFeed, A: AffectFeed>(args: &[String], mut pump: DemoPump<T, A>, 
         } else {
             None
         };
-        dc.frame_marked(&out, &you, &me, me_voiced, &snap, step_us, Some(sector.dot));
+        dc.frame_marked(MarkedFrame {
+            out: &out,
+            you_pcm: &you,
+            me_pcm: &me,
+            me_voiced,
+            snap: &snap,
+            step_us,
+            mark: Some(sector.dot),
+        });
         me_voiced_prev = me_voiced;
 
         if headless {

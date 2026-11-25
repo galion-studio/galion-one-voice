@@ -134,7 +134,7 @@ struct Parser<'a> {
     i: usize,
 }
 
-impl<'a> Parser<'a> {
+impl Parser<'_> {
     fn skip(&mut self) {
         while let Some(c) = self.peek() {
             if c == b' ' || c == b'\t' || c == b'\n' || c == b'\r' {
@@ -212,10 +212,8 @@ impl<'a> Parser<'a> {
                 self.bump();
                 return Ok(Json::Arr(items));
             }
-            if !items.is_empty() {
-                if self.bump() != Some(b',') {
-                    return Err("expected comma in array".into());
-                }
+            if !items.is_empty() && self.bump() != Some(b',') {
+                return Err("expected comma in array".into());
             }
             items.push(self.val()?);
         }
@@ -279,8 +277,8 @@ impl<'a> Parser<'a> {
         };
         let mut buf = [0u8; 4];
         buf[0] = first;
-        for i in 1..width {
-            buf[i] = self.bump().ok_or_else(|| "truncated utf-8".to_string())?;
+        for slot in buf.iter_mut().take(width).skip(1) {
+            *slot = self.bump().ok_or_else(|| "truncated utf-8".to_string())?;
         }
         let s = std::str::from_utf8(&buf[..width]).map_err(|_| "bad utf-8 in string")?;
         out.push_str(s);
