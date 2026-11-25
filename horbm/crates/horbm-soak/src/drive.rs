@@ -530,7 +530,7 @@ pub fn run(minutes: u64, allocs: &dyn Fn() -> u64) -> Report {
                 user_heard = user_heard.saturating_add(1);
             }
         }
-        let moment = duplex.emotion().moment();
+        let moment = duplex.emotion().view().moment;
         watch.note(moment);
         let cue = duplex.prosody();
         if !cue.enabled || !cue.rms_db.is_finite() || !cue.f0_hz.is_finite() {

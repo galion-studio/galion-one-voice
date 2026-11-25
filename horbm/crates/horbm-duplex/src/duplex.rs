@@ -11,7 +11,7 @@ use galion_conductor::{
     SideBandView, TickEvent as ConductorEvent,
 };
 use horbm::UNKNOWN_REPLY;
-use horbm_voice::{Mouth, MouthPull, SpokenLine};
+use horbm_voice::{MomentVoice, Mouth, MouthPull, SpokenLine};
 
 use crate::brain::BrainHandle;
 use crate::echo::PlaybackEcho;
@@ -131,6 +131,8 @@ pub struct Duplex<R, E, B, P, M> {
     last_cue: ProsodyCue,
     echo: PlaybackEcho,
     report: LatencyReport,
+    /// Samantha's ramp onto the moment. None until the emotion port has a view.
+    moment: Option<MomentVoice>,
 }
 
 impl<R, E, B, P, M> Duplex<R, E, B, P, M>
@@ -175,6 +177,7 @@ where
             last_cue: ProsodyCue::disabled(),
             echo: PlaybackEcho::new(),
             report: LatencyReport::fresh(),
+            moment: None,
         })
     }
 
@@ -260,6 +263,7 @@ where
         self.release_mouth_if_quiet(voiced);
         self.take_hypothesis(&cleaned, voiced, t_ms)?;
         let affect = self.emotion.step(t32);
+        self.steer();
         self.prefetch_while_listening();
         self.note_onset(voiced, t_ms);
 
@@ -409,6 +413,26 @@ where
             self.release_partial = true;
         }
         Ok(())
+    }
+
+    /// Hand this frame's mouth packet to the mouth. A port with no moment
+    /// leaves the packet where it was. The tone mouth ignores the packet.
+    fn steer(&mut self) {
+        let Some(view) = self.emotion.moment_view() else {
+            return;
+        };
+        let stale = self
+            .moment
+            .as_ref()
+            .map(|voice| voice.identity() != view.baseline.identity_bits())
+            .unwrap_or(true);
+        if stale {
+            self.moment = Some(MomentVoice::new(view.baseline));
+        }
+        if let Some(voice) = self.moment.as_mut() {
+            let controls = voice.tick(view.moment, view.breath);
+            self.mouth.feel(controls);
+        }
     }
 
     fn prefetch_while_listening(&mut self) {

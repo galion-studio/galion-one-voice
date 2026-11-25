@@ -492,6 +492,7 @@ dependencies = [
  "galion-research-gateway",
  "galion-sam-empathy",
  "horbm-brain",
+ "horbm-inner",
  "horbm-keys",
  "horbm-memory",
  "horbm-persona",
@@ -517,6 +518,7 @@ dependencies = [
  "fdaf-aec",
  "galion-conductor",
  "galion-emotion-core",
+ "galion-ml-voice",
  "galion-sam-asr",
  "galion-sam-audio-io",
  "horbm",
@@ -545,10 +547,21 @@ dependencies = [
  "galion-emotion-in",
  "galion-ml-voice",
  "horbm",
+ "horbm-duplex",
  "horbm-voice",
  "serde",
  "serde_json",
  "toml",
+]
+
+[[package]]
+name = "horbm-inner"
+version = "0.0.1"
+dependencies = [
+ "galion-emotion",
+ "galion-emotion-core",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -593,7 +606,10 @@ dependencies = [
 name = "horbm-voice"
 version = "0.0.1"
 dependencies = [
+ "galion-emotion",
+ "galion-emotion-core",
  "galion-sam-asr",
+ "galion-sam-prosody",
  "galion-tts-piper",
  "horbm",
  "horbm-ear",

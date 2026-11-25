@@ -161,7 +161,7 @@ The installer adds that line to `~/.bashrc` between `# BEGIN galion-one-voice` a
 
 `~/.config/systemd/user/galion-one-voice.service` runs `~/.local/bin/galion-one-voice` on `127.0.0.1:7881`. The launcher execs `voice-stack/target/release/samantha-local` when that binary exists, and otherwise `galion-samantha serve`. `GALION_ONE_VOICE_BIN` selects another executable. It is exec'd with no extra arguments and inherits `GALION_SAMANTHA_WS`. The unit sets no `GALION_LLM` and no nerve URL.
 
-`galion-samantha.service` binds the same port. Enable one of the two units.
+`galion-samantha.service` binds the same port. [`deploy/linux/`](../../deploy/linux/README.md) is a third listener for that socket, with a health restart. Enable one listener.
 
 ### GPU mouth (optional)
 

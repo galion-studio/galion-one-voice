@@ -5,6 +5,7 @@
 
 use galion_emotion_core::{BreathPhase, EmotionCore, VOLUME_REST};
 
+use crate::glottis::controls;
 use crate::noise;
 use crate::plan::{plan_pauses, Plan};
 use crate::{
@@ -35,6 +36,10 @@ pub struct Lungs {
     cached: Plan,
     rng: u64,
     frames: u32,
+    /// Caller nasal target, 0..=1. Used while speaking.
+    nasal: f32,
+    /// Caller mouth target, 0..=1. Used while speaking.
+    mouth: f32,
 }
 
 impl Lungs {
@@ -76,7 +81,16 @@ impl Lungs {
             },
             rng: NOISE_SEED,
             frames: 0,
+            nasal: 0.0,
+            mouth: 0.5,
         }
+    }
+
+    /// Nasal and mouth targets for later ticks. Non-finite values become 0.
+    /// This does not move lung volume or pressure.
+    pub fn set_articulation(&mut self, nasal: f32, mouth: f32) {
+        self.nasal = finite01(nasal);
+        self.mouth = finite01(mouth);
     }
 
     #[must_use]
@@ -128,26 +142,26 @@ impl Lungs {
         let drive = drive.clamped();
         self.frames = self.frames.wrapping_add(1);
         if self.inhale_left > 0 {
-            return self.step_inhale(speaking);
+            return self.step_inhale(&drive, speaking);
         }
         if self.hold_left > 0 {
-            return self.step_hold(speaking);
+            return self.step_hold(&drive, speaking);
         }
         if speaking {
             self.release_left = 0;
             if self.phase != BreathPhase::Speech {
                 self.begin_speech_inhale(&drive);
-                return self.step_inhale(true);
+                return self.step_inhale(&drive, true);
             }
             if self.needs_break(&drive) {
                 self.consume_breaks();
                 self.phrase_s = 0.0;
                 self.begin_speech_inhale(&drive);
-                return self.step_inhale(true);
+                return self.step_inhale(&drive, true);
             }
             return self.step_speech(&drive);
         }
-        self.step_quiet()
+        self.step_quiet(&drive)
     }
 
     /// Soft inhale for the frame just stepped, when that frame was an inhale.
@@ -174,7 +188,7 @@ impl Lungs {
         self.phase = BreathPhase::Inhale;
     }
 
-    fn step_inhale(&mut self, speaking: bool) -> Frame {
+    fn step_inhale(&mut self, drive: &Drive, speaking: bool) -> Frame {
         let left = self.inhale_left.max(1) as f32;
         let target = if self.for_speech {
             self.peak
@@ -190,10 +204,15 @@ impl Lungs {
         }
         self.phase = BreathPhase::Inhale;
         let flow = flow_of(self.volume - before);
-        self.air_frame(BreathPhase::Inhale, flow, speaking && self.for_speech)
+        self.air_frame(
+            drive,
+            BreathPhase::Inhale,
+            flow,
+            speaking && self.for_speech,
+        )
     }
 
-    fn step_hold(&mut self, speaking: bool) -> Frame {
+    fn step_hold(&mut self, drive: &Drive, speaking: bool) -> Frame {
         self.hold_left = 0;
         if speaking {
             self.phase = BreathPhase::Speech;
@@ -201,7 +220,7 @@ impl Lungs {
             self.phase = BreathPhase::Rest;
             self.for_speech = false;
         }
-        self.air_frame(BreathPhase::Hold, 0.0, speaking)
+        self.air_frame(drive, BreathPhase::Hold, 0.0, speaking)
     }
 
     fn step_speech(&mut self, drive: &Drive) -> Frame {
@@ -217,6 +236,7 @@ impl Lungs {
         self.for_speech = false;
         let flow = flow_of(self.volume - before);
         let pressure = subglottal_pressure(self.volume, *drive);
+        let shape = controls(drive, BreathPhase::Speech, self.nasal, self.mouth);
         Frame {
             phase: BreathPhase::Speech,
             volume: self.volume,
@@ -225,28 +245,32 @@ impl Lungs {
             loudness_db: loudness_db(pressure),
             loudness_gain: loudness_gain(pressure),
             pause: false,
+            open_quotient: shape.open_quotient,
+            breathiness: shape.breathiness,
+            nasal_coupling: shape.nasal_coupling,
+            mouth_openness: shape.mouth_openness,
         }
     }
 
-    fn step_quiet(&mut self) -> Frame {
+    fn step_quiet(&mut self, drive: &Drive) -> Frame {
         if self.phase == BreathPhase::Speech {
             self.release_left = EXHALE_FRAMES;
             self.phrase_s = 0.0;
             self.phase = BreathPhase::Exhale;
         }
         if self.release_left > 0 {
-            return self.step_release();
+            return self.step_release(drive);
         }
         if self.volume + 0.01 < VOLUME_REST {
             self.begin_quiet_inhale();
-            return self.step_inhale(false);
+            return self.step_inhale(drive, false);
         }
         self.phase = BreathPhase::Rest;
         self.for_speech = false;
-        self.air_frame(BreathPhase::Rest, 0.0, false)
+        self.air_frame(drive, BreathPhase::Rest, 0.0, false)
     }
 
-    fn step_release(&mut self) -> Frame {
+    fn step_release(&mut self, drive: &Drive) -> Frame {
         self.release_left = self.release_left.saturating_sub(1);
         let before = self.volume;
         let drop = QUIET_STEP.min((self.volume - VOLUME_FLOOR).max(0.0));
@@ -257,7 +281,7 @@ impl Lungs {
         } else {
             self.phase = BreathPhase::Exhale;
         }
-        self.air_frame(BreathPhase::Exhale, flow, false)
+        self.air_frame(drive, BreathPhase::Exhale, flow, false)
     }
 
     fn begin_quiet_inhale(&mut self) {
@@ -287,7 +311,8 @@ impl Lungs {
         }
     }
 
-    fn air_frame(&self, phase: BreathPhase, flow: f32, pause: bool) -> Frame {
+    fn air_frame(&self, drive: &Drive, phase: BreathPhase, flow: f32, pause: bool) -> Frame {
+        let shape = controls(drive, phase, self.nasal, self.mouth);
         Frame {
             phase,
             volume: self.volume,
@@ -296,7 +321,19 @@ impl Lungs {
             loudness_db: 0.0,
             loudness_gain: 0.0,
             pause,
+            open_quotient: shape.open_quotient,
+            breathiness: shape.breathiness,
+            nasal_coupling: shape.nasal_coupling,
+            mouth_openness: shape.mouth_openness,
         }
+    }
+}
+
+fn finite01(x: f32) -> f32 {
+    if x.is_finite() {
+        x.clamp(0.0, 1.0)
+    } else {
+        0.0
     }
 }
 
