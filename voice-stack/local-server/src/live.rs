@@ -3,7 +3,9 @@
 //! Mic to ear to [`horbm_voice::VoiceLoop`] to a mouth adapter.
 //!
 //! Silero runs in `vad-ear` (its own workspace, so `ort` stays out of this
-//! one). A quiet gap of 640 ms ends one turn. Vosk stays on a worker thread
+//! one). The energy gate is [`horbm_voice::EnergyGate`], the same floor and
+//! 60 ms onset as the orchestrator. A quiet gap of 640 ms ends one turn on
+//! this socket. Vosk stays on a worker thread
 //! because its handles are not `Send`. The spoken turn is one
 //! [`horbm_voice::VoiceLoop::tick`]: ear, then `horbm::Brain::turn`, then the
 //! mouth selected at boot. CPU is the default device. Piper is linked only
@@ -22,8 +24,10 @@ use std::thread::JoinHandle;
 use std::time::Duration;
 
 use galion_sam_asr::{final_text, open_engine, Asr, EngineOpts};
-use galion_sam_orch::{AudioFrame, EnergyVad, Tts as OrchTts, Vad, VadEvent};
-use horbm_voice::{EarEvent, Mouth as VoiceMouth, MouthPull, SpokenLine, VoiceLoop};
+use galion_sam_orch::Tts as OrchTts;
+use horbm_voice::{
+    EarEvent, EnergyGate, GateEvent, Mouth as VoiceMouth, MouthPull, SpokenLine, VoiceLoop,
+};
 
 use crate::audio::{self, rms, SPEAKER_RATE};
 use crate::brain::HorbmMind;
@@ -45,7 +49,19 @@ pub fn live_factory() -> Arc<dyn Fn() -> Box<dyn crate::pipeline::Pipeline> + Se
 
 enum Front {
     Child(ChildVad),
-    Energy(EnergyVad),
+    Energy(EnergyGate),
+}
+
+struct OpenVad {
+    front: Front,
+    backend: &'static str,
+    ready: bool,
+}
+
+struct OpenAsr {
+    ear: Ear,
+    name: &'static str,
+    worker: Option<JoinHandle<()>>,
 }
 
 enum Ear {
@@ -242,28 +258,18 @@ pub struct LivePipeline {
 }
 
 struct Opened {
-    front: Front,
-    backend: &'static str,
-    ready: bool,
-    ear: Ear,
-    ear_name: &'static str,
-    asr_worker: Option<JoinHandle<()>>,
+    vad: OpenVad,
+    asr: OpenAsr,
 }
 
 impl LivePipeline {
     pub fn from_env() -> Self {
-        let (front, backend, ready) = open_vad();
-        let (ear, ear_name, asr_worker) = open_ear();
         let choice = mouth::decide(&mouth::read_input());
         let device = mouth::mouth_device(&choice);
         Self::assemble(
             Opened {
-                front,
-                backend,
-                ready,
-                ear,
-                ear_name,
-                asr_worker,
+                vad: open_vad(),
+                asr: open_ear(),
             },
             HorbmMind::from_env(),
             mouth::open_selected(&choice),
@@ -283,12 +289,16 @@ impl LivePipeline {
     ) -> Self {
         Self::assemble(
             Opened {
-                front,
-                backend,
-                ready,
-                ear,
-                ear_name,
-                asr_worker: None,
+                vad: OpenVad {
+                    front,
+                    backend,
+                    ready,
+                },
+                asr: OpenAsr {
+                    ear,
+                    name: ear_name,
+                    worker: None,
+                },
             },
             mind,
             mouth,
@@ -302,14 +312,7 @@ impl LivePipeline {
         mouth: Box<dyn Mouth>,
         mouth_device: &'static str,
     ) -> Self {
-        let Opened {
-            front,
-            backend,
-            ready,
-            ear,
-            ear_name,
-            asr_worker,
-        } = opened;
+        let Opened { vad, asr } = opened;
         let brain = MindBrain::new(mind);
         let mind = Arc::clone(&brain.mind);
         let last = Arc::clone(&brain.last);
@@ -325,8 +328,8 @@ impl LivePipeline {
             brain,
         );
         Self {
-            front,
-            ear,
+            front: vad.front,
+            ear: asr.ear,
             mind,
             last,
             feed,
@@ -334,15 +337,15 @@ impl LivePipeline {
             voice,
             worker,
             mouth_device,
-            vad_backend: backend,
-            vad_ready: ready,
-            ear_name,
+            vad_backend: vad.backend,
+            vad_ready: vad.ready,
+            ear_name: asr.name,
             phase: "idle",
             level: 0.0,
             speech: Vec::new(),
             in_speech: false,
             utterance: Vec::new(),
-            _worker: asr_worker,
+            _worker: asr.worker,
         }
     }
 
@@ -403,18 +406,11 @@ impl LivePipeline {
     fn push_frame(&mut self, frame: &[i16]) -> Option<&'static str> {
         self.level = rms(frame).clamp(0.0, 1.0);
         match &mut self.front {
-            Front::Energy(vad) => {
-                let event = vad.push(&AudioFrame {
-                    pcm: frame.to_vec(),
-                    rate_hz: 16_000,
-                    ms: 20,
-                });
-                match event {
-                    VadEvent::Start => Some("start"),
-                    VadEvent::End => Some("end"),
-                    VadEvent::None => None,
-                }
-            }
+            Front::Energy(vad) => match vad.push(frame, 20.0) {
+                GateEvent::Start => Some("start"),
+                GateEvent::End => Some("end"),
+                GateEvent::None => None,
+            },
             Front::Child(child) => match child.push(frame) {
                 Some("start") => Some("start"),
                 Some("end") => Some("end"),
@@ -830,7 +826,7 @@ pub fn gated_mouth_factory(
     Arc::new(move || Box::new(GatedPipeline::new(Arc::clone(&gate))))
 }
 
-fn open_vad() -> (Front, &'static str, bool) {
+fn open_vad() -> OpenVad {
     let require = std::env::var("GALION_VAD_REQUIRE").ok().as_deref() == Some("silero");
     if let Ok(bin) = std::env::var("GALION_VAD_BIN") {
         let path = PathBuf::from(bin.trim());
@@ -838,17 +834,29 @@ fn open_vad() -> (Front, &'static str, bool) {
             if let Ok(child) = ChildVad::spawn(&path) {
                 let backend = child.backend;
                 let ready = !require || backend == "silero";
-                return (Front::Child(child), backend, ready);
+                return OpenVad {
+                    front: Front::Child(child),
+                    backend,
+                    ready,
+                };
             }
         }
     }
     let ready = !require;
-    (Front::Energy(EnergyVad::new(HANG_MS)), "energy", ready)
+    OpenVad {
+        front: Front::Energy(EnergyGate::new(HANG_MS)),
+        backend: "energy",
+        ready,
+    }
 }
 
-fn open_ear() -> (Ear, &'static str, Option<JoinHandle<()>>) {
+fn open_ear() -> OpenAsr {
     if galion_sam_asr::find_vosk_model().is_err() || galion_sam_asr::find_vosk_lib().is_none() {
-        return (Ear::Missing, "missing", None);
+        return OpenAsr {
+            ear: Ear::Missing,
+            name: "missing",
+            worker: None,
+        };
     }
     let (tx, rx) = mpsc::channel::<Job>();
     let worker = std::thread::spawn(move || {
@@ -862,7 +870,11 @@ fn open_ear() -> (Ear, &'static str, Option<JoinHandle<()>>) {
             let _ = job.back.send(result);
         }
     });
-    (Ear::Vosk(tx), "vosk", Some(worker))
+    OpenAsr {
+        ear: Ear::Vosk(tx),
+        name: "vosk",
+        worker: Some(worker),
+    }
 }
 
 fn transcribe(engine: &mut dyn Asr, pcm: &[i16]) -> Result<String, String> {
@@ -1346,14 +1358,14 @@ mod tests {
             eprintln!("energy default not asserted: GALION_VAD_BIN is already set");
             return;
         }
-        let (front, backend, ready) = open_vad();
+        let opened = open_vad();
         assert!(
-            matches!(front, Front::Energy(_)),
+            matches!(opened.front, Front::Energy(_)),
             "a missing child must use the energy ear"
         );
-        assert_eq!(backend, "energy");
+        assert_eq!(opened.backend, "energy");
         let require = std::env::var("GALION_VAD_REQUIRE").ok().as_deref() == Some("silero");
-        assert_eq!(ready, !require);
+        assert_eq!(opened.ready, !require);
     }
 
     #[test]
@@ -1422,7 +1434,7 @@ mod tests {
 
     fn test_pipe(heard: Arc<Mutex<Vec<String>>>, ear: Ear, ear_name: &'static str) -> LivePipeline {
         LivePipeline::for_test(
-            Front::Energy(EnergyVad::new(HANG_MS)),
+            Front::Energy(EnergyGate::new(HANG_MS)),
             "energy",
             true,
             ear,
@@ -1440,7 +1452,7 @@ mod tests {
         let heard = Arc::new(Mutex::new(Vec::new()));
         let cues = Arc::new(Mutex::new(Vec::new()));
         let mut pipe = LivePipeline::for_test(
-            Front::Energy(EnergyVad::new(HANG_MS)),
+            Front::Energy(EnergyGate::new(HANG_MS)),
             "energy",
             true,
             Ear::Script("unused".into()),
