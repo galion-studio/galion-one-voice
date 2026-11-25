@@ -5,7 +5,7 @@
 use galion_emotion_core::Breath;
 use horbm::{Brain, CardLookup, Pad, VoiceBaseline};
 
-use crate::moment_voice::{samantha_baseline, MomentView};
+use crate::moment_voice::MomentView;
 
 /// One line the mouth may speak, plus the mood the brain already computed.
 #[derive(Clone, Debug, PartialEq)]
@@ -35,10 +35,9 @@ pub struct HorbmTurn {
 }
 
 impl HorbmTurn {
-    /// Samantha's voice. The moment starts on her baseline. [`Self::seat`]
-    /// is how Aria stays parked.
-    pub fn new(mut brain: Brain) -> Self {
-        brain.seat(samantha_baseline());
+    /// The brain already carries its persona. Development boot is Samantha.
+    /// [`Self::seat`] replaces that baseline when a host parks Aria.
+    pub fn new(brain: Brain) -> Self {
         Self { brain }
     }
 

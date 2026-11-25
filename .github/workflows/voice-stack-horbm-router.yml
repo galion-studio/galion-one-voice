@@ -1,8 +1,9 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 Galion Labs
-# Layer 5 router, the localhost research gateway, and the duplex loop.
-# Linux only. The end-to-end smoke may fetch the pinned Vosk small-en model
-# into a cache outside the checkout. A failed fetch leaves asr=stub.
+# Layer 5 router, the localhost research gateway, the duplex loop, and the
+# moment-to-mouth glue. Linux only. The synthetic tone is not a voice.
+# The end-to-end smoke may fetch the pinned Vosk small-en model into a
+# cache outside the checkout. A failed fetch leaves asr=stub.
 # The router tests do not download a model. The duplex gate keeps the
 # synthetic tone mouth. `--features piper` on horbm-duplex does not fetch a
 # pack; the stock-voice measurement skips when the cache is empty. The
@@ -32,6 +33,7 @@ jobs:
       - name: cargo test
         run: |
           cargo test --manifest-path horbm/Cargo.toml -p horbm -p horbm-eval
+          cargo test --manifest-path horbm/Cargo.toml -p horbm-voice --features piper
           # Fake closed gate. The real Linux ear (`--features real`) is opt-in.
           cargo run --manifest-path horbm/Cargo.toml -p horbm-eval --bin horbm-eval --quiet
           cargo test --manifest-path horbm/Cargo.toml -p horbm-duplex

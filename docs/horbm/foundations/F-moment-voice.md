@@ -15,7 +15,7 @@ The emotion core already keeps a baseline apart from the 80 ms moment. The nativ
 
 `VoiceBaseline` is who is speaking: persona id, voice id, rest point, design pitch centre. `MomentVoice::tick` does not assign it. The controls are the difference of the moment from that rest. On the baseline, Samantha is the e0 line already in `galion-sam-prosody` (`length_scale` 1, energy 1, pitch offset 0). Pitch on the packet is a sentence offset. The centre in hertz stays the baseline's centre.
 
-Aria is parked (`ARIA_PARKED`). So is every persona id other than `samantha`, including the emotion-core stand-in. A parked packet does not move with the moment and does not take Samantha's noise scales. `HorbmTurn` seats Samantha. `HorbmTurn::seat` is how a host parks Aria.
+Aria is parked (`ARIA_PARKED`). So is every persona id other than `samantha`, including the emotion-core stand-in. A parked packet does not move with the moment and does not take Samantha's noise scales. Development boot already loads Samantha from `horbm-persona`. `HorbmTurn::seat` is how a host parks Aria. The voice turn does not replace that baseline.
 
 ## What the mouth takes
 

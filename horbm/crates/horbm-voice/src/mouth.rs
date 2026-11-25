@@ -80,8 +80,8 @@ pub struct FakeMouth {
     pending_first: bool,
     spoken: Vec<String>,
     cancels: u32,
-    cues: Vec<String>,
     controls: VoiceControls,
+    cues: Vec<String>,
 }
 
 impl Default for FakeMouth {
@@ -100,8 +100,8 @@ impl FakeMouth {
             pending_first: false,
             spoken: Vec::new(),
             cancels: 0,
-            cues: Vec::new(),
             controls: VoiceControls::unsteered(),
+            cues: Vec::new(),
         }
     }
 
