@@ -11,8 +11,8 @@
 //! mouth selected at boot. CPU is the default device. Piper is linked only
 //! with `--features piper`. The s711 clone is selected only for an explicit
 //! cuda opt-in. The brain is [`crate::brain::HorbmMind`]. `Brain::open` in the
-//! orchestrator stays unlinked. This path does not open `horbm-memory`'s
-//! sqlite file.
+//! orchestrator stays unlinked. A hosted session opens the person diary only
+//! when remember is granted.
 
 use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
@@ -21,7 +21,7 @@ use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::mpsc::{self, Sender};
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use galion_sam_asr::{final_text, open_engine, Asr, EngineOpts};
 use galion_sam_orch::Tts as OrchTts;
@@ -31,6 +31,7 @@ use horbm_voice::{
 
 use crate::audio::{self, rms, SPEAKER_RATE};
 use crate::brain::HorbmMind;
+use crate::host::HostSession;
 use crate::mouth::{self, Mouth, MouthCue};
 use crate::native::{self, MindBrain, QueueEar, Stored};
 use crate::pipeline::{AudioFeed, FeedMsg, PipeInfo, Pipeline, TurnProduct};
@@ -45,6 +46,13 @@ const UTTERANCE_CAP: usize = 16_000 * 16;
 
 pub fn live_factory() -> Arc<dyn Fn() -> Box<dyn crate::pipeline::Pipeline> + Send + Sync> {
     Arc::new(|| Box::new(LivePipeline::from_env()))
+}
+
+/// One factory for every socket of a booted host. The mind, seal, and log are shared.
+pub fn live_factory_with(
+    host: Arc<HostSession>,
+) -> Arc<dyn Fn() -> Box<dyn crate::pipeline::Pipeline> + Send + Sync> {
+    Arc::new(move || Box::new(LivePipeline::from_host(Arc::clone(&host))))
 }
 
 enum Front {
@@ -269,6 +277,7 @@ pub struct LivePipeline {
     front: Front,
     ear: Ear,
     mind: Arc<Mutex<HorbmMind>>,
+    host: Option<Arc<HostSession>>,
     last: Arc<Mutex<Option<Stored>>>,
     feed: Arc<Mutex<Option<AudioFeed>>>,
     #[cfg_attr(not(test), allow(dead_code))]
@@ -284,6 +293,10 @@ pub struct LivePipeline {
     speech: Vec<i16>,
     in_speech: bool,
     utterance: Vec<i16>,
+    /// Set when a heard line finished. Idle thoughts wait from this instant.
+    last_heard: Option<Instant>,
+    last_inner: Option<Instant>,
+    last_pad: Option<(u32, u32, u32)>,
     _worker: Option<JoinHandle<()>>,
 }
 
@@ -306,7 +319,28 @@ impl LivePipeline {
                 vad: open_vad(),
                 asr: open_ear(),
             },
-            HorbmMind::from_env(),
+            Arc::new(Mutex::new(HorbmMind::from_env())),
+            None,
+            mouth::open_kind(pick, &choice, &raw),
+            device,
+        )
+    }
+
+    pub(crate) fn from_host(host: Arc<HostSession>) -> Self {
+        let raw = std::env::var("GALION_MOUTH").unwrap_or_default();
+        let (pick, _) = mouth::parse_mouth_env(&raw);
+        let choice = mouth::decide(&mouth::read_input());
+        let device = match pick {
+            mouth::MouthPick::Native => native::BOOT_MOUTH_DEVICE,
+            mouth::MouthPick::Today => mouth::mouth_device(&choice),
+        };
+        Self::assemble(
+            Opened {
+                vad: open_vad(),
+                asr: open_ear(),
+            },
+            host.mind(),
+            Some(host),
             mouth::open_kind(pick, &choice, &raw),
             device,
         )
@@ -335,7 +369,8 @@ impl LivePipeline {
                     worker: None,
                 },
             },
-            mind,
+            Arc::new(Mutex::new(mind)),
+            None,
             mouth,
             native::BOOT_MOUTH_DEVICE,
         )
@@ -343,13 +378,13 @@ impl LivePipeline {
 
     fn assemble(
         opened: Opened,
-        mind: HorbmMind,
+        mind: Arc<Mutex<HorbmMind>>,
+        host: Option<Arc<HostSession>>,
         mouth: Box<dyn Mouth>,
         mouth_device: &'static str,
     ) -> Self {
         let Opened { vad, asr } = opened;
-        let brain = MindBrain::new(mind);
-        let mind = Arc::clone(&brain.mind);
+        let brain = MindBrain::shared(Arc::clone(&mind));
         let last = Arc::clone(&brain.last);
         let turns = Arc::clone(&brain.turns);
         let feed = Arc::new(Mutex::new(None));
@@ -367,6 +402,7 @@ impl LivePipeline {
             front: vad.front,
             ear: asr.ear,
             mind,
+            host,
             last,
             feed,
             turns,
@@ -381,6 +417,9 @@ impl LivePipeline {
             speech: Vec::new(),
             in_speech: false,
             utterance: Vec::new(),
+            last_heard: None,
+            last_inner: None,
+            last_pad: None,
             _worker: asr.worker,
         }
     }
@@ -414,6 +453,7 @@ impl LivePipeline {
             Some(Stored::Err(code)) => return self.fail(&code),
             None => return self.fail("brain-unlinked"),
         };
+        self.note_turn(text, &out);
         let reply = out.reply.clone();
         let native = self
             .worker
@@ -445,6 +485,13 @@ impl LivePipeline {
             rate: SPEAKER_RATE,
             reply,
             feed: Some(feed),
+        }
+    }
+
+    fn note_turn(&mut self, heard: &str, out: &crate::reply::TurnOut) {
+        self.last_heard = Some(Instant::now());
+        if let Some(host) = &self.host {
+            host.on_turn(heard, out);
         }
     }
 
@@ -602,7 +649,7 @@ impl Pipeline for LivePipeline {
     }
 
     fn tick_mood(&mut self) -> (crate::reply::Pad, &'static str) {
-        match self
+        let (pad, source) = match self
             .mind
             .lock()
             .unwrap_or_else(|err| err.into_inner())
@@ -610,7 +657,64 @@ impl Pipeline for LivePipeline {
         {
             Some(pad) => (pad.finite_or_resting(), "brain"),
             None => (crate::reply::Pad::RESTING, "resting"),
+        };
+        let key = (
+            pad.arousal.to_bits(),
+            pad.valence.to_bits(),
+            pad.dominance.to_bits(),
+        );
+        if self.last_pad != Some(key) {
+            self.last_pad = Some(key);
+            if let Some(host) = &self.host {
+                host.on_mood(pad.arousal, pad.valence, pad.dominance);
+            }
         }
+        (pad, source)
+    }
+
+    fn poll_inner(&mut self) -> Option<String> {
+        // Quiet after a heard line, on the existing mood tick. Not inside a turn.
+        if self.phase != "idle" {
+            return None;
+        }
+        let heard_at = self.last_heard?;
+        let quiet = Duration::from_millis(u64::from(horbm::WAIT_MS));
+        if heard_at.elapsed() < quiet {
+            return None;
+        }
+        if self.last_inner.is_some_and(|at| at.elapsed() < quiet) {
+            return None;
+        }
+        let inner = self
+            .mind
+            .lock()
+            .unwrap_or_else(|err| err.into_inner())
+            .idle_inner()
+            .ok()?;
+        self.last_inner = Some(Instant::now());
+        if let Some(host) = &self.host {
+            host.on_inner(
+                &inner.verb,
+                &inner.lean,
+                inner.surprise,
+                inner.learned,
+                &inner.slots,
+            );
+        }
+        Some(crate::protocol::inner_json(
+            &inner.verb,
+            &inner.lean,
+            inner.surprise,
+            inner.learned,
+            &inner.slots,
+        ))
+    }
+
+    fn persona_id(&self) -> String {
+        self.mind
+            .lock()
+            .unwrap_or_else(|err| err.into_inner())
+            .persona_id()
     }
 
     fn phase(&self) -> &'static str {

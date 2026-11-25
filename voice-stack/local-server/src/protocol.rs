@@ -215,6 +215,27 @@ pub fn pong_json() -> String {
     format!("{{\"schema\":\"{SCHEMA}\",\"type\":\"pong\"}}")
 }
 
+/// Idle thought. `verb` is the outbound intent token. `lean` is the dialogue
+/// lean. `slots` are motive tokens. There is no sentence in this frame.
+pub fn inner_json(
+    verb: &str,
+    lean: &str,
+    surprise: f32,
+    learned: bool,
+    slots: &[String],
+) -> String {
+    serde_json::json!({
+        "schema": SCHEMA,
+        "type": "inner",
+        "verb": verb,
+        "lean": lean,
+        "surprise": surprise,
+        "learned": learned,
+        "slots": slots,
+    })
+    .to_string()
+}
+
 pub fn turn_json(turn: &crate::reply::TurnOut) -> String {
     format!(
         "{{\"schema\":\"{SCHEMA}\",\"type\":\"turn\",\"reply\":\"{}\",\"intent\":{},\"arm\":{},\"propensity\":{},\"evidence\":{},\"sources\":{},\"violations\":{},\"lookup_us\":{},\"took_us\":{},\"mood\":{},\"empathy_e\":{},\"prosody\":{{\"rate\":{},\"energy\":{},\"pitch_st\":{},\"pause_ms\":{}}}}}",
@@ -395,6 +416,23 @@ mod tests {
         assert_eq!(redact_error("pcm dump"), "redacted");
         assert_eq!(redact_error("see transcript"), "redacted");
         assert!(error_json("brain-unlinked").contains("brain-unlinked"));
+    }
+
+    #[test]
+    fn inner_frame_is_tokens_only() {
+        let line = inner_json(
+            "answer",
+            "hold",
+            0.0,
+            false,
+            &["heard".into(), "pause".into()],
+        );
+        let parsed: Value = serde_json::from_str(&line).unwrap();
+        assert_eq!(parsed["type"], "inner");
+        assert_eq!(parsed["verb"], "answer");
+        assert_eq!(parsed["lean"], "hold");
+        assert_eq!(parsed["slots"][0], "heard");
+        assert!(parsed.get("reply").is_none());
     }
 
     #[test]

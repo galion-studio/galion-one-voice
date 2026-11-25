@@ -42,8 +42,12 @@ pub(crate) struct MindBrain {
 
 impl MindBrain {
     pub(crate) fn new(mind: HorbmMind) -> Self {
+        Self::shared(Arc::new(Mutex::new(mind)))
+    }
+
+    pub(crate) fn shared(mind: Arc<Mutex<HorbmMind>>) -> Self {
         Self {
-            mind: Arc::new(Mutex::new(mind)),
+            mind,
             last: Arc::new(Mutex::new(None)),
             turns: Arc::new(AtomicU32::new(0)),
         }

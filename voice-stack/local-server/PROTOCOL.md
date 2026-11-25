@@ -74,6 +74,7 @@ The speaker path is 24 kHz, sliced on the 80 ms heartbeat (1920 samples). The `t
 | `vad` | `event` `start` or `end`, plus `t_ms` |
 | `turn` | After a committed line. `intent` is a JSON string from empathy (`"chat"`, `"ask"`, `"task"`, `"vent"`, or `"goodbye"`). `arm` stays `null`. `empathy_e` and `prosody` (`rate`, `energy`, `pitch_st`, `pause_ms`) are on the same object. The spoken `reply` is the card, the research line, or exactly `I don't know.` With `GALION_MOUTH=native` the socket sends the first clause, then the rest, as two `turn` frames when the remainder is non-empty, and it sends no speaker PCM. |
 | `mood` | Every 80 ms. `source` is `brain` or `resting`. `pad` is arousal, valence, dominance. |
+| `inner` | After the idle interval with no heard text (`horbm::WAIT_MS`, 4 s), and only while the dot is idle. One object built from the inner turn: `verb` (outbound intent token), `lean` (dialogue lean), `surprise`, `learned`, and `slots` (motive tokens). There is no sentence. The mouth does not speak it and the frame carries no audio. |
 | `dot` | `idle`, `listening`, or `speaking`, plus `level` 0..1 |
 | `error` | A short code. No PCM and no transcript in the string. |
 

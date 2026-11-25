@@ -6,35 +6,100 @@
 //! cards answer, and the clause fixture covers a card miss. A deep miss on
 //! that idle path may ask the research gateway.
 //!
-//! `GALION_HORBM_REMEMBER=grant` opens the in-memory diary for the same
-//! directory this process already loaded. Any other value leaves the diary
-//! closed. `Brain::open` in `voice-stack/pipeline-orchestrator` still returns
-//! `horbm is not linked`. That is not this process. There is no knowledge-ro
-//! listener on 127.0.0.1:7900 in this repository.
+//! Remember and learn are the words in [`crate::host::HostConfig`]. This
+//! process does not call [`std::env::set_var`]. `grant` opens the person
+//! diary at an absolute path. Any other word leaves it closed. `Brain::open`
+//! in `voice-stack/pipeline-orchestrator` still returns `horbm is not linked`.
+//! That is not this process. There is no knowledge-ro listener in this crate.
 
 use std::path::{Path, PathBuf};
 
 use galion_sam_horbm::{CardEngine, ReplyEngine as HorbmReply};
 
+use crate::host::HostConfig;
 use crate::reply::{Pad, ReplyEngine, TurnOut};
+
+/// One idle thought. Fields are the inner turn and the lean. No prose.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct IdleInner {
+    pub verb: String,
+    pub lean: String,
+    pub surprise: f32,
+    pub learned: bool,
+    pub slots: Vec<String>,
+}
 
 pub struct HorbmMind {
     engine: CardEngine,
 }
 
 impl HorbmMind {
+    /// Scripted and unit-test opener. Remember and learn stay deny. The diary
+    /// path is absolute and is not created.
     pub fn open(knowledge_dir: &Path) -> Self {
+        let root = std::env::temp_dir().join(format!("galion-horbm-mind-{}", std::process::id()));
+        Self::open_configured(knowledge_dir, &HostConfig::deny_under(root))
+    }
+
+    /// Live opener. `config.diary_path` is absolute. The directory is created
+    /// by [`crate::host::HostSession::boot`] only when a grant needs it.
+    pub fn open_configured(knowledge_dir: &Path, config: &HostConfig) -> Self {
+        let cases = config.data_root.join("cases");
         Self {
-            engine: CardEngine::open(Path::new("memory"), knowledge_dir, Path::new("cases")),
+            engine: CardEngine::open_with_remember(
+                &config.diary_path,
+                knowledge_dir,
+                &cases,
+                Some(config.remember.word.as_str()),
+            ),
         }
     }
 
     /// `GALION_HORBM_KNOWLEDGE` when that directory already exists. On the
     /// laptop, `G:\galion\horbm\knowledge` is next. Then `var/knowledge` when
     /// it already holds a card. Otherwise the tracked example card. Nothing
-    /// is created.
+    /// is created. Grants stay deny; the live process uses [`Self::open_configured`].
     pub fn from_env() -> Self {
         Self::open(&knowledge_dir())
+    }
+
+    /// Id loaded by the brain. This host does not pass a persona name.
+    pub fn persona_id(&self) -> String {
+        self.engine.brain().persona().id().to_string()
+    }
+
+    pub fn person_id(&self) -> String {
+        self.engine.brain().person_id().to_string()
+    }
+
+    /// [`horbm::PersonMemory::end_session`]. Refused when remember is denied.
+    pub fn end_diary_session(&mut self, at: &str) -> horbm::WriteOutcome {
+        let person = self.person_id();
+        match self.engine.brain_mut().person_memory() {
+            Some(memory) => memory.end_session(&person, at),
+            None => horbm::WriteOutcome::Refused,
+        }
+    }
+
+    /// One idle thought. Not called from a turn.
+    ///
+    /// follow-up: switch to S77's `persona_inner()` / `persona_nudge()` once they are on main.
+    pub(crate) fn idle_inner(&mut self) -> Result<IdleInner, String> {
+        // Token life does not step the moment. The slower goals do, once.
+        let turn = self.engine.brain_mut().inner_turn(0, "", None);
+        let note = self
+            .engine
+            .brain_mut()
+            .persona_nudge("", None, false)
+            .map_err(|_| "persona-nudge".to_string())?;
+        let slots = slot_tokens(self.engine.brain().inner());
+        Ok(IdleInner {
+            verb: turn.outbound.verb_str().to_string(),
+            lean: note.lean().verb.as_str().to_string(),
+            surprise: turn.surprise,
+            learned: turn.learned,
+            slots,
+        })
     }
 
     /// Cards the open directory contributed. One for the shipped kettle note.
@@ -76,6 +141,27 @@ pub fn select_knowledge_dir(
         return var_dir.to_path_buf();
     }
     example.to_path_buf()
+}
+
+fn slot_tokens(inner: &horbm::InnerLife) -> Vec<String> {
+    let mut out = Vec::new();
+    for index in 0..8 {
+        for motive in [
+            inner.care(index),
+            inner.want(index),
+            inner.expect(index),
+            inner.learned(index),
+        ]
+        .into_iter()
+        .flatten()
+        {
+            let token = motive.token_str();
+            if !token.is_empty() {
+                out.push(token.to_string());
+            }
+        }
+    }
+    out
 }
 
 fn has_card(dir: &Path) -> bool {

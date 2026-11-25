@@ -72,6 +72,14 @@ function onJson(text) {
   if (msg.type === "mood" && msg.pad && typeof msg.pad.arousal === "number") {
     level = Math.max(level * 0.9, msg.pad.arousal * 0.15);
   }
+  if (msg.type === "inner") {
+    const node = document.getElementById("inner");
+    if (!node) return;
+    const slots = Array.isArray(msg.slots) ? msg.slots.join(" ") : "";
+    const surprise = typeof msg.surprise === "number" ? String(msg.surprise) : "";
+    const parts = [msg.verb, msg.lean, surprise, slots].filter((part) => part);
+    node.textContent = parts.join(" ");
+  }
 }
 
 function onBinary(buf) {

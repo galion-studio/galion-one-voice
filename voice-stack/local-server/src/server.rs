@@ -22,7 +22,7 @@ use axum::routing::{get, post};
 use axum::Router;
 use futures_util::{SinkExt, StreamExt};
 use tokio::net::TcpListener;
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, Notify};
 use tokio::task::JoinHandle;
 use tokio::time::{interval_at, sleep_until, Instant as Tick, MissedTickBehavior};
 use tower_http::services::ServeDir;
@@ -42,6 +42,7 @@ pub enum ServeError {
     NotLoopback(NotLoopback),
     Bind(std::io::Error),
     Serve(std::io::Error),
+    Signal(String),
 }
 
 impl std::fmt::Display for ServeError {
@@ -50,6 +51,7 @@ impl std::fmt::Display for ServeError {
             ServeError::NotLoopback(e) => write!(f, "{e}"),
             ServeError::Bind(e) => write!(f, "bind: {e}"),
             ServeError::Serve(e) => write!(f, "serve: {e}"),
+            ServeError::Signal(e) => write!(f, "signal: {e}"),
         }
     }
 }
@@ -170,12 +172,33 @@ pub fn session_ttl_from_env() -> Duration {
 
 pub struct Running {
     pub addr: SocketAddr,
-    join: JoinHandle<()>,
+    join: Option<JoinHandle<()>>,
+    stop: Option<Arc<Notify>>,
+    host: Option<Arc<crate::host::HostSession>>,
 }
 
 impl Drop for Running {
     fn drop(&mut self) {
-        self.join.abort();
+        if let Some(join) = self.join.take() {
+            join.abort();
+        }
+    }
+}
+
+impl Running {
+    /// Drain the listener, then seal the session. This is the path a caught
+    /// SIGTERM or ctrl-c takes after the signal. Dropping [`Running`] aborts
+    /// the task and does not seal.
+    pub async fn shutdown(mut self) {
+        if let Some(stop) = self.stop.take() {
+            stop.notify_one();
+        }
+        if let Some(join) = self.join.take() {
+            let _ = tokio::time::timeout(Duration::from_secs(5), join).await;
+        }
+        if let Some(host) = self.host.take() {
+            host.finish();
+        }
     }
 }
 
@@ -187,6 +210,27 @@ pub async fn start(
     require_session: bool,
     ttl: Duration,
 ) -> Result<Running, ServeError> {
+    start_bound(
+        addr,
+        ui_dir,
+        factory,
+        samantha_ref,
+        require_session,
+        ttl,
+        None,
+    )
+    .await
+}
+
+pub(crate) async fn start_bound(
+    addr: SocketAddr,
+    ui_dir: PathBuf,
+    factory: PipelineFactory,
+    samantha_ref: RefState,
+    require_session: bool,
+    ttl: Duration,
+    host: Option<Arc<crate::host::HostSession>>,
+) -> Result<Running, ServeError> {
     let (listener, bound) = bind_listener(addr).await?;
     let state = app_state(
         bound,
@@ -197,12 +241,24 @@ pub async fn start(
         ui_dir.clone(),
     );
     let app = router(state, ui_dir);
+    let stop = Arc::new(Notify::new());
+    let shutdown = Arc::clone(&stop);
     let join = tokio::spawn(async move {
-        let _ = axum::serve(listener, app).await;
+        let _ = axum::serve(listener, app)
+            .with_graceful_shutdown(async move {
+                shutdown.notified().await;
+            })
+            .await;
     });
-    Ok(Running { addr: bound, join })
+    Ok(Running {
+        addr: bound,
+        join: Some(join),
+        stop: Some(stop),
+        host,
+    })
 }
 
+/// ctrl-c, and on Unix SIGTERM. After the listener drains, the host seals.
 pub async fn serve_until_ctrl_c(
     addr: SocketAddr,
     ui_dir: PathBuf,
@@ -210,24 +266,63 @@ pub async fn serve_until_ctrl_c(
     samantha_ref: RefState,
     require_session: bool,
     ttl: Duration,
+    host: Arc<crate::host::HostSession>,
 ) -> Result<(), ServeError> {
-    let (listener, bound) = bind_listener(addr).await?;
-    eprintln!("samantha-local listening on http://{bound}/  (loopback only, {SCHEMA} {WS_PATH})");
-    let state = app_state(
-        bound,
+    let running = start_bound(
+        addr,
+        ui_dir,
         factory,
         samantha_ref,
         require_session,
         ttl,
-        ui_dir.clone(),
+        Some(Arc::clone(&host)),
+    )
+    .await?;
+    eprintln!(
+        "samantha-local listening on http://{}/  (loopback only, {SCHEMA} {WS_PATH})",
+        running.addr
     );
-    let app = router(state, ui_dir);
-    axum::serve(listener, app)
-        .with_graceful_shutdown(async {
+    let stop = Stop::install().map_err(ServeError::Signal)?;
+    stop.wait().await;
+    running.shutdown().await;
+    Ok(())
+}
+
+/// Installed before the process reports that it is listening, so a stop
+/// signal is not delivered to the default terminate action.
+pub struct Stop {
+    #[cfg(unix)]
+    term: tokio::signal::unix::Signal,
+}
+
+impl Stop {
+    pub fn install() -> Result<Self, String> {
+        #[cfg(unix)]
+        {
+            let term = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+                .map_err(|err| format!("SIGTERM handler: {err}"))?;
+            Ok(Self { term })
+        }
+        #[cfg(not(unix))]
+        {
+            Ok(Self {})
+        }
+    }
+
+    pub async fn wait(self) {
+        #[cfg(unix)]
+        {
+            let mut term = self.term;
+            tokio::select! {
+                _ = tokio::signal::ctrl_c() => {}
+                _ = term.recv() => {}
+            }
+        }
+        #[cfg(not(unix))]
+        {
             let _ = tokio::signal::ctrl_c().await;
-        })
-        .await
-        .map_err(ServeError::Serve)
+        }
+    }
 }
 
 async fn bind_listener(addr: SocketAddr) -> Result<(TcpListener, SocketAddr), ServeError> {
@@ -507,6 +602,11 @@ async fn session(socket: WebSocket, app: AppState) {
                 let line = mood_json(t_ms, source, pad);
                 if tx.try_send(Down { msg: Message::Text(line) }).is_err() && tx.is_closed() {
                     break;
+                }
+                if let Some(inner) = pipe.poll_inner() {
+                    if tx.try_send(Down { msg: Message::Text(inner) }).is_err() && tx.is_closed() {
+                        break;
+                    }
                 }
             }
             _ = sleep_until(deadline.unwrap_or_else(|| Tick::now() + Duration::from_secs(3600))), if deadline.is_some() => {

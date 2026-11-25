@@ -139,6 +139,15 @@ pub trait Pipeline: Send {
     /// The streamed utterance has ended or been dropped.
     fn utterance_done(&mut self) {}
     fn tick_mood(&mut self) -> (Pad, &'static str);
+    /// One idle thought, already JSON. `None` when this pipe has no inner life
+    /// or the quiet interval has not elapsed. The mouth does not speak it.
+    fn poll_inner(&mut self) -> Option<String> {
+        None
+    }
+    /// Persona id loaded by the brain. Empty when this pipe has no brain.
+    fn persona_id(&self) -> String {
+        String::new()
+    }
     fn phase(&self) -> &'static str;
     fn level(&self) -> f32;
     fn info(&self) -> PipeInfo;
