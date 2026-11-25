@@ -15,6 +15,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f2032f911046de80f0a198e0901378627c33f59ea0ac00e363d481118bd70a53"
 
 [[package]]
+name = "biquad"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8dee8f423f64504139bdc53d7fbe6a1cd8eff4f354be3652e7cf26385c9f1cb4"
+dependencies = [
+ "num-traits",
+]
+
+[[package]]
 name = "bitflags"
 version = "2.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -269,6 +278,7 @@ dependencies = [
  "galion-cores",
  "galion-emotion",
  "galion-heartbeat",
+ "galion-source-filter",
  "galion-tensor",
 ]
 
@@ -305,6 +315,15 @@ dependencies = [
 [[package]]
 name = "galion-sideband"
 version = "0.0.1"
+
+[[package]]
+name = "galion-source-filter"
+version = "0.1.0"
+dependencies = [
+ "biquad",
+ "galion-emotion-core",
+ "horbm-breath",
+]
 
 [[package]]
 name = "galion-student-backend"
@@ -352,6 +371,13 @@ checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
 [[package]]
 name = "horbm-brain"
 version = "0.0.1"
+
+[[package]]
+name = "horbm-breath"
+version = "0.0.1"
+dependencies = [
+ "galion-emotion-core",
+]
 
 [[package]]
 name = "horbm-device"
@@ -437,6 +463,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "libm"
+version = "0.2.16"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b6d2cec3eae94f9f509c767b45932f1ada8350c4bdb85af2fcab4a3c14807981"
+
+[[package]]
 name = "linux-raw-sys"
 version = "0.4.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -518,6 +550,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "071dfc062690e90b734c0b2273ce72ad0ffa95f0c74596bc250dcfd960262841"
 dependencies = [
  "autocfg",
+ "libm",
 ]
 
 [[package]]
