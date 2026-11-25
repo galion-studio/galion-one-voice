@@ -134,7 +134,11 @@ fn epilogue(acc: i32, w_scale: f32, x_scale: f32, b: Option<f32>) -> f32 {
     match b { Some(b) => v + b, None => v }
 }
 
-/// W8A8 GEMV on a [`QuantRowsI8`] with pre-quantized activations, selected SIMD level.
+/// W8A8 GEMV on a [`QuantRowsI8`] with pre-quantized activations.
+///
+/// The kernel is [`dot_i8_for`] at [`crate::features::selected`]. That is AVX-512 only when this
+/// build has `simd-avx512` and the CPU has AVX-512F and AVX-512BW. Without BW the int8 kernel
+/// is AVX2 (if that feature is compiled) or scalar. The f32 epilogue is unchanged.
 pub fn gemv_i8_into(w: &QuantRowsI8, xq: &[i8], x_scale: f32, bias: Option<&[f32]>, y: &mut [f32], exec: Exec) -> Result<()> {
     gemv_i8_into_with(features::selected(), &w.data, &w.scales, w.m, w.k, xq, x_scale, bias, y, exec)
 }

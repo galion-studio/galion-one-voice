@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 //! Public helpers on small in-memory buffers. CPU only: no weight files, no device.
 
-use galion_tensor::features::{cpu_supports, report, select_with_cap, selected};
+use galion_tensor::features::{cpu_supports, kernel_level, report, select_with_cap, selected, startup_line, Kernel};
 use galion_tensor::gemv_i8::gemv_i8_scalar_ref;
 use galion_tensor::gq::{parse_sha256sums, sha256, to_hex};
 use galion_tensor::ops::{
@@ -228,6 +228,17 @@ fn simd_report_is_a_cpu_level_and_sha256_is_in_memory() {
     let line = report();
     assert!(line.contains(&format!("selected={}", level.name())));
     assert!(line.contains("cpu="));
+    assert!(line.contains("dot=") && line.contains("dot_i8=") && line.contains("axpy="));
+    let start = startup_line();
+    assert!(start.starts_with("galion-tensor "));
+    assert!(std::ptr::eq(start, startup_line()));
+    for kernel in [Kernel::Dot, Kernel::DotI8, Kernel::Axpy] {
+        let token = format!("{}={}", kernel.name(), kernel_level(kernel, level).name());
+        assert!(line.contains(&token), "{line} missing {token}");
+        assert!(start.contains(&token), "{start} missing {token}");
+    }
+    assert_eq!(kernel_level(Kernel::Dot, level), level);
+    assert_eq!(kernel_level(Kernel::Axpy, level), level);
 
     let empty = sha256(b"");
     assert_eq!(to_hex(&empty), "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
