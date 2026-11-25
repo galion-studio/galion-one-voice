@@ -31,6 +31,27 @@ pub struct Heard {
     pub confidence: f32,
 }
 
+impl Heard {
+    /// Listener point from pleasure, activation, and how sure the reading is.
+    ///
+    /// `None` when any value is non-finite, or when `confidence` is below
+    /// [`EAR_CONFIDENCE`]. That `None` is no claim. Finite values are stored
+    /// as given.
+    pub const fn from_axes(valence: f32, arousal: f32, confidence: f32) -> Option<Self> {
+        if !valence.is_finite() || !arousal.is_finite() || !confidence.is_finite() {
+            return None;
+        }
+        if confidence < EAR_CONFIDENCE {
+            return None;
+        }
+        Some(Self {
+            valence,
+            arousal,
+            confidence,
+        })
+    }
+}
+
 /// One turn's evidence. The words are borrowed and not copied.
 #[derive(Clone, Copy, Debug)]
 pub struct Perceived<'a> {

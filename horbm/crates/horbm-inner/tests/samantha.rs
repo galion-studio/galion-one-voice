@@ -9,8 +9,8 @@ use galion_emotion::SAMANTHA;
 use galion_emotion_core::{EmotionCore, IntentMsg, IntentSource, AROUSAL, DOMINANCE, VALENCE};
 use horbm_inner::{
     remember_denied, Heard, InnerMsg, MsgDir, Perceived, SamanthaInner, Verb, CARE_HOME, CARE_SAD,
-    CHECKIN_GAP_MS, CHECKIN_MS, CURIOSITY_HOME, DECAY_KEEP_DEN, DECAY_KEEP_NUM, EXPECT_HOME,
-    PERSONA, REMEMBER_LOCK, TICK_MS, WAIT_MS,
+    CHECKIN_GAP_MS, CHECKIN_MS, CURIOSITY_HOME, DECAY_KEEP_DEN, DECAY_KEEP_NUM, EAR_CONFIDENCE,
+    EXPECT_HOME, PERSONA, REMEMBER_LOCK, TICK_MS, WAIT_MS,
 };
 
 fn seen(words: &str, ear: Option<Heard>, sense: bool) -> Perceived<'_> {
@@ -192,6 +192,45 @@ fn silence_waits_then_checks_in_once() {
     assert_eq!(second, 1);
     let msg = life.tick(TICK_MS, true);
     assert_eq!(msg.verb, Verb::Wait);
+}
+
+#[test]
+fn a_low_confidence_ear_is_no_claim() {
+    let shy = 0.34f32;
+    assert!(shy < EAR_CONFIDENCE);
+
+    assert!(Heard::from_axes(-0.55, 0.28, shy).is_none());
+    assert!(Heard::from_axes(-0.55, 0.28, 0.0).is_none());
+    for bad in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
+        assert!(Heard::from_axes(bad, 0.28, 0.9).is_none());
+        assert!(Heard::from_axes(-0.55, bad, 0.9).is_none());
+        assert!(Heard::from_axes(-0.55, 0.28, bad).is_none());
+    }
+
+    let claimed = Heard::from_axes(-0.55, 0.28, EAR_CONFIDENCE).expect("floor is a claim");
+    assert_eq!(claimed.valence.to_bits(), (-0.55f32).to_bits());
+    assert_eq!(claimed.arousal.to_bits(), 0.28f32.to_bits());
+    assert_eq!(claimed.confidence.to_bits(), EAR_CONFIDENCE.to_bits());
+
+    let mut from_words = SamanthaInner::new();
+    let heard = from_words.turn(seen("I feel sad", Heard::from_axes(0.8, 0.8, shy), true));
+    assert_eq!(heard.verb, Verb::Comfort);
+    assert!(from_words.care() > CARE_HOME + 0.1);
+
+    let mut quiet = SamanthaInner::new();
+    let ignored = quiet.turn(seen("", Heard::from_axes(-0.55, 0.28, shy), true));
+    assert_ne!(ignored.verb, Verb::Comfort);
+    assert_eq!(quiet.care().to_bits(), CARE_HOME.to_bits());
+    assert_eq!(quiet.turns(), 0);
+
+    let mut sensed = SamanthaInner::new();
+    let ear_only = sensed.turn(seen(
+        "",
+        Heard::from_axes(-0.55, 0.28, EAR_CONFIDENCE),
+        true,
+    ));
+    assert_eq!(ear_only.verb, Verb::Comfort);
+    assert!(sensed.care() > CARE_HOME);
 }
 
 #[test]
