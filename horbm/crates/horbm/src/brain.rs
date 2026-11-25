@@ -274,13 +274,14 @@ impl Retriever for CardRetriever<'_> {
 }
 
 impl Brain {
-    pub fn with_cards(
+    /// Cards and an already loaded persona. Does not read configuration.
+    pub fn with_persona(
         cards: impl CardLookup + Send + 'static,
         research: Option<Box<dyn ResearchAsk + Send>>,
+        persona: Persona,
     ) -> Self {
         let card_count = cards.len();
-        let (emotion, inner, persona) =
-            install(development_persona().expect("development persona"));
+        let (emotion, inner, persona) = install(persona);
         Self {
             empathy: Empathy::new(),
             cards: Box::new(cards),
@@ -304,6 +305,29 @@ impl Brain {
             follow_rx: None,
             pending_follow: None,
         }
+    }
+
+    /// [`Self::with_persona`] after loading the configured development persona.
+    ///
+    /// A blank id, a missing directory, or a missing file is the error.
+    /// This does not panic.
+    pub fn try_with_cards(
+        cards: impl CardLookup + Send + 'static,
+        research: Option<Box<dyn ResearchAsk + Send>>,
+    ) -> Result<Self, PersonaError> {
+        Ok(Self::with_persona(cards, research, development_persona()?))
+    }
+
+    /// Same cards as [`Self::try_with_cards`].
+    ///
+    /// When configuration is present, the persona is that one. When it is
+    /// missing, the stand-in fixture is installed. This does not panic.
+    pub fn with_cards(
+        cards: impl CardLookup + Send + 'static,
+        research: Option<Box<dyn ResearchAsk + Send>>,
+    ) -> Self {
+        let persona = development_persona().unwrap_or_else(|_| Persona::standin());
+        Self::with_persona(cards, research, persona)
     }
 
     /// Dialogue cards. Empty unless a research root was attached. They are
@@ -370,27 +394,60 @@ impl Brain {
             Some(path) => Persona::load(path)?,
             None => development_persona()?,
         };
-        let mut brain = Self::open(memory_db, knowledge_dir, cases);
-        brain.install_persona(persona);
-        Ok(brain)
+        Ok(Self::open_with_persona(
+            memory_db,
+            knowledge_dir,
+            cases,
+            persona,
+        ))
+    }
+
+    /// [`Self::open_with_persona`] after loading the configured persona.
+    /// A missing configuration is the error. This does not panic.
+    pub fn try_open(
+        memory_db: &Path,
+        knowledge_dir: &Path,
+        cases: &Path,
+    ) -> Result<Self, PersonaError> {
+        let persona = development_persona()?;
+        Ok(Self::open_with_persona(
+            memory_db,
+            knowledge_dir,
+            cases,
+            persona,
+        ))
     }
 
     /// Read `knowledge_dir` when it is already a directory. A missing path is
     /// an empty card set. Nothing is created. `memory_db` is kept on a denied
     /// diary and is not opened. `cases` is not opened.
+    ///
+    /// The persona is the configured one when that load succeeds, and the
+    /// stand-in fixture when it does not. This does not panic.
     pub fn open(memory_db: &Path, knowledge_dir: &Path, cases: &Path) -> Self {
+        let persona = development_persona().unwrap_or_else(|_| Persona::standin());
+        Self::open_with_persona(memory_db, knowledge_dir, cases, persona)
+    }
+
+    /// [`Self::open`] with an already loaded persona. Does not read configuration.
+    pub fn open_with_persona(
+        memory_db: &Path,
+        knowledge_dir: &Path,
+        cases: &Path,
+        persona: Persona,
+    ) -> Self {
         let _ = cases;
         let mut brain = match crate::KnowledgeCards::load(knowledge_dir) {
             Ok(loaded) => {
                 eprintln!("{}", loaded.report.log_line());
-                Self::with_cards(loaded.cards, None).with_style(ResearchRoot::from_env())
+                Self::with_persona(loaded.cards, None, persona).with_style(ResearchRoot::from_env())
             }
             Err(crate::CardError::NotADirectory(_)) => {
-                Self::with_cards(EmptyCards, None).with_style(ResearchRoot::from_env())
+                Self::with_persona(EmptyCards, None, persona).with_style(ResearchRoot::from_env())
             }
             Err(err) => {
                 eprintln!("horbm cards: {err}");
-                Self::with_cards(EmptyCards, None).with_style(ResearchRoot::from_env())
+                Self::with_persona(EmptyCards, None, persona).with_style(ResearchRoot::from_env())
             }
         };
         brain.memory = Some(Box::new(crate::EpisodicStore::open(memory_db, false)));
@@ -532,13 +589,6 @@ impl Brain {
         let note = self.samantha.nudge(&mut self.emotion, seen)?;
         self.apply_prosody(note.lean());
         Ok(note)
-    }
-
-    fn install_persona(&mut self, persona: Persona) {
-        let (emotion, inner, persona) = install(persona);
-        self.emotion = emotion;
-        self.inner = inner;
-        self.persona = persona;
     }
 
     /// One dialogue turn of cares, wants, and expects. Emits a GEMI intent
@@ -1094,8 +1144,9 @@ impl Brain {
 /// Configured development persona.
 ///
 /// `GALION_HORBM_DEV_PERSONA` names the id when it is non-empty. Otherwise
-/// `development.toml` does. The file is `personas/<id>.toml`. A blank id or
-/// a missing file is an error.
+/// `development.toml` does. The file is `<persona dir>/<id>.toml`. The
+/// directory is `GALION_HORBM_PERSONA_DIR`, otherwise `persona_dir` in the
+/// boot file. A blank id, a missing directory, or a missing file is an error.
 fn development_persona() -> Result<Persona, PersonaError> {
     Persona::load_development()
 }

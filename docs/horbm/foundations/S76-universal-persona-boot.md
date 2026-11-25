@@ -15,11 +15,11 @@ Perpetual Open MIT License. (c) 2026 Galion Labs.
 
 Development boot no longer calls a loader named for one persona. `Persona::samantha` and `SAMANTHA_TOML` are gone.
 
-`Persona::load_development` reads `BootConfig`. `GALION_HORBM_DEV_PERSONA` wins when it is a non-empty id. Otherwise the id is the `development_persona` key in `development.toml`. The file is `personas/<id>.toml` under the persona root. The id inside the file must equal that configured id (`Persona::is_configured_boot`). A blank id, a missing `development.toml` when the environment is also unset, or a missing file returns `PersonaError`. It does not panic.
+`Persona::load_development` reads `BootConfig`. `GALION_HORBM_DEV_PERSONA` wins when it is a non-empty id. Otherwise the id is the `development_persona` key in `development.toml`. The directory of `<id>.toml` files is `GALION_HORBM_PERSONA_DIR` when that value is non-empty. Otherwise it is the `persona_dir` key in `development.toml`, joined to the directory that holds that file. If neither source is present, the error is `development persona directory is not configured`. No absolute crate path is compiled into the binary. The boot file is found by walking from the process working directory. The id inside the loaded file must equal the configured id (`Persona::is_configured_boot`). A blank id or a missing file returns `PersonaError`. It does not panic.
 
-The root is `GALION_HORBM_PERSONA_DIR` when that value is a non-empty path. Otherwise it is this crate's directory, recorded at compile time with `CARGO_MANIFEST_DIR`. `development.toml` in the repository is still the only assignment of the development id. The shipped file names the same persona the laptop already boots. `personas/samantha.toml` and `personas/aria.toml` stay data files. Aria is not selected unless the config names that id.
+`development.toml` in the repository is still the only assignment of the development id. Its `persona_dir` is `personas`, so a process that can see that file still loads the same persona the laptop already boots. `personas/samantha.toml` and `personas/aria.toml` stay data files. Aria is not selected unless the config names that id.
 
-`Brain::boot(..., None)` uses that loader. `Brain::boot(..., Some(path))` still reads the given file and does not check it against the configured id. `Brain::with_cards` and `Brain::open` use the same loader. Their signatures still return `Self`, because callers outside this change construct a brain that way. A missing configuration aborts those two constructors. `Brain::boot` resolves the persona before `open`, so the error path returns `PersonaError` and does not reach that abort.
+`Brain::boot(..., None)`, `Brain::try_open`, and `Brain::try_with_cards` use that loader and return `PersonaError` when it fails. `Brain::boot(..., Some(path))` still reads the given file and does not check it against the configured id. `Brain::with_persona` and `Brain::open_with_persona` take an already loaded persona and do not read configuration. `Brain::with_cards` and `Brain::open` keep the signatures callers outside this change already use. When configuration is present they install that persona. When it is missing they install the stand-in fixture. They do not panic.
 
 Nothing on the turn or the retrieval query reads the persona file. Consent is unchanged: `remember` deny, `learn` deny, `learn_in_band` false. No research card was added.
 
@@ -29,13 +29,13 @@ Nothing on the turn or the retrieval query reads the persona file. Consent is un
 
 ## Tests
 
-`boot_installs_the_persona_the_env_names` points `GALION_HORBM_DEV_PERSONA` at a temporary id and `GALION_HORBM_PERSONA_DIR` at a directory that holds `personas/<id>.toml`. `Brain::boot(..., None)` installs that id. Its baseline identity bits and valence differ from the shipped development file. `Brain::with_cards` installs the same id. An explicit path still installs the file it names.
+`boot_installs_the_persona_the_env_names` points `GALION_HORBM_DEV_PERSONA` at a temporary id and `GALION_HORBM_PERSONA_DIR` at a directory that holds `<id>.toml`. `Brain::boot(..., None)` installs that id. Its baseline identity bits and valence differ from the shipped development file. `Brain::try_with_cards` installs the same id. An explicit path still installs the file it names.
 
-`boot_refuses_when_nothing_is_configured` points the directory at an empty temp dir and unsets the id variable. Boot returns `development persona is not configured` and does not panic. The same error is returned for a blank id. A configured id with no file returns `cannot read persona file`. A file whose id does not match the configured id is refused.
+`boot_refuses_when_nothing_is_configured` points the directory at an empty temp dir and unsets the id variable. `boot`, `try_with_cards`, and `try_open` return `development persona is not configured` and do not panic. `with_cards` and `open` return a brain whose persona is the stand-in fixture. The same boot error is returned for a blank id. A configured id with no file returns `cannot read persona file`. A file whose id does not match the configured id is refused.
 
-`boot_without_a_file_loads_samantha` unsets both variables. Boot, open, and `with_cards` still install the id named in the shipped `development.toml`.
+`boot_without_a_file_loads_samantha` unsets both variables. The boot file is found from the working directory. Boot, open, and `with_cards` still install the id named in the shipped `development.toml`.
 
-Nothing added here is Linux-only. Paths use `std::path`. The persona root baked into the binary is the crate directory on the machine that compiled it. A relocated binary needs `GALION_HORBM_PERSONA_DIR` or that directory still present. The run below is Linux, rustc 1.85.0 (`4d91de4e4`, 2025-02-17).
+Nothing added here is Linux-only. Paths use `std::path`. The binary does not contain the crate directory. A relocated process needs `GALION_HORBM_PERSONA_DIR`, or a `development.toml` it can see from its working directory. The run below is Linux, rustc 1.85.0 (`4d91de4e4`, 2025-02-17).
 
 | Command | Result |
 |---|---|

@@ -164,12 +164,12 @@ impl Persona {
         load::parse(text)
     }
 
-    /// `root/personas/<id>.toml`, where `id` is [`BootConfig::id`].
+    /// `<dir>/<id>.toml`, where `id` is [`BootConfig::id`].
     ///
     /// The id inside the file must pass [`Self::is_configured_boot`].
     /// A missing file is [`PersonaError::Unreadable`].
-    pub fn load_configured(root: &std::path::Path, cfg: &BootConfig) -> Result<Self, PersonaError> {
-        let path = root.join("personas").join(cfg.id()).with_extension("toml");
+    pub fn load_configured(dir: &std::path::Path, cfg: &BootConfig) -> Result<Self, PersonaError> {
+        let path = dir.join(cfg.id()).with_extension("toml");
         let persona = Self::load(&path)?;
         if persona.is_configured_boot(cfg) {
             Ok(persona)
@@ -182,15 +182,23 @@ impl Persona {
 
     /// Development persona for this process.
     ///
-    /// [`BootConfig::ENV`] names the id when it is non-empty. Otherwise
-    /// `development.toml` in [`BootConfig::root`] does. The file is
-    /// `personas/<id>.toml` under that root. A blank id or a missing file
-    /// is an error.
+    /// [`BootConfig::ENV`] names the id when it is non-empty. Otherwise the
+    /// boot file does. Persona files are read from [`BootConfig::DIR`] when
+    /// that value is non-empty, otherwise from `persona_dir` in the boot
+    /// file, relative to that file. A blank id, a missing directory, or a
+    /// missing file is an error.
     pub fn load_development() -> Result<Self, PersonaError> {
-        let root = BootConfig::root();
         let env = std::env::var(BootConfig::ENV).ok();
-        let cfg = BootConfig::from_dir(&root, env.as_deref())?;
-        Self::load_configured(&root, &cfg)
+        if let Some(dir) = BootConfig::env_dir() {
+            let text = BootConfig::boot_text_near(&dir)?;
+            let cfg = BootConfig::resolve(env.as_deref(), text.as_deref())?;
+            return Self::load_configured(&dir, &cfg);
+        }
+        let toml_path = BootConfig::locate()?;
+        let text = std::fs::read_to_string(&toml_path).map_err(|_| PersonaError::Unreadable)?;
+        let dir = BootConfig::files_from_toml(&toml_path)?;
+        let cfg = BootConfig::resolve(env.as_deref(), Some(&text))?;
+        Self::load_configured(&dir, &cfg)
     }
 
     pub fn to_toml(&self) -> String {

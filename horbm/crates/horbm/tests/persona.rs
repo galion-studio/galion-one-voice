@@ -99,6 +99,20 @@ fn boot_unset(root: &std::path::Path, knowledge: &std::path::Path) -> PersonaErr
     }
 }
 
+fn cards_unset() -> PersonaError {
+    match Brain::try_with_cards(NoCards, None) {
+        Err(err) => err,
+        Ok(_) => panic!("cards accepted a missing configuration"),
+    }
+}
+
+fn open_unset(root: &std::path::Path, knowledge: &std::path::Path) -> PersonaError {
+    match Brain::try_open(root, knowledge, &root.join("cases")) {
+        Err(err) => err,
+        Ok(_) => panic!("open accepted a missing configuration"),
+    }
+}
+
 fn bare() -> MoveClaim<'static> {
     MoveClaim {
         tag: b"fact",
@@ -224,7 +238,7 @@ fn boot_installs_the_persona_the_env_names() {
         .replace("valence = 0.28", "valence = 0.0");
     assert_ne!(text, shipped_text);
     std::fs::write(personas.join("cedar.toml"), text).unwrap();
-    let _env = hold(Some("cedar"), Some(&root));
+    let _env = hold(Some("cedar"), Some(&personas));
     let knowledge = root.join("knowledge");
     let brain = Brain::boot(&root, &knowledge, &root.join("cases"), None).unwrap();
     assert!(!knowledge.exists());
@@ -240,7 +254,7 @@ fn boot_installs_the_persona_the_env_names() {
         brain.persona().valence().to_bits(),
         shipped.valence().to_bits()
     );
-    let cards = Brain::with_cards(NoCards, None);
+    let cards = Brain::try_with_cards(NoCards, None).expect("configured persona");
     assert_eq!(cards.persona().id(), "cedar");
     let explicit = Brain::boot(&root, &knowledge, &root.join("cases"), Some(&samantha())).unwrap();
     assert_eq!(explicit.persona().id(), shipped.id());
@@ -259,6 +273,18 @@ fn boot_refuses_when_nothing_is_configured() {
     let knowledge = root.join("knowledge");
     let unset = PersonaError::Invalid("development persona is not configured");
     assert_eq!(boot_unset(&root, &knowledge), unset);
+    assert_eq!(cards_unset(), unset);
+    assert_eq!(open_unset(&root, &knowledge), unset);
+    assert_eq!(
+        Brain::with_cards(NoCards, None).persona().id(),
+        Persona::standin().id()
+    );
+    assert_eq!(
+        Brain::open(&root, &knowledge, &root.join("cases"))
+            .persona()
+            .id(),
+        Persona::standin().id()
+    );
     assert!(!knowledge.exists());
 
     std::fs::write(
@@ -282,13 +308,11 @@ fn boot_refuses_when_nothing_is_configured() {
     .unwrap();
     assert_eq!(boot_unset(&root, &knowledge), PersonaError::Unreadable);
 
-    let personas = root.join("personas");
-    std::fs::create_dir(&personas).unwrap();
     let mismatched = std::fs::read_to_string(samantha())
         .unwrap()
         .replace("id = \"samantha\"", "id = \"maple\"")
         .replace("voice = \"samantha\"", "voice = \"maple\"");
-    std::fs::write(personas.join("cedar.toml"), mismatched).unwrap();
+    std::fs::write(root.join("cedar.toml"), mismatched).unwrap();
     assert_eq!(
         boot_unset(&root, &knowledge),
         PersonaError::Invalid("persona file id is not the configured id")
