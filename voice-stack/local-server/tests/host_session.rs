@@ -591,9 +591,18 @@ fn assert_closed_session(root: &Path) {
     }
     let diary = root.join("memory").join("person-memory.sqlite");
     assert!(diary.is_file(), "diary file missing");
-    // `end_session` writes the session summary into the diary items. `recall`
-    // is the read that opens that file. `session_turns` stays empty: this
-    // store does not call `Store::push_turn`.
+    // `end_session` writes the session summary into the diary items and the
+    // buffered heard lines into `session_turns`. `recall` reads that file.
+    let (ring_len, rows, _extracted, turns) =
+        EpisodicStore::read_transcript_file(&diary, "Northwind").expect("reopen session_turns");
+    assert!(
+        rows > 0,
+        "session_turns rows {rows}, ring {ring_len}, turns {turns:?}"
+    );
+    assert!(
+        turns.iter().any(|(_, text, _)| text.contains(PERSON_LINE)),
+        "session_turns missing the person line: {turns:?}"
+    );
     let mut store = EpisodicStore::open(&diary, true);
     let hits = store.recall("person", "Northwind");
     assert!(
