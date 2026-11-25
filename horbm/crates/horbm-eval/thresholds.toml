@@ -30,3 +30,22 @@ eager_to_voice_p50_max_ms = 200
 eager_to_voice_p95_max_ms = 240
 barge_in_max_ms = 200
 backchannel_cancels = false
+
+# Real mode only. Mean per-sentence word error rate of the mouth-to-ear
+# round trip (the seven scripted lines, rendered by this mouth, heard by
+# vosk-model-small-en-us-0.15). The fake gate does not read this.
+[asr]
+wer_max = 0.20
+
+# Real mode wall clock. The virtual R4 lock above is unchanged.
+# Eager-to-voice is the warm Piper/Flite reply, same 200/240 budgets.
+# Barge-in on this path includes one vosk-small decode of the interruption,
+# so its wall budget is wider than the 200 ms frame lock. The virtual
+# overlap is still reported beside it and is not this number.
+[real.latency]
+clock = "wall"
+frame_ms = 80
+eager_to_voice_p50_max_ms = 200
+eager_to_voice_p95_max_ms = 240
+barge_in_max_ms = 500
+backchannel_cancels = false

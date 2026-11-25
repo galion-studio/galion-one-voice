@@ -297,11 +297,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "galion-asr-vosk"
+version = "0.0.1"
+dependencies = [
+ "galion-cores",
+]
+
+[[package]]
 name = "galion-conductor"
 version = "0.0.1"
 dependencies = [
  "galion-mne-contract",
 ]
+
+[[package]]
+name = "galion-consent"
+version = "0.0.1"
+
+[[package]]
+name = "galion-cores"
+version = "0.0.1"
 
 [[package]]
 name = "galion-emotion"
@@ -317,6 +332,24 @@ dependencies = [
 [[package]]
 name = "galion-emotion-in"
 version = "0.1.0"
+
+[[package]]
+name = "galion-heartbeat"
+version = "0.0.1"
+dependencies = [
+ "galion-emotion",
+]
+
+[[package]]
+name = "galion-ml-voice"
+version = "0.0.1"
+dependencies = [
+ "galion-consent",
+ "galion-cores",
+ "galion-emotion",
+ "galion-heartbeat",
+ "galion-tensor",
+]
 
 [[package]]
 name = "galion-mne-contract"
@@ -361,6 +394,10 @@ version = "0.0.1"
 dependencies = [
  "galion-emotion",
 ]
+
+[[package]]
+name = "galion-tensor"
+version = "0.0.1"
 
 [[package]]
 name = "galion-tts-piper"
@@ -435,10 +472,12 @@ dependencies = [
 name = "horbm-eval"
 version = "0.0.1"
 dependencies = [
+ "galion-asr-vosk",
  "galion-conductor",
  "galion-emotion",
  "galion-emotion-core",
  "galion-emotion-in",
+ "galion-ml-voice",
  "horbm",
  "horbm-voice",
  "serde",
