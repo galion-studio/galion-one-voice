@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Galion Labs
-//! Local HORBM mind. A turn is [`galion_sam_horbm::CardEngine`], which calls
-//! `horbm::Brain::turn`. That turn reads the retrieval cell. `Hits` speaks
+//! Local HORBM mind. A turn is [`galion_sam_horbm::CardEngine`]. Typed text
+//! calls `horbm::Brain::turn` (`turn_with_ear` with no point). A live mic
+//! utterance passes that utterance's listener point to
+//! `horbm::Brain::turn_with_ear`. The spoken clause stays the card lookup.
+//! `Hits` speaks
 //! the stored clause. `Miss` is `I don't know.` `Idle` is `remember` denied:
 //! cards answer, and the clause fixture covers a card miss. A deep miss on
 //! that idle path may ask the research gateway.
@@ -13,6 +16,8 @@
 //! That is not this process. There is no knowledge-ro listener in this crate.
 
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::{Arc, Mutex};
 
 use galion_sam_horbm::{CardEngine, ReplyEngine as HorbmReply};
 
@@ -29,8 +34,67 @@ pub(crate) struct IdleInner {
     pub slots: Vec<String>,
 }
 
+/// What one turn handed to `Brain::turn_with_ear`. Production leaves this unset.
+pub(crate) struct EarTrace {
+    last_point: Mutex<Option<(f32, f32, f32)>>,
+    with_point: AtomicU32,
+    without: AtomicU32,
+    last_turn: Mutex<Option<TurnOut>>,
+}
+
+impl EarTrace {
+    pub(crate) fn new() -> Self {
+        Self {
+            last_point: Mutex::new(None),
+            with_point: AtomicU32::new(0),
+            without: AtomicU32::new(0),
+            last_turn: Mutex::new(None),
+        }
+    }
+
+    fn record(&self, ear: Option<horbm::Heard>, turn: &TurnOut) {
+        match ear {
+            Some(point) => {
+                *self
+                    .last_point
+                    .lock()
+                    .unwrap_or_else(|err| err.into_inner()) =
+                    Some((point.valence, point.arousal, point.confidence));
+                self.with_point.fetch_add(1, Ordering::Relaxed);
+            }
+            None => {
+                self.without.fetch_add(1, Ordering::Relaxed);
+            }
+        }
+        *self.last_turn.lock().unwrap_or_else(|err| err.into_inner()) = Some(turn.clone());
+    }
+
+    pub(crate) fn last_point(&self) -> Option<(f32, f32, f32)> {
+        *self
+            .last_point
+            .lock()
+            .unwrap_or_else(|err| err.into_inner())
+    }
+
+    pub(crate) fn with_point(&self) -> u32 {
+        self.with_point.load(Ordering::Relaxed)
+    }
+
+    pub(crate) fn without(&self) -> u32 {
+        self.without.load(Ordering::Relaxed)
+    }
+
+    pub(crate) fn last_turn(&self) -> Option<TurnOut> {
+        self.last_turn
+            .lock()
+            .unwrap_or_else(|err| err.into_inner())
+            .clone()
+    }
+}
+
 pub struct HorbmMind {
     engine: CardEngine,
+    trace: Option<Arc<EarTrace>>,
 }
 
 impl HorbmMind {
@@ -52,7 +116,13 @@ impl HorbmMind {
                 &cases,
                 Some(config.remember.word.as_str()),
             ),
+            trace: None,
         }
+    }
+
+    pub(crate) fn with_trace(mut self, trace: Arc<EarTrace>) -> Self {
+        self.trace = Some(trace);
+        self
     }
 
     /// `GALION_HORBM_KNOWLEDGE` when that directory already exists. On the
@@ -182,11 +252,15 @@ impl ReplyEngine for HorbmMind {
     }
 
     fn turn(&mut self, heard: &str) -> Result<TurnOut, String> {
-        let out = self.engine.turn(heard);
+        self.turn_heard(heard, None)
+    }
+
+    fn turn_heard(&mut self, heard: &str, ear: Option<horbm::Heard>) -> Result<TurnOut, String> {
+        let out = self.engine.brain_mut().turn_with_ear(heard, ear);
         let meta = self.engine.mood_meta();
-        let (first_clause, rest) = crate::mouth::clause_pair(&out.text);
-        Ok(TurnOut {
-            reply: out.text,
+        let (first_clause, rest) = crate::mouth::clause_pair(&out.reply);
+        let mapped = TurnOut {
+            reply: out.reply,
             intent_json: format!("\"{}\"", meta.intent),
             arm_json: "null".into(),
             propensity: out.propensity,
@@ -207,7 +281,11 @@ impl ReplyEngine for HorbmMind {
             prosody_pause_ms: meta.pause_ms,
             first_clause,
             rest,
-        })
+        };
+        if let Some(trace) = &self.trace {
+            trace.record(ear, &mapped);
+        }
+        Ok(mapped)
     }
 
     fn tick(&mut self) -> Option<Pad> {
@@ -252,6 +330,42 @@ mod tests {
         assert!(!dir.join("memory").exists());
         assert_eq!(mind.knowledge_cards(), 1);
         assert_eq!(mind.knowledge_path(), dir);
+    }
+
+    #[test]
+    fn text_turn_matches_a_turn_with_no_ear_point() {
+        let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("knowledge");
+        let mut mind = HorbmMind::open(&dir);
+        let via_turn = mind.turn("where is the kettle").unwrap();
+        let via_ear = mind.turn_heard("where is the kettle", None).unwrap();
+        assert_eq!(via_turn.reply, via_ear.reply);
+        assert_eq!(via_turn.reply, "The kettle is on the stove.");
+        assert_eq!(via_turn.sources, via_ear.sources);
+        assert_eq!(via_turn.evidence, via_ear.evidence);
+        assert_eq!(via_turn.first_clause, via_ear.first_clause);
+        assert_eq!(via_turn.rest, via_ear.rest);
+        assert_eq!(via_turn.intent_json, via_ear.intent_json);
+        assert_eq!(via_turn.arm_json, via_ear.arm_json);
+        assert_eq!(via_turn.mood, via_ear.mood);
+        assert_eq!(via_turn.violations, via_ear.violations);
+        assert_eq!(via_turn.empathy_e.to_bits(), via_ear.empathy_e.to_bits());
+        assert_eq!(
+            via_turn.prosody_rate.to_bits(),
+            via_ear.prosody_rate.to_bits()
+        );
+        assert_eq!(
+            via_turn.prosody_energy.to_bits(),
+            via_ear.prosody_energy.to_bits()
+        );
+        assert_eq!(
+            via_turn.prosody_pitch_st.to_bits(),
+            via_ear.prosody_pitch_st.to_bits()
+        );
+        assert_eq!(
+            via_turn.prosody_pause_ms.to_bits(),
+            via_ear.prosody_pause_ms.to_bits()
+        );
+        assert_eq!(via_turn.propensity.to_bits(), via_ear.propensity.to_bits());
     }
 
     #[test]

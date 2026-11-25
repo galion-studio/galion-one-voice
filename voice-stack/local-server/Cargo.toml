@@ -36,6 +36,7 @@ galion-sam-horbm = { path = "../horbm-bridge" }
 galion-sam-orch = { path = "../pipeline-orchestrator" }
 galion-tts-piper = { path = "../tts-piper-stream", optional = true }
 horbm = { path = "../../horbm/crates/horbm" }
+horbm-ear = { path = "../../crates/horbm-ear" }
 horbm-voice = { path = "../../horbm/crates/horbm-voice" }
 samantha-voice-clone = { path = "../samantha-voice-clone" }
 

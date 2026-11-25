@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Galion Labs
 
-//! Reply engine. The 7881 process runs `HorbmMind`, which calls
-//! `horbm::Brain::turn`. [`UnlinkedBrain`] is the stand-in used by
+//! Reply engine. The 7881 process runs `HorbmMind`. Typed text calls
+//! `horbm::Brain::turn`. A mic utterance calls `turn_with_ear`.
+//! [`UnlinkedBrain`] is the stand-in used by
 //! [`crate::pipeline::FakePipeline`]: `turn` is an error, and `tick` does
 //! not invent a mood. [`FakeReply`] exists so tests can drop a brain in
 //! without speaking a comfort script.
@@ -69,6 +70,12 @@ pub struct TurnOut {
 pub trait ReplyEngine: Send {
     fn name(&self) -> &str;
     fn turn(&mut self, heard: &str) -> Result<TurnOut, String>;
+    /// Same turn with a listener point from this utterance.
+    /// `None` keeps the word path. The default calls [`Self::turn`].
+    fn turn_heard(&mut self, heard: &str, ear: Option<horbm::Heard>) -> Result<TurnOut, String> {
+        let _ = ear;
+        self.turn(heard)
+    }
     /// One call per 80 ms frame. `None` means the socket keeps `source: resting`.
     /// This method must not ease a pad toward a target.
     fn tick(&mut self) -> Option<Pad> {
@@ -195,6 +202,63 @@ fn is_scripted_comfort(reply: &str) -> bool {
 
 fn contains_bracket_tag(reply: &str) -> bool {
     reply.contains('[') && reply.contains(']')
+}
+
+/// Live pipeline with a scripted recogniser, for the ear tests.
+/// `sense_on` builds the ear with [`horbm_ear::Ear::from_env`]: unset is on,
+/// `"off"` is the off switch. This does not read or write the process environment.
+pub struct EarLive {
+    pipe: Box<dyn crate::pipeline::Pipeline>,
+    trace: std::sync::Arc<crate::brain::EarTrace>,
+    ear_line: &'static str,
+}
+
+impl EarLive {
+    pub fn scripted(transcript: &str, sense_on: bool) -> Self {
+        let ear_line = crate::live::ear_state_line(sense_on);
+        let trace = std::sync::Arc::new(crate::brain::EarTrace::new());
+        let pipe =
+            crate::live::open_scripted_ear(transcript, sense_on, std::sync::Arc::clone(&trace));
+        Self {
+            pipe: Box::new(pipe),
+            trace,
+            ear_line,
+        }
+    }
+
+    pub fn push_mic(&mut self, pcm: &[i16], rate: u32, t_ms: u64) -> crate::pipeline::TurnProduct {
+        self.pipe.push_mic(pcm, rate, t_ms)
+    }
+
+    pub fn push_text(&mut self, text: &str, t_ms: u64) -> crate::pipeline::TurnProduct {
+        self.pipe.push_text(text, t_ms)
+    }
+
+    pub fn ear_line(&self) -> &'static str {
+        self.ear_line
+    }
+
+    pub fn last_point(&self) -> Option<(f32, f32, f32)> {
+        self.trace.last_point()
+    }
+
+    pub fn points_passed(&self) -> u32 {
+        self.trace.with_point()
+    }
+
+    pub fn turns_without_point(&self) -> u32 {
+        self.trace.without()
+    }
+
+    pub fn last_turn(&self) -> Option<TurnOut> {
+        self.trace.last_turn()
+    }
+}
+
+/// One card turn through [`ReplyEngine::turn`], which passes no ear point.
+pub fn card_turn(heard: &str) -> Result<TurnOut, String> {
+    let dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("knowledge");
+    crate::brain::HorbmMind::open(&dir).turn(heard)
 }
 
 #[cfg(test)]

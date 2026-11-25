@@ -7,8 +7,9 @@
 //! 60 ms onset as the orchestrator. A quiet gap of 640 ms ends one turn on
 //! this socket. Vosk stays on a worker thread
 //! because its handles are not `Send`. The spoken turn is one
-//! [`horbm_voice::VoiceLoop::tick`]: ear, then `horbm::Brain::turn`, then the
-//! mouth selected at boot. CPU is the default device. Piper is linked only
+//! [`horbm_voice::VoiceLoop::tick`]: ear, then `turn_heard` (the mic's
+//! listener point, or `None` for typed text), then the mouth selected at
+//! boot. CPU is the default device. Piper is linked only
 //! with `--features piper`. The s711 clone is selected only for an explicit
 //! cuda opt-in. The brain is [`crate::brain::HorbmMind`]. `Brain::open` in the
 //! orchestrator stays unlinked. A hosted session opens the person diary only
@@ -19,14 +20,15 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStdin, Command, Stdio};
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::mpsc::{self, Sender};
-use std::sync::{Arc, Mutex};
-use std::thread::JoinHandle;
+use std::sync::{Arc, Condvar, Mutex};
+use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
 use galion_sam_asr::{final_text, open_engine, Asr, EngineOpts};
 use galion_sam_orch::Tts as OrchTts;
 use horbm_voice::{
-    EarEvent, EnergyGate, GateEvent, Mouth as VoiceMouth, MouthPull, SpokenLine, VoiceLoop,
+    EarEvent, EnergyGate, GateEvent, Mouth as VoiceMouth, MouthPull, SpokenLine, TurnBrain,
+    VoiceLoop,
 };
 
 use crate::audio::{self, rms, SPEAKER_RATE};
@@ -36,7 +38,7 @@ use crate::mouth::{self, Mouth, MouthCue};
 use crate::native::{self, MindBrain, QueueEar, Stored};
 use crate::pipeline::{AudioFeed, FeedMsg, PipeInfo, Pipeline, TurnProduct};
 use crate::protocol::{dot_json, error_json, spoken_text_json, turn_json, vad_json};
-use crate::reply::{Pad, ReplyEngine, TurnOut};
+use crate::reply::{may_speak_piper, Pad, ReplyEngine, TurnOut};
 
 const FRAME: usize = 320;
 const SPEECH_RMS: f32 = 0.02;
@@ -73,7 +75,6 @@ struct OpenAsr {
 }
 
 enum Ear {
-    #[cfg(test)]
     Script(String),
     Missing,
     Vosk(Sender<Job>),
@@ -282,7 +283,7 @@ pub struct LivePipeline {
     feed: Arc<Mutex<Option<AudioFeed>>>,
     #[cfg_attr(not(test), allow(dead_code))]
     turns: Arc<AtomicU32>,
-    voice: VoiceLoop<QueueEar, LoopMouth, MindBrain>,
+    voice: VoiceLoop<QueueEar, LoopMouth, ProsodyBrain>,
     worker: Arc<Mutex<SpeakWorker>>,
     mouth_device: &'static str,
     vad_backend: &'static str,
@@ -293,6 +294,19 @@ pub struct LivePipeline {
     speech: Vec<i16>,
     in_speech: bool,
     utterance: Vec<i16>,
+    /// Prosody ear. One per pipeline, on its own thread: the pitch crate is
+    /// not `Send`, and this pipeline is. Sensing is on unless
+    /// `GALION_EAR_SENSE` is `0`, `off`, or `deny`.
+    prosody: ProsodyEar,
+    /// Leftover samples short of one 1280-sample frame. Not a heap buffer.
+    prosody_carry: [i16; horbm_ear::FRAME_SAMPLES],
+    prosody_carry_len: usize,
+    /// Reused f32 frame. Filled in place. Not allocated per frame.
+    prosody_frame: [f32; horbm_ear::FRAME_SAMPLES],
+    /// Latest listener point from this utterance. Cleared when the turn runs.
+    prosody_point: Option<horbm::Heard>,
+    pending_ear: Arc<Mutex<Option<horbm::Heard>>>,
+    ear_info_logged: AtomicBool,
     /// Set when a heard line finished. Idle thoughts wait from this instant.
     last_heard: Option<Instant>,
     last_inner: Option<Instant>,
@@ -323,6 +337,7 @@ impl LivePipeline {
             None,
             mouth::open_kind(pick, &choice, &raw),
             device,
+            ProsodyBoot::Process,
         )
     }
 
@@ -343,6 +358,7 @@ impl LivePipeline {
             Some(host),
             mouth::open_kind(pick, &choice, &raw),
             device,
+            ProsodyBoot::Process,
         )
     }
 
@@ -373,6 +389,7 @@ impl LivePipeline {
             None,
             mouth,
             native::BOOT_MOUTH_DEVICE,
+            ProsodyBoot::Process,
         )
     }
 
@@ -382,11 +399,18 @@ impl LivePipeline {
         host: Option<Arc<HostSession>>,
         mouth: Box<dyn Mouth>,
         mouth_device: &'static str,
+        prosody: ProsodyBoot,
     ) -> Self {
         let Opened { vad, asr } = opened;
-        let brain = MindBrain::shared(Arc::clone(&mind));
-        let last = Arc::clone(&brain.last);
-        let turns = Arc::clone(&brain.turns);
+        let prosody = ProsodyEar::spawn(prosody);
+        eprintln!("{}", ear_state_line(prosody.sensing()));
+        let pending_ear = Arc::new(Mutex::new(None));
+        let brain = ProsodyBrain {
+            inner: MindBrain::shared(Arc::clone(&mind)),
+            pending: Arc::clone(&pending_ear),
+        };
+        let last = Arc::clone(&brain.inner.last);
+        let turns = Arc::clone(&brain.inner.turns);
         let feed = Arc::new(Mutex::new(None));
         let worker = Arc::new(Mutex::new(SpeakWorker::spawn(mouth)));
         let voice = VoiceLoop::new(
@@ -417,6 +441,13 @@ impl LivePipeline {
             speech: Vec::new(),
             in_speech: false,
             utterance: Vec::new(),
+            prosody,
+            prosody_carry: [0; horbm_ear::FRAME_SAMPLES],
+            prosody_carry_len: 0,
+            prosody_frame: [0.0; horbm_ear::FRAME_SAMPLES],
+            prosody_point: None,
+            pending_ear,
+            ear_info_logged: AtomicBool::new(false),
             last_heard: None,
             last_inner: None,
             last_pad: None,
@@ -434,8 +465,18 @@ impl LivePipeline {
         TurnProduct::events(vec![error_json(code), dot_json("idle", self.level)])
     }
 
-    fn hear(&mut self, text: &str, t_ms: u64, preface: Vec<String>) -> TurnProduct {
+    fn hear(
+        &mut self,
+        text: &str,
+        ear: Option<horbm::Heard>,
+        t_ms: u64,
+        preface: Vec<String>,
+    ) -> TurnProduct {
         let _ = t_ms;
+        *self
+            .pending_ear
+            .lock()
+            .unwrap_or_else(|err| err.into_inner()) = ear;
         self.voice.ear_mut().push(EarEvent::end(text));
         let _frame = self.voice.tick(&[]);
         let stored = self
@@ -533,6 +574,8 @@ impl Pipeline for LivePipeline {
                     self.in_speech = true;
                     self.utterance.clear();
                     self.utterance.extend_from_slice(&piece);
+                    self.reset_prosody_utterance();
+                    self.push_prosody(&piece);
                     self.phase = "listening";
                     events.push(vad_json("start", t_ms));
                     events.push(dot_json("listening", self.level));
@@ -540,16 +583,19 @@ impl Pipeline for LivePipeline {
                 Some("end") => {
                     if self.in_speech {
                         self.utterance.extend_from_slice(&piece);
+                        self.push_prosody(&piece);
                     }
                     self.in_speech = false;
                     events.push(vad_json("end", t_ms));
                     let heard_pcm = std::mem::take(&mut self.utterance);
                     self.speech = buf;
                     if heard_pcm.is_empty() {
+                        let _ = self.take_ear_point();
                         self.phase = "idle";
                         events.push(dot_json("idle", self.level));
                         return TurnProduct::events(events);
                     }
+                    let point = self.take_ear_point();
                     let heard = match self.recognise(&heard_pcm) {
                         Ok(text) => text,
                         Err(code) => {
@@ -559,11 +605,12 @@ impl Pipeline for LivePipeline {
                             return fail;
                         }
                     };
-                    return self.hear(&heard, t_ms, events);
+                    return self.hear(&heard, point, t_ms, events);
                 }
                 _ => {
                     if self.in_speech {
                         self.utterance.extend_from_slice(&piece);
+                        self.push_prosody(&piece);
                         if self.utterance.len() > UTTERANCE_CAP {
                             let drop_n = self.utterance.len() - UTTERANCE_CAP;
                             self.utterance.drain(..drop_n);
@@ -588,6 +635,8 @@ impl Pipeline for LivePipeline {
             return self.fail("bad-rate");
         };
         self.speech.clear();
+        self.reset_prosody_utterance();
+        self.push_prosody(&samples);
         let mut preface = Vec::new();
         let mut saw_speech = rms(&samples) >= SPEECH_RMS;
         let mut off = 0;
@@ -605,15 +654,17 @@ impl Pipeline for LivePipeline {
         }
         self.speech.clear();
         if !saw_speech {
+            let _ = self.take_ear_point();
             self.phase = "idle";
             preface.push(dot_json("idle", self.level));
             return TurnProduct::events(preface);
         }
+        let point = self.take_ear_point();
         let heard = match self.recognise(&samples) {
             Ok(text) => text,
             Err(code) => return self.fail(&code),
         };
-        self.hear(&heard, t_ms, preface)
+        self.hear(&heard, point, t_ms, preface)
     }
 
     fn push_text(&mut self, text: &str, t_ms: u64) -> TurnProduct {
@@ -621,8 +672,9 @@ impl Pipeline for LivePipeline {
         if text.is_empty() {
             return self.fail("empty-text");
         }
+        let _ = self.take_ear_point();
         self.phase = "thinking";
-        self.hear(text, t_ms, vec![dot_json("thinking", self.level)])
+        self.hear(text, None, t_ms, vec![dot_json("thinking", self.level)])
     }
 
     fn stop(&mut self) {
@@ -633,6 +685,7 @@ impl Pipeline for LivePipeline {
         self.speech.clear();
         self.utterance.clear();
         self.in_speech = false;
+        let _ = self.take_ear_point();
         self.phase = "idle";
         if let Front::Energy(vad) = &mut self.front {
             vad.reset_turn();
@@ -726,6 +779,9 @@ impl Pipeline for LivePipeline {
     }
 
     fn info(&self) -> PipeInfo {
+        if !self.ear_info_logged.swap(true, Ordering::Relaxed) {
+            eprintln!("{}", ear_state_line(self.prosody.sensing()));
+        }
         let mind = self.mind.lock().unwrap_or_else(|err| err.into_inner());
         let knowledge_cards = mind.knowledge_cards();
         let knowledge_dir = mind.knowledge_path().display().to_string();
@@ -802,7 +858,6 @@ impl LivePipeline {
     fn recognise(&mut self, pcm: &[i16]) -> Result<String, String> {
         match &self.ear {
             Ear::Missing => Err("asr-unready".into()),
-            #[cfg(test)]
             Ear::Script(line) => {
                 let line = line.trim().to_string();
                 if line.is_empty() {
@@ -823,6 +878,325 @@ impl LivePipeline {
                     .unwrap_or(Err("asr-unready".into()))
             }
         }
+    }
+
+    fn reset_prosody_utterance(&mut self) {
+        self.prosody_carry_len = 0;
+        self.prosody_point = None;
+    }
+
+    fn take_ear_point(&mut self) -> Option<horbm::Heard> {
+        self.prosody_carry_len = 0;
+        self.prosody_point.take()
+    }
+
+    /// Push 16 kHz samples. A short tail stays in `prosody_carry` until the
+    /// next samples fill one frame. The f32 frame is the array filled below.
+    fn push_prosody(&mut self, pcm: &[i16]) {
+        let mut off = 0;
+        while off < pcm.len() {
+            let room = horbm_ear::FRAME_SAMPLES - self.prosody_carry_len;
+            let n = room.min(pcm.len() - off);
+            self.prosody_carry[self.prosody_carry_len..self.prosody_carry_len + n]
+                .copy_from_slice(&pcm[off..off + n]);
+            self.prosody_carry_len += n;
+            off += n;
+            if self.prosody_carry_len == horbm_ear::FRAME_SAMPLES {
+                self.flush_prosody_frame();
+            }
+        }
+    }
+
+    fn flush_prosody_frame(&mut self) {
+        for (slot, sample) in self.prosody_frame.iter_mut().zip(self.prosody_carry.iter()) {
+            // Same scale as `crate::audio::rms`: full-scale i16 is about 1.0.
+            *slot = f32::from(*sample) / 32768.0;
+        }
+        self.prosody_carry_len = 0;
+        if let Some(point) = self.prosody.push_frame(&self.prosody_frame) {
+            self.prosody_point = Some(point);
+        }
+    }
+}
+
+/// How the prosody thread builds its ear. The ear is created on that thread:
+/// the pitch crate keeps `Rc` scratch, so an `Ear` is not `Send`.
+enum ProsodyBoot {
+    /// `Ear::from_env` on `GALION_EAR_SENSE`. Unset stays on.
+    Process,
+    ExplicitOn,
+    ExplicitOff,
+}
+
+fn boot_ear(boot: ProsodyBoot) -> horbm_ear::Ear {
+    match boot {
+        ProsodyBoot::Process => horbm_ear::Ear::from_process_env(),
+        ProsodyBoot::ExplicitOn => horbm_ear::Ear::from_env(None),
+        ProsodyBoot::ExplicitOff => horbm_ear::Ear::from_env(Some("off")),
+    }
+}
+
+/// The pitch detector keeps `Rc` scratch, so it cannot sit on this `Send`
+/// pipeline. One thread owns the ear for the life of the pipeline. The frame
+/// array is the only buffer, filled by the caller and copied into the slot.
+struct ProsodyEar {
+    slot: Arc<(Mutex<ProsodySlot>, Condvar)>,
+    sensing: bool,
+    join: Option<JoinHandle<()>>,
+}
+
+struct ProsodySlot {
+    frame: [f32; horbm_ear::FRAME_SAMPLES],
+    state: ProsodyState,
+    kept: Option<horbm::Heard>,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ProsodyState {
+    Idle,
+    Push,
+    Shutdown,
+}
+
+impl ProsodyEar {
+    fn spawn(boot: ProsodyBoot) -> Self {
+        let slot = Arc::new((
+            Mutex::new(ProsodySlot {
+                frame: [0.0; horbm_ear::FRAME_SAMPLES],
+                state: ProsodyState::Idle,
+                kept: None,
+            }),
+            Condvar::new(),
+        ));
+        let started = Arc::new((Mutex::new(None), Condvar::new()));
+        let worker = Arc::clone(&slot);
+        let ready = Arc::clone(&started);
+        let join = thread::Builder::new()
+            .name("galion-prosody-ear".into())
+            .spawn(move || {
+                let ear = boot_ear(boot);
+                {
+                    let (lock, wake) = &*ready;
+                    *lock.lock().unwrap_or_else(|err| err.into_inner()) = Some(ear.sensing());
+                    wake.notify_one();
+                }
+                prosody_loop(ear, worker);
+            })
+            .ok();
+        let sensing = if join.is_some() {
+            let (lock, wake) = &*started;
+            let mut guard = lock.lock().unwrap_or_else(|err| err.into_inner());
+            while guard.is_none() {
+                guard = wake.wait(guard).unwrap_or_else(|err| err.into_inner());
+            }
+            guard.unwrap_or(false)
+        } else {
+            false
+        };
+        Self {
+            slot,
+            sensing,
+            join,
+        }
+    }
+
+    fn sensing(&self) -> bool {
+        self.sensing
+    }
+
+    fn push_frame(&self, frame: &[f32; horbm_ear::FRAME_SAMPLES]) -> Option<horbm::Heard> {
+        if self.join.is_none() {
+            return None;
+        }
+        let (lock, wake) = &*self.slot;
+        let mut slot = lock.lock().unwrap_or_else(|err| err.into_inner());
+        slot.frame = *frame;
+        slot.kept = None;
+        slot.state = ProsodyState::Push;
+        wake.notify_one();
+        while slot.state == ProsodyState::Push {
+            slot = wake.wait(slot).unwrap_or_else(|err| err.into_inner());
+        }
+        slot.kept.take()
+    }
+}
+
+impl Drop for ProsodyEar {
+    fn drop(&mut self) {
+        let (lock, wake) = &*self.slot;
+        let mut slot = lock.lock().unwrap_or_else(|err| err.into_inner());
+        slot.state = ProsodyState::Shutdown;
+        wake.notify_one();
+        drop(slot);
+        if let Some(join) = self.join.take() {
+            let _ = join.join();
+        }
+    }
+}
+
+fn prosody_loop(mut ear: horbm_ear::Ear, slot: Arc<(Mutex<ProsodySlot>, Condvar)>) {
+    let (lock, wake) = &*slot;
+    loop {
+        let mut guard = lock.lock().unwrap_or_else(|err| err.into_inner());
+        while guard.state == ProsodyState::Idle {
+            guard = wake.wait(guard).unwrap_or_else(|err| err.into_inner());
+        }
+        match guard.state {
+            ProsodyState::Shutdown => break,
+            ProsodyState::Push => {
+                let frame = guard.frame;
+                guard.kept = heard_point(&mut ear, &frame);
+                guard.state = ProsodyState::Idle;
+                wake.notify_one();
+            }
+            ProsodyState::Idle => {}
+        }
+    }
+}
+
+fn heard_point(ear: &mut horbm_ear::Ear, frame: &[f32]) -> Option<horbm::Heard> {
+    let horbm_ear::FrameOut::Heard(heard) = ear.push(frame) else {
+        return None;
+    };
+    let (valence, arousal, strength) = heard.offer.heard_axes()?;
+    horbm::Heard::from_axes(valence, arousal, strength)
+}
+
+/// `ear=on` or `ear=off`. Startup and the first `info()` call print this.
+pub(crate) fn ear_state_line(sensing: bool) -> &'static str {
+    if sensing {
+        "ear=on"
+    } else {
+        "ear=off"
+    }
+}
+
+/// Scripted recogniser and an explicit prosody ear. The process environment
+/// is not read. The mind records each point the brain turn receives.
+pub(crate) fn open_scripted_ear(
+    transcript: &str,
+    sense_on: bool,
+    trace: Arc<crate::brain::EarTrace>,
+) -> LivePipeline {
+    let mind = HorbmMind::open(&PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("knowledge"))
+        .with_trace(trace);
+    let prosody = if sense_on {
+        ProsodyBoot::ExplicitOn
+    } else {
+        ProsodyBoot::ExplicitOff
+    };
+    LivePipeline::assemble(
+        Opened {
+            vad: OpenVad {
+                front: Front::Energy(EnergyGate::new(HANG_MS)),
+                backend: "energy",
+                ready: true,
+            },
+            asr: OpenAsr {
+                ear: Ear::Script(transcript.to_string()),
+                name: "script",
+                worker: None,
+            },
+        },
+        Arc::new(Mutex::new(mind)),
+        None,
+        Box::new(ScriptMouth),
+        native::BOOT_MOUTH_DEVICE,
+        prosody,
+    )
+}
+
+struct ScriptMouth;
+
+impl Mouth for ScriptMouth {
+    fn speak(&mut self, _text: &str, _cue: &MouthCue) -> Result<(Vec<i16>, u32), String> {
+        Ok((vec![1000, -1000, 1000, -1000], crate::audio::SPEAKER_RATE))
+    }
+    fn mouth(&self) -> &'static str {
+        "sample"
+    }
+    fn voice(&self) -> &'static str {
+        "sample"
+    }
+    fn clone_status(&self) -> &'static str {
+        "off"
+    }
+}
+
+struct ProsodyBrain {
+    inner: MindBrain,
+    pending: Arc<Mutex<Option<horbm::Heard>>>,
+}
+
+impl TurnBrain for ProsodyBrain {
+    fn turn(&mut self, heard: &str) -> SpokenLine {
+        self.inner.turns.fetch_add(1, Ordering::Relaxed);
+        let ear = self
+            .pending
+            .lock()
+            .unwrap_or_else(|err| err.into_inner())
+            .take();
+        let started = Instant::now();
+        let result = self
+            .inner
+            .mind
+            .lock()
+            .unwrap_or_else(|err| err.into_inner())
+            .turn_heard(heard, ear);
+        match result {
+            Err(code) => {
+                *self
+                    .inner
+                    .last
+                    .lock()
+                    .unwrap_or_else(|err| err.into_inner()) = Some(Stored::Err(code));
+                quiet_line()
+            }
+            Ok(mut out) => {
+                if out.took_us == 0 {
+                    out.took_us = u32::try_from(started.elapsed().as_micros()).unwrap_or(u32::MAX);
+                }
+                out.mood = out.mood.finite_or_resting();
+                let speak = may_speak_piper(&out.reply, out.violations);
+                let line = line_from_turn(&out, speak);
+                *self
+                    .inner
+                    .last
+                    .lock()
+                    .unwrap_or_else(|err| err.into_inner()) = Some(Stored::Out(out));
+                line
+            }
+        }
+    }
+}
+
+fn line_from_turn(out: &TurnOut, speak: bool) -> SpokenLine {
+    SpokenLine {
+        text: if speak {
+            out.reply.clone()
+        } else {
+            String::new()
+        },
+        mood: horbm::Pad {
+            arousal: out.mood.arousal,
+            valence: out.mood.valence,
+            dominance: out.mood.dominance,
+        },
+        rate: out.prosody_rate,
+        energy: out.prosody_energy,
+        pitch_st: out.prosody_pitch_st,
+        pause_ms: out.prosody_pause_ms,
+    }
+}
+
+fn quiet_line() -> SpokenLine {
+    SpokenLine {
+        text: String::new(),
+        mood: horbm::Pad::RESTING,
+        rate: 1.0,
+        energy: 1.0,
+        pitch_st: 0.0,
+        pause_ms: 0.0,
     }
 }
 
