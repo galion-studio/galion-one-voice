@@ -17,10 +17,11 @@ thread_local! {
 
 unsafe impl GlobalAlloc for Counting {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-        if ARMED.with(|armed| armed.get()) {
+        let ptr = System.alloc(layout);
+        if !ptr.is_null() && ARMED.with(|armed| armed.get()) {
             ALLOCS.fetch_add(1, Ordering::Relaxed);
         }
-        System.alloc(layout)
+        ptr
     }
 
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
@@ -28,10 +29,11 @@ unsafe impl GlobalAlloc for Counting {
     }
 
     unsafe fn realloc(&self, ptr: *mut u8, layout: Layout, new_size: usize) -> *mut u8 {
-        if ARMED.with(|armed| armed.get()) {
+        let next = System.realloc(ptr, layout, new_size);
+        if !next.is_null() && ARMED.with(|armed| armed.get()) {
             ALLOCS.fetch_add(1, Ordering::Relaxed);
         }
-        System.realloc(ptr, layout, new_size)
+        next
     }
 }
 

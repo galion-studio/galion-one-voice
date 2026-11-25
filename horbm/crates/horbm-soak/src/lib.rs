@@ -102,7 +102,7 @@ impl Report {
             "ear prosody ProsodyEar::hear allocates {prosody} per frame (stack autocorrelation)\n\
              emotion core CoreAffect::step / EmotionCore::step allocates {emotion} per frame\n\
              output buffer enqueue and dequeue allocate {buffer} (fixed ring)\n\
-             echo PlaybackEcho::cancel_into allocates {echo} per frame because fdaf_aec::FdafAec::process returns a new Vec<f32> per 256-sample block and builds intermediate FFT buffers; one 80 ms frame is five blocks\n\
+             echo PlaybackEcho::cancel_into allocates {echo} per frame; the fdaf-aec overlap-save steps run on buffers stored for the call, including the FFT scratch\n\
              steady idle tick allocates {idle_min}..={idle_max} (n={idle_n})\n\
              steady hold tick allocates {hold_min}..={hold_max} (n={hold_n}); a held partial is cloned into FrameOut\n\
              steady playback tick allocates {play_min}..={play_max} (n={play_n}); Conductor::tick clones the committed clause onto TickOut",
@@ -424,27 +424,27 @@ fn barge_list(values: &[u64]) -> String {
 
 /// Conductor barge, in milliseconds. Measured 160 on every sample.
 const BARGE_MS: u64 = 160;
-/// Steady idle allocations per tick. Measured 60, same as the echo probe.
-const IDLE_ALLOC_MAX: u64 = 60;
-/// Steady playback allocations per tick. Measured 64 (idle plus four clause strings).
-const PLAY_ALLOC_MAX: u64 = 64;
-/// Steady user-hold allocations per tick. Measured 61 (idle plus the partial clone).
-const HOLD_ALLOC_MAX: u64 = 61;
+/// Steady idle allocations per tick. Measured 0, same as the echo probe.
+const IDLE_ALLOC_MAX: u64 = 0;
+/// Steady playback allocations per tick. Measured 4 (the committed clause's four strings).
+const PLAY_ALLOC_MAX: u64 = 4;
+/// Steady user-hold allocations per tick. Measured 1 (the partial cloned into FrameOut).
+const HOLD_ALLOC_MAX: u64 = 1;
 /// Resident-set growth from warmup to the end, in KiB.
-/// Measured 20 KiB over 60 minutes. The gate is that measurement plus 108 KiB.
+/// Measured 24 KiB with Flite and 48 KiB with the native mouth, over 60 minutes.
 const RSS_GROWTH_KIB: u64 = 128;
 /// Output buffer high-water mark, in samples.
 /// Measured 28160. One extra frame (1280) is the margin.
 const BUFFER_DEPTH_MAX: usize = 29_440;
 /// How far an axis may travel. Measured span was 0 on `IntentMsg::steady`.
 const EMOTION_SPAN_MAX: f32 = 0.05;
-/// Later window p99 above the first window. Measured drift was 0.11 ms.
+/// Later window p99 above the first window. Measured drift was under 0.2 ms.
 const P99_DRIFT_NS: u64 = 2_000_000;
-/// Later window max above the first window. Measured drift was 7.5 ms.
+/// Later window max above the first window. Measured drift was 7.3 ms.
 const MAX_DRIFT_NS: u64 = 20_000_000;
-/// Absolute p99 ceiling for the first window. Measured about 21.4 ms.
+/// Absolute p99 ceiling for the first window. Measured about 20.5 ms with Flite.
 const TICK_P99_MAX_NS: u64 = 50_000_000;
-/// Absolute max ceiling for the first window. Measured 44.5 ms on the 5-minute run.
+/// Absolute max ceiling for the first window. Measured 28.9 ms on the hour.
 const TICK_MAX_NS: u64 = 90_000_000;
 
 /// CI length. `GALION_SOAK_FULL=1` selects the hour.

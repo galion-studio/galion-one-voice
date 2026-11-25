@@ -521,6 +521,8 @@ dependencies = [
  "galion-sam-audio-io",
  "horbm",
  "horbm-voice",
+ "num-complex",
+ "rustfft",
 ]
 
 [[package]]
