@@ -1,68 +1,84 @@
-# F-breath — lungs, glottis, mouth, nose
+# F — breath
 
 Perpetual Open MIT License. (c) 2026 Galion Labs.
 
 | Field | Value |
 |---|---|
-| Swarm | HORBM foundations, S20 |
-| Crate | `horbm/crates/horbm-breath` (`horbm-breath`), own workspace member. Not in the root workspace (`Cargo.toml` excludes `horbm`). |
-| Clock | 80 ms. `FRAME_MS` matches `LOCKS.toml` `clock.frame_ms`. |
-| Written | 2026-11-24. CPU only. No audio file, no weights, no network. |
+| Swarm | S45, lungs for MnE V2. Volume, phrase pauses, pressure, procedural inhale. |
+| Crate | `horbm/crates/horbm-breath`. Member of the `horbm` workspace. |
+| Clock | 80 ms. One `Lungs::tick` is one frame. |
+| Persona | Samantha. `Lungs::open` refuses any other id. |
+| Locks | `LOCKS.toml` was not edited. `SOUL.md` is not in this tree and was not added. |
 
-`LOCKS.toml` was not edited. `SOUL.md` is not in this tree and was not added.
+Emotion stays an open point. This crate does not read a category name. The baseline voice (persona bytes, voice id, pitch centre) is not an input. `Drive::from_core` reads the moment's arousal and the inside factors energy, fatigue, and health. The core's own lung-volume slot is the stand-in cycle; the lungs here own the volume track and do not copy that slot.
 
-## What a frame is
+## Two passes, both bands
 
-`plan_speech` and `plan_quiet` return one `Frame` per 80 ms tick. The voice can read:
+The duplex tick is both bands on one call. Breath uses that same call.
 
-| Field | Meaning |
-|---|---|
-| `phase` | `Inhale`, `Exhale`, or `Hold` (a boundary, not mid-phrase speech) |
-| `speaking` | True only on a speech exhale |
-| `subglottal_cm_h2o` | Model pressure. Positive drives air out. Speech is clamped to 3..=16. Quiet expiration stays in 0.2..=2. Inspiration is a small negative dip. |
-| `airflow_ml_s` | Same sign as the pressure. Millilitres per second, not a spirometer trace. |
-| `open_quotient` | Fant's quotient while speaking. An abduction fraction (folds open) on inhale, hold, and quiet breathing. |
-| `breathiness` | Rises with Fant Rd while speaking. 1 when the frame is air, not voice. |
-| `nasal_coupling` | 0 oral, 1 nasal. The caller sets the talk target. |
-| `mouth_openness` | 0 closed, 1 open. The caller sets the talk target. |
+1. **Plan.** `plan_pauses` walks the reply once and writes pause slots into a caller buffer. A sentence end or a line break closes a group. A comma, semicolon, or colon closes one only once the group is already long enough. A word that would pass the group budget starts a new group. That budget is the air. Higher arousal, and energy above rest, shorten it. The last group has no trailing pause.
+2. **Tick.** `Lungs::tick` steps volume, phase, flow, and pressure. `speaking` is the me band: inhale, one hold frame, then speech, and a new inhale when the budget or a planned break is reached. `speaking == false` is the you band on that frame: a short release, then a quiet inhale back toward rest. No speech air is spent.
 
-`Track::to_bytes` is little-endian, magic `HB01`, schema `horbm-breath/1`. The same plan is the same bytes. A bad prefix is refused. Nothing in the bytes is a waveform.
+`Lungs::frame` is both passes. Pass 1 runs only when a reply is passed, and the same text does not reset the phrase clock.
 
-## Three inputs, kept apart
+## What a frame carries
 
-- `VoiceBaseline` is the steady speaker: quiet period, I:E, modal speech pressure, modal Rd, resting nasal leak, resting mouth. `VoiceBaseline::ADULT` is the default. Planning does not write it.
-- `Inside` is the body for this plan: `energy` (0 adds nothing), `fatigue` (0 rested, 1 spent), `health` (1 well, 0 unwell, not a diagnosis). Names match the MnE `InnerFactors` fields. This crate does not depend on that crate.
-- `EmotionMoment` is plain `f32`s: `arousal` (−1..=1, 0 still), `amusement`, `disgust`, `fear` (each 0..=1). There is no `emotion-core` crate on `main`, and this crate does not name one. Valence and dominance are not inputs. No breath row was read for them.
+- **Pauses.** `Pause::at_byte` is the byte where the mouth should break the reply. `PauseWhy::Air` is the budget. `PauseWhy::Boundary` is the punctuation.
+- **Envelope.** During speech, `pressure` is relative subglottal drive and `loudness_gain` is the mouth's amplitude multiplier. Off speech the gain is 0. The decibel figure is an offset from the model's own reference, not dB SPL. The gain is a first-order map of that offset (`DB_TO_LIN`).
+- **Inhale.** `Lungs::write_inhale` fills a caller buffer. The generator is the heartbeat LCG, seed 13, scaled to RMS 0.003, with a parabola window so the block starts and ends at 0. No recording is stored. A frame that is not an inhale writes nothing.
 
-A pause is a run of frames the caller already counted. This crate does not tokenize text. A pause shorter than the inspiration is lengthened so the whole inspiration sits in the pause. The next talk starts on the exhale. A trailing pause is an end-expiratory hold.
+## Source-filter (S41, PR 305)
 
-## What moves the numbers
+The lungs sample is `galion_emotion_core::Breath`: phase, volume, and flow. `Frame::lungs` returns it. `MouthControls::from_moment` and `SpeechStack::set_mouth_moment` take that value. Breath noise is mixed only while the phase is `exhale`. Outward air is a negative flow, and that magnitude raises the noise above the filter's floor. Inhale, hold, rest, and speech do not add it. Pressure on the same frame is the loudness envelope for a speech frame. It is not a second lungs type, and the source-filter does not read it.
 
-Signs follow the directions in `DIRECTIONS`. The coefficients are model scales, chosen so a resting adult stays inside the envelopes. They are not cells copied out of a paper. Fatigue has no published magnitude; the sign here is that fatigue lowers speech pressure. Low health does the same and raises Rd (breathier, more open). Energy raises speech pressure. Positive arousal and fear shorten the breath group. Amusement shortens inspiration. Disgust inserts a hold between the inhale and the exhale. Negative arousal does not invent a slower breath.
+This crate does not link `galion-source-filter` or `tools/symphony/articulation`. The type already lives in `galion-emotion-core`, which is on main, so this pull request stays against main.
 
-The open quotient is Fant and Kruckenberg's Rd map (the same algebra as `tools/symphony/throat`). Rd 1 is about 65%. This crate does not sample the Liljencrants–Fant waveform.
+`horbm-duplex` still has `SpeakingBreath` for its own virtual-clock tests. The end-to-end smoke does not. It calls `Lungs::frame` on the breath port, so the report says `breath=real` and prints the tick time. Ear prosody is unchanged: on unless `GALION_EAR_SENSE` is `0`, `off`, or `deny`.
 
-## Crates that were not linked
+## Knobs
 
-`NOT_LINKED` in the crate records the same list:
+Directions follow `docs/galion-voice-v2/symphony/LUNGS.md` and the coefficients in `configs/symphony/lungs.toml`. Magnitudes are those knobs, not re-measured papers. Rest volume is the emotion core's `VOLUME_REST` (0.55), so a resting tick matches the inside factor. Category rows (amusement, disgust, fear) are not applied. Fatigue's published magnitude is still none; the toml coefficients are wired and labelled as such. Energy raises the rate through `ENERGY_RATE_K`, zeroed at `ENERGY_REST`. That slope is not in the toml. `galion-lungs` is not linked: it plans a whole timeline, allocates, and reads category names.
 
-- `organpool` 0.2 is MIT OR Apache-2.0, and it runs lungs on wall-clock threads. That is not an 80 ms speech clock, and it is not deterministic.
-- `phoneme-synth` 0.3 is MIT OR Apache-2.0, and it renders PCM. Open quotient is not a field of its `Voice`. This crate does not render samples.
-- `svara` 2 is GPL-3.0-only. `synthie-trombone` 0.2 is EUPL-1.2 and wants rustc 1.88.
-- `galion-lungs` plans a phrase and also writes a breath waveform. The waveform stays out of this crate.
+`stamp_intent` copies phase, volume, and flow into an `IntentMsg` and sets the breath mask. It does not write the baseline.
 
-No path, no `.exe`, no `std::fs`, no `cfg(target_os)` branch. Linux is the CI target. The same source is what a later cross build would compile.
+## Budget
 
-The conductor read-back is still its own stand-in. This crate does not replace it.
-
-## Tests
-
-Synthetic plans only.
+`TICK_ALLOC_BUDGET` is 0. `tests/zero_alloc.rs` counts a thousand ticks, plans, and inhale writes. Release, rustc 1.85.0, 200 batches of 100 calls, nearest-rank, this machine:
 
 ```text
-cargo +1.85.0 test --manifest-path horbm/Cargo.toml -p horbm-breath
-cargo +1.85.0 clippy --manifest-path horbm/Cargo.toml -p horbm-breath --all-targets -- -D warnings
-bash scripts/check-locks.sh
+breath tick p50_us=0.026 p99_us=0.027 p50_ns=26 p99_ns=27 batches=200 batch=100
+breath inhale p50_us=2.325 p99_us=2.911 p50_ns=2325 p99_ns=2911 batches=200 batch=100
 ```
 
-Quiet cycles stay at 10..=20 breaths/min with expiration longer than inspiration. A pause between two talks begins after an exhale and ends before the next exhale. Fatigue lowers speech pressure. Two calls with the same input encode to the same bytes.
+Both sit under the 80 ms frame. The release smoke on this host, prosody on, printed:
+
+```text
+breath=real
+breath_ns=26
+breath_p50_us=0.026
+breath_p99_us=0.027
+breath_pauses=0
+breath_group_ms=3360
+prosody_sense=on
+```
+
+The prosody-off run printed `breath_ns=27`, `breath_p50_us=0.027`, `breath_p99_us=0.027`. Pauses are 0 because "The kettle is on the hob." fits in the 3360 ms group. The smoke calls `Duplex::set_aec(false)`: there is no speaker, so the script is not a microphone echo. Ear prosody follows the smoke switch and is on unless that switch is closed.
+
+```shell
+cargo test --manifest-path horbm/Cargo.toml -p horbm-breath
+cargo clippy --manifest-path horbm/Cargo.toml -p horbm-breath --all-targets --no-deps -- -D warnings
+bash scripts/horbm-e2e-smoke.sh
+```
+
+## Articulation on the same frame
+
+S20 adds four controls to `Frame`. They do not replace the lungs sample, and they do not change volume, flow, or `pressure`.
+
+| Field | While speaking | Otherwise |
+|---|---|---|
+| `open_quotient` | Fant Rd map. Modal Rd 1 is about 65%. | Abduction: the folds are open for air. |
+| `breathiness` | Rises with Rd. | 1 |
+| `nasal_coupling` | Caller target, reduced when health is low. | Resting leak only. |
+| `mouth_openness` | Caller target, reduced by fatigue above rest. | A small opening for the breath. |
+
+`Lungs::set_articulation` stores the nasal and mouth targets. `controls` is the same function the tick uses. `Articulation::to_bytes` is sixteen little-endian bytes. The baseline voice is still not an input. Category names are still not read. Fatigue's effect on pressure stays the S45 path (depth and group length). The glottal shift is the extra sign: more fatigue, a more open quotient.

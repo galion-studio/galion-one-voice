@@ -52,7 +52,7 @@ pub use device::{place, select_place, Place};
 pub use ear::{Ear, EarEvent, FakeEar};
 pub use energy::{EnergyEar, EnergyGate, GateEvent};
 pub use horbm::Pad;
-pub use lexicon::is_listed_backchannel;
+pub use lexicon::{is_listed_backchannel, listed_backchannels};
 pub use mouth::{AudioFrame, BackchannelPlay, FakeMouth, Mouth, MouthPull};
 pub use turn::{TickEvent, TickOut, TurnMsg, VoiceLoop};
 

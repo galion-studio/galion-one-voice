@@ -459,6 +459,9 @@ version = "0.0.1"
 [[package]]
 name = "horbm-breath"
 version = "0.0.1"
+dependencies = [
+ "galion-emotion-core",
+]
 
 [[package]]
 name = "horbm-duplex"

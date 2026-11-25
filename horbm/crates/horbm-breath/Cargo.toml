@@ -3,7 +3,7 @@
 
 [package]
 name = "horbm-breath"
-description = "Deterministic 80 ms lungs, glottis, mouth, and nose controls. CPU only."
+description = "Samantha's lungs on the 80 ms clock. Volume, phrase pauses, subglottal pressure, a procedural inhale, and glottal, nasal, and mouth controls."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -11,3 +11,4 @@ publish.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+galion-emotion-core = { path = "../../../crates/galion-emotion-core" }
