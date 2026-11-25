@@ -18,3 +18,19 @@ canvas {
   cursor: pointer;
   background: #0A0A0C;
 }
+
+#inner {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 12px;
+  margin: 0;
+  text-align: center;
+  color: #F5F5F7;
+  font: 14px/1.3 system-ui, sans-serif;
+  pointer-events: none;
+}
+
+#inner:empty {
+  display: none;
+}

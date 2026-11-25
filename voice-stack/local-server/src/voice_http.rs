@@ -119,11 +119,16 @@ fn wav_bytes(pcm: &[i16], rate: u32) -> Vec<u8> {
 }
 
 pub async fn dot_state(State(app): State<AppState>) -> Response {
-    let (phase, level, info) = {
+    let (phase, level, info, persona) = {
         let Ok(pipe) = app.http_pipe.lock() else {
             return StatusCode::SERVICE_UNAVAILABLE.into_response();
         };
-        (pipe.phase().to_string(), pipe.level(), pipe.info())
+        (
+            pipe.phase().to_string(),
+            pipe.level(),
+            pipe.info(),
+            pipe.persona_id(),
+        )
     };
     let Ok(mut stage) = app.stage.lock() else {
         return StatusCode::SERVICE_UNAVAILABLE.into_response();
@@ -147,7 +152,7 @@ pub async fn dot_state(State(app): State<AppState>) -> Response {
         "t_ms": stage.seq,
         "mode": mode,
         "level": level.max(stage.mic_level),
-        "persona": "samantha",
+        "persona": persona,
         "approval": false,
         "vad": {"backend": info.vad_backend, "ready": info.vad_ready},
     });
@@ -190,20 +195,29 @@ pub async fn say_text(State(app): State<AppState>, headers: HeaderMap, body: Byt
     }
     let pipe = app.http_pipe.clone();
     let stage = app.stage.clone();
-    let product = tokio::task::spawn_blocking(move || {
+    let (product, persona) = tokio::task::spawn_blocking(move || {
         let Ok(mut guard) = pipe.lock() else {
-            return TurnProduct::events(vec![error_json("turn-lock")]);
+            return (
+                TurnProduct::events(vec![error_json("turn-lock")]),
+                String::new(),
+            );
         };
         let mut product = guard.push_text(&text, 0);
         product.drain_audio();
         guard.utterance_done();
+        let persona = guard.persona_id();
         if let Ok(mut slot) = stage.lock() {
             publish(&mut slot, &product);
         }
-        product
+        (product, persona)
     })
     .await
-    .unwrap_or_else(|_| TurnProduct::events(vec![error_json("turn-task")]));
+    .unwrap_or_else(|_| {
+        (
+            TurnProduct::events(vec![error_json("turn-task")]),
+            String::new(),
+        )
+    });
     if let Some(code) = product_error(&product) {
         return json_response(StatusCode::SERVICE_UNAVAILABLE, json!({"error": code}));
     }
@@ -212,7 +226,7 @@ pub async fn say_text(State(app): State<AppState>, headers: HeaderMap, body: Byt
         StatusCode::OK,
         json!({
             "reply": product.reply,
-            "persona": "samantha",
+            "persona": persona,
             "mood": "calm",
             "silence": silence,
         }),
