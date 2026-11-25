@@ -33,6 +33,9 @@ pub mod stamps;
 /// Phone turn: 16 kHz utterance → transcript → reply text → 24 kHz WAV (feature `cascade`).
 #[cfg(feature = "cascade")]
 pub mod phone;
+/// Unix speech workers, or a stub that does not spawn (feature `cascade`).
+#[cfg(feature = "cascade")]
+pub mod speech_worker;
 
 pub const ONSET_P50_BUDGET_MS: u32 = 800;
 pub const BARGE_IN_BUDGET_MS: u32 = 200;

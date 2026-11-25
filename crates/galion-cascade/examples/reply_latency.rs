@@ -10,6 +10,7 @@ use galion_cascade::{HermesLlm, LLM_NAME};
 use std::io::{Read, Write};
 use std::net::TcpListener;
 use std::path::PathBuf;
+#[cfg(unix)]
 use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
@@ -101,6 +102,18 @@ impl Drop for PiperSession {
 }
 
 fn measure_piper() -> Option<PiperSession> {
+    #[cfg(unix)]
+    {
+        measure_piper_unix()
+    }
+    #[cfg(not(unix))]
+    {
+        None
+    }
+}
+
+#[cfg(unix)]
+fn measure_piper_unix() -> Option<PiperSession> {
     let (bin, model) = piper_paths()?;
     let started = Instant::now();
     let gen = Arc::new(AtomicUsize::new(0));
@@ -195,6 +208,7 @@ fn measure_piper() -> Option<PiperSession> {
 }
 
 impl PiperSession {
+    #[cfg(unix)]
     fn say_until_pcm(&mut self, text: &str, t0: Instant) -> Option<f64> {
         let g = self.gen.load(Ordering::SeqCst);
         let line = format!("{{\"text\":\"{text}\"}}\n");
@@ -405,6 +419,7 @@ fn read_http(sock: &mut std::net::TcpStream) -> String {
     String::from_utf8_lossy(&got).into_owned()
 }
 
+#[cfg(unix)]
 fn piper_paths() -> Option<(PathBuf, PathBuf)> {
     let root = repo_root();
     let bin = std::env::var("GALION_A21_RUNTIME")
@@ -444,13 +459,22 @@ fn host_line() -> String {
     let n = std::thread::available_parallelism()
         .map(|n| n.get())
         .unwrap_or(0);
+    format!("{} nproc={n}", kernel_line())
+}
+
+#[cfg(unix)]
+fn kernel_line() -> String {
     let uname = Command::new("uname").args(["-sr"]).output();
-    let kernel = uname
+    uname
         .ok()
         .filter(|o| o.status.success())
         .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
-        .unwrap_or_else(|| "unknown".into());
-    format!("{kernel} nproc={n}")
+        .unwrap_or_else(|| "unknown".into())
+}
+
+#[cfg(not(unix))]
+fn kernel_line() -> String {
+    "non-unix".into()
 }
 
 fn ms(d: Duration) -> f64 {
