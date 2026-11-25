@@ -107,8 +107,10 @@ fn main() -> std::io::Result<()> {
 
 /// Shared setup: state (colour, restored answers), source, optional answer log.
 fn setup(opts: &Opts) -> std::io::Result<(ConsoleState, Box<dyn MetricsSource>, Option<AnswerLog>)> {
-    let mut state = ConsoleState::default();
-    state.color = live::color_enabled();
+    let mut state = ConsoleState {
+        color: live::color_enabled(),
+        ..ConsoleState::default()
+    };
     let src: Box<dyn MetricsSource> = if opts.real {
         real_source(opts)?
     } else if opts.live {

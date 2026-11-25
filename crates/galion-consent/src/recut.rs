@@ -150,7 +150,7 @@ pub fn quiet_frames(mono: &[i16], rate: u32) -> Vec<usize> {
 }
 
 fn in_bounds(seconds: f64) -> bool {
-    seconds >= DURATION_MIN + MARGIN_S && seconds <= DURATION_MAX - MARGIN_S
+    (DURATION_MIN + MARGIN_S..=DURATION_MAX - MARGIN_S).contains(&seconds)
 }
 
 /// The window from one quiet frame to a later one whose length is inside the
