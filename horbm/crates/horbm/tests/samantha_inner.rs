@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Galion Labs
-//! The dialogue path reads Samantha's lean. The spoken clause stays the card
-//! or the honest miss. Comfort does not open research and does not invent a line.
+//! The dialogue path reads the installed inner lean. The spoken clause stays
+//! the card or the honest miss. Comfort does not open research and does not
+//! invent a line.
 
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
@@ -9,8 +10,8 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use horbm::{
-    AskOutcome, Brain, CardHit, CardLookup, GapReason, Heard, ResearchAsk, ResearchFollowUp,
-    SamanthaInner, Verb, CHECKIN_MS, TICK_MS, UNKNOWN_REPLY, WAIT_MS,
+    AskOutcome, Brain, CardHit, CardLookup, GapReason, Heard, ResearchAsk, ResearchFollowUp, Verb,
+    CHECKIN_MS, TICK_MS, UNKNOWN_REPLY, WAIT_MS,
 };
 
 struct Cards;
@@ -52,7 +53,7 @@ fn a_sad_line_comforts_without_a_script_or_a_lookup() {
     let out = brain.turn("why am I so sad?");
     assert_eq!(out.reply, UNKNOWN_REPLY);
     assert_eq!(brain.dialogue_lean().verb, Verb::Comfort);
-    assert!(brain.persona_inner().care() > SamanthaInner::new().care());
+    assert!(brain.persona_inner().care() > brain.persona_inner().home().care);
     assert!(out.mood_meta.rate < 1.0);
     assert!(out.mood_meta.pause_ms >= 120.0);
     assert!(!brain.dialogue_lean().hold_topic);
@@ -72,7 +73,7 @@ fn a_question_still_speaks_the_card_and_expects_an_answer() {
     assert_eq!(out.reply, "The kettle is on the hob.");
     assert_eq!(out.first_clause, "The kettle");
     assert_eq!(brain.dialogue_lean().verb, Verb::Answer);
-    assert!(brain.persona_inner().expect() > SamanthaInner::new().expect());
+    assert!(brain.persona_inner().expect() > brain.persona_inner().home().expect);
     assert!(brain.may_open_topic());
 }
 
@@ -155,7 +156,7 @@ fn sense_off_still_hears_the_words_and_drops_the_ear() {
     assert_eq!(ignored.verb, Verb::With);
     assert_eq!(
         brain.persona_inner().care().to_bits(),
-        SamanthaInner::new().care().to_bits()
+        brain.persona_inner().home().care.to_bits()
     );
 
     let mut brain = Brain::with_cards(Cards, None);
@@ -163,7 +164,7 @@ fn sense_off_still_hears_the_words_and_drops_the_ear() {
         .persona_nudge("I feel sad", None, false)
         .expect("sad words");
     assert_eq!(words.verb, Verb::Comfort);
-    assert!(brain.persona_inner().care() > SamanthaInner::new().care());
+    assert!(brain.persona_inner().care() > brain.persona_inner().home().care);
 }
 
 #[test]

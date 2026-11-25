@@ -88,18 +88,31 @@ fn sentences_stream_on_the_frame_clock_and_barge_in_drops_them() {
     let hot = held([0.9, 0.95, 0.85, 0.4]);
     assert!(!calm.parked);
     assert!(!hot.parked);
-    let aria = instant(
-        aria_baseline(),
+    let baseline = aria_baseline();
+    let mapped = instant(
+        baseline,
         MomentState::at([0.9, 0.95, 0.85, 0.4]),
         Breath::rest(),
     );
-    assert!(aria.parked);
+    let rest = instant(baseline, MomentState::at(baseline.pos), Breath::rest());
+    assert!(!mapped.parked);
+    assert!(!rest.parked);
+    assert_ne!(
+        mapped.length_scale.to_bits(),
+        rest.length_scale.to_bits(),
+        "the installed baseline did not move its voice"
+    );
+    assert_eq!(mapped.persona, baseline.persona);
+    assert_eq!(
+        mapped.pitch_centre_hz.to_bits(),
+        baseline.pitch_centre_hz.to_bits()
+    );
 
-    let parked = speak(&mut mouth, aria, "Hello there.");
+    let flat = speak(&mut mouth, calm, "Hello there.");
     let steered = speak(&mut mouth, hot, "Hello there.");
     assert_eq!(mouth.pid(), pid, "a new sentence spawned another process");
     assert_ne!(
-        peak(&parked),
+        peak(&flat),
         peak(&steered),
         "moment steering did not change the sentence"
     );

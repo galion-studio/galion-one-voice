@@ -8,16 +8,21 @@
 //! | [`Emotion`] | `CoreAffect` over `galion_emotion_core::EmotionCore` | always |
 //! | [`EarSense`] | `ProsodyEar`, energy and pitch | on by default. `Duplex::set_prosody(false)` turns it off |
 //! | echo | `PlaybackEcho` over `fdaf-aec` | on by default. `Duplex::set_aec(false)` bypasses it |
-//! | [`Persona`] | `SamanthaPersona` | always. Aria is parked |
+//! | [`Persona`] | [`crate::ConfiguredPersona`] | loaded from the configured persona file |
 //! | [`Breath`] | stand-in until the breath crate lands | always |
 //! | mouth | `NativeMouth` over `horbm_voice::FakeMouth`. `PiperMouth` is opt-in | always. `--features piper` adds the worker |
 //!
-//! Development speaks as Samantha only. Another id is refused.
+//! The loop seats the configured persona. Another id is refused.
 
 /// Share of brevity taken off a rate of 1. Same knob as the persona style hook.
 pub const BREVITY_RATE: f32 = 0.15;
 
-/// Development speaker. The loop refuses any other id or voice.
+/// Historical development speaker id.
+///
+/// The live loop loads the configured persona and does not read this
+/// constant. [`crate::SamanthaPersona`] still returns it so soak compiles.
+/// Other crates have their own constants with this name. There is no
+/// `deprecated` attribute this round.
 pub const DEV_PERSONA: &str = "samantha";
 
 /// Partial hypotheses can be replaced. The final is the text to keep.
@@ -92,7 +97,7 @@ pub trait Emotion {
     /// The moment on this frame, when the adapter has one.
     ///
     /// The default is none. A stand-in affect does not steer the mouth.
-    /// [`crate::CoreAffect`] returns Samantha's moment. Aria is not seated.
+    /// [`crate::CoreAffect`] returns the moment of the baseline it was seated on.
     fn moment_view(&self) -> Option<horbm_voice::MomentView> {
         None
     }

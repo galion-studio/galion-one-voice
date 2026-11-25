@@ -126,9 +126,9 @@ pub use galion_research_gateway::RESEARCH_CAP;
 pub use galion_sam_empathy::{Intent, PronounClass, FRAME_MS};
 pub use horbm_brain::{Answer, Heuristic, MarkKind, SidebandMark};
 pub use horbm_inner::{
-    DialogueLean, Heard, InnerHome, InnerMsg, MsgDir, Perceived, PersonaInner, SamanthaInner, Verb,
-    CARE_HOME, CHECKIN_GAP_MS, CHECKIN_MS, CURIOSITY_HOME, EXPECT_HOME, HELP_HOME, REMEMBER_LOCK,
-    TICK_MS, WAIT_MS,
+    DialogueLean, Heard, InnerHome, InnerMsg, MsgDir, Perceived, PersonaInner, Verb, CARE_HOME,
+    CHECKIN_GAP_MS, CHECKIN_MS, CURIOSITY_HOME, EXPECT_HOME, HELP_HOME, REMEMBER_LOCK, TICK_MS,
+    WAIT_MS,
 };
 pub use horbm_keys::StringKeyArena;
 pub use horbm_persona::{

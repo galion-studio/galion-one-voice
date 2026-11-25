@@ -10,8 +10,8 @@ use std::collections::VecDeque;
 use horbm::{CardHit, CardLookup};
 use horbm_duplex::{
     Affect, Breath, BreathCue, BreathPhase, Budgets, Duplex, Emotion, Floor, FrameOut, Hypothesis,
-    HypothesisKind, LoopError, LoopEvent, Parts, Persona, RecogError, Recognizer, Style,
-    DEV_PERSONA, FRAME_MS, FRAME_SAMPLES, SAMPLE_RATE,
+    HypothesisKind, LoopError, LoopEvent, Parts, Persona, RecogError, Recognizer, FRAME_MS,
+    FRAME_SAMPLES, SAMPLE_RATE,
 };
 use horbm_voice::{AudioFrame, Mouth, MouthPull, SpokenLine};
 
@@ -150,19 +150,39 @@ impl Breath for ExhaleBreath {
     }
 }
 
-struct Samantha;
+struct Samantha {
+    id: String,
+    voice: String,
+    brevity: f32,
+    warmth: f32,
+    sentences: u8,
+}
+
+impl Samantha {
+    fn load() -> Self {
+        let persona = horbm::Persona::load_development().expect("configured persona");
+        let style = persona.style();
+        Self {
+            id: persona.id().to_string(),
+            voice: persona.voice().to_string(),
+            brevity: style.brevity,
+            warmth: style.warmth,
+            sentences: style.max_sentences,
+        }
+    }
+}
 
 impl Persona for Samantha {
     fn id(&self) -> &str {
-        DEV_PERSONA
+        &self.id
     }
 
     fn voice(&self) -> &str {
-        DEV_PERSONA
+        &self.voice
     }
 
-    fn style(&self) -> Style {
-        Style::from_brevity(0.55, 0.8, 2)
+    fn style(&self) -> horbm_duplex::Style {
+        horbm_duplex::Style::from_brevity(self.brevity, self.warmth, self.sentences)
     }
 
     fn unknown_line(&self) -> &str {
@@ -170,19 +190,19 @@ impl Persona for Samantha {
     }
 }
 
-struct Aria;
+struct Other;
 
-impl Persona for Aria {
+impl Persona for Other {
     fn id(&self) -> &str {
-        "aria"
+        "other"
     }
 
     fn voice(&self) -> &str {
-        "aria"
+        "other"
     }
 
-    fn style(&self) -> Style {
-        Style::from_brevity(0.4, 0.7, 2)
+    fn style(&self) -> horbm_duplex::Style {
+        horbm_duplex::Style::from_brevity(0.4, 0.7, 2)
     }
 
     fn unknown_line(&self) -> &str {
@@ -297,7 +317,7 @@ fn samantha() -> Duplex<Scripted, SamanthaAffect, ExhaleBreath, Samantha, ToneMo
             recognizer: Scripted::new(&["where is the kettle", "yeah", "stop now"]),
             emotion: SamanthaAffect,
             breath: ExhaleBreath,
-            persona: Samantha,
+            persona: Samantha::load(),
             mouth: ToneMouth::new(24),
         },
         Kettle,
@@ -320,8 +340,9 @@ fn tick(
 #[test]
 fn full_duplex_samantha_both_bands() {
     let mut duplex = samantha();
-    assert_eq!(duplex.persona().id(), DEV_PERSONA);
-    assert_eq!(duplex.persona().voice(), DEV_PERSONA);
+    let configured = horbm::Persona::load_development().expect("configured persona");
+    assert_eq!(duplex.persona().id(), configured.id());
+    assert_eq!(duplex.persona().voice(), configured.voice());
     let cap = Budgets::locked();
 
     for index in 0..4 {
@@ -357,7 +378,7 @@ fn full_duplex_samantha_both_bands() {
         &["The kettle is on the hob.".to_string()]
     );
     let rate = duplex.mouth().rates()[0];
-    let expect = Style::from_brevity(0.55, 0.8, 2).rate;
+    let expect = duplex.persona().style().rate;
     assert!((rate - expect).abs() < 1.0e-5);
 
     let audio = tick(&mut duplex, &silence());
@@ -485,18 +506,18 @@ fn a_short_frame_does_not_move_the_clock() {
 }
 
 #[test]
-fn a_persona_other_than_samantha_is_refused() {
+fn a_persona_other_than_the_configured_one_is_refused() {
     match Duplex::new(
         Parts {
             recognizer: Scripted::new(&[]),
             emotion: SamanthaAffect,
             breath: ExhaleBreath,
-            persona: Aria,
+            persona: Other,
             mouth: ToneMouth::new(4),
         },
         Kettle,
     ) {
-        Ok(_) => panic!("aria was accepted"),
+        Ok(_) => panic!("another id was accepted"),
         Err(err) => assert!(matches!(err, LoopError::Persona(_))),
     }
 }
@@ -513,7 +534,7 @@ fn a_second_barge_matches_the_first_after_she_listens_again() {
             ]),
             emotion: SamanthaAffect,
             breath: ExhaleBreath,
-            persona: Samantha,
+            persona: Samantha::load(),
             mouth: ToneMouth::new(24),
         },
         Kettle,

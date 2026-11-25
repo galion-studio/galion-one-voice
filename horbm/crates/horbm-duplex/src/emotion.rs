@@ -3,8 +3,9 @@
 //! Emotion port over `galion_emotion_core::EmotionCore`.
 //!
 //! One [`Emotion::step`] is one `EmotionCore::step` on the same 80 ms clock.
-//! The baseline is copied in once and the step does not write it. The point
-//! is the published stand-in rest, with the speaker id set to Samantha.
+//! The baseline is copied in once and the step does not write it.
+//! [`CoreAffect::from_baseline`] seats the configured persona's baseline.
+//! [`CoreAffect::samantha`] remains the historical stand-in rest for soak.
 //! Those numbers are not a measured voice.
 
 use galion_emotion_core::{
@@ -22,15 +23,24 @@ pub struct CoreAffect {
 }
 
 impl CoreAffect {
-    /// Samantha's id on the published rest point.
+    /// Seat the affect on a persona baseline. The step does not write it.
     #[must_use]
-    pub fn samantha() -> Self {
-        let baseline = samantha_baseline();
+    pub fn from_baseline(baseline: VoiceBaseline) -> Self {
         let last = affect_of(&baseline);
         Self {
             core: EmotionCore::from_baseline(baseline),
             last,
         }
+    }
+
+    /// Historical rest point. Soak still calls this.
+    ///
+    /// The speaker slots are the development forward and the position is
+    /// [`VoiceBaseline::standin`]. The live loop uses [`Self::from_baseline`]
+    /// on the configured persona. There is no `deprecated` attribute this round.
+    #[must_use]
+    pub fn samantha() -> Self {
+        Self::from_baseline(samantha_baseline())
     }
 
     #[must_use]
@@ -44,7 +54,7 @@ impl CoreAffect {
     }
 
     /// Baseline, moment, and breath for the mouth. The baseline bits are
-    /// the ones [`Self::samantha`] copied in. This does not write them.
+    /// the ones this affect was seated on. This does not write them.
     #[must_use]
     pub fn view(&self) -> MomentView {
         let cue = self.core.conductor_cue();

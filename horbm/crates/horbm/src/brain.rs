@@ -16,8 +16,10 @@ use horbm_persona::{BootConfig, MoveClaim, MoveVerdict, Persona, PersonaError};
 use horbm_brain::{
     classify, pick, split_clause, Answer, Heuristic, Retrieved, Retriever, SidebandMark,
 };
-use horbm_inner::SamanthaInner as PersonaInner;
-use horbm_inner::{DialogueLean, Heard, InnerMsg, Perceived, Verb};
+use horbm_inner::{
+    DialogueLean, Heard, InnerHome, InnerMsg, Perceived, PersonaInner, Verb, CURIOSITY_HOME,
+    EXPECT_HOME, HELP_HOME,
+};
 
 use galion_emotion_core::standins::memory::{PersonMemory, PersonState, TrackedName};
 
@@ -294,6 +296,7 @@ impl Brain {
     ) -> Self {
         let card_count = cards.len();
         let (emotion, inner, persona) = install(persona);
+        let persona_inner = persona_inner_from(&persona);
         Self {
             empathy: Empathy::new(),
             cards: Box::new(cards),
@@ -305,7 +308,7 @@ impl Brain {
             emotion,
             inner,
             persona,
-            persona_inner: PersonaInner::new(),
+            persona_inner,
             ear_sense: true,
             #[cfg(test)]
             forced_hold: None,
@@ -602,13 +605,13 @@ impl Brain {
 
     /// Slower goals for the installed persona. Session only. Not the baseline,
     /// not the moment.
-    pub fn persona_inner(&self) -> &horbm_inner::SamanthaInner {
+    pub fn persona_inner(&self) -> &PersonaInner {
         &self.persona_inner
     }
 
     /// Forward to [`Self::persona_inner`].
     #[deprecated(note = "use persona_inner")]
-    pub fn samantha(&self) -> &horbm_inner::SamanthaInner {
+    pub fn samantha(&self) -> &PersonaInner {
         self.persona_inner()
     }
 
@@ -736,8 +739,9 @@ impl Brain {
 
     /// Empathy mood, then the person diary when `remember` is granted, then
     /// the retrieval cell when a thread is attached, then cards, then the
-    /// fixture on an idle cell. Layer 4 then picks the move. [`Self::finish`]
-    /// splits the clause and returns it. Galion Research is not asked here.
+    /// fixture on an idle cell. Layer 4 then picks the move. The private
+    /// finish step splits the clause and returns it. Galion Research is not
+    /// asked here.
     /// A deep miss arms [`ResearchAsk`] so the ask starts when the returned
     /// value is dropped. [`Self::research_follow_up`] reads that result.
     ///
@@ -1296,6 +1300,20 @@ fn install(persona: Persona) -> (EmotionCore, InnerLife, Persona) {
     let emotion = EmotionCore::from_baseline(persona.baseline());
     let inner = persona.inner_life();
     (emotion, inner, persona)
+}
+
+/// Inner home from this persona's baseline valence. Curiosity, help, and
+/// expect stay the standalone levels. An id the slot refuses, or a baseline
+/// `from_baseline` refuses, keeps those numbers when it can and an empty id.
+/// It never installs a different persona.
+fn persona_inner_from(persona: &Persona) -> PersonaInner {
+    let baseline = persona.baseline();
+    let Some(home) =
+        InnerHome::from_baseline(baseline.valence(), CURIOSITY_HOME, HELP_HOME, EXPECT_HOME)
+    else {
+        return PersonaInner::new();
+    };
+    PersonaInner::with_home_for(persona.id(), home).unwrap_or_else(|| PersonaInner::with_home(home))
 }
 
 fn resting_meta() -> MoodMeta {
