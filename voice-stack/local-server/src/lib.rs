@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Galion Labs
 
-//! Loopback server for the Samantha browser UI.
+//! Loopback server for the local voice UI.
 //!
 //! Sector S10. Directory `voice-stack/local-server`. The socket is
 //! `galion-samantha-ws/1` on `127.0.0.1:7881`, or another loopback port from
-//! `GALION_SAMANTHA_WS` including `::1`. Typed and spoken turns use the HORBM
+//! `GALION_VOICE_WS` including `::1`. `GALION_SAMANTHA_WS` is a deprecated
+//! alias and logs one warning. Typed and spoken turns use the HORBM
 //! card bridge. A miss is "I don't know." Silero runs out of process when
 //! `GALION_VAD_BIN` is set. A turn is [`horbm_voice::VoiceLoop`]: ear, then
 //! `horbm::Brain::turn`, then the mouth selected at boot. CPU is the default
@@ -21,6 +22,7 @@
 pub mod audio;
 pub mod bind;
 mod brain;
+pub mod env_alias;
 mod host;
 mod live;
 mod mouth;

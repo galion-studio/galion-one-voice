@@ -2,8 +2,9 @@
 // Copyright (c) 2026 Galion Labs
 
 //! Axum process for `galion-samantha-ws/1`.
-//! Default bind `127.0.0.1:7881`. `GALION_SAMANTHA_WS` may select another
-//! `127.0.0.1` or `::1` port. `0.0.0.0` is refused. Nothing in this file dials out.
+//! Default bind `127.0.0.1:7881`. `GALION_VOICE_WS` may select another
+//! `127.0.0.1` or `::1` port. `GALION_SAMANTHA_WS` is a deprecated alias.
+//! `0.0.0.0` is refused. Nothing in this file dials out.
 
 use std::collections::{HashMap, VecDeque};
 use std::net::SocketAddr;
@@ -83,9 +84,9 @@ impl RefState {
     }
 
     pub fn from_env() -> Self {
-        match std::env::var("GALION_SAMANTHA_REF") {
-            Err(_) => RefState::Unset,
-            Ok(value) => {
+        match crate::env_alias::read("GALION_VOICE_REF", "GALION_SAMANTHA_REF") {
+            None => RefState::Unset,
+            Some(value) => {
                 let trimmed = value.trim();
                 let exists = !trimmed.is_empty() && std::path::Path::new(trimmed).is_file();
                 Self::classify(Some(&value), exists)

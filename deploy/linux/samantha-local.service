@@ -25,6 +25,8 @@ ExecStart=%h/.local/bin/samantha-local-supervise --systemd
 Restart=on-failure
 RestartSec=2
 RestartPreventExitStatus=2
+# 15s so SAMANTHA_STOP_GRACE (default 5) can finish SIGTERM end_session and
+# the seal before KillMode=control-group. Keep the grace below this number.
 TimeoutStopSec=15
 KillMode=control-group
 SyslogIdentifier=samantha-supervise

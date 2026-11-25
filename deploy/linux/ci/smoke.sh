@@ -122,7 +122,7 @@ done
 if grep -Eq '^User=' "$UNIT"; then
   fail "user unit must not set User="
 fi
-if grep -Eq '0\.0\.0\.0|GALION_LLM|GALION_SAMANTHA_REF=' "$UNIT"; then
+if grep -Eq '0\.0\.0\.0|GALION_LLM|GALION_SAMANTHA_REF=|GALION_VOICE_REF=' "$UNIT"; then
   fail "unit binds a wildcard, sets an LLM, or stores a reference path"
 fi
 printf 'OK: unit keys\n'
@@ -177,7 +177,7 @@ expect_exit() {
 bad_env=$WORK/bad.env
 cat >"$bad_env" <<'EOF'
 SAMANTHA_LOCAL_BIN=/path/to/samantha-local
-GALION_SAMANTHA_WS=127.0.0.1:7881
+GALION_VOICE_WS=127.0.0.1:7881
 EVIL=$(id)
 EOF
 expect_exit 2 "$SUPER" --paths --env "$bad_env"
@@ -185,7 +185,7 @@ grep -q 'not a plain KEY=VALUE' "$LAST_ERR" || fail "substitution was not refuse
 
 cat >"$bad_env" <<'EOF'
 SAMANTHA_LOCAL_BIN=/path/to/samantha-local
-GALION_SAMANTHA_WS=localhost:7881
+GALION_VOICE_WS=localhost:7881
 EOF
 expect_exit 2 "$SUPER" --paths --env "$bad_env"
 grep -q 'refusing bind' "$LAST_ERR" || fail "hostname bind was not refused"
@@ -194,14 +194,14 @@ z=0
 wild="${z}.${z}.${z}.${z}:9"
 cat >"$bad_env" <<EOF
 SAMANTHA_LOCAL_BIN=/path/to/samantha-local
-GALION_SAMANTHA_WS=${wild}
+GALION_VOICE_WS=${wild}
 EOF
 expect_exit 2 "$SUPER" --paths --env "$bad_env"
 grep -q 'refusing bind' "$LAST_ERR" || fail "wildcard bind was not refused"
 
 cat >"$bad_env" <<'EOF'
 SAMANTHA_LOCAL_BIN=/path/to/samantha-local
-GALION_SAMANTHA_WS=[::1]:7881
+GALION_VOICE_WS=[::1]:7881
 EOF
 expect_exit 2 "$SUPER" --paths --env "$bad_env"
 
@@ -211,17 +211,103 @@ printf '#!/bin/sh\nexit 0\n' >"$win_bin"
 chmod 755 "$win_bin"
 cat >"$bad_env" <<EOF
 SAMANTHA_LOCAL_BIN=${win_bin}
-GALION_SAMANTHA_WS=127.0.0.1:7881
+GALION_VOICE_WS=127.0.0.1:7881
 EOF
 expect_exit 2 "$SUPER" --check --env "$bad_env"
 grep -q 'Windows executable suffix' "$LAST_ERR" || fail "Windows suffix was not refused"
 
 cat >"$bad_env" <<'EOF'
 SAMANTHA_LOCAL_BIN=samantha-local
-GALION_SAMANTHA_WS=127.0.0.1:7881
+GALION_VOICE_WS=127.0.0.1:7881
 EOF
 expect_exit 2 "$SUPER" --paths --env "$bad_env"
 printf 'OK: refusals\n'
+
+voice_env=$WORK/voice-names.env
+cat >"$voice_env" <<'EOF'
+SAMANTHA_LOCAL_BIN=/path/to/samantha-local
+GALION_VOICE_UI=/path/to/ui
+GALION_VOICE_WS=127.0.0.1:7881
+EOF
+"$SUPER" --paths --env "$voice_env" >"$WORK/voice-names.out" 2>"$WORK/voice-names.err"
+grep -q '^bind=127\.0\.0\.1:7881$' "$WORK/voice-names.out" || fail "new-name bind"
+grep -q '^ui=/path/to/ui$' "$WORK/voice-names.out" || fail "new-name ui"
+if grep -q 'deprecated' "$WORK/voice-names.err"; then
+  fail "new names logged a deprecation warning"
+fi
+
+old_env=$WORK/old-names.env
+cat >"$old_env" <<'EOF'
+SAMANTHA_LOCAL_BIN=/path/to/samantha-local
+GALION_SAMANTHA_UI=/path/to/ui
+GALION_SAMANTHA_WS=127.0.0.1:7881
+EOF
+"$SUPER" --paths --env "$old_env" >"$WORK/old-names.out" 2>"$WORK/old-names.err"
+grep -q '^bind=127\.0\.0\.1:7881$' "$WORK/old-names.out" || fail "old-name bind"
+grep -q '^ui=/path/to/ui$' "$WORK/old-names.out" || fail "old-name ui"
+ws_warns=$(grep -c 'GALION_SAMANTHA_WS is deprecated; set GALION_VOICE_WS' "$WORK/old-names.err" || true)
+ui_warns=$(grep -c 'GALION_SAMANTHA_UI is deprecated; set GALION_VOICE_UI' "$WORK/old-names.err" || true)
+[[ "$ws_warns" -eq 1 ]] || fail "WS fallback warnings ${ws_warns}"
+[[ "$ui_warns" -eq 1 ]] || fail "UI fallback warnings ${ui_warns}"
+
+differ_env=$WORK/differ-names.env
+cat >"$differ_env" <<'EOF'
+SAMANTHA_LOCAL_BIN=/path/to/samantha-local
+GALION_VOICE_WS=127.0.0.1:7881
+GALION_SAMANTHA_WS=127.0.0.1:9
+GALION_VOICE_UI=/path/to/ui
+GALION_SAMANTHA_UI=/path/to/other
+EOF
+"$SUPER" --paths --env "$differ_env" >"$WORK/differ-names.out" 2>"$WORK/differ-names.err"
+grep -q '^bind=127\.0\.0\.1:7881$' "$WORK/differ-names.out" || fail "conflict bind"
+grep -q '^ui=/path/to/ui$' "$WORK/differ-names.out" || fail "conflict ui"
+ws_conflict=$(grep -c 'differ; using GALION_VOICE_WS' "$WORK/differ-names.err" || true)
+ui_conflict=$(grep -c 'differ; using GALION_VOICE_UI' "$WORK/differ-names.err" || true)
+[[ "$ws_conflict" -eq 1 ]] || fail "WS conflict warnings ${ws_conflict}"
+[[ "$ui_conflict" -eq 1 ]] || fail "UI conflict warnings ${ui_conflict}"
+
+cat >"$bad_env" <<'EOF'
+SAMANTHA_LOCAL_BIN=/path/to/samantha-local
+GALION_SAMANTHA_WS=localhost:7881
+EOF
+expect_exit 2 "$SUPER" --paths --env "$bad_env"
+grep -q 'refusing bind' "$LAST_ERR" || fail "old-name hostname bind was not refused"
+grep -q 'GALION_SAMANTHA_WS is deprecated; set GALION_VOICE_WS' "$LAST_ERR" || fail "old-name refusal did not warn"
+
+alias_prefix=$WORK/alias-prefix
+alias_ui=$WORK/alias-ui
+alias_work=$WORK/alias-work
+mkdir -p "$alias_prefix/.config/galion" "$alias_ui" "$alias_work"
+alias_bin=$WORK/bin/alias-local
+printf '#!/bin/sh\nexit 0\n' >"$alias_bin"
+chmod 755 "$alias_bin"
+cat >"$alias_prefix/.config/galion/samantha-local.env" <<EOF
+SAMANTHA_LOCAL_BIN=${alias_bin}
+GALION_VOICE_UI=${alias_ui}
+SAMANTHA_LOCAL_WORKDIR=${alias_work}
+GALION_VOICE_WS=127.0.0.1:7881
+SAMANTHA_STOP_GRACE=5
+EOF
+chmod 600 "$alias_prefix/.config/galion/samantha-local.env"
+"$INSTALL" install --prefix "$alias_prefix" >"$WORK/alias-inst.out"
+grep -q "ReadOnlyPaths=${alias_ui}" "$alias_prefix/.config/systemd/user/samantha-local.service.d/paths.conf" || fail "install did not accept GALION_VOICE_UI"
+
+old_prefix=$WORK/old-prefix
+old_ui=$WORK/old-ui
+old_work=$WORK/old-work
+mkdir -p "$old_prefix/.config/galion" "$old_ui" "$old_work"
+cat >"$old_prefix/.config/galion/samantha-local.env" <<EOF
+SAMANTHA_LOCAL_BIN=${alias_bin}
+GALION_SAMANTHA_UI=${old_ui}
+SAMANTHA_LOCAL_WORKDIR=${old_work}
+GALION_SAMANTHA_WS=127.0.0.1:7881
+SAMANTHA_STOP_GRACE=5
+EOF
+chmod 600 "$old_prefix/.config/galion/samantha-local.env"
+"$INSTALL" install --prefix "$old_prefix" >"$WORK/old-inst.out" 2>"$WORK/old-inst.err"
+grep -q "ReadOnlyPaths=${old_ui}" "$old_prefix/.config/systemd/user/samantha-local.service.d/paths.conf" || fail "install did not accept the deprecated UI name"
+grep -q 'GALION_SAMANTHA_UI is deprecated; set GALION_VOICE_UI' "$WORK/old-inst.err" || fail "install fallback did not warn"
+printf 'OK: voice env aliases\n'
 
 free_port() {
   python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1]); s.close()'
@@ -287,9 +373,9 @@ write_env() {
   local dest=$1 port=$2
   cat >"$dest" <<EOF
 SAMANTHA_LOCAL_BIN=${WORK}/bin/stub
-GALION_SAMANTHA_UI=${WORK}/ui
+GALION_VOICE_UI=${WORK}/ui
 SAMANTHA_LOCAL_WORKDIR=${WORK}/work
-GALION_SAMANTHA_WS=127.0.0.1:${port}
+GALION_VOICE_WS=127.0.0.1:${port}
 SAMANTHA_HEALTH_FAILS=${FAILS:-3}
 SAMANTHA_HEALTH_INTERVAL=${INTERVAL:-1}
 SAMANTHA_HEALTH_GRACE=${GRACE:-0}
@@ -482,9 +568,9 @@ port=$(free_port)
 start_python "$port" gap
 cat >"$WORK/gap.env" <<EOF
 SAMANTHA_LOCAL_BIN=${WORK}/bin/stay
-GALION_SAMANTHA_UI=${WORK}/ui
+GALION_VOICE_UI=${WORK}/ui
 SAMANTHA_LOCAL_WORKDIR=${WORK}/work
-GALION_SAMANTHA_WS=127.0.0.1:${port}
+GALION_VOICE_WS=127.0.0.1:${port}
 SAMANTHA_HEALTH_FAILS=3
 SAMANTHA_HEALTH_INTERVAL=1
 SAMANTHA_HEALTH_GRACE=0
@@ -524,9 +610,9 @@ chmod 755 "$real_bin"
 cat >"$prefix/.config/galion/samantha-local.env" <<EOF
 # seeded
 SAMANTHA_LOCAL_BIN=${real_bin}
-GALION_SAMANTHA_UI=${WORK}/real-ui
+GALION_VOICE_UI=${WORK}/real-ui
 SAMANTHA_LOCAL_WORKDIR=${WORK}/real-work
-GALION_SAMANTHA_WS=127.0.0.1:7881
+GALION_VOICE_WS=127.0.0.1:7881
 SAMANTHA_HEALTH_FAILS=3
 SAMANTHA_HEALTH_INTERVAL=5
 SAMANTHA_HEALTH_GRACE=10

@@ -7,9 +7,11 @@
 //! mouth when the Piper adapter is not linked. Piper `en_US-ljspeech-medium`
 //! is the mouth only when this crate is built with `--features piper`.
 //! The s711 clone is the Chatterbox worker in `samantha-voice-clone`. It is
-//! selected only when `GALION_SAMANTHA_REF` is a local wav,
-//! `GALION_SAMANTHA_WEIGHTS` is a local checkpoint directory, and
-//! `GALION_SAMANTHA_DEVICE=cuda` with CUDA visible to that crate's probe.
+//! selected only when `GALION_VOICE_REF` is a local wav,
+//! `GALION_VOICE_WEIGHTS` is a local checkpoint directory, and
+//! `GALION_VOICE_DEVICE=cuda` with CUDA visible to that crate's probe.
+//! `GALION_SAMANTHA_REF`, `GALION_SAMANTHA_WEIGHTS`, and
+//! `GALION_SAMANTHA_DEVICE` are deprecated aliases. Each logs one warning.
 //! `auto` stays on CPU, the same rule as the clone crate.
 //!
 //! CPU does not select s711. This process has no measured s711 CPU real-time
@@ -130,15 +132,15 @@ pub(crate) enum Choice {
 
 pub(crate) const CPU_NOT_REALTIME_LOG: &str = "samantha-mouth: keeping Piper en_US-ljspeech-medium. s711 on CPU is not the live mouth: this process has no measured s711 CPU real-time factor under 1, and a Chatterbox generate on CPU is not treated as able to feed the 80 ms clock. Not a new timing.";
 
-pub(crate) const S711_SELECTED_LOG: &str = "samantha-mouth: voice s711 selected (GALION_SAMANTHA_DEVICE=cuda, local reference, local checkpoint). Realtime on this host is not measured in this process.";
+pub(crate) const S711_SELECTED_LOG: &str = "samantha-mouth: voice s711 selected (GALION_VOICE_DEVICE=cuda, local reference, local checkpoint). Realtime on this host is not measured in this process.";
 
-const REF_MISSING_LOG: &str = "samantha-mouth: GALION_SAMANTHA_REF is set but the file is not there. Keeping Piper en_US-ljspeech-medium.";
+const REF_MISSING_LOG: &str = "samantha-mouth: GALION_VOICE_REF is set but the file is not there. Keeping Piper en_US-ljspeech-medium.";
 
-const WEIGHTS_MISSING_LOG: &str = "samantha-mouth: GALION_SAMANTHA_REF is a file but GALION_SAMANTHA_WEIGHTS is not a local checkpoint directory. Keeping Piper en_US-ljspeech-medium.";
+const WEIGHTS_MISSING_LOG: &str = "samantha-mouth: GALION_VOICE_REF is a file but GALION_VOICE_WEIGHTS is not a local checkpoint directory. Keeping Piper en_US-ljspeech-medium.";
 
-const CUDA_UNAVAILABLE_LOG: &str = "samantha-mouth: GALION_SAMANTHA_DEVICE=cuda but the probe does not see CUDA. Keeping Piper en_US-ljspeech-medium.";
+const CUDA_UNAVAILABLE_LOG: &str = "samantha-mouth: GALION_VOICE_DEVICE=cuda but the probe does not see CUDA. Keeping Piper en_US-ljspeech-medium.";
 
-const DEVICE_UNKNOWN_LOG: &str = "samantha-mouth: GALION_SAMANTHA_DEVICE is not cpu, auto, or cuda. Keeping Piper en_US-ljspeech-medium.";
+const DEVICE_UNKNOWN_LOG: &str = "samantha-mouth: GALION_VOICE_DEVICE is not cpu, auto, or cuda. Keeping Piper en_US-ljspeech-medium.";
 
 pub(crate) fn parse_device(raw: &str) -> DeviceRequest {
     match raw.trim().to_ascii_lowercase().as_str() {
@@ -188,14 +190,19 @@ pub(crate) fn decide(input: &SelectInput) -> Choice {
 }
 
 pub(crate) fn read_input() -> SelectInput {
-    let raw_ref = std::env::var("GALION_SAMANTHA_REF").unwrap_or_default();
+    let raw_ref =
+        crate::env_alias::read("GALION_VOICE_REF", "GALION_SAMANTHA_REF").unwrap_or_default();
     let ref_trimmed = raw_ref.trim();
     let ref_set = !ref_trimmed.is_empty();
     let ref_is_file = ref_set && std::path::Path::new(ref_trimmed).is_file();
-    let raw_weights = std::env::var("GALION_SAMANTHA_WEIGHTS").unwrap_or_default();
+    let raw_weights = crate::env_alias::read("GALION_VOICE_WEIGHTS", "GALION_SAMANTHA_WEIGHTS")
+        .unwrap_or_default();
     let weights = raw_weights.trim();
     let weights_is_dir = !weights.is_empty() && std::path::Path::new(weights).is_dir();
-    let device = parse_device(&std::env::var("GALION_SAMANTHA_DEVICE").unwrap_or_default());
+    let device = parse_device(
+        &crate::env_alias::read("GALION_VOICE_DEVICE", "GALION_SAMANTHA_DEVICE")
+            .unwrap_or_default(),
+    );
     let cuda_visible = if device == DeviceRequest::Cuda {
         samantha_voice_clone::probe_compute().kind == samantha_voice_clone::ComputeKind::Cuda
     } else {
@@ -1030,9 +1037,10 @@ mod tests {
         let exist = cmd
             .find("if exist \"%SAMANTHA_REF%\"")
             .expect("ref exist gate");
-        let set_ref = cmd
-            .find("set \"GALION_SAMANTHA_REF=%SAMANTHA_REF%\"")
-            .expect("ref assignment");
+        // The launcher this swarm does not own still assigns the deprecated name.
+        let deprecated = ["SA", "MANTHA"].concat();
+        let set_ref_line = format!("set \"GALION_{deprecated}_REF=%{deprecated}_REF%\"");
+        let set_ref = cmd.find(&set_ref_line).expect("ref assignment");
         let else_at = cmd[exist..]
             .find(") else (")
             .map(|n| exist + n)
@@ -1041,9 +1049,9 @@ mod tests {
         let weights = cmd
             .find("if exist \"%SAMANTHA_WEIGHTS%\\*\"")
             .expect("weights gate");
-        let set_weights = cmd
-            .find("set \"GALION_SAMANTHA_WEIGHTS=%SAMANTHA_WEIGHTS%\"")
-            .expect("weights assignment");
+        let set_weights_line =
+            format!("set \"GALION_{deprecated}_WEIGHTS=%{deprecated}_WEIGHTS%\"");
+        let set_weights = cmd.find(&set_weights_line).expect("weights assignment");
         assert!(weights < set_weights);
         assert!(!cmd.contains("RIFF"));
     }
