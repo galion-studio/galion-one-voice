@@ -31,7 +31,7 @@ fn unset_research_reads_nothing_and_returns_no_hits() {
     let off = ResearchRoot::from_flag(None);
     assert!(off.is_empty());
     assert_eq!(off.files_read(), 0);
-    let searched = off.search(StylePersona::Samantha, "i am tired");
+    let searched = off.search(StylePersona::Active, "i am tired");
     assert!(searched.hits.is_empty());
     assert_eq!(searched.bundles_opened, 0);
     assert_eq!(off.files_read(), 0);
@@ -43,7 +43,7 @@ fn unset_research_reads_nothing_and_returns_no_hits() {
         assert!(env.is_empty());
         assert_eq!(env.files_read(), 0);
         assert!(env
-            .search(StylePersona::Samantha, "i am tired")
+            .search(StylePersona::Active, "i am tired")
             .hits
             .is_empty());
         assert_eq!(env.files_read(), 0);
@@ -58,11 +58,11 @@ fn an_in_memory_card_is_refused_as_an_answer_and_as_a_citation() {
         licence: "in-memory",
     }]);
     assert_eq!(root.files_read(), 0);
-    let aria = root.search(StylePersona::Aria, "spare kettle cupboard");
-    assert!(aria.hits.is_empty());
+    let parked = root.search(StylePersona::Parked, "spare kettle cupboard");
+    assert!(parked.hits.is_empty());
     assert_eq!(root.files_read(), 0);
 
-    let found = root.search(StylePersona::Samantha, "spare kettle cupboard");
+    let found = root.search(StylePersona::Active, "spare kettle cupboard");
     assert_eq!(found.bundles_opened, 0);
     assert_eq!(root.files_read(), 0);
     assert_eq!(found.hits.len(), 1);
@@ -97,11 +97,11 @@ fn laptop_research_root_does_not_answer_or_open_lccc_for_english() {
     };
     let root = ResearchRoot::load(&dir).expect("laptop research root");
     assert_eq!(root.files_read(), 0);
-    let aria = root.search(StylePersona::Aria, "hello");
-    assert!(aria.hits.is_empty());
+    let parked = root.search(StylePersona::Parked, "hello");
+    assert!(parked.hits.is_empty());
     assert_eq!(root.files_read(), 0);
 
-    let found = root.search(StylePersona::Samantha, "hello");
+    let found = root.search(StylePersona::Active, "hello");
     assert!(found.hits.len() <= STYLE_HIT_CAP);
     assert!(found.hits.iter().all(|hit| {
         !hit.allows_answer()
@@ -123,10 +123,10 @@ fn laptop_research_root_latency() {
     };
     let root = ResearchRoot::load(&dir).expect("laptop research root");
     let started = Instant::now();
-    let first = root.search(StylePersona::Samantha, "hello");
+    let first = root.search(StylePersona::Active, "hello");
     let first_ms = started.elapsed().as_secs_f64() * 1000.0;
     let started = Instant::now();
-    let warm = root.search(StylePersona::Samantha, "hello");
+    let warm = root.search(StylePersona::Active, "hello");
     let warm_ms = started.elapsed().as_secs_f64() * 1000.0;
     eprintln!(
         "horbm research style: laptop root indexed {} cards, first search {first_ms:.1} ms ({} us), warm search {warm_ms:.1} ms ({} us), hits {}",
@@ -145,4 +145,25 @@ fn laptop_research_root_latency() {
         .opened_bundles()
         .iter()
         .all(|path| !path.to_ascii_lowercase().contains("lccc")));
+}
+
+#[test]
+fn style_search_follows_the_active_persona() {
+    let root = ResearchRoot::from_examples(&[MemoryExample {
+        id: "soft-pace",
+        text: "The spare kettle sits in the cupboard.",
+        licence: "in-memory",
+    }]);
+    let active = root.search(StylePersona::Active, "spare kettle cupboard");
+    assert_eq!(active.hits.len(), 1);
+    assert_eq!(active.hits[0].id, "soft-pace");
+    assert!(!active.hits[0].allows_answer());
+    assert!(!active.hits[0].allows_cite());
+    let parked = root.search(StylePersona::Parked, "spare kettle cupboard");
+    assert!(parked.hits.is_empty());
+    assert_eq!(root.files_read(), 0);
+    assert_eq!(
+        root.lookup("spare kettle cupboard").map(|hint| hint.id),
+        Some("soft-pace".to_string())
+    );
 }

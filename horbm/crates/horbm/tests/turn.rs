@@ -133,6 +133,118 @@ fn gateway_timeout_at_three_seconds_falls_back() {
     );
 }
 
+#[test]
+fn text_only_kettle_clause_is_unchanged() {
+    let mut brain = Brain::with_cards(Cards, None);
+    let out = brain.turn("where is the kettle");
+    assert_eq!(out.reply, "The kettle is on the hob.");
+    assert_eq!(out.first_clause, "The kettle");
+    let again = brain.turn_with_ear("where is the kettle", None);
+    assert_eq!(again.reply, "The kettle is on the hob.");
+    assert_eq!(again.first_clause, "The kettle");
+}
+
+#[test]
+fn a_sad_ear_does_not_replace_a_card_clause() {
+    let ear = horbm_inner::Heard::from_axes(
+        horbm_inner::SAD_EAR_VALENCE,
+        0.2,
+        horbm_inner::EAR_CONFIDENCE,
+    )
+    .expect("the floor is a claim");
+    assert!(ear.valence <= horbm_inner::SAD_EAR_VALENCE);
+    assert!(ear.confidence >= horbm_inner::EAR_CONFIDENCE);
+    let mut brain = Brain::with_cards(Cards, None);
+    brain.set_ear_sense(true);
+    assert!(brain.ear_sense());
+    let out = brain.turn_with_ear("where is the kettle", Some(ear));
+    assert_eq!(out.reply, "The kettle is on the hob.");
+    assert_eq!(out.first_clause, "The kettle");
+}
+
+#[test]
+fn ear_sense_from_flag_defaults_on() {
+    assert!(Brain::ear_sense_from_flag(None));
+    assert!(Brain::ear_sense_from_flag(Some("")));
+    assert!(Brain::ear_sense_from_flag(Some("1")));
+    assert!(Brain::ear_sense_from_flag(Some(" ON ")));
+    assert!(Brain::ear_sense_from_flag(Some("allow")));
+    assert!(!Brain::ear_sense_from_flag(Some("0")));
+    assert!(!Brain::ear_sense_from_flag(Some("off")));
+    assert!(!Brain::ear_sense_from_flag(Some("Deny")));
+}
+
+#[test]
+fn text_turn_is_identical_with_ear_sense_on_and_off() {
+    let mut on = Brain::with_cards(Cards, None);
+    on.set_ear_sense(true);
+    let mut off = Brain::with_cards(Cards, None);
+    off.set_ear_sense(false);
+    let heard = "where is the kettle";
+    let with_ear = on.turn_with_ear(heard, None);
+    let without = off.turn_with_ear(heard, None);
+    assert_eq!(with_ear.reply, without.reply);
+    assert_eq!(with_ear.first_clause, without.first_clause);
+    assert_eq!(with_ear.reply, "The kettle is on the hob.");
+    assert_eq!(with_ear.first_clause, "The kettle");
+    same_mood(on.mood_meta(), off.mood_meta());
+    same_mood(with_ear.mood_meta, without.mood_meta);
+    same_mood(on.mood_meta(), with_ear.mood_meta);
+}
+
+fn same_mood(left: horbm::MoodMeta, right: horbm::MoodMeta) {
+    assert_eq!(left.arousal.to_bits(), right.arousal.to_bits());
+    assert_eq!(left.valence.to_bits(), right.valence.to_bits());
+    assert_eq!(left.dominance.to_bits(), right.dominance.to_bits());
+    assert_eq!(left.e.to_bits(), right.e.to_bits());
+    assert_eq!(left.intent, right.intent);
+    assert_eq!(left.rate.to_bits(), right.rate.to_bits(), "mood_meta.rate");
+    assert_eq!(left.energy.to_bits(), right.energy.to_bits());
+    assert_eq!(left.pitch_st.to_bits(), right.pitch_st.to_bits());
+    assert_eq!(left.pause_ms.to_bits(), right.pause_ms.to_bits());
+    assert_eq!(left.named, right.named);
+}
+
+#[test]
+fn only_the_grant_word_opens_the_person_file_at_open() {
+    for (index, flag) in [None, Some("yes"), Some("true")].into_iter().enumerate() {
+        let dir = scratch(&format!("remember-deny-{index}"));
+        let path = dir.join("person.sqlite");
+        let mut brain =
+            Brain::open_with_remember_flag(&path, &dir.join("knowledge"), &dir.join("cases"), flag);
+        assert!(!path.exists(), "{flag:?}");
+        let _ = brain.turn("hello");
+        assert!(!path.exists(), "denied turn creates no file: {flag:?}");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    let dir = scratch("remember-grant");
+    let path = dir.join("person.sqlite");
+    let mut brain = Brain::open_with_remember_flag(
+        &path,
+        &dir.join("knowledge"),
+        &dir.join("cases"),
+        Some("grant"),
+    );
+    assert!(!path.exists(), "the file waits for a write");
+    let _ = brain.turn("hello");
+    assert!(path.is_file(), "grant opens the person file on a turn");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+fn scratch(name: &str) -> std::path::PathBuf {
+    let dir = std::env::temp_dir().join(format!(
+        "horbm-turn-flag-{name}-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos()
+    ));
+    std::fs::create_dir_all(&dir).unwrap();
+    dir
+}
+
 fn wait_follow(brain: &mut Brain) -> ResearchFollowUp {
     let started = Instant::now();
     loop {

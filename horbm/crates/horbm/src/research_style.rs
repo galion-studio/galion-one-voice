@@ -14,9 +14,9 @@
 //! query does not open a Chinese LCCC bundle. The index is tantivy, in RAM,
 //! built on the first query for that language.
 //!
-//! Samantha may use a hit as a style mark. Aria is parked and gets nothing.
-//! Every hit is tagged `not_for` answer and cite. The example text is not
-//! an answer and not a citation.
+//! The active persona may use a hit as a style mark. A parked persona gets
+//! nothing. Every hit is tagged `not_for` answer and cite. The example text
+//! is not an answer and not a citation.
 //!
 //! Portable `std::fs` and an in-memory index. No platform path and no
 //! `.exe`. Nothing here is cfg-gated. The tests run on Linux.
@@ -50,11 +50,13 @@ pub const MAX_RESEARCH_BUNDLE_BYTES: u64 = 246 * 1024;
 const NEAR_DUP_JACCARD: f32 = 0.8;
 const TOKENIZER_NAME: &str = "style";
 
-/// Who is asking. Only Samantha searches. Aria stays parked.
+/// Who is asking. Only the active persona searches. A parked one gets nothing.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum StylePersona {
-    Samantha,
-    Aria,
+    /// The persona installed from configuration.
+    Active,
+    /// Not the installed persona. A search returns no hits.
+    Parked,
 }
 
 /// One style example. `allows_answer` and `allows_cite` are always false.
@@ -228,7 +230,7 @@ impl ResearchRoot {
         Self { inner: Inner::Off }
     }
 
-    /// Cards indexed so far. Zero until a Samantha query builds a language index.
+    /// Cards indexed so far. Zero until an active-persona query builds a language index.
     pub fn len(&self) -> usize {
         let Inner::Ready { state, .. } = &self.inner else {
             return 0;
@@ -365,9 +367,9 @@ impl ResearchRoot {
         })
     }
 
-    /// Top style id for Samantha, if the query matches. The gist is not returned.
+    /// Top style id for the active persona, if the query matches. The gist is not returned.
     pub fn lookup(&self, query: &str) -> Option<StyleHint> {
-        self.search(StylePersona::Samantha, query)
+        self.search(StylePersona::Active, query)
             .hits
             .into_iter()
             .next()
@@ -387,7 +389,7 @@ impl ResearchRoot {
         else {
             return StyleSearch::empty(0);
         };
-        if persona != StylePersona::Samantha {
+        if persona != StylePersona::Active {
             return StyleSearch::empty(*skipped_size);
         }
         let started = Instant::now();
@@ -1127,7 +1129,7 @@ mod tests {
         let off = ResearchRoot::from_flag(None);
         assert!(off.is_empty());
         assert_eq!(off.files_read(), 0);
-        let found = off.search(StylePersona::Samantha, "tired");
+        let found = off.search(StylePersona::Active, "tired");
         assert!(found.hits.is_empty());
         assert_eq!(found.bundles_opened, 0);
         assert_eq!(off.files_read(), 0);
@@ -1136,7 +1138,7 @@ mod tests {
             let env = ResearchRoot::from_env();
             assert!(env.is_empty());
             assert_eq!(env.files_read(), 0);
-            assert!(env.search(StylePersona::Samantha, "tired").hits.is_empty());
+            assert!(env.search(StylePersona::Active, "tired").hits.is_empty());
         }
     }
 }
