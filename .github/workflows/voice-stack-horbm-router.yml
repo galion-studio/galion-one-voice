@@ -3,8 +3,8 @@
 # Layer 5 router and the localhost research gateway.
 # The end-to-end smoke may fetch the pinned Vosk small-en model and the
 # Silero VAD ONNX (MIT, not a voice) into a cache outside the checkout.
-# A failed Vosk fetch leaves asr=stub. libssl-dev is only there because
-# the ONNX Runtime pin fetches its CPU build over native-tls. g++ supplies
+# A failed Vosk fetch leaves asr=stub. The Silero runtime is downloaded
+# with rustls, so this job does not install libssl-dev. g++ supplies
 # libstdc++, which that CPU build links.
 # The router tests do not download a model.
 
@@ -25,7 +25,7 @@ jobs:
         with:
           components: clippy
       - name: ALSA headers
-        run: sudo apt-get update && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y libasound2-dev pkg-config libflite1 libssl-dev g++
+        run: sudo apt-get update && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y libasound2-dev pkg-config libflite1 g++
       - name: cargo build
         run: |
           cargo build --manifest-path horbm/Cargo.toml -p horbm -p horbm-eval

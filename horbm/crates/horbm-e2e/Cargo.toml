@@ -38,9 +38,14 @@ galion-tts-piper = { path = "../../../voice-stack/tts-piper-stream" }
 galion-ml-voice = { path = "../../../crates/galion-ml-voice", default-features = false, features = ["speech"] }
 sha2 = "0.10.9"
 voice_activity_detector = { version = "=0.2.1", optional = true }
-ort = { version = "=2.0.0-rc.10", optional = true, features = ["ndarray"] }
+# Defaults stay on because voice_activity_detector asks for them. The
+# workspace patch below swaps ort-sys's downloader from native-tls to rustls.
+ort = { version = "=2.0.0-rc.10", optional = true, default-features = false, features = ["std", "ndarray", "download-binaries", "copy-dylibs"] }
 ureq = { version = "2.12", optional = true, default-features = false, features = ["tls"] }
 cpu-time = { version = "1", optional = true }
+
+[patch.crates-io]
+ort-sys = { path = "vendor/ort-sys" }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 galion-sam-audio-io = { path = "../../../voice-stack/audio-io", optional = true }
