@@ -7,12 +7,12 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
-use galion_emotion_core::{EmotionCore, IntentMsg, AROUSAL, DOMINANCE, VALENCE};
+use galion_emotion_core::{EmotionCore, IntentMsg};
 use horbm::{CardHit, CardLookup};
 use horbm_breath::{Drive, Lungs};
 use horbm_duplex::{
-    Affect, Breath, BreathCue, BreathPhase, Duplex, Emotion, LoopError, LoopEvent, Parts, Persona,
-    Style, DEV_PERSONA, FRAME_SAMPLES,
+    Breath, BreathCue, BreathPhase, ConfiguredPersona, CoreAffect, Duplex, LoopError, LoopEvent,
+    Parts, Persona, Style, FRAME_SAMPLES,
 };
 use horbm_voice::SAMPLE_RATE;
 
@@ -98,24 +98,6 @@ impl CardLookup for Kettle {
     }
 }
 
-struct CoreEmotion {
-    core: EmotionCore,
-}
-
-impl Emotion for CoreEmotion {
-    fn step(&mut self, t_ms: u32) -> Affect {
-        let msg = IntentMsg::steady(t_ms);
-        let moment = self.core.step(&msg).unwrap_or_else(|err| {
-            panic!("emotion step at {t_ms} ms failed: {err:?}");
-        });
-        Affect {
-            valence: moment.pos[VALENCE],
-            arousal: moment.pos[AROUSAL],
-            dominance: moment.pos[DOMINANCE],
-        }
-    }
-}
-
 struct LiveBreath {
     lungs: Lungs,
     core: EmotionCore,
@@ -155,35 +137,15 @@ impl Breath for LiveBreath {
     }
 }
 
-struct Samantha;
-
-impl Persona for Samantha {
-    fn id(&self) -> &str {
-        DEV_PERSONA
-    }
-
-    fn voice(&self) -> &str {
-        DEV_PERSONA
-    }
-
-    fn style(&self) -> Style {
-        Style::from_brevity(0.55, 0.8, 2)
-    }
-
-    fn unknown_line(&self) -> &str {
-        horbm::UNKNOWN_REPLY
-    }
-}
-
 struct Other;
 
 impl Persona for Other {
     fn id(&self) -> &str {
-        "aria"
+        "other"
     }
 
     fn voice(&self) -> &str {
-        "aria"
+        "other"
     }
 
     fn style(&self) -> Style {
@@ -313,7 +275,11 @@ pub fn run(sense: Sense) -> Result<Outcome, String> {
 
     let wav_removed = remove_tree(&tree.dir);
     let mut report = Report::new();
-    report.push("persona", DEV_PERSONA);
+    let persona_id = horbm::Persona::load_development()
+        .map_err(|err| err.to_string())?
+        .id()
+        .to_string();
+    report.push("persona", persona_id);
     report.push(
         "profile",
         if cfg!(debug_assertions) {
@@ -330,10 +296,7 @@ pub fn run(sense: Sense) -> Result<Outcome, String> {
     report.push("vad", scored.backend);
     report.push("vad_voiced_frames", scored.voiced.to_string());
     report.push("vad_quiet_frames", scored.quiet.to_string());
-    report.push(
-        "vad_energy_voiced_frames",
-        scored.energy_voiced.to_string(),
-    );
+    report.push("vad_energy_voiced_frames", scored.energy_voiced.to_string());
     report.push("vad_energy_quiet_frames", scored.energy_quiet.to_string());
     push_measured(
         &mut report,
@@ -541,14 +504,14 @@ fn drive(
         EarPlan::Stub { .. } => EarRec::scripted(&LINES),
     };
     let from_script = recognizer.is_script();
+    let persona = horbm::Persona::load_development().map_err(|err| err.to_string())?;
+    let emotion = CoreAffect::from_baseline(persona.baseline());
     let mut duplex = Duplex::new(
         Parts {
             recognizer,
-            emotion: CoreEmotion {
-                core: EmotionCore::at_rest(),
-            },
+            emotion,
             breath: LiveBreath::samantha(),
-            persona: Samantha,
+            persona: ConfiguredPersona::from_persona(persona),
             mouth: LiveMouth::open(kind)?,
         },
         Kettle,
@@ -758,19 +721,19 @@ fn remove_tree(dir: &Path) -> bool {
 }
 
 pub fn refuse_other_persona() -> Result<(), String> {
+    let persona = horbm::Persona::load_development().map_err(|err| err.to_string())?;
+    let emotion = CoreAffect::from_baseline(persona.baseline());
     match Duplex::new(
         Parts {
             recognizer: EarRec::scripted(&[]),
-            emotion: CoreEmotion {
-                core: EmotionCore::at_rest(),
-            },
+            emotion,
             breath: LiveBreath::samantha(),
             persona: Other,
             mouth: LiveMouth::open(EngineKind::Stub)?,
         },
         Kettle,
     ) {
-        Ok(_) => Err("a persona other than samantha was accepted".into()),
+        Ok(_) => Err("a persona other than the configured one was accepted".into()),
         Err(LoopError::Persona(_)) => Ok(()),
         Err(err) => Err(err.to_string()),
     }

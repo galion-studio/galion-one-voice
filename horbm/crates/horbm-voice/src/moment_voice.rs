@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Galion Labs
-//! Samantha's moment, on the controls the mouth already has.
+//! The installed moment, on the controls the mouth already has.
 //!
-//! [`VoiceBaseline`] is who she is (persona, voice id, rest point, design
-//! pitch centre). [`MomentState`] is how she feels on this 80 ms frame.
-//! The map uses only the difference. A frame that sits on the baseline is
-//! the Samantha e0 line from [`galion_sam_prosody::map`]. Aria is parked:
-//! her packet stays the unsteered line no matter where the moment is.
+//! [`VoiceBaseline`] is who is speaking (persona, voice id, rest point,
+//! design pitch centre). [`MomentState`] is how that speaker feels on this
+//! 80 ms frame. The map uses only the difference. A frame that sits on the
+//! baseline is the e0 line from [`galion_sam_prosody::map`]. A parked seat
+//! keeps the unsteered packet. Parking is a flag, not a persona id.
 //!
 //! The warm Piper process reads `length_scale`, `noise_scale`, and `noise_w`
 //! once, at spawn. This module still emits those three every frame. Pace is
@@ -34,7 +34,8 @@ pub const AFFECT_TO_VOICE_FRAMES: u32 = 2;
 /// `LOCKS.toml` `[gates] affect_to_voice_max_ms`. Two frames of [`FRAME_MS`].
 pub const AFFECT_TO_VOICE_MS: u32 = FRAME_MS * AFFECT_TO_VOICE_FRAMES;
 
-/// Aria has no moment map. The flag is the park, not a fifth consent bit.
+/// Deprecated forward. Parking is [`MomentVoice::for_persona`], not this
+/// constant. Existing callers still read it.
 pub const ARIA_PARKED: bool = true;
 
 /// Approach lean, length units per axis unit. Higher approach is slightly faster.
@@ -47,7 +48,7 @@ const _: () = assert!(AFFECT_TO_VOICE_MS == 160);
 const _: () = assert!(FRAME_MS == 80);
 
 /// Where a breath sits on the sentence. Not a bracket token. Piper would
-/// speak a token, and `samantha.toml` leaves inhale off that list.
+/// speak a token, and the persona file leaves inhale off that list.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum BreathPlace {
     None,
@@ -76,13 +77,13 @@ pub struct VoiceControls {
     pub rate: f32,
     pub breath: BreathPlace,
     pub breath_ms: u32,
-    /// True for Aria and for every persona other than Samantha.
+    /// True when the seat was opened parked. The packet is then unsteered.
     pub parked: bool,
 }
 
 impl VoiceControls {
     /// Unsteered packet. Pace and energy are unity. Noise stays off so a
-    /// parked seat does not inherit Samantha's timbre.
+    /// parked seat does not inherit a speaking timbre.
     pub const fn unsteered() -> Self {
         Self {
             persona: [0; 16],
@@ -167,20 +168,22 @@ pub struct MomentView {
     pub breath: Breath,
 }
 
-/// The voice turn's speaker. Persona id `samantha`, e0 rest point, the
-/// design pitch centre already on [`VoiceBaseline::standin`]. Not a recording.
+/// Deprecated forward. Baseline slot the older callers still request.
+/// The moment map does not read the id.
 pub fn samantha_baseline() -> VoiceBaseline {
     VoiceBaseline {
         persona: id_slot("samantha"),
         voice: id_slot("samantha-e0"),
-        // `SAMANTHA.dynamics.rest` (valence, arousal, dominance). Approach 0
+        // Development profile rest (valence, arousal, dominance). Approach 0
         // is neither lean nor withdrawal; that axis is not in the persona rest.
         pos: [0.25, 0.35, 0.45, 0.0],
         pitch_centre_hz: VoiceBaseline::standin().pitch_centre_hz,
     }
 }
 
-/// Parked seat. The numbers fill the baseline struct. They are not a voice.
+/// Deprecated forward. Baseline slot the older callers still request.
+/// The numbers fill the struct. They are not a voice, and the map does not
+/// read the id.
 pub fn aria_baseline() -> VoiceBaseline {
     VoiceBaseline {
         persona: id_slot("aria"),
@@ -190,20 +193,22 @@ pub fn aria_baseline() -> VoiceBaseline {
     }
 }
 
+/// Deprecated forward. Reports the development id. The moment map does not
+/// call this.
 pub fn is_samantha(baseline: &VoiceBaseline) -> bool {
     baseline.persona_id().eq_ignore_ascii_case("samantha")
 }
 
+/// Deprecated forward. Reports the parked-seat id. The moment map does not
+/// call this.
 pub fn is_aria(baseline: &VoiceBaseline) -> bool {
     baseline.persona_id().eq_ignore_ascii_case("aria")
 }
 
-/// Instant map. Does not smooth and does not write `baseline`.
+/// Instant map for whatever baseline was installed. Does not smooth and
+/// does not write `baseline`. Parking is [`MomentVoice::for_persona`].
 pub fn instant(baseline: VoiceBaseline, moment: MomentState, breath: Breath) -> VoiceControls {
-    if !is_samantha(&baseline) {
-        return parked_packet(baseline.persona, baseline.voice, baseline.pitch_centre_hz);
-    }
-    map_samantha(&baseline, moment, breath)
+    map_active(&baseline, moment, breath)
 }
 
 /// Two-frame ramp from the baseline voice onto the moment.
@@ -215,11 +220,22 @@ pub struct MomentVoice {
     goal: VoiceControls,
     origin: VoiceControls,
     step: u32,
+    parked: bool,
 }
 
 impl MomentVoice {
     pub fn new(baseline: VoiceBaseline) -> Self {
-        let rest = instant(baseline, MomentState::at(baseline.pos), Breath::rest());
+        Self::for_persona(baseline, false)
+    }
+
+    /// `parked` is config. `true` keeps the unsteered packet for any
+    /// baseline. `false` maps the moment for the baseline the brain installed.
+    pub fn for_persona(baseline: VoiceBaseline, parked: bool) -> Self {
+        let rest = if parked {
+            parked_packet(baseline.persona, baseline.voice, baseline.pitch_centre_hz)
+        } else {
+            instant(baseline, MomentState::at(baseline.pos), Breath::rest())
+        };
         Self {
             identity: baseline.identity_bits(),
             baseline,
@@ -227,6 +243,7 @@ impl MomentVoice {
             goal: rest,
             origin: rest,
             step: AFFECT_TO_VOICE_FRAMES,
+            parked,
         }
     }
 
@@ -246,7 +263,7 @@ impl MomentVoice {
     /// The baseline this was built with is not assigned.
     pub fn tick(&mut self, moment: MomentState, breath: Breath) -> VoiceControls {
         debug_assert_eq!(self.baseline.identity_bits(), self.identity);
-        if !is_samantha(&self.baseline) {
+        if self.parked {
             let frozen = parked_packet(
                 self.baseline.persona,
                 self.baseline.voice,
@@ -258,7 +275,7 @@ impl MomentVoice {
             self.step = AFFECT_TO_VOICE_FRAMES;
             return frozen;
         }
-        let goal = map_samantha(&self.baseline, moment, breath);
+        let goal = map_active(&self.baseline, moment, breath);
         if !same_packet(&goal, &self.goal) {
             self.origin = self.applied;
             self.goal = goal;
@@ -310,7 +327,7 @@ pub fn shape_sentence(input: &[i16], sample_rate: u32, controls: VoiceControls) 
     place_silence(&paced, sample_rate, controls)
 }
 
-fn map_samantha(baseline: &VoiceBaseline, moment: MomentState, breath: Breath) -> VoiceControls {
+fn map_active(baseline: &VoiceBaseline, moment: MomentState, breath: Breath) -> VoiceControls {
     let da = axis_delta(moment.pos[AROUSAL], baseline.pos[AROUSAL]);
     let dv = axis_delta(moment.pos[VALENCE], baseline.pos[VALENCE]);
     let dd = axis_delta(moment.pos[DOMINANCE], baseline.pos[DOMINANCE]);

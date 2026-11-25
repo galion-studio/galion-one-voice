@@ -3,8 +3,8 @@
 //! Any persona. The fixture id is `northwind`. No audio and no user store.
 
 use horbm_inner::{
-    InnerHome, Perceived, PersonaInner, SamanthaInner, CARE_ABOVE_REST, CARE_HOME, CURIOSITY_HOME,
-    EXPECT_HOME, HELP_HOME, PERSONA_ID_BYTES, TICK_MS,
+    InnerHome, Perceived, PersonaInner, CARE_ABOVE_REST, CARE_HOME, CURIOSITY_HOME, EXPECT_HOME,
+    HELP_HOME, PERSONA_ID_BYTES, TICK_MS,
 };
 
 fn northwind() -> InnerHome {
@@ -28,23 +28,32 @@ fn seen(words: &str) -> Perceived<'_> {
 #[test]
 fn new_matches_the_old_numbers_bit_for_bit() {
     let fresh = PersonaInner::new();
-    let alias = SamanthaInner::new();
-    assert_eq!(fresh.care().to_bits(), alias.care().to_bits());
-    assert_eq!(fresh.curiosity().to_bits(), alias.curiosity().to_bits());
-    assert_eq!(fresh.help().to_bits(), alias.help().to_bits());
-    assert_eq!(fresh.expect().to_bits(), alias.expect().to_bits());
     assert_eq!(fresh.care().to_bits(), CARE_HOME.to_bits());
     assert_eq!(fresh.curiosity().to_bits(), CURIOSITY_HOME.to_bits());
     assert_eq!(fresh.help().to_bits(), HELP_HOME.to_bits());
     assert_eq!(fresh.expect().to_bits(), EXPECT_HOME.to_bits());
     assert_eq!(fresh.home().care.to_bits(), CARE_HOME.to_bits());
     assert_eq!(fresh.persona_id(), "");
-    assert_eq!(alias.persona_id(), "");
     assert_eq!(
         (CARE_ABOVE_REST + 0.25).to_bits(),
         CARE_HOME.to_bits(),
         "standalone care stays 0.30 above a rest valence of 0.25"
     );
+}
+
+#[test]
+#[allow(deprecated)]
+fn deprecated_alias_matches_persona_inner() {
+    use horbm_inner::SamanthaInner;
+
+    let fresh = PersonaInner::new();
+    let alias = SamanthaInner::new();
+    assert_eq!(fresh.care().to_bits(), alias.care().to_bits());
+    assert_eq!(fresh.curiosity().to_bits(), alias.curiosity().to_bits());
+    assert_eq!(fresh.help().to_bits(), alias.help().to_bits());
+    assert_eq!(fresh.expect().to_bits(), alias.expect().to_bits());
+    assert_eq!(fresh.persona_id(), alias.persona_id());
+    assert_eq!(alias.persona_id(), "");
 }
 
 #[test]

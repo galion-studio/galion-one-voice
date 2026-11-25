@@ -8,9 +8,9 @@
 use galion_emotion_core::{IntentMsg, AROUSAL};
 use horbm::{CardHit, CardLookup, Pad};
 use horbm_duplex::{
-    open_persona, Breath, BreathPhase, CoreAffect, Duplex, EarSense, Emotion, FramePump,
-    NativeMouth, Parts, Persona, ProsodyEar, Recognizer, SamanthaPersona, SilentRecognizer,
-    SpeakingBreath, ARIA_ACTIVE, ARIA_ID, DEV_PERSONA, FRAME_SAMPLES, SAMPLE_RATE,
+    open_persona, Breath, BreathPhase, ConfiguredPersona, CoreAffect, Duplex, EarSense, Emotion,
+    FramePump, LoopError, NativeMouth, Parts, Persona, ProsodyEar, Recognizer, SamanthaPersona,
+    SilentRecognizer, SpeakingBreath, FRAME_SAMPLES, SAMPLE_RATE,
 };
 use horbm_voice::{is_aria, is_samantha, Mouth, MouthPull, SpokenLine, VoiceControls};
 
@@ -36,18 +36,26 @@ fn sine(hz: f32, amp: f32) -> Vec<i16> {
     pcm
 }
 
-fn harness() -> Duplex<SilentRecognizer, CoreAffect, SpeakingBreath, SamanthaPersona, NativeMouth> {
+fn seated() -> (CoreAffect, ConfiguredPersona) {
+    let persona = horbm::Persona::load_development().expect("configured persona");
+    let affect = CoreAffect::from_baseline(persona.baseline());
+    (affect, ConfiguredPersona::from_persona(persona))
+}
+
+fn harness() -> Duplex<SilentRecognizer, CoreAffect, SpeakingBreath, ConfiguredPersona, NativeMouth>
+{
+    let (emotion, persona) = seated();
     let mut duplex = Duplex::new(
         Parts {
             recognizer: SilentRecognizer::new(),
-            emotion: CoreAffect::samantha(),
+            emotion,
             breath: SpeakingBreath,
-            persona: SamanthaPersona,
+            persona,
             mouth: NativeMouth::new(),
         },
         NoCards,
     )
-    .expect("samantha");
+    .expect("configured persona");
     duplex.set_aec(false);
     duplex
 }
@@ -56,8 +64,9 @@ fn harness() -> Duplex<SilentRecognizer, CoreAffect, SpeakingBreath, SamanthaPer
 fn emotion_core_satisfies_the_port_and_leaves_the_baseline() {
     let mut emotion = CoreAffect::samantha();
     let base = emotion.baseline();
-    assert_eq!(base.persona_id(), DEV_PERSONA);
-    assert_eq!(base.voice_id(), DEV_PERSONA);
+    let forward = SamanthaPersona;
+    assert_eq!(base.persona_id(), forward.id());
+    assert_eq!(base.voice_id(), forward.voice());
     let bits = base.identity_bits();
     let rejected = emotion.step(80);
     assert_eq!(emotion.frames(), 0);
@@ -125,12 +134,13 @@ fn the_tick_hands_samantha_s_moment_to_the_mouth_and_not_aria() {
         }
     }
 
+    let (emotion, persona) = seated();
     let mut duplex = Duplex::new(
         Parts {
             recognizer: SilentRecognizer::new(),
-            emotion: CoreAffect::samantha(),
+            emotion,
             breath: SpeakingBreath,
-            persona: SamanthaPersona,
+            persona,
             mouth: Remember {
                 inner: NativeMouth::new(),
                 felt: 0,
@@ -139,7 +149,7 @@ fn the_tick_hands_samantha_s_moment_to_the_mouth_and_not_aria() {
         },
         NoCards,
     )
-    .expect("samantha");
+    .expect("configured persona");
     duplex
         .tick(&vec![0i16; FRAME_SAMPLES])
         .expect("one quiet frame");
@@ -148,26 +158,25 @@ fn the_tick_hands_samantha_s_moment_to_the_mouth_and_not_aria() {
 }
 
 #[test]
-fn samantha_is_the_only_loaded_persona_and_aria_stays_parked() {
-    let persona = open_persona(DEV_PERSONA).expect("samantha");
-    assert_eq!(persona.id(), DEV_PERSONA);
-    assert_eq!(persona.voice(), DEV_PERSONA);
+fn the_configured_persona_loads_and_any_other_id_is_refused() {
+    let configured = horbm::Persona::load_development().expect("configured persona");
+    let persona = open_persona(configured.id()).expect("open");
+    assert_eq!(persona.id(), configured.id());
+    assert_eq!(persona.voice(), configured.voice());
     assert_eq!(persona.unknown_line(), horbm::UNKNOWN_REPLY);
     let style = persona.style();
-    let expect = 1.0 - 0.15 * 0.55;
-    assert!((style.rate - expect).abs() < 1.0e-5);
-    assert!((0.0..=1.0).contains(&style.brevity));
-    assert!((0.0..=1.0).contains(&style.warmth));
-    match ARIA_ACTIVE {
-        false => {}
-        true => panic!("aria was marked active"),
-    }
-    assert_eq!(ARIA_ID, "aria");
-    match open_persona(ARIA_ID) {
-        Ok(_) => panic!("aria was loaded"),
-        Err(err) => assert!(err.to_string().contains("parked")),
-    }
-    assert!(open_persona("jarvis").is_err());
+    let hook = configured.style();
+    assert!((style.brevity - hook.brevity).abs() < 1.0e-5);
+    assert!((style.warmth - hook.warmth).abs() < 1.0e-5);
+    assert_eq!(style.max_sentences, hook.max_sentences);
+    assert!((style.rate - hook.rate).abs() < 1.0e-5);
+    let missed = open_persona("other").expect_err("other id");
+    let also = open_persona("jarvis").expect_err("jarvis");
+    assert_eq!(
+        missed,
+        LoopError::Persona("the id is not the configured persona")
+    );
+    assert_eq!(also, missed);
 }
 
 #[test]

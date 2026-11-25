@@ -26,9 +26,9 @@ use horbm::{CardHit, CardLookup};
 #[cfg(not(feature = "vosk"))]
 use horbm_duplex::SilentRecognizer;
 use horbm_duplex::{
-    CoreAffect, Duplex, FramePump, Hypothesis, HypothesisKind, LoopEvent, NativeMouth, Parts,
-    PlaybackEcho, RecogError, Recognizer, SamanthaPersona, SpeakingBreath, FRAME_SAMPLES,
-    SAMPLE_RATE,
+    ConfiguredPersona, CoreAffect, Duplex, FramePump, Hypothesis, HypothesisKind, LoopEvent,
+    NativeMouth, Parts, Persona, PlaybackEcho, RecogError, Recognizer, SpeakingBreath,
+    FRAME_SAMPLES, SAMPLE_RATE,
 };
 use horbm_voice::{Mouth, MouthPull, SpokenLine, VoiceControls};
 
@@ -152,10 +152,11 @@ fn run_devices<R: Recognizer>(
         }
     };
     eprintln!(
-        "duplex s28 host={} recognizer={name} emotion=galion-emotion-core prosody={} aec={} persona=samantha mouth={mouth_name} breath=stand-in network=none",
+        "duplex s28 host={} recognizer={name} emotion=galion-emotion-core prosody={} aec={} persona={} mouth={mouth_name} breath=stand-in network=none",
         session.info().host,
         on_off(duplex.prosody_enabled()),
         aec_label(duplex.aec_enabled()),
+        duplex.persona().id(),
     );
     let playback = session.playback();
     let capture = session.capture();
@@ -204,28 +205,34 @@ fn run_self_test(json: bool, prosody: bool) -> ExitCode {
         }
     };
     eprintln!(
-        "duplex s28 host=self-test recognizer=stand-in emotion=galion-emotion-core prosody={} aec={} persona=samantha mouth=native breath=stand-in network=none",
+        "duplex s28 host=self-test recognizer=stand-in emotion=galion-emotion-core prosody={} aec={} persona={} mouth=native breath=stand-in network=none",
         on_off(duplex.prosody_enabled()),
         aec_label(duplex.aec_enabled()),
+        duplex.persona().id(),
     );
     let mut pump = FramePump::new();
-    let mut feed =
-        |duplex: &mut Duplex<Script, CoreAffect, SpeakingBreath, SamanthaPersona, NativeMouth>,
-         pcm: &[i16],
-         json: bool|
-         -> bool {
-            let mut failed = false;
-            for chunk in pump.push(pcm) {
-                match duplex.tick(&chunk) {
-                    Ok(out) => publish(json, out.event, duplex.report()),
-                    Err(err) => {
-                        eprintln!("duplex s28 {err}");
-                        failed = true;
-                    }
+    let mut feed = |duplex: &mut Duplex<
+        Script,
+        CoreAffect,
+        SpeakingBreath,
+        ConfiguredPersona,
+        NativeMouth,
+    >,
+                    pcm: &[i16],
+                    json: bool|
+     -> bool {
+        let mut failed = false;
+        for chunk in pump.push(pcm) {
+            match duplex.tick(&chunk) {
+                Ok(out) => publish(json, out.event, duplex.report()),
+                Err(err) => {
+                    eprintln!("duplex s28 {err}");
+                    failed = true;
                 }
             }
-            failed
-        };
+        }
+        failed
+    };
     for _ in 0..5 {
         if feed(&mut duplex, &tone(), json) {
             return ExitCode::from(1);
@@ -273,13 +280,15 @@ fn build<R: Recognizer, M: Mouth>(
     prosody: bool,
     aec: bool,
     mouth: M,
-) -> Result<Duplex<R, CoreAffect, SpeakingBreath, SamanthaPersona, M>, String> {
+) -> Result<Duplex<R, CoreAffect, SpeakingBreath, ConfiguredPersona, M>, String> {
+    let persona = horbm::Persona::load_development().map_err(|err| err.to_string())?;
+    let emotion = CoreAffect::from_baseline(persona.baseline());
     let mut duplex = Duplex::new(
         Parts {
             recognizer,
-            emotion: CoreAffect::samantha(),
+            emotion,
             breath: SpeakingBreath,
-            persona: SamanthaPersona,
+            persona: ConfiguredPersona::from_persona(persona),
             mouth,
         },
         NoCards,
