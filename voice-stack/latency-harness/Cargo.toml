@@ -3,7 +3,7 @@
 
 [package]
 name = "galion-sam-latency"
-description = "Per-stage latency harness for the Samantha voice path. Standalone crate. Not a member of the root workspace."
+description = "Per-stage latency harness for the local voice path. Standalone crate. Not a member of the root workspace."
 version = "0.0.1"
 edition = "2021"
 license = "MIT"

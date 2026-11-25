@@ -3,7 +3,7 @@
 
 [package]
 name = "horbm-voice"
-description = "HORBM-native voice turn. Energy ear, brain turn, mouth, on the conductor frame clock. The Samantha moment drives pace, noise, pitch, energy, pause, and breath. Piper and Vosk are optional adapters."
+description = "HORBM-native voice turn. Energy ear, brain turn, mouth, on the conductor frame clock. The configured persona's moment drives pace, noise, pitch, energy, pause, and breath. Piper and Vosk are optional adapters."
 version.workspace = true
 edition.workspace = true
 license.workspace = true

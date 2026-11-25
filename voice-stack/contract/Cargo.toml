@@ -4,7 +4,7 @@
 
 [package]
 name = "galion-sam-contract"
-description = "Swarm 16 shared types for the local Samantha path. No I/O, no model, no audio."
+description = "Swarm 16 shared types for the local voice path. No I/O, no model, no audio."
 version = "0.0.1"
 edition = "2021"
 license = "MIT"
