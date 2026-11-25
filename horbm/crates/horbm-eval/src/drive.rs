@@ -12,8 +12,8 @@ use std::rc::Rc;
 
 use horbm::{CardHit, CardLookup};
 use horbm_duplex::{
-    CoreAffect, Duplex, Floor, FrameOut, Hypothesis, HypothesisKind, LoopEvent, NativeMouth, Parts,
-    RecogError, Recognizer, SamanthaPersona, SpeakingBreath, FRAME_SAMPLES,
+    ConfiguredPersona, CoreAffect, Duplex, Floor, FrameOut, Hypothesis, HypothesisKind, LoopEvent,
+    NativeMouth, Parts, RecogError, Recognizer, SpeakingBreath, FRAME_SAMPLES,
 };
 use horbm_voice::Mouth;
 
@@ -123,19 +123,27 @@ fn run_one(scenario: &Scenario) -> Trial {
     }
 }
 
+fn seated() -> (CoreAffect, ConfiguredPersona) {
+    let persona = horbm::Persona::load_development()
+        .unwrap_or_else(|err| panic!("configured persona is not loaded: {err}"));
+    let affect = CoreAffect::from_baseline(persona.baseline());
+    (affect, ConfiguredPersona::from_persona(persona))
+}
+
 fn run_script(scenario: &Scenario) -> Trial {
     let pending = Rc::new(RefCell::new(String::new()));
+    let (emotion, persona) = seated();
     let mut duplex = Duplex::new(
         Parts {
             recognizer: Script::new(Rc::clone(&pending)),
-            emotion: CoreAffect::samantha(),
+            emotion,
             breath: SpeakingBreath,
-            persona: SamanthaPersona,
+            persona,
             mouth: NativeMouth::new(),
         },
         Cards,
     )
-    .unwrap_or_else(|_| panic!("{} refused samantha", scenario.id));
+    .unwrap_or_else(|_| panic!("{} refused the configured persona", scenario.id));
     arm_conversation(&mut duplex);
     let mut trial = Trial {
         id: scenario.id,
@@ -215,7 +223,7 @@ fn run_script(scenario: &Scenario) -> Trial {
 }
 
 fn say<M: Mouth>(
-    duplex: &mut Duplex<Script, CoreAffect, SpeakingBreath, SamanthaPersona, M>,
+    duplex: &mut Duplex<Script, CoreAffect, SpeakingBreath, ConfiguredPersona, M>,
     pending: &Rc<RefCell<String>>,
     trial: &mut Trial,
     words: &[&str],
@@ -253,17 +261,18 @@ fn push_word(partial: &mut String, word: &str) {
 
 fn run_echo(scenario: &Scenario, far: Far) -> Trial {
     let pending = Rc::new(RefCell::new(String::new()));
+    let (emotion, persona) = seated();
     let mut duplex = Duplex::new(
         Parts {
             recognizer: Script::new(Rc::clone(&pending)),
-            emotion: CoreAffect::samantha(),
+            emotion,
             breath: SpeakingBreath,
-            persona: SamanthaPersona,
+            persona,
             mouth: FarMouth::new(far),
         },
         Cards,
     )
-    .unwrap_or_else(|_| panic!("{} refused samantha", scenario.id));
+    .unwrap_or_else(|_| panic!("{} refused the configured persona", scenario.id));
     let echo_live = arm_echo(&mut duplex);
     let mut trial = Trial {
         id: scenario.id,
@@ -361,7 +370,7 @@ fn next_far(mouth: &FarMouth) -> Vec<i16> {
 }
 
 fn step<M: Mouth>(
-    duplex: &mut Duplex<Script, CoreAffect, SpeakingBreath, SamanthaPersona, M>,
+    duplex: &mut Duplex<Script, CoreAffect, SpeakingBreath, ConfiguredPersona, M>,
     pending: &Rc<RefCell<String>>,
     trial: &mut Trial,
     text: &str,
@@ -388,7 +397,7 @@ fn note(trial: &mut Trial, frame: FrameOut, phase: Phase) {
 }
 
 fn arm_conversation<M: Mouth>(
-    duplex: &mut Duplex<Script, CoreAffect, SpeakingBreath, SamanthaPersona, M>,
+    duplex: &mut Duplex<Script, CoreAffect, SpeakingBreath, ConfiguredPersona, M>,
 ) {
     duplex.set_prosody(true);
     #[cfg(duplex_aec)]
@@ -399,7 +408,7 @@ fn arm_conversation<M: Mouth>(
 
 /// `true` when the canceller is in this build and accepted the on switch.
 fn arm_echo<M: Mouth>(
-    duplex: &mut Duplex<Script, CoreAffect, SpeakingBreath, SamanthaPersona, M>,
+    duplex: &mut Duplex<Script, CoreAffect, SpeakingBreath, ConfiguredPersona, M>,
 ) -> bool {
     duplex.set_prosody(true);
     #[cfg(duplex_aec)]
