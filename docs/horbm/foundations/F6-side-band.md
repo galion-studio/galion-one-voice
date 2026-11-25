@@ -9,6 +9,7 @@ Perpetual Open MIT License. (c) 2026 Galion Labs.
 | Parent | Phase 5 conductor, PR #254, branch `cursor/horbm-phase5-conductor-5ab1`, commit `577c333a4177228e760fead27dc14c2ba4593a4b`. This pull request stacks on #254. |
 | Plan | `docs/horbm/research/R4-cpu-realtime-integration.md` §11 on draft PR #207. The draft is closed and unmerged. Phase 6 there is the side band: the local clause plays, a deeper answer may arrive later, and the cap is 3 seconds. |
 | This change | `crates/galion-conductor` (`src/research.rs`, the conductor tick, the phase 6 gate), this note, one pointer in `F5-conductor-deep-dive.md`, and one new gate in `LOCKS.toml`. `scripts/check-locks.sh` requires that gate. |
+| Mark, 2026-11-25 | The conductor posts the side-band mark when a Galion Research request starts and ends. Types live in `crates/galion-sideband` (`src/mark.rs`). `LOCKS.toml` was not edited again. |
 
 The work was split four ways, then written in this tree: the client types and the cap rule, the conductor wiring, the virtual-clock gate, and the lock plus this note.
 
@@ -45,7 +46,7 @@ The cap is [`SIDE_BAND_CAP_MS`](../../../crates/galion-conductor/src/clock.rs) =
 
 Barge-in and a resumed speculation both cancel a pending ask and clear a merged sentence. A listed backchannel does not. The phase 5 silence schedule is unchanged: silence on the frame that contains 200 ms, which is 160 ms after onset on this clock.
 
-This crate still does not name the heartbeat frame function, and it still does not read a wall clock. `galion-sideband` was not linked. That client times the cap with a wall clock and speaks the old access-layer name. A virtual-clock gate cannot sit on that clock, and this crate does not use that name. No runtime was added. The trait is the place a later local engine can plug in. Nothing here opens a socket.
+This crate still does not name the heartbeat frame function, and it still does not read a wall clock. The first landing did not link `galion-sideband`, because that client times the cap with a wall clock and speaks the old access-layer name. A virtual-clock gate cannot sit on that clock. Section 7 links the mark types only. The conductor still does not call that client, and it still does not use that name. No runtime was added. The trait is the place a later local engine can plug in. Nothing here opens a socket.
 
 `RUNS_INSIDE_HEARTBEAT_STEP` stays `false`.
 
@@ -104,5 +105,46 @@ No other lock value moved. `barge_in_max_ms` stays 200. `backchannel_cancels` st
 - A real local engine can implement `ResearchClient`. This crate does not ship one, and it does not bind a port.
 - `openmind-sandbox` is not called. Tools stay off this path.
 - PR #252 is still the real clause pick. `FakeBrain` is the stand-in.
-- The root workspace does not build this crate. `galion-mne-contract` is its own workspace root, same as phase 5.
-- Do not merge this pull request. The laptop test comes first. Auto-merge stays off.
+- The root workspace does not build `galion-conductor`. `galion-mne-contract` is its own workspace root, same as phase 5. `galion-sideband` is a root-workspace member.
+- The `horbm` mark still records `posted: false`. This pass does not edit that crate. The post is the conductor log in section 7.
+- Do not merge the original phase 6 pull request from this note. Auto-merge stays off.
+
+## 7. Side-band mark
+
+The gap in `F-integration-deep-dive.md` was that phase 6 did not post the side-band mark. The conductor now does, on the same virtual frame that opens or closes the Galion Research request. The 3 second cap is unchanged. The mark is the wire `galion-sideband` already uses. `SidebandClient` is not called, so the cap is not moved onto a wall clock.
+
+| When | Mark | Wire |
+|---|---|---|
+| Lookup ask opens | start, `posted = true` | `ToHermes::Intent` with `Intent::Lookup { query }` |
+| Body arrives at or under 3000 ms | end, merged | `FromHermes::Knowledge`, source `research` |
+| Wait passes 3000 ms, or the body itself is past the cap | end, dropped | `FromHermes::NoKnowledge { reason: Timeout }` |
+| Barge-in, or a resumed speculation | end, cancelled | `FromHermes::NoKnowledge { reason: Cancelled }` |
+| Engine reports unavailable on the ask | start, then end on that same frame | `FromHermes::NoKnowledge { reason: Unreachable }` |
+| Not a lookup, or an imperative payment | no mark | the client is not called |
+| `SidebandConsent::Deny` | no mark | the ask still runs |
+
+`Cancelled` is a new reason on the existing `NoKnowledgeReason` enum. The other four reasons are unchanged. The source string is `research`. It is not a URL and it is not an address.
+
+`REMEMBER_LOCK` and `LEARN_LOCK` are `"deny"`, the same strings as `LOCKS.toml` `[consent] remember` and `[consent] learn`. `LEARN_IN_BAND` is false. Posting a mark does not grant remember, does not grant learn, and does not teach. The default session is `SidebandConsent::Post`, so a lookup writes the start and the end. `set_sideband_consent(SidebandConsent::Deny)` writes neither. `LOCKS.toml` was not edited for this.
+
+The trace line is still counts and an event name. The question and the answer are on the mark, because that is the lookup and knowledge wire, and they are not copied into the trace.
+
+Host for this pass: Linux, rustc 1.85.1. No `RUSTFLAGS`. No `target-cpu`.
+
+```text
+cargo test --manifest-path crates/galion-sideband/Cargo.toml
+cargo test --manifest-path crates/galion-conductor/Cargo.toml -- --nocapture
+```
+
+`galion-sideband` is a root-workspace member, so the first command is run from the repo root as `cargo test -p galion-sideband`. 13 tests passed: 3 client, 5 lang, 4 mark, 1 types.
+
+`galion-conductor` is its own workspace. 50 tests passed: 13 in the library, 8 in `tests/backchannel.rs`, 1 in `tests/ear_prosody.rs`, 3 in `tests/end_of_turn.rs`, 10 in `tests/phase6_gate.rs`, 9 in `tests/phase_gate.rs`, 6 in `tests/sideband_mark.rs`. The phase 6 lines in section 3 still print. The mark lines:
+
+```text
+phase6 mark: posted=true edge=start+end arrival_ms=2900 cap_ms=3000 result=pass
+phase6 mark: posted=true edge=end kind=dropped elapsed_ms=3040 cap_ms=3000 result=pass
+phase6 mark: posted=true edge=end kind=cancelled barge_in_ms=160 result=pass
+phase6 mark: consent=deny posted=false learn_in_band=false result=pass
+```
+
+`elapsed_ms=3040` is the same frame wait as section 3. `barge_in_ms=160` is the same mixer schedule. Nothing in this pass is Linux-only. There is no `cfg` for the host, no hard-coded path, and no socket.

@@ -504,6 +504,7 @@ name = "galion-conductor"
 version = "0.0.1"
 dependencies = [
  "galion-mne-contract",
+ "galion-sideband",
 ]
 
 [[package]]
@@ -591,6 +592,10 @@ version = "0.0.1"
 dependencies = [
  "galion-emotion",
 ]
+
+[[package]]
+name = "galion-sideband"
+version = "0.0.1"
 
 [[package]]
 name = "galion-source-filter"
@@ -725,6 +730,10 @@ dependencies = [
 [[package]]
 name = "horbm-brain"
 version = "0.0.1"
+dependencies = [
+ "galion-tensor",
+ "horbm-keys",
+]
 
 [[package]]
 name = "horbm-breath"

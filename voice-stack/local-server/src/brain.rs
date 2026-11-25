@@ -98,6 +98,7 @@ impl ReplyEngine for HorbmMind {
     fn turn(&mut self, heard: &str) -> Result<TurnOut, String> {
         let out = self.engine.turn(heard);
         let meta = self.engine.mood_meta();
+        let (first_clause, rest) = crate::mouth::clause_pair(&out.text);
         Ok(TurnOut {
             reply: out.text,
             intent_json: format!("\"{}\"", meta.intent),
@@ -118,6 +119,8 @@ impl ReplyEngine for HorbmMind {
             prosody_energy: meta.energy,
             prosody_pitch_st: meta.pitch_st,
             prosody_pause_ms: meta.pause_ms,
+            first_clause,
+            rest,
         })
     }
 
@@ -143,10 +146,14 @@ mod tests {
         let mut mind = HorbmMind::open(&dir);
         let hit = mind.turn("where is the kettle").unwrap();
         assert_eq!(hit.reply, "The kettle is on the stove.");
+        assert_eq!(hit.first_clause, "The kettle");
+        assert_eq!(hit.rest, "is on the stove.");
         assert!(hit.sources.iter().any(|s| s == "card:kettle"));
         assert!(!hit.reply.contains("brain-unlinked"));
         let miss = mind.turn("who won the match").unwrap();
         assert_eq!(miss.reply, "I don't know.");
+        assert_eq!(miss.first_clause, "I don't know.");
+        assert!(miss.rest.is_empty());
         assert_eq!(miss.reply, BRIDGE_UNKNOWN);
         assert_eq!(miss.sources, vec!["honest:unknown".to_string()]);
         let tired = mind.turn("I am so tired").unwrap();

@@ -5,11 +5,12 @@
 
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
-use std::time::Duration;
+use std::thread;
+use std::time::{Duration, Instant};
 
 use horbm::{
-    AskOutcome, Brain, CardHit, CardLookup, GapReason, Heard, ResearchAsk, SamanthaInner, Verb,
-    CHECKIN_MS, TICK_MS, UNKNOWN_REPLY, WAIT_MS,
+    AskOutcome, Brain, CardHit, CardLookup, GapReason, Heard, ResearchAsk, ResearchFollowUp,
+    SamanthaInner, Verb, CHECKIN_MS, TICK_MS, UNKNOWN_REPLY, WAIT_MS,
 };
 
 struct Cards;
@@ -76,7 +77,7 @@ fn a_question_still_speaks_the_card_and_expects_an_answer() {
 }
 
 #[test]
-fn a_plain_deep_question_still_asks_research() {
+fn a_plain_deep_question_asks_research_after_the_clause() {
     let calls = Arc::new(AtomicU32::new(0));
     let mut brain = Brain::with_cards(
         Cards,
@@ -86,8 +87,15 @@ fn a_plain_deep_question_still_asks_research() {
     );
     let out = brain.turn("why is the spare fuse missing from the drawer?");
     assert_eq!(out.reply, UNKNOWN_REPLY);
+    assert_eq!(out.first_clause, UNKNOWN_REPLY);
     assert_eq!(brain.dialogue_lean().verb, Verb::Answer);
+    assert_eq!(calls.load(Ordering::SeqCst), 0);
+    assert_eq!(brain.gaps().last().unwrap().reason, GapReason::ResearchOff);
+    drop(out);
+    let follow = wait_follow(&mut brain);
     assert_eq!(calls.load(Ordering::SeqCst), 1);
+    assert_eq!(follow.outcome, AskOutcome::Miss);
+    assert_eq!(follow.gap.reason, GapReason::ResearchMiss);
     assert_eq!(brain.gaps().last().unwrap().reason, GapReason::ResearchMiss);
 }
 
@@ -110,6 +118,19 @@ fn the_moment_warms_on_her_note_and_the_baseline_stays() {
     assert_eq!(brain.emotion().baseline().pitch_centre_hz.to_bits(), pitch);
     assert!(brain.emotion().persisted_baseline().is_none());
     assert_eq!(brain.emotion().consent() & horbm_inner_remember_mask(), 0);
+}
+
+fn wait_follow(brain: &mut Brain) -> ResearchFollowUp {
+    let started = Instant::now();
+    loop {
+        if let Some(follow) = brain.research_follow_up() {
+            return follow;
+        }
+        if started.elapsed() > Duration::from_secs(2) {
+            panic!("research follow-up did not arrive");
+        }
+        thread::sleep(Duration::from_millis(5));
+    }
 }
 
 fn horbm_inner_remember_mask() -> u8 {

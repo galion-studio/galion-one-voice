@@ -6,7 +6,9 @@
 //!
 //! Galion Research is asked only after the local brain has returned, and only
 //! for a lookup. The ask itself returns on this frame. A later frame merges
-//! the result when its virtual arrival is inside the cap.
+//! the result when its virtual arrival is inside the cap. The same frames
+//! post the side-band mark: a start when the request opens, an end when it
+//! merges, drops, or is cancelled. A denied session posts neither.
 
 use crate::backchannel::{Backchannel, BackchannelConfig, ListenCue, ListenMood, ListenPolicy};
 use crate::brain::{ClauseBrain, PickedClause};
@@ -29,6 +31,7 @@ use crate::research::{
 };
 use crate::stamps::Domain04Stamps;
 use galion_mne_contract::Document;
+use galion_sideband::{MarkKind, MarkLog, SidebandConsent, SidebandMark};
 
 /// What the ear reported for this frame. Text is a partial, not audio.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -119,6 +122,9 @@ pub struct Conductor<B: ClauseBrain, R: ResearchClient = OfflineClient> {
     frame_log: Option<String>,
     side_log: Vec<String>,
     side_cancels: u32,
+    /// Posted start and end marks. Empty when the session denies them.
+    marks: MarkLog,
+    consent: SidebandConsent,
     /// Set for the frame that took a rising-pitch yield. Cleared each tick.
     frame_question: bool,
     /// Listening nods. Default on, Samantha. Does not own the floor.
@@ -200,6 +206,8 @@ impl<B: ClauseBrain, R: ResearchClient> Conductor<B, R> {
             frame_log: None,
             side_log: Vec::new(),
             side_cancels: 0,
+            marks: MarkLog::new(),
+            consent: SidebandConsent::default(),
             frame_question: false,
             listen: ListenPolicy::new(),
         }
@@ -244,6 +252,22 @@ impl<B: ClauseBrain, R: ResearchClient> Conductor<B, R> {
     /// Side-band trace. Counts and event names only. No transcript.
     pub fn side_log(&self) -> &[String] {
         &self.side_log
+    }
+
+    /// Start and end marks for Galion Research requests. Empty when
+    /// [`SidebandConsent::Deny`] was set before the request opened.
+    pub fn marks(&self) -> &[SidebandMark] {
+        self.marks.marks()
+    }
+
+    pub fn sideband_consent(&self) -> SidebandConsent {
+        self.consent
+    }
+
+    /// `Deny` posts no mark. Remember, learn, and in-band learning stay denied
+    /// either way. The research ask is unchanged.
+    pub fn set_sideband_consent(&mut self, consent: SidebandConsent) {
+        self.consent = consent;
     }
 
     pub fn research(&self) -> &R {
@@ -567,13 +591,18 @@ impl<B: ClauseBrain, R: ResearchClient> Conductor<B, R> {
                 AskResult::Unavailable => {
                     self.side_note = SideBandView::Unavailable;
                     self.note_log("side_band event=unavailable elapsed_ms=0");
+                    let turn = self.epoch;
+                    self.marks.post_start(self.consent, turn, query, now_ms);
+                    self.marks.post_end(turn, MarkKind::Unavailable, now_ms);
                 }
                 AskResult::Pending { id } => {
+                    let turn = self.epoch;
                     self.pending = Some(PendingResearch {
                         id,
                         asked_ms: now_ms,
-                        epoch: self.epoch,
+                        epoch: turn,
                     });
+                    self.marks.post_start(self.consent, turn, query, now_ms);
                     self.side_note = SideBandView::Pending { elapsed_ms: 0 };
                 }
             },
@@ -598,6 +627,11 @@ impl<B: ClauseBrain, R: ResearchClient> Conductor<B, R> {
                 self.pending = None;
                 if cap_decision(Some(elapsed_ms), waited, SIDE_BAND_CAP_MS) == CapDecision::Merge {
                     let chars = text.chars().count();
+                    self.marks.post_end(
+                        pending_epoch,
+                        MarkKind::Merged { text: text.clone() },
+                        now_ms,
+                    );
                     self.merged = Some(text);
                     self.side_note = SideBandView::Merged { elapsed_ms };
                     self.note_log_owned(format!(
@@ -605,6 +639,8 @@ impl<B: ClauseBrain, R: ResearchClient> Conductor<B, R> {
                     ));
                 } else {
                     self.research.cancel(id);
+                    self.marks
+                        .post_end(pending_epoch, MarkKind::Dropped, now_ms);
                     self.side_note = SideBandView::Dropped { elapsed_ms };
                     self.note_log_owned(format!(
                         "side_band event=dropped elapsed_ms={elapsed_ms} cap_ms={SIDE_BAND_CAP_MS}"
@@ -620,6 +656,8 @@ impl<B: ClauseBrain, R: ResearchClient> Conductor<B, R> {
             }
             PollResult::Gone => {
                 self.pending = None;
+                self.marks
+                    .post_end(pending_epoch, MarkKind::Unavailable, now_ms);
             }
         }
     }
@@ -630,6 +668,8 @@ impl<B: ClauseBrain, R: ResearchClient> Conductor<B, R> {
             return;
         };
         self.research.cancel(pending.id);
+        self.marks
+            .post_end(pending.epoch, MarkKind::Cancelled, self.clock.t_ms());
         self.side_cancels = self.side_cancels.saturating_add(1);
         self.side_note = SideBandView::Cancelled;
     }
@@ -637,6 +677,8 @@ impl<B: ClauseBrain, R: ResearchClient> Conductor<B, R> {
     fn abandon_cap(&mut self, elapsed_ms: u64) {
         if let Some(pending) = self.pending.take() {
             self.research.cancel(pending.id);
+            self.marks
+                .post_end(pending.epoch, MarkKind::Dropped, self.clock.t_ms());
         }
         self.side_note = SideBandView::Dropped { elapsed_ms };
         self.note_log_owned(format!(

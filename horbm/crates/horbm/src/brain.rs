@@ -3,6 +3,8 @@
 //! Empathy, then the layer 5 route, then the mood the voice speaks with.
 
 use std::path::Path;
+use std::sync::mpsc::{self, Receiver, TryRecvError};
+use std::thread;
 use std::time::Instant;
 
 use galion_emotion_core::{
@@ -22,8 +24,11 @@ use crate::dialogue::{DecideIn, Decision, Dialogue, DialogueConsent, Move, Reply
 use crate::memory::{about_the_person, pin_command};
 use crate::research_style::{ResearchHit, ResearchRoot, StylePersona};
 use crate::retrieve::{CellState, MemoryHitCell, RetrievalThread, RetrievedCells};
-use crate::route::{accept_line, route_heard, CardLookup, Gap, ResearchAsk, Speakable};
-use crate::{MemoryItem, Pad, TurnOut, UNKNOWN_REPLY};
+use crate::route::{
+    accept_line, classify_ask, route_heard, AskOutcome, CardLookup, Gap, GapReason, ResearchAsk,
+    Speakable,
+};
+use crate::{MemoryItem, Pad, TurnOut, RESEARCH_CAP, UNKNOWN_REPLY};
 
 /// Mood and the prosody knobs that belong on the turn. Not a sentence.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -98,6 +103,56 @@ pub struct Brain {
     memory: Option<Box<dyn PersonMemory>>,
     person_id: String,
     memory_tick: u64,
+    /// In-flight follow-up. The port lives in the worker until this yields.
+    follow_rx: Option<Receiver<FollowDone>>,
+    pending_follow: Option<ResearchFollowUp>,
+}
+
+/// A Galion Research result that arrived after the local clause.
+///
+/// It does not replace [`TurnOut::reply`] or [`TurnOut::first_clause`].
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ResearchFollowUp {
+    pub heard: String,
+    pub outcome: AskOutcome,
+    pub spoken: Option<String>,
+    pub sources: Vec<String>,
+    pub evidence: Vec<String>,
+    pub gap: Gap,
+}
+
+/// Last clone drops the sender and lets the worker call [`ResearchAsk::ask`].
+#[derive(Clone)]
+pub(crate) struct FollowHook {
+    release: Option<mpsc::Sender<()>>,
+}
+
+impl FollowHook {
+    fn idle() -> Self {
+        Self { release: None }
+    }
+}
+
+impl PartialEq for FollowHook {
+    fn eq(&self, _other: &Self) -> bool {
+        true
+    }
+}
+
+impl std::fmt::Debug for FollowHook {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(if self.release.is_some() {
+            "armed"
+        } else {
+            "idle"
+        })
+    }
+}
+
+struct FollowDone {
+    question: String,
+    outcome: AskOutcome,
+    port: Box<dyn ResearchAsk + Send>,
 }
 
 struct Spoke {
@@ -111,6 +166,8 @@ struct Spoke {
 struct Gathered {
     spoke: Spoke,
     gap: Option<Gap>,
+    /// Deep miss with a port attached. The ask waits until the clause is dropped.
+    research_later: bool,
 }
 
 fn effective_reply(spoke: &Spoke) -> &str {
@@ -243,6 +300,8 @@ impl Brain {
             memory: None,
             person_id: "person".to_string(),
             memory_tick: 0,
+            follow_rx: None,
+            pending_follow: None,
         }
     }
 
@@ -534,8 +593,10 @@ impl Brain {
 
     /// Empathy mood, then the person diary when `remember` is granted, then
     /// the retrieval cell when a thread is attached, then cards, then the
-    /// fixture on an idle cell, then the gateway. Layer 4 then picks the move.
-    /// [`Self::finish`] splits the clause.
+    /// fixture on an idle cell. Layer 4 then picks the move. [`Self::finish`]
+    /// splits the clause and returns it. Galion Research is not asked here.
+    /// A deep miss arms [`ResearchAsk`] so the ask starts when the returned
+    /// value is dropped. [`Self::research_follow_up`] reads that result.
     ///
     /// A granted card hit speaks [`crate::MemoryHit::clause`]. A granted miss
     /// speaks [`crate::UNKNOWN_REPLY`] and does not call research. `Idle`
@@ -546,6 +607,7 @@ impl Brain {
     /// waits for the retrieval thread. Do not call it from `Heartbeat::step`.
     /// Barge-in is not this function.
     pub fn turn(&mut self, text: &str) -> TurnOut {
+        self.reap_follow();
         let started = Instant::now();
         let heard = text.trim();
         let tick = self.empathy.tick(TickIn {
@@ -574,12 +636,22 @@ impl Brain {
             prep.query.as_str()
         };
         if query.is_empty() {
-            return self.finish(query, started, Spoke::empty(), &Decision::pass());
+            return self.finish(
+                query,
+                started,
+                Spoke::empty(),
+                &Decision::pass(),
+                FollowHook::idle(),
+            );
         }
         let query_owned = query.to_string();
         let memory_hit = self.person_hit(heard);
         let gathered = match memory_hit {
-            Some(spoke) => Gathered { spoke, gap: None },
+            Some(spoke) => Gathered {
+                spoke,
+                gap: None,
+                research_later: false,
+            },
             None => self.gather(&query_owned),
         };
         let reply = effective_reply(&gathered.spoke).to_string();
@@ -639,11 +711,24 @@ impl Brain {
                 self.gaps.push(gap);
             }
         }
+        let research_later = gathered.research_later;
         let mut spoke = apply_plan(gathered.spoke, decision.plan().clone());
         if let Some(id) = style_mark(decision.chosen, &style.hits) {
             spoke.evidence.push(format!("style:{id}"));
         }
-        self.finish(&query_owned, started, spoke, &decision)
+        let mut out = self.finish(&query_owned, started, spoke, &decision, FollowHook::idle());
+        if research_later {
+            // The clause is already in `out`. The worker blocks until `out` is dropped.
+            out.follow = self.arm_follow(&query_owned);
+        }
+        out
+    }
+
+    /// The research result, if the worker has finished. Does not block.
+    /// Does not change the clause already returned by [`Self::turn`].
+    pub fn research_follow_up(&mut self) -> Option<ResearchFollowUp> {
+        self.reap_follow();
+        self.pending_follow.take()
     }
 
     /// Person diary hit, only when the line is about the person. A world
@@ -662,7 +747,11 @@ impl Brain {
     /// Retrieval, cards, the idle fixture, then the gateway. No reply split.
     fn gather(&mut self, query: &str) -> Gathered {
         if let Some(spoke) = self.retrieval_spoke(query) {
-            return Gathered { spoke, gap: None };
+            return Gathered {
+                spoke,
+                gap: None,
+                research_later: false,
+            };
         }
         let lookup_started = Instant::now();
         let picked = pick(
@@ -686,28 +775,28 @@ impl Brain {
                     picked: Some(picked),
                 },
                 gap: None,
+                research_later: false,
             };
         }
         if self.retrieval.is_some() {
             if let Some(spoke) = fixture_spoke(query) {
-                return Gathered { spoke, gap: None };
+                return Gathered {
+                    spoke,
+                    gap: None,
+                    research_later: false,
+                };
             }
         }
         // Comfort stays with them. The research ask does not open.
+        // Every other miss stays local too. A deep miss is armed after the clause.
         let comfort = self.dialogue_lean().verb == Verb::Comfort;
-        let routed = if comfort {
-            route_heard(query, self.cards.as_ref(), None, self.speakable)
-        } else {
-            match self.research.as_mut() {
-                Some(port) => route_heard(
-                    query,
-                    self.cards.as_ref(),
-                    Some(port.as_mut()),
-                    self.speakable,
-                ),
-                None => route_heard(query, self.cards.as_ref(), None, self.speakable),
-            }
-        };
+        let routed = route_heard(query, self.cards.as_ref(), None, self.speakable);
+        let research_later = self.research.is_some()
+            && !comfort
+            && routed
+                .gap
+                .as_ref()
+                .is_some_and(|gap| gap.reason == GapReason::ResearchOff);
         Gathered {
             gap: routed.gap,
             spoke: Spoke {
@@ -717,6 +806,7 @@ impl Brain {
                 lookup_us: routed.lookup_us,
                 picked: None,
             },
+            research_later,
         }
     }
 
@@ -842,7 +932,14 @@ impl Brain {
         }
     }
 
-    fn finish(&self, query: &str, started: Instant, spoke: Spoke, decision: &Decision) -> TurnOut {
+    fn finish(
+        &self,
+        query: &str,
+        started: Instant,
+        spoke: Spoke,
+        decision: &Decision,
+        follow: FollowHook,
+    ) -> TurnOut {
         let Spoke {
             reply,
             sources,
@@ -884,7 +981,83 @@ impl Brain {
             first_clause,
             rest,
             sideband,
+            follow,
         }
+    }
+
+    /// Spawn the ask, blocked until the clause value is dropped.
+    fn arm_follow(&mut self, question: &str) -> FollowHook {
+        let Some(mut port) = self.research.take() else {
+            return FollowHook::idle();
+        };
+        let question = question.trim().to_string();
+        let (release_tx, release_rx) = mpsc::channel();
+        let (done_tx, done_rx) = mpsc::channel();
+        thread::Builder::new()
+            .name("horbm-research".into())
+            .spawn(move || {
+                let _ = release_rx.recv();
+                let outcome = port.ask(&question, RESEARCH_CAP);
+                let _ = done_tx.send(FollowDone {
+                    question,
+                    outcome,
+                    port,
+                });
+            })
+            .expect("horbm research follow-up");
+        self.follow_rx = Some(done_rx);
+        FollowHook {
+            release: Some(release_tx),
+        }
+    }
+
+    fn reap_follow(&mut self) {
+        let received = {
+            let Some(rx) = self.follow_rx.as_ref() else {
+                return;
+            };
+            match rx.try_recv() {
+                Ok(done) => Some(done),
+                Err(TryRecvError::Empty) => return,
+                Err(TryRecvError::Disconnected) => None,
+            }
+        };
+        self.follow_rx = None;
+        let Some(done) = received else {
+            return;
+        };
+        let class = classify_ask(done.outcome.clone(), self.speakable);
+        let gap = Gap {
+            heard: done.question.clone(),
+            reason: class.reason,
+            advice: crate::GAP_ADVICE,
+        };
+        self.note_follow_gap(gap.clone());
+        self.research = Some(done.port);
+        self.pending_follow = Some(ResearchFollowUp {
+            heard: done.question,
+            outcome: done.outcome,
+            spoken: class.spoken,
+            sources: class.sources,
+            evidence: class.evidence,
+            gap,
+        });
+    }
+
+    fn note_follow_gap(&mut self, gap: Gap) {
+        if let Some(slot) = self
+            .gaps
+            .iter_mut()
+            .rev()
+            .find(|item| item.heard == gap.heard && item.reason == GapReason::ResearchOff)
+        {
+            *slot = gap;
+            return;
+        }
+        if self.gaps.len() == GAP_CAP {
+            self.gaps.remove(0);
+        }
+        self.gaps.push(gap);
     }
 }
 

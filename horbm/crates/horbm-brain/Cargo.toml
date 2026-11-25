@@ -3,7 +3,7 @@
 
 [package]
 name = "horbm-brain"
-description = "HORBM phase 4 brain: heuristic pick of one stored clause. No weights, no network, no audio."
+description = "HORBM phase 4 brain: heuristic pick of one stored clause, and the versioned HKB1 file that stores string ids and a per-key int8 scale."
 version = "0.0.1"
 edition = "2021"
 license = "MIT"
@@ -15,8 +15,12 @@ default = []
 # Swarm 2 (FTS5, crates/horbm-retrieval) had not landed when this crate was
 # written. The feature compiles the retrieval plug and does not link a crate.
 retrieval = []
-# Swarm 3 (int8 keys, crates/horbm-keys) had not landed. The feature compiles
-# the key plug. The int8 dot stays in galion-tensor when that crate is wired.
+# Compiles the key-plug note. The stored file always links the crates below.
 keys = []
+simd-avx2 = ["galion-tensor/simd-avx2", "horbm-keys/simd-avx2"]
+simd-avx512 = ["galion-tensor/simd-avx512", "horbm-keys/simd-avx512"]
+simd-neon = ["galion-tensor/simd-neon", "horbm-keys/simd-neon"]
 
 [dependencies]
+galion-tensor = { path = "../../../crates/galion-tensor", default-features = false }
+horbm-keys = { path = "../../../crates/horbm-keys", default-features = false }

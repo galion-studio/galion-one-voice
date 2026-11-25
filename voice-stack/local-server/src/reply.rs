@@ -59,6 +59,11 @@ pub struct TurnOut {
     pub prosody_energy: f32,
     pub prosody_pitch_st: f32,
     pub prosody_pause_ms: f32,
+    /// First spoken piece, copied from `horbm::TurnOut::first_clause`.
+    /// Empty when this turn did not come from that brain.
+    pub first_clause: String,
+    /// Remainder after [`Self::first_clause`], copied from `horbm::TurnOut::rest`.
+    pub rest: String,
 }
 
 pub trait ReplyEngine: Send {
@@ -162,6 +167,8 @@ impl ReplyEngine for FakeReply {
             prosody_energy: 1.0,
             prosody_pitch_st: 0.0,
             prosody_pause_ms: 0.0,
+            first_clause: String::new(),
+            rest: String::new(),
         })
     }
 }
@@ -214,6 +221,8 @@ mod tests {
                 prosody_energy: 1.0,
                 prosody_pitch_st: 0.0,
                 prosody_pause_ms: 0.0,
+                first_clause: String::new(),
+                rest: String::new(),
             })
         }
         fn tick(&mut self) {}

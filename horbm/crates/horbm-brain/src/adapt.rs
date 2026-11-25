@@ -8,8 +8,9 @@
 //! fixture test can pass a retriever through without a path dependency and
 //! without a network call.
 //!
-//! Cargo features `retrieval` and `keys` compile the notes below. They do
-//! not fetch or link those crates.
+//! Cargo features `retrieval` and `keys` compile the notes below. `retrieval`
+//! does not link a diary crate. `keys` does not change the pick. Every build
+//! of this crate links `horbm-keys` and `galion-tensor` for [`crate::StoredKeys`].
 
 use crate::retrieve::{Retrieved, Retriever};
 
@@ -25,8 +26,9 @@ impl<T> Retriever for RetrievalAdapter<T> {
     }
 }
 
-/// Fixture plug. The live int8 scan is `horbm_keys::StringKeyArena`, and it
-/// stays bit-exact with `galion-tensor`'s scalar i8 dot.
+/// Fixture plug. The turn crate still scores with `horbm_keys::StringKeyArena`,
+/// which binds strings in memory. The file that stores those strings and a
+/// per-key int8 scale is [`crate::StoredKeys`]. The dot stays `galion-tensor`'s.
 pub struct KeyAdapter<T> {
     pub inner: T,
     pub nearest: fn(&T, &str, usize) -> Vec<Retrieved>,
@@ -46,6 +48,7 @@ pub mod retrieval_pending {
 
 #[cfg(feature = "keys")]
 pub mod keys_pending {
-    //! This feature does not add a path dependency. Crate `horbm` implements `Int8Scorer`.
-    pub const STATUS: &str = "horbm-keys is not linked";
+    //! The feature does not change the pick. The stored file is [`crate::StoredKeys`].
+    //! Crate `horbm` still implements `Int8Scorer` for `horbm_keys::StringKeyArena`.
+    pub const STATUS: &str = "stored HKB1 strings and scales are in horbm_brain::StoredKeys";
 }

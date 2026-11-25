@@ -2,9 +2,10 @@
 // Copyright (c) 2026 Galion Labs
 //! HORBM layer 4. Decide the next move and keep the talk alive.
 //!
-//! Empathy has already stepped the mood. Retrieval, cards, the fixture, and
-//! the research port have already produced a clause or an honest miss.
-//! This layer picks one move, then the brain splits that clause.
+//! Empathy has already stepped the mood. Retrieval, cards, and the fixture
+//! have already produced a clause or an honest miss. Galion Research has
+//! not been asked. This layer picks one move, then the brain splits that
+//! clause. A deep miss may ask research only after that clause is returned.
 //!
 //! The heuristic is the policy. The offline bandit is off. It counts a move
 //! only when it is enabled and [`DialogueConsent::learn`] is granted, and
