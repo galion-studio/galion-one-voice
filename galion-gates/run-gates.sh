@@ -1,10 +1,16 @@
 #!/usr/bin/env bash
 # Galion Voice — Perpetual Open MIT License
-# Live CPU test gates G0–G3 (local) + R0–R3 (remote VPS, PENDING unless GALION_VPS_HOST is set).
+# Live CPU test gates G0–G3 (local) + R0–R3 (remote VPS).
+#   R0–R3 run only when GALION_VPS_HOST is set. With no VPS settings they are
+#   SKIP "skipped (no VPS)" and do not fail the process. Titan stays down on
+#   purpose during the cloud move; that is a skip, not a pending result.
+#   A set host that does not answer stays PENDING.
 #   G0 env probe        : CPU/ISA/RAM/toolchain + bandwidth 3x (CV<5% target) + scalar ref ops
 #   G1 tensor correct   : cargo test --workspace (all crates) + G0 scalar reference self-checks
 #   G2 GGUF absence     : no *.gguf file, and no live source line that loads the format.
-#                         Docs, LOCKS.toml, and lines that only forbid the format name the ban.
+#                         Docs, LOCKS.toml, and lines that only forbid the format name the ban,
+#                         including a forbidden-word list element. See g2_scan.py.
+#                         galion-gates/selftest.sh plants a real load and requires exit 1.
 #   G3 purity denylist  : candle/ort/tract/burn/llama/ggml/gguf absent from the root workspace
 #                         manifests + cargo tree
 #                         (one owner exception, t613s2992: `ort` in runtimes/galion-piper-rt only, own workspace).
@@ -22,11 +28,25 @@
 #   RG offline rust     : galion-gates/rg-offline.sh (std-only rustc; no network, weights, or microphone;
 #                         wer/ecapa/mos/latency/ttfa stay BLOCKED; GALION_GATES_NO_RG=1 skips)
 # Usage: galion-gates/run-gates.sh [--strict-cv]
+#        galion-gates/run-gates.sh --g2-scan ROOT     (G2 only; exit 0 clean, 1 hit)
+#        galion-gates/run-gates.sh --self-test        (fixtures; no cargo, no VPS)
 #   env GALION_VPS_HOST=user@host [GALION_VPS_KEY=path] enables remote gates.
 #   env GALION_GATES_HARD=1 makes soft-gate failures (G4/G6/PS/LK/DG/LV/V1/OP/SY/RG) count toward the exit code.
 set -uo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$HERE/.." && pwd)"
+# shellcheck source=gates_lib.sh
+source "$HERE/gates_lib.sh"
+if [ "${1:-}" = "--g2-scan" ]; then
+  if [ -z "${2:-}" ] || [ ! -d "$2" ]; then
+    echo "usage: galion-gates/run-gates.sh --g2-scan ROOT" >&2
+    exit 2
+  fi
+  exec python3 "$HERE/g2_scan.py" "$2"
+fi
+if [ "${1:-}" = "--self-test" ]; then
+  exec bash "$HERE/selftest.sh"
+fi
 TS="$(date +%Y%m%dT%H%M%S%z)"
 OUT="$HERE/results"; mkdir -p "$OUT" "$HERE/.build"
 LOG="$OUT/$TS.log"; JSON="$OUT/$TS.json"
@@ -73,39 +93,32 @@ fi
 [ $G1F = 0 ] && mark G1 PASS "$G1N" || mark G1 FAIL "$G1N"
 
 # ---------- G2 GGUF absence ----------
-# A file named *.gguf is a container. Docs, LOCKS.toml, disabled *.off scripts, and
-# source lines that only forbid the format (comments, asserts of absence, refuse())
-# name the ban. They are not a load of the format. LOCKS.toml is not edited.
-FILES="$(find "$ROOT" \( -path '*/target' -o -path '*/.git' \) -prune -o -type f -iname '*gguf*' -print)"
-HITS="$(grep -RIni \
-  --exclude-dir=target --exclude-dir=.git --exclude-dir=results --exclude-dir=.build \
-  --exclude-dir=galion-gates --exclude-dir=docs \
-  --include='*.rs' --include='*.py' --include='*.toml' --include='*.sh' \
-  --include='*.c' --include='*.cpp' --include='*.h' \
-  --exclude=check-no-forbidden.sh --exclude=LOCKS.toml --exclude='*.off' \
-  -e 'gguf' "$ROOT" 2>/dev/null || true)"
-if [ -n "$HITS" ]; then
-  HITS="$(printf '%s\n' "$HITS" | grep -v -E -i \
-    -e ':[0-9]+:[[:space:]]*(//|///|//!|#|\*)' \
-    -e 'gguf=false' \
-    -e 'no gguf' \
-    -e 'do not import' \
-    -e 'refuse\(' \
-    -e 'contains\("\.?gguf' \
-    -e 'b"GGUF"' \
-    -e '"gguf" in' \
-    -e "'gguf' in" \
-    -e 'gguf" not in' \
-    -e 'without a refusal' \
-    -e 'import \(gguf' \
-    -e 'llama_cpp' \
-    -e 'landing checks' \
-    || true)"
+# galion-gates/g2_scan.py is the rule. A file named *.gguf is a container.
+# A source line that only names the ban is not a load: a comment, refuse(),
+# an absence assert, or a forbidden-word list element (crates/horbm-ear/tests/frames.rs
+# keeps "gguf" inside `banned` and asserts the sources do not contain it).
+# Test files are scanned. The marker galion-gates:allow-forbidden-word clears only
+# a bare token line. It does not clear a path, include_bytes!, or format!("…", "gguf").
+# LOCKS.toml is not edited. selftest.sh plants a real load and requires exit 1.
+if ! command -v python3 >/dev/null 2>&1; then
+  mark G2 FAIL "python3 missing; G2 scanner did not run"
+else
+  G2OUT="$OUT/$TS.g2.txt"
+  python3 "$HERE/g2_scan.py" "$ROOT" > "$G2OUT"
+  G2RC=$?
+  if [ "$G2RC" -eq 0 ]; then
+    mark G2 PASS "0 GGUF files, 0 load lines in code"
+  elif [ "$G2RC" -eq 1 ]; then
+    say "$(cat "$G2OUT")"
+    G2N="$(grep -c . "$G2OUT" || true)"
+    mark G2 FAIL "${G2N} GGUF hit(s)"
+  else
+    say "$(cat "$G2OUT")"
+    mark G2 FAIL "g2_scan.py failed (rc=$G2RC)"
+  fi
 fi
-if [ -z "$HITS$FILES" ]; then mark G2 PASS "0 GGUF files, 0 load lines in code"
-else say "$HITS"; say "$FILES"; mark G2 FAIL "$(printf '%s\n' "$HITS$FILES" | grep -c .) GGUF hit(s)"; fi
-DOCHITS="$(grep -RIli --exclude-dir=galion-voice-code --exclude-dir=target --exclude-dir=.git -e gguf /workspace 2>/dev/null | wc -l)"
-say "G2 advisory: $DOCHITS non-code files under /workspace mention 'gguf' (docs/research; not gated)"
+DOC_N="$(grep -RIli --exclude-dir=target --exclude-dir=.git --exclude-dir=galion-gates -e gguf "$ROOT" 2>/dev/null | wc -l | tr -d ' ' || true)"
+say "G2 advisory: ${DOC_N:-0} files under the repo mention gguf (docs and ban lines included; not a failure by itself)"
 
 # ---------- G3 purity denylist ----------
 # Owner exception t613s2992 (2026-11-04, LOCKS formats.exceptions.a21_piper): exactly one
@@ -178,7 +191,9 @@ soft DG "$ROOT/galion-demo/golden.sh"   # A14 canned demo golden (galion-gates/g
 [ "${GALION_GATES_NO_RG:-0}" = 1 ] && mark RG SKIP "GALION_GATES_NO_RG=1" || soft RG "$HERE/rg-offline.sh"   # offline rust gate; unmeasured metrics stay BLOCKED
 
 # ---------- Remote R0–R3 (VPS) ----------
-if [ -n "${GALION_VPS_HOST:-}" ]; then
+# No host: SKIP. The cloud move leaves Titan down on purpose, so a local run
+# has nothing to wait on. A host that was set and does not answer stays PENDING.
+if [ "$(vps_mode)" = remote ]; then
   SSHO=(-o BatchMode=yes -o ConnectTimeout=8); [ -n "${GALION_VPS_KEY:-}" ] && SSHO+=(-i "$GALION_VPS_KEY")
   if ssh "${SSHO[@]}" "$GALION_VPS_HOST" true 2>>"$LOG"; then
     ssh "${SSHO[@]}" "$GALION_VPS_HOST" 'mkdir -p ~/galion-gates-run' &&
@@ -188,13 +203,13 @@ if [ -n "${GALION_VPS_HOST:-}" ]; then
     RRC=${PIPESTATUS[0]}
     for g in 0 1 2 3; do mark R$g "$([ $RRC = 0 ] && echo PASS || echo SEE_LOG)" "remote run rc=$RRC"; done
   else for g in 0 1 2 3; do mark R$g PENDING "VPS $GALION_VPS_HOST unreachable (ssh BatchMode)"; done; fi
-else for g in 0 1 2 3; do mark R$g PENDING "GALION_VPS_HOST not set — VPS not reachable from this run"; done; fi
+else for g in 0 1 2 3; do mark R$g SKIP "skipped (no VPS)"; done; fi
 
 # ---------- summary ----------
 FAILS=0; { echo "{\"ts\":\"$TS\",\"root\":\"$ROOT\",\"probe\":$PROBE_JSON,\"gates\":{"
   first=1; for g in G0 G1 G2 G3 G4 G6 PS LK DG LV V1 OP SY RG R0 R1 R2 R3; do
     [ $first = 1 ] || echo ","; first=0
     printf '"%s":{"status":"%s","note":"%s"}' "$g" "${ST[$g]}" "$(echo "${NOTE[$g]}" | sed 's/"/\\"/g')"
-    [ "${ST[$g]}" = FAIL ] && FAILS=$((FAILS+1)); done; echo "}}"; } > "$JSON"
+    is_hard_fail "${ST[$g]}" && FAILS=$((FAILS+1)); done; echo "}}"; } > "$JSON"
 say "== SUMMARY: G0=${ST[G0]} G1=${ST[G1]} G2=${ST[G2]} G3=${ST[G3]} | soft G4=${ST[G4]} G6=${ST[G6]} PS=${ST[PS]} LK=${ST[LK]} DG=${ST[DG]} LV=${ST[LV]} V1=${ST[V1]} OP=${ST[OP]} SY=${ST[SY]} RG=${ST[RG]} | R0-R3=${ST[R0]}  fails=$FAILS  json=$JSON"
 exit $([ $FAILS = 0 ] && echo 0 || echo 1)
