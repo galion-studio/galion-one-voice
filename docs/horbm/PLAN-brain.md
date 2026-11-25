@@ -25,7 +25,7 @@ Every brain PR runs these on rustc 1.85, Linux, next to the test, clippy, and so
 - Rustdoc, required for every brain PR: `RUSTDOCFLAGS='-D warnings' cargo doc --manifest-path horbm/Cargo.toml -p horbm --no-deps`
 - Voice-stack lock: `cargo metadata --locked --manifest-path voice-stack/Cargo.toml`
 
-`scripts/check-locks.sh` and `scripts/check-research-boundary.sh` stay required. The root workspace test and clippy, and the voice-stack package test and clippy in the laptop gate, stay required too. The rustdoc command is not a step in `.github/workflows/voice-stack-horbm-router.yml` until the private link in `horbm/crates/horbm/src/brain.rs` (PR #342) is gone.
+`scripts/check-locks.sh` and `scripts/check-research-boundary.sh` stay required. The root workspace test and clippy, and the voice-stack package test and clippy in the laptop gate, stay required too. The rustdoc command is not a step in `.github/workflows/voice-stack-horbm-router.yml` yet. `turn` in `horbm/crates/horbm/src/brain.rs` still links private `Self::finish`. That link stayed after PR #342. The workflow step waits until the link is a public item or plain text.
 
 ## The model
 
