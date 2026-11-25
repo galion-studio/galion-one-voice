@@ -186,6 +186,165 @@ fn stopwords_alone_are_a_miss_and_write_nothing() {
     let _ = fs::remove_dir_all(&scratch);
 }
 
+/// Unset `keys_path` is the lexical ask: one card is one knowledge hit.
+/// The scan would also publish the same id from the diary leg.
+#[test]
+fn unset_keys_path_stays_lexical() {
+    let unset = RetrievalConfig::default();
+    assert!(!unset.remember);
+    assert!(unset.keys_path.is_none());
+    assert_eq!(unset.fixture_rows, 0);
+
+    let dir = scratch("lexical");
+    let cards = dir.join("cards");
+    fs::create_dir(&cards).expect("cards");
+    fs::write(
+        cards.join("kettle.json"),
+        r#"{
+  "id": "kettle",
+  "title": "The kettle is on the hob.",
+  "section": "horbm",
+  "category": "fixture",
+  "summary": "The kettle is on the hob.",
+  "body": "The kettle is on the hob.",
+  "claim_type": "fact",
+  "sources": [],
+  "evidence_strength": "strong",
+  "said_by": "horbm",
+  "as_of_date": "2026-11-25",
+  "status": "draft",
+  "contested_views": [],
+  "related": []
+}
+"#,
+    )
+    .expect("card");
+    let thread = RetrievalThread::spawn(RetrievalConfig {
+        remember: true,
+        knowledge_dir: Some(cards),
+        ..unset
+    })
+    .expect("lexical grant");
+    thread.ask_wait("where is the kettle", 1, 1).expect("ask");
+    let cell = thread.cell();
+    assert_eq!(cell.state, CellState::Hits);
+    assert_eq!(cell.hits.len(), 1, "{:?}", cell.hits);
+    assert!(cell.hits.len() <= MEMORY_HIT_CAP);
+    let hit = &cell.hits[0];
+    assert_eq!(hit.item_id, "kettle");
+    assert_eq!(hit.pool, horbm::HitPool::Knowledge);
+    assert_eq!(hit.clause(), "The kettle is on the hob.");
+    assert_ne!(hit.clause(), hit.item_id);
+    assert!(cell.answer.is_empty());
+    drop(thread);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+/// A granted key file publishes at most four hits. Deny does not open the file.
+#[test]
+fn granted_key_file_publishes_at_most_four_hits() {
+    let dir = scratch("keys");
+    let cards = dir.join("cards");
+    fs::create_dir(&cards).expect("cards");
+    fs::write(
+        cards.join("bowl.json"),
+        r#"{
+  "id": "bowl",
+  "title": "The blue bowl is in the cupboard.",
+  "section": "horbm",
+  "category": "fixture",
+  "summary": "The blue bowl is in the cupboard.",
+  "body": "The blue bowl is in the cupboard.",
+  "claim_type": "fact",
+  "sources": [],
+  "evidence_strength": "strong",
+  "said_by": "horbm",
+  "as_of_date": "2026-11-25",
+  "status": "draft",
+  "contested_views": [],
+  "related": []
+}
+"#,
+    )
+    .expect("card");
+    let keys = dir.join("keys.hkb");
+    write_keys(&keys, &["bowl", "not-in-store"], "where is the blue bowl");
+
+    let thread = RetrievalThread::spawn(RetrievalConfig {
+        remember: true,
+        knowledge_dir: Some(cards.clone()),
+        fixture_rows: 0,
+        keys_path: Some(keys.clone()),
+    })
+    .expect("grant opens keys");
+    thread
+        .ask_wait("where is the blue bowl", 1, 1)
+        .expect("ask");
+    let cell = thread.cell();
+    assert_ne!(cell.state, CellState::Idle);
+    assert!(!cell.hits.is_empty(), "granted ask published no hit");
+    assert!(cell.hits.len() <= MEMORY_HIT_CAP, "{}", cell.hits.len());
+    assert!(
+        cell.hits.iter().all(|hit| hit.item_id != "not-in-store"),
+        "unresolved id was published: {:?}",
+        cell.hits
+    );
+    assert!(
+        cell.hits
+            .iter()
+            .all(|hit| hit.clause() == "The blue bowl is in the cupboard."),
+        "clause was not the stored card: {:?}",
+        cell.hits
+    );
+    drop(thread);
+
+    let garbage = b"this is not an HKB1 file";
+    fs::write(&keys, garbage).expect("corrupt keys");
+    let denied = RetrievalThread::spawn(RetrievalConfig {
+        remember: false,
+        knowledge_dir: Some(cards),
+        fixture_rows: 0,
+        keys_path: Some(keys.clone()),
+    })
+    .expect("deny does not open keys");
+    denied
+        .ask_wait("where is the blue bowl", 2, 1)
+        .expect("ask");
+    assert!(denied.cell().is_empty());
+    assert!(denied.last_error().is_none());
+    assert_eq!(fs::read(&keys).expect("keys"), garbage);
+    drop(denied);
+
+    let opened = RetrievalThread::spawn(RetrievalConfig {
+        remember: true,
+        knowledge_dir: None,
+        fixture_rows: 0,
+        keys_path: Some(keys.clone()),
+    });
+    assert!(opened.is_err(), "grant opened a corrupt key file");
+    let _ = fs::remove_dir_all(&dir);
+}
+
+fn write_keys(path: &Path, ids: &[&str], text: &str) {
+    let mut lane = [0i8; 8];
+    horbm_brain::encode_query_into(text, &mut lane);
+    let n = ids.len();
+    let mut keys = Vec::with_capacity(n * lane.len());
+    for _ in 0..n {
+        keys.extend_from_slice(&lane);
+    }
+    let pack = horbm_brain::StoredPack {
+        k: lane.len(),
+        keys,
+        clause_id: (0..n as u64).collect(),
+        allow: vec![true; n],
+        source: vec![1; n],
+        item_id: ids.iter().map(|id| (*id).to_string()).collect(),
+        scale: vec![1; n],
+    };
+    pack.write(path).expect("write keys");
+}
+
 #[test]
 fn deny_does_not_open_a_missing_key_file() {
     let missing = scratch("no-keys").join("keys.hkb");

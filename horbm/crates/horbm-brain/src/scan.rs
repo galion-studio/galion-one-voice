@@ -2,8 +2,8 @@
 // Copyright (c) 2026 Galion Labs
 //! Scan one query over the HKB1 arena and the person-diary arena.
 //!
-//! The retrieval thread in crate `horbm` still calls `search_lexical` and
-//! does not call this. The call it would add is
+//! The retrieval thread in crate `horbm` calls this when a key file is
+//! passed, and still calls `search_lexical` when it is not. That call is
 //! [`DiaryScan::scan_selected_into`], described in
 //! `docs/horbm/foundations/S54-diary-scan.md`. This module does not open
 //! SQLite, does not link `horbm-memory`, and does not add a second SIMD

@@ -4,13 +4,19 @@
 //!
 //! This is phase 2 of `docs/horbm/research/R4-cpu-realtime-integration.md`:
 //! a RAM fixture, `remember` denied unless granted, and a cell published off
-//! the heartbeat thread. A granted ask scores with [`horbm_brain::DiaryScan`]:
-//! the HKB1 file when one is configured, and the person-diary rows loaded
-//! from the in-memory store. `Stack::open` is not used: it creates
+//! the heartbeat thread. `Stack::open` is not used: it creates
 //! `revisions.sqlite`.
 //!
-//! The scan writes into a `[ScanHit; MEMORY_HIT_CAP]` the worker allocates
-//! once. After the grant builds the scan, that call does not allocate.
+//! [`RetrievalConfig::keys_path`] unset keeps the lexical ask:
+//! `search_lexical`, then [`covers`], then the blocked-id filter. No key
+//! file is opened and no scan is built. When the path is set and `remember`
+//! is granted, setup builds [`horbm_brain::DiaryScan`] with
+//! [`DiaryScan::open_capped`] once. A query calls
+//! [`DiaryScan::scan_selected_into`] into a `[ScanHit; MEMORY_HIT_CAP]` the
+//! worker allocates once. That call does not allocate. A hit is published
+//! only when the open store can already resolve its id. The clause is that
+//! stored text. An id the store cannot resolve is dropped.
+//!
 //! Publishing the cell still builds [`MemoryHit`] strings.
 //!
 //! Person memory is a second diary. [`search_person_lexical`] reads that
@@ -39,8 +45,7 @@ use std::thread::{self, JoinHandle};
 use std::time::Instant;
 
 use horbm_brain::{
-    DiaryArena, DiaryRow, DiaryScan, KeyPrefault, ScanHit, ScanPool, StoredKeys, StoredPack,
-    DIARY_DIM, SCAN_CAP,
+    DiaryArena, DiaryRow, DiaryScan, KeyPrefault, ScanHit, ScanPool, StoredKeys, DIARY_DIM,
 };
 
 use crate::UNKNOWN_REPLY;
@@ -192,7 +197,8 @@ pub trait RetrievedCells: Send + Sync {
 }
 
 /// F3's mapped int8 arena. [`RetrievalThread`] does not call this trait.
-/// A granted ask calls [`DiaryScan::scan_selected_into`] instead.
+/// A granted ask with a key file calls [`DiaryScan::scan_selected_into`].
+/// An unset key file calls `search_lexical` instead.
 /// [`crate::keys`] still implements this for a version-1 `StringKeyArena`
 /// and returns the raw `i32` dot.
 pub trait Int8Scorer: Send + Sync {
@@ -211,8 +217,8 @@ pub struct RetrievalConfig {
     /// Synthetic cards loaded into the RAM diary. Ignored when `remember`
     /// is false. When this is non-zero the card directory is not opened.
     pub fixture_rows: usize,
-    /// HKB1 file. Opened only while `remember` is granted. Not created.
-    /// `None` scores no key rows.
+    /// HKB1 file. Opened only while `remember` is granted, once at setup.
+    /// Not created. `None` keeps lexical search and does not build a scan.
     pub keys_path: Option<PathBuf>,
 }
 
@@ -562,13 +568,20 @@ fn apply_consent(
 }
 
 struct Opened {
-    scan: DiaryScan,
-    diary: Vec<CatalogRow>,
-    keys: Vec<CatalogRow>,
+    /// In-memory diary. The lexical ask reads it. Dropped when the grant falls.
+    store: horbm_memory::Store,
     /// Card ids that must not be published. Also stored as `allow: false`.
     blocked: BTreeSet<String>,
-    /// In-memory diary. Dropped with the scan when the grant falls.
-    _store: horbm_memory::Store,
+    /// Built once at setup when a key file is configured. Absent on the
+    /// lexical path.
+    scan: Option<PreparedScan>,
+}
+
+/// Key file plus the ids the store could already resolve when the grant opened.
+struct PreparedScan {
+    scan: DiaryScan,
+    /// Clause text captured from the store. A query only reads it.
+    resolved: HashMap<String, CatalogRow>,
 }
 
 /// Text for one arena row. Built when the grant opens. A query only reads it.
@@ -585,22 +598,6 @@ struct CatalogRow {
     haystack: String,
 }
 
-impl CatalogRow {
-    fn named(item_id: &str) -> Self {
-        Self {
-            item_id: item_id.to_string(),
-            title: String::new(),
-            text: String::new(),
-            said_by: String::new(),
-            date: String::new(),
-            source: String::new(),
-            claim_type: String::new(),
-            pinned: false,
-            haystack: item_id.to_string(),
-        }
-    }
-}
-
 struct EmbeddedRow {
     item_id: String,
     values: Vec<i8>,
@@ -613,8 +610,40 @@ struct EmbeddedRow {
 fn open_store(config: &RetrievalConfig) -> Result<Opened, RetrieveError> {
     let mut store = horbm_memory::Store::open_in_memory().map_err(RetrieveError::memory)?;
     let blocked = load_rows(&mut store, config)?;
-    let diary_rows = embed_store(&store, &blocked)?;
-    let diary = DiaryArena::from_rows(diary_rows.iter().map(|row| DiaryRow {
+    // This runs only while the grant holds, including `set_remember(true)`
+    // after a denied spawn. The spawn flag can still be false then.
+    let scan = match config.keys_path.as_deref() {
+        Some(path) => Some(prepare_scan(&store, &blocked, path, true)?),
+        None => None,
+    };
+    Ok(Opened {
+        store,
+        blocked,
+        scan,
+    })
+}
+
+/// Open the key file and the diary arena once. Not called on a query.
+///
+/// The pinned `horbm-memory` rev does not return stored embedding rows.
+/// Diary entries are text, and the int8 arena is private. Rows are rebuilt
+/// with [`horbm_brain::embed_diary_into`] from text the store already holds,
+/// the same hashing vector that rev stores. A store with no rows is an empty
+/// [`DiaryArena`], and the scan ranks keys only. The git rev is unchanged.
+fn prepare_scan(
+    store: &horbm_memory::Store,
+    blocked: &BTreeSet<String>,
+    path: &Path,
+    remember: bool,
+) -> Result<PreparedScan, RetrieveError> {
+    let keys = StoredKeys::open(path, KeyPrefault::Populate)
+        .map_err(|err| RetrieveError::new(format!("open keys: {err}")))?;
+    let embedded = embed_store(store, blocked)?;
+    let mut resolved = HashMap::with_capacity(embedded.len());
+    for row in &embedded {
+        resolved.insert(row.item_id.clone(), row.catalog.clone());
+    }
+    let diary = DiaryArena::from_rows(embedded.iter().map(|row| DiaryRow {
         item_id: row.item_id.as_str(),
         values: row.values.as_slice(),
         scale: row.scale,
@@ -622,18 +651,8 @@ fn open_store(config: &RetrievalConfig) -> Result<Opened, RetrieveError> {
         allow: row.allow,
     }))
     .map_err(|err| RetrieveError::new(format!("diary arena: {err}")))?;
-    let (keys, key_rows) = load_keys(config.keys_path.as_deref(), &diary_rows)?;
-    // The grant is what opened this store. `remember` false leaves the diary
-    // leg out; callers only reach here while the grant holds.
-    let scan = DiaryScan::open(keys, diary, config.remember, SCAN_CAP);
-    let diary_catalog = diary_rows.into_iter().map(|row| row.catalog).collect();
-    Ok(Opened {
-        scan,
-        diary: diary_catalog,
-        keys: key_rows,
-        blocked,
-        _store: store,
-    })
+    let scan = DiaryScan::open_capped(keys, diary, remember);
+    Ok(PreparedScan { scan, resolved })
 }
 
 fn load_rows(
@@ -756,124 +775,6 @@ fn join_hay(parts: &[&str]) -> String {
     out
 }
 
-/// Width of the in-memory key pack built when no HKB1 file is configured.
-const MADE_KEY_DIM: usize = 32;
-
-fn load_keys(
-    path: Option<&Path>,
-    diary_rows: &[EmbeddedRow],
-) -> Result<(StoredKeys, Vec<CatalogRow>), RetrieveError> {
-    let keys = match path {
-        Some(path) => StoredKeys::open(path, KeyPrefault::Populate)
-            .map_err(|err| RetrieveError::new(format!("open keys: {err}")))?,
-        None => keys_for_rows(diary_rows)?,
-    };
-    let mut rows = Vec::with_capacity(keys.len());
-    for index in 0..keys.len() {
-        let id = keys.item_id(index).ok().flatten().unwrap_or("");
-        let catalog = diary_rows
-            .iter()
-            .find(|row| row.item_id == id)
-            .map(|row| row.catalog.clone())
-            .unwrap_or_else(|| CatalogRow::named(id));
-        rows.push(catalog);
-    }
-    Ok((keys, rows))
-}
-
-/// One key per diary row, used only when no HKB1 file is configured.
-///
-/// The vector is `encode_query_into` of that row's rarest content token, so a
-/// one-token ask for the token ranks the row. The diary leg still embeds the
-/// full line. This runs at setup.
-fn keys_for_rows(rows: &[EmbeddedRow]) -> Result<StoredKeys, RetrieveError> {
-    if rows.is_empty() {
-        return empty_keys();
-    }
-    let frequency = document_frequency(rows);
-    let n = rows.len();
-    let mut packed = vec![0i8; n * MADE_KEY_DIM];
-    let mut allow = Vec::with_capacity(n);
-    let mut item_id = Vec::with_capacity(n);
-    let mut clause_id = Vec::with_capacity(n);
-    let source = vec![0u64; n];
-    let scale = vec![1i8; n];
-    for (i, row) in rows.iter().enumerate() {
-        let probe =
-            rarest_token(&row.catalog.haystack, &frequency).unwrap_or_else(|| row.item_id.clone());
-        let start = i * MADE_KEY_DIM;
-        horbm_brain::encode_query_into(&probe, &mut packed[start..start + MADE_KEY_DIM]);
-        allow.push(row.allow);
-        item_id.push(row.item_id.clone());
-        clause_id.push(u64::try_from(i).unwrap_or(u64::MAX));
-    }
-    let pack = StoredPack {
-        k: MADE_KEY_DIM,
-        keys: packed,
-        clause_id,
-        allow,
-        source,
-        item_id,
-        scale,
-    };
-    let bytes = pack
-        .encode()
-        .map_err(|err| RetrieveError::new(format!("key pack: {err}")))?;
-    StoredKeys::from_bytes(&bytes).map_err(|err| RetrieveError::new(format!("key pack: {err}")))
-}
-
-fn document_frequency(rows: &[EmbeddedRow]) -> HashMap<String, usize> {
-    let mut frequency = HashMap::new();
-    for row in rows {
-        let mut seen = BTreeSet::new();
-        for token in horbm_memory::index_tokens(&row.catalog.haystack) {
-            if seen.insert(token.clone()) {
-                *frequency.entry(token).or_insert(0) += 1;
-            }
-        }
-    }
-    frequency
-}
-
-/// Lowest document frequency, then the longer token, then byte order.
-fn rarest_token(haystack: &str, frequency: &HashMap<String, usize>) -> Option<String> {
-    let mut best: Option<String> = None;
-    for token in horbm_memory::index_tokens(haystack) {
-        let replace = match best.as_deref() {
-            None => true,
-            Some(current) => {
-                let next_df = frequency.get(&token).copied().unwrap_or(0);
-                let current_df = frequency.get(current).copied().unwrap_or(0);
-                next_df < current_df
-                    || (next_df == current_df && token.len() > current.len())
-                    || (next_df == current_df
-                        && token.len() == current.len()
-                        && token.as_str() < current)
-            }
-        };
-        if replace {
-            best = Some(token);
-        }
-    }
-    best
-}
-
-fn empty_keys() -> Result<StoredKeys, RetrieveError> {
-    let pack = StoredPack {
-        k: 1,
-        keys: Vec::new(),
-        clause_id: Vec::new(),
-        allow: Vec::new(),
-        source: Vec::new(),
-        item_id: Vec::new(),
-        scale: Vec::new(),
-    };
-    let bytes = pack
-        .encode()
-        .map_err(|err| RetrieveError::new(format!("empty keys: {err}")))?;
-    StoredKeys::from_bytes(&bytes).map_err(|err| RetrieveError::new(format!("empty keys: {err}")))
-}
-
 fn asked(
     opened: &mut Opened,
     hit_buf: &mut [ScanHit; MEMORY_HIT_CAP],
@@ -881,24 +782,78 @@ fn asked(
     turn_id: u64,
     epoch: u64,
 ) -> Result<MemoryHitCell, RetrieveError> {
+    if let Some(prepared) = opened.scan.as_mut() {
+        return asked_scan(prepared, &opened.blocked, hit_buf, text, turn_id, epoch);
+    }
+    asked_lexical(&opened.store, &opened.blocked, text, turn_id, epoch)
+}
+
+/// `search_lexical`, then [`covers`], then the blocked-id filter.
+///
+/// This is the ask an unset `keys_path` runs. It does not open a key file
+/// and it does not call the scan.
+fn asked_lexical(
+    store: &horbm_memory::Store,
+    blocked: &BTreeSet<String>,
+    text: &str,
+    turn_id: u64,
+    epoch: u64,
+) -> Result<MemoryHitCell, RetrieveError> {
+    let response = store.search_lexical(text).map_err(RetrieveError::memory)?;
+    let terms = horbm_memory::index_tokens(text);
+    let mut hits = Vec::new();
+    for hit in &response.hits {
+        if blocked.contains(&hit.item_id) {
+            continue;
+        }
+        if covers(&hit.haystack, &terms) {
+            hits.push(MemoryHit::from_hit(hit));
+        }
+        if hits.len() == MEMORY_HIT_CAP {
+            break;
+        }
+    }
+    if hits.is_empty() {
+        Ok(MemoryHitCell::miss(turn_id, epoch, text, response.took_us))
+    } else {
+        Ok(MemoryHitCell::hits(
+            turn_id,
+            epoch,
+            text,
+            hits,
+            response.took_us,
+        ))
+    }
+}
+
+/// Scan into the worker's buffer. Publish only ids [`PreparedScan::resolved`]
+/// already holds. The clause is that stored text. Nothing is invented.
+fn asked_scan(
+    prepared: &mut PreparedScan,
+    blocked: &BTreeSet<String>,
+    hit_buf: &mut [ScanHit; MEMORY_HIT_CAP],
+    text: &str,
+    turn_id: u64,
+    epoch: u64,
+) -> Result<MemoryHitCell, RetrieveError> {
     let started = Instant::now();
     // Caller-owned buffer. This call does not allocate.
-    let n = opened.scan.scan_selected_into(text, hit_buf);
+    let n = prepared.scan.scan_selected_into(text, hit_buf);
     let took_us = elapsed_us(started.elapsed());
     let terms = horbm_memory::index_tokens(text);
     let mut hits = Vec::new();
     for hit in &hit_buf[..n] {
         let hit = *hit;
-        let Some(item_id) = opened.scan.item_id(hit).map(str::to_string) else {
+        let Some(item_id) = prepared.scan.item_id(hit) else {
             continue;
         };
-        if opened.blocked.contains(&item_id) {
+        if blocked.contains(item_id) {
             continue;
         }
-        let Some(row) = catalog_row(opened, hit) else {
+        let Some(row) = prepared.resolved.get(item_id) else {
             continue;
         };
-        if row.item_id != item_id || !covers(&row.haystack, &terms) {
+        if !covers(&row.haystack, &terms) {
             continue;
         }
         hits.push(MemoryHit {
@@ -922,14 +877,6 @@ fn asked(
     } else {
         Ok(MemoryHitCell::hits(turn_id, epoch, text, hits, took_us))
     }
-}
-
-fn catalog_row(opened: &Opened, hit: ScanHit) -> Option<&CatalogRow> {
-    let rows = match hit.pool {
-        ScanPool::Diary => &opened.diary,
-        ScanPool::Keys => &opened.keys,
-    };
-    rows.get(hit.row as usize)
 }
 
 /// [`ScanPool::Diary`] is the memory pool. [`ScanPool::Keys`] is knowledge.
@@ -1017,7 +964,7 @@ mod tests {
     #[test]
     fn cap_matches_the_diary() {
         assert_eq!(MEMORY_HIT_CAP, horbm_memory::MAX_HITS);
-        assert_eq!(MEMORY_HIT_CAP, SCAN_CAP);
+        assert_eq!(MEMORY_HIT_CAP, horbm_brain::SCAN_CAP);
     }
 
     #[test]
