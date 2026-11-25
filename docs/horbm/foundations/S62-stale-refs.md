@@ -116,12 +116,12 @@ bash voice-stack/ci/check-no-archived-crate-refs.sh --self-test
 
 ## Tests
 
-Host: rustc 1.85.0 (`4d91de4e4` 2025-02-17), Linux x86_64. `horbm` is a virtual workspace, so those lines pass `--workspace`. Toolchain flag on this machine: `cargo +1.85.0`.
+Host: rustc 1.85.0 (`4d91de4e4` 2025-02-17), Linux x86_64. `horbm` is a virtual workspace, so those lines pass `--workspace`. Toolchain flag on this machine: `cargo +1.85.0`. Counted after merging `origin/main` `b8f33bb` into this branch.
 
 | Command | Result |
 |---|---|
 | `bash voice-stack/ci/check-no-archived-crate-refs.sh --self-test` | exit 0. `self-test ok` |
-| `cargo test --workspace` | 1062 passed, 0 failed, 5 ignored |
+| `cargo test --workspace` | 1068 passed, 0 failed, 5 ignored |
 | `cargo clippy --workspace --all-targets -- -D warnings` | clean |
 | `cargo test --manifest-path horbm/Cargo.toml --workspace` | 267 passed, 0 failed, 2 ignored |
 | `cargo clippy --manifest-path horbm/Cargo.toml --workspace --all-targets -- -D warnings` | clean |
