@@ -51,7 +51,7 @@ The build below glues those pieces. It adds no new engine, no new runtime, and n
 
 **Must.** Learn is a separate consent, default deny, not an emotion-wire bit. `GALION_HORBM_LEARN=grant` is the only process grant. A fresh pass writes nothing. A granted pass writes one sourced row. Withdrawal leaves no row. `Brain::turn` does not call the pass. **Found** (`F7-learn-deep-dive.md`, `learn.rs`, `LOCKS.toml` `[consent] learn = "deny"`, `learn_in_band = false`).
 
-**On main.** `LearnPass::write_clause` swaps `live` / `next` / `retiring` and refuses a denied config. **Found** (`learn.rs`). Nothing in `Brain::turn` names `LearnPass`. **Found** (`lib.rs` says the pass is outside the order; `brain.rs` has no learn call — **Inferred** from the turn body read in this pass, which steps empathy, Samantha, memory, gather, style, and dialogue).
+**On main.** `LearnPass::write_clause` swaps `live` / `next` / `retiring` and refuses a denied config. **Found** (`learn.rs`). Nothing in `Brain::turn` names `LearnPass`. **Found** (`lib.rs` says the pass is outside the order; `brain.rs` has no learn call — **Inferred** from the turn body read in this pass, which steps empathy, the inner life, memory, gather, style, and dialogue).
 
 **Gap.** `SessionSeal` keeps one clause in RAM and writes it when the host calls `seal`. `Brain::turn` does not call it. **Found** (`learn.rs`). In development, S82's dev profile grants learn and remember. Outside development they stay off unless granted. No encryption for now. The horbm crates stay deny.
 
@@ -59,7 +59,7 @@ The build below glues those pieces. It adds no new engine, no new runtime, and n
 
 ### Inner life
 
-**Must.** Two layers, both Samantha. `InnerLife` is four slots each of care, want, and expect, tokens of at most 16 ASCII bytes, learning off while `learn` is deny. Seed tokens are `heard`, `answer`, `pause`. `SamanthaInner` is four floats (care, curiosity, help, expect) for this session only, and it does not keep user facts. A turn may bias pace. It does not replace the spoken clause. **Found** (`F-inner-life.md`, `F-persona.md` `[inner]`, `horbm-inner`, `lib.rs`).
+**Must.** Two layers. `InnerLife` is four slots each of care, want, and expect, tokens of at most 16 ASCII bytes, learning off while `learn` is deny. Seed tokens are `heard`, `answer`, `pause`. `SamanthaInner` is four floats (care, curiosity, help, expect) for this session only, and it does not keep user facts. A turn may bias pace. It does not replace the spoken clause. **Found** (`F-inner-life.md`, `F-persona.md` `[inner]`, `horbm-inner`, `lib.rs`).
 
 **On main.** Both types are real and tested. `Brain::turn` calls `SamanthaInner::turn` with `ear: None` and `sense: self.ear_sense`. `with_cards` sets `ear_sense: false`. `set_ear_sense` has no other caller. `inner_turn` / `inner_nudge` / `samantha_nudge` are separate methods and are not called from `turn`. **Found** (`brain.rs`, repo search for `set_ear_sense`). `EAR_CONFIDENCE` is 0.35. A missing ear is ignored; words still count. **Found** (`horbm-inner/src/lib.rs`, `life.rs` `apply_turn`).
 
@@ -93,7 +93,7 @@ The build below glues those pieces. It adds no new engine, no new runtime, and n
 
 **On main.** `Dialogue::decide` is that heuristic. `Brain::turn` calls it, then `admit_move`, and a forbid becomes ask plus `I don't know.` **Found** (`brain.rs`). `choose_steered` exists and `decide` does not call it. **Found** (`policy.rs` module docs). `hold_topic` is on `DialogueLean` and is not an input to `decide`. **Found** (`DecideIn` has no hold field). `Move::OfferTopic` can speak `Back to {topic}?`. **Found** (`policy.rs` `plan_for`).
 
-**Gap.** A hold from Samantha does not block a new topic. The bandit stays an observer. This plan leaves the bandit as an observer (fewest moving parts). **Found** for the gap; the bandit decision is this plan.
+**Gap.** A hold from the inner life does not block a new topic. The bandit stays an observer. This plan leaves the bandit as an observer (fewest moving parts). **Found** for the gap; the bandit decision is this plan.
 
 **Evidence.** `cargo test --manifest-path horbm/Cargo.toml -p horbm --test dialogue`. **Found.**
 
@@ -245,7 +245,7 @@ No swarm edits `brain.rs` or `lib.rs`. Adding a struct field is done with `Defau
 
 **Acceptance.** `cargo test --manifest-path horbm/Cargo.toml -p horbm --test dialogue`. New test `hold_false_matches_decide_and_hold_true_blocks_offer_topic`.
 
-**Serves the brain.** Samantha already computes `hold_topic`. The move picker ignores it, so a check-in can still offer a new topic.
+**Serves the brain.** `SamanthaInner` already computes `hold_topic`. The move picker ignores it, so a check-in can still offer a new topic.
 
 **Depends on.** Nothing. The flag is a `bool`, so this swarm does not edit `horbm-inner`.
 
