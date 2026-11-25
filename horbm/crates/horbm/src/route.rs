@@ -4,6 +4,11 @@
 //!
 //! The spoken miss is [`UNKNOWN_REPLY`] and nothing else. A gap is recorded.
 //! It is not turned into a sentence.
+//!
+//! [`crate::Brain::turn`] does not pass its port into [`route_heard`]. The
+//! turn returns the local clause first and asks only after that value is
+//! dropped. A caller that does pass a port, including the bridge router,
+//! still asks inside [`route_heard`].
 
 use std::time::{Duration, Instant};
 
@@ -137,35 +142,71 @@ pub fn route_heard(
     }
     let reason = match research.as_mut() {
         None => GapReason::ResearchOff,
-        Some(port) => match port.ask(trimmed, RESEARCH_CAP) {
-            AskOutcome::Answer { text, source } => {
-                if clean_source(&source).is_some() {
-                    if let Some(spoken) = speakable(&text) {
-                        let label = format!("research:{source}");
-                        let gap = Gap {
-                            heard: trimmed.to_string(),
-                            reason: GapReason::ResearchAnswered,
-                            advice: GAP_ADVICE,
-                        };
-                        return RouteOut {
-                            kind: RouteKind::Research,
-                            spoken,
-                            sources: vec![label.clone()],
-                            evidence: vec![label],
-                            gap: Some(gap),
-                            lookup_us,
-                            took_us: elapsed_us(started.elapsed()),
-                        };
-                    }
-                }
-                GapReason::ResearchMiss
+        Some(port) => {
+            let class = classify_ask(port.ask(trimmed, RESEARCH_CAP), speakable);
+            if let Some(spoken) = class.spoken {
+                let gap = Gap {
+                    heard: trimmed.to_string(),
+                    reason: class.reason,
+                    advice: GAP_ADVICE,
+                };
+                return RouteOut {
+                    kind: RouteKind::Research,
+                    spoken,
+                    sources: class.sources,
+                    evidence: class.evidence,
+                    gap: Some(gap),
+                    lookup_us,
+                    took_us: elapsed_us(started.elapsed()),
+                };
             }
-            AskOutcome::Miss => GapReason::ResearchMiss,
-            AskOutcome::Timeout => GapReason::ResearchTimeout,
-            AskOutcome::Unreachable => GapReason::ResearchUnreachable,
-        },
+            class.reason
+        }
     };
     finish_miss(trimmed, reason, lookup_us, started)
+}
+
+/// What one research answer is allowed to become. No new sentence is invented.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct AskClass {
+    pub spoken: Option<String>,
+    pub sources: Vec<String>,
+    pub evidence: Vec<String>,
+    pub reason: GapReason,
+}
+
+impl AskClass {
+    fn plain(reason: GapReason) -> Self {
+        Self {
+            spoken: None,
+            sources: Vec::new(),
+            evidence: Vec::new(),
+            reason,
+        }
+    }
+}
+
+/// Map a gateway result through the same speakable check [`route_heard`] uses.
+pub(crate) fn classify_ask(outcome: AskOutcome, speakable: Speakable) -> AskClass {
+    match outcome {
+        AskOutcome::Answer { text, source } => {
+            if clean_source(&source).is_some() {
+                if let Some(spoken) = speakable(&text) {
+                    let label = format!("research:{source}");
+                    return AskClass {
+                        spoken: Some(spoken),
+                        evidence: vec![label.clone()],
+                        sources: vec![label],
+                        reason: GapReason::ResearchAnswered,
+                    };
+                }
+            }
+            AskClass::plain(GapReason::ResearchMiss)
+        }
+        AskOutcome::Miss => AskClass::plain(GapReason::ResearchMiss),
+        AskOutcome::Timeout => AskClass::plain(GapReason::ResearchTimeout),
+        AskOutcome::Unreachable => AskClass::plain(GapReason::ResearchUnreachable),
+    }
 }
 
 fn finish_miss(heard: &str, reason: GapReason, lookup_us: u32, started: Instant) -> RouteOut {
