@@ -10,7 +10,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Mutex;
 
 use galion_emotion_core::{EmotionCore, IntentMsg, IntentSource, VALENCE};
-use horbm_inner::{Heard, InnerHome, Perceived, PersonaInner, SamanthaInner, TICK_MS};
+use horbm_inner::{Heard, InnerHome, Perceived, PersonaInner, TICK_MS};
 
 static GATE: Mutex<()> = Mutex::new(());
 
@@ -59,7 +59,7 @@ fn turn_tick_and_nudge_allocate_nothing() {
     inbound.strength = 0.8;
     inbound.set_pull(VALENCE, -0.4).unwrap();
 
-    let mut life = SamanthaInner::new();
+    let mut life = PersonaInner::new();
     ALLOCS.store(0, Ordering::SeqCst);
     ARMED.with(|armed| armed.set(true));
     for i in 0..100u32 {
@@ -83,7 +83,7 @@ fn turn_tick_and_nudge_allocate_nothing() {
     ARMED.with(|armed| armed.set(false));
     assert_eq!(ALLOCS.load(Ordering::SeqCst), 0, "turn or tick allocated");
 
-    let mut life = SamanthaInner::new();
+    let mut life = PersonaInner::new();
     let mut core = EmotionCore::at_rest();
     ALLOCS.store(0, Ordering::SeqCst);
     ARMED.with(|armed| armed.set(true));
