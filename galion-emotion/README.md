@@ -10,6 +10,10 @@ Emotion pipeline for **Galion Voice**, both directions, Rust-first, zero depende
 
 Stubs only. No model downloads. Weights: safetensors + .gq only. MIT (Perpetual Open MIT).
 
+## Built-in profiles
+
+`SAMANTHA` and `JARVIS` are built-in `PersonaProfile` values. `persona_mood::configured(Some(id))` selects one (ASCII case-insensitive; surrounding whitespace ignored). `persona_mood::configured_from_env` reads `GALION_HORBM_DEV_PERSONA`. An unknown or blank id is `UnknownPersona`, never a silent default. Conditioning, shared manner, tags, and the hub bed read profile fields (`conditioning_slot`, `shares_manner`, `tags`, `has_hub`).
+
 ```
 cargo test
 ```

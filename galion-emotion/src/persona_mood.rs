@@ -7,14 +7,13 @@
 //!  user voice ─► GatedDetector (consent first) ─┐
 //!  user text  ─► text_affect (lexicon)          ├─► UserObservation (fused VAD + confidence)
 //!                                               ▼
-//!                       per-persona appraisal (Samantha mirrors + softens,
-//!                       Jarvis steadies + stays composed)
+//!                       per-persona appraisal (each built-in profile's own gains)
 //!                                               ▼
 //!                       PersonaMood (persistent VAD, inertia toward the appraisal,
 //!                       exponential decay back to the persona's resting mood)
 //!                                               ▼
 //!          PersonaConditioning  ← one shared, versioned, fixed-size vector
-//!            │                    (persona one-hot + mood VAD + user VAD/conf + e)
+//!            │                    (profile one-hot + mood VAD + user VAD/conf + e)
 //!            ├─► PiperVoiceProfile::prosody() → PiperProsodyVector
 //!            │     (length_scale, sentence silence, pitch shift st,
 //!            │      energy, pre-pause)                        — feeling, today, Piper
@@ -42,7 +41,8 @@ use crate::express::empathy_weight;
 use crate::frame::EmotionFrame;
 use crate::loudness::Estimate;
 
-/// The two V2 test personas. A future id is a new variant + profile, nothing else.
+/// Built-in profiles. A new id is a new variant plus its profile data.
+/// [`configured`] selects one. Behaviour reads that data.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(u8)]
 pub enum Persona {
@@ -52,22 +52,22 @@ pub enum Persona {
 
 impl Persona {
     pub const ALL: [Persona; 2] = [Persona::Samantha, Persona::Jarvis];
+
+    /// Built-in id. This match is the only spelling of a persona name.
     pub fn as_str(self) -> &'static str {
         match self {
             Persona::Samantha => "samantha",
             Persona::Jarvis => "jarvis",
         }
     }
+
+    /// Match `s` against [`Self::as_str`]. ASCII case and surrounding whitespace
+    /// are ignored. Blank is not a profile.
     pub fn parse(s: &str) -> Option<Persona> {
         let s = s.trim();
-        if s.eq_ignore_ascii_case("samantha") {
-            Some(Persona::Samantha)
-        } else if s.eq_ignore_ascii_case("jarvis") {
-            Some(Persona::Jarvis)
-        } else {
-            None
-        }
+        Self::ALL.iter().find(|p| p.as_str().eq_ignore_ascii_case(s)).copied()
     }
+
     /// The persona's full profile (appraisal + mood dynamics + Piper voice).
     pub fn profile(self) -> &'static PersonaProfile {
         match self {
@@ -75,6 +75,41 @@ impl Persona {
             Persona::Jarvis => &JARVIS,
         }
     }
+}
+
+/// Process environment read by [`configured_from_env`].
+pub const DEV_PERSONA_ENV: &str = "GALION_HORBM_DEV_PERSONA";
+
+/// Missing, blank, or not a built-in profile. Never a default profile.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct UnknownPersona;
+
+impl std::fmt::Display for UnknownPersona {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("unknown or blank persona")
+    }
+}
+
+impl std::error::Error for UnknownPersona {}
+
+/// Built-in profile for `id`.
+///
+/// Pure: no environment and no I/O. `None`, a blank id, and any id that is
+/// not in [`Persona::ALL`] return [`UnknownPersona`]. ASCII case is ignored,
+/// and surrounding whitespace is ignored, the same as [`Persona::parse`].
+pub fn configured(id: Option<&str>) -> Result<&'static PersonaProfile, UnknownPersona> {
+    match id.map(str::trim).filter(|id| !id.is_empty()) {
+        Some(id) => Persona::parse(id).map(Persona::profile).ok_or(UnknownPersona),
+        None => Err(UnknownPersona),
+    }
+}
+
+/// [`configured`] of [`DEV_PERSONA_ENV`].
+///
+/// Unset, blank, and unknown are [`UnknownPersona`].
+pub fn configured_from_env() -> Result<&'static PersonaProfile, UnknownPersona> {
+    let raw = std::env::var(DEV_PERSONA_ENV).ok();
+    configured(raw.as_deref())
 }
 
 // ---------------------------------------------------------------------------
@@ -368,16 +403,45 @@ pub struct PiperVoiceProfile {
     pub energy_bounds: (f32, f32),
 }
 
+/// Feeling-band column at one empathy weight.
+/// Pitch semitones, pitch range, rate, loudness, warmth, pre-pause milliseconds, wash amber.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct FeelingColumn {
+    pub pitch_st: f32,
+    pub pitch_range: f32,
+    pub rate: f32,
+    pub loudness: f32,
+    pub warmth: f32,
+    pub pre_pause_ms: f32,
+    pub wash_amber: f32,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct PersonaProfile {
     pub persona: Persona,
     pub appraisal: Appraisal,
     pub dynamics: MoodDynamics,
     pub voice: PiperVoiceProfile,
+    /// One-hot index in [`PersonaConditioning::to_array`] layout v1.
+    /// `1.0` is written at this index; the other one-hot slot stays `0.0`.
+    pub conditioning_slot: u8,
+    /// [`crate::persona::Manner::Shared`] lifts pitch and rate slightly under the caller.
+    pub shares_manner: bool,
+    /// Feeling-band control-token flag. Piper must not speak them.
+    pub tags: bool,
+    /// Hub bed is mixed when the host leaves the layer on.
+    pub has_hub: bool,
+    /// Voice this profile speaks as on the feeling band.
+    pub voice_persona: crate::persona::VoicePersona,
+    /// Feeling band at empathy weight 0.
+    pub column_e0: FeelingColumn,
+    /// Feeling band at empathy weight 1.
+    pub column_e1: FeelingColumn,
 }
 
-/// Samantha: warm and mobile. Mirrors the user, then softens: shares joy
-/// nearly fully, takes on sorrow as gentle concern, follows arousal but caps it.
+/// Built-in profile data, selected through [`configured`].
+/// Warm and mobile: mirrors the user, then softens. Shares joy nearly fully,
+/// takes on sorrow as gentle concern, follows arousal but caps it.
 pub const SAMANTHA: PersonaProfile = PersonaProfile {
     persona: Persona::Samantha,
     appraisal: Appraisal {
@@ -416,11 +480,35 @@ pub const SAMANTHA: PersonaProfile = PersonaProfile {
         length_bounds: (0.80, 1.30),
         energy_bounds: (0.60, 1.20),
     },
+    conditioning_slot: 0,
+    shares_manner: true,
+    tags: true,
+    has_hub: false,
+    voice_persona: crate::persona::VoicePersona::Samantha,
+    column_e0: FeelingColumn {
+        pitch_st: 0.0,
+        pitch_range: 1.00,
+        rate: 1.00,
+        loudness: 1.00,
+        warmth: 0.62,
+        pre_pause_ms: 0.0,
+        wash_amber: 0.62,
+    },
+    column_e1: FeelingColumn {
+        pitch_st: -0.5,
+        pitch_range: 0.88,
+        rate: 0.92,
+        loudness: 0.80,
+        warmth: 0.75,
+        pre_pause_ms: 250.0,
+        wash_amber: 0.50,
+    },
 };
 
-/// Jarvis: composed. Steadies the user instead of following: small share of
-/// their arousal, low arousal cap, takes more dominance when they are
-/// distressed, never mirrors anger.
+/// Built-in profile data, selected through [`configured`].
+/// Composed: steadies the user instead of following. Small share of their
+/// arousal, low arousal cap, takes more dominance when they are distressed,
+/// and does not mirror anger.
 pub const JARVIS: PersonaProfile = PersonaProfile {
     persona: Persona::Jarvis,
     appraisal: Appraisal {
@@ -458,6 +546,29 @@ pub const JARVIS: PersonaProfile = PersonaProfile {
         pitch_bound_st: 1.5,
         length_bounds: (0.92, 1.18),
         energy_bounds: (0.75, 1.05),
+    },
+    conditioning_slot: 1,
+    shares_manner: false,
+    tags: false,
+    has_hub: true,
+    voice_persona: crate::persona::VoicePersona::Jarvis,
+    column_e0: FeelingColumn {
+        pitch_st: -0.3,
+        pitch_range: 0.92,
+        rate: 0.96,
+        loudness: 0.92,
+        warmth: 0.42,
+        pre_pause_ms: 80.0,
+        wash_amber: 0.28,
+    },
+    column_e1: FeelingColumn {
+        pitch_st: -0.4,
+        pitch_range: 0.90,
+        rate: 0.94,
+        loudness: 0.88,
+        warmth: 0.55,
+        pre_pause_ms: 120.0,
+        wash_amber: 0.50,
     },
 };
 
@@ -543,10 +654,7 @@ impl PersonaMood {
     /// Timbre is not part of the return and is not updated.
     pub fn feeling(&mut self, now_ms: u64) -> crate::persona::Feeling {
         self.tick(now_ms);
-        let voice = match self.persona {
-            Persona::Samantha => crate::persona::VoicePersona::Samantha,
-            Persona::Jarvis => crate::persona::VoicePersona::Jarvis,
-        };
+        let voice = self.persona.profile().voice_persona;
         let frame = if self.last_user.confidence > 0.0 {
             Some(self.last_user.as_frame())
         } else {
@@ -591,11 +699,13 @@ pub struct PersonaConditioning {
 }
 
 impl PersonaConditioning {
-    /// Layout v1: `[is_samantha, is_jarvis, mood_v, mood_a, mood_d, user_v, user_a, user_d, user_conf, e]`.
+    /// Layout v1 ([`CONDITIONING_VERSION`]), unchanged: two one-hot slots, then
+    /// mood VAD, user VAD, user confidence, and empathy `e`.
+    /// The slot that is `1.0` is [`PersonaProfile::conditioning_slot`].
     pub fn to_array(&self) -> [f32; CONDITIONING_DIM] {
-        [
-            (self.persona == Persona::Samantha) as u8 as f32,
-            (self.persona == Persona::Jarvis) as u8 as f32,
+        let mut sample = [
+            0.0,
+            0.0,
             self.mood.valence,
             self.mood.arousal,
             self.mood.dominance,
@@ -604,7 +714,12 @@ impl PersonaConditioning {
             self.user.dominance,
             self.user.confidence,
             self.empathy_e,
-        ]
+        ];
+        let slot = usize::from(self.persona.profile().conditioning_slot);
+        if slot < 2 {
+            sample[slot] = 1.0;
+        }
+        sample
     }
 }
 

@@ -3,11 +3,11 @@
 //! CPU arithmetic only. No accelerator crate, no weight file, no phrase table.
 //! [`Feeling::live`] calls [`crate::express::StubExpressor::voice_color`] so the
 //! empathy weight and the OKLCH colour are the live galion-emotion decision.
-//! Prosody is that weight on this persona's column. Jarvis does not become
-//! Samantha when the weight rises. Samantha does not borrow his dryness.
+//! Prosody is that weight on this profile's column. One profile does not
+//! become another when the weight rises, and it does not borrow the other's column.
 //!
 //! The reference path does not denoise. [`STRIP_REFERENCE_TEXTURE`] stays false.
-//! Jarvis's Tony Stark hub bed (clicks, alarms, room tone) is a character layer
+//! A profile with a hub bed (clicks, alarms, room tone) is a character layer
 //! on the me band. It is toggleable. It never reads or writes caller audio.
 //!
 //! Situational mood is this band. [`Feeling::situational`] is [`Feeling::live`]
@@ -33,11 +33,10 @@ pub enum VoicePersona {
 }
 
 impl VoicePersona {
+    /// Id of the built-in profile that speaks as this voice.
+    /// The spelling lives on [`crate::persona_mood::Persona::as_str`].
     pub fn as_str(self) -> &'static str {
-        match self {
-            VoicePersona::Samantha => "samantha",
-            VoicePersona::Jarvis => "jarvis",
-        }
+        voice_profile(self).persona.as_str()
     }
 }
 
@@ -52,20 +51,21 @@ pub enum Manner {
     Shared,
 }
 
-/// Hub clicks, alarms, and room tone for Jarvis. Not a denoise, and not the caller.
+/// Hub clicks, alarms, and room tone. Not a denoise, and not the caller.
+/// Present only for a profile whose `has_hub` is set.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct HubLayer {
-    /// True only for Jarvis when the host has the layer on.
+    /// True when the profile has a hub bed and the host has the layer on.
     pub enabled: bool,
     /// 0 when the layer is off. [`HUB_GAIN`] when it is on.
     pub gain: f32,
 }
 
 impl HubLayer {
-    /// Samantha has no bed. Jarvis has one when `on` is true. Default in
-    /// [`Feeling::live`] is on, so the character is present until the host mutes it.
+    /// A profile's hub bed is present when `on` is true and the profile has one.
+    /// Default in [`Feeling::live`] is on, so that layer stays until the host mutes it.
     pub fn character(persona: VoicePersona, on: bool) -> Self {
-        if persona == VoicePersona::Jarvis && on {
+        if on && voice_profile(persona).has_hub {
             Self { enabled: true, gain: HUB_GAIN }
         } else {
             Self { enabled: false, gain: 0.0 }
@@ -127,29 +127,17 @@ pub struct Feeling {
     pub manner: Manner,
     /// Character bed. Separate from the you band.
     pub hub: HubLayer,
-    /// Control tokens may exist later. Jarvis is always false. Piper must not speak them.
+    /// Control tokens may exist later. The profile decides. Piper must not speak them.
     pub tags: bool,
 }
 
-/// pitch st, range, rate, loudness, warmth, pre-pause ms, wash amber.
-type Column = (f32, f32, f32, f32, f32, f32, f32);
-
-/// Samantha at rest. Warm, no extra pause. Design table in the voice draft.
-const SAMANTHA_E0: Column = (0.0, 1.00, 1.00, 1.00, 0.62, 0.0, 0.62);
-/// Samantha at e = 1. Same profile as [`EMPATHY_PROSODY`].
-const SAMANTHA_E1: Column = (-0.5, 0.88, 0.92, 0.80, 0.75, 250.0, 0.50);
-/// Jarvis at rest. Lower, drier, a short pre-pause so he does not step on them.
-const JARVIS_E0: Column = (-0.3, 0.92, 0.96, 0.92, 0.42, 80.0, 0.28);
-/// Jarvis at e = 1. Still drier than Samantha. Warmth stays under her ceiling.
-const JARVIS_E1: Column = (-0.4, 0.90, 0.94, 0.88, 0.55, 120.0, 0.50);
-
 impl Feeling {
-    /// Persona at rest. e = 0, neutral mark, no empathy colour. Hub layer on for Jarvis.
+    /// Persona at rest. e = 0, neutral mark, no empathy colour. Hub layer follows the profile.
     pub fn rest(persona: VoicePersona) -> Self {
         Self::live(persona, None)
     }
 
-    /// One consented caller frame → this persona's conduct. Jarvis hub layer on.
+    /// One consented caller frame → this profile's conduct. Hub layer on when the profile has one.
     /// `None` is no frame (no consent, or nothing to answer): e stays 0.
     pub fn live(persona: VoicePersona, caller: Option<&EmotionFrame>) -> Self {
         Self::conduct(persona, caller, true)
@@ -165,17 +153,17 @@ impl Feeling {
     }
 
     /// Same as [`Self::live`], with the hub layer forced on or off.
-    /// The flag does not change `e`, OKLCH, or prosody. Samantha stays silent either way.
+    /// The flag does not change `e`, OKLCH, or prosody. A profile without a hub
+    /// bed stays silent either way.
     pub fn conduct(persona: VoicePersona, caller: Option<&EmotionFrame>, hub_on: bool) -> Self {
         let color = StubExpressor.voice_color(caller);
         let e = color.e;
-        let (lo, hi) = match persona {
-            VoicePersona::Samantha => (SAMANTHA_E0, SAMANTHA_E1),
-            VoicePersona::Jarvis => (JARVIS_E0, JARVIS_E1),
-        };
+        let profile = voice_profile(persona);
+        let lo = profile.column_e0;
+        let hi = profile.column_e1;
         let mut prosody = lerp_column(lo, hi, e);
         let manner = manner_of(caller, e);
-        if manner == Manner::Shared && persona == VoicePersona::Samantha {
+        if manner == Manner::Shared && profile.shares_manner {
             // Share the rise, slightly under a bright caller. Not an exclamation.
             prosody.pitch_shift_st = (prosody.pitch_shift_st + 0.12).min(0.18);
             prosody.rate = (prosody.rate + 0.03).min(1.04);
@@ -186,12 +174,20 @@ impl Feeling {
             e,
             oklch: color.oklch,
             prosody,
-            wash_amber: lerp(lo.6, hi.6, e),
+            wash_amber: lerp(lo.wash_amber, hi.wash_amber, e),
             manner,
             hub: HubLayer::character(persona, hub_on),
-            tags: persona == VoicePersona::Samantha,
+            tags: profile.tags,
         }
     }
+}
+
+fn voice_profile(persona: VoicePersona) -> &'static crate::persona_mood::PersonaProfile {
+    crate::persona_mood::Persona::ALL
+        .iter()
+        .find(|p| p.profile().voice_persona == persona)
+        .map(|p| p.profile())
+        .expect("every voice persona is built-in profile data")
 }
 
 fn manner_of(caller: Option<&EmotionFrame>, e: f32) -> Manner {
@@ -208,15 +204,19 @@ fn lerp(a: f32, b: f32, t: f32) -> f32 {
     a + (b - a) * t
 }
 
-fn lerp_column(lo: Column, hi: Column, e: f32) -> ProsodyControl {
+fn lerp_column(
+    lo: crate::persona_mood::FeelingColumn,
+    hi: crate::persona_mood::FeelingColumn,
+    e: f32,
+) -> ProsodyControl {
     let e = if e.is_finite() { e.clamp(0.0, 1.0) } else { 0.0 };
     ProsodyControl {
-        pitch_shift_st: lerp(lo.0, hi.0, e),
-        pitch_range: lerp(lo.1, hi.1, e),
-        rate: lerp(lo.2, hi.2, e),
-        energy: lerp(lo.3, hi.3, e),
-        warmth: lerp(lo.4, hi.4, e),
-        pre_pause_ms: lerp(lo.5, hi.5, e).round() as u16,
+        pitch_shift_st: lerp(lo.pitch_st, hi.pitch_st, e),
+        pitch_range: lerp(lo.pitch_range, hi.pitch_range, e),
+        rate: lerp(lo.rate, hi.rate, e),
+        energy: lerp(lo.loudness, hi.loudness, e),
+        warmth: lerp(lo.warmth, hi.warmth, e),
+        pre_pause_ms: lerp(lo.pre_pause_ms, hi.pre_pause_ms, e).round() as u16,
     }
     .clamped()
 }
