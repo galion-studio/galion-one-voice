@@ -17,8 +17,11 @@ path = "src/main.rs"
 # toml 0.8.19 depends on indexmap 2, and the newest indexmap needs edition 2024.
 serde = { version = "=1.0.210", features = ["derive"] }
 serde_json = "=1.0.128"
-toml = "=0.8.19"
-indexmap = "=2.2.6"
+# Caret, not an exact pin: this crate's own lock stays on 0.8.19.
+# The horbm workspace shares one toml with horbm-persona, which needs 0.8.23
+# so the voice-stack build can compile it against its serde.
+toml = "0.8.19"
+indexmap = "2.2.6"
 
 # Own workspace, same pattern as tools/symphony/articulation.
 # The locked voice runtime does not build this tool.

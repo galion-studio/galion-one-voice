@@ -294,7 +294,8 @@ fn curiosity_asks_and_a_greeting_stays_with_them() {
     assert_eq!(with.verb, Verb::With);
     assert_eq!(with.to_gemi().expect("gemi").verb_str(), "with");
     assert_eq!(life.care().to_bits(), CARE_HOME.to_bits());
-    assert!((with.lean().rate - 0.98).abs() < 1.0e-6);
+    assert!((with.lean().rate - 1.0).abs() < 1.0e-6);
+    assert!((with.lean().pause_ms - 40.0).abs() < 1.0e-6);
 }
 
 #[test]

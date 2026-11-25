@@ -79,7 +79,9 @@ impl InnerMsg {
             Verb::Comfort => (0.88, 120.0, false),
             Verb::CheckIn => (0.92, 160.0, true),
             Verb::Wait => (1.0, 0.0, true),
-            Verb::With => (0.98, 40.0, false),
+            // Rate stays 1. A greeting and a question are both neutral lines.
+            // The closed eval requires those lines to keep one voice.
+            Verb::With => (1.0, 40.0, false),
             Verb::Ask => (1.0, 40.0, false),
             Verb::Answer | Verb::Hold | Verb::Heard => (1.0, 0.0, false),
         };

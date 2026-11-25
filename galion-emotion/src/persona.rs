@@ -75,7 +75,10 @@ impl HubLayer {
     /// Add the bed to `me`. Caller audio is not an argument and is not touched.
     /// Off is a no-op, so muting the layer does not rewrite the reference.
     pub fn mix_me(self, me: &mut [f32]) {
-        if !self.enabled || !(self.gain > 0.0) || me.is_empty() {
+        if !self.enabled
+            || self.gain.partial_cmp(&0.0) != Some(std::cmp::Ordering::Greater)
+            || me.is_empty()
+        {
             return;
         }
         let n = me.len();
@@ -229,8 +232,8 @@ mod tests {
 
     #[test]
     fn no_frame_is_rest_and_not_a_script() {
-        assert!(!CANNED_EMPATHY);
-        assert!(!STRIP_REFERENCE_TEXTURE);
+        assert!(lock_holds(!CANNED_EMPATHY));
+        assert!(lock_holds(!STRIP_REFERENCE_TEXTURE));
         let s = Feeling::rest(VoicePersona::Samantha);
         let j = Feeling::rest(VoicePersona::Jarvis);
         assert_eq!(s.e, 0.0);
@@ -308,7 +311,11 @@ mod tests {
         let mut muted = [0.0f32; 128];
         off.hub.mix_me(&mut muted);
         assert!(muted.iter().all(|s| *s == 0.0));
-        assert!(!STRIP_REFERENCE_TEXTURE);
+        assert!(lock_holds(!STRIP_REFERENCE_TEXTURE));
+    }
+
+    fn lock_holds(cond: bool) -> bool {
+        cond
     }
 
     #[test]

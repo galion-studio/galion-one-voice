@@ -292,7 +292,7 @@ fn silence() -> Vec<i16> {
 }
 
 fn samantha() -> Duplex<Scripted, SamanthaAffect, ExhaleBreath, Samantha, ToneMouth> {
-    Duplex::new(
+    let mut duplex = Duplex::new(
         Parts {
             recognizer: Scripted::new(&["where is the kettle", "yeah", "stop now"]),
             emotion: SamanthaAffect,
@@ -302,7 +302,12 @@ fn samantha() -> Duplex<Scripted, SamanthaAffect, ExhaleBreath, Samantha, ToneMo
         },
         Kettle,
     )
-    .expect("samantha")
+    .expect("samantha");
+    // The virtual-clock gate is not an acoustic path. The mouth tone and the
+    // scripted mic are the same square, so a live canceller would treat the
+    // person as echo.
+    duplex.set_aec(false);
+    duplex
 }
 
 fn tick(
@@ -443,6 +448,20 @@ fn full_duplex_samantha_both_bands() {
     assert_eq!(report.backchannel_cancels, 0);
     assert!(report.overlap_live_frames >= 6);
     assert_eq!(report.research_frames, 0);
+    let voice = report.turn_text("voice");
+    let barge = report.turn_text("barge");
+    assert_eq!(
+        voice,
+        "duplex s28 event=voice clock=frame eager_to_voice_ms=160 barge_to_silence_ms=160 backchannel_cancels=0"
+    );
+    assert_eq!(
+        barge,
+        "duplex s28 event=barge clock=frame eager_to_voice_ms=160 barge_to_silence_ms=160 backchannel_cancels=0"
+    );
+    assert!(!voice.to_ascii_lowercase().contains("kettle"));
+    assert!(report
+        .turn_json("voice")
+        .contains("\"backchannel_cancels\":0"));
 }
 
 #[test]

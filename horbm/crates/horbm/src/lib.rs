@@ -31,6 +31,11 @@
 //! core. Neither call rewrites the empathy mood or the voice baseline.
 //! Learning a new care stays off while `LOCKS.toml` `[consent] learn` is deny.
 //!
+//! [`Brain::open`] and [`Brain::boot`] with no path load Samantha, the
+//! development persona. Aria stays in the repo and is not loaded. An explicit
+//! path replaces Samantha. An invalid file is refused. [`Brain::admit_move`]
+//! is the legal-move port.
+//!
 //! [`Brain::samantha`] is the slower layer: care, curiosity, help, and
 //! expect. [`Brain::turn`] lets that layer bias the pace and, when the act
 //! is comfort, skips the research ask. It does not replace the spoken
@@ -60,6 +65,9 @@ pub use horbm_inner::{
     DialogueLean, Heard, InnerMsg, MsgDir, Perceived, SamanthaInner, Verb, CARE_HOME,
     CHECKIN_GAP_MS, CHECKIN_MS, CURIOSITY_HOME, EXPECT_HOME, HELP_HOME, PERSONA as SAMANTHA_INNER,
     REMEMBER_LOCK, TICK_MS, WAIT_MS,
+};
+pub use horbm_persona::{
+    LegalMovePort, MoveClaim, MoveVerdict, Persona, PersonaError, StyleHook, UNKNOWN_LINE,
 };
 pub use route::{
     is_deep_question, route_heard, AskOutcome, CardHit, CardLookup, Gap, GapReason, ResearchAsk,

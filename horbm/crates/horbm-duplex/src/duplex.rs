@@ -2,9 +2,9 @@
 // Copyright (c) 2026 Galion Labs
 //! One tick, both bands.
 //!
-//! Order, fixed: ear, recognizer, emotion, brain prefetch, conductor,
+//! Order, fixed: echo, ear, recognizer, emotion, brain prefetch, conductor,
 //! breath, mouth. The conductor owns the floor. The mouth is the me band.
-//! The you band is the frame that just arrived.
+//! The you band is the frame that just arrived, after echo removal.
 
 use galion_conductor::{
     is_listed_backchannel, Conductor, Ear as ConductorEar, Floor as ConductorFloor, ReactionKind,
@@ -14,9 +14,12 @@ use horbm::UNKNOWN_REPLY;
 use horbm_voice::{Mouth, MouthPull, SpokenLine};
 
 use crate::brain::BrainHandle;
+use crate::echo::PlaybackEcho;
 use crate::ports::{
-    Affect, Breath, BreathCue, Emotion, Hypothesis, Persona, Recognizer, Style, DEV_PERSONA,
+    Affect, Breath, BreathCue, EarSense, Emotion, Hypothesis, Persona, ProsodyCue, Recognizer,
+    Style, DEV_PERSONA,
 };
+use crate::prosody::ProsodyEar;
 use crate::report::LatencyReport;
 use crate::{LoopError, FRAME_MS, FRAME_SAMPLES};
 
@@ -37,6 +40,8 @@ pub enum LoopEvent {
     Committed,
     FirstAudio,
     Backchannel,
+    /// Samantha nodded while the user kept the floor. Not a barge-in.
+    ListenBackchannel,
     BargeIn,
     TurnResumed,
 }
@@ -116,6 +121,9 @@ pub struct Duplex<R, E, B, P, M> {
     last_voiced_ms: Option<u64>,
     eager_ms: Option<u64>,
     onset_ms: Option<u64>,
+    sense: ProsodyEar,
+    last_cue: ProsodyCue,
+    echo: PlaybackEcho,
     report: LatencyReport,
 }
 
@@ -155,8 +163,39 @@ where
             last_voiced_ms: None,
             eager_ms: None,
             onset_ms: None,
+            sense: ProsodyEar::new(),
+            last_cue: ProsodyCue::disabled(),
+            echo: PlaybackEcho::new(),
             report: LatencyReport::fresh(),
         })
+    }
+
+    /// Prosody and ear sensing. On when the feature is compiled.
+    /// `false` is the runtime off switch: a non-zero sample is voiced again.
+    pub fn set_prosody(&mut self, on: bool) {
+        self.sense.set_enabled(on);
+    }
+
+    #[must_use]
+    pub fn prosody_enabled(&self) -> bool {
+        self.sense.enabled()
+    }
+
+    /// The cue from the last accepted frame. Disabled before the first tick.
+    #[must_use]
+    pub fn prosody(&self) -> ProsodyCue {
+        self.last_cue
+    }
+
+    /// Echo removal. On when the feature is compiled.
+    /// `false` is the bypass: the microphone frame is the ear frame.
+    pub fn set_aec(&mut self, on: bool) {
+        self.echo.set_enabled(on);
+    }
+
+    #[must_use]
+    pub fn aec_enabled(&self) -> bool {
+        self.echo.enabled()
     }
 
     #[must_use]
@@ -189,14 +228,21 @@ where
         }
         let t_ms = self.conductor.t_ms();
         let t32 = u32::try_from(t_ms).unwrap_or(u32::MAX);
-        let voiced = pcm.iter().any(|sample| *sample != 0);
+        let cleaned = self.echo.cancel(pcm)?;
+        let cue = self.sense.hear(&cleaned);
+        self.last_cue = cue;
+        let voiced = if cue.enabled {
+            cue.voiced
+        } else {
+            cleaned.iter().any(|sample| *sample != 0)
+        };
         if voiced && self.first_voiced_ms.is_none() {
             self.first_voiced_ms = Some(t_ms);
         }
         if voiced {
             self.last_voiced_ms = Some(t_ms);
         }
-        self.take_hypothesis(pcm, voiced, t_ms)?;
+        self.take_hypothesis(&cleaned, voiced, t_ms)?;
         let affect = self.emotion.step(t32);
         self.prefetch_while_listening();
         self.note_onset(voiced, t_ms);
@@ -222,8 +268,11 @@ where
         let mut me_samples = 0usize;
         let mut me_audible = false;
         let mut me_first = false;
+        let mut noted = false;
         if out.me_silent || out.event == ConductorEvent::BargeIn {
             self.mouth.cancel();
+            self.recognizer.cancel()?;
+            self.you_open = false;
             self.yielded = true;
             self.skip_pull = false;
             self.note_barge(out.t_ms, voiced);
@@ -232,6 +281,7 @@ where
             self.skip_pull = false;
         } else if self.mouth.speaking() && !self.yielded {
             if let Some(pulled) = self.pull_mouth() {
+                noted = true;
                 me_samples = pulled.samples;
                 me_audible = pulled.audible;
                 me_first = pulled.first;
@@ -240,6 +290,9 @@ where
                     self.note_voice(out.t_ms);
                 }
             }
+        }
+        if !noted {
+            self.echo.note_silence();
         }
 
         if event == LoopEvent::Backchannel {
@@ -379,6 +432,7 @@ where
         match self.mouth.pull() {
             MouthPull::Frame(frame) => {
                 let audible = frame.samples.iter().any(|sample| *sample != 0);
+                self.echo.note_playback(&frame.samples);
                 Some(Pulled {
                     samples: frame.samples.len(),
                     audible,
@@ -460,6 +514,7 @@ fn map_event(event: ConductorEvent) -> LoopEvent {
         ConductorEvent::EagerEndOfTurn => LoopEvent::EagerEndOfTurn,
         ConductorEvent::Committed => LoopEvent::Committed,
         ConductorEvent::Backchannel => LoopEvent::Backchannel,
+        ConductorEvent::ListenBackchannel => LoopEvent::ListenBackchannel,
         ConductorEvent::BargeIn => LoopEvent::BargeIn,
         ConductorEvent::TurnResumed => LoopEvent::TurnResumed,
     }

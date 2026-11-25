@@ -443,13 +443,14 @@ mod tests {
     /// Ottosson OKLab → sRGB. Test-only check that the anchor is the named hex.
     fn oklch_hex(c: Oklch) -> String {
         let [l, a, b] = c.to_lab();
-        let l_ = l + 0.3963377774 * a + 0.2158037573 * b;
-        let m_ = l - 0.1055613458 * a - 0.0638541728 * b;
-        let s_ = l - 0.0894841775 * a - 1.2914855480 * b;
+        // These decimals are the same f32 bits as the longer constants.
+        let l_ = l + 0.39633778 * a + 0.21580376 * b;
+        let m_ = l - 0.105561346 * a - 0.06385417 * b;
+        let s_ = l - 0.08948418 * a - 1.2914855 * b;
         let (l, m, s) = (l_ * l_ * l_, m_ * m_ * m_, s_ * s_ * s_);
-        let r = 4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s;
-        let g = -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s;
-        let b = -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s;
+        let r = 4.0767417 * l - 3.3077116 * m + 0.23096994 * s;
+        let g = -1.268438 * l + 2.6097574 * m - 0.34131938 * s;
+        let b = -0.0041960863 * l - 0.7034186 * m + 1.7076147 * s;
         let gamma = |x: f32| {
             if x >= 0.0031308 { 1.055 * x.powf(1.0 / 2.4) - 0.055 } else { 12.92 * x }
         };
