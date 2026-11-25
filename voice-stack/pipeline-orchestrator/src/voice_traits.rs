@@ -32,8 +32,7 @@ use tokio::sync::mpsc;
 
 /// Env var for the configured persona's reference clip.
 ///
-/// A TTS adapter loads it at runtime. This module only checks that the path
-/// is a file.
+/// A TTS adapter loads it at runtime. This module does not stat the path.
 pub const VOICE_REF_ENV: &str = "GALION_VOICE_REF";
 
 /// One resolved reference path, and at most one alias warning.
@@ -85,79 +84,34 @@ fn nonempty(value: Option<&str>) -> Option<&str> {
     }
 }
 
-/// Path from the environment when it names a file. Does not open the file.
+/// Path named by the environment. Does not stat the path and does not open it.
 ///
-/// [`VOICE_REF_ENV`] wins. A repeated call with the same variable values
-/// returns the remembered path and does not stat again. The one fallback
-/// warning is written off this thread, so a turn does not take the stderr lock.
+/// A stat here ran on the host turn and missed the socket deadline. The mouth
+/// still checks that the path is a file. [`VOICE_REF_ENV`] wins. One fallback
+/// warning is printed on this thread, once, with no spawned thread and no
+/// cache lock.
 pub fn voice_ref_from_env() -> Option<PathBuf> {
     let new_raw = nonempty_os(VOICE_REF_ENV);
     let old_raw = nonempty_os(SAMANTHA_REF_ENV);
-    if let Some(path) = remembered(&new_raw, &old_raw) {
-        return path;
-    }
-    let (value, warning) = match (&new_raw, &old_raw) {
-        (None, None) => (None, None),
-        (Some(value), None) => (Some(value.as_os_str()), None),
-        (None, Some(value)) => (Some(value.as_os_str()), Some(FALLBACK_WARNING)),
-        (Some(value), Some(old)) if value == old => (Some(value.as_os_str()), None),
-        (Some(value), Some(_)) => (Some(value.as_os_str()), Some(DIFFER_WARNING)),
+    let (chosen, warning) = match (&new_raw, &old_raw) {
+        (None, None) => return None,
+        (Some(value), None) => (value, None),
+        (None, Some(value)) => (value, Some(FALLBACK_WARNING)),
+        (Some(value), Some(old)) if value == old => (value, None),
+        (Some(value), Some(_)) => (value, Some(DIFFER_WARNING)),
     };
-    if let Some(warning) = warning {
-        warn_once(warning);
+    if let Some(line) = warning {
+        warn_line(line);
     }
-    let path = value.and_then(|raw| {
-        let path = PathBuf::from(raw);
-        path.is_file().then_some(path)
-    });
-    remember(new_raw, old_raw, path.clone());
-    path
+    Some(PathBuf::from(chosen))
 }
 
-struct RememberedRef {
-    new_name: Option<std::ffi::OsString>,
-    old_name: Option<std::ffi::OsString>,
-    path: Option<PathBuf>,
-}
-
-static REF_CACHE: Mutex<Option<RememberedRef>> = Mutex::new(None);
-
-fn remembered(
-    new_name: &Option<std::ffi::OsString>,
-    old_name: &Option<std::ffi::OsString>,
-) -> Option<Option<PathBuf>> {
-    let guard = REF_CACHE.lock().unwrap_or_else(|err| err.into_inner());
-    let seen = guard.as_ref()?;
-    if &seen.new_name == new_name && &seen.old_name == old_name {
-        Some(seen.path.clone())
-    } else {
-        None
-    }
-}
-
-fn remember(
-    new_name: Option<std::ffi::OsString>,
-    old_name: Option<std::ffi::OsString>,
-    path: Option<PathBuf>,
-) {
-    let mut guard = REF_CACHE.lock().unwrap_or_else(|err| err.into_inner());
-    *guard = Some(RememberedRef {
-        new_name,
-        old_name,
-        path,
-    });
-}
-
-fn warn_once(line: &'static str) {
+fn warn_line(line: &'static str) {
     static WARNED: AtomicBool = AtomicBool::new(false);
     if WARNED.swap(true, Ordering::Relaxed) {
         return;
     }
-    let _ = std::thread::Builder::new()
-        .name("voice-ref-warn".into())
-        .spawn(move || {
-            eprintln!("{line}");
-        });
+    eprintln!("{line}");
 }
 
 fn nonempty_os(key: &str) -> Option<std::ffi::OsString> {
