@@ -26,6 +26,9 @@
 //! [`phone_host`] (same feature) is what the screen demo polls each tick.
 //! The [`bus`] module (same feature) is the V2-S1 envelope: `BusMsg` lanes next to
 //! that worker, `try_send` only, cancel checked before ASR and before reply publish.
+//! `Debug` on that envelope prints lengths and times, never PCM or words.
+//! [`bus_clock`] is the one map from heartbeat `t_ms` to the stamp clock.
+//! `try_send` does not apply it.
 //! [`auto_workflow`] names the proceed after a `/` mic take: skill slot or auto program.
 //! It does not add a surface.
 //! [`workflow`] (same feature) is the one-dot hook: a recorded utterance becomes
@@ -36,6 +39,8 @@
 pub mod auto_workflow;
 #[cfg(feature = "phone-turn")]
 pub mod bus;
+#[cfg(feature = "phone-turn")]
+pub mod bus_clock;
 #[cfg(feature = "dot-viz")]
 pub mod dotviz;
 #[cfg(feature = "dot-viz")]
@@ -57,6 +62,8 @@ pub mod ui;
 
 #[cfg(feature = "phone-turn")]
 pub use bus::{BusBody, BusMsg, OrbMode, PersonaId, PersonaSource, ProcessBus};
+#[cfg(feature = "phone-turn")]
+pub use bus_clock::{BusStampAnchor, BUS_FRAME_MS, STAMP_US_PER_MS};
 #[cfg(feature = "phone-turn")]
 pub use workflow::{next_step, Next};
 pub use heartbeat::{Answer, HeartbeatEvent, YesNo, FRAME_MS};
