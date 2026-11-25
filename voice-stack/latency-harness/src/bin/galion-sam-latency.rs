@@ -16,7 +16,7 @@
 
 use galion_sam_latency::{probe_machine, repo_root, run_fake, run_piper, HarnessError, Report};
 use std::env;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 fn main() -> ExitCode {
@@ -147,7 +147,7 @@ fn run(opts: Opts) -> ExitCode {
     }
 }
 
-fn write(report: &Report, dir: &PathBuf, stem: &str) -> Result<(), ()> {
+fn write(report: &Report, dir: &Path, stem: &str) -> Result<(), ()> {
     match report.write_pair(dir, stem) {
         Ok((json, md)) => {
             eprintln!("wrote {} and {}", json.display(), md.display());
@@ -160,7 +160,7 @@ fn write(report: &Report, dir: &PathBuf, stem: &str) -> Result<(), ()> {
     }
 }
 
-fn write_unmeasured(backend: &str, reason: &str, dir: &PathBuf) -> Result<(), ()> {
+fn write_unmeasured(backend: &str, reason: &str, dir: &Path) -> Result<(), ()> {
     let machine = probe_machine(&repo_root());
     let report = Report::unmeasured(backend, reason, machine);
     write(&report, dir, backend)

@@ -9,7 +9,8 @@
 //!
 //! Stages that are still open pull requests are not given a timing. When
 //! their source is on the tree, the smoke calls it. Until then the report
-//! says `stub`.
+//! says `stub`. Breath is `horbm-breath`: the report says `breath=real`
+//! and times the 80 ms tick. Ear prosody follows the smoke switch.
 //!
 //! # Safety
 //!

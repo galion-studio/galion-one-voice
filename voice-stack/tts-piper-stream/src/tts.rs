@@ -89,18 +89,32 @@ pub struct SpeakReport {
     pub detail: Vec<SentenceStat>,
 }
 
+/// Inputs to [`SpeakReport::from_parts`]. One struct, so the report builder stays under clippy's argument limit.
+pub(crate) struct SpeakParts<'a> {
+    pub backend: &'a str,
+    pub sample_rate: u32,
+    pub cold: bool,
+    pub pid: Option<u32>,
+    pub cold_spawn_to_first_pcm_ms: Option<u32>,
+    pub samples: usize,
+    pub wall_ms: u32,
+    pub events: Vec<StreamEvent>,
+    pub detail: Vec<SentenceStat>,
+}
+
 impl SpeakReport {
-    pub(crate) fn from_parts(
-        backend: &str,
-        sample_rate: u32,
-        cold: bool,
-        pid: Option<u32>,
-        cold_spawn_to_first_pcm_ms: Option<u32>,
-        samples: usize,
-        wall_ms: u32,
-        events: Vec<StreamEvent>,
-        detail: Vec<SentenceStat>,
-    ) -> Self {
+    pub(crate) fn from_parts(parts: SpeakParts<'_>) -> Self {
+        let SpeakParts {
+            backend,
+            sample_rate,
+            cold,
+            pid,
+            cold_spawn_to_first_pcm_ms,
+            samples,
+            wall_ms,
+            events,
+            detail,
+        } = parts;
         let audio_ms = if sample_rate == 0 {
             0
         } else {
@@ -294,9 +308,17 @@ impl Tts for FakeTts {
             });
         }
         let wall = ms_since(t0);
-        Ok(SpeakReport::from_parts(
-            "fake", self.rate, cold, None, None, total, wall, events, detail,
-        ))
+        Ok(SpeakReport::from_parts(SpeakParts {
+            backend: "fake",
+            sample_rate: self.rate,
+            cold,
+            pid: None,
+            cold_spawn_to_first_pcm_ms: None,
+            samples: total,
+            wall_ms: wall,
+            events,
+            detail,
+        }))
     }
 }
 

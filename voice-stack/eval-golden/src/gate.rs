@@ -284,7 +284,7 @@ mod tests {
     fn emotion_formula_is_the_locked_weights() {
         let score = emotion_match_value(1.0, 0.0);
         assert!((score - 0.70).abs() < 1e-12);
-        assert!(meets_min(score, EMOTION_MIN) == false);
+        assert!(!meets_min(score, EMOTION_MIN));
         assert!(meets_min(0.83, 0.83));
         assert!(!ecapa_passes(0.7057, 0.7057));
         assert!(wer_passes(0.018, 0.018));

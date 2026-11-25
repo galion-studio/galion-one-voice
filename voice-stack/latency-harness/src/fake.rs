@@ -260,13 +260,12 @@ pub fn run_fake(reps: usize, warmup: usize) -> Result<Report, HarnessError> {
     let mut reply = FakeReply::resting();
     let mut tts = FakeTts::new();
     let mut sink = FrameSink::default();
-    let mut notes = Vec::new();
-    notes.push(
+    let notes = vec![
         "Fake backend. VAD, ASR, reply, and TTS are in-process and labeled fake. \
 No sleep stands in for a model. product_claim is false. The sine is not a voice. \
 The reply-to-first-slice clock is the first speakable piece. This phrase is one sentence, so first_slice_grain is sentence. It is not a Piper time."
             .to_string(),
-    );
+    ];
     measure(
         &mut vad,
         &mut asr,

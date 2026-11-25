@@ -17,6 +17,7 @@ rust-version = "1.85"
 
 [dependencies]
 horbm = { path = "../horbm" }
+horbm-breath = { path = "../horbm-breath" }
 horbm-duplex = { path = "../horbm-duplex" }
 horbm-voice = { path = "../horbm-voice" }
 galion-emotion-core = { path = "../../../crates/galion-emotion-core" }
