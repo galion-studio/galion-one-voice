@@ -43,7 +43,8 @@ run test -p galion-render --lib empathy_switch_needs_eight_unpinned_frames -- --
 c3=$?
 run test -p galion-console --features phone-turn --lib drain_takes_one_heartbeat_frame -- --test-threads=1
 c4=$?
-run test -p galion-live-demo --features dot-viz --test live -- --test-threads=1
+# galion-live-demo is archived. The live loop is the HORBM duplex package.
+run test --manifest-path horbm/Cargo.toml -p horbm-duplex -- --test-threads=1
 c5=$?
 set +e
 plog=$(run test -p galion-ml-voice --features speech --test piper_drain -- --test-threads=1 --nocapture 2>&1)
@@ -51,11 +52,11 @@ c6=$?
 set -e
 printf '%s\n' "$plog"
 if [[ $c6 -ne 0 ]]; then
-  echo "verdict=FAIL clone=$c1 sectors=$c2 persona=$c3 drain=$c4 live=$c5 piper=$c6"
+  echo "verdict=FAIL clone=$c1 sectors=$c2 persona=$c3 drain=$c4 duplex=$c5 piper=$c6"
   exit 1
 fi
 if [[ $c1 -ne 0 || $c2 -ne 0 || $c3 -ne 0 || $c4 -ne 0 || $c5 -ne 0 ]]; then
-  echo "verdict=FAIL clone=$c1 sectors=$c2 persona=$c3 drain=$c4 live=$c5 piper=$c6"
+  echo "verdict=FAIL clone=$c1 sectors=$c2 persona=$c3 drain=$c4 duplex=$c5 piper=$c6"
   exit 1
 fi
 if printf '%s\n' "$plog" | grep -q 'piper_measured=true'; then

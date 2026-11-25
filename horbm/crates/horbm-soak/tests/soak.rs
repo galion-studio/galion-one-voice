@@ -58,8 +58,55 @@ fn soak_clock() -> TickClock {
     }
 }
 
+/// The style index is linked into this binary. Fault its pages before the
+/// soak samples resident memory, so a later call does not look like a leak.
+#[cfg(target_os = "linux")]
+fn prefault_file_mappings() {
+    let Ok(text) = std::fs::read_to_string("/proc/self/maps") else {
+        return;
+    };
+    for line in text.lines() {
+        let mut parts = line.split_whitespace();
+        let Some(range) = parts.next() else {
+            continue;
+        };
+        let Some(perms) = parts.next() else {
+            continue;
+        };
+        if !perms.contains('r') {
+            continue;
+        }
+        let path = line.splitn(6, ' ').nth(5).unwrap_or("").trim();
+        if path.is_empty() || path.starts_with('[') {
+            continue;
+        }
+        let Some((start_hex, end_hex)) = range.split_once('-') else {
+            continue;
+        };
+        let Ok(start) = usize::from_str_radix(start_hex, 16) else {
+            continue;
+        };
+        let Ok(end) = usize::from_str_radix(end_hex, 16) else {
+            continue;
+        };
+        let mut addr = start;
+        while addr < end {
+            // SAFETY: `addr` is a readable mapped byte from `/proc/self/maps`.
+            // The read is volatile so the fault is not deleted. The pointer is not retained.
+            unsafe {
+                std::ptr::read_volatile(addr as *const u8);
+            }
+            addr = addr.saturating_add(4096);
+        }
+    }
+}
+
+#[cfg(not(target_os = "linux"))]
+fn prefault_file_mappings() {}
+
 #[test]
 fn samantha_duplex_long_call() {
+    prefault_file_mappings();
     #[cfg(unix)]
     {
         let started = thread_cpu_ns();

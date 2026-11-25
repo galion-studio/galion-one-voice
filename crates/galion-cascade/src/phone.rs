@@ -46,6 +46,10 @@
 //! pre-warms it with a discarded "Hello." so the first caller turn is warm. No backend
 //! → [`PhoneError::NoSpeech`]; tones are never returned as a reply (FRXDEL Q2).
 //!
+//! [`PhoneLane::new`] opens that stack through [`crate::speech_worker::speech_host`].
+//! On Unix the host calls `SpeechStack::detect` and `VoskClient::open`. On any other
+//! target the host does not spawn, and the lane cannot speak.
+//!
 //! # Threads
 //! [`PhoneLane`] is `Send`: build it once on a worker thread and call [`PhoneLane::turn`]
 //! per utterance (the speech stack and the Piper process are reused). [`phone_turn`] /
@@ -281,7 +285,7 @@ impl PhoneTurnAsr {
 
     fn vosk_transcribe(&mut self, pcm16k: &[i16]) -> Result<(String, AsrSource), PhoneError> {
         if self.worker.is_none() {
-            match galion_asr_vosk::VoskClient::open() {
+            match crate::speech_worker::speech_host().open_vosk() {
                 Ok(w) => self.worker = Some(w),
                 Err(e) => return Err(PhoneError::AsrUnavailable(e)),
             }
@@ -396,7 +400,9 @@ impl PhoneLane {
     /// Env-configured lane (`GALION_ASR`, `GALION_LLM`, `GALION_SPEECH`, …).
     pub fn from_env() -> Result<Self, PhoneError> { Ok(Self::new(PhoneConfig::from_env()?)) }
 
-    pub fn new(cfg: PhoneConfig) -> Self { Self::with_speech(cfg, SpeechStack::detect()) }
+    pub fn new(cfg: PhoneConfig) -> Self {
+        Self::with_speech(cfg, crate::speech_worker::speech_host().open_stack())
+    }
 
     /// Lane around an existing stack. Pre-warms Piper when that stack is A21.
     pub fn with_speech(cfg: PhoneConfig, mut speech: SpeechStack) -> Self {

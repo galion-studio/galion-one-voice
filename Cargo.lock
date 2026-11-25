@@ -252,18 +252,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "galion-live-demo"
-version = "0.0.1"
-dependencies = [
- "galion-console",
- "galion-emotion",
- "galion-heartbeat",
- "galion-presence",
- "galion-render",
- "galion-student-backend",
-]
-
-[[package]]
 name = "galion-mimi"
 version = "0.0.1"
 dependencies = [
@@ -280,6 +268,7 @@ dependencies = [
  "galion-heartbeat",
  "galion-source-filter",
  "galion-tensor",
+ "libc",
 ]
 
 [[package]]

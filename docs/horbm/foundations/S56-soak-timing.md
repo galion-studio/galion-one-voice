@@ -149,6 +149,10 @@ Same binary as the gate above. Passed in 89.35 s. RSS growth was again 52 KiB (w
 
 The highest thread-CPU maximum in either hour is 30.233 ms. That is why 90 ms was not raised.
 
+### After merging main
+
+`origin/main` moved while this branch was open. It links the research-style index into the soak binary and faults those file mappings before the call, so the fault does not show up as RSS growth. That prefault is kept, and it runs before the timed ticks. A five-minute rerun on the merged tree passed. Steady alloc counts were unchanged. RSS growth was 52 KiB again (warm 38,908, end 38,960). The higher start RSS (35,436 KiB) is the index already resident, not growth. Thread-CPU p99 was 22.722 ms and the thread-CPU maximum was 25.110 ms. The wall maximum was 25.112 ms.
+
 ## Files
 
 - `horbm/crates/horbm-soak/src/drive.rs` — clock argument, warmup left out of the ranked series, wall samples kept beside the gate samples.
