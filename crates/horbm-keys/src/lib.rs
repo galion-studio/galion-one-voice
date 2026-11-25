@@ -23,8 +23,10 @@
 //! so a wider key (the 256-wide width in the R1 note) is the same file.
 //! This version stores no per-key scale. The compare is the i32 dot.
 //!
-//! The retrieval thread is not linked. Nothing here opens FTS, a socket, or
-//! a card directory.
+//! [`StringKeyArena`] scores one string `item_id` with that same dot. The
+//! HKB1 file still stores clause ids as `u64`. The string table is bound in
+//! memory and is not a second file format. Nothing here opens FTS, a socket,
+//! or a card directory. The retrieval thread does not call this crate.
 
 #![forbid(unsafe_code)]
 
@@ -35,6 +37,10 @@ use std::fmt;
 use std::path::Path;
 
 pub use galion_tensor::gq::Prefault as KeyPrefault;
+
+mod score;
+
+pub use score::{encode_query_i8, StringKeyArena};
 
 /// Magic `HKB1` — HORBM key arena, version 1.
 pub const MAGIC: [u8; 4] = *b"HKB1";
@@ -77,6 +83,8 @@ pub enum ArenaError {
         got: usize,
         need: usize,
     },
+    EmptyItemId,
+    DuplicateItemId,
 }
 
 impl fmt::Display for ArenaError {

@@ -7,8 +7,8 @@ use galion_tensor::features::SimdLevel;
 use galion_tensor::gq::{sha256, to_hex, Prefault};
 use galion_tensor::simd::{dot_i8_level, dot_i8_scalar};
 use horbm_keys::{
-    fixed_fixture, shaped_pack, ArenaError, KeyArena, KeyPack, FIXTURE_SEED, HEADER_LEN, KEY_DIM,
-    MAGIC,
+    encode_query_i8, fixed_fixture, shaped_pack, ArenaError, KeyArena, KeyPack, StringKeyArena,
+    FIXTURE_SEED, HEADER_LEN, KEY_DIM, MAGIC,
 };
 use std::path::PathBuf;
 
@@ -279,5 +279,44 @@ fn empty_header_is_a_valid_arena() {
     assert!(arena.keys_aligned_64());
     let mut out = [];
     arena.dots_selected_into(&[0i8; KEY_DIM], &mut out).unwrap();
+    std::fs::remove_dir_all(d).unwrap();
+}
+
+/// Phase integration gate. The string scorer's i32 is the scalar dot of the
+/// encoded query, and the selected kernel matches that scalar. A denied row
+/// and an unknown id are `None`.
+#[test]
+fn string_item_scorer_is_bit_exact_with_scalar_on_the_fixture() {
+    let (pack, _) = fixed_fixture();
+    let ids: Vec<String> = (0..pack.n()).map(|i| format!("item-{i}")).collect();
+    let (d, arena) = open_pack("score", &pack, Prefault::Populate);
+    let keyed = StringKeyArena::bind(arena, ids.iter().map(String::as_str)).unwrap();
+    let text = "fixture-query";
+    let encoded = encode_query_i8(text, pack.k);
+    let oracle = naive(&pack.keys, pack.k, &encoded);
+    for (i, expected) in oracle.iter().enumerate() {
+        let id = format!("item-{i}");
+        let scalar = keyed.score_scalar_text(&id, text);
+        let selected = keyed.score_selected_text(&id, text);
+        if pack.allow[i] {
+            assert_eq!(scalar, Some(*expected), "row {i}");
+            assert_eq!(selected, scalar, "row {i}");
+        } else {
+            assert_eq!(scalar, None, "denied row {i} is not a score");
+            assert_eq!(selected, None);
+        }
+    }
+    assert_eq!(keyed.score_scalar_text("missing-item", text), None);
+    assert_eq!(keyed.score_selected_text("missing-item", text), None);
+    let short = ids[..ids.len() - 1].iter().map(String::as_str);
+    let (short_dir, again) = open_pack("score-short", &pack, Prefault::None);
+    match StringKeyArena::bind(again, short) {
+        Err(ArenaError::LenMismatch {
+            field: "item_id", ..
+        }) => {}
+        Err(err) => panic!("short id list: {err}"),
+        Ok(_) => panic!("short id list was accepted"),
+    }
+    std::fs::remove_dir_all(short_dir).unwrap();
     std::fs::remove_dir_all(d).unwrap();
 }

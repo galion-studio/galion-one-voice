@@ -1,0 +1,364 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Galion Labs
+//! Deterministic policy, plus an offline bandit that does not steer.
+//!
+//! The heuristic picks the move. The bandit may count that move when it is
+//! switched on and learn consent is granted. Counting does not change the
+//! next move. [`OfflineBandit::choose_steered`] is the optional count tie-in.
+//! `Dialogue::decide` does not call it.
+
+use super::cues::{self, CheckInPhrase};
+use super::filter::{self, Legal};
+use super::moves::Move;
+use crate::UNKNOWN_REPLY;
+
+/// What the gathered evidence looks like, plus the ring facts the heuristic
+/// is allowed to reuse.
+pub struct Choice<'a> {
+    pub heard: &'a str,
+    pub intent: &'a str,
+    pub reply: &'a str,
+    pub sources: &'a [String],
+    pub current_topic: Option<&'a str>,
+    pub ring_source: Option<&'a str>,
+    pub ring_clause: Option<&'a str>,
+    pub callback: Option<&'a str>,
+    pub check_ins: bool,
+    pub remember: bool,
+}
+
+/// Spoken text after the move is chosen. `Keep` leaves the gathered clause.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ReplyPlan {
+    Keep,
+    Replace {
+        reply: String,
+        sources: Vec<String>,
+        evidence: Vec<String>,
+    },
+}
+
+impl ReplyPlan {
+    fn line(reply: &str, source: &str) -> Self {
+        Self::Replace {
+            reply: reply.to_string(),
+            sources: vec![source.to_string()],
+            evidence: vec![source.to_string()],
+        }
+    }
+
+    fn miss() -> Self {
+        Self::line(UNKNOWN_REPLY, "honest:unknown")
+    }
+}
+
+enum Offer<'a> {
+    Callback(&'a str),
+    Topic(&'a str),
+}
+
+/// Heuristic scores, then the persona and truth mask. Higher wins.
+/// Ties keep the earlier move in [`Move::ALL`].
+pub fn choose(choice: &Choice<'_>) -> (Move, ReplyPlan, f32) {
+    let sourced = filter::is_sourced(choice.reply, choice.sources);
+    let stop = cues::is_stop(choice.heard, choice.intent);
+    let cite = cues::is_cite(choice.heard);
+    let switch = cues::is_switch(choice.heard);
+    let greet = cues::is_greeting(choice.heard);
+    let vent = choice.intent == "vent";
+
+    let (cite_source, cite_clause) = if sourced {
+        (filter::real_source(choice.sources), Some(choice.reply))
+    } else if cite {
+        let source = choice
+            .ring_source
+            .filter(|source| filter::is_real_source(source));
+        let clause = choice.ring_clause.filter(|clause| {
+            let clause = clause.trim();
+            !clause.is_empty() && clause != UNKNOWN_REPLY && !filter::is_scripted_comfort(clause)
+        });
+        (source, clause)
+    } else {
+        (None, None)
+    };
+    let cite_ok = cite && cite_source.is_some() && cite_clause.is_some();
+
+    let callback = if choice.check_ins && choice.remember && greet && !sourced {
+        choice.callback.filter(|text| {
+            let text = text.trim();
+            !text.is_empty() && !filter::is_scripted_comfort(text)
+        })
+    } else {
+        None
+    };
+    let switch_topic = if switch && !sourced {
+        choice.current_topic.filter(|topic| !topic.is_empty())
+    } else {
+        None
+    };
+    let offer = if let Some(text) = callback {
+        Some(Offer::Callback(text))
+    } else {
+        switch_topic.map(Offer::Topic)
+    };
+
+    let mut scores = [i32::MIN; 6];
+    if stop {
+        scores[Move::Stop.index()] = 100;
+    }
+    if cite_ok {
+        scores[Move::Cite.index()] = 80;
+    }
+    if offer.is_some() {
+        scores[Move::OfferTopic.index()] = 55;
+    }
+    if sourced {
+        scores[Move::Answer.index()] = 60;
+    }
+    if vent && !sourced {
+        scores[Move::Comfort.index()] = 50;
+    }
+    scores[Move::Ask.index()] = 10;
+    let scores = filter::mask(
+        scores,
+        &Legal {
+            sourced,
+            stop,
+            cite_ok,
+            offer: offer.is_some(),
+            vent,
+        },
+    );
+    let chosen = argmax(scores);
+    let plan = plan_for(chosen, choice, sourced, cite_source, cite_clause, offer);
+    (chosen, plan, propensity(chosen))
+}
+
+fn plan_for(
+    chosen: Move,
+    choice: &Choice<'_>,
+    sourced: bool,
+    cite_source: Option<&str>,
+    cite_clause: Option<&str>,
+    offer: Option<Offer<'_>>,
+) -> ReplyPlan {
+    match chosen {
+        Move::Stop => ReplyPlan::line("Talk soon.", "persona:talk-soon"),
+        Move::Cite if sourced => ReplyPlan::Keep,
+        Move::Cite => ReplyPlan::line(
+            cite_clause.unwrap_or(UNKNOWN_REPLY),
+            cite_source.unwrap_or("honest:unknown"),
+        ),
+        Move::OfferTopic => match offer {
+            Some(Offer::Callback(text)) => ReplyPlan::line(text, "memory:callback"),
+            Some(Offer::Topic(topic)) => {
+                let reply = format!("Back to {topic}?");
+                let source = format!("topic:{topic}");
+                ReplyPlan::Replace {
+                    reply,
+                    sources: vec![source.clone()],
+                    evidence: vec![source],
+                }
+            }
+            None => ReplyPlan::miss(),
+        },
+        Move::Answer => ReplyPlan::Keep,
+        Move::Comfort | Move::Ask => keep_honest(choice.reply),
+    }
+}
+
+fn keep_honest(reply: &str) -> ReplyPlan {
+    let trimmed = reply.trim();
+    if trimmed.is_empty() || trimmed == UNKNOWN_REPLY {
+        ReplyPlan::Keep
+    } else if filter::is_scripted_comfort(trimmed) {
+        ReplyPlan::miss()
+    } else {
+        ReplyPlan::Keep
+    }
+}
+
+pub fn argmax(scores: [i32; 6]) -> Move {
+    let mut best = Move::Ask;
+    let mut best_score = scores[Move::Ask.index()];
+    for move_ in Move::ALL {
+        let score = scores[move_.index()];
+        if score > best_score {
+            best = move_;
+            best_score = score;
+        }
+    }
+    best
+}
+
+pub fn propensity(move_: Move) -> f32 {
+    match move_ {
+        Move::Answer => 0.8,
+        Move::Cite => 0.7,
+        Move::OfferTopic => 0.6,
+        Move::Comfort => 0.5,
+        Move::Ask => 0.4,
+        Move::Stop => 0.9,
+    }
+}
+
+/// Same scores with zero counts match [`argmax`]. A count never revives an
+/// illegal arm (`i32::MIN`).
+pub fn steered(scores: [i32; 6], counts: [u32; 6]) -> Move {
+    let mut adjusted = scores;
+    for (score, count) in adjusted.iter_mut().zip(counts) {
+        if *score == i32::MIN {
+            continue;
+        }
+        let bump = i32::try_from(count).unwrap_or(i32::MAX);
+        *score = score.saturating_add(bump);
+    }
+    argmax(adjusted)
+}
+
+/// Optional counter. Off by default. `observe` writes a count only when
+/// enabled and `learn` is granted. It does not pick the move.
+#[derive(Clone, Debug)]
+pub struct OfflineBandit {
+    enabled: bool,
+    counts: [u32; 6],
+    updates: u32,
+}
+
+impl Default for OfflineBandit {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl OfflineBandit {
+    pub const fn new() -> Self {
+        Self {
+            enabled: false,
+            counts: [0; 6],
+            updates: 0,
+        }
+    }
+
+    pub fn set_enabled(&mut self, enabled: bool) {
+        self.enabled = enabled;
+    }
+
+    pub fn enabled(&self) -> bool {
+        self.enabled
+    }
+
+    pub fn updates(&self) -> u32 {
+        self.updates
+    }
+
+    pub fn counts(&self) -> [u32; 6] {
+        self.counts
+    }
+
+    pub fn observe(&mut self, chosen: Move, learn: bool) {
+        if !self.enabled || !learn {
+            return;
+        }
+        let index = chosen.index();
+        self.counts[index] = self.counts[index].saturating_add(1);
+        self.updates = self.updates.saturating_add(1);
+    }
+
+    pub fn choose_steered(&self, scores: [i32; 6]) -> Move {
+        steered(scores, self.counts)
+    }
+}
+
+pub fn check_in_phrase(text: &str) -> CheckInPhrase {
+    cues::check_in_phrase(text)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn choice<'a>(
+        heard: &'a str,
+        intent: &'a str,
+        reply: &'a str,
+        sources: &'a [String],
+    ) -> Choice<'a> {
+        Choice {
+            heard,
+            intent,
+            reply,
+            sources,
+            current_topic: None,
+            ring_source: None,
+            ring_clause: None,
+            callback: None,
+            check_ins: false,
+            remember: false,
+        }
+    }
+
+    #[test]
+    fn each_move_wins_its_own_case_and_an_unsourced_answer_cannot() {
+        let card = vec!["card:kettle".to_string()];
+        let unknown = vec!["honest:unknown".to_string()];
+        let (answer, _, _) = choose(&choice(
+            "where is the kettle",
+            "ask",
+            "The kettle is on the hob.",
+            &card,
+        ));
+        assert_eq!(answer, Move::Answer);
+        let (ask, plan, _) = choose(&choice("who won the match", "ask", UNKNOWN_REPLY, &unknown));
+        assert_eq!(ask, Move::Ask);
+        assert!(matches!(plan, ReplyPlan::Keep));
+        let (comfort, _, _) = choose(&choice("I am so tired", "vent", UNKNOWN_REPLY, &unknown));
+        assert_eq!(comfort, Move::Comfort);
+        let (stop, _, _) = choose(&choice("goodbye", "goodbye", UNKNOWN_REPLY, &unknown));
+        assert_eq!(stop, Move::Stop);
+        let mut cite = choice("cite that", "ask", UNKNOWN_REPLY, &unknown);
+        cite.ring_source = Some("card:kettle");
+        cite.ring_clause = Some("The kettle is on the hob.");
+        let (cited, plan, _) = choose(&cite);
+        assert_eq!(cited, Move::Cite);
+        match plan {
+            ReplyPlan::Replace { reply, sources, .. } => {
+                assert_eq!(reply, "The kettle is on the hob.");
+                assert_eq!(sources, vec!["card:kettle".to_string()]);
+            }
+            ReplyPlan::Keep => panic!("cite had no current card"),
+        }
+        let mut offer = choice("something else", "chat", UNKNOWN_REPLY, &unknown);
+        offer.current_topic = Some("kettle");
+        let (offered, _, _) = choose(&offer);
+        assert_eq!(offered, Move::OfferTopic);
+    }
+
+    #[test]
+    fn zero_counts_match_the_heuristic_and_an_illegal_arm_stays_down() {
+        let scores = [i32::MIN, i32::MIN, i32::MIN, 60, i32::MIN, 10];
+        assert_eq!(argmax(scores), Move::Answer);
+        assert_eq!(steered(scores, [0; 6]), Move::Answer);
+        assert_eq!(steered(scores, [0; 6]), steered(scores, [0; 6]));
+        let mut flooded = [9_000u32; 6];
+        flooded[Move::Answer.index()] = 0;
+        flooded[Move::Ask.index()] = 0;
+        assert_eq!(steered(scores, flooded), Move::Answer);
+        let bandit = OfflineBandit::new();
+        assert!(!bandit.enabled());
+        assert_eq!(bandit.choose_steered(scores), Move::Answer);
+    }
+
+    #[test]
+    fn observe_is_a_no_op_until_the_bandit_is_on_and_learn_is_granted() {
+        let mut bandit = OfflineBandit::new();
+        bandit.observe(Move::Ask, true);
+        assert_eq!(bandit.updates(), 0);
+        bandit.set_enabled(true);
+        bandit.observe(Move::Ask, false);
+        assert_eq!(bandit.updates(), 0);
+        bandit.observe(Move::Ask, true);
+        assert_eq!(bandit.updates(), 1);
+        assert_eq!(bandit.counts()[Move::Ask.index()], 1);
+    }
+}

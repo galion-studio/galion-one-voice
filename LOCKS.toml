@@ -190,3 +190,17 @@ copyright = "(c) 2026 Maciej Grajczyk"
 free_forever = true
 paid_tiers = false
 sources = ["Q-BRANDING.Q9", "Q-BRANDING.Q10", "Q-BRANDING.Q13"]
+
+# ---------------------------------------------------------------- horbm hot path
+# Owner decision 2026-11-24 19:15 CET. Q1 option A.
+# [consent] above is unchanged: remember stays deny, default stays deny,
+# withdraw still wipes RAM history. This block does not grant remember.
+# The diary opens only when the process is given remember_grant exactly.
+# A student decode is not on the chat-turn hot path.
+[horbm]
+hot_path = "retrieval"
+student_on_tick = false
+miss = "I don't know."
+remember_grant = "GALION_HORBM_REMEMBER=grant"
+decision = "2026-11-24 Q1 option A"
+owner = "Maciej Grajczyk"
