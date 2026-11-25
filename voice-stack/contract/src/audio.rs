@@ -51,7 +51,7 @@ pub trait AudioOut {
     fn sample_rate(&self) -> u32;
 }
 
-/// Same names as `galion_v2_live::endpoint::EpEv`.
+/// Same names as `endpoint::EpEv` in `archive/2026-11-24/crates/galion-v2-live/src/endpoint.rs`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum EndpointEvent {
     None,

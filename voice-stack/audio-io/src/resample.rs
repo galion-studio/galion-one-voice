@@ -19,7 +19,7 @@ use crate::AudioError;
 
 /// Linear resample. `from == to` returns a copy. Empty in, empty out.
 /// Output length is `len * to / from`, truncated, matching the integer
-/// length in `galion-v2-live`.
+/// length in `archive/2026-11-24/crates/galion-v2-live/src/audio.rs`.
 pub fn resample_linear(input: &[f32], from: u32, to: u32) -> Result<Vec<f32>, AudioError> {
     if from == 0 || to == 0 {
         return Err(AudioError::Rate);

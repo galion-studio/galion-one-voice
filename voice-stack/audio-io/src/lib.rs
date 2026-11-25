@@ -57,7 +57,7 @@ pub use wav::{read_wav, write_wav, PcmWav};
 
 /// Microphone rate. Same constant as `galion_asr_vosk::SAMPLE_RATE`.
 pub const CAPTURE_HZ: u32 = 16_000;
-/// One VAD/ASR frame. Same hop as `galion-v2-live` (`FRAME` 320 at 16 kHz).
+/// One VAD/ASR frame. Same hop as `archive/2026-11-24/crates/galion-v2-live` (`FRAME` 320 at 16 kHz).
 pub const CAPTURE_FRAME_MS: u32 = 20;
 /// 20 ms at 16 kHz. Same value as `galion_asr_vosk::FRAME_SAMPLES`.
 pub const CAPTURE_FRAME_SAMPLES: usize = (CAPTURE_HZ as usize * CAPTURE_FRAME_MS as usize) / 1_000;
@@ -68,7 +68,7 @@ pub const PLAYBACK_FRAME_MS: u32 = 80;
 /// 80 ms at 24 kHz. `galion_heartbeat::FRAME_SAMPLES` is 1920.
 pub const PLAYBACK_FRAME_SAMPLES: usize =
     (PLAYBACK_HZ as usize * PLAYBACK_FRAME_MS as usize) / 1_000;
-/// Piper's pinned rate (`galion_v2_live::piper::PIPER_HZ`). Not negotiated.
+/// Piper's pinned rate (`PIPER_HZ` in `archive/2026-11-24/crates/galion-v2-live/src/piper.rs`). Not negotiated.
 pub const PIPER_HZ: u32 = 22_050;
 /// Duck applied by the heartbeat mixer at 80 ms of overlap.
 /// `galion_heartbeat::mixer::DUCK_GAIN`.

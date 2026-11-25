@@ -71,7 +71,7 @@ pub fn to_mono(w: &Wav) -> Vec<i16> {
         .collect()
 }
 
-/// Linear resample. Same formula as `galion_v2_live::audio::resample`.
+/// Linear resample. Same formula as `audio::resample` in `archive/2026-11-24/crates/galion-v2-live/src/audio.rs`.
 pub fn resample(x: &[i16], from: u32, to: u32) -> Vec<i16> {
     if from == to || x.is_empty() || from == 0 || to == 0 {
         return x.to_vec();
@@ -90,7 +90,7 @@ pub fn resample(x: &[i16], from: u32, to: u32) -> Vec<i16> {
         .collect()
 }
 
-/// dBFS of an s16 frame. Same formula as `galion_v2_live::audio::rms_db`.
+/// dBFS of an s16 frame. Same formula as `audio::rms_db` in `archive/2026-11-24/crates/galion-v2-live/src/audio.rs`.
 pub fn rms_db(x: &[i16]) -> f64 {
     if x.is_empty() {
         return -120.0;

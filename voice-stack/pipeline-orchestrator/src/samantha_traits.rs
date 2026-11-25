@@ -6,7 +6,7 @@
 //! Other sectors implement these. This sector runs them. The shapes follow
 //! the code already in the repo:
 //!
-//! * [`Vad`] — `galion-v2-live` `Vad::push` (energy, hangover, start / end).
+//! * [`Vad`] — `Vad::push` in `archive/2026-11-24/crates/galion-v2-live/src/vad.rs` (energy, hangover, start / end).
 //! * [`Asr`] — final text after end of turn. The live worker is
 //!   `galion-asr-vosk` (NDJSON, 16 kHz, 20 ms frames). A blank final is not
 //!   a transcript.
@@ -235,7 +235,7 @@ pub trait AudioIn: Send + 'static {
     fn recv(&mut self) -> impl Future<Output = Option<AudioFrame>> + Send;
 }
 
-/// Endpointer event. Same three outcomes as `galion-v2-live` `VadEv`.
+/// Endpointer event. Same three outcomes as `VadEv` in `archive/2026-11-24/crates/galion-v2-live/src/vad.rs`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum VadEvent {
     None,
@@ -287,7 +287,7 @@ pub trait AudioOut: Send + 'static {
     fn stop(&mut self);
 }
 
-/// RMS in dB, same formula as `galion-v2-live` `audio::rms_db`.
+/// RMS in dB, same formula as `audio::rms_db` in `archive/2026-11-24/crates/galion-v2-live/src/audio.rs`.
 pub fn rms_db(frame: &[i16]) -> f64 {
     if frame.is_empty() {
         return -120.0;
@@ -300,7 +300,7 @@ pub fn rms_db(frame: &[i16]) -> f64 {
     10.0 * energy.max(1e-12).log10()
 }
 
-/// Energy VAD. Thresholds match `galion-v2-live` `Vad`.
+/// Energy VAD. Thresholds match `Vad` in `archive/2026-11-24/crates/galion-v2-live/src/vad.rs`.
 #[derive(Debug)]
 pub struct EnergyVad {
     pub floor_db: f64,
