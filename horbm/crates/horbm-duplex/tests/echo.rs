@@ -10,8 +10,8 @@ use std::time::Instant;
 
 use horbm::{CardHit, CardLookup};
 use horbm_duplex::{
-    CoreAffect, Duplex, Hypothesis, HypothesisKind, LoopError, LoopEvent, Parts, PlaybackEcho,
-    RecogError, Recognizer, SamanthaPersona, SpeakingBreath, FRAME_MS, FRAME_SAMPLES, SAMPLE_RATE,
+    ConfiguredPersona, CoreAffect, Duplex, Hypothesis, HypothesisKind, LoopError, LoopEvent, Parts,
+    PlaybackEcho, RecogError, Recognizer, SpeakingBreath, FRAME_MS, FRAME_SAMPLES, SAMPLE_RATE,
 };
 #[cfg(feature = "aec")]
 use horbm_duplex::{EarSense, ProsodyEar, AEC_CRATE, AEC_LICENSE, AEC_VERSION};
@@ -377,17 +377,19 @@ struct Scene {
 
 fn scene(kind: Kind, aec: bool, near_after: Option<usize>) -> Scene {
     let phase = Rc::new(Cell::new(0u8));
+    let persona = horbm::Persona::load_development().expect("configured persona");
+    let emotion = CoreAffect::from_baseline(persona.baseline());
     let mut duplex = Duplex::new(
         Parts {
             recognizer: Schedule::new(Rc::clone(&phase)),
-            emotion: CoreAffect::samantha(),
+            emotion,
             breath: SpeakingBreath,
-            persona: SamanthaPersona,
+            persona: ConfiguredPersona::from_persona(persona),
             mouth: FarMouth::new(kind),
         },
         NoCards,
     )
-    .expect("samantha");
+    .expect("configured persona");
     duplex.set_aec(aec);
     let mut saw_audio = false;
     for step in 0..16 {
