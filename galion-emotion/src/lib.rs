@@ -16,6 +16,7 @@
 //!   reference replay; later a learned head) behind the same consent gate.
 //! * [`band`] defines the 8-byte wire sample and the duplex packet that carries it.
 //! * [`duplex`] is the host clock: one [`VoiceColor`] per 80 ms frame, after the heartbeat step.
+//! * [`persona_mood`] holds the built-in profiles. [`persona_mood::configured`] selects one.
 //!
 //! Phase 2 status: all model-backed parts are **stubs** (cheap DSP heuristics),
 //! zero dependencies, zero model downloads, safetensors + .gq only.
@@ -52,9 +53,10 @@ pub use loudness::{
     ReferenceEstimator, SyntheticEstimator, SyntheticMode,
 };
 pub use persona_mood::{
-    appraise, text_affect, Appraisal, ConditionedDecoder, Mood, MoodDynamics, ObsSource, Persona, PersonaConditioning,
-    PersonaMood, PersonaProfile, PiperProsodyVector, PiperVoiceProfile, UserObservation, CONDITIONING_DIM,
-    CONDITIONING_VERSION, JARVIS, SAMANTHA,
+    appraise, configured, configured_from_env, text_affect, Appraisal, ConditionedDecoder, FeelingColumn, Mood,
+    MoodDynamics, ObsSource, Persona, PersonaConditioning, PersonaMood, PersonaProfile, PiperProsodyVector,
+    PiperVoiceProfile, UnknownPersona, UserObservation, CONDITIONING_DIM, CONDITIONING_VERSION, DEV_PERSONA_ENV, JARVIS,
+    SAMANTHA,
 };
 pub use rika::{Cue, FrameFeatures, OffReason, Rika, RikaConfig, RikaCtx, RikaOutput, RikaReport, RikaState, Trigger};
 pub use store::{AffectBaseline, AffectStore, Consented, Revalidated, Unconsented, WipeHook, WipeReason, WipeReceipt};
