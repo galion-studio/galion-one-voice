@@ -6,9 +6,10 @@ edition = "2021"
 license = "MIT"
 publish = false
 rust-version = "1.85"
-description = "Samantha mouth: an 80 ms source-filter stage on Piper and flite PCM. Baseline tract stays put; the emotion-core moment supplies the deltas."
+description = "Samantha mouth: an 80 ms source-filter on Piper and flite PCM. Glottal, nasal, and mouth numbers come from horbm-breath."
 
 [dependencies]
 # MIT OR Apache-2.0. Direct Form 1 biquads, retuned each frame. This crate is glue.
 biquad = "0.6.0"
 galion-emotion-core = { path = "../galion-emotion-core" }
+horbm-breath = { path = "../../horbm/crates/horbm-breath" }

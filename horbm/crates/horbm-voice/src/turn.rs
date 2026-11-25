@@ -8,6 +8,7 @@ use crate::clock::{VirtualClock, BARGE_IN_MAX_MS, FRAME_MS, PAUSE_MS};
 use crate::device::{place, Place};
 use crate::ear::{Ear, EarEvent};
 use crate::lexicon::is_listed_backchannel;
+use crate::moment_voice::MomentVoice;
 use crate::mouth::{AudioFrame, BackchannelPlay, Mouth, MouthPull};
 
 /// What this frame decided.
@@ -76,6 +77,7 @@ pub struct VoiceLoop<E, M, B> {
     eot_ms: Option<u64>,
     first_audio_ms: Option<u64>,
     barge_ms: Option<u64>,
+    moment: Option<MomentVoice>,
     /// Mouth samples from the previous frame. The ear treats a copy as echo.
     played: Vec<i16>,
     last_partial: String,
@@ -109,6 +111,7 @@ where
             eot_ms: None,
             first_audio_ms: None,
             barge_ms: None,
+            moment: None,
             played: Vec::new(),
             last_partial: String::new(),
             frame_question: false,
@@ -204,6 +207,7 @@ where
         mood: ListenMood,
     ) -> TickOut {
         let t_ms = self.clock.t_ms();
+        self.follow_moment();
         if self.speaking {
             self.ear.note_playback(&self.played);
         } else {
@@ -275,6 +279,25 @@ where
         };
         self.clock.advance();
         out
+    }
+
+    fn follow_moment(&mut self) {
+        let Some(view) = self.brain.moment_view() else {
+            return;
+        };
+        let bits = view.baseline.identity_bits();
+        let stale = self
+            .moment
+            .as_ref()
+            .map(|voice| voice.identity() != bits)
+            .unwrap_or(true);
+        if stale {
+            self.moment = Some(MomentVoice::new(view.baseline));
+        }
+        if let Some(voice) = self.moment.as_mut() {
+            let controls = voice.tick(view.moment, view.breath);
+            self.mouth.feel(controls);
+        }
     }
 
     /// `true` means yield the floor on this frame. The ear has already decided

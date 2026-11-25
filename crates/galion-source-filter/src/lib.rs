@@ -12,11 +12,10 @@
 //!
 //! [`TractBaseline`] is the steady voice (where F1 and F2 sit at rest).
 //! [`MouthControls`] is what this stage renders: tilt, formant shift, nasal
-//! dips, and exhale noise. It does not compute glottal open quotient,
-//! breathiness, or mouth openness. Those numbers belong to `horbm-breath`
-//! (PR 278). [`MouthControls::from_moment`] only turns an exhale into noise
-//! and copies a caller velum. It does not write the baseline or the moment.
-//! Neutral controls leave every sample alone.
+//! dips, and exhale noise. Glottal open quotient, breathiness, nasal
+//! coupling, and mouth openness are read from [`horbm_breath::Frame`].
+//! This crate does not compute a second Fant model. Neutral controls leave
+//! every sample alone.
 //!
 //! Samantha is the only persona the speech stack will run this on.
 //! [`applies_to`] is that check. The filter itself does not read the
@@ -38,6 +37,7 @@ pub use controls::{
 pub use cost::{measure_frame_cost, FrameReport};
 pub use filter::{SourceFilter, FRAME_ALLOC_BUDGET};
 pub use galion_emotion_core::{Breath, BreathPhase, MomentState, VoiceBaseline};
+pub use horbm_breath::{Articulation, Drive, Frame};
 
 const _: () = assert!(FRAME_MS == 80);
 const _: () = assert!(FRAME_MS == galion_emotion_core::FRAME_MS);

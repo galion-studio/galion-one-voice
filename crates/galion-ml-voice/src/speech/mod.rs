@@ -64,7 +64,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
 
-pub use galion_source_filter::{Breath, MomentState, MouthControls, VoiceBaseline};
+pub use galion_source_filter::{Breath, Frame as BreathFrame, MomentState, MouthControls, VoiceBaseline};
 
 pub mod clause;
 pub mod clip_store;
@@ -588,6 +588,12 @@ impl SpeechStack {
         velum: f32,
     ) {
         self.mouth.set_moment(voice, moment, breath, velum);
+    }
+
+    /// Shape from one `horbm-breath` frame. Open quotient, breathiness,
+    /// nasal coupling, and mouth openness are that frame's fields.
+    pub fn set_mouth_frame(&mut self, frame: BreathFrame) {
+        self.mouth.set_controls(MouthControls::from_breath_frame(frame));
     }
 
     /// Shape Samantha's Piper or flite PCM in 80 ms frames. Clone audio never

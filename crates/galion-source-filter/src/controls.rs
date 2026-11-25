@@ -7,6 +7,7 @@
 //! speaker. They are anchors for the shift, not a new measurement.
 
 use galion_emotion_core::{Breath, BreathPhase, MomentState, VoiceBaseline};
+use horbm_breath::{controls, Articulation, Drive, Frame};
 
 /// The only persona this mouth shapes.
 pub const PERSONA: &str = "samantha";
@@ -143,17 +144,11 @@ impl MouthControls {
             && self.breath_noise.abs() < SECTION_EPS
     }
 
-    /// Exhale noise, and a nasal amount the caller already chose.
+    /// Exhale noise from a lungs sample, plus a velum the caller already chose.
     ///
-    /// Does not write `voice` or `moment`. Does not turn arousal, dominance,
-    /// fatigue, or health into glottal tension, breathiness, or mouth
-    /// openness. Those numbers belong to `horbm-breath`'s articulation frame
-    /// (Fant open quotient and the rest, PR 278). This filter renders
-    /// [`MouthControls`] and does not compute a second set.
-    ///
-    /// `velum` is copied into [`Self::nasal`] when it is finite. The health
-    /// mix on nasal coupling stays in that breath crate. Breath noise follows
-    /// the exhale phase, including when the feeling is still on the baseline.
+    /// Does not write `voice` or `moment`. Does not turn the axes into
+    /// glottal tension, breathiness, or mouth openness. Those come from
+    /// [`Self::from_breath_frame`].
     pub fn from_moment(
         voice: &VoiceBaseline,
         moment: &MomentState,
@@ -162,27 +157,66 @@ impl MouthControls {
     ) -> Self {
         let _baseline = voice;
         let _moment = moment;
-        let breath_noise = match breath.phase {
-            BreathPhase::Exhale => {
-                let outward = if breath.flow.is_finite() && breath.flow < 0.0 {
-                    -breath.flow
-                } else {
-                    0.0
-                };
-                outward.max(BREATH_FLOOR).clamp(0.0, 1.0)
-            }
-            BreathPhase::Rest | BreathPhase::Inhale | BreathPhase::Hold | BreathPhase::Speech => {
-                0.0
-            }
-        };
         Self {
             tension: 0.0,
             breathiness: 0.0,
             openness: 0.0,
             nasal: finite_clamp(velum, 0.0, 1.0),
-            breath_noise,
+            breath_noise: exhale_noise(breath.phase, breath.flow),
         }
     }
+
+    /// Render one `horbm-breath` frame.
+    ///
+    /// Open quotient, breathiness, nasal coupling, and mouth openness are
+    /// that frame's fields. The deltas are against [`controls`] at the rest
+    /// drive, speech phase, nasal target 0, and mouth target 0.5 (the value
+    /// `Lungs` starts with). This crate does not recompute Rd, Ra, or Rk.
+    /// Breath noise still follows the exhale phase on the same frame.
+    pub fn from_breath_frame(frame: Frame) -> Self {
+        let rest = rest_speech();
+        let breathiness = finite_clamp(frame.breathiness - rest.breathiness, 0.0, 1.0);
+        let tension = if rest.open_quotient > 1.0e-3 {
+            finite_clamp(
+                (rest.open_quotient - frame.open_quotient) / rest.open_quotient,
+                0.0,
+                1.0,
+            )
+        } else {
+            0.0
+        };
+        let span = rest.mouth_openness.max(0.05);
+        let openness = finite_clamp(
+            (frame.mouth_openness - rest.mouth_openness) / span,
+            -1.0,
+            1.0,
+        );
+        let nasal = finite_clamp(frame.nasal_coupling - rest.nasal_coupling, 0.0, 1.0);
+        Self {
+            tension,
+            breathiness,
+            openness,
+            nasal,
+            breath_noise: exhale_noise(frame.phase, frame.flow),
+        }
+    }
+}
+
+/// Rest speech articulation from `horbm-breath`. Mouth 0.5 is `Lungs`' start.
+fn rest_speech() -> Articulation {
+    controls(&Drive::rest(), BreathPhase::Speech, 0.0, 0.5)
+}
+
+fn exhale_noise(phase: BreathPhase, flow: f32) -> f32 {
+    if phase != BreathPhase::Exhale {
+        return 0.0;
+    }
+    let outward = if flow.is_finite() && flow < 0.0 {
+        -flow
+    } else {
+        0.0
+    };
+    outward.max(BREATH_FLOOR).clamp(0.0, 1.0)
 }
 
 pub(crate) fn tilt_q() -> f32 {
@@ -211,6 +245,7 @@ mod tests {
     use galion_emotion_core::{
         Breath, BreathPhase, MomentState, VoiceBaseline, APPROACH, AROUSAL, VALENCE,
     };
+    use horbm_breath::{controls, Drive, Frame};
 
     fn rest_moment() -> (VoiceBaseline, MomentState) {
         let voice = VoiceBaseline::standin();
@@ -279,6 +314,55 @@ mod tests {
         assert_eq!(shut.nasal, 0.0);
         assert!((open.nasal - 0.4).abs() < 1.0e-6);
         assert!((open.tension - shut.tension).abs() < 1.0e-6);
+    }
+
+    fn frame_of(art: horbm_breath::Articulation, phase: BreathPhase, flow: f32) -> Frame {
+        Frame {
+            phase,
+            volume: 0.55,
+            flow,
+            pressure: 1.0,
+            loudness_db: 0.0,
+            loudness_gain: 1.0,
+            pause: false,
+            open_quotient: art.open_quotient,
+            breathiness: art.breathiness,
+            nasal_coupling: art.nasal_coupling,
+            mouth_openness: art.mouth_openness,
+        }
+    }
+
+    #[test]
+    fn a_breath_frame_is_the_only_glottal_and_mouth_source() {
+        let rest_art = controls(&Drive::rest(), BreathPhase::Speech, 0.0, 0.5);
+        let rest = MouthControls::from_breath_frame(frame_of(rest_art, BreathPhase::Speech, -0.4));
+        assert!(rest.is_neutral(), "{rest:?}");
+        assert_eq!(rest.breath_noise, 0.0);
+
+        let mut tired = Drive::rest();
+        tired.fatigue = 0.9;
+        tired.health = 0.3;
+        let tired_art = controls(&tired, BreathPhase::Speech, 0.0, 0.5);
+        let tired_controls =
+            MouthControls::from_breath_frame(frame_of(tired_art, BreathPhase::Speech, -0.4));
+        assert!(tired_controls.breathiness > rest.breathiness);
+
+        let open = controls(&Drive::rest(), BreathPhase::Speech, 1.0, 1.0);
+        let shaped = MouthControls::from_breath_frame(frame_of(open, BreathPhase::Speech, 0.0));
+        assert!(shaped.nasal > 0.5, "nasal {}", shaped.nasal);
+        assert!(shaped.openness > 0.4, "openness {}", shaped.openness);
+
+        let mut pressed = rest_art;
+        pressed.open_quotient *= 0.6;
+        let tight = MouthControls::from_breath_frame(frame_of(pressed, BreathPhase::Speech, 0.0));
+        assert!(tight.tension > 0.2, "tension {}", tight.tension);
+
+        let exhaled =
+            MouthControls::from_breath_frame(frame_of(rest_art, BreathPhase::Exhale, -0.8));
+        assert!(exhaled.breath_noise >= 0.8);
+        let inhaled =
+            MouthControls::from_breath_frame(frame_of(rest_art, BreathPhase::Inhale, 0.8));
+        assert_eq!(inhaled.breath_noise, 0.0);
     }
 
     #[test]

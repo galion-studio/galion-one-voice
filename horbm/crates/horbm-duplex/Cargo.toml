@@ -24,6 +24,10 @@ aec = ["dep:fdaf-aec"]
 vosk = ["dep:galion-sam-asr"]
 # `horbm-duplex-live`. Opens the default devices through cpal. Off in CI.
 live = ["dep:galion-sam-audio-io"]
+# Warm Piper mouth. Off in CI. The default mouth stays the generated tone.
+# The worker is the existing `galion-ml-voice` process. This feature does
+# not download a model and does not link ONNX Runtime.
+piper = ["dep:galion-ml-voice"]
 
 [dependencies]
 horbm = { path = "../horbm" }
@@ -32,6 +36,7 @@ galion-conductor = { path = "../../../crates/galion-conductor" }
 galion-emotion-core = { path = "../../../crates/galion-emotion-core" }
 galion-sam-asr = { path = "../../../voice-stack/asr", optional = true }
 galion-sam-audio-io = { path = "../../../voice-stack/audio-io", optional = true }
+galion-ml-voice = { path = "../../../crates/galion-ml-voice", optional = true, default-features = false, features = ["speech"] }
 fdaf-aec = { version = "0.1.0", optional = true }
 
 [dev-dependencies]
