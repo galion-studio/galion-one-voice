@@ -3,7 +3,7 @@
 
 [package]
 name = "horbm-brain"
-description = "HORBM phase 4 brain: heuristic pick of one stored clause, and the versioned HKB1 file that stores string ids and a per-key int8 scale."
+description = "HORBM phase 4 brain: heuristic pick of one stored clause, the versioned HKB1 file, and the zero-alloc scan of that file plus the person-diary arena."
 version = "0.0.1"
 edition = "2021"
 license = "MIT"
