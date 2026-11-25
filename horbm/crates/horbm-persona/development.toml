@@ -1,0 +1,5 @@
+# Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
+# Id of the persona development boot may install.
+# Any schema-valid persona file with this id is bootable.
+# GALION_HORBM_DEV_PERSONA overrides this file. Blank is not configured.
+development_persona = "samantha"
