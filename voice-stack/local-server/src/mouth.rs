@@ -16,6 +16,12 @@
 //! factor, and a Chatterbox `generate` on CPU is not treated as able to feed
 //! the 80 ms speaker clock. The log line says that. It is not a new timing.
 //! The 80 ms slice clock stays in the socket. This module returns PCM.
+//!
+//! `GALION_MOUTH=native` (also `horbm` or `text`) selects [`NativeMouth`].
+//! That mouth does not spawn Piper. It speaks `horbm::TurnOut::first_clause`
+//! and then `rest` as text on the socket, and it returns no PCM. Any other
+//! value keeps today's mouth, so a build with `--features piper` still speaks
+//! through `PiperMouth`.
 
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -79,6 +85,16 @@ pub(crate) trait Mouth: Send {
         }
         let _ = on_pcm(&pcm);
         Ok(())
+    }
+    /// `false` when this mouth speaks text and returns no samples.
+    fn emits_audio(&self) -> bool {
+        true
+    }
+    /// Pieces from `horbm::TurnOut`, when the caller has them.
+    fn set_clauses(&mut self, _first_clause: &str, _rest: &str) {}
+    /// Text queued by the last [`Self::speak`]. Empty for an audio mouth.
+    fn drain_lines(&mut self) -> Vec<String> {
+        Vec::new()
     }
     fn mouth(&self) -> &'static str;
     fn voice(&self) -> &'static str;
@@ -242,13 +258,197 @@ pub(crate) fn open_selected(choice: &Choice) -> Box<dyn Mouth> {
     }
 }
 
+/// Which mouth `GALION_MOUTH` names. `Today` is the existing Piper, tone, or s711 choice.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum MouthPick {
+    Native,
+    Today,
+}
+
+pub(crate) const NATIVE_MOUTH_LOG: &str = "samantha-mouth: native mouth selected (GALION_MOUTH). The turn text goes on the socket, first clause then the rest. No PCM until an MIT or Apache-2.0 speaker is linked. Piper is not started. Not a new timing.";
+
+pub(crate) const UNKNOWN_MOUTH_LOG: &str =
+    "samantha-mouth: GALION_MOUTH is not a known selector. Keeping today's mouth.";
+
+/// `native`, `horbm`, and `text` select the socket mouth. A known alias of
+/// today's mouth, or an empty value, keeps [`decide`]. Anything else falls
+/// back to today's mouth as well.
+pub(crate) fn parse_mouth_env(raw: &str) -> (MouthPick, bool) {
+    match raw.trim().to_ascii_lowercase().as_str() {
+        "native" | "horbm" | "text" => (MouthPick::Native, true),
+        "" | "piper" | "cpu" | "auto" | "today" | "tone" | "s711" | "fake" => {
+            (MouthPick::Today, true)
+        }
+        _ => (MouthPick::Today, false),
+    }
+}
+
+/// Name a pure selection would build. Does not open a process.
+#[cfg(test)]
+pub(crate) fn resolved_mouth(pick: MouthPick, choice: &Choice) -> &'static str {
+    match pick {
+        MouthPick::Native => "native",
+        MouthPick::Today => match choice {
+            Choice::S711 { .. } => "s711",
+            Choice::Piper { .. } => {
+                #[cfg(feature = "piper")]
+                {
+                    "piper"
+                }
+                #[cfg(not(feature = "piper"))]
+                {
+                    "fake"
+                }
+            }
+        },
+    }
+}
+
+pub(crate) fn open_kind(pick: MouthPick, choice: &Choice, raw_env: &str) -> Box<dyn Mouth> {
+    match pick {
+        MouthPick::Native => {
+            log_native();
+            Box::new(NativeMouth::new())
+        }
+        MouthPick::Today => {
+            if !parse_mouth_env(raw_env).1 {
+                log_unknown();
+            }
+            open_selected(choice)
+        }
+    }
+}
+
+fn log_native() {
+    use std::sync::Once;
+    static ONCE: Once = Once::new();
+    ONCE.call_once(|| eprintln!("{NATIVE_MOUTH_LOG}"));
+}
+
+fn log_unknown() {
+    use std::sync::Once;
+    static ONCE: Once = Once::new();
+    ONCE.call_once(|| eprintln!("{UNKNOWN_MOUTH_LOG}"));
+}
+
+/// Same cut `horbm::Brain::turn` stores on `TurnOut.first_clause` and `rest`
+/// for a card clause and for the miss. The miss stays one piece. A longer
+/// clause yields two words, then the remainder. Locked against `horbm::TurnOut`
+/// in the tests below.
+pub(crate) fn clause_pair(reply: &str) -> (String, String) {
+    let text = reply.trim();
+    let atomic = text.is_empty() || text == horbm::UNKNOWN_REPLY;
+    split_clause(text, atomic)
+}
+
+/// Spoken order from the fields `horbm` already computed. Does not split again.
+#[cfg(test)]
+pub(crate) fn pieces_from_turn(turn: &horbm::TurnOut) -> Vec<String> {
+    pieces_from_fields(&turn.first_clause, &turn.rest)
+}
+
+fn pieces_from_fields(first_clause: &str, rest: &str) -> Vec<String> {
+    let mut lines = Vec::new();
+    if !first_clause.is_empty() {
+        lines.push(first_clause.to_string());
+    }
+    if !rest.is_empty() {
+        lines.push(rest.to_string());
+    }
+    lines
+}
+
+fn split_clause(text: &str, atomic: bool) -> (String, String) {
+    if text.is_empty() {
+        return (String::new(), String::new());
+    }
+    if atomic || text.split_whitespace().count() <= 2 {
+        return (text.to_string(), String::new());
+    }
+    let mut index = 0usize;
+    let mut rest_at = None;
+    for (seen, word) in text.split_whitespace().enumerate() {
+        let pos = text[index..]
+            .find(word)
+            .map(|off| index + off)
+            .unwrap_or(index);
+        if seen == 2 {
+            rest_at = Some(pos);
+            break;
+        }
+        index = pos + word.len();
+    }
+    match rest_at {
+        Some(at) => (text[..at].trim_end().to_string(), text[at..].to_string()),
+        None => (text.to_string(), String::new()),
+    }
+}
+
+/// HORBM mouth. Text on the socket. No Piper process and no samples.
+pub(crate) struct NativeMouth {
+    lead: String,
+    rest: String,
+    clauses_set: bool,
+    lines: Vec<String>,
+}
+
+impl NativeMouth {
+    pub(crate) fn new() -> Self {
+        Self {
+            lead: String::new(),
+            rest: String::new(),
+            clauses_set: false,
+            lines: Vec::new(),
+        }
+    }
+}
+
+impl Mouth for NativeMouth {
+    fn speak(&mut self, text: &str, _cue: &MouthCue) -> Result<(Vec<i16>, u32), String> {
+        self.lines = if self.clauses_set {
+            pieces_from_fields(&self.lead, &self.rest)
+        } else if text.trim().is_empty() {
+            Vec::new()
+        } else {
+            vec![text.trim().to_string()]
+        };
+        Ok((Vec::new(), SPEAKER_RATE))
+    }
+
+    fn emits_audio(&self) -> bool {
+        false
+    }
+
+    fn set_clauses(&mut self, first_clause: &str, rest: &str) {
+        self.clauses_set = !first_clause.is_empty() || !rest.is_empty();
+        self.lead = first_clause.to_string();
+        self.rest = rest.to_string();
+    }
+
+    fn drain_lines(&mut self) -> Vec<String> {
+        std::mem::take(&mut self.lines)
+    }
+
+    fn mouth(&self) -> &'static str {
+        "native"
+    }
+
+    fn voice(&self) -> &'static str {
+        "text"
+    }
+
+    fn clone_status(&self) -> &'static str {
+        "off"
+    }
+}
+
 fn open_cpu(clone_status: &'static str, log: Option<&'static str>) -> Box<dyn Mouth> {
     #[cfg(feature = "piper")]
     {
         if let Some(line) = log {
             log_once(line);
         }
-        return open_piper(clone_status);
+        open_piper(clone_status)
     }
     #[cfg(not(feature = "piper"))]
     {
@@ -344,7 +544,6 @@ struct MissingMouth {
 }
 
 #[cfg(feature = "piper")]
-
 impl Mouth for MissingMouth {
     fn speak(&mut self, _: &str, _: &MouthCue) -> Result<(Vec<i16>, u32), String> {
         Err("piper-missing".into())
@@ -367,7 +566,6 @@ struct PiperMouth {
 }
 
 #[cfg(feature = "piper")]
-
 impl Mouth for PiperMouth {
     fn speak(&mut self, text: &str, cue: &MouthCue) -> Result<(Vec<i16>, u32), String> {
         let mut pcm = Vec::new();
@@ -848,5 +1046,113 @@ mod tests {
             .expect("weights assignment");
         assert!(weights < set_weights);
         assert!(!cmd.contains("RIFF"));
+    }
+
+    struct KettleCard;
+
+    impl horbm::CardLookup for KettleCard {
+        fn len(&self) -> usize {
+            1
+        }
+
+        fn lookup(&self, query: &str) -> Option<horbm::CardHit> {
+            if query.to_ascii_lowercase().contains("kettle") {
+                Some(horbm::CardHit {
+                    id: "kettle".into(),
+                    gist: "The kettle is on the stove.".into(),
+                })
+            } else {
+                None
+            }
+        }
+    }
+
+    #[test]
+    fn mouth_env_selects_native_and_an_unknown_value_falls_back() {
+        let today = SelectInput {
+            ref_set: false,
+            ref_is_file: false,
+            weights_is_dir: false,
+            device: DeviceRequest::Cpu,
+            cuda_visible: false,
+        };
+        let (native, known) = parse_mouth_env("native");
+        assert!(known);
+        assert_eq!(native, MouthPick::Native);
+        assert_eq!(parse_mouth_env("HORBM").0, MouthPick::Native);
+        assert_eq!(parse_mouth_env("text").0, MouthPick::Native);
+        assert_eq!(resolved_mouth(MouthPick::Native, &decide(&today)), "native");
+        let (unset, unset_known) = parse_mouth_env("");
+        assert!(unset_known);
+        assert_eq!(unset, MouthPick::Today);
+        assert_eq!(parse_mouth_env("piper").0, MouthPick::Today);
+        let (unknown, unknown_known) = parse_mouth_env("flute");
+        assert!(!unknown_known);
+        assert_eq!(unknown, MouthPick::Today);
+        assert!(UNKNOWN_MOUTH_LOG.contains("Keeping today's mouth"));
+        let cuda = files(DeviceRequest::Cuda, true);
+        assert_eq!(
+            resolved_mouth(MouthPick::Today, &decide(&cuda)),
+            "s711",
+            "an unknown selector falls back through the existing choice"
+        );
+        assert_eq!(resolved_mouth(MouthPick::Native, &decide(&cuda)), "native");
+        #[cfg(feature = "piper")]
+        assert_eq!(resolved_mouth(MouthPick::Today, &decide(&today)), "piper");
+        #[cfg(not(feature = "piper"))]
+        assert_eq!(resolved_mouth(MouthPick::Today, &decide(&today)), "fake");
+    }
+
+    #[test]
+    fn native_mouth_speaks_horbm_first_clause_then_the_rest_and_returns_no_pcm() {
+        let mut brain = horbm::Brain::with_cards(KettleCard, None);
+        let hit = brain.turn("where is the kettle");
+        assert_eq!(hit.reply, "The kettle is on the stove.");
+        assert_eq!(
+            clause_pair(&hit.reply),
+            (hit.first_clause.clone(), hit.rest.clone())
+        );
+        let pieces = pieces_from_turn(&hit);
+        assert_eq!(pieces[0], hit.first_clause);
+        assert_eq!(pieces[1], hit.rest);
+        assert_eq!(format!("{} {}", hit.first_clause, hit.rest), hit.reply);
+
+        let mut mouth = NativeMouth::new();
+        mouth.set_clauses(&hit.first_clause, &hit.rest);
+        let (pcm, rate) = mouth
+            .speak("not the clause order", &MouthCue::resting())
+            .unwrap();
+        assert!(pcm.is_empty(), "native mouth returns no PCM");
+        assert_eq!(rate, SPEAKER_RATE);
+        assert!(!mouth.emits_audio());
+        assert_eq!(mouth.mouth(), "native");
+        assert_eq!(mouth.voice(), "text");
+        assert_eq!(mouth.drain_lines(), pieces);
+        assert!(NATIVE_MOUTH_LOG.contains("No PCM"));
+        assert!(NATIVE_MOUTH_LOG.contains("Piper is not started"));
+
+        let miss = brain.turn("who won the match");
+        assert_eq!(miss.reply, horbm::UNKNOWN_REPLY);
+        assert_eq!(miss.first_clause, miss.reply);
+        assert!(miss.rest.is_empty());
+        assert_eq!(clause_pair(&miss.reply).0, miss.first_clause);
+        mouth.set_clauses(&miss.first_clause, &miss.rest);
+        let (pcm, _) = mouth.speak(&miss.reply, &MouthCue::resting()).unwrap();
+        assert!(pcm.is_empty());
+        assert_eq!(mouth.drain_lines(), vec![miss.first_clause.clone()]);
+    }
+
+    #[test]
+    fn native_mouth_without_clause_fields_speaks_the_whole_line() {
+        let mut mouth = NativeMouth::new();
+        let (pcm, _) = mouth
+            .speak("The fence is loose.", &MouthCue::resting())
+            .unwrap();
+        assert!(pcm.is_empty());
+        assert_eq!(mouth.drain_lines(), vec!["The fence is loose.".to_string()]);
+        mouth.set_clauses("", "");
+        let (pcm, _) = mouth.speak("", &MouthCue::resting()).unwrap();
+        assert!(pcm.is_empty());
+        assert!(mouth.drain_lines().is_empty());
     }
 }

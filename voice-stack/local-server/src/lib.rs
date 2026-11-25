@@ -10,8 +10,11 @@
 //! `GALION_VAD_BIN` is set. A turn is [`horbm_voice::VoiceLoop`]: ear, then
 //! `horbm::Brain::turn`, then the mouth selected at boot. CPU is the default
 //! device. The in-process tone is the mouth unless this crate is built with
-//! `--features piper`. The s711 clone is selected only when the local
-//! reference, the local checkpoint, and an explicit cuda opt-in are all present.
+//! `--features piper`. `GALION_MOUTH=native` selects the HORBM text mouth:
+//! `TurnOut.first_clause`, then `rest`, on this socket, and no PCM. Unset,
+//! `piper`, or an unknown value keeps today's mouth. The s711 clone is
+//! selected only when the local reference, the local checkpoint, and an
+//! explicit cuda opt-in are all present.
 
 #![forbid(unsafe_code)]
 

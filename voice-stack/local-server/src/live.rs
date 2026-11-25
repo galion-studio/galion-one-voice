@@ -34,7 +34,7 @@ use crate::brain::HorbmMind;
 use crate::mouth::{self, Mouth, MouthCue};
 use crate::native::{self, MindBrain, QueueEar, Stored};
 use crate::pipeline::{AudioFeed, FeedMsg, PipeInfo, Pipeline, TurnProduct};
-use crate::protocol::{dot_json, error_json, turn_json, vad_json};
+use crate::protocol::{dot_json, error_json, spoken_text_json, turn_json, vad_json};
 use crate::reply::{Pad, ReplyEngine, TurnOut};
 
 const FRAME: usize = 320;
@@ -108,6 +108,8 @@ enum MouthJob {
     Speak {
         text: String,
         cue: MouthCue,
+        lead: String,
+        rest: String,
         cancel: Arc<AtomicBool>,
         tx: tokio::sync::mpsc::UnboundedSender<FeedMsg>,
     },
@@ -161,7 +163,7 @@ impl SpeakWorker {
         }
     }
 
-    fn start(&mut self, text: String, cue: MouthCue) -> AudioFeed {
+    fn start(&mut self, text: String, cue: MouthCue, lead: String, rest: String) -> AudioFeed {
         self.cancel();
         let cancel = Arc::new(AtomicBool::new(false));
         self.cancel = Some(Arc::clone(&cancel));
@@ -169,6 +171,8 @@ impl SpeakWorker {
         let _ = self.tx.send(MouthJob::Speak {
             text,
             cue,
+            lead,
+            rest,
             cancel,
             tx,
         });
@@ -191,6 +195,8 @@ fn worker_loop(mouth: &mut Box<dyn Mouth>, rx: std::sync::mpsc::Receiver<MouthJo
         let MouthJob::Speak {
             text,
             cue,
+            lead,
+            rest,
             cancel,
             tx,
         } = job
@@ -199,6 +205,30 @@ fn worker_loop(mouth: &mut Box<dyn Mouth>, rx: std::sync::mpsc::Receiver<MouthJo
         };
         if cancel.load(Ordering::SeqCst) {
             let _ = tx.send(FeedMsg::End);
+            continue;
+        }
+        mouth.set_clauses(&lead, &rest);
+        if !mouth.emits_audio() {
+            let result = mouth.speak_stream(&text, &cue, &cancel, &mut |_| false);
+            match result {
+                Ok(()) => {
+                    for line in mouth.drain_lines() {
+                        if cancel.load(Ordering::SeqCst) {
+                            break;
+                        }
+                        if tx
+                            .send(FeedMsg::Text(spoken_text_json(&line, cue.mood)))
+                            .is_err()
+                        {
+                            break;
+                        }
+                    }
+                    let _ = tx.send(FeedMsg::End);
+                }
+                Err(code) => {
+                    let _ = tx.send(FeedMsg::Failed(code));
+                }
+            }
             continue;
         }
         let mut emitted = false;
@@ -264,15 +294,20 @@ struct Opened {
 
 impl LivePipeline {
     pub fn from_env() -> Self {
+        let raw = std::env::var("GALION_MOUTH").unwrap_or_default();
+        let (pick, _) = mouth::parse_mouth_env(&raw);
         let choice = mouth::decide(&mouth::read_input());
-        let device = mouth::mouth_device(&choice);
+        let device = match pick {
+            mouth::MouthPick::Native => native::BOOT_MOUTH_DEVICE,
+            mouth::MouthPick::Today => mouth::mouth_device(&choice),
+        };
         Self::assemble(
             Opened {
                 vad: open_vad(),
                 asr: open_ear(),
             },
             HorbmMind::from_env(),
-            mouth::open_selected(&choice),
+            mouth::open_kind(pick, &choice, &raw),
             device,
         )
     }
@@ -324,6 +359,7 @@ impl LivePipeline {
             LoopMouth {
                 worker: Arc::clone(&worker),
                 feed: Arc::clone(&feed),
+                last: Arc::clone(&last),
             },
             brain,
         );
@@ -379,10 +415,16 @@ impl LivePipeline {
             None => return self.fail("brain-unlinked"),
         };
         let reply = out.reply.clone();
+        let native = self
+            .worker
+            .lock()
+            .unwrap_or_else(|err| err.into_inner())
+            .mouth()
+            == "native";
         let mut events = preface;
-        events.push(turn_json(&out));
         let Some(feed) = feed else {
             self.phase = "idle";
+            events.push(turn_json(&out));
             events.push(dot_json("idle", self.level));
             return TurnProduct {
                 events,
@@ -393,6 +435,9 @@ impl LivePipeline {
             };
         };
         self.phase = "speaking";
+        if !native {
+            events.push(turn_json(&out));
+        }
         events.push(dot_json("speaking", self.level));
         TurnProduct {
             events,
@@ -601,6 +646,7 @@ impl Pipeline for LivePipeline {
 struct LoopMouth {
     worker: Arc<Mutex<SpeakWorker>>,
     feed: Arc<Mutex<Option<AudioFeed>>>,
+    last: Arc<Mutex<Option<Stored>>>,
 }
 
 impl VoiceMouth for LoopMouth {
@@ -613,11 +659,22 @@ impl VoiceMouth for LoopMouth {
             return;
         }
         let cue = MouthCue::from_spoken(line);
+        let (lead, rest) = match self
+            .last
+            .lock()
+            .unwrap_or_else(|err| err.into_inner())
+            .as_ref()
+        {
+            Some(Stored::Out(out)) if out.reply == line.text => {
+                (out.first_clause.clone(), out.rest.clone())
+            }
+            _ => (String::new(), String::new()),
+        };
         let feed = self
             .worker
             .lock()
             .unwrap_or_else(|err| err.into_inner())
-            .start(line.text.clone(), cue);
+            .start(line.text.clone(), cue, lead, rest);
         *self.feed.lock().unwrap_or_else(|err| err.into_inner()) = Some(feed);
     }
 
@@ -758,6 +815,8 @@ impl Pipeline for GatedPipeline {
             prosody_energy: 1.0,
             prosody_pitch_st: 0.0,
             prosody_pause_ms: 0.0,
+            first_clause: String::new(),
+            rest: String::new(),
         };
         self.phase = "speaking";
         let feed = self.mouth.start(
@@ -769,6 +828,8 @@ impl Pipeline for GatedPipeline {
                 pitch_st: 0.0,
                 pause_ms: 0.0,
             },
+            String::new(),
+            String::new(),
         );
         TurnProduct {
             events: vec![turn_json(&out), dot_json("speaking", 0.0)],
@@ -1509,5 +1570,153 @@ elif line=='quit':\n        break\n"
         fn sources_ok(&self) -> bool {
             self.events.iter().any(|e| e.contains("card:kettle"))
         }
+    }
+
+    fn native_pipe() -> LivePipeline {
+        LivePipeline::for_test(
+            Front::Energy(EnergyGate::new(HANG_MS)),
+            "energy",
+            true,
+            Ear::Script("unused".into()),
+            "script",
+            HorbmMind::open(&PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("knowledge")),
+            Box::new(crate::mouth::NativeMouth::new()),
+        )
+    }
+
+    fn turn_replies(events: &[String]) -> Vec<String> {
+        events
+            .iter()
+            .filter_map(|line| {
+                let value: serde_json::Value = serde_json::from_str(line).ok()?;
+                if value.get("type").and_then(|kind| kind.as_str()) == Some("turn") {
+                    value
+                        .get("reply")
+                        .and_then(|reply| reply.as_str())
+                        .map(str::to_string)
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
+    #[test]
+    fn native_mouth_puts_the_clauses_on_the_feed_and_returns_no_pcm() {
+        let mut pipe = native_pipe();
+        assert_eq!(pipe.info().mouth, "native");
+        assert_eq!(pipe.info().voice, "text");
+        let mut hit = pipe.push_text("where is the kettle", 0);
+        let reply = hit.reply.clone();
+        hit.drain_audio();
+        assert!(hit.pcm.is_empty());
+        let spoken = turn_replies(&hit.events);
+        let (first, rest) = crate::mouth::clause_pair(&reply);
+        assert_eq!(spoken, vec![first, rest]);
+        assert!(hit.events.iter().all(|event| !event.contains("piper")));
+        let mut miss = pipe.push_text("who won the match", 1);
+        miss.drain_audio();
+        assert!(miss.pcm.is_empty());
+        assert_eq!(
+            turn_replies(&miss.events),
+            vec!["I don't know.".to_string()]
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn native_mouth_text_is_on_the_socket_and_no_pcm_follows() {
+        use futures_util::{SinkExt, StreamExt};
+        use tokio_tungstenite::tungstenite::client::IntoClientRequest;
+        use tokio_tungstenite::tungstenite::Message;
+
+        let factory: crate::server::PipelineFactory = Arc::new(|| Box::new(native_pipe()));
+        let running = crate::server::start(
+            "127.0.0.1:0".parse().unwrap(),
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("ui"),
+            factory,
+            crate::RefState::Unset,
+            false,
+            Duration::from_secs(30),
+        )
+        .await
+        .unwrap();
+        let health = tokio::net::TcpStream::connect(running.addr).await.unwrap();
+        let (mut health_read, mut health_write) = health.into_split();
+        tokio::io::AsyncWriteExt::write_all(
+            &mut health_write,
+            b"GET /health HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
+        )
+        .await
+        .unwrap();
+        let mut body = Vec::new();
+        tokio::io::AsyncReadExt::read_to_end(&mut health_read, &mut body)
+            .await
+            .unwrap();
+        let health_text = String::from_utf8_lossy(&body);
+        assert!(health_text.contains("\"mouth\":\"native\""));
+        assert!(health_text.contains("\"voice\":\"text\""));
+
+        let mut request = format!("ws://localhost:{}/v1/samantha", running.addr.port())
+            .into_client_request()
+            .unwrap();
+        request
+            .headers_mut()
+            .insert("Origin", "http://127.0.0.1:7878".parse().unwrap());
+        let (mut ws, _) = tokio_tungstenite::connect_async(request).await.unwrap();
+        ws.send(Message::Text(
+            "{\"schema\":\"galion-samantha-ws/1\",\"type\":\"hello\",\"session\":null}".into(),
+        ))
+        .await
+        .unwrap();
+        let welcome = tokio::time::timeout(Duration::from_secs(2), ws.next())
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap();
+        let Message::Text(welcome) = welcome else {
+            panic!("welcome was not text");
+        };
+        assert!(welcome.contains("\"type\":\"welcome\""));
+        ws.send(Message::Text(
+            "{\"schema\":\"galion-samantha-ws/1\",\"type\":\"text\",\"text\":\"where is the kettle\"}"
+                .into(),
+        ))
+        .await
+        .unwrap();
+
+        let mut replies = Vec::new();
+        let mut pcm = 0usize;
+        let deadline = std::time::Instant::now() + Duration::from_secs(3);
+        while std::time::Instant::now() < deadline && replies.len() < 2 {
+            let Some(Ok(msg)) = tokio::time::timeout(Duration::from_millis(400), ws.next())
+                .await
+                .ok()
+                .flatten()
+            else {
+                continue;
+            };
+            match msg {
+                Message::Text(text) => {
+                    if let Ok(value) = serde_json::from_str::<serde_json::Value>(&text) {
+                        if value.get("type").and_then(|kind| kind.as_str()) == Some("turn") {
+                            if let Some(reply) = value.get("reply").and_then(|r| r.as_str()) {
+                                replies.push(reply.to_string());
+                            }
+                        }
+                        assert_ne!(
+                            value.get("error").and_then(|e| e.as_str()),
+                            Some("piper-missing")
+                        );
+                    }
+                }
+                Message::Binary(_) => pcm += 1,
+                _ => {}
+            }
+        }
+        assert_eq!(pcm, 0, "native mouth sends no PCM");
+        assert_eq!(
+            replies,
+            vec!["The kettle".to_string(), "is on the stove.".to_string()]
+        );
     }
 }
