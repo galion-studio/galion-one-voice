@@ -517,6 +517,7 @@ dependencies = [
  "fdaf-aec",
  "galion-conductor",
  "galion-emotion-core",
+ "galion-ml-voice",
  "galion-sam-asr",
  "galion-sam-audio-io",
  "horbm",
@@ -580,7 +581,10 @@ dependencies = [
 name = "horbm-voice"
 version = "0.0.1"
 dependencies = [
+ "galion-emotion",
+ "galion-emotion-core",
  "galion-sam-asr",
+ "galion-sam-prosody",
  "galion-tts-piper",
  "horbm",
  "horbm-ear",
@@ -1277,9 +1281,9 @@ dependencies = [
 
 [[package]]
 name = "toml_parser"
-version = "1.1.6+spec-1.1.0"
+version = "1.1.7+spec-1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e6769c452d71ba30696c6b37770c439a9cc9110f47f7d5cdbeda79840ef5ea31"
+checksum = "0bb28d6e049a9766c3bd91a8326e6179f5b132dec87906bb97018ef7a2f3431a"
 dependencies = [
  "winnow 1.0.5",
 ]

@@ -6,7 +6,7 @@ use std::path::Path;
 use std::time::Instant;
 
 use galion_emotion_core::{
-    ConductorCue, EmotionCore, InnerLife, InnerTurn, IntentMsg, MomentState,
+    ConductorCue, EmotionCore, InnerLife, InnerTurn, IntentMsg, MomentState, VoiceBaseline,
 };
 use galion_sam_empathy::{Empathy, PronounClass, TickIn, FRAME_MS};
 use horbm_persona::{MoveClaim, MoveVerdict, Persona, PersonaError};
@@ -342,6 +342,13 @@ impl Brain {
     /// The speaker's moment. Empathy mood is [`Self::mood_meta`].
     pub fn emotion(&self) -> &EmotionCore {
         &self.emotion
+    }
+
+    /// Who is speaking. The moment starts on this baseline. Empathy, cards,
+    /// and the inner life stay as they are. Later [`Self::step_moment`] calls
+    /// still do not write the baseline.
+    pub fn seat(&mut self, baseline: VoiceBaseline) {
+        self.emotion = EmotionCore::from_baseline(baseline);
     }
 
     /// One 80 ms emotion frame. Does not change the empathy mood.
