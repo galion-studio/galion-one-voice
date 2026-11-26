@@ -3,7 +3,6 @@
 //! The virtual-clock gate. Numbers come from `Duplex::tick`, not from a table
 //! that was typed in ahead of a run.
 
-use horbm_duplex::Persona;
 use horbm_eval::{run_stand_in, StageState, FRAME_SAMPLES};
 
 fn persona_file_stems() -> Vec<String> {
@@ -32,11 +31,9 @@ fn turn_eval_gates_hold() {
     assert!(report.scenarios >= 20);
     assert!(report.samples > 0);
     assert_eq!(report.samples % FRAME_SAMPLES, 0);
-    let configured = horbm_duplex::ConfiguredPersona::development()
-        .expect("configured persona")
-        .id()
-        .to_string();
+    let configured = horbm_eval::stand_in_persona_label();
     assert!(text.contains(&format!("persona={configured}")));
+    assert!(!text.to_ascii_lowercase().contains("samantha"));
     assert!(text.contains("clock=virtual"));
     assert!(text.contains("cite=arxiv:2503.04721,arxiv:2507.23159"));
     assert!(text.contains("result=pass"));
@@ -80,9 +77,7 @@ fn echo_probe_stays_quiet_when_the_canceller_is_on() {
 #[test]
 fn the_report_names_the_configured_persona() {
     let report = run_stand_in();
-    let id = horbm_duplex::ConfiguredPersona::development()
-        .expect("configured persona")
-        .id()
-        .to_string();
+    let id = horbm_eval::stand_in_persona_label();
     assert!(report.text().contains(&format!("persona={id}")));
+    assert_ne!(id, "samantha");
 }

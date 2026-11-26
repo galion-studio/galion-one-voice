@@ -70,22 +70,49 @@ pub fn research_dir_is_unset(value: Option<&str>) -> bool {
 /// Run the closed turn-taking set with the in-memory stand-in.
 /// Piper is not invoked: this tree has no voice model, and the eval does not download one.
 ///
-/// The report names the development persona. The duplex engine in `drive`
+/// The report names [`stand_in_persona_label`]. The duplex engine in `drive`
 /// is unchanged.
 #[must_use]
 pub fn run_stand_in() -> TurnReport {
     run_stand_in_for(None)
 }
 
-/// [`run_stand_in`] naming `persona_file`, or the development persona when
+/// Label for a stand-in turn report that was not given a persona file.
+///
+/// `GALION_HORBM_DEV_PERSONA` when that value is non-empty. Otherwise
+/// `configured`. The id inside `development.toml` is not copied into the
+/// report: that string is a persona-file stem, and the no-leak check forbids
+/// those stems.
+#[must_use]
+pub fn stand_in_persona_label() -> String {
+    match std::env::var("GALION_HORBM_DEV_PERSONA") {
+        Ok(value) => {
+            let trimmed = value.trim();
+            if trimmed.is_empty() {
+                "configured".to_string()
+            } else {
+                trimmed.to_string()
+            }
+        }
+        Err(_) => "configured".to_string(),
+    }
+}
+
+/// [`run_stand_in`] naming `persona_file`, or [`stand_in_persona_label`] when
 /// `persona_file` is `None`.
 ///
 /// The duplex engine in `drive` still uses its built-in speaker. This only
-/// names the report.
+/// names the report. A file that does not load is `unconfigured` and a miss.
 #[must_use]
 pub fn run_stand_in_for(persona_file: Option<&std::path::Path>) -> TurnReport {
     let (persona_id, load_error) = match gate::resolve_persona(persona_file) {
-        Ok(persona) => (persona.id().to_string(), None),
+        Ok(persona) => {
+            let id = match persona_file {
+                Some(_) => persona.id().to_string(),
+                None => stand_in_persona_label(),
+            };
+            (id, None)
+        }
         Err(err) => ("unconfigured".to_string(), Some(err)),
     };
     let gaps = scenario::pause_gaps_ms();

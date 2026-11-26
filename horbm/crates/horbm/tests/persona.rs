@@ -77,25 +77,36 @@ fn scratch(name: &str) -> PathBuf {
     ))
 }
 
-fn development_file() -> PathBuf {
-    let id = Persona::load_development()
-        .expect("development persona")
-        .id()
-        .to_string();
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../horbm-persona/personas")
-        .join(format!("{id}.toml"))
+/// The repo's development boot file. Ignores `GALION_HORBM_DEV_PERSONA` and
+/// `GALION_HORBM_PERSONA_DIR`, which these tests point at a scratch directory.
+fn shipped_boot_text() -> String {
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../horbm-persona/development.toml");
+    std::fs::read_to_string(&path).unwrap_or_else(|err| panic!("{}: {err}", path.display()))
 }
 
 fn shipped_id() -> String {
-    Persona::load_development()
-        .expect("development persona")
-        .id()
-        .to_string()
+    shipped_boot_text()
+        .lines()
+        .find_map(|line| {
+            let rest = line.trim().strip_prefix("development_persona = ")?;
+            let rest = rest.trim().trim_matches('"');
+            if rest.is_empty() {
+                None
+            } else {
+                Some(rest.to_string())
+            }
+        })
+        .expect("development_persona")
+}
+
+fn development_file() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../horbm-persona/personas")
+        .join(format!("{}.toml", shipped_id()))
 }
 
 fn rewrite_shipped(text: &str, new_id: &str) -> String {
-    let shipped = Persona::load_development().expect("development persona");
+    let shipped = Persona::load(&development_file()).expect("shipped persona file");
     text.replace(
         &format!("id = \"{}\"", shipped.id()),
         &format!("id = \"{new_id}\""),

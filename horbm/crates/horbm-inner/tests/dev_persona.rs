@@ -416,8 +416,7 @@ fn development_profile() -> &'static galion_emotion::persona_mood::PersonaProfil
         let text = std::fs::read_to_string(&path).unwrap_or_else(|err| panic!("{}: {err}", path.display()));
         text.lines()
             .find_map(|line| {
-                let line = line.trim();
-                let rest = line.strip_prefix("id = ")?;
+                let rest = line.trim().strip_prefix("development_persona = ")?;
                 let rest = rest.trim().trim_matches('"');
                 if rest.is_empty() {
                     None
@@ -425,7 +424,7 @@ fn development_profile() -> &'static galion_emotion::persona_mood::PersonaProfil
                     Some(rest.to_string())
                 }
             })
-            .expect("development id")
+            .expect("development_persona")
     });
     configured(Some(id)).expect("development profile")
 }
