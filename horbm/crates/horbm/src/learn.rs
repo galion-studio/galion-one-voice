@@ -4,11 +4,18 @@
 //!
 //! This is phase 7 of `docs/horbm/research/R4-cpu-realtime-integration.md`:
 //! a separate learn consent, a source on every clause, a pack swap, and a
-//! withdrawal that leaves no row. The diary is `horbm-memory`
+//! withdrawal that leaves no row. [`LearnPass::retract_clause`] takes one
+//! clause back and leaves the rest. The diary is `horbm-memory`
 //! ([`horbm_memory::Store`]). This module does not open a second store, does
 //! not call [`horbm_memory::Stack::open`] (that creates `revisions.sqlite`),
 //! and does not call [`horbm_memory::Store::forget`] (that keeps the text in
 //! `archive`).
+//!
+//! [`LearnedRow::item_id`] is not a stable key. A write and a retraction both
+//! copy the rows that stay into a new file, and [`horbm_memory::Store::diary_add`]
+//! allocates a new id for every row it inserts, including each copied row. An
+//! id read from the previous pack does not name a row in the new one. The
+//! stable identity is the trimmed speaker and the trimmed text.
 //!
 //! Learn consent is not recall. `GALION_HORBM_LEARN=grant` is the only value
 //! that lets this pass write. This module does not read a retrieval config.
@@ -16,9 +23,10 @@
 //! This module does not parse that file. The default matches it. The process
 //! grant does not rewrite the file, and it does not set an EmotionWire bit.
 //!
-//! Do not call [`LearnPass::write_clause`], [`LearnPass::withdraw`],
-//! [`LearnPass::audit`], [`SessionSeal::note`], [`SessionSeal::note_taught`],
-//! or [`SessionSeal::seal`] from `Heartbeat::step` or from [`crate::Brain::turn`].
+//! Do not call [`LearnPass::write_clause`], [`LearnPass::retract_clause`],
+//! [`LearnPass::withdraw`], [`LearnPass::audit`], [`SessionSeal::note`],
+//! [`SessionSeal::note_taught`], or [`SessionSeal::seal`] from `Heartbeat::step`
+//! or from [`crate::Brain::turn`].
 //! The call never waits on this pass. The pass does not call Galion Research
 //! and it does not read or write audio. [`SessionSeal`] keeps one clause in
 //! RAM. It is not encrypted. The live pack keeps every sourced clause, up to
@@ -79,6 +87,9 @@ impl ClauseSource {
 }
 
 /// One diary row read back from the learn pack.
+///
+/// `item_id` is allocated again on every pack rewrite. It is not a key.
+/// See the module docs.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct LearnedRow {
     pub item_id: String,
@@ -89,7 +100,8 @@ pub struct LearnedRow {
 }
 
 /// What [`LearnPass::audit`] sees. `archived` is the `horbm-memory` archive
-/// table. A withdrawal does not use that table. It removes the pack.
+/// table. A withdrawal does not use that table. It removes the pack. A
+/// retraction of the last clause leaves the pack file and reports no rows.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct LearnAudit {
     pub rows: Vec<LearnedRow>,
@@ -323,19 +335,56 @@ impl LearnPass {
                 "learn pack holds {LEARN_PACK_CAP} rows"
             )));
         }
-        let next_db = self.child(LEARN_PACK_NEXT).join(LEARN_PACK_DB);
-        let written = match insert_clause(&next_db, session, &prior, said_by, text, date, &label) {
-            Ok(row) => row,
-            Err(err) => {
-                let _ = fs::remove_dir_all(self.child(LEARN_PACK_NEXT));
-                return Err(err);
-            }
-        };
-        if let Err(err) = self.swap_in() {
-            let _ = fs::remove_dir_all(self.child(LEARN_PACK_NEXT));
-            return Err(err);
-        }
+        let written = self
+            .publish(
+                session,
+                &prior,
+                Some(ForwardClause {
+                    said_by,
+                    text,
+                    date,
+                    label: &label,
+                }),
+            )?
+            .ok_or_else(|| LearnError::store_msg("learn pack diary row missing"))?;
         Ok(written)
+    }
+
+    /// Take back one taught clause.
+    ///
+    /// The gate and the deny check match [`LearnPass::write_clause`]. The
+    /// clause is the trimmed `said_by` and the trimmed text. [`LearnedRow::item_id`]
+    /// is not that key. [`horbm_memory::Store::diary_add`] allocates a new id
+    /// for every row copied into the next pack, so an id read before this
+    /// call does not name a row after it.
+    ///
+    /// When no live row has that speaker and text, this returns `Ok(false)`
+    /// and does not create or rewrite the pack. Otherwise every other row is
+    /// copied, in the live order, through the same path a write uses, and
+    /// that directory is swapped onto `live/`. `Ok(true)` means that one
+    /// clause was removed. Removing the last row leaves an empty live pack:
+    /// [`LearnPass::audit`] reports no rows, and the live file stays. This
+    /// is not [`LearnPass::withdraw`].
+    pub fn retract_clause(&self, said_by: &str, text: &str) -> Result<bool, LearnError> {
+        let _guard = self.gate.lock().expect("learn pack");
+        if !self.config.granted {
+            return Err(LearnError::denied());
+        }
+        let said_by = said_by.trim();
+        let text = text.trim();
+        self.refuse_card_folder()?;
+        let prior = self.live_rows()?;
+        let Some(drop_at) = prior.iter().position(|row| same_clause(row, said_by, text)) else {
+            return Ok(false);
+        };
+        let mut kept = prior;
+        let dropped = kept.remove(drop_at);
+        let Some(session) = session_of(&dropped.source) else {
+            return Err(LearnError::store_msg("learned row has no session"));
+        };
+        self.prepare()?;
+        self.publish(session, &kept, None)?;
+        Ok(true)
     }
 
     /// Delete the learn pack directories. After this, [`LearnPass::audit`]
@@ -450,6 +499,41 @@ impl LearnPass {
         }
         Ok(())
     }
+
+    /// Copy `kept` into `next/`, append `extra` when it is present, then swap.
+    ///
+    /// A write passes the previous rows and the new clause. A retraction
+    /// passes the rows that stay and `None`. A failure removes `next/` and
+    /// leaves `live/` as it was.
+    fn publish(
+        &self,
+        session: &str,
+        kept: &[LearnedRow],
+        extra: Option<ForwardClause<'_>>,
+    ) -> Result<Option<LearnedRow>, LearnError> {
+        let adding = extra.is_some();
+        let next_db = self.child(LEARN_PACK_NEXT).join(LEARN_PACK_DB);
+        let written = match copy_forward(&next_db, session, kept, extra) {
+            Ok(row) => row,
+            Err(err) => {
+                let _ = fs::remove_dir_all(self.child(LEARN_PACK_NEXT));
+                return Err(err);
+            }
+        };
+        if adding != written.is_some() {
+            let _ = fs::remove_dir_all(self.child(LEARN_PACK_NEXT));
+            return Err(LearnError::store_msg(if adding {
+                "learn pack diary row missing"
+            } else {
+                "learn pack has an extra diary row"
+            }));
+        }
+        if let Err(err) = self.swap_in() {
+            let _ = fs::remove_dir_all(self.child(LEARN_PACK_NEXT));
+            return Err(err);
+        }
+        Ok(written)
+    }
 }
 
 /// One clause held until [`SessionSeal::seal`]. Plain text. Not a diary row.
@@ -538,20 +622,34 @@ impl SessionSeal {
     }
 }
 
-fn insert_clause(
+/// One clause appended after the copied rows. Absent when the rewrite only keeps rows.
+#[derive(Clone, Copy)]
+struct ForwardClause<'a> {
+    said_by: &'a str,
+    text: &'a str,
+    date: &'a str,
+    label: &'a str,
+}
+
+/// Copy `kept` into a fresh pack, then append `extra` when it is present.
+///
+/// [`LearnPass::write_clause`] passes the live rows and the new clause.
+/// [`LearnPass::retract_clause`] passes every other row and `None`. Both use
+/// this function. [`horbm_memory::Store::diary_add`] allocates a new
+/// `item_id` for every insert, including each copied row, so
+/// [`LearnedRow::item_id`] from the previous pack is not a key into this one.
+/// The returned row is the appended clause. `None` means nothing was appended.
+fn copy_forward(
     db: &Path,
     session: &str,
-    prior: &[LearnedRow],
-    said_by: &str,
-    text: &str,
-    date: &str,
-    label: &str,
-) -> Result<LearnedRow, LearnError> {
+    kept: &[LearnedRow],
+    extra: Option<ForwardClause<'_>>,
+) -> Result<Option<LearnedRow>, LearnError> {
     let mut store = horbm_memory::Store::open(db).map_err(LearnError::store)?;
     store.pause_worker();
     let result = (|| {
         store.set_session(session).map_err(LearnError::store)?;
-        for row in prior {
+        for row in kept {
             store
                 .diary_add(
                     row.text.as_str(),
@@ -561,10 +659,12 @@ fn insert_clause(
                 )
                 .map_err(LearnError::store)?;
         }
-        store
-            .diary_add(text, date, said_by, label)
-            .map_err(LearnError::store)?;
-        checked_row(&store, prior, said_by, text, date, label)
+        if let Some(clause) = extra {
+            store
+                .diary_add(clause.text, clause.date, clause.said_by, clause.label)
+                .map_err(LearnError::store)?;
+        }
+        checked_pack(&store, kept, extra)
     })();
     drop(store);
     result
@@ -585,16 +685,13 @@ fn read_audit(db: &Path) -> Result<LearnAudit, LearnError> {
     result
 }
 
-fn checked_row(
+fn checked_pack(
     store: &horbm_memory::Store,
-    prior: &[LearnedRow],
-    said_by: &str,
-    text: &str,
-    date: &str,
-    label: &str,
-) -> Result<LearnedRow, LearnError> {
+    kept: &[LearnedRow],
+    extra: Option<ForwardClause<'_>>,
+) -> Result<Option<LearnedRow>, LearnError> {
     let rows = store.diary_list().map_err(LearnError::store)?;
-    let expected = prior.len() + 1;
+    let expected = kept.len() + usize::from(extra.is_some());
     if rows.len() != expected {
         return Err(LearnError::store_msg(format!(
             "learn pack has {} diary rows",
@@ -610,7 +707,7 @@ fn checked_row(
     }
     let rows: Vec<LearnedRow> = rows.into_iter().map(learned_row).collect();
     let mut used = vec![false; rows.len()];
-    for old in prior {
+    for old in kept {
         let Some(idx) = rows.iter().enumerate().position(|(i, row)| {
             !used[i]
                 && !row.item_id.is_empty()
@@ -625,26 +722,40 @@ fn checked_row(
         };
         used[idx] = true;
     }
+    let Some(clause) = extra else {
+        return Ok(None);
+    };
     let Some(idx) = used.iter().position(|flag| !*flag) else {
         return Err(LearnError::store_msg("learn pack diary row missing"));
     };
     let row = &rows[idx];
     if row.item_id.is_empty()
-        || row.source != label
-        || row.text != text
-        || row.said_by != said_by
-        || row.date != date
+        || row.source != clause.label
+        || row.text != clause.text
+        || row.said_by != clause.said_by
+        || row.date != clause.date
     {
         return Err(LearnError::store_msg(
             "stored row does not match the sourced clause",
         ));
     }
-    Ok(row.clone())
+    Ok(Some(row.clone()))
 }
 
 /// Trimmed text and trimmed speaker. That is the clause identity.
 fn same_clause(row: &LearnedRow, said_by: &str, text: &str) -> bool {
     row.said_by.trim() == said_by && row.text.trim() == text
+}
+
+/// Session id stored by [`ClauseSource::label`]. `None` when the label has none.
+fn session_of(source: &str) -> Option<&str> {
+    let rest = source.strip_prefix("session=")?;
+    let session = rest.split(';').next()?.trim();
+    if session.is_empty() {
+        None
+    } else {
+        Some(session)
+    }
 }
 
 /// `missed` names a previous miss, and `heard` is a non-question line that covers it.
