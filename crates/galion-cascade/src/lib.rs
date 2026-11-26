@@ -6,7 +6,6 @@
 //! No model weights are loaded or downloaded; every backend here is a
 //! deterministic mock so the harness exists before the model.
 
-/// Budgets from A18 design.
 /// W21-03: per-turn language route (pin > hint > LID), EN-only.
 pub mod route;
 /// W21-03: runnable EN demo lane on galion-ml-voice stubs (feature `cascade`).
@@ -37,7 +36,11 @@ pub mod phone;
 #[cfg(feature = "cascade")]
 pub mod speech_worker;
 
-pub const ONSET_P50_BUDGET_MS: u32 = 800;
+/// Onset p50 ceiling, milliseconds. `LOCKS.toml` `[gates] onset_p50_max_ms`.
+/// The lock file is the source of truth. A test parses it and checks this
+/// constant. A measurement that misses the number does not change it.
+pub const ONSET_P50_BUDGET_MS: u32 = 300;
+/// Barge-in ceiling, milliseconds. `LOCKS.toml` `[gates] barge_in_max_ms`.
 pub const BARGE_IN_BUDGET_MS: u32 = 200;
 pub const SAMPLE_RATE_HZ: u32 = 16_000;
 
@@ -149,9 +152,74 @@ pub use stamps::{dry_run_log, stamp_log_clean, Domain04Stamps, StampClock, Stamp
 pub use hermes::{contains_forbidden, HermesLlm, HermesTarget, FORBIDDEN, LLM_NAME, REFUSED, UNREACHABLE};
 #[cfg(feature = "cascade")]
 pub use phone::{
-    phone_turn, phone_turn_wav, stub_fixture_pcm16, AsrMode, AsrSource, LlmMode, PhoneConfig, PhoneError, PhoneLane,
-    PhoneTurn, PhoneTurnAsr,
+    phone_turn, phone_turn_wav, stub_fixture_pcm16, AsrMode, AsrSource, FailNote, LlmMode, PhoneConfig, PhoneError,
+    PhoneLane, PhoneTurn, PhoneTurnAsr,
 };
+
+/// Nearest-rank percentile. Same index as `galion_presence::percentile`:
+/// `ceil(pct/100 * n)`, then that rank minus one. `sorted` must be sorted.
+#[cfg(test)]
+pub(crate) fn nearest_rank(sorted: &[u64], pct: u64) -> u64 {
+    assert!(!sorted.is_empty() && (1..=100).contains(&pct));
+    let rank = (pct * sorted.len() as u64).div_ceil(100).max(1) as usize;
+    sorted[rank.min(sorted.len()) - 1]
+}
+
+/// Wall-clock p50 of 49 turns after 16 warmup turns. The closure is one turn.
+#[cfg(test)]
+pub(crate) fn onset_p50_us(mut turn: impl FnMut()) -> u64 {
+    for _ in 0..16 {
+        turn();
+    }
+    let mut samples = Vec::with_capacity(49);
+    for _ in 0..49 {
+        let t0 = std::time::Instant::now();
+        turn();
+        samples.push(u64::try_from(t0.elapsed().as_micros()).unwrap_or(u64::MAX));
+    }
+    samples.sort_unstable();
+    nearest_rank(&samples, 50)
+}
+
+/// The lock is the ceiling. A miss names the measured gap and does not pass.
+#[cfg(test)]
+pub(crate) fn assert_onset_within_lock(p50_us: u64, lane: &str) {
+    let budget_us = u64::from(ONSET_P50_BUDGET_MS) * 1_000;
+    eprintln!("S61 {lane} onset_p50_us={p50_us} budget_us={budget_us}");
+    assert!(p50_us > 0, "{lane} clock did not move");
+    assert!(
+        p50_us <= budget_us,
+        "{lane} onset p50 {p50_us} µs exceeds LOCKS onset_p50_max_ms {budget} ms by {gap} µs. Not a pass. The lock stays {budget}.",
+        budget = ONSET_P50_BUDGET_MS,
+        gap = p50_us.saturating_sub(budget_us),
+    );
+}
+
+/// Integer after `=` in `[gates]`, ignoring a trailing comment.
+#[cfg(test)]
+fn lock_gate_ms(key: &str) -> u32 {
+    let locks = include_str!("../../../LOCKS.toml");
+    let mut in_gates = false;
+    for line in locks.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with('[') {
+            in_gates = trimmed == "[gates]";
+            continue;
+        }
+        if !in_gates || trimmed.starts_with('#') {
+            continue;
+        }
+        let Some((k, rest)) = trimmed.split_once('=') else {
+            continue;
+        };
+        if k.trim() != key {
+            continue;
+        }
+        let num = rest.split('#').next().unwrap_or("").trim();
+        return num.parse().unwrap_or_else(|_| panic!("[gates] {key} is not an integer"));
+    }
+    panic!("LOCKS.toml [gates] is missing {key}");
+}
 
 #[cfg(test)]
 mod tests {
@@ -160,6 +228,27 @@ mod tests {
     #[test] fn mock_turn() { let t = mock_cascade().turn(&[100; 1600]).unwrap(); assert_eq!(t.emotion, Emotion::Neutral); assert!(t.reply.contains("hello galion")); assert!(!t.audio.is_empty()); }
     #[test] fn empty_rejected() { assert!(matches!(mock_cascade().turn(&[]), Err(CascadeError::Empty))); }
     #[test] fn loud_is_angry() { assert_eq!(MockEmotion.classify(&[20_000; 160]), Emotion::Angry); }
-    #[test] fn budgets() { assert!(lock_off(BARGE_IN_BUDGET_MS < ONSET_P50_BUDGET_MS)); }
-    fn lock_off(cond: bool) -> bool { cond }
+
+    #[test]
+    fn budgets_match_locks_toml() {
+        let onset = lock_gate_ms("onset_p50_max_ms");
+        let barge = lock_gate_ms("barge_in_max_ms");
+        assert_eq!(ONSET_P50_BUDGET_MS, onset);
+        assert_eq!(BARGE_IN_BUDGET_MS, barge);
+        assert!(barge < onset, "barge-in ceiling {barge} ms is not under onset {onset} ms");
+    }
+
+    /// Stub lane: `MockAsr` → `MockLlm` → `MockTts`. Not the phone speech path.
+    /// p50 is this process. A miss fails with the gap. The constant stays the lock.
+    #[test]
+    fn stub_lane_onset_p50_against_the_lock() {
+        let pcm = [100i16; 1600];
+        let mut lane = mock_cascade();
+        let p50 = onset_p50_us(|| {
+            let turn = lane.turn(&pcm).expect("stub turn");
+            assert!(!turn.audio.is_empty());
+            assert!(turn.audio.iter().all(|&s| s == 0), "stub tts is silence, not pcm words");
+        });
+        assert_onset_within_lock(p50, "stub lane");
+    }
 }

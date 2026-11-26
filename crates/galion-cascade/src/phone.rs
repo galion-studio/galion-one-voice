@@ -39,6 +39,15 @@
 //! fall back to the rule table. Emotion is fixed `Neutral`: inferring affect
 //! from the caller's voice is the LOCKS `[consent] sense` bit (default deny).
 //!
+//! # Error sheet
+//! A published lane error carries the partial [`Domain04Stamps`] when this
+//! lane had opened a turn. Display prints the message, then
+//! [`Domain04Stamps::log_line`] on the next line. That line is lengths and
+//! times only: no transcript and no PCM. [`PhoneError::Empty`] and
+//! [`PhoneError::Superseded`] stay unit variants so existing matches keep
+//! compiling. The worker does not publish those two. Their sheet stays on
+//! [`PhoneLane::stamps`].
+//!
 //! # S6 TTS
 //! [`SpeechStack::detect`] (A21 Piper VITS `en_US-ljspeech-medium` if the sha256-verified
 //! pack + Piper runtime are on disk, else libflite). The A21 path keeps **one** Piper
@@ -117,7 +126,7 @@ impl LlmMode {
             "echo" | "mock" => Ok(LlmMode::Echo),
             "" | "hermes" => Ok(LlmMode::Hermes),
             "student" => Ok(LlmMode::Student),
-            _ => Err(PhoneError::UnknownLlm(raw.to_string())),
+            _ => Err(PhoneError::UnknownLlm(FailNote::bare(raw.to_string()))),
         }
     }
 }
@@ -137,45 +146,140 @@ impl PhoneConfig {
 /// `GALION_LLM` is unset.
 impl Default for PhoneConfig { fn default() -> Self { Self { asr: AsrMode::Stub, llm: LlmMode::Canned } } }
 
+/// Message plus the partial domain 04 sheet.
+///
+/// `detail` is the existing failure text. The sheet is lengths and monotonic
+/// times, or `None` when this error was built before a turn sheet existed.
+/// The sheet is not words and it is not PCM.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FailNote<T> {
+    pub detail: T,
+    sheet: Option<Box<Domain04Stamps>>,
+}
+
+impl<T> FailNote<T> {
+    /// Message only. The lane attaches a sheet with [`PhoneError::with_sheet`].
+    pub const fn bare(detail: T) -> Self {
+        Self { detail, sheet: None }
+    }
+}
+
+impl<T: AsRef<str>> std::ops::Deref for FailNote<T> {
+    type Target = str;
+    fn deref(&self) -> &str {
+        self.detail.as_ref()
+    }
+}
+
+impl<T: AsRef<str>> PartialEq<str> for FailNote<T> {
+    fn eq(&self, other: &str) -> bool {
+        self.detail.as_ref() == other
+    }
+}
+
+impl<T: AsRef<str>> PartialEq<&str> for FailNote<T> {
+    fn eq(&self, other: &&str) -> bool {
+        self.detail.as_ref() == *other
+    }
+}
+
+impl std::fmt::Display for FailNote<String> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.detail)
+    }
+}
+
+impl std::fmt::Display for FailNote<&str> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.detail)
+    }
+}
+
 /// Phone-turn failure.
+///
+/// Message variants carry [`FailNote`]. After the lane has opened a turn,
+/// [`Self::with_sheet`] stores the partial sheet and [`Display`] appends
+/// [`Domain04Stamps::log_line`] on its own line. [`Self::Empty`] and
+/// [`Self::Superseded`] stay unit variants. Their sheet stays on the lane.
 #[derive(Debug, Clone, PartialEq)]
 pub enum PhoneError {
     /// No audio, or only silence.
     Empty,
     /// WAV bytes could not be parsed (only PCM16 RIFF is accepted).
-    BadWav(String),
+    BadWav(FailNote<String>),
     /// Real speech arrived and this lane is not running Vosk (see [`RATIFY_DOC`]).
-    AsrUnratified(&'static str),
+    AsrUnratified(FailNote<&'static str>),
     /// `GALION_ASR=vosk` but the model, library, or worker could not produce words.
     /// The message is the failure. The transcript was not invented.
-    AsrUnavailable(String),
+    AsrUnavailable(FailNote<String>),
     /// No speech backend on this machine (Piper/flite missing); never falls back to tones.
-    NoSpeech(String),
+    NoSpeech(FailNote<String>),
     /// A newer turn superseded this one between clauses. The Piper process is still running.
     Superseded,
     /// Error from the cascade (LLM / route).
-    Cascade(CascadeError),
+    Cascade(FailNote<CascadeError>),
     /// `GALION_LLM` is not `canned`, `horbm`, `echo`/`mock`, or `hermes`. Not a canned fallback.
-    UnknownLlm(String),
+    UnknownLlm(FailNote<String>),
+}
+
+impl PhoneError {
+    /// Partial sheet captured with this error. Lengths and times only.
+    pub fn partial_sheet(&self) -> Option<&Domain04Stamps> {
+        let sheet = match self {
+            PhoneError::BadWav(n) => &n.sheet,
+            PhoneError::AsrUnratified(n) => &n.sheet,
+            PhoneError::AsrUnavailable(n) => &n.sheet,
+            PhoneError::NoSpeech(n) => &n.sheet,
+            PhoneError::Cascade(n) => &n.sheet,
+            PhoneError::UnknownLlm(n) => &n.sheet,
+            PhoneError::Empty | PhoneError::Superseded => return None,
+        };
+        sheet.as_deref()
+    }
+
+    /// Store `sheet` on a message variant. Unit variants keep the sheet on the lane.
+    pub fn with_sheet(mut self, sheet: Domain04Stamps) -> Self {
+        let slot = match &mut self {
+            PhoneError::BadWav(n) => &mut n.sheet,
+            PhoneError::AsrUnratified(n) => &mut n.sheet,
+            PhoneError::AsrUnavailable(n) => &mut n.sheet,
+            PhoneError::NoSpeech(n) => &mut n.sheet,
+            PhoneError::Cascade(n) => &mut n.sheet,
+            PhoneError::UnknownLlm(n) => &mut n.sheet,
+            PhoneError::Empty | PhoneError::Superseded => return self,
+        };
+        *slot = Some(Box::new(sheet));
+        self
+    }
 }
 
 impl std::fmt::Display for PhoneError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            PhoneError::Empty => write!(f, "empty or silent audio"),
-            PhoneError::BadWav(m) => write!(f, "bad WAV: {m}"),
-            PhoneError::AsrUnratified(m) => write!(f, "{m}"),
-            PhoneError::AsrUnavailable(m) => write!(f, "{m}"),
-            PhoneError::NoSpeech(m) => write!(f, "no speech backend: {m}"),
-            PhoneError::Superseded => write!(f, "turn superseded before speech finished"),
-            PhoneError::Cascade(e) => write!(f, "cascade: {e:?}"),
-            PhoneError::UnknownLlm(m) => write!(f, "unknown GALION_LLM '{m}'; use canned, horbm, echo, or hermes"),
+            PhoneError::Empty => write!(f, "empty or silent audio")?,
+            PhoneError::BadWav(m) => write!(f, "bad WAV: {m}")?,
+            PhoneError::AsrUnratified(m) => write!(f, "{m}")?,
+            PhoneError::AsrUnavailable(m) => write!(f, "{m}")?,
+            PhoneError::NoSpeech(m) => write!(f, "no speech backend: {m}")?,
+            PhoneError::Superseded => write!(f, "turn superseded before speech finished")?,
+            PhoneError::Cascade(e) => write!(f, "cascade: {:?}", e.detail)?,
+            PhoneError::UnknownLlm(m) => write!(f, "unknown GALION_LLM '{m}'; use canned, horbm, echo, or hermes")?,
         }
+        if let Some(sheet) = self.partial_sheet() {
+            write!(f, "\n{}", sheet.log_line())?;
+        }
+        Ok(())
     }
 }
 impl std::error::Error for PhoneError {}
 impl From<CascadeError> for PhoneError {
-    fn from(e: CascadeError) -> Self { if e == CascadeError::Empty { PhoneError::Empty } else { PhoneError::Cascade(e) } }
+    fn from(e: CascadeError) -> Self {
+        if e == CascadeError::Empty {
+            PhoneError::Empty
+        } else {
+            PhoneError::Cascade(FailNote::bare(e))
+        }
+    }
 }
 
 /// Which ASR produced the transcript (label it in the UI).
@@ -264,7 +368,7 @@ impl PhoneTurnAsr {
     pub fn transcribe(&mut self, pcm16k: &[i16]) -> Result<(String, AsrSource), PhoneError> {
         if pcm16k.is_empty() { return Err(PhoneError::Empty); }
         if self.mode == AsrMode::Off {
-            return Err(PhoneError::AsrUnratified("EN phone ASR disabled (GALION_ASR=off). Typed text still works. No transcript was invented."));
+            return Err(PhoneError::AsrUnratified(FailNote::bare("EN phone ASR disabled (GALION_ASR=off). Typed text still works. No transcript was invented.")));
         }
         if let Some(t) = decode_stub_fixture(pcm16k) { return Ok((t, AsrSource::StubFixture)); }
         let rms = (pcm16k.iter().map(|&s| (s as f32 / 32768.0).powi(2)).sum::<f32>() / pcm16k.len() as f32).sqrt();
@@ -277,9 +381,9 @@ impl PhoneTurnAsr {
                 Ok((INTERIM_TRANSCRIPTS[i].to_string(), AsrSource::InterimPlaceholder))
             }
             AsrMode::Vosk => self.vosk_transcribe(pcm16k),
-            AsrMode::Stub | AsrMode::Off => Err(PhoneError::AsrUnratified(
+            AsrMode::Stub | AsrMode::Off => Err(PhoneError::AsrUnratified(FailNote::bare(
                 "EN phone ASR is not running on this turn (GALION_ASR=stub). Real speech needs GALION_ASR=vosk and the small-en model (docs/asr/VOSK.md). No transcript was invented.",
-            )),
+            ))),
         }
     }
 
@@ -287,7 +391,7 @@ impl PhoneTurnAsr {
         if self.worker.is_none() {
             match crate::speech_worker::speech_host().open_vosk() {
                 Ok(w) => self.worker = Some(w),
-                Err(e) => return Err(PhoneError::AsrUnavailable(e)),
+                Err(e) => return Err(PhoneError::AsrUnavailable(FailNote::bare(e))),
             }
         }
         let grammar = vosk_grammar();
@@ -299,7 +403,7 @@ impl PhoneTurnAsr {
             }
             Err(e) => {
                 self.worker = None;
-                Err(PhoneError::AsrUnavailable(e))
+                Err(PhoneError::AsrUnavailable(FailNote::bare(e)))
             }
         }
     }
@@ -342,7 +446,7 @@ pub fn decode_stub_fixture(pcm: &[i16]) -> Option<String> {
 /// Parse PCM16 RIFF/WAVE (any rate, mono or multi-channel) → 16 kHz mono PCM16.
 /// Fixture signals are returned untouched (no resample) so `StubAsr` still decodes them.
 pub fn wav_to_pcm16k(b: &[u8]) -> Result<Vec<i16>, PhoneError> {
-    let bad = |m: &str| PhoneError::BadWav(m.to_string());
+    let bad = |m: &str| PhoneError::BadWav(FailNote::bare(m.to_string()));
     if b.len() < 12 || &b[0..4] != b"RIFF" || &b[8..12] != b"WAVE" { return Err(bad("not RIFF/WAVE")); }
     let (mut fmt, mut data) = (None, None);
     let mut i = 12;
@@ -435,6 +539,14 @@ impl PhoneLane {
     /// Sheet for the turn that just ran, including a turn that stopped early.
     pub fn stamps(&self) -> &Domain04Stamps { &self.stamps }
 
+    /// Copy the current sheet onto `err` and close the turn.
+    /// Unit variants cannot hold the sheet. It stays on [`Self::stamps`].
+    fn seal(&mut self, err: PhoneError) -> PhoneError {
+        let err = err.with_sheet(self.stamps.clone());
+        self.close_turn();
+        err
+    }
+
     /// Caller saw VAD silence on this lane's clock. The lane itself does not.
     pub fn note_vad_silence_start(&mut self) {
         let us = self.clock.us();
@@ -510,7 +622,7 @@ impl PhoneLane {
         let t0 = Instant::now();
         let (transcript, asr) = match self.asr.transcribe(pcm16k) {
             Ok(v) => v,
-            Err(e) => { self.close_turn(); return Err(e); }
+            Err(e) => return Err(self.seal(e)),
         };
         self.note_asr(&transcript);
         let asr_ms = ms_since(t0);
@@ -553,8 +665,9 @@ impl PhoneLane {
         reply_text: String,
     ) -> Result<PhoneTurn, PhoneError> {
         if !self.speech.can_speak() {
-            self.close_turn();
-            return Err(PhoneError::NoSpeech(self.speech.backend.label()));
+            self.stamps.reply_chars = char_len(&reply_text);
+            let label = self.speech.backend.label();
+            return Err(self.seal(PhoneError::NoSpeech(FailNote::bare(label))));
         }
         let clock = self.clock;
         let clause = clock.us();
@@ -565,8 +678,7 @@ impl PhoneLane {
             Err(e) => {
                 self.stamps.mark(StampPoint::FirstClauseFlushed, clause);
                 self.stamps.reply_chars = char_len(&reply_text);
-                self.close_turn();
-                return Err(voice_to_phone(e));
+                return Err(self.seal(voice_to_phone(e)));
             }
         };
         let tts_at = clock.us();
@@ -616,8 +728,8 @@ impl PhoneLane {
         asr: AsrSource,
     ) -> Result<PhoneTurn, PhoneError> {
         if !self.speech.can_speak() {
-            self.close_turn();
-            return Err(PhoneError::NoSpeech(self.speech.backend.label()));
+            let label = self.speech.backend.label();
+            return Err(self.seal(PhoneError::NoSpeech(FailNote::bare(label))));
         }
         let clock = self.clock;
         let llm_req = clock.us();
@@ -703,7 +815,7 @@ impl PhoneLane {
                         }
                     },
                 )
-                .map_err(PhoneError::Cascade);
+                .map_err(|e| PhoneError::Cascade(FailNote::bare(e)));
             let llm_ms = ms_since(t_llm);
             let model_text = match model_text {
                 Ok(text) => text,
@@ -779,11 +891,14 @@ impl PhoneLane {
         if let Some(us) = tts_at {
             self.stamps.mark(StampPoint::TtsFirstPcm, us);
         }
-        self.close_turn();
-        let built = built?;
+        let built = match built {
+            Ok(built) => built,
+            Err(e) => return Err(self.seal(e)),
+        };
         self.stamps.reply_chars = char_len(&built.reply_text);
         self.stamps.pcm_out_samples = built.pcm_out;
         let stamps = self.stamps.clone();
+        self.close_turn();
         Ok(PhoneTurn {
             transcript,
             reply_text: built.reply_text,
@@ -808,7 +923,7 @@ impl PhoneLane {
         self.accept_utterance(pcm16k.len() as u64);
         match self.asr.transcribe(pcm16k) {
             Ok((text, src)) => { self.note_asr(&text); Ok((text, src)) }
-            Err(e) => { self.close_turn(); Err(e) }
+            Err(e) => Err(self.seal(e))
         }
     }
 
@@ -833,7 +948,7 @@ fn voice_to_phone(e: VoiceError) -> PhoneError {
     match e {
         VoiceError::Cancelled => PhoneError::Superseded,
         VoiceError::EmptyInput => PhoneError::Empty,
-        other => PhoneError::NoSpeech(format!("{other:?}")),
+        other => PhoneError::NoSpeech(FailNote::bare(format!("{other:?}"))),
     }
 }
 
@@ -848,6 +963,33 @@ mod tests {
     use galion_ml_voice::stub::fixture_audio;
 
     fn fx(t: &str) -> Vec<i16> { to_pcm16(&fixture_audio(t).samples) }
+
+    /// The error's last line is the lane sheet. Lengths and times only.
+    fn assert_carried_sheet(err: &PhoneError, lane: &PhoneLane, banned: &[&str]) {
+        let sheet = err.partial_sheet().expect("error reply dropped the partial sheet");
+        assert_eq!(sheet, lane.stamps());
+        let line = sheet.log_line();
+        assert!(crate::stamp_log_clean(&line), "{line}");
+        assert!(!line.contains("RIFF") && !line.contains("WAVE"), "{line}");
+        for word in banned {
+            assert!(!line.contains(word), "{line} contains {word}");
+        }
+        let rendered = err.to_string();
+        let last = rendered.lines().next_back().unwrap();
+        assert_eq!(last, line);
+        assert!(rendered.contains('\n'));
+        let first = rendered.lines().next().unwrap();
+        assert!(!first.starts_with("domain04"), "{first}");
+        assert!(!crate::stamp_log_clean(&rendered), "prose must not pass as the sheet");
+        // The console worker builds `format!("{kind}: {e}")`. The sheet stays the last line.
+        let worker_shaped = format!("kind: {err}");
+        let carried = worker_shaped.lines().next_back().unwrap();
+        assert_eq!(carried, line);
+        assert!(crate::stamp_log_clean(carried), "{carried}");
+        for word in banned {
+            assert!(!carried.contains(word), "{carried} contains {word}");
+        }
+    }
     fn voice(secs: f32) -> Vec<i16> {
         let n = (secs * 16_000.0) as usize;
         (0..n).map(|i| { let t = i as f32 / 16_000.0; (0.2 * (t * 180.0 * std::f32::consts::TAU).sin() * (t * 3.0 * std::f32::consts::TAU).sin().abs() * 32767.0) as i16 }).collect()
@@ -1043,8 +1185,11 @@ mod tests {
     #[test] fn speak_fixed_skips_the_canned_table() {
         let mut l = PhoneLane::with_speech(cfg(AsrMode::Stub), galion_ml_voice::speech::SpeechStack::silent("off"));
         assert!(matches!(l.speak_fixed("  "), Err(PhoneError::Empty)));
-        let e = l.speak_fixed("Your mother died this morning.").unwrap_err();
+        let text = "Your mother died this morning.";
+        let e = l.speak_fixed(text).unwrap_err();
         assert!(matches!(e, PhoneError::NoSpeech(_)), "{e}");
+        assert_carried_sheet(&e, &l, &["mother", "died", "morning"]);
+        assert_eq!(e.partial_sheet().unwrap().reply_chars, char_len(text));
     }
     #[test] fn speech_off_is_not_a_spoken_reply() {
         let mut l = PhoneLane::with_speech(cfg(AsrMode::Interim), galion_ml_voice::speech::SpeechStack::silent("GALION_SPEECH=off"));
@@ -1071,6 +1216,52 @@ mod tests {
         assert!(log.contains(&format!("pcm_in_samples={}", pcm.len())), "{log}");
         assert!(log.contains("pcm_out_samples=0") && log.contains("heard_chars=12") && log.contains("reply_chars=0"), "{log}");
         assert!(l.stamps().timings_non_decreasing());
+        assert_carried_sheet(&err, &l, &["hello", "galion"]);
+    }
+
+    #[test]
+    fn asr_refusal_carries_the_partial_sheet_without_words_or_pcm() {
+        use crate::stamp_log_clean;
+        let mut l = PhoneLane::with_speech(cfg(AsrMode::Stub), galion_ml_voice::speech::SpeechStack::silent("off"));
+        l.set_stamp_turn(7);
+        let pcm = voice(0.4);
+        let err = l.turn(&pcm).unwrap_err();
+        assert!(matches!(err, PhoneError::AsrUnratified(_)));
+        assert!(err.to_string().contains("No transcript was invented"));
+        assert_carried_sheet(&err, &l, &["hello", "galion", "RIFF"]);
+        let sheet = err.partial_sheet().unwrap();
+        assert_eq!(sheet.turn_id, 7);
+        assert!(sheet.t_eou_decided.is_some());
+        assert!(sheet.t_asr_final.is_none());
+        assert!(sheet.t_llm_req.is_none());
+        assert_eq!(sheet.pcm_in_samples, pcm.len() as u64);
+        assert_eq!(sheet.pcm_out_samples, 0);
+        assert_eq!(sheet.heard_chars, 0);
+        assert_eq!(sheet.reply_chars, 0);
+        assert!(stamp_log_clean(&sheet.log_line()));
+        let rendered = err.to_string();
+        assert!(!rendered.contains("RIFF") && !rendered.contains("WAVE"), "{rendered}");
+    }
+
+    #[test]
+    fn empty_audio_keeps_the_sheet_on_the_lane() {
+        let mut l = PhoneLane::with_speech(cfg(AsrMode::Stub), galion_ml_voice::speech::SpeechStack::silent("off"));
+        l.set_stamp_turn(3);
+        let err = l.turn(&[]).unwrap_err();
+        assert!(matches!(err, PhoneError::Empty));
+        assert!(err.partial_sheet().is_none(), "Empty stays a unit variant");
+        assert!(!err.to_string().contains("domain04"));
+        assert_eq!(l.stamps().turn_id, 3);
+        assert_eq!(l.stamps().pcm_in_samples, 0);
+        assert!(l.stamps().t_eou_decided.is_some());
+        assert!(crate::stamp_log_clean(&l.stamps().log_line()));
+    }
+
+    #[test]
+    fn direct_asr_error_has_no_sheet_until_the_lane_seals_it() {
+        let err = PhoneTurnAsr::new(AsrMode::Off).transcribe(&fx("hi")).unwrap_err();
+        assert!(err.partial_sheet().is_none());
+        assert!(!err.to_string().contains('\n'));
     }
 
     #[test]

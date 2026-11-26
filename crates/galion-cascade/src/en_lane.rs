@@ -180,6 +180,18 @@ pub fn wav_bytes(pcm: &[i16], rate: u32) -> Vec<u8> {
 mod tests {
     use super::*;
     use crate::route::RouteSource;
+    /// 24 kHz stub cascade (`StubAsr` → `MockLlm` → `StubTts`). Not Flite and not Piper.
+    #[test]
+    fn en_stub_cascade_onset_p50_against_the_lock() {
+        let pcm = to_pcm16(&fixture_audio("hello galion").samples);
+        let mut lane = en_cascade(Emotion::Neutral);
+        let p50 = crate::onset_p50_us(|| {
+            let turn = lane.turn(&pcm).expect("en stub turn");
+            assert!(!turn.audio.is_empty());
+        });
+        crate::assert_onset_within_lock(p50, "en stub cascade");
+    }
+
     #[test] fn en_turn_end_to_end() {
         let d = run_en_turn("hello galion", None, None).unwrap();
         assert_eq!(d.turn.transcript.text, "hello galion");
