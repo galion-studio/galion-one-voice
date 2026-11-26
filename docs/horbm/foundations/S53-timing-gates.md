@@ -81,15 +81,15 @@ Today the soak times `Instant` around `Duplex::tick` and stores every tick, incl
 | Later window p99 above the first | `P99_DRIFT_NS` | 2 ms |
 | Later window max above the first | `MAX_DRIFT_NS` | 20 ms |
 
-`F-soak.md` measured the wall p99 of that tick near 20 ms and the wall max near 29 ms. The allocation gates are exact and separate: idle 0, hold 1, playback 4, probes 0, RSS growth ≤ 128 KiB, buffer ≤ 29,440 samples, emotion span ≤ 0.05, barge 160 ms.
+`F-soak.md` measured the wall p99 of that tick near 20 ms and the wall max near 29 ms. The allocation gates are exact and separate: idle 0, hold 1, playback 4, probes 0, live-heap growth ≤ 128 KiB, buffer ≤ 29,440 samples, emotion span ≤ 0.05, barge 160 ms.
 
 What flakes is a single wall sample. It sets `max_ns`, which can miss `TICK_MAX_NS` or `MAX_DRIFT_NS` while p99 is fine. The voice runs show the shape: wall p99 stayed near 8 µs while one wall sample ran past a second.
 
 When that test is changed, in a later patch that owns `horbm-soak`:
 
-1. Leave the allocation, RSS, buffer, emotion, and barge gates alone. Do not retune them in the same patch as the clock.
+1. Leave the allocation, live-heap, buffer, emotion, and barge gates alone. Do not retune them in the same patch as the clock.
 2. Read the clock the same way. On Unix, `libc::clock_gettime(CLOCK_THREAD_CPUTIME_ID)` immediately before and after `duplex.tick`. Elsewhere, `Instant`. Print the clock name, the gated p99, the gated max, and the wall max. Wall max stays a diagnostic on Unix. Fail the run if the Unix clock call fails or the gated p50 is zero.
-3. Drop the 250 warmup ticks from the ranked series. They already exist for the allocation buckets and the RSS snapshot. Today they still sit inside window 0's wall vector. Rank only ticks after warmup. Keep 3,750 as the window length unless a new measurement says why it should change.
+3. Drop the 250 warmup ticks from the ranked series. They already exist for the allocation buckets and the live-heap snapshot. Today they still sit inside window 0's wall vector. Rank only ticks after warmup. Keep 3,750 as the window length unless a new measurement says why it should change.
 4. Keep the soak's own percentile rank. Do not switch it to the voice test's `round((n - 1) * 0.99)` in the same patch. The clock and the max policy are the change. A new index would make the before and after incomparable.
 5. Keep `TICK_P99_MAX_NS` at 50 ms and `P99_DRIFT_NS` at 2 ms unless a thread-CPU measurement of this tick says otherwise. The voice p99 of about 8 µs is a 7,680-byte copy. It is not evidence that the duplex tick has that much room, and it is not a reason to lower 50 ms either.
 6. Do not copy the 8 ms voice ceiling onto the soak. A ceiling under the measured ~20 ms body of `Duplex::tick` would fail the real call. Re-run the five-minute test (and the hour if it is run) on the thread clock and record per-window CPU p99, CPU max, and wall max.

@@ -20,7 +20,7 @@ use horbm_voice::Mouth;
 use crate::buffer::OutputBuffer;
 use crate::mouth::SoakMouth;
 use crate::recog::Scripted;
-use crate::stats::{percentile, vm_rss_kib};
+use crate::stats::{percentile, smaps_rss_kib, vm_rss_kib};
 use crate::{AllocSpan, Report, Window};
 
 /// Fixed seed. The schedule and the sine phase come from this and nothing else.
@@ -458,7 +458,12 @@ pub fn ticks_for(minutes: u64) -> u64 {
     minutes.saturating_mul(60).saturating_mul(1_000) / 80
 }
 
-pub fn run(minutes: u64, allocs: &dyn Fn() -> u64, touch_mappings: &dyn Fn()) -> Report {
+pub fn run(
+    minutes: u64,
+    allocs: &dyn Fn() -> u64,
+    live_heap: &dyn Fn() -> u64,
+    touch_mappings: &dyn Fn(),
+) -> Report {
     let ticks = ticks_for(minutes);
     let persona = ConfiguredPersona::development().expect("configured persona");
     let baseline = persona.baseline();
@@ -495,8 +500,12 @@ pub fn run(minutes: u64, allocs: &dyn Fn() -> u64, touch_mappings: &dyn Fn()) ->
     let mut user_sent = 0u64;
     let mut user_heard = 0u64;
     let mut prosody_bad = 0u64;
+    let heap_start = live_heap();
     let rss_start = vm_rss_kib();
+    let smaps_start = smaps_rss_kib();
+    let mut heap_warm: Option<u64> = None;
     let mut rss_warm: Option<Result<u64, String>> = None;
+    let mut smaps_warm: Option<Result<u64, String>> = None;
     let mut rss_peak = 0u64;
 
     for tick in 0..ticks {
@@ -558,10 +567,12 @@ pub fn run(minutes: u64, allocs: &dyn Fn() -> u64, touch_mappings: &dyn Fn()) ->
         }
         if tick == WARMUP_TICKS {
             // Fault file pages that exist now, including libraries opened
-            // while the mouth was built, so a later reclaim-and-refault is
-            // not counted as growth. Anonymous growth is what remains.
+            // while the mouth was built, so the informational resident-set
+            // samples share those pages. The gate reads `live_heap`.
             touch_mappings();
+            heap_warm = Some(live_heap());
             rss_warm = Some(vm_rss_kib());
+            smaps_warm = Some(smaps_rss_kib());
         }
         if walls.len() == WINDOW_TICKS as usize {
             if let Ok(kib) = vm_rss_kib() {
@@ -579,7 +590,9 @@ pub fn run(minutes: u64, allocs: &dyn Fn() -> u64, touch_mappings: &dyn Fn()) ->
         windows.push(close_window(windows.len() as u32, &mut walls));
     }
     touch_mappings();
+    let heap_end = live_heap();
     let rss_end = vm_rss_kib();
+    let smaps_end = smaps_rss_kib();
     if !machine.end_probe {
         machine
             .failures
@@ -618,10 +631,16 @@ pub fn run(minutes: u64, allocs: &dyn Fn() -> u64, touch_mappings: &dyn Fn()) ->
         emotion_probe: probed.emotion,
         buffer_probe: probed.buffer,
         windows,
+        heap_start,
+        heap_warm,
+        heap_end,
         rss_start,
         rss_warm,
         rss_end,
         rss_peak,
+        smaps_start,
+        smaps_warm,
+        smaps_end,
         buffer_max: buf.max_depth(),
         buffer_end: buf.depth(),
         buffer_overflows: buf.overflows(),
