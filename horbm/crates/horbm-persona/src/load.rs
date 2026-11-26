@@ -10,8 +10,8 @@ use serde::Deserialize;
 
 use crate::style::hook;
 use crate::{
-    pack_bytes, Boundary, Persona, PersonaError, StyleHook, TraitSlot, BOUNDARY_BYTES,
-    BOUNDARY_SLOTS, SCHEMA, TOKEN_BYTES, TRAIT_SLOTS, UNKNOWN_LINE, VERSION,
+    pack_bytes, Boundary, Persona, PersonaError, PersonaLine, StyleHook, TraitSlot, BOUNDARY_BYTES,
+    BOUNDARY_SLOTS, LINE_BYTES, SCHEMA, TOKEN_BYTES, TRAIT_SLOTS, UNKNOWN_LINE, VERSION,
 };
 
 pub(crate) fn load(path: &Path) -> Result<Persona, PersonaError> {
@@ -35,6 +35,7 @@ pub(crate) fn parse(text: &str) -> Result<Persona, PersonaError> {
     let care = pack_word(&raw.inner.care)?;
     let want = pack_word(&raw.inner.want)?;
     let expect = pack_word(&raw.inner.expect)?;
+    let (lines, line_len) = pack_lines(raw.lines.as_ref())?;
     Ok(Persona {
         id,
         voice,
@@ -51,6 +52,8 @@ pub(crate) fn parse(text: &str) -> Result<Persona, PersonaError> {
         care,
         want,
         expect,
+        lines,
+        line_len,
     })
 }
 
@@ -110,7 +113,37 @@ pub(crate) fn to_toml(persona: &Persona) -> String {
     out.push_str("\"\nexpect = \"");
     out.push_str(persona.expect_token());
     out.push_str("\"\n");
+    append_lines(&mut out, persona);
     out
+}
+
+fn append_lines(out: &mut String, persona: &Persona) {
+    let forgot = persona.line(PersonaLine::Forgot);
+    let nothing = persona.line(PersonaLine::NothingRemembered);
+    if forgot.is_none() && nothing.is_none() {
+        return;
+    }
+    out.push_str("\n[lines]\n");
+    if let Some(text) = forgot {
+        out.push_str("forgot = \"");
+        push_basic(out, text);
+        out.push_str("\"\n");
+    }
+    if let Some(text) = nothing {
+        out.push_str("nothing_remembered = \"");
+        push_basic(out, text);
+        out.push_str("\"\n");
+    }
+}
+
+/// A TOML basic string. Valid lines have no `"` and no controls, so only `\` is escaped.
+fn push_basic(out: &mut String, text: &str) {
+    for c in text.chars() {
+        if c == '\\' {
+            out.push('\\');
+        }
+        out.push(c);
+    }
 }
 
 fn refuse_markers(text: &str) -> Result<(), PersonaError> {
@@ -304,6 +337,50 @@ fn pack_baseline(raw: &RawBaseline) -> Result<Axes, PersonaError> {
     })
 }
 
+fn pack_lines(raw: Option<&RawLines>) -> Result<([[u8; LINE_BYTES]; 2], [u8; 2]), PersonaError> {
+    let mut lines = [[0u8; LINE_BYTES]; 2];
+    let mut line_len = [0u8; 2];
+    let Some(raw) = raw else {
+        return Ok((lines, line_len));
+    };
+    pack_line(raw.forgot.as_deref(), &mut lines[0], &mut line_len[0])?;
+    pack_line(
+        raw.nothing_remembered.as_deref(),
+        &mut lines[1],
+        &mut line_len[1],
+    )?;
+    Ok((lines, line_len))
+}
+
+fn pack_line(
+    text: Option<&str>,
+    slot: &mut [u8; LINE_BYTES],
+    len: &mut u8,
+) -> Result<(), PersonaError> {
+    let Some(text) = text else {
+        return Ok(());
+    };
+    if !line_ok(text) {
+        return Err(PersonaError::Invalid(
+            "persona line must be 1 to 80 printable ascii bytes with no quote",
+        ));
+    }
+    let bytes = text.as_bytes();
+    slot[..bytes.len()].copy_from_slice(bytes);
+    *len = u8::try_from(bytes.len()).unwrap_or_default();
+    Ok(())
+}
+
+fn line_ok(text: &str) -> bool {
+    let bytes = text.as_bytes();
+    (1..=LINE_BYTES).contains(&bytes.len()) && bytes.iter().copied().all(line_byte)
+}
+
+fn line_byte(c: u8) -> bool {
+    // Printable ASCII except `"`. Newline and other controls sit below space.
+    matches!(c, b' '..=b'!' | b'#'..=b'~')
+}
+
 fn pack_word(s: &str) -> Result<[u8; TOKEN_BYTES], PersonaError> {
     if !inner_ok(s) {
         return Err(PersonaError::Invalid(
@@ -390,6 +467,17 @@ struct RawPersona {
     style: RawStyle,
     baseline: RawBaseline,
     inner: RawInner,
+    #[serde(default)]
+    lines: Option<RawLines>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawLines {
+    #[serde(default)]
+    forgot: Option<String>,
+    #[serde(default)]
+    nothing_remembered: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]

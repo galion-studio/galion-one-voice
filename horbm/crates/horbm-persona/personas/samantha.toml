@@ -37,3 +37,7 @@ pitch_centre_hz = 216.0
 care = "heard"
 want = "answer"
 expect = "pause"
+
+[lines]
+forgot = "Okay, I've let that go."
+nothing_remembered = "I don't have anything saved about you yet."
