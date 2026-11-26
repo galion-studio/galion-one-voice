@@ -33,12 +33,15 @@ CODE="$(awk '/^#\[cfg\(test\)\]/{exit} {print}' "$RIKA")"
 BAD=""
 grep -qE '^pub mod rika;' "$LIB" || BAD+="lib.rs lacks 'pub mod rika'; "
 grep -qE 'pub use rika::.*\bRika\b' "$LIB" || BAD+="lib.rs does not re-export Rika; "
-echo "$CODE" | grep -qE 'std::fs|std::net|File::|OpenOptions' && BAD+="rika.rs not RAM-only (fs/net use); "
-echo "$CODE" | grep -qE 'const fn is_lexical\(self\) -> bool \{[[:space:]]*$' || BAD+="Cue::is_lexical missing; "
-echo "$CODE" | grep -A2 'const fn is_lexical' | grep -qE '^[[:space:]]*false[[:space:]]*$' || BAD+="Cue::is_lexical not const false; "
-echo "$CODE" | grep -q 'hysteresis.max(2)' || BAD+="hysteresis not clamped >= 2; "
-echo "$CODE" | grep -q 'consent_bits::SENSE' || BAD+="no SENSE guard; "
-echo "$CODE" | grep -q 'consent_bits::ADAPT' || BAD+="no ADAPT guard; "
+# Here-strings, not `echo | grep -q`. Under pipefail, grep -q closes the pipe
+# early and echo dies with SIGPIPE, so a guard that is present looks missing.
+if grep -qE 'std::fs|std::net|File::|OpenOptions' <<< "$CODE"; then BAD+="rika.rs not RAM-only (fs/net use); "; fi
+grep -qE 'const fn is_lexical\(self\) -> bool \{[[:space:]]*$' <<< "$CODE" || BAD+="Cue::is_lexical missing; "
+lex="$(grep -A2 'const fn is_lexical' <<< "$CODE" || true)"
+grep -qE '^[[:space:]]*false[[:space:]]*$' <<< "$lex" || BAD+="Cue::is_lexical not const false; "
+grep -q 'hysteresis.max(2)' <<< "$CODE" || BAD+="hysteresis not clamped >= 2; "
+grep -q 'consent_bits::SENSE' <<< "$CODE" || BAD+="no SENSE guard; "
+grep -q 'consent_bits::ADAPT' <<< "$CODE" || BAD+="no ADAPT guard; "
 grep -q 'Workplace | Purpose::Education' "$ROOT/galion-emotion/src/consent.rs" || BAD+="consent gate lacks Workplace/Education denial; "
 [ -z "$BAD" ] || finish FAIL "structural: ${BAD%; }"
 
@@ -47,7 +50,7 @@ LIST="$( cd "$ROOT" && cargo test -p galion-emotion --offline -q -- --list 2>"$L
   || finish FAIL "galion-emotion does not build: $(grep -m1 -E '^error' "$LOGF" || tail -n1 "$LOGF")"
 G6T="$(echo "$LIST" | grep -E ': test$' | grep -iE 'g6_' || true)"
 [ -n "$G6T" ] || finish SKIP "rika.rs present but no g6_ tests yet (expected g6_r1..g6_r9)"
-MISSING=""; for n in 1 2 3 4 5 6 7 8 9; do echo "$G6T" | grep -qiE "g6_r${n}([^0-9]|$)" || MISSING+="R$n "; done
+MISSING=""; for n in 1 2 3 4 5 6 7 8 9; do grep -qiE "g6_r${n}([^0-9]|$)" <<< "$G6T" || MISSING+="R$n "; done
 ( cd "$ROOT" && cargo test -p galion-emotion --offline -- g6_ ) > "$LOGF" 2>&1; RC=$?
 SUM="$(grep -E '^test result:' "$LOGF" | awk '{p+=$4; f+=$6} END{printf "%d passed, %d failed", p, f}')"
 NPASS="$(grep -E '^test result:' "$LOGF" | awk '{p+=$4} END{print p+0}')"
