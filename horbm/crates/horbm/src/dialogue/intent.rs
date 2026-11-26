@@ -145,6 +145,26 @@ fn contains_phrase(hay: &str, phrase: &str) -> bool {
     first_phrase_at(hay.as_bytes(), phrase.as_bytes(), 0).is_some()
 }
 
+/// Words from the earliest recall cue, when this line is a recall.
+/// A correction or a forget keeps `heard` whole.
+pub(crate) fn recall_clause(heard: &str) -> &str {
+    if TurnIntent::read(heard, "chat") != TurnIntent::Recall {
+        return heard;
+    }
+    let bytes = heard.as_bytes();
+    let mut at: Option<usize> = None;
+    for phrase in RECALL {
+        let Some(hit) = first_phrase_at(bytes, phrase.as_bytes(), 0) else {
+            continue;
+        };
+        at = Some(at.map_or(hit, |prev| prev.min(hit)));
+    }
+    match at {
+        Some(at) => &heard[at..],
+        None => heard,
+    }
+}
+
 fn first_phrase_at(hay: &[u8], phrase: &[u8], from: usize) -> Option<usize> {
     if phrase.is_empty() || from >= hay.len() || hay.len() - from < phrase.len() {
         return None;
@@ -389,6 +409,48 @@ mod tests {
                 "{heard}"
             );
         }
+    }
+
+    #[test]
+    fn recall_clause_starts_at_the_earliest_cue() {
+        assert_eq!(
+            recall_clause("please don't forget that, do you remember the blue bowl"),
+            "do you remember the blue bowl"
+        );
+        assert_eq!(
+            recall_clause("I forgot my keys, do you remember the blue bowl"),
+            "do you remember the blue bowl"
+        );
+        assert_eq!(
+            recall_clause("forget-me-not, do you remember the blue bowl"),
+            "do you remember the blue bowl"
+        );
+        assert_eq!(
+            recall_clause("Please, Do you remember the bowl"),
+            "Do you remember the bowl"
+        );
+        assert_eq!(
+            recall_clause("hello, what did I tell you, do you remember"),
+            "what did I tell you, do you remember"
+        );
+        assert_eq!(
+            recall_clause("do you remember the blue bowl"),
+            "do you remember the blue bowl"
+        );
+        assert_eq!(
+            recall_clause("forget that, do you remember the blue bowl"),
+            "forget that, do you remember the blue bowl"
+        );
+        assert_eq!(
+            recall_clause("no, that's wrong, do you remember the blue bowl"),
+            "no, that's wrong, do you remember the blue bowl"
+        );
+        assert_eq!(
+            recall_clause("please don't forget that"),
+            "please don't forget that"
+        );
+        assert_eq!(recall_clause("where is the kettle"), "where is the kettle");
+        assert_eq!(recall_clause(""), "");
     }
 
     #[test]

@@ -36,6 +36,7 @@ use crate::research_style::ResearchHit;
 pub use moves::{flag_granted, DialogueConsent, Move, TurnSnap, RING_CAP};
 pub use policy::{OfflineBandit, ReplyPlan};
 
+pub(crate) use intent::recall_clause;
 use intent::TurnIntent;
 use moves::TurnRing;
 use policy::Choice;
