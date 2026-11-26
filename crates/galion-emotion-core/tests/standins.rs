@@ -62,3 +62,11 @@ fn deny_memory_forget_matching_is_empty() {
     assert!(!memory.remember_granted());
     assert!(memory.forget_matching("person-alpha", "sister").is_empty());
 }
+
+#[test]
+fn deny_memory_list_person_is_empty() {
+    let mut memory: Box<dyn PersonMemory> = Box::new(DenyMemory::new());
+    memory.set_remember(true);
+    assert!(!memory.remember_granted());
+    assert!(memory.list_person("person-alpha", 8).is_empty());
+}

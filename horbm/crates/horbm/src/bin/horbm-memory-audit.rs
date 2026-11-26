@@ -11,8 +11,11 @@
 //! `list` opens the memory file with `SQLITE_OPEN_READ_ONLY` and only after
 //! the file exists. It does not create that file or its parent. `PRAGMA
 //! user_version` and the named columns are compared with the `CREATE TABLE`
-//! statements `horbm-memory` installs. A difference exits 3. This program
-//! does not guess a newer or older shape.
+//! statements `horbm-memory` installs. That check, and the `items` and
+//! `archive` readers, are `EpisodicStore::open_readonly`, `check_schema`,
+//! `read_items`, and `read_archive`. This program maps those rows to JSON.
+//! A schema difference exits 3. This program does not guess a newer or older
+//! shape.
 //!
 //! `forget` archives one row through `EpisodicStore` with remember granted.
 //! Exit 0 is `Archived`. Any other outcome exits 1. A missing file exits 2
@@ -35,27 +38,16 @@
 
 use std::env;
 use std::ffi::OsString;
-use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
-use std::sync::OnceLock;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+use galion_emotion_core::standins::memory::{DiaryArchiveRow, DiaryItemRow, DiaryReadError};
 use horbm::{EpisodicStore, LearnConfig, LearnPass, PersonMemory, WriteOutcome};
-use rusqlite::{params, Connection, OpenFlags};
 
 const EXIT_OK: u8 = 0;
 const EXIT_FAIL: u8 = 1;
 const EXIT_USAGE: u8 = 2;
 const EXIT_SCHEMA: u8 = 3;
-
-/// Columns and `user_version` taken from the `CREATE TABLE` statements
-/// `horbm-memory` installs. Not a copy of that list.
-struct DeclaredSchema {
-    user_version: i32,
-    items: Vec<(String, String)>,
-    archive: Vec<(String, String)>,
-}
 
 enum Stop {
     Usage(String),
@@ -144,10 +136,13 @@ fn cmd_list(args: &[OsString]) -> u8 {
 }
 
 fn list(args: &ListArgs) -> Result<(), Stop> {
-    let conn = open_readonly(&args.memory)?;
-    check_schema(&conn)?;
-    let mut lines = read_items(&conn, args.person.as_deref())?;
-    lines.extend(read_archive(&conn, args.person.as_deref())?);
+    let conn = EpisodicStore::open_readonly(&args.memory).map_err(stop_of)?;
+    EpisodicStore::check_schema(&conn).map_err(stop_of)?;
+    let mut lines =
+        json_items(&EpisodicStore::read_items(&conn, args.person.as_deref()).map_err(stop_of)?);
+    lines.extend(json_archive(
+        &EpisodicStore::read_archive(&conn, args.person.as_deref()).map_err(stop_of)?,
+    ));
     if let Some(pack) = &args.learn {
         lines.extend(read_learned(pack, args.person.as_deref())?);
     }
@@ -156,6 +151,50 @@ fn list(args: &ListArgs) -> Result<(), Stop> {
         println!("{text}");
     }
     Ok(())
+}
+
+fn stop_of(err: DiaryReadError) -> Stop {
+    match err {
+        DiaryReadError::Missing(message) => Stop::Missing(message),
+        DiaryReadError::Schema(message) => Stop::Schema(message),
+        DiaryReadError::Fail(message) => Stop::Fail(message),
+    }
+}
+
+fn json_items(rows: &[DiaryItemRow]) -> Vec<serde_json::Value> {
+    rows.iter()
+        .map(|row| {
+            serde_json::json!({
+                "kind": "row",
+                "item_id": row.item_id,
+                "layer": row.layer,
+                "said_by": row.said_by,
+                "date": row.date,
+                "source": row.source,
+                "pinned": row.pinned,
+                "marked": row.marked,
+                "current": row.current,
+                "text": row.text,
+            })
+        })
+        .collect()
+}
+
+fn json_archive(rows: &[DiaryArchiveRow]) -> Vec<serde_json::Value> {
+    rows.iter()
+        .map(|row| {
+            serde_json::json!({
+                "kind": "tombstone",
+                "item_id": row.item_id,
+                "layer": row.layer,
+                "said_by": row.said_by,
+                "date": row.date,
+                "source": row.source,
+                "text": row.text,
+                "reason": row.reason,
+            })
+        })
+        .collect()
 }
 
 fn cmd_forget(args: &[OsString]) -> u8 {
@@ -186,383 +225,6 @@ fn cmd_withdraw(args: &[OsString]) -> u8 {
         Ok(()) => EXIT_OK,
         Err(err) => Stop::Fail(err.to_string()).code(),
     }
-}
-
-fn open_readonly(path: &Path) -> Result<Connection, Stop> {
-    if !path.is_file() {
-        return Err(Stop::Missing(format!("{} is not a file", path.display())));
-    }
-    let conn =
-        Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY).map_err(|err| {
-            if path.is_file() {
-                Stop::Fail(format!("{}: {err}", path.display()))
-            } else {
-                Stop::Missing(format!("{} is not a file", path.display()))
-            }
-        })?;
-    conn.busy_timeout(Duration::from_millis(0))
-        .map_err(|err| Stop::Fail(err.to_string()))?;
-    conn.pragma_update(None, "query_only", true)
-        .map_err(|err| Stop::Fail(err.to_string()))?;
-    Ok(conn)
-}
-
-fn check_schema(conn: &Connection) -> Result<(), Stop> {
-    let declared = declared_schema()?;
-    let version: i32 = conn
-        .pragma_query_value(None, "user_version", |row| row.get(0))
-        .map_err(|err| Stop::Fail(err.to_string()))?;
-    if version != declared.user_version {
-        return Err(Stop::Schema(format!(
-            "schema mismatch: PRAGMA user_version is {version}, horbm-memory's schema declares {}",
-            declared.user_version
-        )));
-    }
-    expect_columns(conn, "items", &declared.items)?;
-    expect_columns(conn, "archive", &declared.archive)?;
-    Ok(())
-}
-
-fn declared_schema() -> Result<&'static DeclaredSchema, Stop> {
-    static CELL: OnceLock<Result<DeclaredSchema, String>> = OnceLock::new();
-    match CELL.get_or_init(load_declared_schema) {
-        Ok(schema) => Ok(schema),
-        Err(message) => Err(Stop::Fail(message.clone())),
-    }
-}
-
-/// Open a throwaway database with `horbm_memory::Store` and read the
-/// `CREATE TABLE` text that crate installed. The caller's file is not used.
-fn load_declared_schema() -> Result<DeclaredSchema, String> {
-    let nanos = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|elapsed| elapsed.as_nanos())
-        .unwrap_or(0);
-    let dir = env::temp_dir().join(format!(
-        "horbm-memory-audit-schema-{}-{nanos}",
-        std::process::id()
-    ));
-    let guard = RemoveDir(dir);
-    fs::create_dir_all(guard.path()).map_err(|err| err.to_string())?;
-    let path = guard.path().join("reference.sqlite");
-    {
-        let store = horbm_memory::Store::open(&path).map_err(|err| err.to_string())?;
-        drop(store);
-    }
-    let conn = Connection::open_with_flags(&path, OpenFlags::SQLITE_OPEN_READ_ONLY)
-        .map_err(|err| err.to_string())?;
-    let user_version: i32 = conn
-        .pragma_query_value(None, "user_version", |row| row.get(0))
-        .map_err(|err| err.to_string())?;
-    let items = columns_from_create(&create_sql(&conn, "items")?)?;
-    let archive = columns_from_create(&create_sql(&conn, "archive")?)?;
-    drop(conn);
-    Ok(DeclaredSchema {
-        user_version,
-        items,
-        archive,
-    })
-}
-
-fn create_sql(conn: &Connection, table: &str) -> Result<String, String> {
-    conn.query_row(
-        "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?1",
-        params![table],
-        |row| row.get(0),
-    )
-    .map_err(|err| format!("horbm-memory installed no CREATE TABLE for {table}: {err}"))
-}
-
-fn columns_from_create(sql: &str) -> Result<Vec<(String, String)>, String> {
-    let body = table_body(sql)?;
-    let mut columns = Vec::new();
-    for clause in split_clauses(body) {
-        if let Some(column) = column_from_clause(clause)? {
-            columns.push(column);
-        }
-    }
-    if columns.is_empty() {
-        return Err(format!(
-            "horbm-memory CREATE TABLE declares no columns: {sql}"
-        ));
-    }
-    Ok(columns)
-}
-
-fn table_body(sql: &str) -> Result<&str, String> {
-    let Some(start) = sql.find('(') else {
-        return Err(format!(
-            "horbm-memory CREATE TABLE has no column list: {sql}"
-        ));
-    };
-    let bytes = sql.as_bytes();
-    let mut depth = 0;
-    let mut quote: Option<u8> = None;
-    let mut i = start;
-    while i < bytes.len() {
-        let byte = bytes[i];
-        if let Some(mark) = quote {
-            if byte == mark {
-                if mark == b'\'' && bytes.get(i + 1) == Some(&b'\'') {
-                    i += 2;
-                    continue;
-                }
-                quote = None;
-            }
-            i += 1;
-            continue;
-        }
-        match byte {
-            b'\'' | b'"' | b'`' => quote = Some(byte),
-            b'(' => depth += 1,
-            b')' => {
-                depth -= 1;
-                if depth == 0 {
-                    return Ok(&sql[start + 1..i]);
-                }
-            }
-            _ => {}
-        }
-        i += 1;
-    }
-    Err(format!(
-        "horbm-memory CREATE TABLE column list is not closed: {sql}"
-    ))
-}
-
-fn split_clauses(body: &str) -> Vec<&str> {
-    let bytes = body.as_bytes();
-    let mut out = Vec::new();
-    let mut start = 0;
-    let mut depth = 0;
-    let mut quote: Option<u8> = None;
-    let mut i = 0;
-    while i < bytes.len() {
-        let byte = bytes[i];
-        if let Some(mark) = quote {
-            if byte == mark {
-                if mark == b'\'' && bytes.get(i + 1) == Some(&b'\'') {
-                    i += 2;
-                    continue;
-                }
-                quote = None;
-            }
-            i += 1;
-            continue;
-        }
-        match byte {
-            b'\'' | b'"' | b'`' => quote = Some(byte),
-            b'(' => depth += 1,
-            b')' if depth > 0 => depth -= 1,
-            b',' if depth == 0 => {
-                out.push(&body[start..i]);
-                start = i + 1;
-            }
-            _ => {}
-        }
-        i += 1;
-    }
-    out.push(&body[start..]);
-    out
-}
-
-fn column_from_clause(clause: &str) -> Result<Option<(String, String)>, String> {
-    let clause = clause.trim();
-    if clause.is_empty() {
-        return Ok(None);
-    }
-    let Some((name, rest)) = take_ident(clause) else {
-        return Err(format!(
-            "horbm-memory schema has an unreadable declaration: {clause}"
-        ));
-    };
-    if is_table_constraint(name) {
-        return Ok(None);
-    }
-    let Some((ty, _)) = take_ident(rest) else {
-        return Err(format!(
-            "horbm-memory schema column {name} has no declared type"
-        ));
-    };
-    Ok(Some((name.to_string(), ty.to_string())))
-}
-
-fn take_ident(text: &str) -> Option<(&str, &str)> {
-    let text = text.trim_start();
-    let mut chars = text.char_indices();
-    let (_, first) = chars.next()?;
-    if first == '"' || first == '`' || first == '[' {
-        let end = if first == '[' { ']' } else { first };
-        let close = text[1..].find(end)?;
-        return Some((&text[1..1 + close], &text[1 + close + 1..]));
-    }
-    if !first.is_ascii_alphabetic() && first != '_' {
-        return None;
-    }
-    let mut end = first.len_utf8();
-    for (index, ch) in chars {
-        if ch.is_ascii_alphanumeric() || ch == '_' {
-            end = index + ch.len_utf8();
-        } else {
-            break;
-        }
-    }
-    Some((&text[..end], &text[end..]))
-}
-
-fn is_table_constraint(name: &str) -> bool {
-    matches!(
-        name.to_ascii_uppercase().as_str(),
-        "PRIMARY" | "UNIQUE" | "CHECK" | "FOREIGN" | "CONSTRAINT"
-    )
-}
-
-fn expect_columns(
-    conn: &Connection,
-    table: &str,
-    expected: &[(String, String)],
-) -> Result<(), Stop> {
-    let found = table_columns(conn, table)?;
-    if found.is_empty() {
-        return Err(Stop::Schema(format!(
-            "schema mismatch: table {table} is missing; horbm-memory's schema declares it"
-        )));
-    }
-    let mut matched = vec![false; expected.len()];
-    for (name, ty) in &found {
-        let Some(index) = expected.iter().position(|(want, _)| want == name) else {
-            return Err(Stop::Schema(format!(
-                "schema mismatch: table {table} has column {name} ({ty}), which horbm-memory's schema does not declare"
-            )));
-        };
-        let want_ty = &expected[index].1;
-        if !ty.eq_ignore_ascii_case(want_ty) {
-            return Err(Stop::Schema(format!(
-                "schema mismatch: {table}.{name} type is {ty}, horbm-memory's schema declares {want_ty}"
-            )));
-        }
-        if matched[index] {
-            return Err(Stop::Schema(format!(
-                "schema mismatch: table {table} lists column {name} twice"
-            )));
-        }
-        matched[index] = true;
-    }
-    for (index, seen) in matched.iter().enumerate() {
-        if !seen {
-            let (name, ty) = &expected[index];
-            return Err(Stop::Schema(format!(
-                "schema mismatch: table {table} has no column {name}; horbm-memory's schema declares {name} {ty}"
-            )));
-        }
-    }
-    Ok(())
-}
-
-struct RemoveDir(PathBuf);
-
-impl RemoveDir {
-    fn path(&self) -> &Path {
-        &self.0
-    }
-}
-
-impl Drop for RemoveDir {
-    fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.0);
-    }
-}
-
-fn table_columns(conn: &Connection, table: &str) -> Result<Vec<(String, String)>, Stop> {
-    let sql = match table {
-        "items" => "PRAGMA table_info(items)",
-        "archive" => "PRAGMA table_info(archive)",
-        _ => {
-            return Err(Stop::Fail(format!(
-                "schema check does not know table {table}"
-            )))
-        }
-    };
-    let mut stmt = conn
-        .prepare(sql)
-        .map_err(|err| Stop::Fail(err.to_string()))?;
-    let rows = stmt
-        .query_map([], |row| {
-            Ok((row.get::<_, String>(1)?, row.get::<_, String>(2)?))
-        })
-        .map_err(|err| Stop::Fail(err.to_string()))?;
-    let mut out = Vec::new();
-    for row in rows {
-        out.push(row.map_err(|err| Stop::Fail(err.to_string()))?);
-    }
-    Ok(out)
-}
-
-fn read_items(conn: &Connection, person: Option<&str>) -> Result<Vec<serde_json::Value>, Stop> {
-    let mut stmt = conn
-        .prepare(
-            "SELECT item_id, layer, said_by, source_date, source, pinned, marked, current, body
-             FROM items
-             WHERE layer IN ('episode', 'diary') AND (?1 IS NULL OR said_by = ?1)
-             ORDER BY rowid ASC",
-        )
-        .map_err(|err| Stop::Fail(err.to_string()))?;
-    let mut rows = stmt
-        .query(params![person])
-        .map_err(|err| Stop::Fail(err.to_string()))?;
-    let mut out = Vec::new();
-    while let Some(row) = rows.next().map_err(|err| Stop::Fail(err.to_string()))? {
-        out.push(serde_json::json!({
-            "kind": "row",
-            "item_id": text_at(row, 0)?,
-            "layer": text_at(row, 1)?,
-            "said_by": text_at(row, 2)?,
-            "date": text_at(row, 3)?,
-            "source": text_at(row, 4)?,
-            "pinned": flag_at(row, 5)?,
-            "marked": flag_at(row, 6)?,
-            "current": flag_at(row, 7)?,
-            "text": text_at(row, 8)?,
-        }));
-    }
-    Ok(out)
-}
-
-fn read_archive(conn: &Connection, person: Option<&str>) -> Result<Vec<serde_json::Value>, Stop> {
-    let mut stmt = conn
-        .prepare(
-            "SELECT item_id, layer, said_by, source_date, source, body, reason
-             FROM archive
-             WHERE (?1 IS NULL OR said_by = ?1)
-             ORDER BY rowid ASC",
-        )
-        .map_err(|err| Stop::Fail(err.to_string()))?;
-    let mut rows = stmt
-        .query(params![person])
-        .map_err(|err| Stop::Fail(err.to_string()))?;
-    let mut out = Vec::new();
-    while let Some(row) = rows.next().map_err(|err| Stop::Fail(err.to_string()))? {
-        out.push(serde_json::json!({
-            "kind": "tombstone",
-            "item_id": text_at(row, 0)?,
-            "layer": text_at(row, 1)?,
-            "said_by": text_at(row, 2)?,
-            "date": text_at(row, 3)?,
-            "source": text_at(row, 4)?,
-            "text": text_at(row, 5)?,
-            "reason": text_at(row, 6)?,
-        }));
-    }
-    Ok(out)
-}
-
-fn text_at(row: &rusqlite::Row<'_>, index: usize) -> Result<String, Stop> {
-    row.get(index).map_err(|err| Stop::Fail(err.to_string()))
-}
-
-fn flag_at(row: &rusqlite::Row<'_>, index: usize) -> Result<bool, Stop> {
-    let value: i64 = row.get(index).map_err(|err| Stop::Fail(err.to_string()))?;
-    Ok(value != 0)
 }
 
 fn read_learned(pack: &Path, person: Option<&str>) -> Result<Vec<serde_json::Value>, Stop> {
