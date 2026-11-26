@@ -16,8 +16,14 @@
 //! Depth 1. Explicit pins use `turn_id` 0 and survive barge-in. Empathy and
 //! intent use the current turn and restore the previous floor if that turn
 //! is cancelled. `Heartbeat::step` does not send it.
+//!
+//! `Debug` on [`BusMsg`] and [`BusBody`] prints kind, ids, lengths, times, and
+//! numeric metadata. It never prints PCM bytes or text. The frame/stamp
+//! conversion lives in [`crate::bus_clock`] ([`crate::BusStampAnchor`]) and is
+//! not applied by `try_send`.
 
 use std::collections::VecDeque;
+use std::fmt;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::mpsc::{sync_channel, Receiver, SyncSender, TrySendError};
 use std::sync::{Arc, Mutex};
@@ -307,7 +313,9 @@ pub enum SendError {
 }
 
 /// One hop on the bus. `t_ms` is heartbeat time (frame × 80), not wall clock.
-#[derive(Clone, Debug, PartialEq)]
+/// Convert to the stamp clock with [`crate::BusStampAnchor`]. Do not invent
+/// a second formula.
+#[derive(Clone, PartialEq)]
 pub struct BusMsg {
     /// Monotonic per sender. [`ProcessBus::alloc_id`] starts at 1.
     pub id: u64,
@@ -321,7 +329,7 @@ pub struct BusMsg {
 }
 
 /// Message bodies from `IPC.md`. `PartialAsr.is_final` is the spec's `final` flag.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub enum BusBody {
     MicLevel {
         rms: f32,
@@ -372,6 +380,87 @@ pub enum BusBody {
         stage: String,
         kind: String,
     },
+}
+
+impl fmt::Debug for BusMsg {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("BusMsg")
+            .field("id", &self.id)
+            .field("turn_id", &self.turn_id)
+            .field("t_ms", &self.t_ms)
+            .field("cancel", &self.cancel)
+            .field("body", &self.body)
+            .finish()
+    }
+}
+
+impl fmt::Debug for BusBody {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            BusBody::MicLevel { rms } => f.debug_struct("MicLevel").field("rms", rms).finish(),
+            BusBody::Utterance { rate, pcm } => f
+                .debug_struct("Utterance")
+                .field("rate", rate)
+                .field("pcm_bytes", &pcm.len())
+                .finish(),
+            BusBody::PartialAsr {
+                text,
+                source,
+                is_final,
+            } => {
+                let text_chars = text.chars().count();
+                let source_chars = source.chars().count();
+                f.debug_struct("PartialAsr")
+                    .field("text_chars", &text_chars)
+                    .field("source_chars", &source_chars)
+                    .field("is_final", is_final)
+                    .finish()
+            }
+            BusBody::ReplyText { text, emotion } => {
+                let text_chars = text.chars().count();
+                let emotion_chars = emotion.as_ref().map(|s| s.chars().count());
+                f.debug_struct("ReplyText")
+                    .field("text_chars", &text_chars)
+                    .field("emotion_chars", &emotion_chars)
+                    .finish()
+            }
+            BusBody::SpeechPcm { rate, pcm, ms } => f
+                .debug_struct("SpeechPcm")
+                .field("rate", rate)
+                .field("pcm_bytes", &pcm.len())
+                .field("ms", ms)
+                .finish(),
+            BusBody::OrbState { mode, level, env } => f
+                .debug_struct("OrbState")
+                .field("mode", mode)
+                .field("level", level)
+                .field("env", env)
+                .finish(),
+            BusBody::Consent { bits, purpose } => {
+                let purpose_chars = purpose.chars().count();
+                f.debug_struct("Consent")
+                    .field("bits", bits)
+                    .field("purpose_chars", &purpose_chars)
+                    .finish()
+            }
+            BusBody::BargeIn { turn_id } => {
+                f.debug_struct("BargeIn").field("turn_id", turn_id).finish()
+            }
+            BusBody::Persona { id, source } => f
+                .debug_struct("Persona")
+                .field("id", id)
+                .field("source", source)
+                .finish(),
+            BusBody::Fault { stage, kind } => {
+                let stage_chars = stage.chars().count();
+                let kind_chars = kind.chars().count();
+                f.debug_struct("Fault")
+                    .field("stage_chars", &stage_chars)
+                    .field("kind_chars", &kind_chars)
+                    .finish()
+            }
+        }
+    }
 }
 
 impl BusMsg {
@@ -1617,5 +1706,220 @@ mod tests {
             }
             other => panic!("{other:?}"),
         }
+    }
+
+    #[test]
+    fn debug_print_keeps_pcm_and_words_out_of_the_log() {
+        const WORD: &str = "s60-private-speech-canary";
+        let mut pcm = vec![0xF1, 0xF2];
+        pcm.extend_from_slice(WORD.as_bytes());
+        pcm.extend_from_slice(&[201, 202, 203, 204]);
+        let chars = WORD.chars().count();
+
+        let utt = BusMsg::utterance(1, 7, 160, 3, 16_000, pcm.clone());
+        let speech = BusMsg::speech_pcm(2, 7, 240, 3, pcm.clone(), 80);
+        let partial = BusMsg::partial_asr(3, 7, 320, 3, WORD, WORD, false);
+        let reply = BusMsg::reply_text(4, 7, 400, 3, WORD, Some(WORD.to_string()), true);
+        let reply_denied = BusMsg::reply_text(12, 7, 400, 3, WORD, Some(WORD.into()), false);
+        let fault = BusMsg::fault(5, 7, 480, 3, WORD, WORD);
+        let consent = BusMsg::consent(6, 560, 1, WORD);
+        let mic = BusMsg::mic_level(8, 80, 0.5);
+        let orb = BusMsg::orb_state(9, 160, OrbMode::Listening, 0.25, 0.5);
+        let barge = BusMsg::barge_in(10, 7, 240);
+        let persona = BusMsg::persona_explicit(11, 320, PersonaId::Jarvis);
+
+        let full_err = format!("{:?}", SendError::Full(utt.clone()));
+        let large_err = format!("{:?}", SendError::TooLarge(utt.clone()));
+
+        let rendered = [
+            format!("{utt:?}"),
+            format!("{:?}", utt.body),
+            format!("{speech:?}"),
+            format!("{:?}", speech.body),
+            format!("{partial:?}"),
+            format!("{:?}", partial.body),
+            format!("{reply:?}"),
+            format!("{:?}", reply.body),
+            format!("{reply_denied:?}"),
+            format!("{:?}", reply_denied.body),
+            format!("{fault:?}"),
+            format!("{:?}", fault.body),
+            format!("{consent:?}"),
+            format!("{:?}", consent.body),
+            format!("{mic:?}"),
+            format!("{:?}", mic.body),
+            format!("{orb:?}"),
+            format!("{:?}", orb.body),
+            format!("{barge:?}"),
+            format!("{:?}", barge.body),
+            format!("{persona:?}"),
+            format!("{:?}", persona.body),
+            format!("{utt:#?}"),
+            format!("{:#?}", utt.body),
+            format!("{partial:#?}"),
+            format!("{:#?}", partial.body),
+            format!("{reply:#?}"),
+            format!("{:#?}", reply.body),
+            format!("{reply_denied:#?}"),
+            full_err.clone(),
+            large_err.clone(),
+        ];
+        for line in &rendered {
+            assert!(!line.contains(WORD), "{line}");
+            assert!(!line.contains("201, 202, 203, 204"), "{line}");
+            assert!(!line.contains("241, 242"), "{line}");
+        }
+
+        let utt_dbg = format!("{utt:?}");
+        let utt_body = format!("{:?}", utt.body);
+        assert!(utt_dbg.starts_with("BusMsg {"), "{utt_dbg}");
+        assert!(utt_body.starts_with("Utterance {"), "{utt_body}");
+        assert!(!utt_body.contains("BusBody::"), "{utt_body}");
+        for line in [&utt_dbg, &utt_body] {
+            assert!(line.contains("Utterance"), "{line}");
+            assert!(
+                line.contains(&format!("pcm_bytes: {}", pcm.len())),
+                "{line}"
+            );
+            assert!(line.contains("rate: 16000"), "{line}");
+        }
+        assert!(utt_dbg.contains("id: 1"), "{utt_dbg}");
+        assert!(utt_dbg.contains("turn_id: 7"), "{utt_dbg}");
+        assert!(utt_dbg.contains("t_ms: 160"), "{utt_dbg}");
+        assert!(utt_dbg.contains("cancel: 3"), "{utt_dbg}");
+
+        let partial_dbg = format!("{partial:?}");
+        let partial_body = format!("{:?}", partial.body);
+        assert!(partial_body.starts_with("PartialAsr {"), "{partial_body}");
+        assert!(!partial_body.contains("BusBody::"), "{partial_body}");
+        for line in [&partial_dbg, &partial_body] {
+            assert!(line.contains("PartialAsr"), "{line}");
+            assert!(line.contains(&format!("text_chars: {chars}")), "{line}");
+            assert!(line.contains(&format!("source_chars: {chars}")), "{line}");
+            assert!(line.contains("is_final: false"), "{line}");
+        }
+        assert!(partial_dbg.contains("turn_id: 7"), "{partial_dbg}");
+        assert!(partial_dbg.contains("t_ms: 320"), "{partial_dbg}");
+
+        let reply_dbg = format!("{reply:?}");
+        let reply_body = format!("{:?}", reply.body);
+        assert!(reply_body.starts_with("ReplyText {"), "{reply_body}");
+        for line in [&reply_dbg, &reply_body] {
+            assert!(line.contains("ReplyText"), "{line}");
+            assert!(line.contains(&format!("text_chars: {chars}")), "{line}");
+            assert!(
+                line.contains(&format!("emotion_chars: Some({chars})")),
+                "{line}"
+            );
+            assert!(!line.contains(WORD), "{line}");
+        }
+
+        let denied_dbg = format!("{reply_denied:?}");
+        let denied_body = format!("{:?}", reply_denied.body);
+        for line in [&denied_dbg, &denied_body] {
+            assert!(line.contains("ReplyText"), "{line}");
+            assert!(line.contains("emotion_chars: None"), "{line}");
+            assert!(line.contains(&format!("text_chars: {chars}")), "{line}");
+            assert!(!line.contains(WORD), "{line}");
+        }
+
+        let speech_dbg = format!("{speech:?}");
+        let speech_body = format!("{:?}", speech.body);
+        assert!(speech_body.starts_with("SpeechPcm {"), "{speech_body}");
+        for line in [&speech_dbg, &speech_body] {
+            assert!(line.contains("SpeechPcm"), "{line}");
+            assert!(
+                line.contains(&format!("pcm_bytes: {}", pcm.len())),
+                "{line}"
+            );
+            assert!(line.contains("ms: 80"), "{line}");
+        }
+        assert!(speech_dbg.contains("t_ms: 240"), "{speech_dbg}");
+
+        let fault_dbg = format!("{fault:?}");
+        let fault_body = format!("{:?}", fault.body);
+        assert!(fault_body.starts_with("Fault {"), "{fault_body}");
+        for line in [&fault_dbg, &fault_body] {
+            assert!(line.contains("Fault"), "{line}");
+            assert!(line.contains(&format!("stage_chars: {chars}")), "{line}");
+            assert!(line.contains(&format!("kind_chars: {chars}")), "{line}");
+            assert!(!line.contains(WORD), "{line}");
+        }
+
+        let consent_dbg = format!("{consent:?}");
+        let consent_body = format!("{:?}", consent.body);
+        assert!(consent_body.starts_with("Consent {"), "{consent_body}");
+        for line in [&consent_dbg, &consent_body] {
+            assert!(line.contains("Consent"), "{line}");
+            assert!(line.contains(&format!("purpose_chars: {chars}")), "{line}");
+            assert!(!line.contains(WORD), "{line}");
+        }
+        assert!(consent_dbg.contains("turn_id: 0"), "{consent_dbg}");
+
+        let mic_dbg = format!("{mic:?}");
+        let mic_body = format!("{:?}", mic.body);
+        assert!(mic_dbg.contains("MicLevel"), "{mic_dbg}");
+        assert!(mic_body.starts_with("MicLevel {"), "{mic_body}");
+        assert!(mic_body.contains("rms:"), "{mic_body}");
+
+        let orb_dbg = format!("{orb:?}");
+        let orb_body = format!("{:?}", orb.body);
+        assert!(orb_dbg.contains("OrbState"), "{orb_dbg}");
+        assert!(orb_body.starts_with("OrbState {"), "{orb_body}");
+        assert!(orb_body.contains("mode: Listening"), "{orb_body}");
+
+        let barge_dbg = format!("{barge:?}");
+        let barge_body = format!("{:?}", barge.body);
+        assert!(barge_dbg.contains("BargeIn"), "{barge_dbg}");
+        assert!(barge_body.starts_with("BargeIn {"), "{barge_body}");
+        assert!(barge_body.contains("turn_id: 7"), "{barge_body}");
+
+        let persona_dbg = format!("{persona:?}");
+        let persona_body = format!("{:?}", persona.body);
+        assert!(persona_dbg.contains("Persona"), "{persona_dbg}");
+        assert!(persona_body.starts_with("Persona {"), "{persona_body}");
+        assert!(persona_body.contains("id: Jarvis"), "{persona_body}");
+        assert!(persona_body.contains("source: Explicit"), "{persona_body}");
+
+        assert!(full_err.contains("Full("), "{full_err}");
+        assert!(full_err.contains("pcm_bytes:"), "{full_err}");
+        assert!(!full_err.contains(WORD), "{full_err}");
+        assert!(large_err.contains("TooLarge("), "{large_err}");
+        assert!(large_err.contains("pcm_bytes:"), "{large_err}");
+        assert!(!large_err.contains(WORD), "{large_err}");
+        assert!(!large_err.contains("201, 202, 203, 204"), "{large_err}");
+        assert!(!large_err.contains("241, 242"), "{large_err}");
+
+        match &utt.body {
+            BusBody::Utterance { pcm: got, rate } => {
+                assert_eq!(got, &pcm);
+                assert_eq!(*rate, 16_000);
+            }
+            other => panic!("{other:?}"),
+        }
+        match &partial.body {
+            BusBody::PartialAsr {
+                text,
+                source,
+                is_final,
+            } => {
+                assert_eq!(text, WORD);
+                assert_eq!(*source, WORD);
+                assert!(!is_final);
+            }
+            other => panic!("{other:?}"),
+        }
+    }
+
+    #[test]
+    fn try_send_keeps_the_frame_clock_the_sender_wrote() {
+        let bus = ProcessBus::new();
+        let anchor = crate::bus_clock::BusStampAnchor::new(0, 5_000);
+        bus.try_send(BusMsg::mic_level(bus.alloc_id(), 160, 0.2))
+            .unwrap();
+        let got = bus.try_recv_mic().expect("mic slot");
+        assert_eq!(got.t_ms, 160);
+        assert_eq!(anchor.to_stamp_us(160), 5_000 + 160_000);
+        assert_ne!(got.t_ms, anchor.to_stamp_us(got.t_ms));
     }
 }
