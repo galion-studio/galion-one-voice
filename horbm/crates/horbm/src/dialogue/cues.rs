@@ -2,6 +2,8 @@
 // Copyright (c) 2026 Galion Labs
 //! Phrase cues for the heuristic. Fixed strings. No model.
 
+use super::intent::TurnIntent;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CheckInPhrase {
     On,
@@ -27,8 +29,8 @@ pub fn check_in_phrase(text: &str) -> CheckInPhrase {
 }
 
 /// Goodbye, or a whole line whose only job is to end the talk.
-pub fn is_stop(text: &str, intent: &str) -> bool {
-    if intent == "goodbye" {
+pub fn is_stop(text: &str, intent: TurnIntent) -> bool {
+    if intent == TurnIntent::Goodbye {
         return true;
     }
     matches!(
@@ -72,7 +74,7 @@ pub fn is_greeting(text: &str) -> bool {
 
 /// Last content word, if this line is about a thing we can return to.
 pub fn topic_word(text: &str) -> Option<String> {
-    if is_stop(text, "")
+    if is_stop(text, TurnIntent::Chat)
         || is_switch(text)
         || is_greeting(text)
         || check_in_phrase(text) != CheckInPhrase::None

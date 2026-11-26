@@ -9,6 +9,7 @@
 
 use super::cues::{self, CheckInPhrase};
 use super::filter::{self, Legal};
+use super::intent::TurnIntent;
 use super::moves::Move;
 use crate::research_style::ResearchHit;
 use crate::UNKNOWN_REPLY;
@@ -17,7 +18,7 @@ use crate::UNKNOWN_REPLY;
 /// is allowed to reuse.
 pub struct Choice<'a> {
     pub heard: &'a str,
-    pub intent: &'a str,
+    pub intent: TurnIntent,
     pub reply: &'a str,
     pub sources: &'a [String],
     pub research: &'a [ResearchHit],
@@ -54,6 +55,30 @@ impl ReplyPlan {
     }
 }
 
+/// The ask miss. The reply is the existing unknown line. Evidence stays empty,
+/// matching a gathered miss. Not a new sentence.
+fn honest_unknown() -> ReplyPlan {
+    ReplyPlan::Replace {
+        reply: UNKNOWN_REPLY.to_string(),
+        sources: vec!["honest:unknown".to_string()],
+        evidence: Vec::new(),
+    }
+}
+
+/// Recall speaks a person diary hit (`memory:` plus an id). A callback offer
+/// is `memory:callback` and is not that hit. A card is not a memory.
+fn recall_without_memory(choice: &Choice<'_>) -> bool {
+    choice.intent == TurnIntent::Recall
+        && !choice.sources.iter().any(|source| is_person_memory(source))
+}
+
+fn is_person_memory(source: &str) -> bool {
+    match source.strip_prefix("memory:") {
+        Some(id) => !id.is_empty() && id != "callback",
+        None => false,
+    }
+}
+
 enum Offer<'a> {
     Callback(&'a str),
     Topic(&'a str),
@@ -68,13 +93,19 @@ pub fn choose(choice: &Choice<'_>) -> (Move, ReplyPlan, f32) {
 /// [`choose`] when `hold_topic` is false. A hold that selected
 /// [`Move::OfferTopic`] becomes [`Move::Ask`] before the offer line is built.
 pub(super) fn choose_held(choice: &Choice<'_>, hold_topic: bool) -> (Move, ReplyPlan, f32) {
+    // A correction is never an argument, and a recall with no person-memory
+    // source is never a card. Both use the ask miss. The old labels do not
+    // enter this branch.
+    if choice.intent == TurnIntent::Correct || recall_without_memory(choice) {
+        return (Move::Ask, honest_unknown(), propensity(Move::Ask));
+    }
     let sourced = filter::is_sourced_truth(choice.reply, choice.sources, choice.research);
     let hits = choice.research;
     let stop = cues::is_stop(choice.heard, choice.intent);
     let cite = cues::is_cite(choice.heard);
     let switch = cues::is_switch(choice.heard);
     let greet = cues::is_greeting(choice.heard);
-    let vent = choice.intent == "vent";
+    let vent = choice.intent == TurnIntent::Vent;
 
     let (cite_source, cite_clause) = if sourced {
         (
@@ -330,7 +361,7 @@ mod tests {
     ) -> Choice<'a> {
         Choice {
             heard,
-            intent,
+            intent: super::TurnIntent::read(heard, intent),
             reply,
             sources,
             research: &[],
@@ -463,6 +494,70 @@ mod tests {
                     || sources.iter().any(|source| source.contains(needle))
             }
         }
+    }
+
+    #[test]
+    fn recall_keeps_a_person_source_and_a_card_or_a_correction_is_unknown() {
+        let card = vec!["card:kettle".to_string()];
+        let (asked, plan, score) = choose(&choice(
+            "do you remember where the kettle is",
+            "ask",
+            "The kettle is on the hob.",
+            &card,
+        ));
+        assert_eq!(asked, Move::Ask);
+        assert_eq!(score, propensity(Move::Ask));
+        assert_eq!(spoken(&plan, "The kettle is on the hob."), UNKNOWN_REPLY);
+        assert!(!spoken(&plan, "The kettle is on the hob.").contains("hob"));
+        match plan {
+            ReplyPlan::Replace {
+                sources, evidence, ..
+            } => {
+                assert_eq!(sources, vec!["honest:unknown".to_string()]);
+                assert!(evidence.is_empty());
+            }
+            ReplyPlan::Keep => panic!("a card was kept as a memory"),
+        }
+
+        let callback = vec!["memory:callback".to_string()];
+        let (asked, plan, _) = choose(&choice(
+            "do you remember",
+            "chat",
+            "how did the interview go?",
+            &callback,
+        ));
+        assert_eq!(asked, Move::Ask);
+        assert_eq!(spoken(&plan, "how did the interview go?"), UNKNOWN_REPLY);
+
+        let memory = vec!["memory:pin-1".to_string()];
+        let (asked, plan, _) = choose(&choice(
+            "do you remember the blue bowl",
+            "ask",
+            "you remember the blue bowl is mine",
+            &memory,
+        ));
+        assert_eq!(asked, Move::Ask);
+        assert_eq!(
+            spoken(&plan, "you remember the blue bowl is mine"),
+            "you remember the blue bowl is mine"
+        );
+        assert!(matches!(plan, ReplyPlan::Keep));
+
+        let mut wrong = choice(
+            "no, that's wrong",
+            "ask",
+            "The kettle is on the hob.",
+            &card,
+        );
+        wrong.ring_source = Some("card:kettle");
+        wrong.ring_clause = Some("The kettle is on the hob.");
+        let (asked, plan, _) = choose(&wrong);
+        assert_eq!(asked, Move::Ask);
+        assert_eq!(spoken(&plan, "The kettle is on the hob."), UNKNOWN_REPLY);
+        assert_ne!(
+            spoken(&plan, "The kettle is on the hob."),
+            wrong.ring_clause.unwrap()
+        );
     }
 
     #[test]

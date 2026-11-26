@@ -9,15 +9,22 @@
 //!
 //! The heuristic is the policy. The offline bandit is off. It counts a move
 //! only when it is enabled and [`DialogueConsent::learn`] is granted, and
-//! the count does not change the move. [`Dialogue::decide_held`] matches
-//! [`Dialogue::decide`] when the hold flag is false. When the flag is true,
-//! a selected topic offer becomes ask and the offer line is not built.
+//! the count does not change the move. A correction is not counted. [`Dialogue::decide_held`]
+//! matches [`Dialogue::decide`] when the hold flag is false. When the flag is
+//! true, a selected topic offer becomes ask and the offer line is not built.
 //! Check-ins are off until the person turns them on. A callback is stored
 //! only when remember is granted. Nothing here writes a file, opens a
 //! socket, or reads the diary.
+//!
+//! The heard line is read once as a `TurnIntent`. Chat, ask, task,
+//! vent, and goodbye keep this heuristic. Recall speaks a person-memory
+//! source, or the honest miss when the gathered sources are not one. A
+//! correction becomes that same miss and does not repeat the last sourced
+//! clause.
 
 mod cues;
 mod filter;
+mod intent;
 mod moves;
 mod policy;
 mod topic;
@@ -29,6 +36,7 @@ use crate::research_style::ResearchHit;
 pub use moves::{flag_granted, DialogueConsent, Move, TurnSnap, RING_CAP};
 pub use policy::{OfflineBandit, ReplyPlan};
 
+use intent::TurnIntent;
 use moves::TurnRing;
 use policy::Choice;
 use topic::TopicManager;
@@ -79,6 +87,7 @@ pub struct Dialogue {
     ring: TurnRing,
     topics: TopicManager,
     bandit: OfflineBandit,
+    last_intent: TurnIntent,
 }
 
 impl Default for Dialogue {
@@ -95,6 +104,7 @@ impl Dialogue {
             ring: TurnRing::default(),
             topics: TopicManager::default(),
             bandit: OfflineBandit::new(),
+            last_intent: TurnIntent::Chat,
         }
     }
 
@@ -146,6 +156,13 @@ impl Dialogue {
         self.bandit.counts()
     }
 
+    /// Label of the intent read on the last non-empty turn. `chat` before that.
+    /// The brain reads this. The enum stays in this crate.
+    #[allow(dead_code)]
+    pub fn last_intent_label(&self) -> &'static str {
+        self.last_intent.as_str()
+    }
+
     pub fn ring_len(&self) -> usize {
         self.ring.len()
     }
@@ -161,11 +178,14 @@ impl Dialogue {
     /// [`Self::decide`] when `hold_topic` is false. When it is true, a
     /// selected [`Move::OfferTopic`] becomes [`Move::Ask`] and the offer
     /// line is not built. The bandit still only counts the move that is
-    /// returned. A research hit still cannot be an answer or a citation.
+    /// returned. A correction is the exception: it is not counted. A research
+    /// hit still cannot be an answer or a citation.
     pub fn decide_held(&mut self, input: DecideIn<'_>, hold_topic: bool) -> Decision {
         if input.heard.trim().is_empty() {
             return Decision::pass();
         }
+        let intent = TurnIntent::read(input.heard, input.intent);
+        self.last_intent = intent;
         match policy::check_in_phrase(input.heard) {
             cues::CheckInPhrase::On => self.consent.check_ins = true,
             cues::CheckInPhrase::Off => self.consent.check_ins = false,
@@ -176,7 +196,7 @@ impl Dialogue {
         let current = self.topics.current().map(str::to_string);
         let choice = Choice {
             heard: input.heard,
-            intent: input.intent,
+            intent,
             reply: input.reply,
             sources: input.sources,
             research: input.research,
@@ -217,7 +237,11 @@ impl Dialogue {
             source,
             clause,
         });
-        self.bandit.observe(chosen, self.consent.learn);
+        // A correction is not a lesson. Learn stays granted and the count
+        // stays where the previous turn left it.
+        if intent != TurnIntent::Correct {
+            self.bandit.observe(chosen, self.consent.learn);
+        }
         Decision {
             chosen: Some(chosen),
             plan,
@@ -667,5 +691,81 @@ mod tests {
             spoken(&answer_held, "The kettle is on the hob."),
             "The kettle is on the hob."
         );
+    }
+
+    #[test]
+    fn recall_speaks_a_person_source_and_a_card_becomes_the_miss() {
+        let mut dialogue = fresh(false);
+        assert_eq!(dialogue.last_intent_label(), "chat");
+        let memory = vec!["memory:pin-1".to_string()];
+        let kept = dialogue.decide(input(
+            "do you remember the blue bowl",
+            "ask",
+            "you remember the blue bowl is mine",
+            &memory,
+            &[],
+        ));
+        assert_eq!(dialogue.last_intent_label(), "recall");
+        assert_eq!(kept.chosen, Some(Move::Ask));
+        assert_eq!(
+            spoken(&kept, "you remember the blue bowl is mine"),
+            "you remember the blue bowl is mine"
+        );
+        let card = vec!["card:kettle".to_string()];
+        let missed = dialogue.decide(input(
+            "what did I tell you about the kettle",
+            "ask",
+            "The kettle is on the hob.",
+            &card,
+            &[],
+        ));
+        assert_eq!(missed.chosen, Some(Move::Ask));
+        assert_eq!(spoken(&missed, "The kettle is on the hob."), UNKNOWN_REPLY);
+        match &missed.plan {
+            ReplyPlan::Replace {
+                reply,
+                sources,
+                evidence,
+            } => {
+                assert_eq!(reply, UNKNOWN_REPLY);
+                assert_eq!(sources, &vec!["honest:unknown".to_string()]);
+                assert!(evidence.is_empty());
+            }
+            ReplyPlan::Keep => panic!("a card was kept as a memory"),
+        }
+    }
+
+    #[test]
+    fn a_correction_does_not_repeat_the_clause_or_count_a_learn_row() {
+        let mut dialogue = fresh(true);
+        let card = vec!["card:kettle".to_string()];
+        let answer = dialogue.decide(input(
+            "where is the kettle",
+            "ask",
+            "The kettle is on the hob.",
+            &card,
+            &[],
+        ));
+        assert_eq!(answer.chosen, Some(Move::Answer));
+        assert_eq!(dialogue.bandit_updates(), 1);
+        let wrong = dialogue.decide(input(
+            "no, that's wrong",
+            "ask",
+            "The kettle is on the hob.",
+            &card,
+            &[],
+        ));
+        assert_eq!(dialogue.last_intent_label(), "correct");
+        assert_eq!(wrong.chosen, Some(Move::Ask));
+        assert_eq!(spoken(&wrong, "The kettle is on the hob."), UNKNOWN_REPLY);
+        assert!(!spoken(&wrong, "The kettle is on the hob.").contains("hob"));
+        let snap = dialogue
+            .ring_get(dialogue.ring_len() - 1)
+            .expect("correction turn");
+        assert_eq!(snap.clause, UNKNOWN_REPLY);
+        assert_eq!(snap.chosen, Move::Ask);
+        assert_eq!(dialogue.bandit_updates(), 1);
+        assert_eq!(dialogue.bandit_counts()[Move::Answer.index()], 1);
+        assert_eq!(dialogue.bandit_counts()[Move::Ask.index()], 0);
     }
 }
