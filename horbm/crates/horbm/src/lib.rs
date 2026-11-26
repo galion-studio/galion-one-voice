@@ -11,7 +11,9 @@
 //!    The diary is a second file, kept apart from the truth cards. A pin, a name or mood
 //!    line, and the session buffer are written there. The turn then reads
 //!    that file. A stored line is spoken only when the utterance is about
-//!    the person. A world question drops those hits and does not cite them.
+//!    the person. A recall whose topic is only "me" or "about me" lists that
+//!    person's newest rows, up to the persona sentence cap. Any other recall
+//!    still searches. A world question drops those hits and does not cite them.
 //!    Denied `remember` does not open the file.
 //! 3. When a [`RetrievalThread`] is attached, [`Brain::turn`] asks it and
 //!    reads the [`MemoryHitCell`]. `Hits` speaks [`MemoryHit::clause`]. `Miss`
@@ -94,7 +96,12 @@
 //! [`LearnPass`] is not part of that order. It is the offline learn pass.
 //! Learn consent is [`LearnConfig::granted`]. [`Brain::turn`] does not call it.
 //! [`SessionSeal`] keeps one clause until the host calls [`SessionSeal::seal`].
-//! The turn does not note or seal it.
+//! [`SessionSeal::drop_clause`] clears that slot when the host has taken the
+//! clause back. The turn does not note, seal, or drop it.
+//! [`Brain::allow_learn_retract`] queues one [`Retraction`] when a learned
+//! answer is forgotten or corrected. [`Brain::take_retraction`] hands it to
+//! the host. The turn does not call [`LearnPass::retract_clause`].
+//! [`Brain::reload_knowledge`] forwards to [`RetrievalThread::reload`].
 
 #![forbid(unsafe_code)]
 
@@ -108,7 +115,7 @@ mod research_style;
 mod retrieve;
 mod route;
 
-pub use brain::{Brain, MoodMeta, ResearchFollowUp};
+pub use brain::{Brain, MoodMeta, ResearchFollowUp, Retraction};
 pub use cards::{
     blocks_answer, knowledge_dir_from_env, CardError, KnowledgeCards, LoadReport, LoadedPack,
     WINDOWS_KNOWLEDGE_DIR,

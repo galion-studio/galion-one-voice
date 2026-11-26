@@ -25,8 +25,9 @@
 //!
 //! Do not call [`LearnPass::write_clause`], [`LearnPass::retract_clause`],
 //! [`LearnPass::withdraw`], [`LearnPass::audit`], [`SessionSeal::note`],
-//! [`SessionSeal::note_taught`], or [`SessionSeal::seal`] from `Heartbeat::step`
-//! or from [`crate::Brain::turn`].
+//! [`SessionSeal::note_taught`], [`SessionSeal::seal`], or
+//! [`SessionSeal::drop_clause`] from `Heartbeat::step` or from
+//! [`crate::Brain::turn`].
 //! The call never waits on this pass. The pass does not call Galion Research
 //! and it does not read or write audio. [`SessionSeal`] keeps one clause in
 //! RAM. It is not encrypted. The live pack keeps every sourced clause, up to
@@ -327,7 +328,10 @@ impl LearnPass {
         self.refuse_card_folder()?;
         self.prepare()?;
         let prior = self.live_rows()?;
-        if let Some(existing) = prior.iter().find(|row| same_clause(row, said_by, text)) {
+        if let Some(existing) = prior
+            .iter()
+            .find(|row| same_clause(&row.said_by, &row.text, said_by, text))
+        {
             return Ok(existing.clone());
         }
         if prior.len() >= LEARN_PACK_CAP {
@@ -374,7 +378,10 @@ impl LearnPass {
         let text = text.trim();
         self.refuse_card_folder()?;
         let prior = self.live_rows()?;
-        let Some(drop_at) = prior.iter().position(|row| same_clause(row, said_by, text)) else {
+        let Some(drop_at) = prior
+            .iter()
+            .position(|row| same_clause(&row.said_by, &row.text, said_by, text))
+        else {
             return Ok(false);
         };
         let mut kept = prior;
@@ -548,9 +555,10 @@ struct NotedClause {
 /// [`SessionSeal::note`] keeps one clause and replaces it on a second note.
 /// [`SessionSeal::note_taught`] keeps `heard` only when it teaches the previous
 /// miss. [`SessionSeal::seal`] calls [`LearnPass::write_clause`] once and clears
-/// the slot. A later seal, with the slot empty, writes nothing. A denied
-/// pass writes nothing and creates no file. The slot is plain text. This
-/// type does not encrypt. Not called from [`crate::Brain::turn`].
+/// the slot. [`SessionSeal::drop_clause`] clears the slot when it is that
+/// clause and writes nothing. A later seal, with the slot empty, writes
+/// nothing. A denied pass writes nothing and creates no file. The slot is
+/// plain text. This type does not encrypt. Not called from [`crate::Brain::turn`].
 // Nothing outside this module names this type yet. The allow keeps a
 // non-test build quiet. The learn tests construct it.
 #[cfg_attr(not(test), allow(dead_code))]
@@ -604,6 +612,25 @@ impl SessionSeal {
         }
         self.note(said_by, heard, source);
         true
+    }
+
+    /// Clear the slot when it holds this clause.
+    ///
+    /// The clause is the trimmed speaker and the trimmed text, the same
+    /// identity [`LearnPass::retract_clause`] uses. A match clears the slot
+    /// and returns true. Anything else leaves the slot and returns false.
+    /// Nothing is written. Not called from [`crate::Brain::turn`].
+    pub fn drop_clause(&mut self, said_by: &str, text: &str) -> bool {
+        let said_by = said_by.trim();
+        let text = text.trim();
+        let hit = self
+            .slot
+            .as_ref()
+            .is_some_and(|held| same_clause(&held.said_by, &held.text, said_by, text));
+        if hit {
+            self.slot = None;
+        }
+        hit
     }
 
     /// Write the held clause once and clear the slot.
@@ -743,8 +770,10 @@ fn checked_pack(
 }
 
 /// Trimmed text and trimmed speaker. That is the clause identity.
-fn same_clause(row: &LearnedRow, said_by: &str, text: &str) -> bool {
-    row.said_by.trim() == said_by && row.text.trim() == text
+///
+/// `said_by` and `text` are already trimmed by the caller.
+fn same_clause(stored_by: &str, stored_text: &str, said_by: &str, text: &str) -> bool {
+    stored_by.trim() == said_by && stored_text.trim() == text
 }
 
 /// Session id stored by [`ClauseSource::label`]. `None` when the label has none.
@@ -1025,6 +1054,31 @@ mod tests {
         let row = seal.seal().expect("seal").expect("taught row");
         assert_eq!(row.text, heard);
         assert_eq!(seal.pass.audit().expect("audit").rows.len(), 1);
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn drop_clause_clears_the_matching_slot_and_writes_nothing() {
+        let root = scratch("drop");
+        let pack = root.join("pack");
+        let mut seal = SessionSeal::open(LearnConfig::granted(&pack));
+        assert!(!seal.drop_clause("user", "The kettle is on the hob."));
+        assert!(seal.slot.is_none());
+
+        seal.note("user", "alpha the kettle is on the hob.", &source());
+        seal.note("user", "beta the kettle is off the hob.", &source());
+        assert!(!seal.drop_clause("user", "alpha the kettle is on the hob."));
+        assert_eq!(
+            seal.slot.as_ref().expect("the later note").text,
+            "beta the kettle is off the hob."
+        );
+        assert!(!seal.drop_clause("other", "beta the kettle is off the hob."));
+        assert!(!seal.drop_clause("user", "The lantern is in the shed."));
+        assert!(seal.drop_clause("  user  ", "  beta the kettle is off the hob.  "));
+        assert!(seal.slot.is_none());
+        assert!(!seal.drop_clause("user", "beta the kettle is off the hob."));
+        assert!(!pack.exists(), "drop_clause created {}", pack.display());
+        assert!(sqlite_under(&root).is_empty());
         let _ = fs::remove_dir_all(&root);
     }
 }
