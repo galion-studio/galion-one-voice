@@ -76,7 +76,7 @@ fn forget_matching_hides_pin_and_its_candidate_twin() {
         "{live:?}"
     );
     let archived = store.forget_matching(PERSON, "sister");
-    assert!(archived.len() >= 1, "{archived:?}");
+    assert!(!archived.is_empty(), "{archived:?}");
     assert!(
         archived.iter().any(|id| {
             store
@@ -148,7 +148,7 @@ fn other_person_rows_untouched() {
     let beta_id = beta[0].id.clone();
     assert_eq!(beta[0].text, "my sister is Bea");
     let archived = store.forget_matching(PERSON, "sister");
-    assert!(archived.len() >= 1, "{archived:?}");
+    assert!(!archived.is_empty(), "{archived:?}");
     assert!(
         !archived.contains(&beta_id),
         "another person's row was archived: {archived:?}"
