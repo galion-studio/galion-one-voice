@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Galion Labs
 
-//! Reply engine. The 7881 process runs `HorbmMind`. Typed text calls
-//! `horbm::Brain::turn`. A mic utterance calls `turn_with_ear`.
+//! Reply engine. The 7881 process runs `HorbmMind`, which calls
+//! [`galion_sam_horbm::CardEngine::turn_with_ear`]. Typed text passes no
+//! listener point. A mic utterance passes the point from that take.
 //! [`UnlinkedBrain`] is the stand-in used by
 //! [`crate::pipeline::FakePipeline`]: `turn` is an error, and `tick` does
 //! not invent a mood. [`FakeReply`] exists so tests can drop a brain in
