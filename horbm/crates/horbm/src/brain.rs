@@ -21,9 +21,11 @@ use horbm_inner::{
     EXPECT_HOME, HELP_HOME,
 };
 
-use galion_emotion_core::standins::memory::{PersonMemory, PersonState, TrackedName};
+use galion_emotion_core::standins::memory::{PersonMemory, PersonState, TrackedName, WriteOutcome};
 
-use crate::dialogue::{DecideIn, Decision, Dialogue, DialogueConsent, Move, ReplyPlan, TurnSnap};
+use crate::dialogue::{
+    DecideIn, Decision, Dialogue, DialogueConsent, ForgetAsk, Move, ReplyPlan, TurnSnap,
+};
 use crate::learn::LearnedRow;
 use crate::memory::{about_the_person, pin_command};
 use crate::research_style::{ResearchHit, ResearchRoot, StylePersona};
@@ -784,10 +786,19 @@ impl Brain {
             sense: self.ear_sense,
         });
         self.apply_prosody(note.lean());
-        if self.memory_granted() && !heard.is_empty() {
-            let at = self.stamp();
-            self.observe_memory(heard, &at);
-        }
+        // A forget is not a fact. Archive before this turn is pushed, and
+        // do not note the request into the diary.
+        let forgotten = if self.memory_granted() && !heard.is_empty() {
+            if let Some(ask) = crate::dialogue::forget_clause(heard) {
+                self.archive_forgotten(ask)
+            } else {
+                let at = self.stamp();
+                self.observe_memory(heard, &at);
+                0
+            }
+        } else {
+            0
+        };
         let prep = self.empathy.prepare_lookup(heard);
         let query = if prep.query.trim().is_empty() {
             heard
@@ -884,6 +895,9 @@ impl Brain {
         if let Some(id) = style_mark(decision.chosen, &style.hits) {
             spoke.evidence.push(format!("style:{id}"));
         }
+        if forgotten > 0 {
+            self.speak_forgotten(&mut spoke, forgotten);
+        }
         let mut out = self.finish(&query_owned, started, spoke, &decision, FollowHook::idle());
         if research_later {
             // The clause is already in `out`. The worker blocks until `out` is dropped.
@@ -906,7 +920,9 @@ impl Brain {
             return None;
         }
         let query = crate::dialogue::recall_clause(heard);
-        let recalled = self.recall_person(query);
+        // Search the words after the cue. "do you remember my sister" would
+        // otherwise require "you" and "remember" to be in the stored fact.
+        let recalled = self.recall_person(crate::dialogue::recall_topic(query));
         if !about_the_person(query) {
             return None;
         }
@@ -989,6 +1005,69 @@ impl Brain {
     fn stamp(&mut self) -> String {
         self.memory_tick = self.memory_tick.saturating_add(1);
         format!("t{:06}", self.memory_tick)
+    }
+
+    // Drop what `ask` names. The count is how many rows were archived.
+    // A taught `learned:<id>` snap is left for LearnPass::retract_clause.
+    fn archive_forgotten(&mut self, ask: ForgetAsk<'_>) -> usize {
+        match ask {
+            ForgetAsk::About(topic) => {
+                let topic = topic.trim();
+                if topic.is_empty() {
+                    return 0;
+                }
+                let person = self.person_id.clone();
+                let Some(memory) = self.memory.as_mut() else {
+                    return 0;
+                };
+                memory.forget_matching(&person, topic).len()
+            }
+            ForgetAsk::That => self.forget_newest_memory(),
+        }
+    }
+
+    // The newest snap is the previous turn: this turn has not been pushed.
+    // `memory:<id>` archives that one row. `learned:<id>` archives nothing.
+    fn forget_newest_memory(&mut self) -> usize {
+        let len = self.ring_len();
+        if len == 0 {
+            return 0;
+        }
+        let source = self.ring_get(len - 1).and_then(|snap| snap.source.clone());
+        let Some(source) = source else {
+            return 0;
+        };
+        if source.starts_with("learned:") {
+            return 0;
+        }
+        let Some(id) = source
+            .strip_prefix("memory:")
+            .filter(|id| !id.is_empty() && *id != "callback")
+        else {
+            return 0;
+        };
+        let id = id.to_string();
+        let person = self.person_id.clone();
+        let Some(memory) = self.memory.as_mut() else {
+            return 0;
+        };
+        match memory.forget(&person, &id) {
+            WriteOutcome::Archived { .. } => 1,
+            _ => 0,
+        }
+    }
+
+    // The move stays the ask the policy already chose. The source names
+    // the count only: not the text, and not an id.
+    fn speak_forgotten(&self, spoke: &mut Spoke, archived: usize) {
+        let line = self
+            .persona
+            .line(horbm_persona::PersonaLine::Forgot)
+            .unwrap_or(UNKNOWN_REPLY);
+        spoke.reply = line.to_string();
+        spoke.sources = vec![format!("forget:{archived}")];
+        spoke.evidence.clear();
+        spoke.picked = None;
     }
 
     fn observe_memory(&mut self, heard: &str, at: &str) {
