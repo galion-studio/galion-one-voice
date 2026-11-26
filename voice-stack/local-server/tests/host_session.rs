@@ -13,7 +13,7 @@ use futures_util::{SinkExt, StreamExt};
 use horbm::{EpisodicStore, LearnConfig, LearnPass, PersonMemory};
 use samantha_local_server::protocol::{SCHEMA, WS_PATH};
 use samantha_local_server::{
-    start_with_host, HostConfig, HostSession, HostSources, RefState, Stop, TurnLog,
+    start_with_host, HostConfig, HostSession, HostSources, RefState, ReplyEngine, Stop, TurnLog,
 };
 use serde_json::Value;
 use tokio_tungstenite::tungstenite::Message;
@@ -402,6 +402,45 @@ fn rotated(path: &Path, n: usize) -> PathBuf {
     path.with_file_name(name)
 }
 
+#[test]
+fn miss_then_teaching_line_is_the_audit_row() {
+    let root = scratch("taught");
+    let cfg = resolve(
+        false,
+        Some("grant"),
+        Some("deny"),
+        None,
+        Some(root.to_str().unwrap()),
+        None,
+        None,
+        None,
+        None,
+        None,
+    )
+    .unwrap();
+    assert!(cfg.learn.granted);
+    assert!(!cfg.remember.granted, "a miss has to enter gaps");
+    let host = HostSession::boot(cfg, shipped_knowledge()).unwrap();
+    let teaching = "Northwind won the match";
+    for line in [MISS_LINE, teaching] {
+        let out = host
+            .mind()
+            .lock()
+            .unwrap_or_else(|err| err.into_inner())
+            .turn(line)
+            .unwrap();
+        host.on_turn(line, &out);
+    }
+    host.finish();
+    let pack = root.join("memory").join("learn");
+    let audit = LearnPass::open(LearnConfig::granted(&pack))
+        .audit()
+        .expect("learn audit");
+    assert_eq!(audit.rows.len(), 1, "{:?}", audit.rows);
+    assert_eq!(audit.rows[0].text, teaching);
+    let _ = fs::remove_dir_all(&root);
+}
+
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn end_to_end_dev_session() {
     let root = scratch("e2e");
@@ -635,6 +674,10 @@ fn assert_closed_session(root: &Path) {
         .audit()
         .expect("learn audit");
     assert_eq!(audit.rows.len(), 1, "{:?}", audit.rows);
+    // PERSON_LINE does not cover MISS_LINE (`won` and `match` are absent), so
+    // `note_taught` returns false and the host falls back to `note`. Remember
+    // is granted here, so the miss never enters `Brain::gaps` and that window
+    // stays shut. Either way the sealed row is this last noted line.
     assert_eq!(audit.rows[0].text, PERSON_LINE);
     assert!(
         audit.rows[0].source.contains("dev profile"),
