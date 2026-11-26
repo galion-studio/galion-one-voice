@@ -588,7 +588,9 @@ mod tests {
             taught,
             &mixed,
         ));
-        assert_eq!(asked, Move::Ask);
+        // The card is sourced truth, so the arm is answer. The taught line
+        // stays. Recall does not replace it with the miss.
+        assert_eq!(asked, Move::Answer);
         assert_eq!(spoken(&plan, taught), taught);
         assert!(matches!(plan, ReplyPlan::Keep));
 

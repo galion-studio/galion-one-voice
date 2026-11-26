@@ -324,24 +324,37 @@ fn dont_forget_is_not_forget() {
     let dir = Scratch::new("dont-forget");
     let mut brain = learning(&dir);
     pin_bowl(&mut brain);
-    let updates = brain.bandit_updates();
     for heard in [
         "please don't forget that",
         "never forget that",
         "do not forget that",
         "dont forget that",
     ] {
+        let updates = brain.bandit_updates();
+        let asks = brain.bandit_counts()[horbm::Move::Ask.index()];
         let out = brain.turn(heard);
+        // A forget would not count. These lines miss, and the count moves.
         assert_ne!(out.reply, "Talk soon.", "{heard}");
+        assert_eq!(out.reply, UNKNOWN_REPLY, "{heard}");
         assert!(brain.bandit_updates() > updates, "{heard}");
+        assert!(
+            brain.bandit_counts()[horbm::Move::Ask.index()] > asks,
+            "{heard}"
+        );
+        let updates = brain.bandit_updates();
+        // The pin does not cover "forget", so this recall misses. It is still
+        // counted. A forget would leave the count where it was.
         let recalled = brain.turn(&format!("{heard}, do you remember the blue bowl"));
-        assert_eq!(recalled.reply, PIN, "{heard}");
+        assert_eq!(recalled.reply, UNKNOWN_REPLY, "{heard}");
         assert_eq!(recalled.arm, "ask", "{heard}");
-        assert!(recalled
-            .sources
-            .iter()
-            .any(|source| source.starts_with("memory:") && source != "memory:callback"));
+        assert!(brain.bandit_updates() > updates, "{heard}");
     }
+    let recalled = brain.turn("do you remember the blue bowl");
+    assert_eq!(recalled.reply, PIN);
+    assert!(recalled
+        .sources
+        .iter()
+        .any(|source| source.starts_with("memory:") && source != "memory:callback"));
 }
 
 #[test]
@@ -349,19 +362,25 @@ fn forgot_and_forget_me_not_are_not_forget() {
     let dir = Scratch::new("forgot");
     let mut brain = learning(&dir);
     pin_bowl(&mut brain);
-    let updates = brain.bandit_updates();
     for heard in ["I forgot my keys", "forget-me-not"] {
+        let updates = brain.bandit_updates();
         let out = brain.turn(heard);
         assert_eq!(out.reply, UNKNOWN_REPLY, "{heard}");
-        assert!(brain.bandit_updates() > updates, "{heard}");
         assert!(!out.reply.to_ascii_lowercase().contains("hob"), "{heard}");
+        assert!(brain.bandit_updates() > updates, "{heard}");
+        let updates = brain.bandit_updates();
+        // "forgot", "keys", and "not" are not in the pin, so the recall misses.
+        // The count still moves, which a forget phrase would not do.
         let recalled = brain.turn(&format!("{heard}, do you remember the blue bowl"));
-        assert_eq!(recalled.reply, PIN, "{heard}");
-        assert!(recalled
-            .sources
-            .iter()
-            .any(|source| source.starts_with("memory:") && source != "memory:callback"));
+        assert_eq!(recalled.reply, UNKNOWN_REPLY, "{heard}");
+        assert!(brain.bandit_updates() > updates, "{heard}");
     }
+    let recalled = brain.turn("do you remember the blue bowl");
+    assert_eq!(recalled.reply, PIN);
+    assert!(recalled
+        .sources
+        .iter()
+        .any(|source| source.starts_with("memory:") && source != "memory:callback"));
 }
 
 #[test]
