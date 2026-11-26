@@ -306,3 +306,18 @@ fn retrieval_never_puts_a_research_card_at_hits_zero() {
     drop(thread);
     let _ = std::fs::remove_dir_all(dir);
 }
+
+/// The drive-letter root can exist only on Windows. An unset knowledge flag
+/// stays unset here, and an explicit directory is still kept. No environment
+/// variable is read or written.
+#[cfg(not(windows))]
+#[test]
+fn linux_never_falls_back_to_the_drive_path() {
+    assert_eq!(
+        RetrievalConfig::from_flags(Some("grant"), None).knowledge_dir,
+        None
+    );
+    let dir = "fixture-knowledge";
+    let kept = RetrievalConfig::from_flags(Some("grant"), Some(dir));
+    assert_eq!(kept.knowledge_dir.as_deref(), Some(Path::new(dir)));
+}
