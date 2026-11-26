@@ -920,7 +920,9 @@ impl Brain {
             return None;
         }
         let query = crate::dialogue::recall_clause(heard);
-        let recalled = self.recall_person(query);
+        // Search the words after the cue. "do you remember my sister" would
+        // otherwise require "you" and "remember" to be in the stored fact.
+        let recalled = self.recall_person(crate::dialogue::recall_topic(query));
         if !about_the_person(query) {
             return None;
         }

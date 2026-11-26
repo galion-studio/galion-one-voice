@@ -38,7 +38,7 @@ pub use moves::{flag_granted, DialogueConsent, Move, TurnSnap, RING_CAP};
 pub use policy::{OfflineBandit, ReplyPlan};
 
 use intent::TurnIntent;
-pub(crate) use intent::{forget_clause, recall_clause, ForgetAsk};
+pub(crate) use intent::{forget_clause, recall_clause, recall_topic, ForgetAsk};
 use moves::TurnRing;
 use policy::Choice;
 use topic::TopicManager;

@@ -165,6 +165,39 @@ pub(crate) fn recall_clause(heard: &str) -> &str {
     }
 }
 
+/// Words after the earliest recall cue.
+///
+/// The cue is not part of the diary query. "you" and "remember" are not
+/// stopwords, and a stored fact such as a sister's name does not contain
+/// them, so searching the whole cue matches nothing. A line that is not a
+/// recall is returned whole. A bare cue, with nothing after it, is returned
+/// whole so the search is not empty.
+pub(crate) fn recall_topic(heard: &str) -> &str {
+    if TurnIntent::read(heard, "chat") != TurnIntent::Recall {
+        return heard;
+    }
+    let bytes = heard.as_bytes();
+    let mut at: Option<(usize, usize)> = None;
+    for phrase in RECALL {
+        let Some(hit) = first_phrase_at(bytes, phrase.as_bytes(), 0) else {
+            continue;
+        };
+        let replace = at.is_none_or(|(prev, _)| hit < prev);
+        if replace {
+            at = Some((hit, phrase.len()));
+        }
+    }
+    let Some((start, len)) = at else {
+        return heard;
+    };
+    let rest = trim_topic(&heard[start + len..]);
+    if rest.is_empty() {
+        heard
+    } else {
+        rest
+    }
+}
+
 /// What a forget line is asking to drop. The topic borrows `heard`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum ForgetAsk<'a> {
@@ -536,6 +569,35 @@ mod tests {
         );
         assert_eq!(recall_clause("where is the kettle"), "where is the kettle");
         assert_eq!(recall_clause(""), "");
+    }
+
+    #[test]
+    fn recall_topic_drops_the_cue_and_keeps_the_fact_words() {
+        assert_eq!(recall_topic("do you remember my sister"), "my sister");
+        assert_eq!(
+            recall_topic("Do you remember the blue bowl?"),
+            "the blue bowl"
+        );
+        assert_eq!(
+            recall_topic("what did I tell you about the bowl"),
+            "about the bowl"
+        );
+        assert_eq!(
+            recall_topic("please, do you remember my sister."),
+            "my sister"
+        );
+        assert_eq!(recall_topic("do you remember"), "do you remember");
+        assert_eq!(recall_topic("do you remember?"), "do you remember?");
+        assert_eq!(recall_topic("where is the kettle"), "where is the kettle");
+        assert_eq!(
+            recall_topic("please don't forget that, do you remember the blue bowl"),
+            "the blue bowl"
+        );
+        assert_eq!(
+            recall_topic("forget that, do you remember my sister"),
+            "forget that, do you remember my sister"
+        );
+        assert_eq!(recall_topic(""), "");
     }
 
     #[test]
