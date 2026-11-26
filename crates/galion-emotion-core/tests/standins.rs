@@ -3,6 +3,7 @@
 
 use std::path::PathBuf;
 
+use galion_emotion_core::standins::memory::{DenyMemory, PersonMemory};
 use galion_emotion_core::{load_standins, FATIGUE_REST, FRAME_MS};
 
 fn standins() -> PathBuf {
@@ -52,4 +53,12 @@ fn standin_script_runs_on_the_clock_and_leaves_the_baseline() {
     let cue = core.conductor_cue();
     assert_eq!(cue.fatigue, core.inside().fatigue);
     assert!(!cue.may_share && !cue.may_remember);
+}
+
+#[test]
+fn deny_memory_forget_matching_is_empty() {
+    let mut memory: Box<dyn PersonMemory> = Box::new(DenyMemory::new());
+    memory.set_remember(true);
+    assert!(!memory.remember_granted());
+    assert!(memory.forget_matching("person-alpha", "sister").is_empty());
 }

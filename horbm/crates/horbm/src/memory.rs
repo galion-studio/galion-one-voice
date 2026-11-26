@@ -25,9 +25,10 @@
 //! Recall drops a name candidate when a live or forgotten state-tracker line
 //! names the same person, and drops a candidate whose normalised text matches
 //! a pin. The diary row stays. Other candidates stay. Forget archives the
-//! candidate twin of a pin or a name row. `MemoryKind` has no fact variant,
-//! so a kept name candidate is `Name` and any other kept candidate is `Pin`,
-//! with `pinned` left false.
+//! candidate twin of a pin or a name row. A kept name candidate is `Name`.
+//! Any other kept candidate is `Fact`, with `pinned` left false.
+//! `PersonMemory::forget_matching` is the trait default: recall, then forget
+//! each hit. This type does not define its own copy.
 
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
@@ -951,11 +952,13 @@ fn kind_of(hit: &MemoryHit) -> MemoryKind {
         SOURCE_SUMMARY => MemoryKind::Summary,
         SOURCE_STATE if hit.text.starts_with("my name is") => MemoryKind::Name,
         SOURCE_STATE => MemoryKind::Mood,
-        // No Fact/Candidate variant on MemoryKind. A name slot stays Name.
-        // Every other kept candidate stays Pin, with pinned false.
+        // A name slot stays Name. Any other kept session-ring candidate is
+        // an extracted statement, not a pin. `pinned` stays whatever the hit
+        // carried, which is false for a candidate.
         SOURCE_RING if has_name_slot(&hit.text, &hit.said_by, &hit.date, &hit.source) => {
             MemoryKind::Name
         }
+        SOURCE_RING => MemoryKind::Fact,
         _ => MemoryKind::Pin,
     }
 }
