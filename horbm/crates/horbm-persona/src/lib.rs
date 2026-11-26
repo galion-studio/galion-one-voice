@@ -4,7 +4,9 @@
 //!
 //! A persona file is TOML, schema [`SCHEMA`], read once at boot. Traits are
 //! open numbers. Honesty is fixed: never fabricate, and the miss is
-//! [`UNKNOWN_LINE`]. Boundaries are open tokens the legal-move port reads.
+//! [`UNKNOWN_LINE`]. A file may also set short lines; an unset line is
+//! [`None`] from [`Persona::line`]. Boundaries are open tokens the legal-move
+//! port reads.
 //! Style is a voice hook with no audio. Baseline numbers are copied into a
 //! [`VoiceBaseline`]. Care, want, and expect seed [`InnerLife`] when each
 //! one is a single lowercase word.
@@ -33,6 +35,8 @@ pub const TRAIT_SLOTS: usize = 8;
 pub const BOUNDARY_SLOTS: usize = 8;
 pub const TOKEN_BYTES: usize = 16;
 pub const BOUNDARY_BYTES: usize = 24;
+/// Capacity of one configured short line, in bytes.
+pub const LINE_BYTES: usize = 80;
 /// The spoken miss. The same sentence the turn already uses.
 pub const UNKNOWN_LINE: &str = "I don't know.";
 /// Heap allocations [`Persona::verdict`] and [`Persona::style`] may make.
@@ -92,6 +96,22 @@ impl Boundary {
     }
 }
 
+/// One configured short line. [`Persona::line`] is [`None`] when the file leaves it unset.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PersonaLine {
+    Forgot,
+    NothingRemembered,
+}
+
+impl PersonaLine {
+    const fn index(self) -> usize {
+        match self {
+            Self::Forgot => 0,
+            Self::NothingRemembered => 1,
+        }
+    }
+}
+
 /// The character, packed. Copy. The hot path borrows it.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Persona {
@@ -110,12 +130,14 @@ pub struct Persona {
     care: [u8; TOKEN_BYTES],
     want: [u8; TOKEN_BYTES],
     expect: [u8; TOKEN_BYTES],
+    lines: [[u8; LINE_BYTES]; 2],
+    line_len: [u8; 2],
 }
 
 impl Persona {
     /// The emotion-core fixture: `VoiceBaseline::standin` and the seeded
-    /// inner life, plus the honesty rules. HORBM boot loads
-    /// [`Self::load_development`], not this fixture.
+    /// inner life, plus the honesty rules. Configured lines are unset.
+    /// HORBM boot loads [`Self::load_development`], not this fixture.
     pub const fn standin() -> Self {
         let base = VoiceBaseline::standin();
         let style = style::hook(0.5, 0.4, 2);
@@ -153,6 +175,8 @@ impl Persona {
             care: pack_bytes(b"heard"),
             want: pack_bytes(b"answer"),
             expect: pack_bytes(b"pause"),
+            lines: [[0u8; LINE_BYTES]; 2],
+            line_len: [0; 2],
         }
     }
 
@@ -264,6 +288,17 @@ impl Persona {
 
     pub fn unknown_line(&self) -> &'static str {
         UNKNOWN_LINE
+    }
+
+    /// Configured short line. [`None`] when the file leaves it unset.
+    #[must_use]
+    pub fn line(&self, which: PersonaLine) -> Option<&str> {
+        let index = which.index();
+        let n = usize::from(self.line_len[index]);
+        if n == 0 {
+            return None;
+        }
+        core::str::from_utf8(&self.lines[index][..n]).ok()
     }
 
     #[must_use]
