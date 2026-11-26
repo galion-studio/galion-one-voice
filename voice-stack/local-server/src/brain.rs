@@ -1,13 +1,12 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Galion Labs
-//! Local HORBM mind. A turn is [`galion_sam_horbm::CardEngine`]. Typed text
-//! calls `horbm::Brain::turn` (`turn_with_ear` with no point). A live mic
-//! utterance passes that utterance's listener point to
-//! `horbm::Brain::turn_with_ear`. The spoken clause stays the card lookup.
-//! `Hits` speaks
-//! the stored clause. `Miss` is `I don't know.` `Idle` is `remember` denied:
-//! cards answer, and the clause fixture covers a card miss. A deep miss on
-//! that idle path may ask the research gateway.
+//! Local HORBM mind. A turn is [`galion_sam_horbm::CardEngine::turn_with_ear`].
+//! Typed text passes no listener point. A live mic utterance passes that
+//! utterance's point. The brain speaks a retrieval hit. `Idle` is `remember`
+//! denied: cards answer, and the clause fixture covers a card miss. A granted
+//! retrieval miss is `I don't know.` until the engine speaks a loaded card.
+//! That card read does not take the retrieval cell lock again. A deep miss
+//! on the idle path may ask the research gateway.
 //!
 //! Remember and learn are the words in [`crate::host::HostConfig`]. This
 //! process does not call [`std::env::set_var`]. `grant` opens the person
@@ -256,7 +255,7 @@ impl ReplyEngine for HorbmMind {
     }
 
     fn turn_heard(&mut self, heard: &str, ear: Option<horbm::Heard>) -> Result<TurnOut, String> {
-        let out = self.engine.brain_mut().turn_with_ear(heard, ear);
+        let out = self.engine.turn_with_ear(heard, ear);
         let meta = self.engine.mood_meta();
         let (first_clause, rest) = crate::mouth::clause_pair(&out.reply);
         let mapped = TurnOut {
@@ -330,6 +329,39 @@ mod tests {
         assert!(!dir.join("memory").exists());
         assert_eq!(mind.knowledge_cards(), 1);
         assert_eq!(mind.knowledge_path(), dir);
+    }
+
+    #[test]
+    fn granted_remember_still_speaks_the_shipped_kettle_card() {
+        let root = std::env::temp_dir().join(format!(
+            "galion-grant-kettle-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|elapsed| elapsed.as_nanos())
+                .unwrap_or(0)
+        ));
+        let mut cfg = HostConfig::deny_under(&root);
+        cfg.remember.word = "grant".into();
+        cfg.remember.granted = true;
+        cfg.retrieval.remember = true;
+        let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("knowledge");
+        let mut mind = HorbmMind::open_configured(&dir, &cfg);
+        let hit = mind.turn("where is the kettle").unwrap();
+        assert_eq!(hit.reply, "The kettle is on the stove.");
+        assert_eq!(hit.first_clause, "The kettle");
+        assert_eq!(hit.rest, "is on the stove.");
+        assert!(
+            hit.sources
+                .iter()
+                .any(|source| source == "card:kettle" || source.starts_with("retrieve:")),
+            "{:?}",
+            hit.sources
+        );
+        let miss = mind.turn("who won the match").unwrap();
+        assert_eq!(miss.reply, "I don't know.");
+        drop(mind);
+        let _ = std::fs::remove_dir_all(&root);
     }
 
     #[test]

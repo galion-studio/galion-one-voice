@@ -454,11 +454,42 @@ impl CardEngine {
 }
 
 impl CardEngine {
+    /// [`horbm::Brain::turn_with_ear`], then a loaded card when that reply
+    /// is [`UNKNOWN_REPLY`].
+    ///
+    /// `None` is typed text. A listener point is the mic sample for this
+    /// utterance. The card line does not read the retrieval cell:
+    /// [`horbm::Brain::turn_with_ear`] already waited for the retrieval
+    /// thread, and a second blocking read stalls the host while that
+    /// thread still holds the cell lock. Callers split `reply` again.
+    /// `first_clause` on the brain value is left as the brain wrote it.
+    pub fn turn_with_ear(&mut self, text: &str, ear: Option<horbm::Heard>) -> horbm::TurnOut {
+        let mut out = self.brain.turn_with_ear(text, ear);
+        if out.reply != UNKNOWN_REPLY {
+            return out;
+        }
+        let patched = self.card_after_unknown(
+            Reply {
+                text: std::mem::take(&mut out.reply),
+                mood: Pad::new(out.mood.arousal, out.mood.valence, out.mood.dominance),
+                sources: std::mem::take(&mut out.sources),
+                evidence: std::mem::take(&mut out.evidence),
+                propensity: out.propensity,
+                violations: out.violations,
+                lookup_us: out.lookup_us,
+                took_us: out.took_us,
+            },
+            text,
+        );
+        out.reply = patched.text;
+        out.sources = patched.sources;
+        out.evidence = patched.evidence;
+        out
+    }
+
     /// A granted retrieval miss does not mean the shipped card is absent.
     /// The spoken line is the card when one matches. No card match keeps
-    /// [`UNKNOWN_REPLY`]. This does not read the retrieval cell: `Brain::turn`
-    /// already waited for the retrieval thread once, and a second blocking
-    /// read stalls the host while that thread still holds the cell lock.
+    /// [`UNKNOWN_REPLY`]. This does not read the retrieval cell.
     fn card_after_unknown(&self, mut reply: Reply, text: &str) -> Reply {
         let Some(hit) = card_match(&self.loaded, text) else {
             return reply;
@@ -479,8 +510,8 @@ impl CardEngine {
 
 impl ReplyEngine for CardEngine {
     fn turn(&mut self, text: &str) -> Reply {
-        let out = self.brain.turn(text);
-        let reply = Reply {
+        let out = self.turn_with_ear(text, None);
+        Reply {
             text: out.reply,
             mood: Pad::new(out.mood.arousal, out.mood.valence, out.mood.dominance),
             sources: out.sources,
@@ -489,11 +520,6 @@ impl ReplyEngine for CardEngine {
             violations: out.violations,
             lookup_us: out.lookup_us,
             took_us: out.took_us,
-        };
-        if reply.text == UNKNOWN_REPLY {
-            self.card_after_unknown(reply, text)
-        } else {
-            reply
         }
     }
 

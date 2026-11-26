@@ -55,9 +55,10 @@ pub struct HostConfig {
     pub turn_log: PathBuf,
     pub turn_log_cap: u64,
     pub turn_log_keep: usize,
-    /// Built with [`RetrievalConfig::from_flags`]. The bridge still attaches
-    /// its own retrieval thread from the process environment. This host does
-    /// not spawn a second thread and does not rewrite that environment.
+    /// Built with [`RetrievalConfig::from_flags`] and logged at startup.
+    /// The card engine opens its retrieval thread from `remember.word`,
+    /// not from the process environment. This host does not spawn a second
+    /// thread and does not rewrite that environment.
     pub retrieval: RetrievalConfig,
     pub learn_config: LearnConfig,
 }
@@ -224,7 +225,7 @@ impl HostConfig {
 
     /// Paths and grants. No secrets and no bind address.
     /// `retrieval_remember` is the typed [`RetrievalConfig`]. The card
-    /// engine's retrieval thread still reads the process environment.
+    /// engine opens that thread from `remember.word`.
     pub fn startup_line(&self) -> String {
         format!(
             "horbm host: profile={} learn={} ({}) remember={} ({}) data_root={} memory_dir={} diary={} learn_pack={} turn_log={} turn_log_cap={} retrieval_remember={} (typed config)",
