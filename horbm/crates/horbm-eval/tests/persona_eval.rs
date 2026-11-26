@@ -5,6 +5,22 @@ use std::path::{Path, PathBuf};
 
 use horbm_eval::{run_with, Config, Mode, Report, Thresholds};
 
+fn persona_file_stems() -> Vec<String> {
+    let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../horbm-persona/personas");
+    let mut stems = Vec::new();
+    for entry in std::fs::read_dir(&dir).unwrap_or_else(|err| panic!("{}: {err}", dir.display())) {
+        let path = entry.expect("persona entry").path();
+        if path.extension().and_then(|ext| ext.to_str()) != Some("toml") {
+            continue;
+        }
+        if let Some(stem) = path.file_stem().and_then(|stem| stem.to_str()) {
+            stems.push(stem.to_ascii_lowercase());
+        }
+    }
+    assert!(!stems.is_empty());
+    stems
+}
+
 fn gate(persona_file: &Path) -> Report {
     run_with(Config {
         research_dir: None,
@@ -108,8 +124,9 @@ fn gate_runs_for_northwind() {
         "{unknown}"
     );
     let lower = json.to_ascii_lowercase();
-    assert!(!lower.contains("samantha"), "{json}");
-    assert!(!lower.contains("aria"), "{json}");
+    for stem in persona_file_stems() {
+        assert!(!lower.contains(&stem), "{json} stem={stem}");
+    }
     assert!(!lower.contains("jarvis"), "{json}");
 }
 

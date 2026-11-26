@@ -4,7 +4,7 @@
 //! The stock-voice measurement downloads `en_US-ljspeech-medium` only when
 //! `HORBM_PIPER_FETCH=1`, into the cache directory, and never into the repo.
 //! That pack is the open MIT Piper voice (public-domain LJSpeech). It is not
-//! a clone. Samantha and Aria are refused. No audio file is written.
+//! a clone. A pack whose name is not the stock prefix is refused. No audio file is written.
 
 #![cfg(all(feature = "piper", unix))]
 
@@ -18,8 +18,7 @@ use horbm_duplex::{
     discover_piper, measure_piper, piper_cache_dir, PiperMouth, PiperPaths, STOCK_VOICE,
 };
 use horbm_voice::{
-    aria_baseline, instant, samantha_baseline, MomentVoice, Mouth, MouthPull, SpokenLine,
-    FRAME_SAMPLES, SAMPLE_RATE,
+    instant, MomentVoice, Mouth, MouthPull, SpokenLine, FRAME_SAMPLES, SAMPLE_RATE,
 };
 
 const ONNX_SHA: &str = "6f52a751e2349abe7a76735eb09dc1875298c77ea2342ffd2fef79ff81b87f22";
@@ -31,24 +30,24 @@ const RUNTIME_URL: &str =
     "https://github.com/rhasspy/piper/releases/download/2023.11.14-2/piper_linux_x86_64.tar.gz";
 
 #[test]
-fn a_persona_pack_is_refused_before_spawn() {
+fn a_non_stock_pack_is_refused_before_spawn() {
     match PiperMouth::open(&PiperPaths {
         runtime: PathBuf::from("piper"),
-        model: PathBuf::from("samantha.onnx"),
-        config: PathBuf::from("samantha.onnx.json"),
-        voice: "samantha".into(),
+        model: PathBuf::from("other.onnx"),
+        config: PathBuf::from("other.onnx.json"),
+        voice: "other".into(),
     }) {
         Err(err) => assert!(err.contains("refusing"), "{err}"),
-        Ok(_) => panic!("samantha pack was opened"),
+        Ok(_) => panic!("other pack was opened"),
     }
     match PiperMouth::open(&PiperPaths {
         runtime: PathBuf::from("piper"),
-        model: PathBuf::from("aria.onnx"),
-        config: PathBuf::from("aria.onnx.json"),
-        voice: "aria".into(),
+        model: PathBuf::from("en_US-clone.onnx"),
+        config: PathBuf::from("en_US-clone.onnx.json"),
+        voice: "en_US-clone".into(),
     }) {
         Err(err) => assert!(err.contains("refusing"), "{err}"),
-        Ok(_) => panic!("aria pack was opened"),
+        Ok(_) => panic!("clone pack was opened"),
     }
 }
 
@@ -84,11 +83,11 @@ fn sentences_stream_on_the_frame_clock_and_barge_in_drops_them() {
     assert_eq!(mouth.spawn_noise(), "0.00");
     assert_eq!(mouth.id(), "piper");
 
-    let calm = held(samantha_baseline().pos);
+    let calm = held(northwind_baseline().pos);
     let hot = held([0.9, 0.95, 0.85, 0.4]);
     assert!(!calm.parked);
     assert!(!hot.parked);
-    let baseline = aria_baseline();
+    let baseline = northwind_baseline();
     let mapped = instant(
         baseline,
         MomentState::at([0.9, 0.95, 0.85, 0.4]),
@@ -337,8 +336,22 @@ fn file_sha(path: &Path) -> Result<String, String> {
         .ok_or("sha256sum returned no hash".into())
 }
 
+fn northwind_baseline() -> galion_emotion_core::VoiceBaseline {
+    let standin = galion_emotion_core::VoiceBaseline::standin();
+    let mut persona = [0u8; 16];
+    persona[..b"northwind".len()].copy_from_slice(b"northwind");
+    let mut voice_id = [0u8; 16];
+    voice_id[..b"northwind-e0".len()].copy_from_slice(b"northwind-e0");
+    galion_emotion_core::VoiceBaseline {
+        persona,
+        voice: voice_id,
+        pos: [0.25, 0.35, 0.45, 0.0],
+        pitch_centre_hz: standin.pitch_centre_hz,
+    }
+}
+
 fn held(pos: [f32; 4]) -> horbm_voice::VoiceControls {
-    let mut voice = MomentVoice::new(samantha_baseline());
+    let mut voice = MomentVoice::new(northwind_baseline());
     let moment = MomentState::at(pos);
     voice.tick(moment, Breath::rest());
     voice.tick(moment, Breath::rest());

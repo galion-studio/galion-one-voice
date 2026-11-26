@@ -6,9 +6,8 @@ use galion_emotion_core::{Breath, BreathPhase, IntentMsg, MomentState, AROUSAL};
 use galion_sam_prosody::{map, Pad as ProsodyPad};
 use horbm::{Brain, CardHit, CardLookup, Pad as HorbmPad};
 use horbm_voice::{
-    aria_baseline, instant, is_aria, is_samantha, render_tone, samantha_baseline, BreathPlace,
-    EarEvent, FakeEar, FakeMouth, HorbmTurn, MomentVoice, Mouth, SpokenLine, VoiceControls,
-    VoiceLoop, AFFECT_TO_VOICE_FRAMES, AFFECT_TO_VOICE_MS, ARIA_PARKED,
+    instant, render_tone, BreathPlace, EarEvent, FakeEar, FakeMouth, HorbmTurn, MomentVoice, Mouth,
+    SpokenLine, VoiceControls, VoiceLoop, AFFECT_TO_VOICE_FRAMES, AFFECT_TO_VOICE_MS,
 };
 
 struct NoCards;
@@ -56,16 +55,11 @@ fn budgets_match_the_lock() {
 }
 
 #[test]
-fn samantha_rest_is_the_persona_rest_and_the_e0_line() {
-    let rest = galion_emotion::persona_mood::SAMANTHA.dynamics.rest;
-    let base = samantha_baseline();
-    assert!(is_samantha(&base));
-    assert!(!is_aria(&base));
-    assert_eq!(base.persona_id(), "samantha");
-    assert_eq!(base.voice_id(), "samantha-e0");
-    assert_eq!(base.valence(), rest.valence);
-    assert_eq!(base.arousal(), rest.arousal);
-    assert_eq!(base.dominance(), rest.dominance);
+fn fixture_rest_is_the_e0_line() {
+    let base = northwind_baseline();
+    assert_eq!(base.persona_id(), "northwind");
+    assert_eq!(base.voice_id(), "northwind-e0");
+    assert_eq!(base.pos, DEV_REST);
     assert_eq!(base.approach(), 0.0);
     assert_eq!(
         base.pitch_centre_hz,
@@ -91,8 +85,8 @@ fn samantha_rest_is_the_persona_rest_and_the_e0_line() {
 }
 
 #[test]
-fn the_map_is_deterministic_and_matches_the_existing_samantha_map() {
-    let base = samantha_baseline();
+fn the_map_is_deterministic() {
+    let base = northwind_baseline();
     let moment = moment_at(base, 0.20, 0.10, -0.05, 0.0);
     let once = instant(base, moment, Breath::rest());
     let twice = instant(base, moment, Breath::rest());
@@ -126,7 +120,7 @@ fn the_map_is_deterministic_and_matches_the_existing_samantha_map() {
 
 #[test]
 fn excited_is_faster_and_louder_than_calm_on_the_controls() {
-    let base = samantha_baseline();
+    let base = northwind_baseline();
     let excited = arrived(
         base,
         moment_at(base, 0.30, 0.50, 0.10, 0.20),
@@ -157,7 +151,7 @@ fn excited_is_faster_and_louder_than_calm_on_the_controls() {
 
 #[test]
 fn a_held_target_arrives_in_two_frames_without_a_jump() {
-    let base = samantha_baseline();
+    let base = northwind_baseline();
     let mut voice = MomentVoice::new(base);
     let start_bits = voice.identity();
     let moment = moment_at(base, 0.30, 0.50, 0.10, 0.0);
@@ -187,7 +181,7 @@ fn a_held_target_arrives_in_two_frames_without_a_jump() {
 
 #[test]
 fn a_new_target_mid_ramp_does_not_jump() {
-    let base = samantha_baseline();
+    let base = northwind_baseline();
     let mut voice = MomentVoice::new(base);
     let excited = moment_at(base, 0.30, 0.50, 0.0, 0.0);
     let calm = moment_at(base, -0.10, -0.30, 0.0, 0.0);
@@ -210,7 +204,7 @@ fn a_new_target_mid_ramp_does_not_jump() {
 
 #[test]
 fn clamps_hold_for_a_poisoned_moment() {
-    let base = samantha_baseline();
+    let base = northwind_baseline();
     let wild = MomentState {
         t_ms: 80,
         tick: 1,
@@ -250,7 +244,7 @@ fn voice_bits(voice: &MomentVoice) -> galion_emotion_core::BaselineBits {
 
 #[test]
 fn breath_is_placed_on_the_arriving_frame() {
-    let base = samantha_baseline();
+    let base = northwind_baseline();
     let mut voice = MomentVoice::new(base);
     let inhale = Breath {
         phase: BreathPhase::Inhale,
@@ -288,21 +282,20 @@ fn breath_is_placed_on_the_arriving_frame() {
 }
 
 #[test]
-fn aria_is_parked_and_the_baseline_does_not_move() {
-    let aria = aria_baseline();
-    assert!(is_aria(&aria));
-    assert!(!is_samantha(&aria));
-    let mut voice = MomentVoice::for_persona(aria, true);
+fn parked_config_keeps_the_baseline_still() {
+    let parked = parked_fixture();
+    assert_eq!(parked.persona_id(), "parked-fixture");
+    let mut voice = MomentVoice::for_persona(parked, true);
     let bits = voice.identity();
-    let excited = moment_at(samantha_baseline(), 0.4, 0.5, 0.2, 0.3);
+    let excited = moment_at(northwind_baseline(), 0.4, 0.5, 0.2, 0.3);
     let inhale = Breath {
         phase: BreathPhase::Inhale,
         volume: 0.9,
         flow: 0.8,
     };
     let first = voice.tick(excited, inhale);
-    let second = voice.tick(moment_at(aria, -0.4, -0.2, -0.2, -0.4), Breath::rest());
-    assert_eq!(ARIA_PARKED, first.parked);
+    let second = voice.tick(moment_at(parked, -0.4, -0.2, -0.2, -0.4), Breath::rest());
+    assert!(first.parked);
     assert!(first.parked && second.parked);
     assert!(first.is_neutral_shape() && second.is_neutral_shape());
     assert!(first.in_bounds() && second.in_bounds());
@@ -312,18 +305,18 @@ fn aria_is_parked_and_the_baseline_does_not_move() {
     assert_eq!(first.noise_w, 0.0);
     assert_eq!(
         first.pitch_centre_hz.to_bits(),
-        aria.pitch_centre_hz.to_bits()
+        parked.pitch_centre_hz.to_bits()
     );
-    assert_eq!(first.persona, aria.persona);
+    assert_eq!(first.persona, parked.persona);
     assert_eq!(voice.identity(), bits);
     assert_eq!(voice.baseline().identity_bits(), bits);
-    assert_eq!(voice.baseline().pos, aria.pos);
+    assert_eq!(voice.baseline().pos, parked.pos);
 }
 
 #[test]
 fn synthetic_excited_renders_faster_and_higher_energy_than_calm() {
     // No Piper feature, no model, no file. A 180 Hz tone in memory.
-    let base = samantha_baseline();
+    let base = northwind_baseline();
     let excited = arrived(
         base,
         moment_at(base, 0.30, 0.50, 0.10, 0.20),
@@ -381,7 +374,13 @@ fn frames_until_done(mouth: &mut FakeMouth) -> u32 {
 #[test]
 fn the_loop_puts_the_moment_on_the_mouth_inside_two_frames() {
     let mut turn = HorbmTurn::with_cards(NoCards);
-    assert_eq!(turn.brain().emotion().baseline().persona_id(), "samantha");
+    let configured = horbm::Persona::load_development().expect("configured persona");
+    assert_eq!(
+        turn.brain().emotion().baseline().persona_id(),
+        configured.id()
+    );
+    let seated_pitch = turn.brain().emotion().baseline().pitch_centre_hz.to_bits();
+    let seated_persona = turn.brain().emotion().baseline().persona;
     let bits = turn.brain().emotion().baseline().identity_bits();
     let mood = turn.brain().mood_meta();
     let mut msg = IntentMsg::steady(0);
@@ -412,11 +411,8 @@ fn the_loop_puts_the_moment_on_the_mouth_inside_two_frames() {
     assert_eq!(done.noise_scale.to_bits(), expect.noise_scale.to_bits());
     assert_eq!(done.pitch_st.to_bits(), expect.pitch_st.to_bits());
     assert!(!done.parked);
-    assert_eq!(
-        done.pitch_centre_hz.to_bits(),
-        samantha_baseline().pitch_centre_hz.to_bits()
-    );
-    assert_eq!(done.persona, samantha_baseline().persona);
+    assert_eq!(done.pitch_centre_hz.to_bits(), seated_pitch);
+    assert_eq!(done.persona, seated_persona);
 }
 
 #[test]
@@ -458,13 +454,13 @@ fn inner_life_moves_the_moment_and_not_who_she_is() {
     assert!(!controls.parked);
 
     let mut seated = HorbmTurn::with_cards(NoCards);
-    seated.seat(aria_baseline());
-    let aria_bits = seated.brain().emotion().baseline().identity_bits();
+    seated.seat(parked_fixture());
+    let seat_bits = seated.brain().emotion().baseline().identity_bits();
     seated.brain_mut().inner_nudge("what?", None).unwrap();
     assert_eq!(seated.brain().inner().learned_count(), 0);
     assert_eq!(
         seated.brain().emotion().baseline().identity_bits(),
-        aria_bits
+        seat_bits
     );
     let baseline = seated.brain().emotion().baseline();
     let moment = seated.brain().emotion().moment();
@@ -485,10 +481,10 @@ fn inner_life_moves_the_moment_and_not_who_she_is() {
         controls.length_scale.to_bits(),
         expect.length_scale.to_bits()
     );
-    assert_eq!(controls.persona, aria_baseline().persona);
+    assert_eq!(controls.persona, parked_fixture().persona);
     assert_eq!(
         controls.pitch_centre_hz.to_bits(),
-        aria_baseline().pitch_centre_hz.to_bits()
+        parked_fixture().pitch_centre_hz.to_bits()
     );
 }
 
@@ -496,14 +492,17 @@ fn inner_life_moves_the_moment_and_not_who_she_is() {
 fn seating_does_not_rewrite_empathy() {
     let mut brain = Brain::with_cards(NoCards, None);
     let mood = brain.mood_meta();
-    brain.seat(samantha_baseline());
+    brain.seat(northwind_baseline());
     assert_eq!(brain.mood_meta(), mood);
-    assert_eq!(brain.emotion().baseline().persona_id(), "samantha");
-    brain.seat(aria_baseline());
+    assert_eq!(brain.emotion().baseline().persona_id(), "northwind");
+    brain.seat(parked_fixture());
     assert_eq!(brain.mood_meta(), mood);
-    assert_eq!(brain.emotion().baseline().persona_id(), "aria");
+    assert_eq!(brain.emotion().baseline().persona_id(), "parked-fixture");
     assert_eq!(brain.inner().learned_count(), 0);
 }
+
+/// Old development rest, kept so [`dev_persona_controls_bit_identical`] stays put.
+const DEV_REST: [f32; 4] = [0.25, 0.35, 0.45, 0.0];
 
 fn id_slot(id: &str) -> [u8; 16] {
     let mut out = [0u8; 16];
@@ -513,14 +512,21 @@ fn id_slot(id: &str) -> [u8; 16] {
     out
 }
 
-fn northwind_baseline() -> galion_emotion_core::VoiceBaseline {
-    let dev = samantha_baseline();
+fn baseline_with(id: &str, voice: &str, pos: [f32; 4]) -> galion_emotion_core::VoiceBaseline {
     galion_emotion_core::VoiceBaseline {
-        persona: id_slot("northwind"),
-        voice: id_slot("northwind-e0"),
-        pos: dev.pos,
-        pitch_centre_hz: dev.pitch_centre_hz,
+        persona: id_slot(id),
+        voice: id_slot(voice),
+        pos,
+        pitch_centre_hz: galion_emotion_core::VoiceBaseline::standin().pitch_centre_hz,
     }
+}
+
+fn northwind_baseline() -> galion_emotion_core::VoiceBaseline {
+    baseline_with("northwind", "northwind-e0", DEV_REST)
+}
+
+fn parked_fixture() -> galion_emotion_core::VoiceBaseline {
+    baseline_with("parked-fixture", "parked-e0", [0.0, 0.30, 0.50, 0.0])
 }
 
 #[test]
@@ -534,9 +540,9 @@ fn northwind_baseline_moves_its_voice() {
     assert_ne!(controls.length_scale.to_bits(), rest.length_scale.to_bits());
     assert_ne!(controls.energy.to_bits(), rest.energy.to_bits());
     assert_eq!(controls.persona, id_slot("northwind"));
-    assert_ne!(controls.persona, samantha_baseline().persona);
+    assert_ne!(controls.persona, parked_fixture().persona);
 
-    let dev = samantha_baseline();
+    let dev = baseline_with("rest-fixture", "rest-e0", DEV_REST);
     let dev_controls = instant(dev, moment_at(dev, 0.20, 0.25, 0.0, 0.10), Breath::rest());
     assert_eq!(
         controls.length_scale.to_bits(),
@@ -559,7 +565,7 @@ fn northwind_baseline_moves_its_voice() {
 /// these. No audio.
 #[test]
 fn dev_persona_controls_bit_identical() {
-    let base = samantha_baseline();
+    let base = northwind_baseline();
     let rows = [
         row(
             0.0,

@@ -1,9 +1,9 @@
 <!-- SPDX-License-Identifier: MIT -->
 <!-- Copyright (c) 2026 Galion Labs -->
 
-# Samantha Linux package
+# Linux package (`galion-samantha`)
 
-User install for the local Samantha companion on Ubuntu, WSL, and a Galion OS image that runs systemd. This folder is its own Cargo workspace. It is not a member of the repository workspace.
+User install for the configured persona's local companion on Ubuntu, WSL, and a Galion OS image that runs systemd. The package, binary, and unit names stay `galion-samantha`. This folder is its own Cargo workspace. It is not a member of the repository workspace.
 
 The process is a loopback supervisor. It serves the one-dot page, ticks every 80 ms, and reports whether the public Vosk and Piper files are on disk. HORBM is not linked. `POST /turn` returns 501 and does not invent a reply. Mood stays at the resting pad (arousal 0.3, valence 0.25, dominance 0.5) and the dot stays `idle`.
 
@@ -18,7 +18,7 @@ Piper remains the public CPU voice (`en_US-ljspeech-medium`). Vosk small-en rema
 
 ## What it does not do
 
-- It does not download or store Samantha, Jarvis, s711, or any reference clip. Set `GALION_SAMANTHA_REF` to a local file. `install.sh` writes that path into a user drop-in and does not copy the file.
+- It does not download or store a reference clip. Set `GALION_VOICE_REF` to a local file. `GALION_SAMANTHA_REF` is a deprecated fallback and logs one warning. `install.sh` writes that path into a user drop-in and does not copy the file.
 - It does not call a paid model or an HTTP API.
 - It does not need sudo. It refuses to run as root unless you pass `--prefix` for a throwaway home.
 - It does not install a system unit and it does not deploy.
@@ -45,7 +45,7 @@ WSL needs systemd enabled in `/etc/wsl.conf` before `systemctl --user` works. Th
 | `~/.config/systemd/user/galion-samantha.service` | user unit |
 | `~/.local/share/applications/galion-samantha.desktop` | launcher |
 
-The desktop entry runs `galion-samantha open`, which starts the user service and opens `http://127.0.0.1:7881/`. That is the companion socket (`GALION_SAMANTHA_WS`). Port 7879 stays with the hard loop (`GALION_HARD_ADDR`). The bind is numeric loopback. `0.0.0.0` and public addresses are refused.
+The desktop entry runs `galion-samantha open`, which starts the user service and opens `http://127.0.0.1:7881/`. That is the companion socket (`GALION_VOICE_WS`). `GALION_SAMANTHA_WS` is a deprecated alias, and `GALION_SAMANTHA_BIND` is the oldest name. Port 7879 stays with the hard loop (`GALION_HARD_ADDR`). The bind is numeric loopback. `0.0.0.0` and public addresses are refused.
 
 Public models, when the download finishes on x86_64:
 
@@ -141,7 +141,7 @@ Public files land in `voice-stack/linux-package/wsl/var/`, which is gitignored:
 | `var/models/asr/vosk-model-small-en-us-0.15/` | Vosk small English (Apache-2.0) |
 | `var/models/tts/en_US-ljspeech-medium.onnx` | Piper LJ Speech (public domain) |
 
-libvosk and the Piper runtime for linux x86_64 are fetched beside them. The pins match `scripts/asr/fetch-vosk.sh` and `scripts/a21/fetch-a21.sh`. Speech clips and `GALION_SAMANTHA_REF` stay off this path.
+libvosk and the Piper runtime for linux x86_64 are fetched beside them. The pins match `scripts/asr/fetch-vosk.sh` and `scripts/a21/fetch-a21.sh`. Speech clips and `GALION_VOICE_REF` stay off this path. `GALION_SAMANTHA_REF` is only the deprecated fallback.
 
 ### Audio
 
@@ -159,7 +159,7 @@ The installer adds that line to `~/.bashrc` between `# BEGIN galion-one-voice` a
 
 ### Service
 
-`~/.config/systemd/user/galion-one-voice.service` runs `~/.local/bin/galion-one-voice` on `127.0.0.1:7881`. The launcher execs `voice-stack/target/release/samantha-local` when that binary exists, and otherwise `galion-samantha serve`. `GALION_ONE_VOICE_BIN` selects another executable. It is exec'd with no extra arguments and inherits `GALION_SAMANTHA_WS`. The unit sets no `GALION_LLM` and no nerve URL.
+`~/.config/systemd/user/galion-one-voice.service` runs `~/.local/bin/galion-one-voice` on `127.0.0.1:7881`. The launcher execs `voice-stack/target/release/samantha-local` when that binary exists, and otherwise `galion-samantha serve`. `GALION_ONE_VOICE_BIN` selects another executable. It is exec'd with no extra arguments and inherits `GALION_VOICE_WS` (`GALION_SAMANTHA_WS` is the deprecated alias). The unit sets no `GALION_LLM` and no nerve URL.
 
 `galion-samantha.service` binds the same port. [`deploy/linux/`](../../deploy/linux/README.md) is a third listener for that socket, with a health restart. Enable one listener.
 
@@ -167,7 +167,7 @@ The installer adds that line to `~/.bashrc` between `# BEGIN galion-one-voice` a
 
 The WSL unit above stays on CPU (`GALION_CPU=1`, no `GALION_TTS_DEVICE`). A separate Piper mouth can use the laptop GPU. It binds `127.0.0.1:8002` only, and it falls back to CPU when CUDA is not actually there. Caches and the bench log stay on `G:`. The steps are in [`voice-stack/mouth/README.md`](../mouth/README.md). This install does not start that process and does not download a CUDA library.
 
-The sandbox matches the Samantha unit: `NoNewPrivileges`, `ProtectSystem=strict`, `ProtectHome`, `IPAddressDeny=any`, `IPAddressAllow=localhost`. A drop-in adds read-only paths for `var/` and the WSLg socket directory.
+The sandbox matches the `galion-samantha` unit: `NoNewPrivileges`, `ProtectSystem=strict`, `ProtectHome`, `IPAddressDeny=any`, `IPAddressAllow=localhost`. A drop-in adds read-only paths for `var/` and the WSLg socket directory.
 
 ### CI
 

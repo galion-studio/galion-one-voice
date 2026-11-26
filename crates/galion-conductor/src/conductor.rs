@@ -48,7 +48,7 @@ pub enum Ear<'a> {
 /// `GALION_EAR_SENSE` off) asks for. [`TurnMsg::Hold`] keeps the floor with
 /// the user. [`TurnMsg::Yield`] releases the clause on this quiet frame.
 ///
-/// Barge-in does not read this message. Overlap while Samantha is speaking
+/// Barge-in does not read this message. Overlap while the installed persona is speaking
 /// still arms silence on the 200 ms lock.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TurnMsg {
@@ -76,7 +76,7 @@ pub enum TickEvent {
     Committed,
     Backchannel,
     BargeIn,
-    /// Samantha nodded while the user kept the floor. Not a barge-in.
+    /// The installed persona nodded while the user kept the floor. Not a barge-in.
     ListenBackchannel,
 }
 
@@ -127,7 +127,7 @@ pub struct Conductor<B: ClauseBrain, R: ResearchClient = OfflineClient> {
     consent: SidebandConsent,
     /// Set for the frame that took a rising-pitch yield. Cleared each tick.
     frame_question: bool,
-    /// Listening nods. Default on, Samantha. Does not own the floor.
+    /// Listening nods. Default on, for the installed persona. Does not own the floor.
     listen: ListenPolicy,
 }
 
@@ -217,13 +217,15 @@ impl<B: ClauseBrain, R: ResearchClient> Conductor<B, R> {
     /// [`BackchannelConfig::from_env`], applied here by the host.
     pub fn set_backchannel_config(&mut self, config: BackchannelConfig) {
         self.listen.enabled = config.enabled;
+        self.listen.set_parked(config.parked);
     }
 
     pub fn backchannel_enabled(&self) -> bool {
         self.listen.enabled
     }
 
-    /// Only `samantha` nods. Aria and clone-pack ids stay quiet.
+    /// Record the installed id. Nods do not read it. [`BackchannelConfig::parked`]
+    /// silences every id.
     pub fn set_persona(&mut self, persona: impl Into<String>) {
         self.listen.set_persona(persona);
     }
@@ -325,7 +327,7 @@ impl<B: ClauseBrain, R: ResearchClient> Conductor<B, R> {
         self.tick_listen(ear, intent, turn, ListenCue::None, ListenMood::resting())
     }
 
-    /// [`Self::tick_turn`] plus a listening cue and Samantha's moment.
+    /// [`Self::tick_turn`] plus a listening cue and the installed persona's moment.
     ///
     /// A nod fires only while the user holds, on the quiet frame after a
     /// clause-final fall, and it does not take the floor. Yield, a question

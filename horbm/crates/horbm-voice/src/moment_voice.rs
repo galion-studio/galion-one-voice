@@ -34,10 +34,6 @@ pub const AFFECT_TO_VOICE_FRAMES: u32 = 2;
 /// `LOCKS.toml` `[gates] affect_to_voice_max_ms`. Two frames of [`FRAME_MS`].
 pub const AFFECT_TO_VOICE_MS: u32 = FRAME_MS * AFFECT_TO_VOICE_FRAMES;
 
-/// Deprecated forward. Parking is [`MomentVoice::for_persona`], not this
-/// constant. Existing callers still read it.
-pub const ARIA_PARKED: bool = true;
-
 /// Approach lean, length units per axis unit. Higher approach is slightly faster.
 const APPROACH_LENGTH: f32 = 0.05;
 /// Approach lean, energy units per axis unit.
@@ -166,43 +162,6 @@ pub struct MomentView {
     pub baseline: VoiceBaseline,
     pub moment: MomentState,
     pub breath: Breath,
-}
-
-/// Deprecated forward. Baseline slot the older callers still request.
-/// The moment map does not read the id.
-pub fn samantha_baseline() -> VoiceBaseline {
-    VoiceBaseline {
-        persona: id_slot("samantha"),
-        voice: id_slot("samantha-e0"),
-        // Development profile rest (valence, arousal, dominance). Approach 0
-        // is neither lean nor withdrawal; that axis is not in the persona rest.
-        pos: [0.25, 0.35, 0.45, 0.0],
-        pitch_centre_hz: VoiceBaseline::standin().pitch_centre_hz,
-    }
-}
-
-/// Deprecated forward. Baseline slot the older callers still request.
-/// The numbers fill the struct. They are not a voice, and the map does not
-/// read the id.
-pub fn aria_baseline() -> VoiceBaseline {
-    VoiceBaseline {
-        persona: id_slot("aria"),
-        voice: id_slot("aria-parked"),
-        pos: [0.0, 0.30, 0.50, 0.0],
-        pitch_centre_hz: VoiceBaseline::standin().pitch_centre_hz,
-    }
-}
-
-/// Deprecated forward. Reports the development id. The moment map does not
-/// call this.
-pub fn is_samantha(baseline: &VoiceBaseline) -> bool {
-    baseline.persona_id().eq_ignore_ascii_case("samantha")
-}
-
-/// Deprecated forward. Reports the parked-seat id. The moment map does not
-/// call this.
-pub fn is_aria(baseline: &VoiceBaseline) -> bool {
-    baseline.persona_id().eq_ignore_ascii_case("aria")
 }
 
 /// Instant map for whatever baseline was installed. Does not smooth and
@@ -455,14 +414,6 @@ fn finite_or(x: f32, fallback: f32) -> f32 {
 
 fn finite_between(x: f32, lo: f32, hi: f32) -> bool {
     x.is_finite() && x >= lo && x <= hi
-}
-
-fn id_slot(id: &str) -> [u8; 16] {
-    let mut out = [0u8; 16];
-    let bytes = id.as_bytes();
-    let n = bytes.len().min(15);
-    out[..n].copy_from_slice(&bytes[..n]);
-    out
 }
 
 fn pitch_ratio(st: f32) -> f32 {

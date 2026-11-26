@@ -371,6 +371,22 @@ pub fn pause_gaps_ms() -> Vec<u64> {
 mod tests {
     use super::*;
 
+    fn persona_file_stems() -> Vec<String> {
+        let dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../horbm-persona/personas");
+        let mut stems = Vec::new();
+        for entry in std::fs::read_dir(&dir).unwrap_or_else(|err| panic!("{}: {err}", dir.display())) {
+            let path = entry.expect("persona entry").path();
+            if path.extension().and_then(|ext| ext.to_str()) != Some("toml") {
+                continue;
+            }
+            if let Some(stem) = path.file_stem().and_then(|stem| stem.to_str()) {
+                stems.push(stem.to_string());
+            }
+        }
+        assert!(!stems.is_empty());
+        stems
+    }
+
     #[test]
     fn catalog_is_a_closed_set_of_at_least_twenty() {
         let set = catalog();
@@ -380,7 +396,8 @@ mod tests {
         let before = ids.len();
         ids.dedup();
         assert_eq!(ids.len(), before);
-        assert!(set.iter().all(|scenario| scenario.id != "aria"));
+        let stems = persona_file_stems();
+        assert!(set.iter().all(|scenario| !stems.iter().any(|stem| scenario.id == stem)));
         let gaps = pause_gaps_ms();
         assert_eq!(gaps.len(), 6);
         assert!(gaps.iter().all(|gap| (400..=1_000).contains(gap)));

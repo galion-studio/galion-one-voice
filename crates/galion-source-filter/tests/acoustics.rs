@@ -17,7 +17,7 @@ fn impulse(amp: f32) -> Vec<f32> {
 }
 
 fn render(controls: MouthControls, amp: f32) -> Vec<f32> {
-    let mut filter = SourceFilter::samantha(SR);
+    let mut filter = SourceFilter::rest(SR);
     filter.set_controls(controls);
     let mut buf = impulse(amp);
     filter.process(&mut buf);
@@ -75,7 +75,7 @@ fn neutral_controls_leave_the_signal_unchanged() {
         *sample = (state as i32 as f32) * (0.4 / i32::MAX as f32);
     }
     for rate in [16_000u32, 22_050, 24_000] {
-        let mut filter = SourceFilter::samantha(rate);
+        let mut filter = SourceFilter::rest(rate);
         let mut buf = probe.clone();
         filter.process(&mut buf);
         let err = buf
@@ -134,7 +134,7 @@ fn breathiness_lowers_spectral_tilt() {
 
 #[test]
 fn openness_moves_f1_and_f2() {
-    let rest = TractBaseline::SAMANTHA;
+    let rest = TractBaseline::REST;
     let open = MouthControls {
         openness: 1.0,
         ..MouthControls::neutral()
@@ -276,7 +276,7 @@ fn breath_noise_is_added_on_the_exhale_only() {
     }
 
     let width = frame_samples(SR);
-    let mut filter = SourceFilter::samantha(SR);
+    let mut filter = SourceFilter::rest(SR);
     let mut buf = vec![0.0f32; width * 2];
     filter.process_frames(
         &mut buf,
@@ -305,7 +305,7 @@ fn breath_noise_is_added_on_the_exhale_only() {
         *sample = (std::f32::consts::TAU * 180.0 * t).sin() * 0.2;
     }
     let dry = tone.clone();
-    let mut quiet = SourceFilter::samantha(SR);
+    let mut quiet = SourceFilter::rest(SR);
     quiet.set_moment(
         &voice,
         &moment,
@@ -330,7 +330,7 @@ fn controls_change_on_the_80ms_boundary() {
         *sample = (std::f32::consts::TAU * NASAL_LO_HZ * t).sin() * 0.25;
     }
     let dry = buf.clone();
-    let mut filter = SourceFilter::samantha(SR);
+    let mut filter = SourceFilter::rest(SR);
     filter.process_frames(
         &mut buf,
         &[
@@ -357,7 +357,7 @@ fn controls_change_on_the_80ms_boundary() {
 
 #[test]
 fn the_moment_does_not_move_the_tract_baseline() {
-    let mut filter = SourceFilter::samantha(SR);
+    let mut filter = SourceFilter::rest(SR);
     let before = filter.baseline();
     let voice = VoiceBaseline::standin();
     let bits = voice.identity_bits();

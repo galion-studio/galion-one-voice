@@ -7,7 +7,7 @@
 //! and the off switch nod zero times. None of those frames is a barge-in.
 
 use galion_conductor::{
-    listener_on_bus, persona_allows, Affect, BackchannelConfig, BackchannelKind, Conductor, Ear,
+    listener_on_bus, Affect, BackchannelConfig, BackchannelKind, Conductor, Ear,
     FakeBrain, Floor, ListenCue, ListenMood, TickEvent, TurnMsg, BACKCHANNEL_GAP_MS,
     BACKCHANNEL_PEAK_MAX, FRAME_MS, SPEECH_PEAK_MIN,
 };
@@ -385,13 +385,14 @@ fn the_off_switch_and_a_denied_ear_stay_quiet() {
 }
 
 #[test]
-fn aria_and_a_clone_pack_do_not_nod() {
-    assert!(persona_allows("Samantha"));
-    assert!(!persona_allows("aria"));
-    assert!(!persona_allows("samantha-clone"));
-    for persona in ["aria", "samantha-clone"] {
+fn parked_config_silences_nods_for_any_id() {
+    for persona in ["northwind", "parked-fixture", "configured"] {
         let mut conductor = Conductor::new(FakeBrain::new());
         conductor.set_persona(persona);
+        conductor.set_backchannel_config(BackchannelConfig {
+            enabled: true,
+            parked: true,
+        });
         let report = {
             let mut scorer = Scorer::bundled();
             let steps = {
@@ -423,6 +424,33 @@ fn aria_and_a_clone_pack_do_not_nod() {
             nods
         };
         assert_eq!(report, 0, "{persona}");
+    }
+}
+
+#[test]
+fn installed_persona_nods_without_a_name_check() {
+    for persona in ["northwind", "parked-fixture", "configured"] {
+        let mut conductor = Conductor::new(FakeBrain::new());
+        conductor.set_persona(persona);
+        let mut scorer = Scorer::bundled();
+        let mut steps = Vec::new();
+        push_fall(&mut steps, "I walked down to the market");
+        let mut nods = 0;
+        for step in &steps {
+            let msg = scorer.push_cue(step.cue, step.partial);
+            let cue = scorer.listen();
+            let ear = if step.cue.voiced {
+                Ear::Speech(step.partial)
+            } else {
+                Ear::Quiet
+            };
+            let tick = conductor.tick_listen(ear, None, map_msg(msg), map_cue(cue), ListenMood::resting());
+            if tick.backchannel.is_some() {
+                nods += 1;
+            }
+            assert_ne!(tick.event, TickEvent::BargeIn);
+        }
+        assert_eq!(nods, 1, "{persona}");
     }
 }
 

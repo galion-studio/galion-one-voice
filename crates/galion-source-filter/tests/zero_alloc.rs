@@ -52,7 +52,7 @@ fn the_frame_path_stays_inside_the_alloc_budget() {
 
     let rate = 24_000u32;
     let width = frame_samples(rate);
-    let mut filter = SourceFilter::samantha(rate);
+    let mut filter = SourceFilter::rest(rate);
     let voice = VoiceBaseline::standin();
     let mut moment = MomentState::at(voice.pos);
     let exhale = Breath {

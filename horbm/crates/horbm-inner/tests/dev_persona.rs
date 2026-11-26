@@ -5,7 +5,7 @@
 use std::time::Instant;
 
 use galion_emotion::consent_bits::{ADAPT, REMEMBER, SENSE, SHARE};
-use galion_emotion::SAMANTHA;
+use galion_emotion::persona_mood::configured;
 use galion_emotion_core::{EmotionCore, IntentMsg, IntentSource, AROUSAL, DOMINANCE, VALENCE};
 use horbm_inner::{
     remember_denied, Heard, InnerMsg, MsgDir, Perceived, PersonaInner, Verb, CARE_HOME, CARE_SAD,
@@ -34,10 +34,10 @@ fn sad_ear() -> Heard {
 fn standalone_home_matches_the_old_rest_and_names_nobody() {
     assert_eq!(REMEMBER_LOCK, "deny");
     assert!(remember_denied());
-    let rest = std::hint::black_box(SAMANTHA.dynamics.rest.valence);
+    let rest = std::hint::black_box(development_profile().dynamics.rest.valence);
     assert!(rest > 0.0, "the rest valence is warm");
     assert!((CARE_HOME - (0.30 + rest)).abs() < 1.0e-6);
-    let half_life = std::hint::black_box(SAMANTHA.dynamics.half_life_ms);
+    let half_life = std::hint::black_box(development_profile().dynamics.half_life_ms);
     assert!((half_life - 20_000.0).abs() < 1.0);
     let ideal = 1.0 - std::f32::consts::LN_2 * (TICK_MS as f32) / half_life;
     let keep = DECAY_KEEP_NUM as f32 / DECAY_KEEP_DEN as f32;
@@ -408,14 +408,58 @@ fn black_box_tick(life: &mut PersonaInner) {
     std::hint::black_box(msg);
 }
 
+fn development_profile() -> &'static galion_emotion::persona_mood::PersonaProfile {
+    static ID: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+    let id = ID.get_or_init(|| {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../horbm-persona/development.toml");
+        let text = std::fs::read_to_string(&path).unwrap_or_else(|err| panic!("{}: {err}", path.display()));
+        text.lines()
+            .find_map(|line| {
+                let rest = line.trim().strip_prefix("development_persona = ")?;
+                let rest = rest.trim().trim_matches('"');
+                if rest.is_empty() {
+                    None
+                } else {
+                    Some(rest.to_string())
+                }
+            })
+            .expect("development_persona")
+    });
+    configured(Some(id)).expect("development profile")
+}
+
+fn persona_case_needles() -> Vec<String> {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../horbm-persona/personas");
+    let mut out = Vec::new();
+    for entry in std::fs::read_dir(&dir).unwrap_or_else(|err| panic!("{}: {err}", dir.display())) {
+        let path = entry.expect("persona entry").path();
+        if path.extension().and_then(|ext| ext.to_str()) != Some("toml") {
+            continue;
+        }
+        let Some(stem) = path.file_stem().and_then(|stem| stem.to_str()) else {
+            continue;
+        };
+        out.push(stem.to_string());
+        out.push(stem.to_uppercase());
+        let mut chars = stem.chars();
+        if let Some(first) = chars.next() {
+            out.push(format!("{}{}", first.to_uppercase(), chars.as_str()));
+        }
+    }
+    assert!(!out.is_empty());
+    out
+}
+
 #[test]
 fn sources_do_not_name_another_persona_or_a_runtime() {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
     for name in ["lib.rs", "life.rs", "msg.rs"] {
         let text = std::fs::read_to_string(root.join(name)).expect(name);
+        for needle in persona_case_needles() {
+            assert!(!text.contains(&needle), "{name} contains {needle}");
+        }
         for needle in [
-            "Aria",
-            "ARIA",
             "Jarvis",
             "ort::",
             "onnxruntime",

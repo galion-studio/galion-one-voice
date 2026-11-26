@@ -279,17 +279,23 @@ fn the_off_switch_and_other_personas_play_nothing() {
         FakeMouth::new(),
         HorbmTurn::with_cards(Kettle),
     );
-    voice.set_persona("aria");
-    let mut nods = 0;
-    for plan in plans {
-        let tick = voice.tick_listen(&[], plan.turn, plan.cue, ListenMood::resting());
-        if tick.backchannel.is_some() {
-            nods += 1;
+    voice.set_backchannel_config(BackchannelConfig {
+        enabled: true,
+        parked: true,
+    });
+    for id in ["northwind", "parked-fixture"] {
+        voice.set_persona(id);
+        let mut nods = 0;
+        for plan in &plans {
+            let tick = voice.tick_listen(&[], plan.turn, plan.cue, ListenMood::resting());
+            if tick.backchannel.is_some() {
+                nods += 1;
+            }
+            assert_ne!(tick.event, TickEvent::BargeIn);
         }
-        assert_ne!(tick.event, TickEvent::BargeIn);
+        assert_eq!(nods, 0, "{id}");
     }
-    assert_eq!(nods, 0);
-    println!("backchannel voice off: nods=0 aria=0 false_barge_in=0 result=pass");
+    println!("backchannel voice off: nods=0 parked=1 false_barge_in=0 result=pass");
 }
 
 #[test]

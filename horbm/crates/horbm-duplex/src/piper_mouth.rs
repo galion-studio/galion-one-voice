@@ -22,19 +22,19 @@
 //! Nothing in this file is a hard-coded `.exe` or drive letter.
 //!
 //! The only voice this mouth will open is the open stock pack
-//! `en_US-ljspeech`. Samantha, Aria, and any clone pack are refused.
-//! The pack is not downloaded here.
+//! `en_US-ljspeech`. A name that is not that prefix, and any clone pack,
+//! are refused. The pack is not downloaded here.
 
 use std::collections::VecDeque;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
-use galion_emotion_core::{Breath, MomentState};
+use galion_emotion_core::{Breath, MomentState, VoiceBaseline};
 use galion_ml_voice::speech::piper_worker::{PiperProsody, PiperWorker};
 use horbm::Pad;
 use horbm_voice::{
-    samantha_baseline, shape_sentence, AudioFrame, MomentVoice, Mouth, MouthPull, SpokenLine,
-    VoiceControls, FRAME_SAMPLES, SAMPLE_RATE,
+    shape_sentence, AudioFrame, MomentVoice, Mouth, MouthPull, SpokenLine, VoiceControls,
+    FRAME_SAMPLES, SAMPLE_RATE,
 };
 
 /// Open stock pack this mouth will load. Not a persona and not a clone.
@@ -662,11 +662,7 @@ fn is_stock_model(path: &Path) -> bool {
         return false;
     };
     let name = name.to_ascii_lowercase();
-    if name.contains("samantha")
-        || name.contains("aria")
-        || name.contains("clone")
-        || name.contains("jarvis")
-    {
+    if name.contains("clone") {
         return false;
     }
     name.starts_with("en_us-ljspeech") && name.ends_with(".onnx") && !name.ends_with(".onnx.json")
@@ -766,7 +762,7 @@ fn audible(samples: &[i16]) -> bool {
 }
 
 fn rest_controls() -> VoiceControls {
-    let baseline = samantha_baseline();
+    let baseline = VoiceBaseline::standin();
     let mut voice = MomentVoice::new(baseline);
     let rest = MomentState::at(baseline.pos);
     voice.tick(rest, Breath::rest());
@@ -850,9 +846,10 @@ mod tests {
     #[test]
     fn a_persona_pack_is_not_the_stock_voice() {
         assert!(is_stock_model(Path::new("en_US-ljspeech-medium.onnx")));
-        assert!(!is_stock_model(Path::new("samantha.onnx")));
-        assert!(!is_stock_model(Path::new("aria-parked.onnx")));
+        assert!(!is_stock_model(Path::new("other.onnx")));
+        assert!(!is_stock_model(Path::new("en_US-other.onnx")));
         assert!(!is_stock_model(Path::new("en_US-clone.onnx")));
+        assert!(!is_stock_model(Path::new("en_US-ljspeech-medium.onnx.json")));
     }
 
     #[test]

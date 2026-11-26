@@ -47,22 +47,3 @@ fn neither_is_none() {
     assert_eq!(empty.value, None);
     assert!(empty.warning.is_none());
 }
-
-#[test]
-fn samantha_traits_alias_still_exports_the_same_items() {
-    let gate: std::sync::Arc<galion_sam_orch::samantha_traits::WaitGate> =
-        galion_sam_orch::samantha_traits::WaitGate::new();
-    assert!(!gate.release.load(std::sync::atomic::Ordering::SeqCst));
-    assert_eq!(
-        galion_sam_orch::samantha_traits::SAMANTHA_REF_ENV,
-        "GALION_SAMANTHA_REF"
-    );
-    assert_eq!(
-        galion_sam_orch::samantha_traits::VOICE_REF_ENV,
-        "GALION_VOICE_REF"
-    );
-    let _forward: fn() -> Option<std::path::PathBuf> =
-        galion_sam_orch::samantha_traits::samantha_ref_from_env;
-    let _voice: fn() -> Option<std::path::PathBuf> =
-        galion_sam_orch::samantha_traits::voice_ref_from_env;
-}

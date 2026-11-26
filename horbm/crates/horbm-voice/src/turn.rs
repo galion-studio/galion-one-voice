@@ -21,7 +21,7 @@ pub enum TickEvent {
     FirstAudio,
     Backchannel,
     BargeIn,
-    /// Samantha nodded while the user kept the floor. Not a barge-in.
+    /// The installed persona nodded while the user kept the floor. Not a barge-in.
     ListenBackchannel,
 }
 
@@ -123,13 +123,15 @@ where
     /// [`BackchannelConfig::from_env`] for `GALION_BACKCHANNEL`.
     pub fn set_backchannel_config(&mut self, config: BackchannelConfig) {
         self.listen.enabled = config.enabled;
+        self.listen.set_parked(config.parked);
     }
 
     pub fn backchannel_enabled(&self) -> bool {
         self.listen.enabled
     }
 
-    /// Only `samantha` nods. Aria and clone-pack ids stay quiet.
+    /// Record the installed id. Nods do not read it. [`BackchannelConfig::parked`]
+    /// silences every id.
     pub fn set_persona(&mut self, persona: impl Into<String>) {
         self.listen.set_persona(persona);
     }
@@ -193,7 +195,7 @@ where
         self.tick_listen(pcm, turn, ListenCue::None, ListenMood::resting())
     }
 
-    /// [`Self::tick_turn`] plus a listening cue and Samantha's moment.
+    /// [`Self::tick_turn`] plus a listening cue and the installed persona's moment.
     ///
     /// A nod is one quiet frame on the me band while the user still holds
     /// the you band. It does not start the brain, does not mark the mouth as

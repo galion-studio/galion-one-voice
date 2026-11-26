@@ -59,9 +59,9 @@ The build below glues those pieces. It adds no new engine, no new runtime, and n
 
 ### Inner life
 
-**Must.** Two layers. `InnerLife` is four slots each of care, want, and expect, tokens of at most 16 ASCII bytes, learning off while `learn` is deny. Seed tokens are `heard`, `answer`, `pause`. `SamanthaInner` is four floats (care, curiosity, help, expect) for this session only, and it does not keep user facts. A turn may bias pace. It does not replace the spoken clause. **Found** (`F-inner-life.md`, `F-persona.md` `[inner]`, `horbm-inner`, `lib.rs`).
+**Must.** Two layers. `InnerLife` is four slots each of care, want, and expect, tokens of at most 16 ASCII bytes, learning off while `learn` is deny. Seed tokens are `heard`, `answer`, `pause`. `PersonaInner` is four floats (care, curiosity, help, expect) for this session only, and it does not keep user facts. A turn may bias pace. It does not replace the spoken clause. **Found** (`F-inner-life.md`, `F-persona.md` `[inner]`, `horbm-inner`, `lib.rs`).
 
-**On main.** Both types are real and tested. `Brain::turn` calls `SamanthaInner::turn` with `ear: None` and `sense: self.ear_sense`. `with_cards` sets `ear_sense: false`. `set_ear_sense` has no other caller. `inner_turn` / `inner_nudge` / `samantha_nudge` are separate methods and are not called from `turn`. **Found** (`brain.rs`, repo search for `set_ear_sense`). `EAR_CONFIDENCE` is 0.35. A missing ear is ignored; words still count. **Found** (`horbm-inner/src/lib.rs`, `life.rs` `apply_turn`).
+**On main.** Both types are real and tested. `Brain::turn` calls `PersonaInner::turn` with `ear: None` and `sense: self.ear_sense`. `with_cards` sets `ear_sense: false`. `set_ear_sense` has no other caller. `inner_turn` / `inner_nudge` / `persona_nudge` are separate methods and are not called from `turn`. **Found** (`brain.rs`, repo search for `set_ear_sense`). `EAR_CONFIDENCE` is 0.35. A missing ear is ignored; words still count. **Found** (`horbm-inner/src/lib.rs`, `life.rs` `apply_turn`).
 
 **Gap.** The chat turn never updates `InnerLife`, and it never receives an ear point. **Found.**
 
@@ -89,13 +89,13 @@ The build below glues those pieces. It adds no new engine, no new runtime, and n
 
 ### Intent and dialogue
 
-**Must.** After the evidence is in, one move: answer, cite, ask, comfort, offer topic, or stop. Answer and cite need a truth-card source. A research hit is never an answer or a citation. The heuristic is deterministic. The offline bandit counts a move only when learn is granted, and the count does not change the move. **Found** (`F4b-dialogue-manager.md`, `dialogue/mod.rs`, `policy.rs`).
+**Must.** After the evidence is in, one move: answer, cite, ask, comfort, offer topic, or stop. Answer and cite need a truth-card source. A research hit is never an answer or a citation. The heuristic is deterministic. The offline bandit counts a move only when learn is granted, and the count does not change the move. The heard line is also a closed intent: chat, ask, task, vent, goodbye, recall, correct. Empathy still supplies the first five as a string on `DecideIn`. The dialogue manager reads that label once and refines recall and correction with a fixed English phrase table. Recall speaks a person-memory source (`memory:` plus an id) or the honest miss (`UNKNOWN_REPLY`, `honest:unknown`). A card is not a memory. A correction does not repeat the last sourced clause in the ring, uses that same miss, and does not count a learn row. Chat, ask, task, vent, and goodbye keep their moves. The miss is the existing unknown line. No new sentence. **Found** for the move set (`F4b-dialogue-manager.md`, `dialogue/mod.rs`, `policy.rs`). Recall and correction are `dialogue/intent.rs`.
 
-**On main.** `Dialogue::decide` is that heuristic. `Brain::turn` calls it, then `admit_move`, and a forbid becomes ask plus `I don't know.` **Found** (`brain.rs`). `choose_steered` exists and `decide` does not call it. **Found** (`policy.rs` module docs). `hold_topic` is on `DialogueLean` and is not an input to `decide`. **Found** (`DecideIn` has no hold field). `Move::OfferTopic` can speak `Back to {topic}?`. **Found** (`policy.rs` `plan_for`).
+**On main.** `Dialogue::decide` is that heuristic. `Brain::turn` calls it, then `admit_move`, and a forbid becomes ask plus `I don't know.` **Found** (`brain.rs`). `DecideIn.intent` stays `&str` because `brain.rs` builds the struct literal. `Dialogue::last_intent_label` holds the typed label. `TurnOut.intent` and `MoodMeta.intent` are still empathy's string. `choose_steered` exists and `decide` does not call it. **Found** (`policy.rs`). `hold_topic` is on `DialogueLean` and is not an input to `decide`. **Found** (`DecideIn` has no hold field). `Move::OfferTopic` can speak `Back to {topic}?`. **Found** (`policy.rs` `plan_for`).
 
-**Gap.** A hold from the inner life does not block a new topic. The bandit stays an observer. This plan leaves the bandit as an observer (fewest moving parts). **Found** for the gap; the bandit decision is this plan.
+**Gap.** The brain does not yet read `last_intent_label`, so the published intent string is still empathy's label. A hold from the inner life does not block a new topic. The bandit stays an observer. This plan leaves the bandit as an observer (fewest moving parts).
 
-**Evidence.** `cargo test --manifest-path horbm/Cargo.toml -p horbm --test dialogue`. **Found.**
+**Evidence.** `cargo test --manifest-path horbm/Cargo.toml -p horbm --test intent --test dialogue --test turn`.
 
 ### Ear into the brain
 
@@ -111,7 +111,7 @@ The build below glues those pieces. It adds no new engine, no new runtime, and n
 
 **Must.** The order in `lib.rs`, summarized above. Research inside the turn is the style root only (`GALION_HORBM_RESEARCH_DIR`, hits tagged `not_for` answer and cite). The gateway ask waits until `TurnOut` is dropped. `RESEARCH_CAP` is 3 seconds. **Found** (`lib.rs`, `voice-stack/research-gateway/src/lib.rs` `Duration::from_secs(3)`).
 
-**On main.** `turn` (`brain.rs`): reap a previous follow-up; empathy tick; `SamanthaInner::turn` with `ear: None`; optional person observe; `person_hit` or `gather`; style search; `decide`; `admit_move`; `finish`; `arm_follow` when `research_later`. `gather` calls `route_heard(..., None)`. `research_later` is true only when a port exists, the lean is not comfort, and the gap reason is `ResearchOff`. **Found** (`brain.rs` around the `turn` and `gather` functions). `route_heard` itself will call `ResearchAsk::ask` when the port is `Some`. `voice-stack/horbm-bridge/src/router.rs` `ReasoningRouter::route` passes `Some`. `CardEngine::turn`, which 7881 uses, calls `Brain::turn`. **Found** (`voice-stack/horbm-bridge/src/cards.rs`, `voice-stack/local-server/src/brain.rs`).
+**On main.** `turn` (`brain.rs`): reap a previous follow-up; empathy tick; `PersonaInner::turn` with `ear: None`; optional person observe; `person_hit` or `gather`; style search; `decide`; `admit_move`; `finish`; `arm_follow` when `research_later`. `gather` calls `route_heard(..., None)`. `research_later` is true only when a port exists, the lean is not comfort, and the gap reason is `ResearchOff`. **Found** (`brain.rs` around the `turn` and `gather` functions). `route_heard` itself will call `ResearchAsk::ask` when the port is `Some`. `voice-stack/horbm-bridge/src/router.rs` `ReasoningRouter::route` passes `Some`. `CardEngine::turn`, which 7881 uses, calls `Brain::turn`. **Found** (`voice-stack/horbm-bridge/src/cards.rs`, `voice-stack/local-server/src/brain.rs`).
 
 **Gap.** `ReasoningRouter` is a second brain that can speak a gateway result inside the call. `CardEngine` does not attach `EpisodicStore`. **Found** (`cards.rs` `brain_from_dir` attaches retrieval and style, and does not call `with_memory`). `HorbmEngine::open` discards the memory path and calls `brain_from_dir`. **Found** (`linked.rs`).
 
@@ -169,7 +169,7 @@ No swarm edits `horbm/crates/horbm`. No swarm edits a workspace manifest.
 
 **Acceptance.** `cargo test --manifest-path horbm/Cargo.toml -p horbm-inner --test samantha a_low_confidence_ear_is_no_claim`. The existing `ear_off_ignores_the_listener_and_still_reads_the_words` still passes.
 
-**Serves the brain.** `SamanthaInner` already knows how to read a `Heard`. The missing piece is a constructor the ear's three floats can fill.
+**Serves the brain.** `PersonaInner` already knows how to read a `Heard`. The missing piece is a constructor the ear's three floats can fill.
 
 **Depends on.** Nothing. It does not import `horbm-ear` (different workspace).
 
@@ -245,7 +245,7 @@ No swarm edits `brain.rs` or `lib.rs`. Adding a struct field is done with `Defau
 
 **Acceptance.** `cargo test --manifest-path horbm/Cargo.toml -p horbm --test dialogue`. New test `hold_false_matches_decide_and_hold_true_blocks_offer_topic`.
 
-**Serves the brain.** `SamanthaInner` already computes `hold_topic`. The move picker ignores it, so a check-in can still offer a new topic.
+**Serves the brain.** `PersonaInner` already computes `hold_topic`. The move picker ignores it, so a check-in can still offer a new topic.
 
 **Depends on.** Nothing. The flag is a `bool`, so this swarm does not edit `horbm-inner`.
 
@@ -318,7 +318,7 @@ Boot does not use `allows_development_boot` and does not load one named persona.
 
 ### R3-C — A text turn leaves the moment where it was
 
-**Goal.** Add one integration test. After `Brain::turn` on a text line, the moment position and the baseline identity match the values from before the call. `samantha_nudge` / `step_moment` remain the methods that move the moment.
+**Goal.** Add one integration test. After `Brain::turn` on a text line, the moment position and the baseline identity match the values from before the call. `persona_nudge` / `step_moment` remain the methods that move the moment.
 
 **Owns.** `horbm/crates/horbm/tests/moment_split.rs` (new file only).
 
@@ -472,7 +472,7 @@ These are recommendations. This PR does not move or delete them.
 
 **Keep, because the brain still uses them.** `horbm-brain` `MemoryRetriever` and the clause fixture: `gather` still calls `pick` on the idle path. **Found** (`brain.rs` `gather`). `personas/aria.toml`: inactive schema fixture. **Found** (`F-persona.md`).
 
-**Not the brain, and not free to delete.** `crates/galion-cascade` `PhoneLane` is the console `phone-turn` feature (`crates/galion-console/src/turn_worker.rs`). `horbm/` has no reference to `galion_cascade`. Cascade's `horbm_chat.rs` uses `horbm_brain::Heuristic`, not `horbm::Brain::turn`. **Found.** `.github/workflows/gates.yml` still runs `cargo test -p galion-cascade --features cascade --lib`. **Found.** Archive that lane only after that gate is retargeted. `voice-stack/pipeline-orchestrator` (`galion-sam-orch`) returns `"horbm is not linked; Brain::open stays in crate horbm"` and does not link `horbm`. **Found** (`samantha_traits.rs`). `voice-stack/local-server/tests/stream.rs` still names `galion_sam_orch::samantha_traits::WaitGate`, so the crate is not unused. **Found.** No brain swarm should edit it.
+**Not the brain, and not free to delete.** `crates/galion-cascade` `PhoneLane` is the console `phone-turn` feature (`crates/galion-console/src/turn_worker.rs`). `horbm/` has no reference to `galion_cascade`. Cascade's `horbm_chat.rs` uses `horbm_brain::Heuristic`, not `horbm::Brain::turn`. **Found.** `.github/workflows/gates.yml` still runs `cargo test -p galion-cascade --features cascade --lib`. **Found.** Archive that lane only after that gate is retargeted. `voice-stack/pipeline-orchestrator` (`galion-sam-orch`) returns `"horbm is not linked; Brain::open stays in crate horbm"` and does not link `horbm`. **Found** (`voice_traits.rs`). The `samantha_traits` alias is gone. `voice-stack/local-server/tests/stream.rs` names `galion_sam_orch::voice_traits::WaitGate`, so the crate is not unused. **Found.** No brain swarm should edit it.
 
 **Chatterbox copies.** This pass found no `cbx-v2` or `chatterbox` string under `voice-stack/eval-golden`. A full caller count across `tools/` was not made. **Unknown** how many references remain. `FP-first-principles-audit.md` already says to archive those copies after the voice-v2 and eval paths stop pointing at them. That is a later non-brain pass.
 

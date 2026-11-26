@@ -24,7 +24,7 @@ pub struct FrameReport {
 pub fn measure_frame_cost(sample_rate: u32, frames: u32, controls: MouthControls) -> FrameReport {
     let frames = frames.max(1);
     let samples_per_frame = frame_samples(sample_rate).max(1);
-    let mut filter = SourceFilter::samantha(sample_rate);
+    let mut filter = SourceFilter::rest(sample_rate);
     let mut buf = vec![0.0f32; samples_per_frame];
     for (i, sample) in buf.iter_mut().enumerate() {
         let step = (i % 40) as f32;

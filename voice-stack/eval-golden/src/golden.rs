@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Galion Labs
-//! Golden conversation scripts for Samantha.
+//! Golden conversation scripts for the configured persona.
 //!
-//! Greeting, follow-up, interruption, an unknown question she must admit she
-//! does not know, and an emotional check-in. The check-in must stay off the
-//! canned-empathy list. Feeling is the mood pad moving on the 80 ms tick,
-//! not a scripted comfort line.
+//! Greeting, follow-up, interruption, an unknown question the persona must
+//! admit it does not know, and an emotional check-in. The check-in must stay
+//! off the canned-empathy list. Feeling is the mood pad moving on the 80 ms
+//! tick, not a scripted comfort line.
 //!
 //! The interruption script checks the reply text against `SAMANTHA.md`
 //! ("Stop at once. Do not apologise your way back into the sentence.").

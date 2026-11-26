@@ -609,12 +609,6 @@ impl Brain {
         &self.persona_inner
     }
 
-    /// Forward to [`Self::persona_inner`].
-    #[deprecated(note = "use persona_inner")]
-    pub fn samantha(&self) -> &PersonaInner {
-        self.persona_inner()
-    }
-
     /// Ear switch for [`Self::turn`]. On unless `GALION_EAR_SENSE` closes it.
     /// Words still count when it is off.
     pub fn set_ear_sense(&mut self, on: bool) {
@@ -672,17 +666,6 @@ impl Brain {
         let note = self.persona_inner.nudge(&mut self.emotion, seen)?;
         self.apply_prosody(note.lean());
         Ok(note)
-    }
-
-    /// Forward to [`Self::persona_nudge`].
-    #[deprecated(note = "use persona_nudge")]
-    pub fn samantha_nudge(
-        &mut self,
-        words: &str,
-        ear: Option<Heard>,
-        sense: bool,
-    ) -> Result<InnerMsg, galion_emotion_core::CoreError> {
-        self.persona_nudge(words, ear, sense)
     }
 
     /// One dialogue turn of cares, wants, and expects. Emits a GEMI intent

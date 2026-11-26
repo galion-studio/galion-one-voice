@@ -21,7 +21,7 @@ pub struct Tools {
     pub vosk_lib: Option<PathBuf>,
     pub ffmpeg: Option<PathBuf>,
     pub ecapa_bin: Option<PathBuf>,
-    pub samantha_ref: Option<PathBuf>,
+    pub voice_ref: Option<PathBuf>,
     pub notes: Vec<String>,
 }
 
@@ -36,7 +36,7 @@ impl Tools {
             notes.push("Piper runtime is not on this machine. Set GALION_A21_RUNTIME, or run scripts/a21/fetch-a21.sh. No audio was invented.".into());
         }
         if model.is_none() {
-            notes.push("Piper voice pack is not on this machine. GALION_TTS_WEIGHTS or weights/tts/en_US-ljspeech-medium.onnx. The pack is not a Samantha clone.".into());
+            notes.push("Piper voice pack is not on this machine. GALION_TTS_WEIGHTS or weights/tts/en_US-ljspeech-medium.onnx. The pack is not a clone of the configured persona.".into());
         }
         if model.is_some() && sample_rate.is_none() {
             notes.push(
@@ -54,11 +54,17 @@ impl Tools {
             notes.push("ffmpeg is not on PATH. The wer_t648.py resample step was not replaced with a different resampler.".into());
         }
         let ecapa_bin = find_ecapa();
-        let samantha_ref = env_file("GALION_SAMANTHA_REF");
-        if samantha_ref.is_none() {
-            notes.push("GALION_SAMANTHA_REF is unset. ECAPA is not run. No reference clip is read or written.".into());
+        let voice = std::env::var("GALION_VOICE_REF").ok();
+        let old = std::env::var("GALION_SAMANTHA_REF").ok();
+        let resolved = voice_ref_choice(voice.as_deref(), old.as_deref());
+        if let Some(line) = resolved.warning {
+            eprintln!("{line}");
+        }
+        let voice_ref = resolved.value.and_then(|path| env_path(&path));
+        if voice_ref.is_none() {
+            notes.push("GALION_VOICE_REF is unset. GALION_SAMANTHA_REF is the deprecated fallback. ECAPA is not run. No reference clip is read or written.".into());
         } else if ecapa_bin.is_none() {
-            notes.push("GALION_SAMANTHA_REF is set, but galion-ecapa is not on this machine. ECAPA was not scored.".into());
+            notes.push("A reference path is set, but galion-ecapa is not on this machine. ECAPA was not scored.".into());
         }
         notes.push("emotion_match needs the emotion-v2 recogniser (0.70*category_blend+0.30*emb_sim). Those weights are not invoked by this crate. The CPU stub is not a score.".into());
         Self {
@@ -70,7 +76,7 @@ impl Tools {
             vosk_lib,
             ffmpeg,
             ecapa_bin,
-            samantha_ref,
+            voice_ref,
             notes,
         }
     }
@@ -99,13 +105,44 @@ fn weight_roots() -> Vec<PathBuf> {
     roots
 }
 
+struct VoiceRefChoice {
+    value: Option<String>,
+    warning: Option<&'static str>,
+}
+
+fn voice_ref_choice(new_name: Option<&str>, old_name: Option<&str>) -> VoiceRefChoice {
+    let new_name = nonempty(new_name);
+    let old_name = nonempty(old_name);
+    let (value, warning) = match (new_name, old_name) {
+        (None, None) => (None, None),
+        (Some(value), None) => (Some(value.to_string()), None),
+        (None, Some(value)) => (
+            Some(value.to_string()),
+            Some("GALION_SAMANTHA_REF is a fallback; set GALION_VOICE_REF"),
+        ),
+        (Some(value), Some(old)) if value == old => (Some(value.to_string()), None),
+        (Some(value), Some(_)) => (
+            Some(value.to_string()),
+            Some("GALION_VOICE_REF wins over GALION_SAMANTHA_REF"),
+        ),
+    };
+    VoiceRefChoice { value, warning }
+}
+
+fn nonempty(value: Option<&str>) -> Option<&str> {
+    match value {
+        Some(text) if !text.trim().is_empty() => Some(text.trim()),
+        _ => None,
+    }
+}
+
 fn env_file(key: &str) -> Option<PathBuf> {
     let raw = std::env::var(key).ok()?;
-    let trimmed = raw.trim();
-    if trimmed.is_empty() {
-        return None;
-    }
-    let path = PathBuf::from(trimmed);
+    env_path(raw.trim())
+}
+
+fn env_path(raw: &str) -> Option<PathBuf> {
+    let path = PathBuf::from(raw);
     if path.is_file() {
         Some(path)
     } else {

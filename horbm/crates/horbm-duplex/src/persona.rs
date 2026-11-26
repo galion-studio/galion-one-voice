@@ -4,26 +4,11 @@
 //!
 //! [`ConfiguredPersona`] is loaded from the development persona
 //! ([`horbm::Persona::load_development`]) or from an explicit persona file.
-//! The historical [`SamanthaPersona`] forward stays so soak can keep
-//! constructing it. There is no `deprecated` attribute this round.
+//! Style numbers come from that file. This module does not publish a
+//! persona-named constant.
 
-use crate::ports::{Persona, Style, DEV_PERSONA};
+use crate::ports::{Persona, Style};
 use crate::LoopError;
-
-/// Brevity the historical forward still publishes.
-///
-/// The live loop reads brevity from the configured persona file. Soak still
-/// reaches this number through [`SamanthaPersona`]. There is no `deprecated`
-/// attribute this round.
-pub const SAMANTHA_BREVITY: f32 = 0.55;
-/// Warmth the historical forward still publishes.
-///
-/// See [`SAMANTHA_BREVITY`].
-pub const SAMANTHA_WARMTH: f32 = 0.8;
-/// Sentences one turn may spend on the historical forward.
-///
-/// See [`SAMANTHA_BREVITY`].
-pub const SAMANTHA_SENTENCES: u8 = 2;
 
 /// The persona the loop seats. Id, voice, and style come from the file.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -70,32 +55,6 @@ impl Persona for ConfiguredPersona {
             max_sentences: hook.max_sentences,
             rate: hook.rate,
         }
-    }
-
-    fn unknown_line(&self) -> &str {
-        horbm::UNKNOWN_REPLY
-    }
-}
-
-/// Historical development speaker. Soak still constructs this type.
-///
-/// The live loop builds [`ConfiguredPersona`]. This forward keeps the
-/// previous id, voice, and style numbers so that crate compiles. There is
-/// no `deprecated` attribute this round.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct SamanthaPersona;
-
-impl Persona for SamanthaPersona {
-    fn id(&self) -> &str {
-        DEV_PERSONA
-    }
-
-    fn voice(&self) -> &str {
-        DEV_PERSONA
-    }
-
-    fn style(&self) -> Style {
-        Style::from_brevity(SAMANTHA_BREVITY, SAMANTHA_WARMTH, SAMANTHA_SENTENCES)
     }
 
     fn unknown_line(&self) -> &str {

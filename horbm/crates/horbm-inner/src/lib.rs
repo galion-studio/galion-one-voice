@@ -56,10 +56,6 @@ mod msg;
 pub use life::{DialogueLean, Heard, InnerHome, Perceived, PersonaInner};
 pub use msg::{InnerMsg, MsgDir, Verb};
 
-/// Previous name of [`PersonaInner`].
-#[deprecated(note = "use PersonaInner")]
-pub type SamanthaInner = PersonaInner;
-
 /// `[consent] remember`. Not written, and not a fifth wire bit.
 pub const REMEMBER_LOCK: &str = "deny";
 

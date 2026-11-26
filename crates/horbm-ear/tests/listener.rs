@@ -295,7 +295,7 @@ fn dimensions_are_axes_not_a_category_list() {
         DIMENSIONS,
         ["valence", "arousal", "tension", "fatigue", "confidence"]
     );
-    for name in ["sad", "happy", "angry", "fear", "aria", "jarvis"] {
+    for name in ["sad", "happy", "angry", "fear", "parked-fixture", "northwind"] {
         assert!(
             !DIMENSIONS.contains(&name),
             "{name} is not a listener dimension"
@@ -911,13 +911,37 @@ const FIXTURE_INTENTS: &[(&str, usize, &str)] = &[
     ),
 ];
 
+fn persona_case_needles() -> Vec<String> {
+    let dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../horbm/crates/horbm-persona/personas");
+    let mut out = Vec::new();
+    for entry in std::fs::read_dir(&dir).unwrap_or_else(|err| panic!("{}: {err}", dir.display())) {
+        let path = entry.expect("persona entry").path();
+        if path.extension().and_then(|ext| ext.to_str()) != Some("toml") {
+            continue;
+        }
+        let Some(stem) = path.file_stem().and_then(|stem| stem.to_str()) else {
+            continue;
+        };
+        out.push(stem.to_string());
+        out.push(stem.to_uppercase());
+        let mut chars = stem.chars();
+        if let Some(first) = chars.next() {
+            out.push(format!("{}{}", first.to_uppercase(), chars.as_str()));
+        }
+    }
+    assert!(!out.is_empty());
+    out
+}
+
 #[test]
-fn sources_do_not_name_aria_ort_or_a_research_dir() {
+fn sources_do_not_name_a_persona_file_ort_or_a_research_dir() {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/listen.rs");
     let text = std::fs::read_to_string(&path).expect("listen.rs");
+    for needle in persona_case_needles() {
+        assert!(!text.contains(&needle), "listen.rs contains {needle}");
+    }
     for needle in [
-        "Aria",
-        "ARIA",
         "Jarvis",
         "ort::",
         "onnxruntime",

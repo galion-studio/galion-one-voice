@@ -2,10 +2,12 @@
 // Copyright (c) 2026 Galion Labs
 //! Listening backchannel while the user still holds the floor.
 //!
-//! Samantha only. One short nod at least [`BACKCHANNEL_GAP_MS`] after the
-//! last one, on the quiet frame that follows a clause-final fall. A yield,
-//! a question rise, a filler, a denied ear, and any persona other than
-//! Samantha stay silent. The nod is quieter than ordinary speech.
+//! The installed persona nods. One short nod at least [`BACKCHANNEL_GAP_MS`]
+//! after the last one, on the quiet frame that follows a clause-final fall.
+//! A yield, a question rise, a filler, a denied ear, and a parked seat stay
+//! silent. Parking is [`BackchannelConfig::parked`], default false, the same
+//! rule as [`crate::MomentVoice::for_persona`]. The nod is quieter than
+//! ordinary speech.
 //!
 //! `galion-conductor` keeps the same numbers. The crates are separate
 //! workspaces, so this file is the voice loop's copy. The mouth renders it.
@@ -40,7 +42,7 @@ pub enum ListenCue {
     Filler,
 }
 
-/// One of Samantha's four listening sounds. Not a reply.
+/// Four listening sounds of the installed persona. Not a reply.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum BackchannelKind {
     MmHm,
@@ -86,7 +88,7 @@ impl Affect {
     }
 }
 
-/// Samantha's moment, plus the listener's feeling when the bus carried one.
+/// The installed persona's moment, plus the listener's feeling when the bus carried one.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ListenMood {
     pub moment: Affect,
@@ -95,7 +97,7 @@ pub struct ListenMood {
 }
 
 impl ListenMood {
-    /// Resting Samantha. Valence 0.25, arousal 0.3, no listener on the bus.
+    /// Resting moment. Valence 0.25, arousal 0.3, no listener on the bus.
     pub const fn resting() -> Self {
         Self {
             moment: Affect {
@@ -117,15 +119,20 @@ pub struct Backchannel {
     pub frames_after_fall: u32,
 }
 
-/// Config flag. Default is on. The environment is a second switch.
+/// Config flag. Default is on, and not parked. The environment is a second switch.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct BackchannelConfig {
     pub enabled: bool,
+    /// When true, nods stay silent for every installed id. Default false.
+    pub parked: bool,
 }
 
 impl Default for BackchannelConfig {
     fn default() -> Self {
-        Self { enabled: true }
+        Self {
+            enabled: true,
+            parked: false,
+        }
     }
 }
 
@@ -133,6 +140,7 @@ impl BackchannelConfig {
     pub fn from_env(value: Option<&str>) -> Self {
         Self {
             enabled: !env_disables(value),
+            parked: false,
         }
     }
 
@@ -151,11 +159,6 @@ pub fn env_disables(value: Option<&str>) -> bool {
         value.map(|raw| raw.trim().to_ascii_lowercase()).as_deref(),
         Some("0") | Some("off")
     )
-}
-
-/// True only for Samantha. Aria stays parked. A clone pack id is refused.
-pub fn persona_allows(id: &str) -> bool {
-    id.trim().eq_ignore_ascii_case("samantha")
 }
 
 /// Inbound feeling band, EmotionWire layout. Outbound and absent frames are
@@ -254,6 +257,7 @@ pub fn render(kind: BackchannelKind, energy: f32, samples: usize, rate: u32) -> 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ListenPolicy {
     pub enabled: bool,
+    parked: bool,
     persona: String,
     last_voiced_ms: Option<u64>,
     last_played_ms: Option<u64>,
@@ -269,7 +273,8 @@ impl ListenPolicy {
     pub fn new() -> Self {
         Self {
             enabled: true,
-            persona: "samantha".to_string(),
+            parked: false,
+            persona: String::new(),
             last_voiced_ms: None,
             last_played_ms: None,
         }
@@ -277,6 +282,10 @@ impl ListenPolicy {
 
     pub fn set_persona(&mut self, persona: impl Into<String>) {
         self.persona = persona.into();
+    }
+
+    pub fn set_parked(&mut self, parked: bool) {
+        self.parked = parked;
     }
 
     pub fn persona(&self) -> &str {
@@ -288,8 +297,9 @@ impl ListenPolicy {
         self.last_voiced_ms = Some(t_ms);
     }
 
-    /// Maybe nod. `holding` is false on Yield, on PauseOnly, while Samantha
-    /// is speaking, and on any frame that already took or cancelled the turn.
+    /// Maybe nod. `holding` is false on Yield, on PauseOnly, while the
+    /// installed persona is speaking, and on any frame that already took or
+    /// cancelled the turn.
     ///
     /// PauseOnly is the denied-ear path. The cue needs a pitch fall and must
     /// refuse a question rise. A pause timer cannot see either, so the nod
@@ -302,7 +312,7 @@ impl ListenPolicy {
         cue: ListenCue,
         mood: ListenMood,
     ) -> Option<Backchannel> {
-        if !self.enabled || !persona_allows(&self.persona) {
+        if !self.enabled || self.parked {
             return None;
         }
         if !quiet || !holding || !matches!(cue, ListenCue::ClauseFall) {
@@ -344,13 +354,8 @@ mod tests {
         assert!(!BackchannelConfig::from_env(Some("0")).enabled);
         assert!(!BackchannelConfig::from_env(Some(" off ")).enabled);
         assert!(!BackchannelConfig::from_env(Some("OFF")).enabled);
-        assert!(persona_allows("Samantha"));
-        assert!(persona_allows(" samantha "));
-        assert!(!persona_allows("aria"));
-        assert!(!persona_allows("Aria"));
-        assert!(!persona_allows("samantha-clone"));
-        assert!(!persona_allows("amy-koenig"));
-        assert!(!persona_allows(""));
+        assert!(!BackchannelConfig::default().parked);
+        assert!(!BackchannelConfig::from_env(None).parked);
     }
 
     #[test]
@@ -469,10 +474,55 @@ mod tests {
             .consider(20_080, true, true, ListenCue::ClauseFall, mood)
             .is_none());
         policy.enabled = true;
-        policy.set_persona("aria");
+        policy.set_parked(true);
+        for id in ["northwind", "parked-fixture", ""] {
+            policy.set_persona(id);
+            assert!(
+                policy
+                    .consider(20_080, true, true, ListenCue::ClauseFall, mood)
+                    .is_none(),
+                "{id}"
+            );
+        }
+        policy.set_parked(false);
+        policy.set_persona("northwind");
+        policy.note_voiced(30_000);
         assert!(policy
-            .consider(20_080, true, true, ListenCue::ClauseFall, mood)
-            .is_none());
+            .consider(30_080, true, true, ListenCue::ClauseFall, mood)
+            .is_some());
+    }
+
+    #[test]
+    fn parked_config_silences_nods_for_any_id() {
+        let mood = ListenMood::resting();
+        for id in ["northwind", "parked-fixture", "configured"] {
+            let mut policy = ListenPolicy::new();
+            policy.set_persona(id);
+            policy.set_parked(true);
+            policy.note_voiced(0);
+            assert!(
+                policy
+                    .consider(FRAME_MS as u64, true, true, ListenCue::ClauseFall, mood)
+                    .is_none(),
+                "{id}"
+            );
+        }
+    }
+
+    #[test]
+    fn installed_persona_nods_without_a_name_check() {
+        let mood = ListenMood::resting();
+        for id in ["northwind", "parked-fixture", "configured"] {
+            let mut policy = ListenPolicy::new();
+            policy.set_persona(id);
+            policy.note_voiced(0);
+            assert!(
+                policy
+                    .consider(FRAME_MS as u64, true, true, ListenCue::ClauseFall, mood)
+                    .is_some(),
+                "{id}"
+            );
+        }
     }
 
     #[test]

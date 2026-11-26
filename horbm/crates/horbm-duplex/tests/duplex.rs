@@ -120,9 +120,9 @@ impl Recognizer for Scripted {
     }
 }
 
-struct SamanthaAffect;
+struct FixtureAffect;
 
-impl Emotion for SamanthaAffect {
+impl Emotion for FixtureAffect {
     fn step(&mut self, _t_ms: u32) -> Affect {
         Affect {
             valence: 0.28,
@@ -150,7 +150,7 @@ impl Breath for ExhaleBreath {
     }
 }
 
-struct Samantha {
+struct Seated {
     id: String,
     voice: String,
     brevity: f32,
@@ -158,7 +158,7 @@ struct Samantha {
     sentences: u8,
 }
 
-impl Samantha {
+impl Seated {
     fn load() -> Self {
         let persona = horbm::Persona::load_development().expect("configured persona");
         let style = persona.style();
@@ -172,7 +172,7 @@ impl Samantha {
     }
 }
 
-impl Persona for Samantha {
+impl Persona for Seated {
     fn id(&self) -> &str {
         &self.id
     }
@@ -311,18 +311,18 @@ fn silence() -> Vec<i16> {
     vec![0i16; FRAME_SAMPLES]
 }
 
-fn samantha() -> Duplex<Scripted, SamanthaAffect, ExhaleBreath, Samantha, ToneMouth> {
+fn configured_duplex() -> Duplex<Scripted, FixtureAffect, ExhaleBreath, Seated, ToneMouth> {
     let mut duplex = Duplex::new(
         Parts {
             recognizer: Scripted::new(&["where is the kettle", "yeah", "stop now"]),
-            emotion: SamanthaAffect,
+            emotion: FixtureAffect,
             breath: ExhaleBreath,
-            persona: Samantha::load(),
+            persona: Seated::load(),
             mouth: ToneMouth::new(24),
         },
         Kettle,
     )
-    .expect("samantha");
+    .expect("configured persona");
     // The virtual-clock gate is not an acoustic path. The mouth tone and the
     // scripted mic are the same square, so a live canceller would treat the
     // person as echo.
@@ -331,15 +331,15 @@ fn samantha() -> Duplex<Scripted, SamanthaAffect, ExhaleBreath, Samantha, ToneMo
 }
 
 fn tick(
-    duplex: &mut Duplex<Scripted, SamanthaAffect, ExhaleBreath, Samantha, ToneMouth>,
+    duplex: &mut Duplex<Scripted, FixtureAffect, ExhaleBreath, Seated, ToneMouth>,
     pcm: &[i16],
 ) -> FrameOut {
     duplex.tick(pcm).expect("frame")
 }
 
 #[test]
-fn full_duplex_samantha_both_bands() {
-    let mut duplex = samantha();
+fn full_duplex_configured_both_bands() {
+    let mut duplex = configured_duplex();
     let configured = horbm::Persona::load_development().expect("configured persona");
     assert_eq!(duplex.persona().id(), configured.id());
     assert_eq!(duplex.persona().voice(), configured.voice());
@@ -487,7 +487,7 @@ fn full_duplex_samantha_both_bands() {
 
 #[test]
 fn a_short_frame_does_not_move_the_clock() {
-    let mut duplex = samantha();
+    let mut duplex = configured_duplex();
     let err = match duplex.tick(&[0i16; 10]) {
         Ok(_) => panic!("a short frame was accepted"),
         Err(err) => err,
@@ -510,7 +510,7 @@ fn a_persona_other_than_the_configured_one_is_refused() {
     match Duplex::new(
         Parts {
             recognizer: Scripted::new(&[]),
-            emotion: SamanthaAffect,
+            emotion: FixtureAffect,
             breath: ExhaleBreath,
             persona: Other,
             mouth: ToneMouth::new(4),
@@ -532,14 +532,14 @@ fn a_second_barge_matches_the_first_after_she_listens_again() {
                 "where is the kettle",
                 "stop now",
             ]),
-            emotion: SamanthaAffect,
+            emotion: FixtureAffect,
             breath: ExhaleBreath,
-            persona: Samantha::load(),
+            persona: Seated::load(),
             mouth: ToneMouth::new(24),
         },
         Kettle,
     )
-    .expect("samantha");
+    .expect("configured persona");
     duplex.set_aec(false);
 
     let first = one_barge(&mut duplex);
@@ -556,7 +556,7 @@ fn a_second_barge_matches_the_first_after_she_listens_again() {
 }
 
 fn one_barge(
-    duplex: &mut Duplex<Scripted, SamanthaAffect, ExhaleBreath, Samantha, ToneMouth>,
+    duplex: &mut Duplex<Scripted, FixtureAffect, ExhaleBreath, Seated, ToneMouth>,
 ) -> u64 {
     for _ in 0..5 {
         let _ = tick(duplex, &tone());

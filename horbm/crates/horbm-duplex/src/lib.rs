@@ -50,10 +50,7 @@ pub use emotion::CoreAffect;
 pub use horbm_voice::{FRAME_MS, FRAME_SAMPLES, SAMPLE_RATE};
 pub use live::FramePump;
 pub use mouth::NativeMouth;
-pub use persona::{
-    open_persona, ConfiguredPersona, SamanthaPersona, SAMANTHA_BREVITY, SAMANTHA_SENTENCES,
-    SAMANTHA_WARMTH,
-};
+pub use persona::{open_persona, ConfiguredPersona};
 #[cfg(feature = "piper")]
 pub use piper_mouth::{
     discover_piper, measure_piper, piper_cache_dir, piper_skipped_json, PiperMouth, PiperPaths,
@@ -61,7 +58,7 @@ pub use piper_mouth::{
 };
 pub use ports::{
     Affect, Breath, BreathCue, BreathPhase, EarSense, Emotion, Hypothesis, HypothesisKind, Persona,
-    ProsodyCue, RecogError, Recognizer, Style, BREVITY_RATE, DEV_PERSONA,
+    ProsodyCue, RecogError, Recognizer, Style, BREVITY_RATE,
 };
 pub use prosody::ProsodyEar;
 pub use recog::SilentRecognizer;

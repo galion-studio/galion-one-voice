@@ -18,10 +18,19 @@ pub fn build(golden: Vec<TurnReport>, roundtrip: RoundTrip) -> Report {
     Report { golden, roundtrip }
 }
 
+/// Report label. `GALION_HORBM_DEV_PERSONA` when it is non-empty, otherwise `configured`.
+pub fn persona_label(dev_persona: Option<&str>) -> String {
+    match dev_persona.map(str::trim).filter(|id| !id.is_empty()) {
+        Some(id) => id.to_string(),
+        None => "configured".to_string(),
+    }
+}
+
 pub fn to_json(report: &Report) -> String {
+    let label = persona_label(std::env::var("GALION_HORBM_DEV_PERSONA").ok().as_deref());
     pretty(&J::obj(vec![
         ("schema", J::str("galion-eval-golden/1")),
-        ("persona", J::str("samantha")),
+        ("persona", J::str(label)),
         ("claimed", J::Bool(false)),
         ("scores_fabricated", J::Bool(false)),
         ("audio_committed", J::Bool(false)),
@@ -170,7 +179,7 @@ fn opt_num(value: Option<f64>) -> J {
 
 pub fn summary(report: &Report) -> String {
     let mut lines = Vec::new();
-    lines.push("Samantha eval-golden. claimed=false. No audio in this report.".into());
+    lines.push("configured persona eval-golden. claimed=false. No audio in this report.".into());
     for turn in &report.golden {
         let extra = if turn.hits.is_empty() {
             String::new()
@@ -307,5 +316,13 @@ mod tests {
         assert!(json.contains("0.83"));
         assert!(json.contains("0.018"));
         assert!(!json.contains("pcm_b64"));
+    }
+
+    #[test]
+    fn report_label_is_the_configured_id() {
+        assert_eq!(persona_label(None), "configured");
+        assert_eq!(persona_label(Some("")), "configured");
+        assert_eq!(persona_label(Some("  ")), "configured");
+        assert_eq!(persona_label(Some("northwind")), "northwind");
     }
 }

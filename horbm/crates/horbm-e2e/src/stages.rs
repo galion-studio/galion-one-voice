@@ -200,11 +200,9 @@ fn memory_ns(_script: &str) -> Option<u64> {
 #[cfg(has_moment_voice)]
 fn mood_ns() -> Option<u64> {
     let started = std::time::Instant::now();
-    let baseline = horbm_voice::samantha_baseline();
-    assert!(
-        horbm_voice::is_samantha(&baseline),
-        "moment voice baseline is not samantha"
-    );
+    let persona = horbm::Persona::load_development().expect("configured persona");
+    let baseline = persona.baseline();
+    assert_eq!(baseline.persona_id(), persona.id());
     let mut voice = horbm_voice::MomentVoice::new(baseline);
     let moment = galion_emotion_core::MomentState::at(baseline.pos);
     let controls = voice.tick(moment, galion_emotion_core::Breath::rest());

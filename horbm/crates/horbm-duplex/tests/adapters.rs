@@ -9,10 +9,10 @@ use galion_emotion_core::{IntentMsg, AROUSAL};
 use horbm::{CardHit, CardLookup, Pad};
 use horbm_duplex::{
     open_persona, Breath, BreathPhase, ConfiguredPersona, CoreAffect, Duplex, EarSense, Emotion,
-    FramePump, LoopError, NativeMouth, Parts, Persona, ProsodyEar, Recognizer, SamanthaPersona,
-    SilentRecognizer, SpeakingBreath, FRAME_SAMPLES, SAMPLE_RATE,
+    FramePump, LoopError, NativeMouth, Parts, Persona, ProsodyEar, Recognizer, SilentRecognizer,
+    SpeakingBreath, FRAME_SAMPLES, SAMPLE_RATE,
 };
-use horbm_voice::{is_aria, is_samantha, Mouth, MouthPull, SpokenLine, VoiceControls};
+use horbm_voice::{Mouth, MouthPull, SpokenLine, VoiceControls};
 
 struct NoCards;
 
@@ -62,11 +62,10 @@ fn harness() -> Duplex<SilentRecognizer, CoreAffect, SpeakingBreath, ConfiguredP
 
 #[test]
 fn emotion_core_satisfies_the_port_and_leaves_the_baseline() {
-    let mut emotion = CoreAffect::samantha();
+    let (mut emotion, persona) = seated();
     let base = emotion.baseline();
-    let forward = SamanthaPersona;
-    assert_eq!(base.persona_id(), forward.id());
-    assert_eq!(base.voice_id(), forward.voice());
+    assert_eq!(base.persona_id(), persona.id());
+    assert_eq!(base.voice_id(), persona.voice());
     let bits = base.identity_bits();
     let rejected = emotion.step(80);
     assert_eq!(emotion.frames(), 0);
@@ -95,12 +94,11 @@ fn emotion_core_satisfies_the_port_and_leaves_the_baseline() {
     assert_eq!(emotion.frames(), 2);
     assert_eq!(emotion.baseline().identity_bits(), bits);
     let view = emotion.view();
-    assert!(is_samantha(&view.baseline));
-    assert!(!is_aria(&view.baseline));
+    assert_eq!(view.baseline.persona_id(), persona.id());
 }
 
 #[test]
-fn the_tick_hands_samantha_s_moment_to_the_mouth_and_not_aria() {
+fn the_tick_hands_the_configured_moment_to_the_mouth() {
     struct Remember {
         inner: NativeMouth,
         felt: u32,

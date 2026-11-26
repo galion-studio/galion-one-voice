@@ -43,7 +43,7 @@ pub mod research;
 pub mod stamps;
 
 pub use backchannel::{
-    listener_on_bus, persona_allows, Affect, Backchannel, BackchannelConfig, BackchannelKind,
+    listener_on_bus, Affect, Backchannel, BackchannelConfig, BackchannelKind,
     ListenCue, ListenMood, BACKCHANNEL_ENV, BACKCHANNEL_GAP_MS, BACKCHANNEL_PEAK_MAX,
     SPEECH_PEAK_MIN,
 };

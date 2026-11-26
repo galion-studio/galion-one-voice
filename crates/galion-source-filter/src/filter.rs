@@ -71,7 +71,7 @@ impl<const N: usize> Bank<N> {
     }
 }
 
-/// Samantha's source-filter. Own it for the utterance; call [`Self::process`]
+/// The configured persona's source-filter. Own it for the utterance; call [`Self::process`]
 /// once per 80 ms frame.
 pub struct SourceFilter {
     sample_rate: u32,
@@ -89,7 +89,7 @@ impl SourceFilter {
     pub fn new(sample_rate: u32, tract: TractBaseline) -> Self {
         let mut filter = Self {
             sample_rate: 0,
-            tract: TractBaseline::SAMANTHA,
+            tract: TractBaseline::REST,
             controls: MouthControls::neutral(),
             tilt: Bank::new(),
             formant: Bank::new(),
@@ -103,9 +103,9 @@ impl SourceFilter {
         filter
     }
 
-    /// Rest formants fixed at the Samantha anchors. The moment starts neutral.
-    pub fn samantha(sample_rate: u32) -> Self {
-        Self::new(sample_rate, TractBaseline::SAMANTHA)
+    /// Rest formants fixed at the Burg medians. The moment starts neutral.
+    pub fn rest(sample_rate: u32) -> Self {
+        Self::new(sample_rate, TractBaseline::REST)
     }
 
     pub fn sample_rate(&self) -> u32 {
@@ -122,10 +122,10 @@ impl SourceFilter {
 
     /// Replace the steady tract. Does not read the moment.
     pub fn set_baseline(&mut self, tract: TractBaseline) {
-        let f1 = sane_hz(tract.f1_hz, TractBaseline::SAMANTHA.f1_hz, 120.0, 1_200.0);
+        let f1 = sane_hz(tract.f1_hz, TractBaseline::REST.f1_hz, 120.0, 1_200.0);
         let f2 = sane_hz(
             tract.f2_hz,
-            TractBaseline::SAMANTHA.f2_hz,
+            TractBaseline::REST.f2_hz,
             f1 + 200.0,
             4_000.0,
         );

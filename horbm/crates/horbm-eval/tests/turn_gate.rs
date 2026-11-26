@@ -5,6 +5,22 @@
 
 use horbm_eval::{run_stand_in, StageState, FRAME_SAMPLES};
 
+fn persona_file_stems() -> Vec<String> {
+    let dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../horbm-persona/personas");
+    let mut stems = Vec::new();
+    for entry in std::fs::read_dir(&dir).unwrap_or_else(|err| panic!("{}: {err}", dir.display())) {
+        let path = entry.expect("persona entry").path();
+        if path.extension().and_then(|ext| ext.to_str()) != Some("toml") {
+            continue;
+        }
+        if let Some(stem) = path.file_stem().and_then(|stem| stem.to_str()) {
+            stems.push(stem.to_string());
+        }
+    }
+    assert!(!stems.is_empty());
+    stems
+}
+
 #[test]
 fn turn_eval_gates_hold() {
     let report = run_stand_in();
@@ -15,7 +31,9 @@ fn turn_eval_gates_hold() {
     assert!(report.scenarios >= 20);
     assert!(report.samples > 0);
     assert_eq!(report.samples % FRAME_SAMPLES, 0);
-    assert!(text.contains("persona=samantha"));
+    let configured = horbm_eval::stand_in_persona_label();
+    assert!(text.contains(&format!("persona={configured}")));
+    assert!(!text.to_ascii_lowercase().contains("samantha"));
     assert!(text.contains("clock=virtual"));
     assert!(text.contains("cite=arxiv:2503.04721,arxiv:2507.23159"));
     assert!(text.contains("result=pass"));
@@ -36,8 +54,12 @@ fn stub_stages_are_named_and_the_report_has_no_transcript() {
     assert!(text.contains("metric false_barge_in n=2 p50=0.000 p95=0.000 gate=on limit=p95<=0.000"));
     assert!(text.contains("metric pause_handling_tor"));
     assert!(text.contains("gate=off"));
-    for word in ["kettle", "hob", "window", "garden", "aria", "yeah", "mm-hm"] {
+    for word in ["kettle", "hob", "window", "garden", "yeah", "mm-hm"] {
         assert!(!text.contains(word), "{word} leaked into\n{text}");
+    }
+    let lower = text.to_ascii_lowercase();
+    for stem in persona_file_stems() {
+        assert!(!lower.contains(&stem), "{stem} leaked into\n{text}");
     }
 }
 
@@ -53,7 +75,9 @@ fn echo_probe_stays_quiet_when_the_canceller_is_on() {
 }
 
 #[test]
-fn the_report_names_samantha() {
+fn the_report_names_the_configured_persona() {
     let report = run_stand_in();
-    assert!(report.text().contains("persona=samantha"));
+    let id = horbm_eval::stand_in_persona_label();
+    assert!(report.text().contains(&format!("persona={id}")));
+    assert_ne!(id, "samantha");
 }

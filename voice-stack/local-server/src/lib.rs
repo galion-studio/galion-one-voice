@@ -58,7 +58,7 @@ pub async fn start_with_host(
     addr: SocketAddr,
     ui_dir: PathBuf,
     host: Arc<HostSession>,
-    samantha_ref: RefState,
+    voice_ref: RefState,
     require_session: bool,
     ttl: Duration,
 ) -> Result<Running, ServeError> {
@@ -67,7 +67,7 @@ pub async fn start_with_host(
         addr,
         ui_dir,
         factory,
-        samantha_ref,
+        voice_ref,
         require_session,
         ttl,
         Some(host),

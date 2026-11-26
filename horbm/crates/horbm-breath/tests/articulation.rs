@@ -71,7 +71,7 @@ fn air_frames_are_not_a_phonatory_quotient() {
 #[test]
 fn a_speech_tick_carries_the_same_controls() {
     let drive = Drive::rest();
-    let mut lungs = Lungs::samantha();
+    let mut lungs = Lungs::open("northwind").expect("fixture");
     lungs.set_articulation(0.0, 0.5);
     let mut speech = None;
     for _ in 0..40 {

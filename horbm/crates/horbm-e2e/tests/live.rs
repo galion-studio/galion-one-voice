@@ -96,7 +96,8 @@ fn assert_stub_has_no_time(text: &str, key: &str) {
 
 fn assert_common(outcome: &Outcome, text: &str, sense: Sense) {
     assert!(outcome.wav_removed, "the input wav was left on disk");
-    assert_eq!(field(text, "persona"), "samantha");
+    let configured = horbm::Persona::load_development().expect("configured persona");
+    assert_eq!(field(text, "persona"), configured.id());
     assert_eq!(
         field(text, "prosody_sense"),
         if sense == Sense::On { "on" } else { "off" }
@@ -297,6 +298,6 @@ fn live_loop_prosody_off() {
 }
 
 #[test]
-fn a_persona_other_than_samantha_is_refused() {
-    horbm_e2e::refuse_other_persona().expect("aria refused");
+fn a_persona_other_than_the_configured_one_is_refused() {
+    horbm_e2e::refuse_other_persona().expect("other id refused");
 }

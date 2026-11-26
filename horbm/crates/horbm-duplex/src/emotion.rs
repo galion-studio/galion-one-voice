@@ -5,7 +5,6 @@
 //! One [`Emotion::step`] is one `EmotionCore::step` on the same 80 ms clock.
 //! The baseline is copied in once and the step does not write it.
 //! [`CoreAffect::from_baseline`] seats the configured persona's baseline.
-//! [`CoreAffect::samantha`] remains the historical stand-in rest for soak.
 //! Those numbers are not a measured voice.
 
 use galion_emotion_core::{
@@ -31,16 +30,6 @@ impl CoreAffect {
             core: EmotionCore::from_baseline(baseline),
             last,
         }
-    }
-
-    /// Historical rest point. Soak still calls this.
-    ///
-    /// The speaker slots are the development forward and the position is
-    /// [`VoiceBaseline::standin`]. The live loop uses [`Self::from_baseline`]
-    /// on the configured persona. There is no `deprecated` attribute this round.
-    #[must_use]
-    pub fn samantha() -> Self {
-        Self::from_baseline(samantha_baseline())
     }
 
     #[must_use]
@@ -93,28 +82,10 @@ impl Emotion for CoreAffect {
     }
 }
 
-fn samantha_baseline() -> VoiceBaseline {
-    let rest = VoiceBaseline::standin();
-    VoiceBaseline {
-        persona: slot("samantha"),
-        voice: slot("samantha"),
-        pos: rest.pos,
-        pitch_centre_hz: rest.pitch_centre_hz,
-    }
-}
-
 fn affect_of(baseline: &VoiceBaseline) -> Affect {
     Affect {
         valence: baseline.pos[VALENCE],
         arousal: baseline.pos[AROUSAL],
         dominance: baseline.pos[DOMINANCE],
     }
-}
-
-fn slot(text: &str) -> [u8; 16] {
-    let mut out = [0u8; 16];
-    let bytes = text.as_bytes();
-    let n = bytes.len().min(out.len());
-    out[..n].copy_from_slice(&bytes[..n]);
-    out
 }

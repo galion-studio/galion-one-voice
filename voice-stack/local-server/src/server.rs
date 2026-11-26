@@ -101,7 +101,7 @@ pub type PipelineFactory = Arc<dyn Fn() -> Box<dyn Pipeline> + Send + Sync>;
 pub struct AppState {
     pub bound: SocketAddr,
     pub factory: PipelineFactory,
-    pub samantha_ref: RefState,
+    pub voice_ref: RefState,
     pub sessions: Arc<SessionStore>,
     pub require_session: bool,
     pub live: Arc<AtomicUsize>,
@@ -207,7 +207,7 @@ pub async fn start(
     addr: SocketAddr,
     ui_dir: PathBuf,
     factory: PipelineFactory,
-    samantha_ref: RefState,
+    voice_ref: RefState,
     require_session: bool,
     ttl: Duration,
 ) -> Result<Running, ServeError> {
@@ -215,7 +215,7 @@ pub async fn start(
         addr,
         ui_dir,
         factory,
-        samantha_ref,
+        voice_ref,
         require_session,
         ttl,
         None,
@@ -227,7 +227,7 @@ pub(crate) async fn start_bound(
     addr: SocketAddr,
     ui_dir: PathBuf,
     factory: PipelineFactory,
-    samantha_ref: RefState,
+    voice_ref: RefState,
     require_session: bool,
     ttl: Duration,
     host: Option<Arc<crate::host::HostSession>>,
@@ -236,7 +236,7 @@ pub(crate) async fn start_bound(
     let state = app_state(
         bound,
         factory,
-        samantha_ref,
+        voice_ref,
         require_session,
         ttl,
         ui_dir.clone(),
@@ -264,7 +264,7 @@ pub async fn serve_until_ctrl_c(
     addr: SocketAddr,
     ui_dir: PathBuf,
     factory: PipelineFactory,
-    samantha_ref: RefState,
+    voice_ref: RefState,
     require_session: bool,
     ttl: Duration,
     host: Arc<crate::host::HostSession>,
@@ -273,7 +273,7 @@ pub async fn serve_until_ctrl_c(
         addr,
         ui_dir,
         factory,
-        samantha_ref,
+        voice_ref,
         require_session,
         ttl,
         Some(Arc::clone(&host)),
@@ -337,7 +337,7 @@ async fn bind_listener(addr: SocketAddr) -> Result<(TcpListener, SocketAddr), Se
 fn app_state(
     bound: SocketAddr,
     factory: PipelineFactory,
-    samantha_ref: RefState,
+    voice_ref: RefState,
     require_session: bool,
     ttl: Duration,
     ui: PathBuf,
@@ -346,7 +346,7 @@ fn app_state(
     AppState {
         bound,
         factory,
-        samantha_ref,
+        voice_ref,
         sessions: Arc::new(SessionStore::new(ttl)),
         require_session,
         live: Arc::new(AtomicUsize::new(0)),
@@ -399,13 +399,14 @@ async fn favicon() -> impl IntoResponse {
     )
 }
 
-fn health_json(bound: &str, samantha_ref: &str, info: &crate::pipeline::PipeInfo) -> String {
+fn health_json(bound: &str, voice_ref: &str, info: &crate::pipeline::PipeInfo) -> String {
     serde_json::json!({
         "ok": true,
         "schema": SCHEMA,
         "bind": bound,
         "loopback": true,
-        "samantha_ref": samantha_ref,
+        "voice_ref": voice_ref,
+        "samantha_ref": voice_ref,
         "vad": info.vad_backend,
         "vad_ready": info.vad_ready,
         "asr": info.ear,
@@ -426,7 +427,7 @@ async fn health(State(app): State<AppState>) -> impl IntoResponse {
         .lock()
         .map(|pipe| pipe.info())
         .unwrap_or_else(|err| err.into_inner().info());
-    let body = health_json(&app.bound.to_string(), app.samantha_ref.as_str(), &info);
+    let body = health_json(&app.bound.to_string(), app.voice_ref.as_str(), &info);
     (
         StatusCode::OK,
         [
