@@ -559,6 +559,20 @@ fn assert_closed_session(root: &Path) {
             "session_end"
         ]
     );
+    // Remember is granted here, so a retrieval miss never enters `Brain::gaps`.
+    // A gap line, when a later turn does record one, still has to name its
+    // reason and must not carry a withheld secret.
+    assert!(values
+        .iter()
+        .filter(|value| value["kind"] == "gap")
+        .all(|gap| {
+            let reason = gap["reason"].as_str().unwrap_or("");
+            let heard = gap["heard"].as_str().unwrap_or("");
+            !reason.is_empty()
+                && heard != "withheld"
+                && !gap.to_string().to_ascii_lowercase().contains("password")
+                && !gap.to_string().contains("withheld")
+        }));
     let replies: Vec<&str> = values
         .iter()
         .filter(|value| value["kind"] == "reply")
