@@ -4,7 +4,8 @@
 //!
 //! Piper speaks into memory. ffmpeg resamples to 16 kHz s16le the way
 //! `wer_t648.py` does. Vosk transcribes. WER uses that script's tokeniser.
-//! ECAPA runs only when `GALION_SAMANTHA_REF` is a file and `galion-ecapa`
+//! ECAPA runs only when `GALION_VOICE_REF` (or the deprecated
+//! `GALION_SAMANTHA_REF` fallback) is a file and `galion-ecapa`
 //! is on disk. The comparison wavs live in the temp directory and are
 //! deleted before this function returns. Emotion stays unmeasured: the CPU
 //! stub is not a score. Nothing is committed.
@@ -70,7 +71,7 @@ pub fn run() -> RoundTrip {
     let model = tools.model.clone().expect("model");
     let rate = tools.sample_rate.expect("rate");
     let voice_note = format!(
-        "Piper pack {}. Deterministic scales noise_scale=0 noise_w=0 length_scale=1 sentence_silence=0. This is the A21 voice file on disk, not the Samantha reference.",
+        "Piper pack {}. Deterministic scales noise_scale=0 noise_w=0 length_scale=1 sentence_silence=0. This is the A21 voice file on disk, not the configured persona's reference.",
         locate::display_path(&model)
     );
     let mut session = match Session::spawn(&runtime, &model) {
@@ -384,13 +385,13 @@ fn score_ecapa(tools: &Tools, pcm: &[Vec<u8>], rate: u32) -> (Check, Option<Stri
             None,
         );
     };
-    let Some(reference) = tools.samantha_ref.clone() else {
+    let Some(reference) = tools.voice_ref.clone() else {
         return (
             gate::Check::unmeasured(
                 "ecapa",
                 ">",
                 Some(gate::ECAPA_MIN),
-                "GALION_SAMANTHA_REF is unset. No reference clip was loaded. No cosine was invented.",
+                "GALION_VOICE_REF is unset. GALION_SAMANTHA_REF is the deprecated fallback. No reference clip was loaded. No cosine was invented.",
             ),
             None,
         );
@@ -468,7 +469,7 @@ fn score_ecapa(tools: &Tools, pcm: &[Vec<u8>], rate: u32) -> (Check, Option<Stri
         Ok(mean) => (
             gate::judge_ecapa(
                 Some(mean),
-                "galion-ecapa mean cosine against GALION_SAMANTHA_REF. Temp wavs deleted.",
+                "galion-ecapa mean cosine against GALION_VOICE_REF. Temp wavs deleted.",
                 true,
             ),
             None,

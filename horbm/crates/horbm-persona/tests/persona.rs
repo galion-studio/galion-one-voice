@@ -63,14 +63,18 @@ fn fact(has_card: bool) -> MoveClaim<'static> {
 }
 
 #[test]
-fn development_default_is_samantha() {
+fn development_default_matches_the_shipped_file() {
     let cfg = BootConfig::shipped().unwrap();
     let shipped = Persona::load_configured(&examples(), &cfg).unwrap();
     let file = load_example(&format!("{}.toml", cfg.id()));
     assert_eq!(shipped, file);
-    assert_eq!(shipped.id(), "samantha");
-    let aria = load_example("aria.toml");
-    assert_eq!(aria.id(), "aria");
+    assert_eq!(shipped.id(), cfg.id());
+    let aria_path = examples().join("aria.toml");
+    let aria = Persona::load(&aria_path).unwrap();
+    assert_eq!(
+        aria.id(),
+        aria_path.file_stem().and_then(|stem| stem.to_str()).unwrap()
+    );
     assert_ne!(shipped.id(), aria.id());
     let text = std::fs::read_to_string(examples().join("aria.toml")).unwrap();
     assert!(text.contains("Inactive"));
@@ -329,13 +333,13 @@ fn load_roundtrip() {
 
 #[test]
 fn persona_stays_constant_while_the_moment_swings() {
-    let persona = load_example("samantha.toml");
+    let persona = load_example(&format!("{}.toml", BootConfig::shipped().unwrap().id()));
     let before = persona;
     let style = persona.style();
     let warmth = persona.trait_value("warmth").unwrap().to_bits();
     let mut core = EmotionCore::from_baseline(persona.baseline());
     let bits = core.baseline().identity_bits();
-    assert_eq!(core.baseline().persona_id(), "samantha");
+    assert_eq!(core.baseline().persona_id(), persona.id());
     assert_eq!(
         core.baseline().valence().to_bits(),
         persona.valence().to_bits()
@@ -633,11 +637,15 @@ fn comments(text: &str) -> Vec<&str> {
 }
 
 #[test]
-fn aria_keeps_warmth_and_adds_precision() {
-    let sam = load_example("samantha.toml");
-    let aria = load_example("aria.toml");
-    assert_eq!(sam.id(), "samantha");
-    assert_eq!(aria.id(), "aria");
+fn the_parked_file_keeps_warmth_and_adds_precision() {
+    let sam = load_example(&format!("{}.toml", BootConfig::shipped().unwrap().id()));
+    let aria_path = examples().join("aria.toml");
+    let aria = Persona::load(&aria_path).unwrap();
+    assert_eq!(sam.id(), BootConfig::shipped().unwrap().id());
+    assert_eq!(
+        aria.id(),
+        aria_path.file_stem().and_then(|stem| stem.to_str()).unwrap()
+    );
     assert!(sam.trait_value("precision").is_none());
     assert!(sam.trait_value("steadiness").is_none());
     assert!(aria.trait_value("precision").unwrap() > 0.8);

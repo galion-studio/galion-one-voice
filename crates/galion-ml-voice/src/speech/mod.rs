@@ -53,18 +53,26 @@
 //! Pitch, range, rate, and warmth are carried to the clone child and logged.
 //! No empathy sentence is added.
 //!
-//! Samantha's source-filter then shapes that Piper or flite PCM from the
-//! emotion-core moment, one 80 ms frame at a time, before the samples join
-//! the playback buffer. Neutral mouth controls leave the samples unchanged.
-//! Clone PCM is not rewritten. Any other persona skips the stage.
+//! The configured persona's source-filter then shapes that Piper or flite PCM
+//! from the emotion-core moment, one 80 ms frame at a time, before the samples
+//! join the playback buffer. Neutral mouth controls leave the samples unchanged.
+//! Clone PCM is not rewritten. Any other id skips the stage.
 
 use crate::{Audio, LanguageId, TtsEngine, VoiceError};
-use galion_source_filter::{applies_to, frame_samples, SourceFilter, PERSONA};
+use galion_source_filter::{applies_to, frame_samples, SourceFilter};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
 
 pub use galion_source_filter::{Breath, Frame as BreathFrame, MomentState, MouthControls, VoiceBaseline};
+
+/// Id from [`galion_emotion::persona_mood::configured_from_env`].
+/// Unset or unknown is an empty id, and the mouth gate matches that empty id.
+fn configured_mouth_id() -> String {
+    galion_emotion::persona_mood::configured_from_env()
+        .map(|profile| profile.persona.as_str().to_string())
+        .unwrap_or_default()
+}
 
 pub mod clause;
 pub mod clip_store;
@@ -376,7 +384,7 @@ pub struct SpeechStack {
     /// `turn_id < cancel` means the caller superseded this utterance.
     cancel: Option<Arc<AtomicU64>>,
     turn_id: u64,
-    /// Product persona for the mouth. Piper and flite start as Samantha.
+    /// Product persona for the mouth. Piper and flite start as the configured id.
     mouth_persona: String,
     mouth: SourceFilter,
 }
@@ -417,8 +425,8 @@ impl SpeechStack {
             spoken_id: None, spoken_label: String::new(), prewarmed: false, utterances: 0,
             cold_first_pcm_ms: None, warm_first_pcm_ms: None, last_first_pcm_ms: None,
             cancel: None, turn_id: 0,
-            mouth_persona: PERSONA.to_string(),
-            mouth: SourceFilter::samantha(SPEECH_RATE),
+            mouth_persona: configured_mouth_id(),
+            mouth: SourceFilter::rest(SPEECH_RATE),
         }
     }
 
@@ -559,7 +567,7 @@ impl SpeechStack {
     /// Register for the next utterance.
     ///
     /// The clone child receives the id. The mouth stage shapes Piper and flite
-    /// only when the id is `samantha`. Any other id leaves that PCM alone.
+    /// only when the id is the configured persona. Any other id leaves that PCM alone.
     pub fn set_persona(&mut self, persona: &str) {
         self.mouth_persona = persona.to_string();
         if let Some(Engine::Clone(t)) = self.engine.as_mut() {
@@ -573,13 +581,13 @@ impl SpeechStack {
     }
 
     /// Hold one mouth control vector for the next Piper or flite utterance.
-    /// Neutral leaves the PCM unchanged. Ignored unless the persona is Samantha.
+    /// Neutral leaves the PCM unchanged. Ignored unless the id is the configured persona.
     pub fn set_mouth_controls(&mut self, controls: MouthControls) {
         self.mouth.set_controls(controls);
     }
 
     /// Drive the mouth from one emotion-core frame. The baseline rest point
-    /// is not written. The tract anchors stay the Samantha formants.
+    /// is not written. The tract anchors stay the rest formants.
     pub fn set_mouth_moment(
         &mut self,
         voice: &VoiceBaseline,
@@ -596,10 +604,10 @@ impl SpeechStack {
         self.mouth.set_controls(MouthControls::from_breath_frame(frame));
     }
 
-    /// Shape Samantha's Piper or flite PCM in 80 ms frames. Clone audio never
+    /// Shape the configured persona's Piper or flite PCM in 80 ms frames. Clone audio never
     /// reaches here. The playback buffer is the caller's next `extend`.
     fn shape_mouth(&mut self, samples: &mut [f32], rate: u32) {
-        if !applies_to(&self.mouth_persona) {
+        if !applies_to(&self.mouth_persona, &configured_mouth_id()) {
             return;
         }
         self.mouth.set_sample_rate(rate);
@@ -799,7 +807,7 @@ impl SpeechStack {
     }
 
     /// Frame prosody (pause, loudness, pitch, speaking rate) is applied to
-    /// Piper and flite PCM here, then Samantha's source-filter. Clone PCM is
+    /// Piper and flite PCM here, then the configured persona's source-filter. Clone PCM is
     /// not rewritten after the child: the landed `.gqvoice` packet must equal
     /// the playback buffer. The clone worker applies `rate` to the PCM it writes.
     fn finish_audio(
@@ -1500,15 +1508,15 @@ mod tests {
     }
 
     /// The mouth runs after the TTS engine returns and before `SpeechStream`
-    /// extends the playback buffer. Neutral Samantha matches the engine.
-    /// Jarvis does not enter the stage. Flite uses the same gate.
+    /// extends the playback buffer. Neutral controls match the engine.
+    /// Another id does not enter the stage. Flite uses the same gate.
     #[test]
-    fn samantha_source_filter_sits_between_tts_and_the_playback_buffer() {
+    fn source_filter_sits_between_tts_and_the_playback_buffer() {
         let src: Vec<f32> = (0..1_920)
             .map(|i| ((i as f32) / 18.0).sin() * 0.2)
             .collect();
         let mut piper = SpeechStack::from_mock(Box::new(FixedTts(src.clone())));
-        assert_eq!(piper.mouth_persona(), "samantha");
+        assert_eq!(piper.mouth_persona(), super::configured_mouth_id());
         let neutral = piper.speak("Hello.").unwrap();
         assert_eq!(neutral.samples, src);
 
@@ -1521,11 +1529,11 @@ mod tests {
         assert_eq!(audio.samples.len(), src.len());
         assert!(
             audio.samples.iter().zip(&src).any(|(got, want)| (got - want).abs() > 1.0e-3),
-            "tension should move Samantha's Piper-class PCM"
+            "tension should move the Piper-class PCM"
         );
 
         let mut jarvis = SpeechStack::from_mock(Box::new(FixedTts(src.clone())));
-        jarvis.set_persona("jarvis");
+        jarvis.set_persona("parked-fixture");
         jarvis.set_mouth_controls(MouthControls {
             tension: 1.0,
             openness: 1.0,
@@ -1538,7 +1546,7 @@ mod tests {
         {
             let _staged = StagedFlite::arm(src.clone());
             let mut flite = SpeechStack::for_absent_piper_pack("flite");
-            assert_eq!(flite.mouth_persona(), "samantha");
+            assert_eq!(flite.mouth_persona(), super::configured_mouth_id());
             flite.set_mouth_controls(MouthControls {
                 openness: 1.0,
                 ..MouthControls::neutral()
@@ -1547,7 +1555,7 @@ mod tests {
             assert_eq!(shaped.sample_rate, SPEECH_RATE);
             assert!(
                 shaped.samples.iter().zip(&src).any(|(got, want)| (got - want).abs() > 1.0e-3),
-                "openness should move Samantha's flite PCM"
+                "openness should move the flite PCM"
             );
         }
         {

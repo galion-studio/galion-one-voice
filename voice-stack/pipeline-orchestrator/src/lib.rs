@@ -23,14 +23,6 @@ pub mod pipeline;
 pub mod ui;
 pub mod voice_traits;
 
-/// Doc-deprecated alias of [`voice_traits`].
-///
-/// Existing imports such as `samantha_traits::WaitGate` keep compiling.
-/// There is no `deprecated` attribute on this module.
-pub mod samantha_traits {
-    pub use crate::voice_traits::*;
-}
-
 pub use brain_route::{asr_to_piper_lines, RouterMouth};
 pub use clock::{
     BARGE_IN_MAX_MS, CAPTURE_FRAME_MS, CAPTURE_FRAME_SAMPLES, CAPTURE_RATE_HZ, CHUNK_CHANNEL_BOUND,

@@ -8,7 +8,8 @@ use std::process::Command;
 use std::time::Duration;
 
 use galion_samantha::{
-    default_home, health_json, parse_bind, reference_state, resolve_bind, serve_blocking,
+    default_home, health_json, parse_bind, reference_state, resolve_bind_choice, serve_blocking,
+    warning_text, warn_once,
     ModelReport, Paths, TickClock, DEFAULT_BIND, TICK_MS, VERSION,
 };
 
@@ -45,20 +46,33 @@ fn print_help() {
          local loopback supervisor. HORBM is not linked.\n\
          \n\
          commands:\n\
-           serve     bind GALION_SAMANTHA_WS (default {DEFAULT_BIND})\n\
+           serve     bind GALION_VOICE_WS (default {DEFAULT_BIND})\n\
            check     report public model files (--allow-missing exits 0 if absent)\n\
            open      start the user service if needed and print the one-dot URL\n\
            version   print the version\n\
          \n\
-         GALION_SAMANTHA_REF is a local file path. This program does not copy it."
+         GALION_VOICE_REF is a local file path. GALION_SAMANTHA_REF is a deprecated\n\
+         fallback and logs one warning. This program does not copy the file."
     );
 }
 
 fn configured_bind() -> String {
-    resolve_bind(
-        env::var("GALION_SAMANTHA_WS").ok().as_deref(),
-        env::var("GALION_SAMANTHA_BIND").ok().as_deref(),
-    )
+    let voice = env::var("GALION_VOICE_WS").ok();
+    let ws = env::var("GALION_SAMANTHA_WS").ok();
+    let bind = env::var("GALION_SAMANTHA_BIND").ok();
+    let (value, warning) = resolve_bind_choice(voice.as_deref(), ws.as_deref(), bind.as_deref());
+    if let Some(warning) = warning {
+        let old = if ws.is_some() {
+            "GALION_SAMANTHA_WS"
+        } else {
+            "GALION_SAMANTHA_BIND"
+        };
+        warn_once(
+            "GALION_VOICE_WS",
+            &warning_text("GALION_VOICE_WS", old, warning),
+        );
+    }
+    value
 }
 
 fn cmd_serve() -> i32 {
@@ -95,7 +109,16 @@ fn cmd_check(allow_missing: bool) -> i32 {
         }
     };
     let report = ModelReport::scan(&Paths::from_home(&home));
-    let reference = reference_state(env::var("GALION_SAMANTHA_REF").ok().as_deref());
+    let voice = env::var("GALION_VOICE_REF").ok();
+    let old = env::var("GALION_SAMANTHA_REF").ok();
+    let resolved = galion_samantha::resolve(voice.as_deref(), old.as_deref());
+    if let Some(warning) = resolved.warning {
+        warn_once(
+            "GALION_VOICE_REF",
+            &warning_text("GALION_VOICE_REF", "GALION_SAMANTHA_REF", warning),
+        );
+    }
+    let reference = reference_state(resolved.value.as_deref());
     let (clock, _handle) = TickClock::spawn();
     let body = health_json(&home, &clock, reference);
     println!("{body}");

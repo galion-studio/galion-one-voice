@@ -12,8 +12,8 @@ use std::time::Instant;
 use galion_emotion_core::{MomentState, AROUSAL, AXES, DOMINANCE, VEL_LIMIT};
 use horbm::{CardHit, CardLookup};
 use horbm_duplex::{
-    CoreAffect, Duplex, EarSense, Emotion, Floor, FrameOut, LoopEvent, Parts, Persona,
-    PlaybackEcho, ProsodyEar, SamanthaPersona, SpeakingBreath, FRAME_SAMPLES, SAMPLE_RATE,
+    ConfiguredPersona, CoreAffect, Duplex, EarSense, Emotion, Floor, FrameOut, LoopEvent, Parts,
+    Persona, PlaybackEcho, ProsodyEar, SpeakingBreath, FRAME_SAMPLES, SAMPLE_RATE,
 };
 use horbm_voice::Mouth;
 
@@ -389,14 +389,17 @@ struct Probes {
     buffer: u64,
 }
 
-fn probes(allocs: &dyn Fn() -> u64) -> Probes {
+fn probes(
+    allocs: &dyn Fn() -> u64,
+    baseline: galion_emotion_core::VoiceBaseline,
+) -> Probes {
     let tone = loud_frame();
     let mut sense = ProsodyEar::new();
     let before = allocs();
     let _ = sense.hear(&tone);
     let prosody = allocs().saturating_sub(before);
 
-    let mut emotion = CoreAffect::samantha();
+    let mut emotion = CoreAffect::from_baseline(baseline);
     let before = allocs();
     let _ = emotion.step(0);
     let emotion_n = allocs().saturating_sub(before);
@@ -457,7 +460,9 @@ pub fn ticks_for(minutes: u64) -> u64 {
 
 pub fn run(minutes: u64, allocs: &dyn Fn() -> u64, touch_mappings: &dyn Fn()) -> Report {
     let ticks = ticks_for(minutes);
-    let probed = probes(allocs);
+    let persona = ConfiguredPersona::development().expect("configured persona");
+    let baseline = persona.baseline();
+    let probed = probes(allocs, baseline);
     let line = Rc::new(RefCell::new(EMPTY));
     let buffer = Rc::new(RefCell::new(OutputBuffer::with_capacity_samples(
         usize::try_from(SAMPLE_RATE)
@@ -468,9 +473,9 @@ pub fn run(minutes: u64, allocs: &dyn Fn() -> u64, touch_mappings: &dyn Fn()) ->
     let mut duplex = Duplex::new(
         Parts {
             recognizer: Scripted::new(Rc::clone(&line)),
-            emotion: CoreAffect::samantha(),
+            emotion: CoreAffect::from_baseline(baseline),
             breath: SpeakingBreath,
-            persona: SamanthaPersona,
+            persona,
             mouth,
         },
         Kettle,

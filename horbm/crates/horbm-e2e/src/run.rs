@@ -105,12 +105,15 @@ struct LiveBreath {
 }
 
 impl LiveBreath {
-    fn samantha() -> Self {
-        Self {
-            lungs: Lungs::samantha(),
+    fn open(persona_id: &str) -> Result<Self, String> {
+        let lungs = Lungs::open(persona_id).map_err(|_| {
+            "the configured persona id is not a lungs id".to_string()
+        })?;
+        Ok(Self {
+            lungs,
             core: EmotionCore::at_rest(),
             planned: false,
-        }
+        })
     }
 }
 
@@ -275,11 +278,9 @@ pub fn run(sense: Sense) -> Result<Outcome, String> {
 
     let wav_removed = remove_tree(&tree.dir);
     let mut report = Report::new();
-    let persona_id = horbm::Persona::load_development()
-        .map_err(|err| err.to_string())?
-        .id()
-        .to_string();
-    report.push("persona", persona_id);
+    let persona = horbm::Persona::load_development().map_err(|err| err.to_string())?;
+    let persona_id = persona.id().to_string();
+    report.push("persona", persona_id.clone());
     report.push(
         "profile",
         if cfg!(debug_assertions) {
@@ -359,7 +360,8 @@ pub fn run(sense: Sense) -> Result<Outcome, String> {
     report.push("emotion", "real");
     report.push("mood_into_voice", "stub");
     let times = horbm_breath::measure_ticks();
-    let mut planned = Lungs::samantha();
+    let mut planned = Lungs::open(&persona_id)
+        .map_err(|_| "the configured persona id is not a lungs id".to_string())?;
     let plan = planned.plan_reply(KETTLE_REPLY, Drive::rest());
     report.push("breath", "real");
     report.push("breath_ns", times.p50_ns.to_string());
@@ -506,11 +508,12 @@ fn drive(
     let from_script = recognizer.is_script();
     let persona = horbm::Persona::load_development().map_err(|err| err.to_string())?;
     let emotion = CoreAffect::from_baseline(persona.baseline());
+    let breath = LiveBreath::open(persona.id())?;
     let mut duplex = Duplex::new(
         Parts {
             recognizer,
             emotion,
-            breath: LiveBreath::samantha(),
+            breath,
             persona: ConfiguredPersona::from_persona(persona),
             mouth: LiveMouth::open(kind)?,
         },
@@ -723,11 +726,12 @@ fn remove_tree(dir: &Path) -> bool {
 pub fn refuse_other_persona() -> Result<(), String> {
     let persona = horbm::Persona::load_development().map_err(|err| err.to_string())?;
     let emotion = CoreAffect::from_baseline(persona.baseline());
+    let breath = LiveBreath::open(persona.id())?;
     match Duplex::new(
         Parts {
             recognizer: EarRec::scripted(&[]),
             emotion,
-            breath: LiveBreath::samantha(),
+            breath,
             persona: Other,
             mouth: LiveMouth::open(EngineKind::Stub)?,
         },

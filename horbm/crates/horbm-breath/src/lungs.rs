@@ -43,14 +43,6 @@ pub struct Lungs {
 }
 
 impl Lungs {
-    /// Deprecated forward. Same body as [`Self::open`] for any configured id.
-    /// There is no `deprecated` attribute this round: the end-to-end runner
-    /// still calls this.
-    #[must_use]
-    pub fn samantha() -> Self {
-        Self::with_body()
-    }
-
     /// Any configured persona id. The body is the neutral constructor until a
     /// persona file carries breath values. This does not read that file.
     /// A blank or illegal token is [`BreathError::Persona`].

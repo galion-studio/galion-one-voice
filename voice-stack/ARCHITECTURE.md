@@ -159,7 +159,7 @@ English only, matching that persona file.
 
 This socket is new. [`docs/galion-voice-v2/SECURITY-EDGE.md`](../docs/galion-voice-v2/SECURITY-EDGE.md) still describes the phone path, and that path stays HTTP with no WebSocket. The nebula page uses `ws://127.0.0.1:8766` for a different schema. Neither is this protocol.
 
-Bind `127.0.0.1:7881` only (`SAMANTHA_WS_ADDR`). `GALION_SAMANTHA_WS` may set another `127.0.0.1` or `::1` port. Anything else, including `0.0.0.0`, refuses to start. Occupied neighbours, left alone:
+Bind `127.0.0.1:7881` only (`VOICE_WS_ADDR`). `GALION_VOICE_WS` may set another `127.0.0.1` or `::1` port. `GALION_SAMANTHA_WS` is a deprecated alias and logs one warning. Anything else, including `0.0.0.0`, refuses to start. Occupied neighbours, left alone:
 
 | Port | Already used by |
 |---|---|

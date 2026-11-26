@@ -1,5 +1,5 @@
 // Galion Voice — Perpetual Open MIT License. (c) 2026 Galion Labs.
-//! Source-filter stage for Samantha's mouth.
+//! Source-filter stage for the configured persona's mouth.
 //!
 //! Piper or flite has already made the waveform. This stage does not
 //! synthesise speech. On each 80 ms frame it shapes that waveform and then
@@ -17,10 +17,9 @@
 //! This crate does not compute a second Fant model. Neutral controls leave
 //! every sample alone.
 //!
-//! Samantha is the only persona the speech stack will run this on.
-//! [`applies_to`] is that check. The filter itself does not read the
-//! baseline's persona bytes: the emotion-core stand-in is not named
-//! Samantha, and the product persona is the stack's.
+//! The speech stack runs this stage only when the id matches the configured
+//! persona. [`applies_to`] is that exact check. The filter itself does not
+//! read the baseline's persona bytes.
 
 #![forbid(unsafe_code)]
 
@@ -31,7 +30,7 @@ mod filter;
 pub use controls::{
     applies_to, formant_q, frame_samples, tilt_db, MouthControls, TractBaseline, BREATHINESS_DB,
     BREATH_CENTER_HZ, BREATH_FLOOR, F1_Q0, F1_SHIFT, F2_Q0, F2_SHIFT, FORMANT_DB, FRAME_MS,
-    NASAL_DEPTH_DB, NASAL_HI_HZ, NASAL_LO_HZ, NEUTRAL_TOLERANCE, OPEN_Q_SCALE, PERSONA, TENSION_DB,
+    NASAL_DEPTH_DB, NASAL_HI_HZ, NASAL_LO_HZ, NEUTRAL_TOLERANCE, OPEN_Q_SCALE, TENSION_DB,
     TILT_PIVOT_HZ,
 };
 pub use cost::{measure_frame_cost, FrameReport};

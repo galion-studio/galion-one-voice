@@ -49,10 +49,6 @@ pub use glottis::{controls, open_quotient_from_rd, Articulation, GlottisError};
 pub use lungs::Lungs;
 pub use plan::{plan_pauses, Pause, PauseWhy, Plan};
 
-/// Deprecated forward. The development id string. [`Lungs::open`] does not
-/// compare against it.
-pub const SAMANTHA: &str = "samantha";
-
 /// Symphony clock. Same value as `LOCKS.toml` `clock.frame_ms`.
 pub const FRAME_MS: u32 = 80;
 pub const FRAME_S: f32 = 0.08;
@@ -396,7 +392,7 @@ pub fn measure_inhale() -> TickTimes {
 }
 
 fn measure_loop(batches: u32, batch: u32, inhale: bool) -> TickTimes {
-    let mut lungs = Lungs::samantha();
+    let mut lungs = Lungs::open("configured").expect("bench id");
     let drive = Drive::rest();
     let mut buf = [0.0f32; INHALE_SAMPLES];
     if inhale {

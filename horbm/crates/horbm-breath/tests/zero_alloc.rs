@@ -52,7 +52,7 @@ fn a_tick_a_plan_and_an_inhale_allocate_nothing() {
     assert_eq!(TICK_ALLOC_BUDGET, 0);
     drop(probe);
 
-    let mut lungs = Lungs::samantha();
+    let mut lungs = Lungs::open("northwind").expect("fixture");
     let drive = Drive::rest();
     let mut noise = [0.0f32; INHALE_SAMPLES];
     let mut pauses = [Pause::marker(); PAUSE_CAP];

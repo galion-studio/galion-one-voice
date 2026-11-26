@@ -44,9 +44,8 @@ mod piper_mouth;
 mod vosk_ear;
 
 pub use backchannel::{
-    listener_on_bus, persona_allows, render, Affect, Backchannel, BackchannelConfig,
-    BackchannelKind, ListenCue, ListenMood, BACKCHANNEL_ENV, BACKCHANNEL_GAP_MS,
-    BACKCHANNEL_PEAK_MAX, SPEECH_PEAK_MIN,
+    listener_on_bus, render, Affect, Backchannel, BackchannelConfig, BackchannelKind, ListenCue,
+    ListenMood, BACKCHANNEL_ENV, BACKCHANNEL_GAP_MS, BACKCHANNEL_PEAK_MAX, SPEECH_PEAK_MIN,
 };
 pub use brain::{HorbmTurn, SpokenLine, TurnBrain};
 pub use clock::{
@@ -59,9 +58,8 @@ pub use energy::{EnergyEar, EnergyGate, GateEvent};
 pub use horbm::Pad;
 pub use lexicon::{is_listed_backchannel, listed_backchannels};
 pub use moment_voice::{
-    aria_baseline, instant, is_aria, is_samantha, render_tone, samantha_baseline, shape_sentence,
-    BreathPlace, MomentView, MomentVoice, Rendered, VoiceControls, AFFECT_TO_VOICE_FRAMES,
-    AFFECT_TO_VOICE_MS, ARIA_PARKED,
+    instant, render_tone, shape_sentence, BreathPlace, MomentView, MomentVoice, Rendered,
+    VoiceControls, AFFECT_TO_VOICE_FRAMES, AFFECT_TO_VOICE_MS,
 };
 pub use mouth::{AudioFrame, BackchannelPlay, FakeMouth, Mouth, MouthPull};
 pub use turn::{TickEvent, TickOut, TurnMsg, VoiceLoop};

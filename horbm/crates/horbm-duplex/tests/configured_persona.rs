@@ -347,12 +347,10 @@ fn shipped_dev_style_matches_the_old_consts() {
     assert!((style.brevity - 0.55).abs() < 1.0e-5, "{}", style.brevity);
     assert!((style.warmth - 0.8).abs() < 1.0e-5, "{}", style.warmth);
     assert_eq!(style.max_sentences, 2);
-    assert!((horbm_duplex::SAMANTHA_BREVITY - 0.55).abs() < 1.0e-6);
-    assert!((horbm_duplex::SAMANTHA_WARMTH - 0.8).abs() < 1.0e-6);
-    assert_eq!(horbm_duplex::SAMANTHA_SENTENCES, 2);
-    assert!((style.brevity - horbm_duplex::SAMANTHA_BREVITY).abs() < 1.0e-5);
-    assert!((style.warmth - horbm_duplex::SAMANTHA_WARMTH).abs() < 1.0e-5);
-    assert_eq!(style.max_sentences, horbm_duplex::SAMANTHA_SENTENCES);
+    let seated = horbm_duplex::ConfiguredPersona::from_persona(persona);
+    assert!((seated.style().brevity - style.brevity).abs() < 1.0e-5);
+    assert!((seated.style().warmth - style.warmth).abs() < 1.0e-5);
+    assert_eq!(seated.style().max_sentences, style.max_sentences);
 }
 
 #[test]

@@ -8,7 +8,7 @@ use galion_emotion_core::{
 };
 use horbm_breath::{
     plan_pauses, stamp_intent, BreathError, Drive, Lungs, Pause, PauseWhy, INHALE_SAMPLES,
-    NEUTRAL_RMS, PAUSE_CAP, SAMANTHA,
+    NEUTRAL_RMS, PAUSE_CAP,
 };
 
 fn pauses(text: &str, drive: Drive) -> Vec<Pause> {
@@ -29,16 +29,12 @@ fn long_reply() -> String {
 
 #[test]
 fn lungs_open_accepts_any_configured_id() {
-    let named = Lungs::samantha();
-    let dev = Lungs::open(SAMANTHA).expect("development id");
-    let aria = Lungs::open("aria").expect("aria");
-    let north = Lungs::open("northwind").expect("northwind");
+    let named = Lungs::open("northwind").expect("fixture");
+    let parked = Lungs::open("parked-fixture").expect("fixture");
     let hyphen = Lungs::open("north-wind").expect("hyphen");
-    assert_eq!(named.volume(), dev.volume());
-    assert_eq!(dev.volume(), aria.volume());
-    assert_eq!(aria.volume(), north.volume());
-    assert_eq!(north.volume(), hyphen.volume());
-    assert!(matches!(Lungs::open("Samantha"), Err(BreathError::Persona)));
+    assert_eq!(named.volume(), parked.volume());
+    assert_eq!(parked.volume(), hyphen.volume());
+    assert!(matches!(Lungs::open("Northwind"), Err(BreathError::Persona)));
     assert!(matches!(Lungs::open(""), Err(BreathError::Persona)));
     assert!(matches!(Lungs::open("  "), Err(BreathError::Persona)));
     assert!(matches!(Lungs::open("9lives"), Err(BreathError::Persona)));
@@ -48,7 +44,7 @@ fn lungs_open_accepts_any_configured_id() {
     ));
 
     let drive = Drive::rest();
-    let mut from_forward = Lungs::samantha();
+    let mut from_forward = Lungs::open("northwind").expect("fixture");
     let mut from_id = Lungs::open("northwind").expect("northwind");
     for i in 0..6 {
         let speaking = i % 2 == 0;
@@ -63,7 +59,7 @@ fn lungs_open_accepts_any_configured_id() {
 fn pitch_and_persona_bytes_do_not_change_the_drive() {
     let mut low = VoiceBaseline::standin();
     low.pitch_centre_hz = 110.0;
-    low.persona = *b"samantha\0\0\0\0\0\0\0\0";
+    low.persona = *b"northwind\0\0\0\0\0\0\0";
     let mut high = low;
     high.pitch_centre_hz = 440.0;
     high.voice = *b"other-voice\0\0\0\0\0";
@@ -112,7 +108,7 @@ fn the_lungs_do_not_copy_the_stand_in_volume() {
         core.step(&IntentMsg::hold(i * FRAME_MS)).unwrap();
     }
     assert!((core.inside().breath.volume - 0.85).abs() < 1.0e-5);
-    let mut lungs = Lungs::samantha();
+    let mut lungs = Lungs::open("northwind").expect("fixture");
     let frame = lungs.tick(Drive::from_core(&core), false);
     assert!((frame.volume - VOLUME_REST).abs() < 1.0e-4);
     assert_ne!(
@@ -187,7 +183,7 @@ fn the_pause_buffer_reports_truncation() {
 
 #[test]
 fn speech_pressure_falls_and_the_lungs_sample_matches() {
-    let mut lungs = Lungs::samantha();
+    let mut lungs = Lungs::open("northwind").expect("fixture");
     let mut first = None;
     let mut last = None;
     let mut saw_inhale = false;
@@ -251,7 +247,7 @@ fn a_higher_drive_takes_more_breaths_in_the_same_run() {
 }
 
 fn speech_breaks(drive: Drive) -> u32 {
-    let mut lungs = Lungs::samantha();
+    let mut lungs = Lungs::open("northwind").expect("fixture");
     let mut breaks = 0u32;
     let mut prev = BreathPhase::Rest;
     for _ in 0..700 {
@@ -275,7 +271,7 @@ fn lower_health_inhales_less_deeply() {
 }
 
 fn peak_volume(drive: Drive) -> f32 {
-    let mut lungs = Lungs::samantha();
+    let mut lungs = Lungs::open("northwind").expect("fixture");
     let mut peak = 0.0f32;
     for _ in 0..20 {
         let frame = lungs.tick(drive, true);
@@ -293,7 +289,7 @@ fn the_same_ticks_produce_the_same_frames_and_the_same_inhale() {
     let right = run_pair();
     assert_eq!(left.0, right.0);
     assert_eq!(left.1, right.1);
-    let mut quiet = Lungs::samantha();
+    let mut quiet = Lungs::open("northwind").expect("fixture");
     let frame = quiet.tick(Drive::rest(), false);
     assert_eq!(frame.phase, BreathPhase::Rest);
     let mut buf = [1.0f32; 8];
@@ -302,7 +298,7 @@ fn the_same_ticks_produce_the_same_frames_and_the_same_inhale() {
 }
 
 fn run_pair() -> (Vec<horbm_breath::Frame>, Vec<f32>) {
-    let mut lungs = Lungs::samantha();
+    let mut lungs = Lungs::open("northwind").expect("fixture");
     let drive = Drive::rest();
     let mut frames = Vec::new();
     let mut noise = Vec::new();
@@ -321,7 +317,7 @@ fn run_pair() -> (Vec<horbm_breath::Frame>, Vec<f32>) {
 
 #[test]
 fn inhale_noise_is_windowed_deterministic_and_near_the_neutral_rms() {
-    let mut lungs = Lungs::samantha();
+    let mut lungs = Lungs::open("northwind").expect("fixture");
     let frame = lungs.tick(Drive::rest(), true);
     assert_eq!(frame.phase, BreathPhase::Inhale);
     let mut buf = [0.0f32; INHALE_SAMPLES];
@@ -339,7 +335,7 @@ fn inhale_noise_is_windowed_deterministic_and_near_the_neutral_rms() {
         "rms {rms} target {NEUTRAL_RMS}"
     );
 
-    let mut again = Lungs::samantha();
+    let mut again = Lungs::open("northwind").expect("fixture");
     let _ = again.tick(Drive::rest(), true);
     let mut second = [0.0f32; INHALE_SAMPLES];
     again.write_inhale(&mut second);
@@ -348,7 +344,7 @@ fn inhale_noise_is_windowed_deterministic_and_near_the_neutral_rms() {
 
 #[test]
 fn a_nan_drive_does_not_poison_the_frame() {
-    let mut lungs = Lungs::samantha();
+    let mut lungs = Lungs::open("northwind").expect("fixture");
     let drive = Drive {
         arousal: f32::NAN,
         energy: f32::NAN,
@@ -366,7 +362,7 @@ fn a_nan_drive_does_not_poison_the_frame() {
 
 #[test]
 fn the_source_filter_reads_this_breath_and_noise_is_the_exhale() {
-    let mut lungs = Lungs::samantha();
+    let mut lungs = Lungs::open("northwind").expect("fixture");
     let mut saw_speech = false;
     for _ in 0..30 {
         let frame = lungs.tick(Drive::rest(), true);
@@ -395,7 +391,7 @@ fn the_source_filter_reads_this_breath_and_noise_is_the_exhale() {
 
 #[test]
 fn stamp_writes_breath_and_leaves_the_verb() {
-    let mut lungs = Lungs::samantha();
+    let mut lungs = Lungs::open("northwind").expect("fixture");
     let frame = lungs.tick(Drive::rest(), true);
     let mut msg = IntentMsg::steady(0);
     let verb = msg.verb;
@@ -409,7 +405,7 @@ fn stamp_writes_breath_and_leaves_the_verb() {
 
 #[test]
 fn quiet_recovery_stays_finite_and_near_rest() {
-    let mut lungs = Lungs::samantha();
+    let mut lungs = Lungs::open("northwind").expect("fixture");
     for _ in 0..40 {
         let _ = lungs.tick(Drive::rest(), true);
     }
@@ -424,7 +420,7 @@ fn quiet_recovery_stays_finite_and_near_rest() {
 
 #[test]
 fn frame_plans_once_and_then_ticks() {
-    let mut lungs = Lungs::samantha();
+    let mut lungs = Lungs::open("northwind").expect("fixture");
     let core = EmotionCore::at_rest();
     let first = lungs.frame(&core, true, Some("The kettle is on the hob."));
     let second = lungs.frame(&core, true, Some("The kettle is on the hob."));

@@ -42,21 +42,6 @@ fn new_matches_the_old_numbers_bit_for_bit() {
 }
 
 #[test]
-#[allow(deprecated)]
-fn deprecated_alias_matches_persona_inner() {
-    use horbm_inner::SamanthaInner;
-
-    let fresh = PersonaInner::new();
-    let alias = SamanthaInner::new();
-    assert_eq!(fresh.care().to_bits(), alias.care().to_bits());
-    assert_eq!(fresh.curiosity().to_bits(), alias.curiosity().to_bits());
-    assert_eq!(fresh.help().to_bits(), alias.help().to_bits());
-    assert_eq!(fresh.expect().to_bits(), alias.expect().to_bits());
-    assert_eq!(fresh.persona_id(), alias.persona_id());
-    assert_eq!(alias.persona_id(), "");
-}
-
-#[test]
 fn with_home_takes_any_persona() {
     let home = northwind();
     assert_ne!(home.care.to_bits(), CARE_HOME.to_bits());
@@ -137,7 +122,7 @@ fn home_from_baseline_is_pure() {
     }
 
     let dumped = format!("{once:?}").to_ascii_lowercase();
-    for name in ["samantha", "aria", "northwind", "standin"] {
+    for name in ["northwind", "parked-fixture", "standin"] {
         assert!(!dumped.contains(name), "{dumped}");
     }
     let life = PersonaInner::with_home(once);

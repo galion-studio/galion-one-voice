@@ -17,14 +17,6 @@
 /// Share of brevity taken off a rate of 1. Same knob as the persona style hook.
 pub const BREVITY_RATE: f32 = 0.15;
 
-/// Historical development speaker id.
-///
-/// The live loop loads the configured persona and does not read this
-/// constant. [`crate::SamanthaPersona`] still returns it so soak compiles.
-/// Other crates have their own constants with this name. There is no
-/// `deprecated` attribute this round.
-pub const DEV_PERSONA: &str = "samantha";
-
 /// Partial hypotheses can be replaced. The final is the text to keep.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum HypothesisKind {

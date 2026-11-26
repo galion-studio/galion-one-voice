@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Galion Labs
-//! Persona-tone lint for Samantha.
+//! Persona-tone lint for the configured persona.
 //!
 //! The rules are the speech patterns in `docs/galion-voice-v2/personas/SAMANTHA.md`:
 //! short spoken lines, no help-desk phrasing, no canned empathy, no whisper,
@@ -132,7 +132,7 @@ pub fn lint_reply(reply: &str, user: Option<&str>) -> Vec<Hit> {
     if lower.contains("whisper") {
         hits.push(Hit {
             rule: "whisper",
-            detail: "Samantha does not whisper. The line would be spoken at a normal level.".into(),
+            detail: "The configured persona does not whisper. The line would be spoken at a normal level.".into(),
         });
     }
     for phrase in CANNED {

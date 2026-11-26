@@ -82,12 +82,10 @@ pub struct VoiceRefChoice<'a> {
     pub warning: Option<&'static str>,
 }
 
-/// Alias helper. Doc-deprecated forward. No `#[deprecated]` attribute.
-///
-/// [`VOICE_REF_ENV`] wins. This old name is read only when the new variable
-/// is unset. When both are set and differ, the new one wins and `warning`
-/// is one line.
-pub const SAMANTHA_REF_ENV: &str = "GALION_SAMANTHA_REF";
+/// [`VOICE_REF_ENV`] wins. The old variable is read only when the new
+/// variable is unset. When both are set and differ, the new one wins and
+/// `warning` is one line.
+const LEGACY_VOICE_REF_ENV: &str = "GALION_SAMANTHA_REF";
 
 const FALLBACK_WARNING: &str = "GALION_SAMANTHA_REF is a fallback; set GALION_VOICE_REF";
 
@@ -128,7 +126,7 @@ fn nonempty(value: Option<&str>) -> Option<&str> {
 /// once, with no spawned thread and no cache lock.
 pub fn voice_ref_from_env() -> Option<std::path::PathBuf> {
     let new_raw = nonempty_os(VOICE_REF_ENV);
-    let old_raw = nonempty_os(SAMANTHA_REF_ENV);
+    let old_raw = nonempty_os(LEGACY_VOICE_REF_ENV);
     let (chosen, warning) = match (&new_raw, &old_raw) {
         (None, None) => return None,
         (Some(value), None) => (value, None),
@@ -157,9 +155,4 @@ fn nonempty_os(key: &str) -> Option<std::ffi::OsString> {
     } else {
         Some(raw)
     }
-}
-
-/// Doc-deprecated forward of [`voice_ref_from_env`].
-pub fn samantha_ref_from_env() -> Option<std::path::PathBuf> {
-    voice_ref_from_env()
 }

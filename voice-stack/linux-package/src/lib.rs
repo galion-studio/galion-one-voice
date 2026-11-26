@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Galion Labs
 
-//! Loopback supervisor for the local Samantha companion.
+//! Loopback supervisor for the configured persona's local companion.
 //!
 //! This crate does not implement HORBM. Mood stays at the resting pad
 //! `{arousal: 0.3, valence: 0.25, dominance: 0.5}` until a reply engine is
@@ -172,15 +172,101 @@ pub fn reference_state(value: Option<&str>) -> &'static str {
     }
 }
 
-/// `GALION_SAMANTHA_WS` wins. `GALION_SAMANTHA_BIND` is the older name.
-/// An empty value is ignored. The fallback is [`DEFAULT_BIND`] (`127.0.0.1:7881`).
-pub fn resolve_bind(ws: Option<&str>, bind: Option<&str>) -> String {
-    for value in [ws, bind] {
-        if let Some(text) = value.map(str::trim).filter(|text| !text.is_empty()) {
-            return text.to_string();
+/// Why a deprecated name was read.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AliasWarning {
+    /// The new name is missing. The value came from an older name.
+    Fallback,
+    /// Both names are set and their values differ. The new value is kept.
+    Conflict,
+}
+
+/// The value to use, and at most one warning.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Resolution {
+    pub value: Option<String>,
+    pub warning: Option<AliasWarning>,
+}
+
+/// Pure alias. `new` wins. `old` is the fallback. Empty strings count as set.
+pub fn resolve(new: Option<&str>, old: Option<&str>) -> Resolution {
+    match (new, old) {
+        (None, None) => Resolution {
+            value: None,
+            warning: None,
+        },
+        (Some(value), None) => Resolution {
+            value: Some(value.to_string()),
+            warning: None,
+        },
+        (None, Some(value)) => Resolution {
+            value: Some(value.to_string()),
+            warning: Some(AliasWarning::Fallback),
+        },
+        (Some(value), Some(previous)) if value == previous => Resolution {
+            value: Some(value.to_string()),
+            warning: None,
+        },
+        (Some(value), Some(_)) => Resolution {
+            value: Some(value.to_string()),
+            warning: Some(AliasWarning::Conflict),
+        },
+    }
+}
+
+/// One line. Names the new variable.
+pub fn warning_text(new_name: &str, old_name: &str, warning: AliasWarning) -> String {
+    match warning {
+        AliasWarning::Fallback => format!("{old_name} is deprecated; set {new_name}"),
+        AliasWarning::Conflict => {
+            format!("{old_name} is deprecated; {new_name} and {old_name} differ; using {new_name}")
         }
     }
-    DEFAULT_BIND.to_string()
+}
+
+/// `GALION_VOICE_WS` wins, then `GALION_SAMANTHA_WS`, then `GALION_SAMANTHA_BIND`.
+/// Blank values are ignored. The fallback is [`DEFAULT_BIND`].
+pub fn resolve_bind(voice: Option<&str>, ws: Option<&str>, bind: Option<&str>) -> String {
+    let (value, _) = resolve_bind_choice(voice, ws, bind);
+    value
+}
+
+/// Same choice as [`resolve_bind`], plus at most one warning.
+pub fn resolve_bind_choice(
+    voice: Option<&str>,
+    ws: Option<&str>,
+    bind: Option<&str>,
+) -> (String, Option<AliasWarning>) {
+    let voice = blank_as_none(voice);
+    let ws = blank_as_none(ws);
+    let bind = blank_as_none(bind);
+    let first = resolve(voice, ws);
+    if let Some(value) = first.value {
+        return (value, first.warning);
+    }
+    let oldest = resolve(None, bind);
+    (
+        oldest
+            .value
+            .unwrap_or_else(|| DEFAULT_BIND.to_string()),
+        oldest.warning,
+    )
+}
+
+fn blank_as_none(value: Option<&str>) -> Option<&str> {
+    value.map(str::trim).filter(|text| !text.is_empty())
+}
+
+/// Print `line` once per `key`.
+pub fn warn_once(key: &str, line: &str) {
+    use std::collections::HashSet;
+    use std::sync::{Mutex, OnceLock};
+    static SEEN: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
+    let seen = SEEN.get_or_init(|| Mutex::new(HashSet::new()));
+    let mut guard = seen.lock().unwrap_or_else(|err| err.into_inner());
+    if guard.insert(key.to_string()) {
+        eprintln!("{line}");
+    }
 }
 
 pub fn parse_bind(raw: &str) -> Result<SocketAddr, String> {
@@ -196,7 +282,7 @@ pub fn parse_bind(raw: &str) -> Result<SocketAddr, String> {
         .map_err(|_| format!("bind address {raw} is not a numeric host:port"))?;
     if !is_loopback(addr.ip()) {
         return Err(format!(
-            "bind address {raw} is not loopback; Samantha stays on 127.0.0.1 or ::1"
+            "bind address {raw} is not loopback; the configured persona stays on 127.0.0.1 or ::1"
         ));
     }
     Ok(addr)
@@ -461,11 +547,16 @@ fn find_header_end(buf: &[u8]) -> Option<usize> {
 }
 
 fn reference_from_env() -> &'static str {
-    // Leak nothing: read the env once per request and return only the state word.
-    // The string is copied into an owned check so we don't store the path.
-    let owned = std::env::var("GALION_SAMANTHA_REF").ok();
-    // reference_state needs a lifetime. Use a thread-local? Simpler: match here.
-    match owned.as_deref() {
+    let voice = std::env::var("GALION_VOICE_REF").ok();
+    let old = std::env::var("GALION_SAMANTHA_REF").ok();
+    let resolved = resolve(voice.as_deref(), old.as_deref());
+    if let Some(warning) = resolved.warning {
+        warn_once(
+            "GALION_VOICE_REF",
+            &warning_text("GALION_VOICE_REF", "GALION_SAMANTHA_REF", warning),
+        );
+    }
+    match resolved.value.as_deref() {
         None => "unset",
         Some(value) => reference_state(Some(value)),
     }
@@ -547,10 +638,17 @@ fn write_response(
 }
 
 pub fn default_home() -> Result<PathBuf, String> {
-    if let Ok(home) = std::env::var("GALION_SAMANTHA_HOME") {
-        if !home.is_empty() {
-            return Ok(PathBuf::from(home));
-        }
+    let voice = std::env::var("GALION_VOICE_HOME").ok();
+    let old = std::env::var("GALION_SAMANTHA_HOME").ok();
+    let resolved = resolve(voice.as_deref(), old.as_deref());
+    if let Some(warning) = resolved.warning {
+        warn_once(
+            "GALION_VOICE_HOME",
+            &warning_text("GALION_VOICE_HOME", "GALION_SAMANTHA_HOME", warning),
+        );
+    }
+    if let Some(home) = resolved.value.filter(|home| !home.is_empty()) {
+        return Ok(PathBuf::from(home));
     }
     let home = std::env::var("HOME").map_err(|_| "HOME is unset".to_string())?;
     Ok(PathBuf::from(home).join(".local/share/galion/samantha"))
@@ -601,11 +699,45 @@ mod tests {
         assert_eq!(DEFAULT_BIND, "127.0.0.1:7881");
         assert!(!DEFAULT_BIND.contains("7879"));
         assert_eq!(
-            resolve_bind(Some("127.0.0.1:7882"), Some("127.0.0.1:9")),
+            resolve_bind(Some("127.0.0.1:7882"), Some("127.0.0.1:9"), None),
             "127.0.0.1:7882"
         );
-        assert_eq!(resolve_bind(Some("  "), Some("127.0.0.1:9")), "127.0.0.1:9");
-        assert_eq!(resolve_bind(None, None), DEFAULT_BIND);
+        assert_eq!(
+            resolve_bind(Some("  "), Some("127.0.0.1:9"), None),
+            "127.0.0.1:9"
+        );
+        assert_eq!(
+            resolve_bind(None, None, Some("127.0.0.1:9")),
+            "127.0.0.1:9"
+        );
+        assert_eq!(resolve_bind(None, None, None), DEFAULT_BIND);
+    }
+
+    #[test]
+    fn new_wins() {
+        let only_new = resolve(Some("voice"), None);
+        assert_eq!(only_new.value.as_deref(), Some("voice"));
+        assert!(only_new.warning.is_none());
+        let same = resolve(Some("voice"), Some("voice"));
+        assert_eq!(same.value.as_deref(), Some("voice"));
+        assert!(same.warning.is_none());
+    }
+
+    #[test]
+    fn old_is_fallback_and_warns_once() {
+        let choice = resolve(None, Some("old"));
+        assert_eq!(choice.value.as_deref(), Some("old"));
+        assert_eq!(choice.warning, Some(AliasWarning::Fallback));
+        let line = warning_text("GALION_VOICE_WS", "GALION_SAMANTHA_WS", AliasWarning::Fallback);
+        assert_eq!(line.lines().count(), 1);
+        assert!(line.contains("GALION_VOICE_WS"));
+    }
+
+    #[test]
+    fn none_is_none() {
+        let choice = resolve(None, None);
+        assert!(choice.value.is_none());
+        assert!(choice.warning.is_none());
     }
 
     #[test]

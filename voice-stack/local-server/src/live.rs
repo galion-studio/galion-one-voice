@@ -1250,7 +1250,7 @@ struct GatedPipeline {
 }
 
 impl GatedPipeline {
-    fn new(gate: Arc<galion_sam_orch::samantha_traits::WaitGate>) -> Self {
+    fn new(gate: Arc<galion_sam_orch::voice_traits::WaitGate>) -> Self {
         let mouth = GatedMouth {
             inner: galion_sam_orch::FakeTts::gated(
                 vec![2_000; crate::audio::SPEAKER_FRAME_SAMPLES],
@@ -1358,7 +1358,7 @@ impl Pipeline for GatedPipeline {
 /// The first slice is the fake mouth's opening PCM. The gate holds the rest.
 #[doc(hidden)]
 pub fn gated_mouth_factory(
-    gate: Arc<galion_sam_orch::samantha_traits::WaitGate>,
+    gate: Arc<galion_sam_orch::voice_traits::WaitGate>,
 ) -> Arc<dyn Fn() -> Box<dyn Pipeline> + Send + Sync> {
     Arc::new(move || Box::new(GatedPipeline::new(Arc::clone(&gate))))
 }
@@ -1776,7 +1776,7 @@ mod tests {
 
     #[test]
     fn first_slice_is_queued_before_the_fake_mouth_finishes() {
-        let gate = galion_sam_orch::samantha_traits::WaitGate::new();
+        let gate = galion_sam_orch::voice_traits::WaitGate::new();
         let mut pipe = GatedPipeline::new(Arc::clone(&gate));
         let started = std::time::Instant::now();
         let mut out = pipe.push_text("hello", 0);
@@ -1818,7 +1818,7 @@ mod tests {
 
     #[test]
     fn stop_unblocks_the_gated_fake_mouth() {
-        let gate = galion_sam_orch::samantha_traits::WaitGate::new();
+        let gate = galion_sam_orch::voice_traits::WaitGate::new();
         let mut pipe = GatedPipeline::new(gate);
         let mut out = pipe.push_text("hello", 0);
         let feed = out.feed.as_mut().expect("stream");

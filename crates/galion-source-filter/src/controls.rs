@@ -2,15 +2,12 @@
 //! Moment deltas, kept off the steady tract.
 //!
 //! Every gain and every shift below is a knob. None of them is a z against
-//! Samantha's own neutral, and none is a hertz figure copied out of a paper.
-//! The rest formants are the Burg medians already written down for this
-//! speaker. They are anchors for the shift, not a new measurement.
+//! a speaker's own neutral, and none is a hertz figure copied out of a paper.
+//! The rest formants are the Burg medians already written down. They are
+//! anchors for the shift, not a new measurement.
 
 use galion_emotion_core::{Breath, BreathPhase, MomentState, VoiceBaseline};
 use horbm_breath::{controls, Articulation, Drive, Frame};
-
-/// The only persona this mouth shapes.
-pub const PERSONA: &str = "samantha";
 
 /// Symphony clock. Same constant as `galion-emotion-core` and `LOCKS.toml`.
 pub const FRAME_MS: u32 = 80;
@@ -56,9 +53,9 @@ const TILT_Q: f32 = 0.7;
 const NASAL_Q: f32 = 5.0;
 const SECTION_EPS: f32 = 1.0e-4;
 
-/// True only for the exact persona id `samantha`.
-pub fn applies_to(persona: &str) -> bool {
-    persona == PERSONA
+/// True only when `id` is exactly `configured_id`.
+pub fn applies_to(id: &str, configured_id: &str) -> bool {
+    id == configured_id
 }
 
 /// Samples in one 80 ms frame at `sample_rate`. Zero when the rate is zero.
@@ -85,7 +82,7 @@ pub fn formant_q(base_q: f32, openness: f32) -> f32 {
 
 /// Where F1 and F2 sit for this speaker when nothing is felt.
 ///
-/// `SAMANTHA` uses the Burg medians from the articulation layer note
+/// [`Self::REST`] uses the Burg medians from the articulation layer note
 /// (F1 431.512 Hz, F2 1857.581 Hz). Bandwidths are not taken from that note.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct TractBaseline {
@@ -94,7 +91,7 @@ pub struct TractBaseline {
 }
 
 impl TractBaseline {
-    pub const SAMANTHA: Self = Self {
+    pub const REST: Self = Self {
         f1_hz: 431.512,
         f2_hz: 1857.581,
     };
@@ -366,12 +363,13 @@ mod tests {
     }
 
     #[test]
-    fn persona_gate_is_exact() {
-        assert!(applies_to("samantha"));
-        assert!(!applies_to("Samantha"));
-        assert!(!applies_to("jarvis"));
-        assert!(!applies_to("samantha "));
-        assert!(!applies_to(""));
+    fn applies_to_is_the_configured_id_only() {
+        assert!(applies_to("northwind", "northwind"));
+        assert!(!applies_to("Northwind", "northwind"));
+        assert!(!applies_to("northwind ", "northwind"));
+        assert!(!applies_to("parked-fixture", "northwind"));
+        assert!(!applies_to("", "northwind"));
+        assert!(!applies_to("northwind", ""));
     }
 
     #[test]

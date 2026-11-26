@@ -251,8 +251,9 @@ async fn dot_page_shows_the_configured_name() {
         "page={page}"
     );
     let lower = page.to_ascii_lowercase();
-    assert!(!lower.contains("samantha"), "page={page}");
-    assert!(!lower.contains("aria"), "page={page}");
+    for stem in persona_file_stems() {
+        assert!(!lower.contains(&stem), "page={page} stem={stem}");
+    }
     assert!(!page.contains("GALION_DOT_NAME"), "page={page}");
     running.handle.shutdown().await;
     server.shutdown();
@@ -260,19 +261,37 @@ async fn dot_page_shows_the_configured_name() {
 
 #[test]
 fn reference_env_points_at_a_local_file() {
-    let path = std::env::temp_dir().join("samantha-core-s09-not-audio.txt");
+    let path = std::env::temp_dir().join("voice-core-s09-not-audio.txt");
     std::fs::write(&path, b"not audio").unwrap();
     let prev_new = std::env::var_os(VOICE_REF_ENV);
-    let prev_old = std::env::var_os(galion_sam_orch::samantha_traits::SAMANTHA_REF_ENV);
-    std::env::remove_var(galion_sam_orch::samantha_traits::SAMANTHA_REF_ENV);
+    let prev_old = std::env::var_os("GALION_SAMANTHA_REF");
+    std::env::remove_var("GALION_SAMANTHA_REF");
     std::env::set_var(VOICE_REF_ENV, &path);
     let got = galion_sam_orch::voice_ref_from_env().expect("path");
     assert_eq!(got, path);
     std::env::remove_var(VOICE_REF_ENV);
     assert!(galion_sam_orch::voice_ref_from_env().is_none());
     restore_var(VOICE_REF_ENV, prev_new);
-    restore_var(galion_sam_orch::samantha_traits::SAMANTHA_REF_ENV, prev_old);
+    restore_var("GALION_SAMANTHA_REF", prev_old);
     let _ = std::fs::remove_file(path);
+}
+
+fn persona_file_stems() -> Vec<String> {
+    let dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../horbm/crates/horbm-persona/personas");
+    let mut stems = Vec::new();
+    let entries = std::fs::read_dir(&dir).unwrap_or_else(|err| panic!("{}: {err}", dir.display()));
+    for entry in entries {
+        let path = entry.expect("persona entry").path();
+        if path.extension().and_then(|ext| ext.to_str()) != Some("toml") {
+            continue;
+        }
+        if let Some(stem) = path.file_stem().and_then(|stem| stem.to_str()) {
+            stems.push(stem.to_ascii_lowercase());
+        }
+    }
+    assert!(!stems.is_empty(), "no persona files in {}", dir.display());
+    stems
 }
 
 fn restore_var(key: &str, prev: Option<std::ffi::OsString>) {

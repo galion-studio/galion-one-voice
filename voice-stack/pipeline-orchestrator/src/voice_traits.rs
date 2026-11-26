@@ -45,13 +45,10 @@ pub struct VoiceRefChoice<'a> {
     pub warning: Option<&'static str>,
 }
 
-/// Alias helper. Doc-deprecated forwards. No `#[deprecated]` attribute:
-/// other crates still name the old module and the old function.
-///
-/// [`VOICE_REF_ENV`] wins. [`SAMANTHA_REF_ENV`] is read only when the new
+/// [`VOICE_REF_ENV`] wins. The old variable is read only when the new
 /// variable is unset. When both are set and differ, the new one wins and
 /// `warning` is one line.
-pub const SAMANTHA_REF_ENV: &str = "GALION_SAMANTHA_REF";
+const LEGACY_VOICE_REF_ENV: &str = "GALION_SAMANTHA_REF";
 
 const FALLBACK_WARNING: &str = "GALION_SAMANTHA_REF is a fallback; set GALION_VOICE_REF";
 
@@ -92,7 +89,7 @@ fn nonempty(value: Option<&str>) -> Option<&str> {
 /// cache lock.
 pub fn voice_ref_from_env() -> Option<PathBuf> {
     let new_raw = nonempty_os(VOICE_REF_ENV);
-    let old_raw = nonempty_os(SAMANTHA_REF_ENV);
+    let old_raw = nonempty_os(LEGACY_VOICE_REF_ENV);
     let (chosen, warning) = match (&new_raw, &old_raw) {
         (None, None) => return None,
         (Some(value), None) => (value, None),
@@ -121,11 +118,6 @@ fn nonempty_os(key: &str) -> Option<std::ffi::OsString> {
     } else {
         Some(raw)
     }
-}
-
-/// Doc-deprecated forward of [`voice_ref_from_env`].
-pub fn samantha_ref_from_env() -> Option<PathBuf> {
-    voice_ref_from_env()
 }
 
 /// One capture quantum. Default size is the Vosk frame.
@@ -760,7 +752,7 @@ mod tests {
     #[test]
     fn reference_env_name_is_the_runtime_path() {
         assert_eq!(VOICE_REF_ENV, "GALION_VOICE_REF");
-        assert_eq!(SAMANTHA_REF_ENV, "GALION_SAMANTHA_REF");
+        assert_eq!(LEGACY_VOICE_REF_ENV, "GALION_SAMANTHA_REF");
         let chosen = voice_ref_choice(Some("new"), Some("old"));
         assert_eq!(chosen.value, Some("new"));
         assert_eq!(chosen.warning, Some(DIFFER_WARNING));

@@ -107,11 +107,12 @@ pub fn run_stand_in_for(persona_file: Option<&std::path::Path>) -> TurnReport {
 
 #[cfg(test)]
 mod tests {
-    use horbm_duplex::open_persona;
+    use horbm_duplex::{open_persona, Persona};
 
     #[test]
-    fn aria_is_refused() {
-        assert!(open_persona("aria").is_err());
-        assert!(open_persona("samantha").is_ok());
+    fn another_id_is_refused() {
+        let configured = horbm_duplex::ConfiguredPersona::development().expect("configured");
+        assert!(open_persona(configured.id()).is_ok());
+        assert!(open_persona("northwind").is_err());
     }
 }

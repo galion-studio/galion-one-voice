@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Galion Labs
-//! Shared types for the Swarm 16 Samantha path.
+//! Shared types for the configured persona's voice path.
 //!
 //! This crate does not open a microphone, a speaker, a model, or a socket.
 //! It does not vendor crate `horbm`. The turn fields match the owner's
@@ -37,7 +37,7 @@ pub const ASR_FRAME_SAMPLES: usize = 320;
 
 /// Loopback socket for this stack. Not 7878 (one-dot HTTP), 7879 (hard loop),
 /// 7880 (clone worker), 8642 (Hermes), or 8766 (nebula feed).
-pub const SAMANTHA_WS_ADDR: &str = "127.0.0.1:7881";
+pub const VOICE_WS_ADDR: &str = "127.0.0.1:7881";
 
 #[cfg(test)]
 mod tests {

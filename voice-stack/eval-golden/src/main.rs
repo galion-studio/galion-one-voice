@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Galion Labs
-//! `eval-golden` — Samantha golden scripts, persona lint, and the Piper
+//! `eval-golden` — golden scripts for the configured persona, persona lint, and the Piper
 //! round-trip. A missing scorer is UNMEASURED. A measured miss is FAIL.
 //! Neither one is turned into a pass.
 
@@ -121,7 +121,7 @@ fn flag(args: &[String], name: &str) -> Option<String> {
 
 fn print_help() {
     println!(
-        "eval-golden — Samantha quality gates\n\
+        "eval-golden — quality gates for the configured persona\n\
          \n\
          Commands:\n\
            report [--out FILE] [--strict]    golden scripts plus the Piper round-trip\n\
@@ -131,7 +131,8 @@ fn print_help() {
          \n\
          PASS, FAIL, and UNMEASURED are separate. An absent scorer is not a pass.\n\
          ECAPA is a strict greater-than 0.7057. WER must be <= 0.018. emotion_match >= 0.83.\n\
-         Reference audio is read only from GALION_SAMANTHA_REF and is never written into the repo.\n\
+         Reference audio is read from GALION_VOICE_REF. GALION_SAMANTHA_REF is a\n\
+         deprecated fallback. The file is never written into the repo.\n\
          --strict exits 1 when a measured check fails. Default exit is 0 after an honest report."
     );
 }

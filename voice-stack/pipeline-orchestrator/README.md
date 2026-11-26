@@ -3,9 +3,9 @@
 
 # S09 pipeline orchestrator (`galion-sam-orch`)
 
-The real-time conversation loop for Samantha. The directory is `voice-stack/pipeline-orchestrator` and the package is `galion-sam-orch`, which is the path the swarm workspace map lists. Mic audio comes in, an endpointer closes the turn, a reply engine answers, and speech goes out in sentence chunks. If you start talking while she is thinking or speaking, `AudioOut::stop` runs on that voice start.
+The real-time conversation loop for the configured persona. The directory is `voice-stack/pipeline-orchestrator` and the package is `galion-sam-orch`, which is the path the swarm workspace map lists. Mic audio comes in, an endpointer closes the turn, a reply engine answers, and speech goes out in sentence chunks. If you start talking while the persona is thinking or speaking, `AudioOut::stop` runs on that voice start.
 
-This crate is its own Cargo workspace. It is not a member of the Galion Voice workspace. It does not link Piper, Vosk, Chatterbox, or `horbm`. Those stay behind the traits in `samantha_traits`.
+This crate is its own Cargo workspace. It is not a member of the Galion Voice workspace. It does not link Piper, Vosk, Chatterbox, or `horbm`. Those stay behind the traits in `voice_traits`.
 
 ## What it reuses
 
@@ -21,9 +21,9 @@ The numbers and the stage shapes come from the tree that already runs:
 | Phases idle / listening / thinking / speaking | `galion_console::bus::OrbMode` | `Handle::subscribe` is the in-process feed. The HTML dot polls `/state` every 80 ms. |
 | Barge-in ceiling 200 ms | `LOCKS.toml` `[gates] barge_in_max_ms` | `AudioOut::stop` does not wait on the chunk channel. The fake-speaker time is what the tests print. |
 | Loopback only | `galion-render` bind check, `deploy/systemd/templates/galion-voice-stage.service` | The dot refuses any non-loopback bind. This sector does not install or edit a unit. |
-| Samantha reference | `GALION_SAMANTHA_REF` | A path, read by a TTS adapter at runtime. This crate only checks that the path is a file. |
+| Voice reference | `GALION_VOICE_REF` | A path, read by a TTS adapter at runtime. `GALION_SAMANTHA_REF` is a deprecated fallback and logs one warning. This crate only checks that the path is a file. |
 
-`ReplyEngine` is the brain seam in the `samantha_traits` module. `HorbmReply` adapts a type that matches `horbm::Brain::turn(&str) -> TurnOut`. `Brain::open(memory_db, knowledge_dir, cases)` is recorded on `BrainOpen` and returns an error here: crate `horbm` is not in this tree, and this loop does not call Hermes. The memory pin is `galion-studio/galion-knowledge` rev `761a7f225304fc010379219e5b88c6669dd48f40`. The resting pad is `{ arousal: 0.3, valence: 0.25, dominance: 0.5 }`. `HoldMood` keeps the last pad. It does not invent a curve. Emotion is that pad on the TTS call, not words added to the reply.
+`ReplyEngine` is the brain seam in the `voice_traits` module. `HorbmReply` adapts a type that matches `horbm::Brain::turn(&str) -> TurnOut`. `Brain::open(memory_db, knowledge_dir, cases)` is recorded on `BrainOpen` and returns an error here: crate `horbm` is not in this tree, and this loop does not call Hermes. The memory pin is `galion-studio/galion-knowledge` rev `761a7f225304fc010379219e5b88c6669dd48f40`. The resting pad is `{ arousal: 0.3, valence: 0.25, dominance: 0.5 }`. `HoldMood` keeps the last pad. It does not invent a curve. Emotion is that pad on the TTS call, not words added to the reply.
 
 ## Bounded channels
 
@@ -66,13 +66,11 @@ cargo run --bin galion-sam-orch -- --ui
 
 Reference clip, not committed, not opened by this binary:
 
-```bat
-set GALION_SAMANTHA_REF=G:\galion\refs\samantha.wav
+```bash
+export GALION_VOICE_REF="$HOME/refs/voice.wav"
 ```
 
-```bash
-export GALION_SAMANTHA_REF="$HOME/refs/samantha.wav"
-```
+`GALION_SAMANTHA_REF` is a deprecated fallback. When only that name is set, the process logs one warning and uses it.
 
 `galion-sam-orch` prints `reference_present=true` when that path is a file, and `false` when it is unset or missing. It does not read the audio. A missing file still runs the fake mouth.
 
@@ -85,4 +83,4 @@ export GALION_SAMANTHA_REF="$HOME/refs/samantha.wav"
 - `horbm::Brain` and any card lookup
 - A live microphone, Vosk process, Piper process, or Chatterbox worker
 - A hardware speaker measurement (the cancel time is `AudioOut::cancel` on the in-memory speaker)
-- Samantha's voice. No reference clip is in git.
+- The configured persona's voice. No reference clip is in git.

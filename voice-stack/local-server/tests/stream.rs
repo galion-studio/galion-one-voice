@@ -201,6 +201,7 @@ async fn companion_socket() {
             assert!(resp.body.contains("\"ok\":true"));
             assert!(resp.body.contains(SCHEMA));
             assert!(resp.body.contains("\"loopback\":true"));
+            assert!(resp.body.contains("\"voice_ref\":\"unset\""));
             assert!(resp.body.contains("\"samantha_ref\":\"unset\""));
             assert!(resp.body.contains("\"mouth\":\"hold\""));
             assert!(resp.body.contains("\"voice\":\"none\""));
@@ -482,7 +483,7 @@ async fn galion_one_text_returns_speaker_audio() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn first_slice_is_sent_before_the_fake_mouth_finishes() {
-    let gate = galion_sam_orch::samantha_traits::WaitGate::new();
+    let gate = galion_sam_orch::voice_traits::WaitGate::new();
     let running = start(
         "127.0.0.1:0".parse().unwrap(),
         ui_dir(),

@@ -168,14 +168,13 @@ fn sense_off_still_hears_the_words_and_drops_the_ear() {
 }
 
 #[test]
-#[allow(deprecated)]
-fn deprecated_names_forward_to_the_installed_persona() {
+fn persona_nudge_answers_from_the_installed_persona() {
     let mut brain = Brain::with_cards(Cards, None);
-    assert!(std::ptr::eq(brain.samantha(), brain.persona_inner()));
     let forwarded = brain
-        .samantha_nudge("where is the kettle", None, true)
-        .expect("forward");
+        .persona_nudge("where is the kettle", None, true)
+        .expect("nudge");
     assert_eq!(forwarded.verb, Verb::Answer);
+    let _ = brain.persona_inner();
 }
 
 #[test]

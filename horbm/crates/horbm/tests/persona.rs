@@ -77,8 +77,33 @@ fn scratch(name: &str) -> PathBuf {
     ))
 }
 
-fn samantha() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../horbm-persona/personas/samantha.toml")
+fn development_file() -> PathBuf {
+    let id = Persona::load_development()
+        .expect("development persona")
+        .id()
+        .to_string();
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../horbm-persona/personas")
+        .join(format!("{id}.toml"))
+}
+
+fn shipped_id() -> String {
+    Persona::load_development()
+        .expect("development persona")
+        .id()
+        .to_string()
+}
+
+fn rewrite_shipped(text: &str, new_id: &str) -> String {
+    let shipped = Persona::load_development().expect("development persona");
+    text.replace(
+        &format!("id = \"{}\"", shipped.id()),
+        &format!("id = \"{new_id}\""),
+    )
+    .replace(
+        &format!("voice = \"{}\"", shipped.voice()),
+        &format!("voice = \"{new_id}\""),
+    )
 }
 
 fn boot_err(
@@ -137,7 +162,7 @@ fn invalid_persona_refused_at_boot() {
     );
     assert!(!knowledge.exists());
 
-    let text = std::fs::read_to_string(samantha())
+    let text = std::fs::read_to_string(development_file())
         .unwrap()
         .replace("never_fabricate = true", "never_fabricate = false");
     let lied = root.join("lied.toml");
@@ -159,10 +184,10 @@ fn boot_installs_any_valid_persona_file() {
     let root = scratch("northwind");
     std::fs::create_dir(&root).unwrap();
     let knowledge = root.join("knowledge");
-    let text = std::fs::read_to_string(samantha())
-        .unwrap()
-        .replace("id = \"samantha\"", "id = \"northwind\"")
-        .replace("voice = \"samantha\"", "voice = \"northwind\"");
+    let text = rewrite_shipped(
+        &std::fs::read_to_string(development_file()).unwrap(),
+        "northwind",
+    );
     let file = root.join("northwind.toml");
     std::fs::write(&file, text).unwrap();
     let explicit = Brain::boot(&root, &knowledge, &root.join("cases"), Some(&file)).unwrap();
@@ -176,15 +201,15 @@ fn boot_installs_any_valid_persona_file() {
 }
 
 #[test]
-fn boot_without_a_file_loads_samantha() {
+fn boot_without_a_file_loads_development_file() {
     let _env = hold(None, None);
     let root = scratch("none");
     std::fs::create_dir(&root).unwrap();
     let knowledge = root.join("knowledge");
     let brain = Brain::boot(&root, &knowledge, &root.join("cases"), None).unwrap();
     assert!(!knowledge.exists());
-    assert_eq!(brain.persona().id(), "samantha");
-    assert_eq!(brain.emotion().baseline().persona_id(), "samantha");
+    assert_eq!(brain.persona().id(), shipped_id());
+    assert_eq!(brain.emotion().baseline().persona_id(), shipped_id());
     assert_ne!(
         brain.emotion().baseline().identity_bits(),
         VoiceBaseline::standin().identity_bits()
@@ -194,23 +219,30 @@ fn boot_without_a_file_loads_samantha() {
     assert_eq!(brain.persona().unknown_line(), UNKNOWN_REPLY);
     assert_eq!(UNKNOWN_LINE, UNKNOWN_REPLY);
     let open = Brain::open(&root, &knowledge, &root.join("cases"));
-    assert_eq!(open.persona().id(), "samantha");
+    assert_eq!(open.persona().id(), shipped_id());
     let cards = Brain::with_cards(NoCards, None);
-    assert_eq!(cards.persona().id(), "samantha");
-    assert_ne!(cards.persona().id(), "aria");
+    assert_eq!(cards.persona().id(), shipped_id());
+    let parked_path =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../horbm-persona/personas/aria.toml");
+    let parked = Persona::load(&parked_path).expect("parked persona file");
+    assert_eq!(
+        parked.id(),
+        parked_path.file_stem().and_then(|stem| stem.to_str()).expect("stem")
+    );
+    assert_ne!(cards.persona().id(), parked.id());
     let _ = std::fs::remove_dir_all(&root);
 }
 
 #[test]
-fn boot_loads_samantha_and_keeps_her_while_the_moment_swings() {
+fn boot_loads_the_development_persona_and_keeps_it_while_the_moment_swings() {
     let _env = hold(None, None);
     let root = scratch("sam");
     std::fs::create_dir(&root).unwrap();
     let knowledge = root.join("knowledge");
-    let mut brain = Brain::boot(&root, &knowledge, &root.join("cases"), Some(&samantha())).unwrap();
+    let mut brain = Brain::boot(&root, &knowledge, &root.join("cases"), Some(&development_file())).unwrap();
     assert!(!knowledge.exists());
-    assert_eq!(brain.persona().id(), "samantha");
-    assert_eq!(brain.emotion().baseline().persona_id(), "samantha");
+    assert_eq!(brain.persona().id(), shipped_id());
+    assert_eq!(brain.emotion().baseline().persona_id(), shipped_id());
     assert_eq!(brain.persona().unknown_line(), UNKNOWN_REPLY);
     assert_eq!(brain.inner().care(0).unwrap().token_str(), "heard");
     let before = *brain.persona();
@@ -232,13 +264,13 @@ fn boot_loads_samantha_and_keeps_her_while_the_moment_swings() {
     };
     assert_eq!(brain.admit_move(card), MoveVerdict::Allow);
 
-    let text = std::fs::read_to_string(samantha())
+    let text = std::fs::read_to_string(development_file())
         .unwrap()
         .replace("care = \"heard\"", "care = \"focus\"");
     let file = root.join("focus.toml");
     std::fs::write(&file, text).unwrap();
     let focused = Brain::boot(&root, &knowledge, &root.join("cases"), Some(&file)).unwrap();
-    assert_eq!(focused.persona().id(), "samantha");
+    assert_eq!(focused.persona().id(), shipped_id());
     assert_eq!(focused.inner().care(0).unwrap().token_str(), "focus");
     assert_eq!(focused.inner().want(0).unwrap().token_str(), "answer");
     assert_ne!(
@@ -253,11 +285,8 @@ fn boot_installs_the_persona_the_env_names() {
     let root = scratch("env");
     let personas = root.join("personas");
     std::fs::create_dir_all(&personas).unwrap();
-    let shipped_text = std::fs::read_to_string(samantha()).unwrap();
-    let text = shipped_text
-        .replace("id = \"samantha\"", "id = \"cedar\"")
-        .replace("voice = \"samantha\"", "voice = \"cedar\"")
-        .replace("valence = 0.28", "valence = 0.0");
+    let shipped_text = std::fs::read_to_string(development_file()).unwrap();
+    let text = rewrite_shipped(&shipped_text, "cedar").replace("valence = 0.28", "valence = 0.0");
     assert_ne!(text, shipped_text);
     std::fs::write(personas.join("cedar.toml"), text).unwrap();
     let _env = hold(Some("cedar"), Some(&personas));
@@ -265,8 +294,8 @@ fn boot_installs_the_persona_the_env_names() {
     let brain = Brain::boot(&root, &knowledge, &root.join("cases"), None).unwrap();
     assert!(!knowledge.exists());
     assert_eq!(brain.persona().id(), "cedar");
-    let shipped = Persona::load(&samantha()).unwrap();
-    assert_eq!(shipped.id(), "samantha");
+    let shipped = Persona::load(&development_file()).unwrap();
+    assert_eq!(shipped.id(), shipped_id());
     assert_ne!(brain.persona().id(), shipped.id());
     assert_ne!(
         brain.emotion().baseline().identity_bits(),
@@ -278,7 +307,7 @@ fn boot_installs_the_persona_the_env_names() {
     );
     let cards = Brain::try_with_cards(NoCards, None).expect("configured persona");
     assert_eq!(cards.persona().id(), "cedar");
-    let explicit = Brain::boot(&root, &knowledge, &root.join("cases"), Some(&samantha())).unwrap();
+    let explicit = Brain::boot(&root, &knowledge, &root.join("cases"), Some(&development_file())).unwrap();
     assert_eq!(explicit.persona().id(), shipped.id());
     assert_eq!(
         explicit.emotion().baseline().identity_bits(),
@@ -330,10 +359,10 @@ fn boot_refuses_when_nothing_is_configured() {
     .unwrap();
     assert_eq!(boot_unset(&root, &knowledge), PersonaError::Unreadable);
 
-    let mismatched = std::fs::read_to_string(samantha())
-        .unwrap()
-        .replace("id = \"samantha\"", "id = \"maple\"")
-        .replace("voice = \"samantha\"", "voice = \"maple\"");
+    let mismatched = rewrite_shipped(
+        &std::fs::read_to_string(development_file()).unwrap(),
+        "maple",
+    );
     std::fs::write(root.join("cedar.toml"), mismatched).unwrap();
     assert_eq!(
         boot_unset(&root, &knowledge),
