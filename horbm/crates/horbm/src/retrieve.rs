@@ -23,6 +23,13 @@
 //! file with FTS5. This thread does not mix that file into the scan. A hit
 //! whose pool is not memory is dropped from the person search.
 //!
+//! Learned rows are diary lines the learn pack already wrote.
+//! [`RetrievalThread::set_learned`] keeps them on the worker. A granted
+//! thread inserts each one and rebuilds the scan when a key file is set.
+//! The stored source starts with `learned;`. Withdraw keeps the rows and
+//! drops the diary. The next grant inserts them again. Deny keeps the rows
+//! and opens nothing.
+//!
 //! `LOCKS.toml` `[consent] remember = "deny"`. `[horbm] remember_grant` names
 //! the only grant string. This module does not read the lock file. The
 //! default matches it. `GALION_HORBM_REMEMBER=grant` is the explicit grant
@@ -30,8 +37,9 @@
 //! the HKB1 file, opened only while that grant holds.
 //!
 //! Do not call [`RetrievalThread::ask`], [`RetrievalThread::ask_wait`],
-//! [`RetrievalThread::set_remember`], or [`RetrievalThread::cell`] from
-//! `Heartbeat::step`. That step does not allocate and does not block.
+//! [`RetrievalThread::set_remember`], [`RetrievalThread::set_learned`], or
+//! [`RetrievalThread::cell`] from `Heartbeat::step`. That step does not
+//! allocate and does not block.
 //! [`RetrievalThread::try_cell`] is the non-waiting read for a conductor
 //! thread between frames. A `None` means the lock was busy, not that the
 //! cell is empty.
@@ -48,11 +56,19 @@ use horbm_brain::{
     DiaryArena, DiaryRow, DiaryScan, KeyPrefault, ScanHit, ScanPool, StoredKeys, DIARY_DIM,
 };
 
+use crate::learn::LearnedRow;
 use crate::UNKNOWN_REPLY;
 use crate::WINDOWS_KNOWLEDGE_DIR;
 
 /// Published hits. Same cap as `horbm_memory::MAX_HITS`.
 pub const MEMORY_HIT_CAP: usize = 4;
+
+/// Learned rows kept on this thread.
+///
+/// A longer [`RetrievalThread::set_learned`] list keeps the newest
+/// [`crate::LearnedRow::date`] values. The number of rows that did
+/// not fit is `dropped N learned rows` in [`RetrievalThread::last_error`].
+pub const LEARNED_ROW_CAP: usize = 256;
 
 /// Where a hit came from. The two pools are not fused into one score.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -319,12 +335,19 @@ enum Command {
         grant: bool,
         done: Option<Sender<()>>,
     },
+    // Sent through `wait`, so an ask that is still queued does not replace it.
+    Learned {
+        rows: Vec<LearnedRow>,
+        done: Option<Sender<()>>,
+    },
 }
 
 impl Command {
     fn take_done(self) -> Option<Sender<()>> {
         match self {
-            Command::Ask { done, .. } | Command::Consent { done, .. } => done,
+            Command::Ask { done, .. }
+            | Command::Consent { done, .. }
+            | Command::Learned { done, .. } => done,
         }
     }
 }
@@ -384,8 +407,9 @@ impl RetrievalThread {
         }
     }
 
-    /// Queue an ask. Does not wait. A newer ask or a consent change replaces
-    /// an ask that has not started.
+    /// Queue an ask. Does not wait. A newer ask, a consent change, or
+    /// [`RetrievalThread::set_learned`] replaces an ask that has not started.
+    /// An ask leaves a learned command sitting in the slot.
     pub fn ask(&self, text: impl Into<String>, turn_id: u64, epoch: u64) {
         self.enqueue(Command::Ask {
             text: text.into(),
@@ -411,13 +435,29 @@ impl RetrievalThread {
     }
 
     /// Grant or withdraw. Withdraw drops the RAM diary and publishes an idle
-    /// cell. Grant opens an in-memory diary and loads the fixture or the card
-    /// directory from the config passed to [`RetrievalThread::spawn`].
+    /// cell. Learned rows stay on the worker. Grant opens an in-memory diary,
+    /// loads the fixture or the card directory from the config passed to
+    /// [`RetrievalThread::spawn`], and inserts those learned rows again.
     pub fn set_remember(&self, grant: bool) -> Result<(), RetrieveError> {
         self.wait(Command::Consent { grant, done: None })
     }
 
-    /// Last diary error. Cleared on a successful grant and on withdraw.
+    /// Replace the learned rows this thread recalls.
+    ///
+    /// The worker keeps `rows`. When recall is already granted it rebuilds
+    /// the diary once and, when a key file is set, the scan. Each row is
+    /// inserted with `diary_add`. The stored source is `learned;` plus
+    /// [`crate::LearnedRow::source`]. An empty list clears the rows.
+    /// More than [`LEARNED_ROW_CAP`] keeps the newest dates and records the drop in
+    /// [`RetrievalThread::last_error`]. A denied thread stores the rows and
+    /// does not open the diary. An ask does not replace this command.
+    pub fn set_learned(&self, rows: Vec<LearnedRow>) -> Result<(), RetrieveError> {
+        self.wait(Command::Learned { rows, done: None })
+    }
+
+    /// Last diary error. Cleared on a successful grant, on withdraw, and when
+    /// a learned update drops nothing. A list over [`LEARNED_ROW_CAP`] sets
+    /// `dropped N learned rows`.
     pub fn last_error(&self) -> Option<String> {
         self.shared
             .last_error
@@ -429,7 +469,9 @@ impl RetrievalThread {
     fn wait(&self, mut cmd: Command) -> Result<(), RetrieveError> {
         let (tx, rx) = mpsc::channel();
         match &mut cmd {
-            Command::Ask { done, .. } | Command::Consent { done, .. } => *done = Some(tx),
+            Command::Ask { done, .. }
+            | Command::Consent { done, .. }
+            | Command::Learned { done, .. } => *done = Some(tx),
         }
         self.enqueue(cmd);
         rx.recv()
@@ -438,6 +480,14 @@ impl RetrievalThread {
 
     fn enqueue(&self, cmd: Command) {
         let mut slot = self.shared.slot.lock().expect("retrieval mailbox");
+        // The learned command was sent through `wait`. An ask must not take
+        // its slot, or `set_learned` would return before the rows were stored.
+        if matches!(cmd, Command::Ask { .. })
+            && matches!(slot.as_ref(), Some(Command::Learned { .. }))
+        {
+            signal(cmd.take_done());
+            return;
+        }
         if let Some(old) = slot.replace(cmd) {
             signal(old.take_done());
         }
@@ -481,7 +531,7 @@ fn thread_main(
     ready: Sender<Result<(), RetrieveError>>,
 ) {
     let store = if config.remember {
-        match open_store(&config) {
+        match rebuild(&config, &[]) {
             Ok(opened) => Some(opened),
             Err(err) => {
                 let _ = ready.send(Err(err));
@@ -499,6 +549,8 @@ fn thread_main(
 
 fn worker(mut store: Option<Opened>, config: RetrievalConfig, shared: &Shared) {
     // One hit buffer for the life of the worker. A query reuses it.
+    // Learned rows live here, not on `Shared`. An ask does not read them.
+    let mut learned: Vec<LearnedRow> = Vec::new();
     let mut hit_buf = [ScanHit::default(); MEMORY_HIT_CAP];
     while let Some(cmd) = recv(shared) {
         match cmd {
@@ -514,7 +566,11 @@ fn worker(mut store: Option<Opened>, config: RetrievalConfig, shared: &Shared) {
                 signal(done);
             }
             Command::Consent { grant, done } => {
-                apply_consent(shared, &mut store, &config, grant);
+                apply_consent(shared, &mut store, &config, &learned, grant);
+                signal(done);
+            }
+            Command::Learned { rows, done } => {
+                apply_learned(shared, &mut store, &config, &mut learned, rows);
                 signal(done);
             }
         }
@@ -536,7 +592,7 @@ fn publish_ask(
     match asked(opened, hit_buf, text, turn_id, epoch) {
         Ok(cell) => publish(shared, cell, false),
         Err(err) => {
-            *shared.last_error.lock().expect("retrieval error") = Some(err.message);
+            set_last_error(shared, Some(err.message));
             publish(shared, MemoryHitCell::miss(turn_id, epoch, text, 0), false);
         }
     }
@@ -546,25 +602,68 @@ fn apply_consent(
     shared: &Shared,
     store: &mut Option<Opened>,
     config: &RetrievalConfig,
+    learned: &[LearnedRow],
     grant: bool,
 ) {
     if grant {
         if store.is_none() {
-            match open_store(config) {
+            match rebuild(config, learned) {
                 Ok(opened) => {
                     *store = Some(opened);
-                    *shared.last_error.lock().expect("retrieval error") = None;
+                    set_last_error(shared, None);
                 }
-                Err(err) => {
-                    *shared.last_error.lock().expect("retrieval error") = Some(err.message);
-                }
+                Err(err) => set_last_error(shared, Some(err.message)),
             }
         }
         return;
     }
     *store = None;
-    *shared.last_error.lock().expect("retrieval error") = None;
+    set_last_error(shared, None);
     publish(shared, MemoryHitCell::idle(), true);
+}
+
+fn apply_learned(
+    shared: &Shared,
+    store: &mut Option<Opened>,
+    config: &RetrievalConfig,
+    learned: &mut Vec<LearnedRow>,
+    rows: Vec<LearnedRow>,
+) {
+    let (kept, dropped) = keep_newest(rows);
+    let drop_error = (dropped > 0).then(|| format!("dropped {dropped} learned rows"));
+    // Deny stores the list and does not open a diary.
+    if store.is_none() {
+        *learned = kept;
+        if let Some(message) = drop_error {
+            set_last_error(shared, Some(message));
+        }
+        return;
+    }
+    match rebuild(config, &kept) {
+        Ok(opened) => {
+            *store = Some(opened);
+            *learned = kept;
+            set_last_error(shared, drop_error);
+        }
+        Err(err) => set_last_error(shared, Some(err.message)),
+    }
+}
+
+/// Keep at most [`LEARNED_ROW_CAP`] rows. Newest [`crate::LearnedRow::date`] wins.
+/// Equal dates keep the later input rows: the sort is stable, and the
+/// oldest prefix is what gets dropped. Does not panic.
+fn keep_newest(mut rows: Vec<LearnedRow>) -> (Vec<LearnedRow>, usize) {
+    if rows.len() <= LEARNED_ROW_CAP {
+        return (rows, 0);
+    }
+    let dropped = rows.len() - LEARNED_ROW_CAP;
+    rows.sort_by(|left, right| left.date.cmp(&right.date));
+    let kept = rows.split_off(dropped);
+    (kept, dropped)
+}
+
+fn set_last_error(shared: &Shared, message: Option<String>) {
+    *shared.last_error.lock().expect("retrieval error") = message;
 }
 
 struct Opened {
@@ -572,8 +671,8 @@ struct Opened {
     store: horbm_memory::Store,
     /// Card ids that must not be published. Also stored as `allow: false`.
     blocked: BTreeSet<String>,
-    /// Built once at setup when a key file is configured. Absent on the
-    /// lexical path.
+    /// Rebuilt when the diary is opened or learned rows change. Absent on
+    /// the lexical path.
     scan: Option<PreparedScan>,
 }
 
@@ -610,17 +709,38 @@ struct EmbeddedRow {
 fn open_store(config: &RetrievalConfig) -> Result<Opened, RetrieveError> {
     let mut store = horbm_memory::Store::open_in_memory().map_err(RetrieveError::memory)?;
     let blocked = load_rows(&mut store, config)?;
-    // This runs only while the grant holds, including `set_remember(true)`
-    // after a denied spawn. The spawn flag can still be false then.
-    let scan = match config.keys_path.as_deref() {
-        Some(path) => Some(prepare_scan(&store, &blocked, path, true)?),
-        None => None,
-    };
     Ok(Opened {
         store,
         blocked,
-        scan,
+        scan: None,
     })
+}
+
+/// Open the diary, insert `learned`, then build the scan once when a key
+/// file is set. Spawn, a grant, and [`RetrievalThread::set_learned`] share
+/// this. `open_store` is not copied. The scan is built after the inserts so
+/// a learned row is in the arena. This does not run on an ask.
+fn rebuild(config: &RetrievalConfig, learned: &[LearnedRow]) -> Result<Opened, RetrieveError> {
+    let mut opened = open_store(config)?;
+    insert_learned(&mut opened.store, learned)?;
+    if let Some(path) = config.keys_path.as_deref() {
+        opened.scan = Some(prepare_scan(&opened.store, &opened.blocked, path, true)?);
+    }
+    Ok(opened)
+}
+
+fn insert_learned(
+    store: &mut horbm_memory::Store,
+    rows: &[LearnedRow],
+) -> Result<(), RetrieveError> {
+    for row in rows {
+        let label = row.source.as_str();
+        let source = format!("learned;{label}");
+        store
+            .diary_add(&row.text, &row.date, &row.said_by, &source)
+            .map_err(RetrieveError::memory)?;
+    }
+    Ok(())
 }
 
 /// Open the key file and the diary arena once. Not called on a query.
@@ -939,7 +1059,7 @@ fn superseded(shared: &Shared, epoch: u64) -> bool {
     let slot = shared.slot.lock().expect("retrieval mailbox");
     match slot.as_ref() {
         Some(Command::Ask { epoch: newer, .. }) => *newer > epoch,
-        Some(Command::Consent { .. }) => true,
+        Some(Command::Consent { .. } | Command::Learned { .. }) => true,
         None => false,
     }
 }
@@ -965,6 +1085,45 @@ mod tests {
     fn cap_matches_the_diary() {
         assert_eq!(MEMORY_HIT_CAP, horbm_memory::MAX_HITS);
         assert_eq!(MEMORY_HIT_CAP, horbm_brain::SCAN_CAP);
+        assert_eq!(LEARNED_ROW_CAP, 256);
+    }
+
+    fn learned_sample(id: &str, date: &str) -> LearnedRow {
+        LearnedRow {
+            item_id: id.to_string(),
+            text: format!("line {id}"),
+            said_by: "user".to_string(),
+            date: date.to_string(),
+            source: "session=s;turn=1;time=t;consent=c".to_string(),
+        }
+    }
+
+    #[test]
+    fn keep_newest_drops_the_oldest_dates_and_keeps_later_ties() {
+        let mut rows = vec![learned_sample("early", "0000")];
+        for i in 1..LEARNED_ROW_CAP {
+            rows.push(learned_sample(&format!("n{i}"), &format!("{i:04}")));
+        }
+        rows.push(learned_sample("late", "0000"));
+        assert_eq!(rows.len(), LEARNED_ROW_CAP + 1);
+        let (kept, dropped) = keep_newest(rows);
+        assert_eq!(dropped, 1);
+        assert_eq!(kept.len(), LEARNED_ROW_CAP);
+        assert!(kept.iter().all(|row| row.item_id != "early"));
+        assert_eq!(kept[0].item_id, "late");
+        assert_eq!(
+            kept.last().expect("kept").date,
+            format!("{:04}", LEARNED_ROW_CAP - 1)
+        );
+        let (same, none) = keep_newest(Vec::new());
+        assert!(same.is_empty());
+        assert_eq!(none, 0);
+        let exact: Vec<_> = (0..LEARNED_ROW_CAP)
+            .map(|i| learned_sample(&format!("e{i}"), &format!("{i:04}")))
+            .collect();
+        let (all, zero) = keep_newest(exact);
+        assert_eq!(zero, 0);
+        assert_eq!(all.len(), LEARNED_ROW_CAP);
     }
 
     #[test]
