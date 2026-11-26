@@ -190,6 +190,9 @@ impl Running {
     /// Drain the listener, then seal the session. This is the path a caught
     /// SIGTERM or ctrl-c takes after the signal. Dropping [`Running`] aborts
     /// the task and does not seal.
+    ///
+    /// The seal runs on the blocking pool. `finish` closes the turn log in
+    /// that same call, so a stalled seal does not pin a runtime worker.
     pub async fn shutdown(mut self) {
         if let Some(stop) = self.stop.take() {
             stop.notify_one();
@@ -198,7 +201,12 @@ impl Running {
             let _ = tokio::time::timeout(Duration::from_secs(5), join).await;
         }
         if let Some(host) = self.host.take() {
-            host.finish();
+            let joined = tokio::task::spawn_blocking(move || host.finish()).await;
+            if let Err(err) = joined {
+                if err.is_panic() {
+                    std::panic::resume_unwind(err.into_panic());
+                }
+            }
         }
     }
 }
@@ -683,9 +691,40 @@ async fn handle_text(
         Ok(ClientControl::Consent { .. }) => true,
         Ok(ClientControl::Stop) => stop_audio(pipe, tx, pace).await,
         Ok(ClientControl::Text { text }) => {
-            let product = pipe.push_text(&text, elapsed_ms(started));
+            let Some(product) = push_text_off_worker(pipe, text, elapsed_ms(started)).await else {
+                return false;
+            };
             emit_turn(pipe, product, tx, pace).await
         }
+    }
+}
+
+/// `push_text` does the brain turn on the caller. That turn is synchronous
+/// SQLite and disk work, so it runs on the blocking pool. The session task
+/// awaits the join, which keeps one socket's turns in order. Other sockets
+/// and the writer keep the worker.
+///
+/// The stand-in occupies `pipe` only while this task is suspended. Nothing
+/// else reads it. A panicked turn drops the socket instead of serving the
+/// stand-in.
+async fn push_text_off_worker(
+    pipe: &mut Box<dyn Pipeline>,
+    text: String,
+    t_ms: u64,
+) -> Option<TurnProduct> {
+    let placeholder: Box<dyn Pipeline> = Box::new(crate::pipeline::FakePipeline::unlinked());
+    let mut owned = std::mem::replace(pipe, placeholder);
+    let joined = tokio::task::spawn_blocking(move || {
+        let product = owned.push_text(&text, t_ms);
+        (owned, product)
+    })
+    .await;
+    match joined {
+        Ok((owned, product)) => {
+            *pipe = owned;
+            Some(product)
+        }
+        Err(_) => None,
     }
 }
 
@@ -703,6 +742,8 @@ async fn handle_binary(
     if dir != AudioDir::Mic {
         return send_line(tx, error_json("mic-only")).await;
     }
+    // `push_mic` stays on this task. A frame is every 80 ms, and a per-frame
+    // `spawn_blocking` is the wrong shape. The live ear path is the follow-up.
     let product = pipe.push_mic(&pcm, rate.hz(), elapsed_ms(started));
     emit_turn(pipe, product, tx, pace).await
 }
