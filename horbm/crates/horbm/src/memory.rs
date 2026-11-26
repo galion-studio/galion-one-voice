@@ -36,14 +36,25 @@
 //! Any other kept candidate is `Fact`, with `pinned` left false.
 //! `PersonMemory::forget_matching` is the trait default: recall, then forget
 //! each hit. This type does not define its own copy.
+//!
+//! `PersonMemory::list_person` lists every live episode and diary row for
+//! one person, newest `source_date` first. The length is at most `limit`
+//! and at most four times [`crate::MEMORY_HIT_CAP`]. It is not a search.
+//! Forgotten rows, and the session-ring twins recall already hides, stay
+//! out. The read-only schema check and the `items` / `archive` readers live
+//! here. The audit binary only maps those rows to JSON.
 
 use std::collections::{HashMap, HashSet};
+use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::OnceLock;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use galion_emotion_core::standins::memory::{
-    MemoryItem, MemoryKind, MemorySink, PersonMemory, PersonState, Tombstone, TrackedName,
-    WriteOutcome,
+    DiaryArchiveRow, DiaryItemRow, DiaryReadError, MemoryItem, MemoryKind, MemorySink,
+    PersonMemory, PersonState, Tombstone, TrackedName, WriteOutcome,
 };
+use rusqlite::{params, Connection, OpenFlags};
 
 use crate::retrieve::{covers, search_person_lexical, MemoryHit};
 
@@ -505,6 +516,127 @@ impl EpisodicStore {
             false,
         ));
     }
+
+    /// Open an existing diary read-only.
+    ///
+    /// `SQLITE_OPEN_READ_ONLY` and `query_only`. A path that is not a file
+    /// is [`DiaryReadError::Missing`] and is not created. The audit command
+    /// and `PersonMemory::list_person` both use this open.
+    pub fn open_readonly(path: &Path) -> Result<Connection, DiaryReadError> {
+        if !path.is_file() {
+            return Err(DiaryReadError::Missing(format!(
+                "{} is not a file",
+                path.display()
+            )));
+        }
+        let conn =
+            Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY).map_err(|err| {
+                if path.is_file() {
+                    DiaryReadError::Fail(format!("{}: {err}", path.display()))
+                } else {
+                    DiaryReadError::Missing(format!("{} is not a file", path.display()))
+                }
+            })?;
+        conn.busy_timeout(Duration::from_millis(0))
+            .map_err(|err| DiaryReadError::Fail(err.to_string()))?;
+        conn.pragma_update(None, "query_only", true)
+            .map_err(|err| DiaryReadError::Fail(err.to_string()))?;
+        Ok(conn)
+    }
+
+    /// Compare `user_version` and the `items` and `archive` columns with the
+    /// `CREATE TABLE` statements `horbm-memory` installs.
+    pub fn check_schema(conn: &Connection) -> Result<(), DiaryReadError> {
+        let declared = declared_schema()?;
+        let version: i32 = conn
+            .pragma_query_value(None, "user_version", |row| row.get(0))
+            .map_err(|err| DiaryReadError::Fail(err.to_string()))?;
+        if version != declared.user_version {
+            return Err(DiaryReadError::Schema(format!(
+                "schema mismatch: PRAGMA user_version is {version}, horbm-memory's schema declares {}",
+                declared.user_version
+            )));
+        }
+        expect_columns(conn, "items", &declared.items)?;
+        expect_columns(conn, "archive", &declared.archive)?;
+        Ok(())
+    }
+
+    /// `items` rows whose layer is `episode` or `diary`, oldest `rowid` first.
+    ///
+    /// `person` keeps one `said_by`. `None` keeps every person. Marked and
+    /// non-current rows stay in this list; the audit prints them.
+    /// `PersonMemory::list_person` drops those after the read.
+    pub fn read_items(
+        conn: &Connection,
+        person: Option<&str>,
+    ) -> Result<Vec<DiaryItemRow>, DiaryReadError> {
+        let mut stmt = conn
+            .prepare(
+                "SELECT item_id, layer, said_by, source_date, source, pinned, marked, current, body
+                 FROM items
+                 WHERE layer IN ('episode', 'diary') AND (?1 IS NULL OR said_by = ?1)
+                 ORDER BY rowid ASC",
+            )
+            .map_err(|err| DiaryReadError::Fail(err.to_string()))?;
+        let mut rows = stmt
+            .query(params![person])
+            .map_err(|err| DiaryReadError::Fail(err.to_string()))?;
+        let mut out = Vec::new();
+        while let Some(row) = rows
+            .next()
+            .map_err(|err| DiaryReadError::Fail(err.to_string()))?
+        {
+            out.push(DiaryItemRow {
+                item_id: text_at(row, 0)?,
+                layer: text_at(row, 1)?,
+                said_by: text_at(row, 2)?,
+                date: text_at(row, 3)?,
+                source: text_at(row, 4)?,
+                pinned: flag_at(row, 5)?,
+                marked: flag_at(row, 6)?,
+                current: flag_at(row, 7)?,
+                text: text_at(row, 8)?,
+            });
+        }
+        Ok(out)
+    }
+
+    /// `archive` rows, oldest `rowid` first.
+    ///
+    /// `person` keeps one `said_by`. `None` keeps every person.
+    pub fn read_archive(
+        conn: &Connection,
+        person: Option<&str>,
+    ) -> Result<Vec<DiaryArchiveRow>, DiaryReadError> {
+        let mut stmt = conn
+            .prepare(
+                "SELECT item_id, layer, said_by, source_date, source, body, reason
+                 FROM archive
+                 WHERE (?1 IS NULL OR said_by = ?1)
+                 ORDER BY rowid ASC",
+            )
+            .map_err(|err| DiaryReadError::Fail(err.to_string()))?;
+        let mut rows = stmt
+            .query(params![person])
+            .map_err(|err| DiaryReadError::Fail(err.to_string()))?;
+        let mut out = Vec::new();
+        while let Some(row) = rows
+            .next()
+            .map_err(|err| DiaryReadError::Fail(err.to_string()))?
+        {
+            out.push(DiaryArchiveRow {
+                item_id: text_at(row, 0)?,
+                layer: text_at(row, 1)?,
+                said_by: text_at(row, 2)?,
+                date: text_at(row, 3)?,
+                source: text_at(row, 4)?,
+                text: text_at(row, 5)?,
+                reason: text_at(row, 6)?,
+            });
+        }
+        Ok(out)
+    }
 }
 
 impl PersonMemory for EpisodicStore {
@@ -845,6 +977,58 @@ impl PersonMemory for EpisodicStore {
         items
     }
 
+    /// Live episode and diary rows for one person, newest `source_date` first.
+    ///
+    /// At most `limit.min(MEMORY_HIT_CAP * 4)`. [`crate::MEMORY_HIT_CAP`] is
+    /// the recall window. A forgotten row does not come back, and neither
+    /// does the session-ring twin `recall` already drops.
+    fn list_person(&mut self, person_id: &str, limit: usize) -> Vec<MemoryItem> {
+        if !self.remember {
+            return Vec::new();
+        }
+        let person_id = person_id.trim();
+        if person_id.is_empty() {
+            return Vec::new();
+        }
+        // Drain queued pins before the read-only open. Do not `connect`:
+        // that would create a missing file. The helper refuses a path that
+        // is not already a file.
+        let _ = self.settle();
+        if !self.path.is_file() {
+            return Vec::new();
+        }
+        let Ok(conn) = Self::open_readonly(&self.path) else {
+            return Vec::new();
+        };
+        if Self::check_schema(&conn).is_err() {
+            return Vec::new();
+        }
+        let Ok(rows) = Self::read_items(&conn, Some(person_id)) else {
+            return Vec::new();
+        };
+        let mut items: Vec<MemoryItem> = rows
+            .into_iter()
+            .filter(|row| row.current && !row.marked)
+            .map(|row| {
+                item_from(
+                    row.item_id,
+                    &row.said_by,
+                    kind_of(&row.source, &row.text, &row.said_by, &row.date),
+                    &row.text,
+                    &row.date,
+                    &row.source,
+                    row.pinned,
+                )
+            })
+            .collect();
+        let terms: &[String] = &[];
+        self.drop_duplicate_candidates(person_id, &mut items, terms);
+        items.sort_by(|left, right| right.at.cmp(&left.at).then_with(|| left.id.cmp(&right.id)));
+        let cap = limit.min(crate::MEMORY_HIT_CAP * 4);
+        items.truncate(cap);
+        items
+    }
+
     fn tombstone(&self, item_id: &str) -> Option<Tombstone> {
         let store = self.store.as_ref()?;
         let rows = store.archive_list().ok()?;
@@ -859,6 +1043,301 @@ impl PersonMemory for EpisodicStore {
                 reason: row.reason,
             })
     }
+}
+
+/// Columns and `user_version` taken from the `CREATE TABLE` statements
+/// `horbm-memory` installs. Not a copy of that list.
+struct DeclaredSchema {
+    user_version: i32,
+    items: Vec<(String, String)>,
+    archive: Vec<(String, String)>,
+}
+
+fn declared_schema() -> Result<&'static DeclaredSchema, DiaryReadError> {
+    static CELL: OnceLock<Result<DeclaredSchema, String>> = OnceLock::new();
+    match CELL.get_or_init(load_declared_schema) {
+        Ok(schema) => Ok(schema),
+        Err(message) => Err(DiaryReadError::Fail(message.clone())),
+    }
+}
+
+/// Open a throwaway database with `horbm_memory::Store` and read the
+/// `CREATE TABLE` text that crate installed. The caller's file is not used.
+fn load_declared_schema() -> Result<DeclaredSchema, String> {
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|elapsed| elapsed.as_nanos())
+        .unwrap_or(0);
+    let dir = std::env::temp_dir().join(format!(
+        "horbm-memory-audit-schema-{}-{nanos}",
+        std::process::id()
+    ));
+    let guard = RemoveDir(dir);
+    fs::create_dir_all(guard.path()).map_err(|err| err.to_string())?;
+    let path = guard.path().join("reference.sqlite");
+    {
+        let store = horbm_memory::Store::open(&path).map_err(|err| err.to_string())?;
+        drop(store);
+    }
+    let conn = Connection::open_with_flags(&path, OpenFlags::SQLITE_OPEN_READ_ONLY)
+        .map_err(|err| err.to_string())?;
+    let user_version: i32 = conn
+        .pragma_query_value(None, "user_version", |row| row.get(0))
+        .map_err(|err| err.to_string())?;
+    let items = columns_from_create(&create_sql(&conn, "items")?)?;
+    let archive = columns_from_create(&create_sql(&conn, "archive")?)?;
+    drop(conn);
+    Ok(DeclaredSchema {
+        user_version,
+        items,
+        archive,
+    })
+}
+
+fn create_sql(conn: &Connection, table: &str) -> Result<String, String> {
+    conn.query_row(
+        "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?1",
+        params![table],
+        |row| row.get(0),
+    )
+    .map_err(|err| format!("horbm-memory installed no CREATE TABLE for {table}: {err}"))
+}
+
+fn columns_from_create(sql: &str) -> Result<Vec<(String, String)>, String> {
+    let body = table_body(sql)?;
+    let mut columns = Vec::new();
+    for clause in split_clauses(body) {
+        if let Some(column) = column_from_clause(clause)? {
+            columns.push(column);
+        }
+    }
+    if columns.is_empty() {
+        return Err(format!(
+            "horbm-memory CREATE TABLE declares no columns: {sql}"
+        ));
+    }
+    Ok(columns)
+}
+
+fn table_body(sql: &str) -> Result<&str, String> {
+    let Some(start) = sql.find('(') else {
+        return Err(format!(
+            "horbm-memory CREATE TABLE has no column list: {sql}"
+        ));
+    };
+    let bytes = sql.as_bytes();
+    let mut depth = 0;
+    let mut quote: Option<u8> = None;
+    let mut i = start;
+    while i < bytes.len() {
+        let byte = bytes[i];
+        if let Some(mark) = quote {
+            if byte == mark {
+                if mark == b'\'' && bytes.get(i + 1) == Some(&b'\'') {
+                    i += 2;
+                    continue;
+                }
+                quote = None;
+            }
+            i += 1;
+            continue;
+        }
+        match byte {
+            b'\'' | b'"' | b'`' => quote = Some(byte),
+            b'(' => depth += 1,
+            b')' => {
+                depth -= 1;
+                if depth == 0 {
+                    return Ok(&sql[start + 1..i]);
+                }
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+    Err(format!(
+        "horbm-memory CREATE TABLE column list is not closed: {sql}"
+    ))
+}
+
+fn split_clauses(body: &str) -> Vec<&str> {
+    let bytes = body.as_bytes();
+    let mut out = Vec::new();
+    let mut start = 0;
+    let mut depth = 0;
+    let mut quote: Option<u8> = None;
+    let mut i = 0;
+    while i < bytes.len() {
+        let byte = bytes[i];
+        if let Some(mark) = quote {
+            if byte == mark {
+                if mark == b'\'' && bytes.get(i + 1) == Some(&b'\'') {
+                    i += 2;
+                    continue;
+                }
+                quote = None;
+            }
+            i += 1;
+            continue;
+        }
+        match byte {
+            b'\'' | b'"' | b'`' => quote = Some(byte),
+            b'(' => depth += 1,
+            b')' if depth > 0 => depth -= 1,
+            b',' if depth == 0 => {
+                out.push(&body[start..i]);
+                start = i + 1;
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+    out.push(&body[start..]);
+    out
+}
+
+fn column_from_clause(clause: &str) -> Result<Option<(String, String)>, String> {
+    let clause = clause.trim();
+    if clause.is_empty() {
+        return Ok(None);
+    }
+    let Some((name, rest)) = take_ident(clause) else {
+        return Err(format!(
+            "horbm-memory schema has an unreadable declaration: {clause}"
+        ));
+    };
+    if is_table_constraint(name) {
+        return Ok(None);
+    }
+    let Some((ty, _)) = take_ident(rest) else {
+        return Err(format!(
+            "horbm-memory schema column {name} has no declared type"
+        ));
+    };
+    Ok(Some((name.to_string(), ty.to_string())))
+}
+
+fn take_ident(text: &str) -> Option<(&str, &str)> {
+    let text = text.trim_start();
+    let mut chars = text.char_indices();
+    let (_, first) = chars.next()?;
+    if first == '"' || first == '`' || first == '[' {
+        let end = if first == '[' { ']' } else { first };
+        let close = text[1..].find(end)?;
+        return Some((&text[1..1 + close], &text[1 + close + 1..]));
+    }
+    if !first.is_ascii_alphabetic() && first != '_' {
+        return None;
+    }
+    let mut end = first.len_utf8();
+    for (index, ch) in chars {
+        if ch.is_ascii_alphanumeric() || ch == '_' {
+            end = index + ch.len_utf8();
+        } else {
+            break;
+        }
+    }
+    Some((&text[..end], &text[end..]))
+}
+
+fn is_table_constraint(name: &str) -> bool {
+    matches!(
+        name.to_ascii_uppercase().as_str(),
+        "PRIMARY" | "UNIQUE" | "CHECK" | "FOREIGN" | "CONSTRAINT"
+    )
+}
+
+fn expect_columns(
+    conn: &Connection,
+    table: &str,
+    expected: &[(String, String)],
+) -> Result<(), DiaryReadError> {
+    let found = table_columns(conn, table)?;
+    if found.is_empty() {
+        return Err(DiaryReadError::Schema(format!(
+            "schema mismatch: table {table} is missing; horbm-memory's schema declares it"
+        )));
+    }
+    let mut matched = vec![false; expected.len()];
+    for (name, ty) in &found {
+        let Some(index) = expected.iter().position(|(want, _)| want == name) else {
+            return Err(DiaryReadError::Schema(format!(
+                "schema mismatch: table {table} has column {name} ({ty}), which horbm-memory's schema does not declare"
+            )));
+        };
+        let want_ty = &expected[index].1;
+        if !ty.eq_ignore_ascii_case(want_ty) {
+            return Err(DiaryReadError::Schema(format!(
+                "schema mismatch: {table}.{name} type is {ty}, horbm-memory's schema declares {want_ty}"
+            )));
+        }
+        if matched[index] {
+            return Err(DiaryReadError::Schema(format!(
+                "schema mismatch: table {table} lists column {name} twice"
+            )));
+        }
+        matched[index] = true;
+    }
+    for (index, seen) in matched.iter().enumerate() {
+        if !seen {
+            let (name, ty) = &expected[index];
+            return Err(DiaryReadError::Schema(format!(
+                "schema mismatch: table {table} has no column {name}; horbm-memory's schema declares {name} {ty}"
+            )));
+        }
+    }
+    Ok(())
+}
+
+struct RemoveDir(PathBuf);
+
+impl RemoveDir {
+    fn path(&self) -> &Path {
+        &self.0
+    }
+}
+
+impl Drop for RemoveDir {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.0);
+    }
+}
+
+fn table_columns(conn: &Connection, table: &str) -> Result<Vec<(String, String)>, DiaryReadError> {
+    let sql = match table {
+        "items" => "PRAGMA table_info(items)",
+        "archive" => "PRAGMA table_info(archive)",
+        _ => {
+            return Err(DiaryReadError::Fail(format!(
+                "schema check does not know table {table}"
+            )))
+        }
+    };
+    let mut stmt = conn
+        .prepare(sql)
+        .map_err(|err| DiaryReadError::Fail(err.to_string()))?;
+    let rows = stmt
+        .query_map([], |row| {
+            Ok((row.get::<_, String>(1)?, row.get::<_, String>(2)?))
+        })
+        .map_err(|err| DiaryReadError::Fail(err.to_string()))?;
+    let mut out = Vec::new();
+    for row in rows {
+        out.push(row.map_err(|err| DiaryReadError::Fail(err.to_string()))?);
+    }
+    Ok(out)
+}
+
+fn text_at(row: &rusqlite::Row<'_>, index: usize) -> Result<String, DiaryReadError> {
+    row.get(index)
+        .map_err(|err| DiaryReadError::Fail(err.to_string()))
+}
+
+fn flag_at(row: &rusqlite::Row<'_>, index: usize) -> Result<bool, DiaryReadError> {
+    let value: i64 = row
+        .get(index)
+        .map_err(|err| DiaryReadError::Fail(err.to_string()))?;
+    Ok(value != 0)
 }
 
 fn turn_ord(id: &str) -> u64 {
@@ -976,7 +1455,7 @@ fn item_from(
 }
 
 fn item_from_hit(hit: MemoryHit) -> MemoryItem {
-    let kind = kind_of(&hit);
+    let kind = kind_of(&hit.source, &hit.text, &hit.said_by, &hit.date);
     MemoryItem {
         id: hit.item_id,
         person_id: hit.said_by,
@@ -988,17 +1467,15 @@ fn item_from_hit(hit: MemoryHit) -> MemoryItem {
     }
 }
 
-fn kind_of(hit: &MemoryHit) -> MemoryKind {
-    match hit.source.as_str() {
+fn kind_of(source: &str, text: &str, said_by: &str, date: &str) -> MemoryKind {
+    match source {
         SOURCE_SUMMARY => MemoryKind::Summary,
-        SOURCE_STATE if hit.text.starts_with("my name is") => MemoryKind::Name,
+        SOURCE_STATE if text.starts_with("my name is") => MemoryKind::Name,
         SOURCE_STATE => MemoryKind::Mood,
         // A name slot stays Name. Any other kept session-ring candidate is
         // an extracted statement, not a pin. `pinned` stays whatever the hit
         // carried, which is false for a candidate.
-        SOURCE_RING if has_name_slot(&hit.text, &hit.said_by, &hit.date, &hit.source) => {
-            MemoryKind::Name
-        }
+        SOURCE_RING if has_name_slot(text, said_by, date, source) => MemoryKind::Name,
         SOURCE_RING => MemoryKind::Fact,
         _ => MemoryKind::Pin,
     }

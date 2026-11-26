@@ -52,6 +52,50 @@ pub struct MemoryItem {
     pub pinned: bool,
 }
 
+/// One `items` row from the person-diary file.
+///
+/// `date` is `source_date`. `text` is `body`. The audit command and the
+/// diary list read this shape from one reader.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DiaryItemRow {
+    pub item_id: String,
+    pub layer: String,
+    pub said_by: String,
+    pub date: String,
+    pub source: String,
+    pub pinned: bool,
+    pub marked: bool,
+    pub current: bool,
+    pub text: String,
+}
+
+/// One `archive` row from the person-diary file.
+///
+/// `date` is `source_date`. `text` is `body`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DiaryArchiveRow {
+    pub item_id: String,
+    pub layer: String,
+    pub said_by: String,
+    pub date: String,
+    pub source: String,
+    pub text: String,
+    pub reason: String,
+}
+
+/// A read-only diary open or schema check stopped.
+///
+/// The string is the line the audit command prints after its name.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum DiaryReadError {
+    /// The path is not a file. Nothing was created.
+    Missing(String),
+    /// `user_version` or a column does not match the installed schema.
+    Schema(String),
+    /// The file could not be read.
+    Fail(String),
+}
+
 /// A forgotten row. The text stays here. Recall does not return it.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Tombstone {
@@ -111,6 +155,19 @@ pub trait PersonMemory: Send {
         archived
     }
     fn recall(&mut self, person_id: &str, query: &str) -> Vec<MemoryItem>;
+
+    /// Every live row for one person, newest first, at most `limit`.
+    ///
+    /// The default is empty, so a stand-in and [`DenyMemory`] stay silent.
+    /// [`Self::recall`] is the query-driven search and stays capped on its
+    /// own. The diary store caps this list at `limit` and at four times the
+    /// recall hit cap, and it leaves out a forgotten row and the session-ring
+    /// twin of a pin or a name.
+    fn list_person(&mut self, person_id: &str, limit: usize) -> Vec<MemoryItem> {
+        let _ = (person_id, limit);
+        Vec::new()
+    }
+
     fn tombstone(&self, item_id: &str) -> Option<Tombstone>;
 }
 
@@ -245,6 +302,7 @@ mod tests {
             WriteOutcome::Refused
         );
         assert!(memory.recall("person-alpha", "favourite").is_empty());
+        assert!(memory.list_person("person-alpha", 8).is_empty());
         assert!(memory.tombstone("ram-1").is_none());
         assert_eq!(stored.load(Ordering::SeqCst), 0);
         assert_eq!(extracted.load(Ordering::SeqCst), 0);
