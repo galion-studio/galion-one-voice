@@ -34,7 +34,7 @@ It is a standalone package. It is not a member of the repo workspace. `cargo tes
 
 `Pad::RESTING` is arousal `0.3`, valence `0.25`, dominance `0.5`. `HorbmAdapter` and `OpenHorbm` match `Brain::open(memory_db, knowledge_dir, cases)` and `turn` / `tick`. The `horbm` crate is not a dependency. It needs `horbm-memory` from `galion-studio/galion-knowledge` at `761a7f225304fc010379219e5b88c6669dd48f40`. This tree does not fetch that revision.
 
-`GALION_SAMANTHA_REF` is reported on `/health` as `unset`, `set`, or `missing`. The path is not put in `/health`. A turn goes through `horbm-voice` on the 80 ms conductor clock. Boot default is `brain=horbm` and `mouth_device=cpu`. The default cargo features do not link Piper: that CPU mouth is an in-process tone (`mouth` `fake`). Build with `--features piper` when the CPU mouth should be Piper `ljspeech`. The laptop build script passes that feature. `GALION_MOUTH=native` speaks `first_clause` then `rest` as text on the socket and returns no PCM. Piper stays in the binary when the feature is on, and it stays the mouth when `GALION_MOUTH` is unset. The wav is read only when the s711 mouth is selected (`GALION_SAMANTHA_WEIGHTS` plus `GALION_SAMANTHA_DEVICE=cuda`). It is not downloaded. CPU does not select s711.
+`GALION_VOICE_REF` is reported on `/health` as `unset`, `set`, or `missing`. The path is not put in `/health`. `GALION_SAMANTHA_REF` is a deprecated alias: the new name wins, and a fallback or a differing pair logs one warning. A turn goes through `horbm-voice` on the 80 ms conductor clock. Boot default is `brain=horbm` and `mouth_device=cpu`. The default cargo features do not link Piper: that CPU mouth is an in-process tone (`mouth` `fake`). Build with `--features piper` when the CPU mouth should be Piper `ljspeech`. The laptop build script passes that feature. `GALION_MOUTH=native` speaks `first_clause` then `rest` as text on the socket and returns no PCM. Piper stays in the binary when the feature is on, and it stays the mouth when `GALION_MOUTH` is unset. The wav is read only when the s711 mouth is selected (`GALION_VOICE_WEIGHTS` plus `GALION_VOICE_DEVICE=cuda`). `GALION_SAMANTHA_WEIGHTS` and `GALION_SAMANTHA_DEVICE` are the same kind of deprecated alias. It is not downloaded. CPU does not select s711.
 
 The wire format is [PROTOCOL.md](PROTOCOL.md).
 
@@ -76,10 +76,10 @@ cargo run --release -- --ui ui
 Open `http://127.0.0.1:7881/`. Another loopback port, including `[::1]`:
 
 ```bash
-GALION_SAMANTHA_WS='[::1]:7881' cargo run --release -- --ui ui
+GALION_VOICE_WS='[::1]:7881' cargo run --release -- --ui ui
 ```
 
-`0.0.0.0` and any non-loopback address refuse to start. `--addr` overrides `GALION_SAMANTHA_WS`.
+`0.0.0.0` and any non-loopback address refuse to start. `--addr` overrides `GALION_VOICE_WS`. `GALION_SAMANTHA_WS` and `GALION_SAMANTHA_UI` are deprecated aliases of `GALION_VOICE_WS` and `GALION_VOICE_UI`. Each logs one warning that names the new variable. The new value wins when both are set and they differ.
 
 That command is a foreground process. When it exits, the process stays down. Linux supervision for the built `samantha-local` binary is [`deploy/linux/README.md`](../../deploy/linux/README.md): a systemd user unit, or a restart loop when the user session has no systemd. Paths come from an env file. The supervised bind is `127.0.0.1` only. Repeated failed `GET /health` checks restart the process.
 
@@ -89,7 +89,7 @@ cargo test
 
 ## Windows
 
-Use `scripts/windows/Start-GalionOne.ps1` from the section above. It is the start path on the laptop. The table there is the set of directories the script creates. `scripts/windows/START-SAMANTHA-7881.cmd` sets `GALION_SAMANTHA_REF` only when `G:\galion\samantha-ref.wav` is already there, and `GALION_SAMANTHA_WEIGHTS` only when `G:\galion\chatterbox-expr` is already there. Neither file is created or committed. `/health` still reports the ref as set, missing, or unset, and adds `mouth`, `voice`, and `clone`.
+Use `scripts/windows/Start-GalionOne.ps1` from the section above. It is the start path on the laptop. The table there is the set of directories the script creates. `scripts/windows/START-SAMANTHA-7881.cmd` sets the deprecated name `GALION_SAMANTHA_REF` only when `G:\galion\samantha-ref.wav` is already there, and `GALION_SAMANTHA_WEIGHTS` only when `G:\galion\chatterbox-expr` is already there. Neither file is created or committed. The server accepts those names, logs one warning each, and prefers `GALION_VOICE_REF` and `GALION_VOICE_WEIGHTS` when those are set. `/health` still reports the ref as set, missing, or unset, and adds `mouth`, `voice`, and `clone`.
 
 The unit file under `deploy/` is a template. This crate does not install it and does not start it.
 

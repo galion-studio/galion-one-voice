@@ -14,6 +14,7 @@ A foreground start (`cargo run` in `voice-stack/local-server`, or the WSL launch
 - A crash (any exit other than 0) starts the process again.
 - `GET /health` is checked on a timer. HTTP 200 and JSON `"ok": true` is healthy. Anything else, including a refused connection, counts as one failure. `SAMANTHA_HEALTH_FAILS` failures in a row restart the process. The default is 3. Failures during `SAMANTHA_HEALTH_GRACE` seconds after start are ignored so a slow boot can bind.
 - The supervisor accepts `127.0.0.1:PORT` and refuses every other bind, including a wildcard, a hostname, and `[::1]`. The server binary still has its own loopback check.
+- A stop sends SIGTERM and waits `SAMANTHA_STOP_GRACE` seconds (default 5) before SIGKILL. That wait is the server's session close: drain, `end_session`, then the seal. Measure the close on the laptop before lowering the grace. The user unit's `TimeoutStopSec` is 15, so the grace stays below that.
 - With a systemd user session, the unit's `Restart=on-failure` and `RestartSec=2` do the restart. After 8 starts in 120 seconds systemd stops trying. Exit 2 is a config error and is not restarted.
 - With no systemd user session, `supervise.sh` is a foreground restart loop. The delay starts at `SAMANTHA_RESTART_BACKOFF_SEC` and doubles up to `SAMANTHA_RESTART_BACKOFF_MAX_SEC`. A generation that was healthy at least once resets the delay.
 
@@ -51,13 +52,18 @@ Replace the three `/path/to/...` placeholders:
 | Key | Meaning |
 |---|---|
 | `SAMANTHA_LOCAL_BIN` | the `samantha-local` binary from `voice-stack/local-server` |
-| `GALION_SAMANTHA_UI` | directory that contains `index.html` |
+| `GALION_VOICE_UI` | directory that contains `index.html` |
 | `SAMANTHA_LOCAL_WORKDIR` | working directory for the process |
-| `GALION_SAMANTHA_WS` | `127.0.0.1:7881`, or another `127.0.0.1` port |
+| `GALION_VOICE_WS` | `127.0.0.1:7881`, or another `127.0.0.1` port |
+| `SAMANTHA_STOP_GRACE` | seconds after SIGTERM before SIGKILL (default 5) |
 
-Each value is one word: letters, digits, and `/ . _ : + - @`. No spaces, no `~`, no substitution. Extra `KEY=VALUE` lines are passed through to the server (model directories, for example). Keep credentials and reference-clip paths out of a file you might commit. The example file has none.
+`GALION_SAMANTHA_WS` and `GALION_SAMANTHA_UI` are deprecated fallbacks. The new name wins. A fallback, and a pair that differs, each log one warning that names the new variable. The supervisor then drops the old name so the server process sees the new one. The loopback refusal still applies to whichever value won.
 
-`samantha-local` reads `GALION_SAMANTHA_WS` and `GALION_SAMANTHA_UI` itself. The supervisor exports the env file and does not add arguments, so a stand-in binary used in the smoke test can ignore them.
+The example also lists, as comments, the development-profile placeholders `GALION_HORBM_PROFILE`, `GALION_HORBM_DATA_ROOT`, and `GALION_HORBM_TURN_LOG`. They stay commented so a copied file does not turn the profile on. Uncomment them on the machine. They are not real paths.
+
+Each value is one word: letters, digits, and `/ . _ : + - @`. No spaces, no `~`, no substitution. Extra `KEY=VALUE` lines are passed through to the server (model directories, for example). Keep reference-clip paths out of a file you might commit. The example file has none.
+
+`samantha-local` reads `GALION_VOICE_WS` and `GALION_VOICE_UI` itself, with the same deprecated fallbacks. The supervisor exports the env file and does not add arguments, so a stand-in binary used in the smoke test can ignore them.
 
 Create the work directory before enable. Re-run `install.sh install` after editing paths so `paths.conf` picks up the new directories. `ProtectHome=yes` hides the home directory except for the paths listed in the unit and that drop-in.
 
@@ -136,7 +142,7 @@ Ctrl-C stops it. A stop signal exits 0 and does not schedule another start.
 deploy/linux/install.sh stop
 ```
 
-With systemd that is `systemctl --user stop samantha-local.service`. The unit's `KillMode=control-group` stops the supervisor and the server. With no systemd it signals the pid in `$XDG_RUNTIME_DIR/samantha-local.pid` (or `~/.local/share/galion/samantha-local.pid`).
+With systemd that is `systemctl --user stop samantha-local.service`. The unit's `KillMode=control-group` stops the supervisor and the server. `TimeoutStopSec=15` leaves room for `SAMANTHA_STOP_GRACE`. With no systemd, `--stop` signals the pid in `$XDG_RUNTIME_DIR/samantha-local.pid` (or `~/.local/share/galion/samantha-local.pid`). A generation stop sends the server SIGTERM and waits `SAMANTHA_STOP_GRACE` seconds so it can drain, end the diary session, and seal, then SIGKILL. The default is 5. Measure that close on the laptop before lowering it.
 
 ## Logs
 

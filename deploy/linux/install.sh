@@ -4,6 +4,10 @@
 # Install, start, stop, and roll back the samantha-local user supervisor.
 # Linux only. No sudo. No system unit. Does not edit /etc/wsl.conf.
 # --prefix writes a throwaway layout and does not talk to systemd.
+# The env file may set GALION_VOICE_WS and GALION_VOICE_UI.
+# GALION_SAMANTHA_WS and GALION_SAMANTHA_UI are deprecated fallbacks.
+# supervise.sh resolves them (new name wins, one warning) before --paths,
+# which this installer uses for the drop-in. The bind stays 127.0.0.1:PORT.
 
 set -euo pipefail
 export LC_ALL=C
@@ -45,6 +49,11 @@ usage: install.sh [install|enable|start|stop|logs|status|rollback] [--prefix DIR
   rollback   disable the unit, restore a backed-up unit, remove this install
   --prefix   write under DIR and do not call systemctl
   --dry-run  print the install or rollback plan and write nothing
+
+The env file uses GALION_VOICE_WS and GALION_VOICE_UI.
+GALION_SAMANTHA_WS and GALION_SAMANTHA_UI are deprecated fallbacks.
+supervise.sh keeps the new value, logs one warning, and refuses any bind
+other than 127.0.0.1:PORT. SAMANTHA_STOP_GRACE is the SIGTERM session close.
 EOF
 }
 

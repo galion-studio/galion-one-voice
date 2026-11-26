@@ -3,6 +3,12 @@
 # Copyright (c) 2026 Galion Labs
 # Supervise samantha-local. Linux only. Loopback bind 127.0.0.1.
 # Paths come from the env file. This script hard-codes no home and no Windows binary name.
+# GALION_VOICE_WS and GALION_VOICE_UI are the names. GALION_SAMANTHA_WS and
+# GALION_SAMANTHA_UI are deprecated fallbacks: one warning, then the new name.
+# SAMANTHA_STOP_GRACE (default 5) is the seconds after SIGTERM before SIGKILL.
+# That wait is the session close: the server drains, end_session, then the seal.
+# Measure that close on the laptop before lowering the grace. The user unit's
+# TimeoutStopSec is 15, so the grace stays below that.
 #
 #   samantha-local-supervise --systemd   one generation; systemd restarts on failure
 #   samantha-local-supervise             restart loop with exponential backoff
@@ -49,6 +55,13 @@ usage: supervise.sh [--systemd|--check|--probe|--paths|--status|--stop] [--env F
   --status    report the restart-loop pid
   --stop      signal the restart-loop pid
   --env FILE  env file (default: $HOME/.config/galion/samantha-local.env)
+
+GALION_VOICE_WS and GALION_VOICE_UI are the bind and the UI directory.
+GALION_SAMANTHA_WS and GALION_SAMANTHA_UI are deprecated fallbacks.
+Each fallback logs one warning and names the new variable. The new value wins
+when both are set and differ. The bind stays 127.0.0.1:PORT.
+SAMANTHA_STOP_GRACE (default 5) is how long SIGTERM may run the session close
+before SIGKILL. The close is end_session and the seal.
 EOF
 }
 
@@ -199,8 +212,37 @@ valid_path() {
   [[ "$p" != *'$'* && "$p" != *'`'* && "$p" != *'~'* && "$p" != *\\* ]] || return 1
 }
 
+# New name wins. Old name is one warning, then removed so the child sees the new name.
+# shellcheck disable=SC2086
+alias_voice() {
+  local new_name=$1 old_name=$2
+  local new_set=0 old_set=0
+  local new_val='' old_val=''
+  if [[ -v $new_name ]]; then
+    new_set=1
+    new_val=${!new_name}
+  fi
+  if [[ -v $old_name ]]; then
+    old_set=1
+    old_val=${!old_name}
+  fi
+  if ((new_set == 1 && old_set == 1)); then
+    if [[ "$new_val" != "$old_val" ]]; then
+      log "${old_name} is deprecated; ${new_name} and ${old_name} differ; using ${new_name}"
+    fi
+    unset "$old_name"
+  elif ((new_set == 0 && old_set == 1)); then
+    log "${old_name} is deprecated; set ${new_name}"
+    printf -v "$new_name" '%s' "$old_val"
+    export "${new_name?}"
+    unset "$old_name"
+  fi
+}
+
 apply_defaults() {
-  GALION_SAMANTHA_UI=${GALION_SAMANTHA_UI:-}
+  alias_voice GALION_VOICE_WS GALION_SAMANTHA_WS
+  alias_voice GALION_VOICE_UI GALION_SAMANTHA_UI
+  GALION_VOICE_UI=${GALION_VOICE_UI:-}
   SAMANTHA_LOCAL_WORKDIR=${SAMANTHA_LOCAL_WORKDIR:-}
   set_default SAMANTHA_HEALTH_FAILS 3
   set_default SAMANTHA_HEALTH_INTERVAL 5
@@ -213,10 +255,10 @@ apply_defaults() {
 
 validate_shape() {
   local base win_suffix
-  [[ -n "${GALION_SAMANTHA_WS:-}" ]] || die 2 "GALION_SAMANTHA_WS is unset"
+  [[ -n "${GALION_VOICE_WS:-}" ]] || die 2 "GALION_VOICE_WS is unset"
   [[ -n "${SAMANTHA_LOCAL_BIN:-}" ]] || die 2 "SAMANTHA_LOCAL_BIN is unset"
-  if ! valid_bind "$GALION_SAMANTHA_WS"; then
-    die 2 "refusing bind ${GALION_SAMANTHA_WS} (127.0.0.1:PORT only)"
+  if ! valid_bind "$GALION_VOICE_WS"; then
+    die 2 "refusing bind ${GALION_VOICE_WS} (127.0.0.1:PORT only)"
   fi
   if ! valid_path "$SAMANTHA_LOCAL_BIN"; then
     die 2 "SAMANTHA_LOCAL_BIN must be an absolute path"
@@ -227,8 +269,8 @@ validate_shape() {
   case "$base" in
     *"$win_suffix" | *"${win_suffix^^}") die 2 "refusing a Windows executable suffix" ;;
   esac
-  if [[ -n "$GALION_SAMANTHA_UI" ]] && ! valid_path "$GALION_SAMANTHA_UI"; then
-    die 2 "GALION_SAMANTHA_UI must be an absolute path"
+  if [[ -n "$GALION_VOICE_UI" ]] && ! valid_path "$GALION_VOICE_UI"; then
+    die 2 "GALION_VOICE_UI must be an absolute path"
   fi
   if [[ -n "$SAMANTHA_LOCAL_WORKDIR" ]] && ! valid_path "$SAMANTHA_LOCAL_WORKDIR"; then
     die 2 "SAMANTHA_LOCAL_WORKDIR must be an absolute path"
@@ -253,15 +295,15 @@ validate_ready() {
   if [[ -n "$SAMANTHA_LOCAL_WORKDIR" && ! -d "$SAMANTHA_LOCAL_WORKDIR" ]]; then
     die 2 "workdir is not a directory: ${SAMANTHA_LOCAL_WORKDIR}"
   fi
-  if [[ -n "$GALION_SAMANTHA_UI" && ! -d "$GALION_SAMANTHA_UI" ]]; then
+  if [[ -n "$GALION_VOICE_UI" && ! -d "$GALION_VOICE_UI" ]]; then
     log "ui directory is missing; the server still starts"
   fi
 }
 
 print_paths() {
-  printf 'bind=%s\n' "$GALION_SAMANTHA_WS"
+  printf 'bind=%s\n' "$GALION_VOICE_WS"
   printf 'bin=%s\n' "$SAMANTHA_LOCAL_BIN"
-  printf 'ui=%s\n' "$GALION_SAMANTHA_UI"
+  printf 'ui=%s\n' "$GALION_VOICE_UI"
   printf 'workdir=%s\n' "$SAMANTHA_LOCAL_WORKDIR"
 }
 
@@ -276,7 +318,7 @@ health_ok() {
       --max-redirs 0 \
       --output - \
       --write-out $'\n%{http_code}' \
-      "http://${GALION_SAMANTHA_WS}/health" 2>/dev/null || true
+      "http://${GALION_VOICE_WS}/health" 2>/dev/null || true
   )
   [[ -n "$body" ]] || return 1
   code=${body##*$'\n'}
@@ -336,6 +378,8 @@ stop_child() {
     if [[ "$sig" == "KILL" ]]; then
       break
     fi
+    # Seconds of SIGTERM for end_session and the seal, then SIGKILL.
+    # SAMANTHA_STOP_GRACE is the knob. Default 5. Measure the close on the laptop.
     i=$SAMANTHA_STOP_GRACE
     while ((i > 0)); do
       state=$(child_state)
@@ -374,7 +418,7 @@ start_child() {
     ) &
   fi
   child=$!
-  log "started pid=${child} bind=${GALION_SAMANTHA_WS}"
+  log "started pid=${child} bind=${GALION_VOICE_WS}"
 }
 
 sleep_slice() {
@@ -404,7 +448,7 @@ watch_generation() {
     if ((SECONDS >= next_probe)); then
       if health_ok; then
         if ((generation_healthy == 0)); then
-          log "health ok bind=${GALION_SAMANTHA_WS}"
+          log "health ok bind=${GALION_VOICE_WS}"
         fi
         generation_healthy=1
         fails=0

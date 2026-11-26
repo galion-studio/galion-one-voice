@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Galion Labs
 
-//! Loopback bind for `GALION_SAMANTHA_WS`.
+//! Loopback bind for `GALION_VOICE_WS`.
+//! `GALION_SAMANTHA_WS` is a deprecated alias.
 //! `127.0.0.1` and `::1` are accepted. `0.0.0.0` and every other address are refused.
 
 use std::net::{IpAddr, SocketAddr};

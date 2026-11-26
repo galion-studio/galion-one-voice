@@ -25,8 +25,10 @@ fn main() -> ExitCode {
 
 fn real_main() -> Result<(), String> {
     let mut addr_s =
-        std::env::var("GALION_SAMANTHA_WS").unwrap_or_else(|_| "127.0.0.1:7881".into());
-    let mut ui = std::env::var("GALION_SAMANTHA_UI").unwrap_or_else(|_| "ui".into());
+        samantha_local_server::env_alias::read("GALION_VOICE_WS", "GALION_SAMANTHA_WS")
+            .unwrap_or_else(|| "127.0.0.1:7881".into());
+    let mut ui = samantha_local_server::env_alias::read("GALION_VOICE_UI", "GALION_SAMANTHA_UI")
+        .unwrap_or_else(|| "ui".into());
     let mut cli_dev = false;
     let mut args = std::env::args().skip(1);
     while let Some(arg) = args.next() {
@@ -34,16 +36,19 @@ fn real_main() -> Result<(), String> {
             "--help" | "-h" => {
                 println!(
                     "samantha-local [--addr 127.0.0.1:7881] [--ui DIR] [--profile dev]\n\
-                     Binds 127.0.0.1 or ::1. GALION_SAMANTHA_WS overrides the default when --addr is absent.\n\
+                     Binds 127.0.0.1 or ::1. GALION_VOICE_WS overrides the default when --addr is absent.\n\
+                     GALION_SAMANTHA_WS is a deprecated alias and logs one warning.\n\
                      GALION_HORBM_PROFILE=dev or --profile dev loads dev.env. Learn and remember\n\
                      then default to grant unless the operator set a value. Outside that profile\n\
                      both stay off unless the operator sets grant.\n\
-                     GALION_SAMANTHA_REF is reported as set, missing, or unset.\n\
+                     GALION_VOICE_REF is reported as set, missing, or unset.\n\
+                     GALION_SAMANTHA_REF is a deprecated alias and logs one warning.\n\
                      Turns run through horbm-voice. brain=horbm and mouth_device=cpu unless cuda is explicit.\n\
                      The CPU mouth is Piper LJ Speech only when this binary was built with --features piper.\n\
                      Otherwise the CPU mouth is an in-process tone. GALION_MOUTH=native speaks the turn\n\
                      text on this socket and returns no PCM. The s711 mouth reads the wav only when\n\
-                     GALION_SAMANTHA_WEIGHTS is a local directory and GALION_SAMANTHA_DEVICE=cuda."
+                     GALION_VOICE_WEIGHTS is a local directory and GALION_VOICE_DEVICE=cuda.\n\
+                     GALION_SAMANTHA_WEIGHTS and GALION_SAMANTHA_DEVICE are deprecated aliases."
                 );
                 return Ok(());
             }
