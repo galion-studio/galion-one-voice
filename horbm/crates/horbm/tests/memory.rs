@@ -650,6 +650,102 @@ fn note_turn_does_no_io() {
     let _ = fs::remove_dir_all(&dir);
 }
 
+#[test]
+fn note_turn_keeps_the_newest_lines_and_drops_the_oldest() {
+    let dir = scratch("turn-cap");
+    let path = dir.join("person-memory.sqlite");
+    let mut store = EpisodicStore::open(&path, true);
+    let cap = 32;
+    let total = cap + 8;
+    for i in 0..total {
+        store
+            .note_turn(
+                "northwind",
+                "northwind",
+                &format!("quillmark line {i}"),
+                &format!("t{i:06}"),
+            )
+            .ok_stored();
+    }
+    assert_eq!(store.buffered_turns(), cap);
+    assert!(!path.exists(), "dropping a buffered line opened sqlite");
+    store.end_session("northwind", "t000099").ok_stored();
+    assert_eq!(store.buffered_turns(), 0);
+    drop(store);
+    let newest = EpisodicStore::read_transcript_file(&path, "line 39").expect("newest transcript");
+    assert!(
+        newest
+            .turns
+            .iter()
+            .any(|turn| turn.text == "quillmark line 39"),
+        "{:?}",
+        newest.turns
+    );
+    let oldest = EpisodicStore::read_transcript_file(&path, "line 0").expect("oldest transcript");
+    assert!(
+        oldest
+            .turns
+            .iter()
+            .all(|turn| turn.text != "quillmark line 0"),
+        "{:?}",
+        oldest.turns
+    );
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn a_repeated_pin_is_one_write() {
+    let dir = scratch("pin-once");
+    let path = dir.join("person-memory.sqlite");
+    let mut store = EpisodicStore::open(&path, true);
+    let first = store.pin("northwind", "my favourite colour is blue", "t000001");
+    first.ok_stored();
+    let writes = store.writes();
+    store
+        .pin("northwind", "  My favourite colour is blue. ", "t000002")
+        .ok_stored();
+    assert_eq!(store.writes(), writes);
+    let WriteOutcome::Stored { id } =
+        store.pin("northwind", "my favourite colour is blue", "t000003")
+    else {
+        panic!("repeat pin was not the stored row");
+    };
+    assert!(matches!(
+        store.forget("northwind", &id),
+        WriteOutcome::Archived { .. }
+    ));
+    let again = store.writes();
+    store
+        .pin("northwind", "my favourite colour is blue", "t000004")
+        .ok_stored();
+    assert!(store.writes() > again);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn the_same_feeling_does_not_insert_another_mood_row() {
+    let dir = scratch("mood-once");
+    let path = dir.join("person-memory.sqlite");
+    let mut store = EpisodicStore::open(&path, true);
+    let mut first = state();
+    first.feeling = Some("tired".into());
+    store.note_state("northwind", &first, "t000001").ok_stored();
+    let writes = store.writes();
+    let mut later = first.clone();
+    later.arousal = 0.91;
+    later.valence = -0.4;
+    later.dominance = 0.2;
+    assert_eq!(
+        store.note_state("northwind", &later, "t000002"),
+        WriteOutcome::Skipped
+    );
+    assert_eq!(store.writes(), writes);
+    later.feeling = Some("glad".into());
+    store.note_state("northwind", &later, "t000003").ok_stored();
+    assert!(store.writes() > writes);
+    let _ = fs::remove_dir_all(&dir);
+}
+
 trait OutcomeExt {
     fn ok_stored(self);
 }

@@ -13,10 +13,17 @@
 //! the word `grant`.
 //!
 //! [`EpisodicStore::note_turn`] only pushes the line into RAM. There is no
-//! SQLite on that path. [`EpisodicStore::end_session`], when `remember` is
-//! granted and the buffer has turns, writes them once through
+//! SQLite on that path. The buffer keeps the newest lines the memory crate's
+//! session ring would keep, and drops the oldest. [`EpisodicStore::end_session`],
+//! when `remember` is granted and the
+//! buffer has turns, writes that tail once through
 //! [`horbm_memory::Store::push_turn`] and [`horbm_memory::Store::drain`],
 //! then writes the extractive summary the same way as before.
+//!
+//! A mood line is one diary row per feeling word. A later trace that only
+//! moves the three decimals does not insert another row, hide the old one,
+//! or reload the embedding arena. A pin whose normalised text is already
+//! live is not written again.
 //!
 //! Forget copies the row into the diary archive and drops it from search.
 //! The archive is the tombstone. This module has no delete of that table.
@@ -45,6 +52,12 @@ const SOURCE_SUMMARY: &str = "session-summary";
 const SOURCE_STATE: &str = "state-tracker";
 const SOURCE_RING: &str = "session-ring";
 
+/// Heard lines kept in RAM until [`EpisodicStore::end_session`].
+///
+/// Same number as [`horbm_memory::RING_CAP`]. A longer call drops the oldest
+/// line from this process. It is not a second sqlite table.
+const SESSION_TURN_CAP: usize = horbm_memory::RING_CAP;
+
 /// The person diary. `remember` false does not create `path`.
 pub struct EpisodicStore {
     remember: bool,
@@ -61,6 +74,8 @@ pub struct EpisodicStore {
     hidden_names: HashMap<String, HashSet<String>>,
     /// Normalised text of a forgotten pin. Same fallback as `hidden_names`.
     hidden_pins: HashMap<String, HashSet<String>>,
+    /// Live pin text, normalised, to the diary id. A repeat does not insert.
+    pinned_norms: HashMap<String, HashMap<String, String>>,
     writes: u64,
     extractions: u64,
 }
@@ -113,6 +128,7 @@ impl EpisodicStore {
             issued: HashMap::new(),
             hidden_names: HashMap::new(),
             hidden_pins: HashMap::new(),
+            pinned_norms: HashMap::new(),
             writes: 0,
             extractions: 0,
         }
@@ -509,6 +525,7 @@ impl PersonMemory for EpisodicStore {
             self.issued.clear();
             self.hidden_names.clear();
             self.hidden_pins.clear();
+            self.pinned_norms.clear();
             self.remember = false;
             return;
         }
@@ -528,6 +545,15 @@ impl PersonMemory for EpisodicStore {
         };
         if looks_like_secret(text) {
             return WriteOutcome::Skipped;
+        }
+        let norm = normalise_fact(text);
+        if let Some(id) = self
+            .pinned_norms
+            .get(person_id)
+            .and_then(|norms| norms.get(&norm))
+            .cloned()
+        {
+            return WriteOutcome::Stored { id };
         }
         if !self.connect(true) {
             return WriteOutcome::Failed;
@@ -556,6 +582,10 @@ impl PersonMemory for EpisodicStore {
             true,
         );
         self.emit(&item);
+        self.pinned_norms
+            .entry(person_id.to_string())
+            .or_default()
+            .insert(norm, id.clone());
         WriteOutcome::Stored { id }
     }
 
@@ -575,11 +605,13 @@ impl PersonMemory for EpisodicStore {
             (Some(line), Some((_, old))) => line == old,
             (Some(_), None) => false,
         };
+        // The feeling word is the row. The three decimals move on every
+        // empathy step, and each new row stays in the sqlite page cache
+        // after `mark` hides it from search.
         let mood_same = self
             .mood_row
             .get(person_id)
-            .map(|(_, old)| old == &mood)
-            .unwrap_or(false);
+            .is_some_and(|(_, old)| feeling_key(old) == feeling_key(&mood));
         if name_same && mood_same {
             return WriteOutcome::Skipped;
         }
@@ -656,6 +688,9 @@ impl PersonMemory for EpisodicStore {
         } else {
             said_by
         };
+        if self.turns.len() == SESSION_TURN_CAP {
+            self.turns.remove(0);
+        }
         self.turns.push(BufferedTurn {
             person_id: person_id.to_string(),
             said_by: said_by.to_string(),
@@ -762,6 +797,12 @@ impl PersonMemory for EpisodicStore {
             return WriteOutcome::Failed;
         }
         self.issued.remove(item_id);
+        if stone.source == SOURCE_PIN {
+            let norm = normalise_fact(&stone.text);
+            if let Some(norms) = self.pinned_norms.get_mut(person_id) {
+                norms.remove(&norm);
+            }
+        }
         self.name_row.retain(|_, (id, _)| id != item_id);
         self.mood_row.retain(|_, (id, _)| id != item_id);
         self.summary_row.retain(|_, id| id != item_id);
@@ -1147,6 +1188,12 @@ pub(crate) fn mood_line(state: &PersonState) -> String {
         fmt3(state.valence),
         fmt3(state.dominance)
     )
+}
+
+/// The word after `i am feeling`, before the axis trace.
+fn feeling_key(line: &str) -> &str {
+    let rest = line.strip_prefix("i am feeling ").unwrap_or(line);
+    rest.split(" arousal ").next().unwrap_or(rest).trim()
 }
 
 fn clean_name(name: &str) -> Option<String> {
