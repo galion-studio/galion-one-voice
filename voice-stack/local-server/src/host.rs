@@ -309,35 +309,51 @@ impl HostSession {
 
     /// The one attach path. R11 S158 re-attaches after a retract through this same helper.
     ///
-    /// Both grants: [`LearnPass::audit`] once, then [`HorbmMind::attach_learned`]
-    /// with those rows. Otherwise attach nothing and open nothing. An empty
-    /// audit does not call `attach_learned` until a previous attach put rows
-    /// in the thread. `set_learned([])` drops the diary the card engine just
-    /// opened and builds a second in-memory store; turns then fault that
-    /// store's page cache in, and the replaced store's pages stay in RSS.
-    /// The spawn diary already has no learned rows. After a real attach, an
-    /// empty audit still forwards `[]` so a retract clears the thread.
+    /// Both grants and a live pack file: [`LearnPass::audit`] once, then
+    /// [`HorbmMind::attach_learned`] with those rows. No grants, or no live
+    /// file and nothing previously attached: return without constructing
+    /// [`LearnPass`] and without calling `attach_learned`. `LearnPass::audit`
+    /// on a missing file does not open SQLite, but constructing the pass is
+    /// still boot work, and `set_learned([])` would replace the diary the
+    /// card engine just opened. The spawn diary already has no learned rows,
+    /// so an empty pack leaves it untouched. After a real attach, a missing
+    /// or empty pack still forwards `[]` so a retract clears the thread.
     ///
     /// An audit or attach error is printed once and the count stays zero.
-    /// The startup line prints the count, never the text. Shutdown does not
-    /// call this; [`Self::finish`] only seals.
+    /// The startup line prints the count, never the text. Not used on a turn.
+    /// `finish` only seals.
     fn attach_pack(&self) -> usize {
         if self.finished.load(Ordering::SeqCst) {
             return self.learned_rows.load(Ordering::Relaxed);
         }
         let count = if self.config.learn.granted && self.config.remember.granted {
-            match LearnPass::open(self.config.learn_config.clone()).audit() {
-                Ok(audit) => self.hand_learned(audit.rows),
-                Err(err) => {
-                    eprintln!("horbm learn: {err}");
-                    0
-                }
-            }
+            self.attach_if_pack_exists()
         } else {
             0
         };
         self.learned_rows.store(count, Ordering::Relaxed);
         count
+    }
+
+    /// Stat the live file. Open the pack only when that file is present, or
+    /// when a previous attach has to be cleared.
+    fn attach_if_pack_exists(&self) -> usize {
+        let live = self
+            .config
+            .learn_config
+            .pack_dir
+            .join(horbm::LEARN_PACK_LIVE)
+            .join(horbm::LEARN_PACK_DB);
+        if !live.is_file() && !self.pack_attached.load(Ordering::Relaxed) {
+            return 0;
+        }
+        match LearnPass::open(self.config.learn_config.clone()).audit() {
+            Ok(audit) => self.hand_learned(audit.rows),
+            Err(err) => {
+                eprintln!("horbm learn: {err}");
+                0
+            }
+        }
     }
 
     /// Forward `rows` unless this is the first attach and the list is empty.
@@ -525,7 +541,7 @@ impl HostSession {
     /// Diary `end_session`, then [`SessionSeal::seal`]. Both are no-ops when
     /// that consent is denied. Not called from [`Drop`]. A crash writes nothing.
     ///
-    /// This does not audit the pack and does not call [`Self::attach_pack`].
+    /// This does not audit the pack and does not call `attach_pack`.
     /// The seal is one write of the clause already held in RAM. The signal
     /// handler only wakes the runtime; this runs after that, on the blocking
     /// pool.
