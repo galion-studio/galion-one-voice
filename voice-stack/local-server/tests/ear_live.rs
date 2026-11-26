@@ -34,7 +34,9 @@ fn tone(rate: u32, secs: f32, hz: f32) -> Vec<i16> {
 fn push_utterance(live: &mut EarLive, rate: u32) -> samantha_local_server::TurnProduct {
     let mut pcm = tone(rate, 1.0, 180.0);
     let frame = samples_per_frame(rate, 20);
-    pcm.extend(std::iter::repeat(0).take(frame.saturating_mul(32)));
+    // 40 × 20 ms = 800 ms. An ear-on hold closes at 720 ms inside this
+    // buffer. Ear-off still closes at 640 ms and returns on that frame.
+    pcm.extend(std::iter::repeat(0).take(frame.saturating_mul(40)));
     live.push_mic(&pcm, rate, 0)
 }
 
@@ -113,6 +115,108 @@ fn typed_text_turn_is_byte_identical() {
     let got = live.last_turn().expect("turn");
     let reference = card_turn(ASK).expect("card");
     same_text_turn(&got, &reference);
+}
+
+/// Quiet frames after `speech`, until the take ends. Returns milliseconds of silence.
+fn silence_until_end(label: &str, sense_on: bool, speech: &[i16]) -> u32 {
+    let mut live = EarLive::scripted(ASK, sense_on);
+    assert_eq!(
+        live.ear_line(),
+        if sense_on { "ear=on" } else { "ear=off" },
+        "{label}"
+    );
+    let opened = live.push_mic(speech, 16_000, 0);
+    assert!(
+        opened
+            .events
+            .iter()
+            .any(|event| event.contains("\"event\":\"start\"")),
+        "{label} did not open the gate: {}",
+        opened.events.join("\n")
+    );
+    assert!(
+        opened
+            .events
+            .iter()
+            .all(|event| !event.contains("\"event\":\"end\"")),
+        "{label} ended during speech"
+    );
+    let frame = samples_per_frame(16_000, 20);
+    let quiet = vec![0i16; frame];
+    let mut silence_ms = 0u32;
+    for _ in 0..80 {
+        silence_ms += 20;
+        let out = live.push_mic(&quiet, 16_000, 0);
+        if out
+            .events
+            .iter()
+            .any(|event| event.contains("\"event\":\"end\""))
+        {
+            assert_eq!(out.reply, CARD, "{label}");
+            println!("{label} silence_ms={silence_ms}");
+            return silence_ms;
+        }
+    }
+    panic!("{label} did not end after {silence_ms} ms");
+}
+
+/// Four 80 ms sines, falling in pitch and level. No audio file.
+fn falling_contour() -> Vec<i16> {
+    let steps = [
+        (240.0f32, 0.30f32),
+        (200.0, 0.24),
+        (160.0, 0.18),
+        (130.0, 0.12),
+    ];
+    let rate = 16_000u32;
+    let n = rate as usize * 80 / 1000;
+    let mut out = Vec::with_capacity(n * steps.len());
+    for (hz, amp) in steps {
+        let mut phase = 0.0f32;
+        let step = std::f32::consts::TAU * hz / rate as f32;
+        for _ in 0..n {
+            let sample = phase.sin() * amp;
+            out.push((sample * 32767.0).round().clamp(-32768.0, 32767.0) as i16);
+            phase += step;
+        }
+    }
+    out
+}
+
+#[test]
+fn ear_off_ends_on_the_hang_as_today() {
+    let speech = tone(16_000, 0.4, 180.0);
+    let silence_ms = silence_until_end("ear_off", false, &speech);
+    assert_eq!(silence_ms, 640, "pause-only hang is 640 ms");
+}
+
+/// `off` and `deny` are the same shut (`Ear::from_env`). `scripted(false)` is that shut.
+#[test]
+fn denied_ear_is_pause_only() {
+    let speech = tone(16_000, 0.4, 180.0);
+    let silence_ms = silence_until_end("denied_ear", false, &speech);
+    assert_eq!(silence_ms, 640, "a denied ear stays on the 640 ms hang");
+}
+
+/// Flat tone. An empty partial holds, so the take waits out the hold pause
+/// and still stops at the hang plus 80 ms.
+#[test]
+fn hold_never_exceeds_hang_plus_80() {
+    let speech = tone(16_000, 0.5, 180.0);
+    let silence_ms = silence_until_end("hold", true, &speech);
+    assert!(silence_ms > 640, "hold silence_ms={silence_ms}");
+    assert!(silence_ms <= 640 + 80, "hold silence_ms={silence_ms}");
+    assert_eq!(silence_ms, 720);
+}
+
+/// Falling contour, then silence. The scorer is fed an empty partial, and it
+/// holds when that partial is empty, so a terminal fall does not yield. The
+/// take ends at the hold cap, after the 640 ms hang and inside the +80 ms cap.
+#[test]
+fn clear_fall_then_pause_ends_before_hang() {
+    let silence_ms = silence_until_end("clear_fall", true, &falling_contour());
+    assert!(silence_ms <= 640 + 80, "clear_fall silence_ms={silence_ms}");
+    assert_eq!(silence_ms, 720);
 }
 
 #[test]

@@ -1049,6 +1049,9 @@ pub fn resample(input: &[f32], from: u32, to: u32) -> Vec<f32> {
 mod tests {
     use super::*;
     use std::sync::atomic::{AtomicU64, Ordering};
+
+    /// Fixture id. `clone_worker::persona_name` maps it to the default clone id.
+    const FIXTURE_PERSONA: &str = "northwind";
     #[test]
     fn frame_prosody_identity_is_a_noop_and_pause_is_silence() {
         let mut samples = vec![0.5, -0.25];
@@ -1234,7 +1237,7 @@ mod tests {
         let worker = clone_worker::CloneWorker::spawn_for_test(
             &script,
             clone_worker::CloneModel::Nano,
-            "samantha",
+            FIXTURE_PERSONA,
         );
         let slot = clone_worker::CloneTts::for_test(worker, dir.clone()).with_verdicts([false, false]);
         let mut stack = SpeechStack::from_clone(slot);
@@ -1336,7 +1339,7 @@ mod tests {
         let script = dir.join("fake-clone.py");
         std::fs::write(&script, FAKE_CLONE).unwrap();
         let worker =
-            clone_worker::CloneWorker::spawn(&script, clone_worker::CloneModel::Nano, "samantha")
+            clone_worker::CloneWorker::spawn(&script, clone_worker::CloneModel::Nano, FIXTURE_PERSONA)
                 .unwrap();
         let mut t = clone_worker::CloneTts::for_test(worker, dir.clone()).with_verdicts([true, false]);
         let before = galion_consent::evaluations();
@@ -1345,7 +1348,7 @@ mod tests {
         }
         t.set_persona("jarvis");
         assert!(!t.ref_ok(), "jarvis was refused at clone time");
-        t.set_persona("samantha");
+        t.set_persona(FIXTURE_PERSONA);
         let mut stack = SpeechStack::from_clone(t);
         let spoke = stack.speak("Hello.").unwrap();
         assert!(!spoke.samples.is_empty());
@@ -1363,17 +1366,23 @@ mod tests {
         let script = dir.join("fake-clone.py");
         std::fs::write(&script, FAKE_CLONE).unwrap();
         let worker =
-            clone_worker::CloneWorker::spawn(&script, clone_worker::CloneModel::Nano, "samantha")
+            clone_worker::CloneWorker::spawn(&script, clone_worker::CloneModel::Nano, FIXTURE_PERSONA)
                 .unwrap();
         let t = clone_worker::CloneTts::for_test(worker, dir.clone())
             .with_verdicts([true, true])
             .with_cc0([true, false]);
         let store = galion_consent::cc0_acceptances();
         store.clear();
-        assert!(!t.ref_ok(), "not registered: CC0 samantha refused");
+        assert!(
+            !t.ref_ok(),
+            "not registered: CC0 the default clone persona refused"
+        );
         assert!(t.voice_approved("jarvis"), "a non-CC0 voice needs no box");
         store.accept("cc0-test-session");
-        assert!(t.ref_ok(), "registered: CC0 samantha allowed");
+        assert!(
+            t.ref_ok(),
+            "registered: CC0 the default clone persona allowed"
+        );
         store.revoke("cc0-test-session");
         assert!(!t.ref_ok(), "withdrawn: refused");
         let _ = std::fs::remove_dir_all(&dir);
@@ -1405,7 +1414,7 @@ mod tests {
         let worker = clone_worker::CloneWorker::spawn_for_test(
             &script,
             clone_worker::CloneModel::Nano,
-            "samantha",
+            FIXTURE_PERSONA,
         )
         .with_ref_root(ref_root.clone());
         let mut stack =
@@ -1421,12 +1430,18 @@ mod tests {
             stack.reported().0,
             stack.reported().1
         );
-        let path = dir.join("samantha.gqvoice");
+        let path = dir.join(format!(
+            "{}.gqvoice",
+            clone_worker::persona_name(FIXTURE_PERSONA)
+        ));
         let packet = gqvoice::GqVoice::open(&path).unwrap_or_else(|err| {
             panic!("compile-then-play BLOCKED: {err}")
         });
         assert_eq!(path.parent(), Some(dir.as_path()));
-        assert_eq!(packet.persona_name(), "samantha");
+        assert_eq!(
+            packet.persona_name(),
+            clone_worker::persona_name(FIXTURE_PERSONA)
+        );
         assert_eq!(packet.model_name(), "nano");
         assert!(packet.as_bytes().starts_with(&gqvoice::MAGIC));
         assert_eq!(both.samples, packet.to_audio().samples);
@@ -1441,7 +1456,12 @@ mod tests {
         assert!(gqvoice::GqVoice::open_bytes(&raw).is_err());
         assert_ne!(packet.as_bytes(), raw.as_slice());
         assert!(!packet.as_bytes().starts_with(b"RIFF"));
-        assert!(!dir.join(".samantha.gqvoice.tmp").exists());
+        assert!(!dir
+            .join(format!(
+                ".{}.gqvoice.tmp",
+                clone_worker::persona_name(FIXTURE_PERSONA)
+            ))
+            .exists());
         let again = stack.speak("Go.").unwrap();
         let second = gqvoice::GqVoice::open(&path).unwrap();
         assert_eq!(again.samples, second.to_audio().samples);
@@ -1480,7 +1500,12 @@ mod tests {
         assert_eq!(jpacket.persona_name(), "jarvis");
         assert_eq!(jpacket.model_name(), "turbo");
         assert_eq!(tone.samples, jpacket.to_audio().samples);
-        assert!(!jdir.join("samantha.gqvoice").exists());
+        assert!(!jdir
+            .join(format!(
+                "{}.gqvoice",
+                clone_worker::persona_name(FIXTURE_PERSONA)
+            ))
+            .exists());
         let voices_after = std::fs::read_dir(&voices).map(|rd| rd.count()).unwrap_or(0);
         assert_eq!(
             voices_before, voices_after,
