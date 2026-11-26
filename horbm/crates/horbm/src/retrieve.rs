@@ -58,7 +58,6 @@ use horbm_brain::{
 
 use crate::learn::LearnedRow;
 use crate::UNKNOWN_REPLY;
-use crate::WINDOWS_KNOWLEDGE_DIR;
 
 /// Published hits. Same cap as `horbm_memory::MAX_HITS`.
 pub const MEMORY_HIT_CAP: usize = 4;
@@ -241,9 +240,10 @@ pub struct RetrievalConfig {
 impl RetrievalConfig {
     /// `GALION_HORBM_REMEMBER=grant` grants. Any other value, including when
     /// the name is unset, denies. `GALION_HORBM_KNOWLEDGE` is the card directory
-    /// when it is set. When it is unset, [`WINDOWS_KNOWLEDGE_DIR`] is used
-    /// only if that directory already exists. `GALION_HORBM_KEYS` is the HKB1
-    /// path when it is set and non-empty. It is not opened here.
+    /// when it is set. When it is unset, [`crate::WINDOWS_KNOWLEDGE_DIR`] is used
+    /// only on Windows, and only if that directory already exists.
+    /// `GALION_HORBM_KEYS` is the HKB1 path when it is set and non-empty. It is
+    /// not opened here.
     pub fn from_env() -> Self {
         let flag = std::env::var("GALION_HORBM_REMEMBER").ok();
         let knowledge = std::env::var("GALION_HORBM_KNOWLEDGE").ok();
@@ -264,14 +264,7 @@ impl RetrievalConfig {
                     Some(PathBuf::from(raw))
                 }
             }
-            None => {
-                let fallback = PathBuf::from(WINDOWS_KNOWLEDGE_DIR);
-                if fallback.is_dir() {
-                    Some(fallback)
-                } else {
-                    None
-                }
-            }
+            None => windows_fallback(),
         };
         Self {
             remember,
@@ -279,6 +272,24 @@ impl RetrievalConfig {
             fixture_rows: 0,
             keys_path: None,
         }
+    }
+}
+
+/// Drive-letter knowledge root. Probed only on Windows, and only when that
+/// directory already exists. Other targets return `None` and do not stat it.
+fn windows_fallback() -> Option<PathBuf> {
+    #[cfg(windows)]
+    {
+        let fallback = PathBuf::from(crate::WINDOWS_KNOWLEDGE_DIR);
+        if fallback.is_dir() {
+            Some(fallback)
+        } else {
+            None
+        }
+    }
+    #[cfg(not(windows))]
+    {
+        None
     }
 }
 
@@ -448,7 +459,7 @@ impl RetrievalThread {
     /// the diary once and, when a key file is set, the scan. Each row is
     /// inserted with `diary_add`. The stored source is `learned;` plus
     /// [`crate::LearnedRow::source`]. An empty list clears the rows.
-    /// More than [`LEARNED_ROW_CAP`] keeps the newest dates and records the drop in
+    /// More than `LEARNED_ROW_CAP` keeps the newest dates and records the drop in
     /// [`RetrievalThread::last_error`]. A denied thread stores the rows and
     /// does not open the diary. An ask does not replace this command.
     pub fn set_learned(&self, rows: Vec<LearnedRow>) -> Result<(), RetrieveError> {
@@ -456,7 +467,7 @@ impl RetrievalThread {
     }
 
     /// Last diary error. Cleared on a successful grant, on withdraw, and when
-    /// a learned update drops nothing. A list over [`LEARNED_ROW_CAP`] sets
+    /// a learned update drops nothing. A list over `LEARNED_ROW_CAP` sets
     /// `dropped N learned rows`.
     pub fn last_error(&self) -> Option<String> {
         self.shared
