@@ -20,8 +20,16 @@
 //!
 //! Forget copies the row into the diary archive and drops it from search.
 //! The archive is the tombstone. This module has no delete of that table.
+//!
+//! `push_turn` also writes a `session-ring` candidate beside that diary row.
+//! Recall drops a name candidate when a live or forgotten state-tracker line
+//! names the same person, and drops a candidate whose normalised text matches
+//! a pin. The diary row stays. Other candidates stay. Forget archives the
+//! candidate twin of a pin or a name row. `MemoryKind` has no fact variant,
+//! so a kept name candidate is `Name` and any other kept candidate is `Pin`,
+//! with `pinned` left false.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 use galion_emotion_core::standins::memory::{
@@ -34,6 +42,7 @@ use crate::retrieve::{covers, search_person_lexical, MemoryHit};
 const SOURCE_PIN: &str = "pin";
 const SOURCE_SUMMARY: &str = "session-summary";
 const SOURCE_STATE: &str = "state-tracker";
+const SOURCE_RING: &str = "session-ring";
 
 /// The person diary. `remember` false does not create `path`.
 pub struct EpisodicStore {
@@ -46,6 +55,11 @@ pub struct EpisodicStore {
     mood_row: HashMap<String, (String, String)>,
     summary_row: HashMap<String, String>,
     issued: HashMap<String, String>,
+    /// Name objects from a forgotten state-tracker line, lowercase.
+    /// Recall hides a matching session-ring twin when that twin was not archived.
+    hidden_names: HashMap<String, HashSet<String>>,
+    /// Normalised text of a forgotten pin. Same fallback as `hidden_names`.
+    hidden_pins: HashMap<String, HashSet<String>>,
     writes: u64,
     extractions: u64,
 }
@@ -96,6 +110,8 @@ impl EpisodicStore {
             mood_row: HashMap::new(),
             summary_row: HashMap::new(),
             issued: HashMap::new(),
+            hidden_names: HashMap::new(),
+            hidden_pins: HashMap::new(),
             writes: 0,
             extractions: 0,
         }
@@ -299,6 +315,179 @@ impl EpisodicStore {
             turns,
         })
     }
+
+    /// Remember a forgotten pin or name so recall can hide a twin the archive
+    /// call did not take. Mood and summary rows have no candidate twin.
+    fn suppress_forgotten(&mut self, person_id: &str, source: &str, text: &str) {
+        if source == SOURCE_PIN {
+            let norm = normalise_fact(text);
+            if !norm.is_empty() {
+                self.hidden_pins
+                    .entry(person_id.to_string())
+                    .or_default()
+                    .insert(norm);
+            }
+            return;
+        }
+        if source == SOURCE_STATE && text.starts_with("my name is") {
+            let slot = self.hidden_names.entry(person_id.to_string()).or_default();
+            for name in names_named_by(text) {
+                slot.insert(name);
+            }
+        }
+    }
+
+    /// Archive `cand-*` rows that repeat this pin or name line. `owns` reads
+    /// `said_by` out of the candidate document. A twin that cannot be archived
+    /// stays out of recall through `suppress_forgotten`.
+    fn archive_twins(&mut self, person_id: &str, source: &str, text: &str) {
+        if source != SOURCE_PIN && !(source == SOURCE_STATE && text.starts_with("my name is")) {
+            return;
+        }
+        let mut queries = vec![text.to_string()];
+        if source == SOURCE_STATE {
+            queries.extend(names_named_by(text));
+        }
+        let mut ids = Vec::new();
+        for query in &queries {
+            if query.is_empty() {
+                continue;
+            }
+            let Some(store) = self.store.as_ref() else {
+                return;
+            };
+            let Ok(hits) = search_person_lexical(store, query) else {
+                continue;
+            };
+            for hit in hits {
+                if hit.said_by != person_id || hit.source != SOURCE_RING {
+                    continue;
+                }
+                if !hit.item_id.starts_with("cand-") {
+                    continue;
+                }
+                if !candidate_matches(
+                    &hit.text,
+                    &hit.said_by,
+                    &hit.date,
+                    &hit.source,
+                    source,
+                    text,
+                ) {
+                    continue;
+                }
+                if !ids.iter().any(|id: &String| id == &hit.item_id) {
+                    ids.push(hit.item_id);
+                }
+            }
+        }
+        for id in ids {
+            if !self.owns(person_id, &id) {
+                continue;
+            }
+            let _archived = {
+                let Some(store) = self.store.as_mut() else {
+                    return;
+                };
+                store.forget(&id).is_ok()
+            };
+            if let Some(store) = self.store.as_mut() {
+                store.pause_worker();
+            }
+        }
+    }
+
+    /// Drop session-ring twins on the hit list, before the recall cap.
+    /// A live name line in `name_row` counts even when this query did not
+    /// return that row. Forgotten lines count through the in-memory sets.
+    ///
+    /// Search keeps only [`crate::MEMORY_HIT_CAP`] rows, and a pin outranks a
+    /// diary name line. The candidate can fill that window while the name
+    /// line is left out. After the candidate is dropped, put the name line
+    /// back when it still covers the query.
+    fn drop_duplicate_candidates(
+        &self,
+        person_id: &str,
+        items: &mut Vec<MemoryItem>,
+        terms: &[String],
+    ) {
+        let mut live_names = Vec::new();
+        if let Some((_, line)) = self.name_row.get(person_id) {
+            live_names.extend(names_named_by(line));
+        }
+        for item in items.iter() {
+            if item.source == SOURCE_STATE && item.text.starts_with("my name is") {
+                for name in names_named_by(&item.text) {
+                    if !live_names.iter().any(|have| have == &name) {
+                        live_names.push(name);
+                    }
+                }
+            }
+        }
+        let live_pins: Vec<String> = items
+            .iter()
+            .filter(|item| item.source == SOURCE_PIN)
+            .map(|item| normalise_fact(&item.text))
+            .filter(|text| !text.is_empty())
+            .collect();
+        let forgotten_names = self.hidden_names.get(person_id);
+        let forgotten_pins = self.hidden_pins.get(person_id);
+        items.retain(|item| {
+            if item.source != SOURCE_RING {
+                return true;
+            }
+            let objects = name_slot_objects(&item.text, &item.person_id, &item.at, &item.source);
+            if objects.iter().any(|object| {
+                live_names.iter().any(|name| name == object)
+                    || forgotten_names.is_some_and(|set| set.contains(object))
+            }) {
+                return false;
+            }
+            let norm = normalise_fact(&item.text);
+            if !norm.is_empty()
+                && (live_pins.iter().any(|pin| pin == &norm)
+                    || forgotten_pins.is_some_and(|set| set.contains(&norm)))
+            {
+                return false;
+            }
+            true
+        });
+        self.restore_covered_name(person_id, items, terms);
+    }
+
+    /// The live state-tracker name line, when this query covers it and search
+    /// did not already return that id.
+    fn restore_covered_name(&self, person_id: &str, items: &mut Vec<MemoryItem>, terms: &[String]) {
+        let Some((id, line)) = self
+            .name_row
+            .get(person_id)
+            .map(|(id, line)| (id.clone(), line.clone()))
+        else {
+            return;
+        };
+        if items.iter().any(|item| item.id == id) {
+            return;
+        }
+        let haystack = format!("{line} {person_id} {SOURCE_STATE}");
+        if !covers(&haystack, terms) {
+            return;
+        }
+        let at = self
+            .store
+            .as_ref()
+            .and_then(|store| store.document_of(&id).ok().flatten())
+            .and_then(|document| json_string(&document, "date"))
+            .unwrap_or_default();
+        items.push(item_from(
+            id,
+            person_id,
+            MemoryKind::Name,
+            &line,
+            &at,
+            SOURCE_STATE,
+            false,
+        ));
+    }
 }
 
 impl PersonMemory for EpisodicStore {
@@ -317,6 +506,8 @@ impl PersonMemory for EpisodicStore {
             self.mood_row.clear();
             self.summary_row.clear();
             self.issued.clear();
+            self.hidden_names.clear();
+            self.hidden_pins.clear();
             self.remember = false;
             return;
         }
@@ -563,14 +754,18 @@ impl PersonMemory for EpisodicStore {
         if forgotten.is_err() {
             return WriteOutcome::Failed;
         }
-        let stone = self.tombstone(item_id);
-        if stone.as_ref().map(|row| row.reason.as_str()) != Some("forget") {
+        let Some(stone) = self.tombstone(item_id) else {
+            return WriteOutcome::Failed;
+        };
+        if stone.reason != "forget" {
             return WriteOutcome::Failed;
         }
         self.issued.remove(item_id);
         self.name_row.retain(|_, (id, _)| id != item_id);
         self.mood_row.retain(|_, (id, _)| id != item_id);
         self.summary_row.retain(|_, id| id != item_id);
+        self.suppress_forgotten(person_id, &stone.source, &stone.text);
+        self.archive_twins(person_id, &stone.source, &stone.text);
         WriteOutcome::Archived {
             id: item_id.to_string(),
         }
@@ -600,14 +795,10 @@ impl PersonMemory for EpisodicStore {
             .filter(|hit| covers(&haystack(hit), &terms))
             .map(item_from_hit)
             .collect();
-        items.sort_by(|left, right| {
-            right
-                .pinned
-                .cmp(&left.pinned)
-                .then_with(|| overlap(&right.text, &terms).cmp(&overlap(&left.text, &terms)))
-                .then_with(|| left.id.cmp(&right.id))
-        });
+        rank_hits(&mut items, &terms);
         items.dedup_by(|left, right| left.id == right.id);
+        self.drop_duplicate_candidates(person_id, &mut items, &terms);
+        rank_hits(&mut items, &terms);
         items.truncate(crate::MEMORY_HIT_CAP);
         items
     }
@@ -760,8 +951,131 @@ fn kind_of(hit: &MemoryHit) -> MemoryKind {
         SOURCE_SUMMARY => MemoryKind::Summary,
         SOURCE_STATE if hit.text.starts_with("my name is") => MemoryKind::Name,
         SOURCE_STATE => MemoryKind::Mood,
+        // No Fact/Candidate variant on MemoryKind. A name slot stays Name.
+        // Every other kept candidate stays Pin, with pinned false.
+        SOURCE_RING if has_name_slot(&hit.text, &hit.said_by, &hit.date, &hit.source) => {
+            MemoryKind::Name
+        }
         _ => MemoryKind::Pin,
     }
+}
+
+fn has_name_slot(text: &str, said_by: &str, date: &str, source: &str) -> bool {
+    !name_slot_objects(text, said_by, date, source).is_empty()
+}
+
+fn name_slot_objects(text: &str, said_by: &str, date: &str, source: &str) -> Vec<String> {
+    horbm_memory::FactExtractor::extract(
+        &horbm_memory::BuiltinExtractor,
+        text,
+        said_by,
+        date,
+        source,
+    )
+    .into_iter()
+    .filter(|candidate| candidate.subject_key == "name")
+    .map(|candidate| candidate.object_value.to_ascii_lowercase())
+    .collect()
+}
+
+fn candidate_matches(
+    text: &str,
+    said_by: &str,
+    date: &str,
+    source: &str,
+    diary_source: &str,
+    diary_text: &str,
+) -> bool {
+    if diary_source == SOURCE_STATE && diary_text.starts_with("my name is") {
+        let names = names_named_by(diary_text);
+        return name_slot_objects(text, said_by, date, source)
+            .iter()
+            .any(|object| names.iter().any(|name| name == object));
+    }
+    if diary_source == SOURCE_PIN {
+        let left = normalise_fact(text);
+        let right = normalise_fact(diary_text);
+        return !left.is_empty() && left == right;
+    }
+    false
+}
+
+/// Names inside a state-tracker `name_line`: `my name is {Name} ({class})`,
+/// joined with ` and `.
+fn names_named_by(line: &str) -> Vec<String> {
+    let Some(rest) = line.strip_prefix("my name is ") else {
+        return Vec::new();
+    };
+    let mut names = Vec::new();
+    let mut rest = rest;
+    while !rest.is_empty() {
+        let Some((end, suffix_len)) = class_suffix(rest) else {
+            break;
+        };
+        let name = rest[..end].trim();
+        if !name.is_empty() {
+            names.push(name.to_ascii_lowercase());
+        }
+        rest = rest[end + suffix_len..].trim_start();
+        if let Some(next) = rest.strip_prefix("and ") {
+            rest = next;
+        } else {
+            break;
+        }
+    }
+    names
+}
+
+fn class_suffix(text: &str) -> Option<(usize, usize)> {
+    const SUFFIXES: &[&str] = &[" (he)", " (she)", " (they)"];
+    SUFFIXES
+        .iter()
+        .filter_map(|suffix| text.find(suffix).map(|index| (index, suffix.len())))
+        .min_by_key(|(index, _)| *index)
+}
+
+/// ASCII lowercase, whitespace collapsed, edge punctuation removed, then a
+/// leading `please remember` / `remember this` / `remember` taken off.
+fn normalise_fact(text: &str) -> String {
+    let folded = collapse_ws_lower(text);
+    let trimmed = trim_ascii_punctuation(folded.trim()).trim();
+    strip_remember_prefix(trimmed)
+}
+
+fn collapse_ws_lower(text: &str) -> String {
+    let mut out = String::new();
+    let mut pending_space = false;
+    for ch in text.chars() {
+        if ch.is_whitespace() {
+            pending_space = !out.is_empty();
+            continue;
+        }
+        if pending_space {
+            out.push(' ');
+            pending_space = false;
+        }
+        out.push(ch.to_ascii_lowercase());
+    }
+    out
+}
+
+fn trim_ascii_punctuation(text: &str) -> &str {
+    text.trim_matches(|ch: char| ch.is_ascii_punctuation())
+}
+
+fn strip_remember_prefix(text: &str) -> String {
+    const PREFIXES: &[&str] = &["please remember", "remember this", "remember"];
+    for prefix in PREFIXES {
+        let Some(rest) = text.strip_prefix(prefix) else {
+            continue;
+        };
+        if rest.starts_with(|ch: char| ch.is_ascii_alphanumeric()) {
+            continue;
+        }
+        let rest = collapse_ws_lower(rest.trim());
+        return trim_ascii_punctuation(rest.trim()).trim().to_string();
+    }
+    text.to_string()
 }
 
 fn haystack(hit: &MemoryHit) -> String {
@@ -777,11 +1091,25 @@ fn overlap(text: &str, terms: &[String]) -> usize {
 }
 
 fn json_said_by(document: &str) -> Option<String> {
+    json_string(document, "said_by")
+}
+
+fn json_string(document: &str, key: &str) -> Option<String> {
     let value: serde_json::Value = serde_json::from_str(document).ok()?;
     value
-        .get("said_by")
+        .get(key)
         .and_then(|field| field.as_str())
         .map(str::to_string)
+}
+
+fn rank_hits(items: &mut [MemoryItem], terms: &[String]) {
+    items.sort_by(|left, right| {
+        right
+            .pinned
+            .cmp(&left.pinned)
+            .then_with(|| overlap(&right.text, terms).cmp(&overlap(&left.text, terms)))
+            .then_with(|| left.id.cmp(&right.id))
+    });
 }
 
 pub(crate) fn name_line(names: &[TrackedName]) -> Option<String> {
@@ -962,5 +1290,62 @@ mod tests {
             mood_line(&state),
             "i am feeling tired arousal 0.300 valence -0.250 dominance 0.500"
         );
+    }
+
+    #[test]
+    fn normalised_pin_text_matches_a_remember_this_line() {
+        assert_eq!(
+            normalise_fact("remember this my sister is Mira"),
+            normalise_fact("my sister is Mira")
+        );
+        assert_eq!(
+            normalise_fact("  Please   remember this: I prefer quiet mornings! "),
+            "this: i prefer quiet mornings"
+        );
+        assert_eq!(
+            normalise_fact("remembering the song"),
+            "remembering the song"
+        );
+        assert_eq!(
+            names_named_by("my name is Nia (they) and Sol (she)"),
+            vec!["nia".to_string(), "sol".to_string()]
+        );
+        assert!(names_named_by("my name is Ana").is_empty());
+    }
+
+    #[test]
+    fn candidate_document_carries_said_by() {
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("clock")
+            .as_nanos();
+        let dir =
+            std::env::temp_dir().join(format!("horbm-f7-cand-doc-{}-{nanos}", std::process::id()));
+        std::fs::create_dir_all(&dir).expect("scratch");
+        let path = dir.join("person-memory.sqlite");
+        {
+            let mut store = EpisodicStore::open(&path, true);
+            let noted = store.note_turn("northwind", "northwind", "I live in Split", "t000001");
+            assert!(matches!(noted, WriteOutcome::Stored { .. }), "{noted:?}");
+            let ended = store.end_session("northwind", "t000099");
+            assert!(matches!(ended, WriteOutcome::Stored { .. }), "{ended:?}");
+        }
+        let opened = horbm_memory::Store::open(&path).expect("reopen");
+        let found = opened.search_lexical("Split").expect("search");
+        let cand = found
+            .hits
+            .iter()
+            .find(|hit| hit.item_id.starts_with("cand-"))
+            .expect("candidate id");
+        let document = opened
+            .document_of(&cand.item_id)
+            .expect("document read")
+            .expect("candidate document");
+        let value: serde_json::Value = serde_json::from_str(&document).expect("json");
+        assert_eq!(value["said_by"], "northwind");
+        assert_eq!(value["source"], "session-ring");
+        assert_eq!(value["kind"], "candidate");
+        drop(opened);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }
