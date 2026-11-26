@@ -5,7 +5,8 @@
 
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
+use std::sync::{mpsc, Mutex};
+use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 #[cfg(target_os = "linux")]
@@ -13,9 +14,7 @@ use std::fs::OpenOptions;
 #[cfg(target_os = "linux")]
 use std::io::Write;
 #[cfg(target_os = "linux")]
-use std::sync::{mpsc, Arc};
-#[cfg(target_os = "linux")]
-use std::thread;
+use std::sync::Arc;
 
 use horbm::{CellState, RetrievalConfig, RetrievalThread, RetrievedCells, MEMORY_HIT_CAP};
 #[cfg(target_os = "linux")]
@@ -248,6 +247,48 @@ fn unset_keys_path_stays_lexical() {
     assert_ne!(hit.clause(), hit.item_id);
     assert!(cell.answer.is_empty());
     drop(thread);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+/// The lexical grant, one ask, and drop, many times. A missed stop wakeup
+/// leaves `Drop` joined to `horbm-retrieval` and `horbm-memory` parked.
+/// The watchdog bounds that hang.
+#[test]
+fn unset_keys_path_ask_and_drop_does_not_wedge() {
+    let dir = scratch("lexical-drop");
+    let cards = dir.join("cards");
+    fs::create_dir(&cards).expect("cards");
+    fs::write(
+        cards.join("kettle.json"),
+        r#"{"id":"kettle","title":"The kettle is on the hob.","section":"horbm","category":"fixture","summary":"The kettle is on the hob.","body":"The kettle is on the hob.","claim_type":"fact","sources":[],"evidence_strength":"strong","said_by":"horbm","as_of_date":"2026-11-25","status":"draft","contested_views":[],"related":[]}"#,
+    )
+    .expect("card");
+    let (done_tx, done_rx) = mpsc::channel();
+    let stress = thread::spawn(move || {
+        for n in 0..32u64 {
+            let thread = RetrievalThread::spawn(RetrievalConfig {
+                remember: true,
+                knowledge_dir: Some(cards.clone()),
+                fixture_rows: 0,
+                keys_path: None,
+            })
+            .expect("spawn");
+            thread.ask_wait("where is the kettle", n, n).expect("ask");
+            assert_eq!(thread.cell().state, CellState::Hits);
+            drop(thread);
+        }
+        let _ = done_tx.send(());
+    });
+    match done_rx.recv_timeout(Duration::from_secs(60)) {
+        Ok(()) => stress.join().expect("stress"),
+        Err(mpsc::RecvTimeoutError::Disconnected) => {
+            stress.join().expect("stress");
+        }
+        Err(mpsc::RecvTimeoutError::Timeout) => {
+            eprintln!("lexical ask and drop wedged");
+            std::process::exit(1);
+        }
+    }
     let _ = fs::remove_dir_all(&dir);
 }
 

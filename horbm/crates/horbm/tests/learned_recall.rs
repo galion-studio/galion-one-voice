@@ -68,7 +68,7 @@ fn spawn(remember: bool, cards: &Path) -> RetrievalThread {
     .expect("spawn")
 }
 
-fn learned<'a>(hits: &'a [horbm::MemoryHit]) -> Vec<&'a horbm::MemoryHit> {
+fn learned(hits: &[horbm::MemoryHit]) -> Vec<&horbm::MemoryHit> {
     hits.iter()
         .filter(|hit| hit.source.starts_with("learned;"))
         .collect()

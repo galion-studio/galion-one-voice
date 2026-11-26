@@ -511,8 +511,16 @@ impl RetrievedCells for RetrievalThread {
 
 impl Drop for RetrievalThread {
     fn drop(&mut self) {
-        self.shared.stop.store(true, Ordering::SeqCst);
-        self.shared.wake.notify_one();
+        // The worker checks `stop` and then waits, both while holding the
+        // mailbox lock. The flag and the wake must happen under that same
+        // lock. Notifying without it can land in the gap and the worker
+        // sleeps until the process is killed. Join then never returns, and
+        // the memory thread stays parked because the store is never dropped.
+        {
+            let _slot = self.shared.slot.lock().expect("retrieval mailbox");
+            self.shared.stop.store(true, Ordering::SeqCst);
+            self.shared.wake.notify_one();
+        }
         if let Some(handle) = self.handle.take() {
             let _ = handle.join();
         }
