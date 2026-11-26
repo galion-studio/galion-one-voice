@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Galion Labs
 
-//! Samantha conversation loop.
+//! Conversation loop for the configured persona.
 //!
 //! Listen, end of turn, think, speak. Barge-in cancels the speaker without
 //! waiting on the chunk queue. The shared stage traits live in
-//! [`samantha_traits`]. `horbm::Brain` is not linked; [`samantha_traits::ReplyEngine`]
-//! is the seam, and [`samantha_traits::HorbmReply`] is the adapter.
+//! [`voice_traits`]. `horbm::Brain` is not linked; [`voice_traits::ReplyEngine`]
+//! is the seam, and [`voice_traits::HorbmReply`] is the adapter.
 //!
 //! Package `galion-sam-orch`, directory `voice-stack/pipeline-orchestrator`.
 //! This crate is its own Cargo workspace. It is not a member of the Galion
@@ -20,8 +20,16 @@ pub mod clause;
 pub mod clock;
 pub mod demo;
 pub mod pipeline;
-pub mod samantha_traits;
 pub mod ui;
+pub mod voice_traits;
+
+/// Doc-deprecated alias of [`voice_traits`].
+///
+/// Existing imports such as `samantha_traits::WaitGate` keep compiling.
+/// There is no `deprecated` attribute on this module.
+pub mod samantha_traits {
+    pub use crate::voice_traits::*;
+}
 
 pub use brain_route::{asr_to_piper_lines, RouterMouth};
 pub use clock::{
@@ -30,8 +38,8 @@ pub use clock::{
     TURN_CHANNEL_BOUND,
 };
 pub use pipeline::{Handle, MoodSnap, Phase, Pipeline, Subscribe, TurnReport};
-pub use samantha_traits::{
-    samantha_ref_from_env, Asr, AudioFrame, AudioIn, AudioOut, BrainOpen, EnergyVad, FakeAsr,
-    FakeReply, FakeTts, HoldMood, HorbmBrain, HorbmReply, MemorySpeaker, MoodTick, Pad, Reply,
-    ReplyEngine, Transcript, Tts, TurnOut, Vad, VadEvent, SAMANTHA_REF_ENV,
+pub use voice_traits::{
+    voice_ref_choice, voice_ref_from_env, Asr, AudioFrame, AudioIn, AudioOut, BrainOpen, EnergyVad,
+    FakeAsr, FakeReply, FakeTts, HoldMood, HorbmBrain, HorbmReply, MemorySpeaker, MoodTick, Pad,
+    Reply, ReplyEngine, Transcript, Tts, TurnOut, Vad, VadEvent, VoiceRefChoice, VOICE_REF_ENV,
 };

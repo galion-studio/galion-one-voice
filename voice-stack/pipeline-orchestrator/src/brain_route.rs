@@ -9,7 +9,7 @@
 
 use galion_sam_horbm::{speakable_chunks, ReasoningRouter, RouteOutcome};
 
-use crate::samantha_traits::{Pad, Reply, ReplyEngine};
+use crate::voice_traits::{Pad, Reply, ReplyEngine};
 
 /// Reply stage. `turn` is what the think loop calls after ASR finishes.
 pub struct RouterMouth {

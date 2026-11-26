@@ -12,7 +12,7 @@
 //! `say` and `chunks` read stdin when no words are given.
 //! With `--features horbm` and `GALION_HORBM_MEMORY`, `GALION_HORBM_KNOWLEDGE`,
 //! and `GALION_HORBM_CASES` all set, `say` opens that brain. Otherwise it
-//! uses the fake echo. This binary does not read `GALION_SAMANTHA_REF`.
+//! uses the fake echo. This binary does not open a voice-reference file.
 
 use std::io::{self, Read};
 use std::thread;
@@ -53,7 +53,7 @@ fn usage() {
          chunks  split reply text into speakable clauses\n\
          say     one turn on the fake engine, or on horbm when the feature and paths are set\n\
          pace    run the 80 ms mood thread and print the gaps it actually woke on\n\
-         This crate does not read GALION_SAMANTHA_REF and does not play audio."
+         This binary does not open a voice-reference file and does not play audio."
     );
 }
 

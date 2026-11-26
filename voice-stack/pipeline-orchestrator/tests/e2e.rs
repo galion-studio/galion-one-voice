@@ -10,7 +10,7 @@ use std::time::Duration;
 use galion_sam_orch::clause::clauses;
 use galion_sam_orch::clock::{STAGE_BAR_US, VAD_HANG_MS};
 use galion_sam_orch::demo::{self, MOOD, REPLY};
-use galion_sam_orch::samantha_traits::SAMANTHA_REF_ENV;
+use galion_sam_orch::voice_traits::VOICE_REF_ENV;
 use galion_sam_orch::{Phase, HEARTBEAT_MS};
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
@@ -59,7 +59,7 @@ async fn scripted_turn_reports_each_stage() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn first_audio_is_out_before_the_gated_rest() {
-    let gate = galion_sam_orch::samantha_traits::WaitGate::new();
+    let gate = galion_sam_orch::voice_traits::WaitGate::new();
     let first = vec![1000, -1000, 500, -500];
     let running = demo::spawn_fake(
         galion_sam_orch::FakeReply::new(REPLY, MOOD),
@@ -157,7 +157,7 @@ async fn mood_tick_is_one_heartbeat() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn dropping_a_gated_mouth_does_not_pin_the_runtime() {
-    let gate = galion_sam_orch::samantha_traits::WaitGate::new();
+    let gate = galion_sam_orch::voice_traits::WaitGate::new();
     let running = demo::spawn_fake(
         galion_sam_orch::FakeReply::new(REPLY, MOOD),
         galion_sam_orch::FakeTts::gated(vec![7, 7], gate),
@@ -177,7 +177,7 @@ async fn dropping_a_gated_mouth_does_not_pin_the_runtime() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn dot_page_follows_the_phase() {
-    let gate = galion_sam_orch::samantha_traits::WaitGate::new();
+    let gate = galion_sam_orch::voice_traits::WaitGate::new();
     let running = demo::spawn_fake(
         galion_sam_orch::FakeReply::new(REPLY, MOOD),
         galion_sam_orch::FakeTts::gated(vec![7, 7], gate.clone()),
@@ -262,12 +262,24 @@ async fn dot_page_shows_the_configured_name() {
 fn reference_env_points_at_a_local_file() {
     let path = std::env::temp_dir().join("samantha-core-s09-not-audio.txt");
     std::fs::write(&path, b"not audio").unwrap();
-    std::env::set_var(SAMANTHA_REF_ENV, &path);
-    let got = galion_sam_orch::samantha_ref_from_env().expect("path");
+    let prev_new = std::env::var_os(VOICE_REF_ENV);
+    let prev_old = std::env::var_os(galion_sam_orch::samantha_traits::SAMANTHA_REF_ENV);
+    std::env::remove_var(galion_sam_orch::samantha_traits::SAMANTHA_REF_ENV);
+    std::env::set_var(VOICE_REF_ENV, &path);
+    let got = galion_sam_orch::voice_ref_from_env().expect("path");
     assert_eq!(got, path);
-    std::env::remove_var(SAMANTHA_REF_ENV);
-    assert!(galion_sam_orch::samantha_ref_from_env().is_none());
+    std::env::remove_var(VOICE_REF_ENV);
+    assert!(galion_sam_orch::voice_ref_from_env().is_none());
+    restore_var(VOICE_REF_ENV, prev_new);
+    restore_var(galion_sam_orch::samantha_traits::SAMANTHA_REF_ENV, prev_old);
     let _ = std::fs::remove_file(path);
+}
+
+fn restore_var(key: &str, prev: Option<std::ffi::OsString>) {
+    match prev {
+        Some(value) => std::env::set_var(key, value),
+        None => std::env::remove_var(key),
+    }
 }
 
 fn contains_in_order(phases: &[Phase], want: &[Phase]) -> bool {
