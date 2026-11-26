@@ -459,7 +459,7 @@ impl RetrievalThread {
     /// the diary once and, when a key file is set, the scan. Each row is
     /// inserted with `diary_add`. The stored source is `learned;` plus
     /// [`crate::LearnedRow::source`]. An empty list clears the rows.
-    /// More than [`LEARNED_ROW_CAP`] keeps the newest dates and records the drop in
+    /// More than `LEARNED_ROW_CAP` keeps the newest dates and records the drop in
     /// [`RetrievalThread::last_error`]. A denied thread stores the rows and
     /// does not open the diary. An ask does not replace this command.
     pub fn set_learned(&self, rows: Vec<LearnedRow>) -> Result<(), RetrieveError> {
@@ -467,7 +467,7 @@ impl RetrievalThread {
     }
 
     /// Last diary error. Cleared on a successful grant, on withdraw, and when
-    /// a learned update drops nothing. A list over [`LEARNED_ROW_CAP`] sets
+    /// a learned update drops nothing. A list over `LEARNED_ROW_CAP` sets
     /// `dropped N learned rows`.
     pub fn last_error(&self) -> Option<String> {
         self.shared
