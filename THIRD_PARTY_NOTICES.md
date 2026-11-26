@@ -120,6 +120,22 @@ The crate's `LICENSE` file is the Apache License 2.0 text. Its appendix notice i
 Copyright 2020 Sébastien Crozet
 ```
 
+## rusqlite 0.32.1
+
+- Locks: `horbm/Cargo.lock`, `voice-stack/Cargo.lock`
+- Repository: https://github.com/rusqlite/rusqlite
+- Licence: MIT
+- Used by: `horbm` (`horbm-memory-audit`)
+- Authors: The rusqlite developers
+
+`horbm` depends on this crate directly. The same version was already locked through `horbm-memory`. MIT is a complete grant. This notice records that direct use.
+
+Copyright notice, from the crate's `LICENSE`:
+
+```
+Copyright (c) 2014-2021 The rusqlite developers
+```
+
 ## unicode-ident 1.0.27
 
 - Locks: `horbm/Cargo.lock`, `voice-stack/Cargo.lock`

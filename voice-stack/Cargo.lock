@@ -799,6 +799,7 @@ dependencies = [
  "horbm-keys",
  "horbm-memory",
  "horbm-persona",
+ "rusqlite",
  "serde_json",
  "sha2",
  "tantivy",
