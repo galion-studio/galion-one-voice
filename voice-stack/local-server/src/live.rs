@@ -4,8 +4,10 @@
 //!
 //! Silero runs in `vad-ear` (its own workspace, so `ort` stays out of this
 //! one). The energy gate is [`horbm_voice::EnergyGate`], the same floor and
-//! 60 ms onset as the orchestrator. A quiet gap of 640 ms ends one turn on
-//! this socket. Vosk stays on a worker thread
+//! 60 ms onset as the orchestrator. With the ear off, a quiet gap of 640 ms
+//! ends one turn. With the ear on, the bundled end-of-turn scorer can end a
+//! yield at its mild pause, or hold until its hold pause, and never later
+//! than 640 ms plus 80 ms. Vosk stays on a worker thread
 //! because its handles are not `Send`. The spoken turn is one
 //! [`horbm_voice::VoiceLoop::tick`]: ear, then `turn_heard` (the mic's
 //! listener point, or `None` for typed text), then the mouth selected at
@@ -42,8 +44,17 @@ use crate::reply::{may_speak_piper, Pad, ReplyEngine, TurnOut};
 
 const FRAME: usize = 320;
 const SPEECH_RMS: f32 = 0.02;
-/// Silence that ends one question. 160 ms split a sentence into two turns.
+/// Silence that ends one question when the ear is pause-only. 160 ms split a
+/// sentence into two turns. [`HANG_MS`] and [`HANG_MS_WHOLE`] are the same gap.
 const HANG_MS: f64 = 640.0;
+const HANG_MS_WHOLE: u32 = 640;
+/// Latest a sensed take may run past [`HANG_MS`].
+const HANG_SLACK_MS: u32 = 80;
+/// Capture quantum passed to [`horbm_voice::EnergyGate::push`].
+const GATE_FRAME_MS: u32 = 20;
+/// The energy gate's clamp (−48 dB). At or under this, the sensed turn clock
+/// counts silence. The pause-only path does not read it.
+const GATE_CLAMP_DB: f64 = -48.0;
 const UTTERANCE_CAP: usize = 16_000 * 16;
 
 pub fn live_factory() -> Arc<dyn Fn() -> Box<dyn crate::pipeline::Pipeline> + Send + Sync> {
@@ -305,6 +316,17 @@ pub struct LivePipeline {
     prosody_frame: [f32; horbm_ear::FRAME_SAMPLES],
     /// Latest listener point from this utterance. Cleared when the turn runs.
     prosody_point: Option<horbm::Heard>,
+    /// Latest [`horbm_ear::TurnMsg`] from the prosody thread.
+    prosody_turn: horbm_ear::TurnMsg,
+    /// From the bundled `eot.toml`, read once. Not parsed per frame.
+    mild_pause_ms: u32,
+    hold_pause_ms: u32,
+    /// Quiet run after the energy gate opened this take, in milliseconds.
+    silence_ms: u32,
+    /// The energy gate has opened a take and this socket has not closed it.
+    turn_open: bool,
+    /// The gate already emitted end and this take is still holding.
+    held_past_gate: bool,
     pending_ear: Arc<Mutex<Option<horbm::Heard>>>,
     ear_info_logged: AtomicBool,
     /// Set when a heard line finished. Idle thoughts wait from this instant.
@@ -389,7 +411,8 @@ impl LivePipeline {
             None,
             mouth,
             native::BOOT_MOUTH_DEVICE,
-            ProsodyBoot::Process,
+            // The 640 ms hang tests lock the gate. Ear-on timing is ear_live.
+            ProsodyBoot::ExplicitOff,
         )
     }
 
@@ -404,6 +427,12 @@ impl LivePipeline {
         let Opened { vad, asr } = opened;
         let prosody = ProsodyEar::spawn(prosody);
         eprintln!("{}", ear_state_line(prosody.sensing()));
+        let eot = horbm_ear::EotConfig::bundled();
+        let prosody_turn = if prosody.sensing() {
+            horbm_ear::TurnMsg::Hold
+        } else {
+            horbm_ear::TurnMsg::PauseOnly
+        };
         let pending_ear = Arc::new(Mutex::new(None));
         let brain = ProsodyBrain {
             inner: MindBrain::shared(Arc::clone(&mind)),
@@ -446,6 +475,12 @@ impl LivePipeline {
             prosody_carry_len: 0,
             prosody_frame: [0.0; horbm_ear::FRAME_SAMPLES],
             prosody_point: None,
+            prosody_turn,
+            mild_pause_ms: eot.mild_pause_ms,
+            hold_pause_ms: eot.hold_pause_ms,
+            silence_ms: 0,
+            turn_open: false,
+            held_past_gate: false,
             pending_ear,
             ear_info_logged: AtomicBool::new(false),
             last_heard: None,
@@ -538,19 +573,87 @@ impl LivePipeline {
 
     fn push_frame(&mut self, frame: &[i16]) -> Option<&'static str> {
         self.level = rms(frame).clamp(0.0, 1.0);
-        match &mut self.front {
-            Front::Energy(vad) => match vad.push(frame, 20.0) {
+        let event = match &mut self.front {
+            Front::Child(child) => {
+                return match child.push(frame) {
+                    Some("start") => Some("start"),
+                    Some("end") => Some("end"),
+                    _ => None,
+                };
+            }
+            Front::Energy(vad) => vad.push(frame, 20.0),
+        };
+        if self.ear_pause_only() {
+            if self.held_past_gate && self.turn_open {
+                self.close_energy_turn();
+                return Some("end");
+            }
+            return match event {
                 GateEvent::Start => Some("start"),
                 GateEvent::End => Some("end"),
                 GateEvent::None => None,
-            },
-            Front::Child(child) => match child.push(frame) {
-                Some("start") => Some("start"),
-                Some("end") => Some("end"),
-                _ => None,
-            },
+            };
+        }
+        self.turn_from_ear(frame, event)
+    }
+
+    /// Ear off, denied, or a scorer frame that said pause-only.
+    fn ear_pause_only(&self) -> bool {
+        !self.prosody.sensing() || matches!(self.prosody_turn, horbm_ear::TurnMsg::PauseOnly)
+    }
+
+    /// Energy gate is in silence after speech. Yield ends at the mild pause.
+    /// Hold does not end before the hold pause, and never later than the hang
+    /// plus [`HANG_SLACK_MS`].
+    fn turn_from_ear(&mut self, frame: &[i16], event: GateEvent) -> Option<&'static str> {
+        if matches!(event, GateEvent::Start) && !self.held_past_gate {
+            self.turn_open = true;
+            self.silence_ms = 0;
+            return Some("start");
+        }
+        if !self.turn_open {
+            return match event {
+                GateEvent::Start => Some("start"),
+                GateEvent::End => Some("end"),
+                GateEvent::None => None,
+            };
+        }
+        if gate_quiet(frame) {
+            self.silence_ms = self.silence_ms.saturating_add(GATE_FRAME_MS);
+        } else if !matches!(event, GateEvent::End) {
+            self.silence_ms = 0;
+        }
+        if matches!(event, GateEvent::End) {
+            self.silence_ms = self.silence_ms.max(HANG_MS_WHOLE);
+            self.held_past_gate = true;
+        }
+        let cap = HANG_MS_WHOLE.saturating_add(HANG_SLACK_MS);
+        let end_now = match self.prosody_turn {
+            horbm_ear::TurnMsg::Yield { .. } => self.silence_ms >= self.mild_pause_ms,
+            horbm_ear::TurnMsg::Hold => self.silence_ms >= self.hold_pause_ms.min(cap),
+            horbm_ear::TurnMsg::PauseOnly => matches!(event, GateEvent::End),
+        };
+        if end_now {
+            self.close_energy_turn();
+            Some("end")
+        } else {
+            None
         }
     }
+
+    fn close_energy_turn(&mut self) {
+        self.turn_open = false;
+        self.silence_ms = 0;
+        self.held_past_gate = false;
+        if let Front::Energy(vad) = &mut self.front {
+            vad.reset_turn();
+        }
+    }
+}
+
+fn gate_quiet(frame: &[i16]) -> bool {
+    // Same formula as the energy gate. `rms_db` is not re-exported from `horbm_voice`.
+    galion_sam_orch::voice_traits::rms_db(frame) <= GATE_CLAMP_DB
 }
 
 impl Pipeline for LivePipeline {
@@ -687,6 +790,9 @@ impl Pipeline for LivePipeline {
         self.in_speech = false;
         let _ = self.take_ear_point();
         self.phase = "idle";
+        self.turn_open = false;
+        self.silence_ms = 0;
+        self.held_past_gate = false;
         if let Front::Energy(vad) = &mut self.front {
             vad.reset_turn();
         }
@@ -913,7 +1019,9 @@ impl LivePipeline {
             *slot = f32::from(*sample) / 32768.0;
         }
         self.prosody_carry_len = 0;
-        if let Some(point) = self.prosody.push_frame(&self.prosody_frame) {
+        let (point, turn) = self.prosody.push_frame(&self.prosody_frame);
+        self.prosody_turn = turn;
+        if let Some(point) = point {
             self.prosody_point = Some(point);
         }
     }
@@ -949,6 +1057,7 @@ struct ProsodySlot {
     frame: [f32; horbm_ear::FRAME_SAMPLES],
     state: ProsodyState,
     kept: Option<horbm::Heard>,
+    turn: horbm_ear::TurnMsg,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -965,6 +1074,7 @@ impl ProsodyEar {
                 frame: [0.0; horbm_ear::FRAME_SAMPLES],
                 state: ProsodyState::Idle,
                 kept: None,
+                turn: horbm_ear::TurnMsg::PauseOnly,
             }),
             Condvar::new(),
         ));
@@ -1004,8 +1114,13 @@ impl ProsodyEar {
         self.sensing
     }
 
-    fn push_frame(&self, frame: &[f32; horbm_ear::FRAME_SAMPLES]) -> Option<horbm::Heard> {
-        self.join.as_ref()?;
+    fn push_frame(
+        &self,
+        frame: &[f32; horbm_ear::FRAME_SAMPLES],
+    ) -> (Option<horbm::Heard>, horbm_ear::TurnMsg) {
+        let Some(_) = self.join.as_ref() else {
+            return (None, horbm_ear::TurnMsg::PauseOnly);
+        };
         let (lock, wake) = &*self.slot;
         let mut slot = lock.lock().unwrap_or_else(|err| err.into_inner());
         slot.frame = *frame;
@@ -1015,7 +1130,7 @@ impl ProsodyEar {
         while slot.state == ProsodyState::Push {
             slot = wake.wait(slot).unwrap_or_else(|err| err.into_inner());
         }
-        slot.kept.take()
+        (slot.kept.take(), slot.turn)
     }
 }
 
@@ -1033,6 +1148,9 @@ impl Drop for ProsodyEar {
 }
 
 fn prosody_loop(mut ear: horbm_ear::Ear, slot: Arc<(Mutex<ProsodySlot>, Condvar)>) {
+    // One scorer for the life of the thread. 7881 has no ASR partial here.
+    // That is prosody-only, not an empty transcript.
+    let mut scorer = horbm_ear::Scorer::bundled();
     let (lock, wake) = &*slot;
     loop {
         let mut guard = lock.lock().unwrap_or_else(|err| err.into_inner());
@@ -1043,7 +1161,9 @@ fn prosody_loop(mut ear: horbm_ear::Ear, slot: Arc<(Mutex<ProsodySlot>, Condvar)
             ProsodyState::Shutdown => break,
             ProsodyState::Push => {
                 let frame = guard.frame;
-                guard.kept = heard_point(&mut ear, &frame);
+                let out = ear.push(&frame);
+                guard.turn = scorer.push_prosody(out);
+                guard.kept = heard_point(out);
                 guard.state = ProsodyState::Idle;
                 wake.notify_one();
             }
@@ -1052,8 +1172,8 @@ fn prosody_loop(mut ear: horbm_ear::Ear, slot: Arc<(Mutex<ProsodySlot>, Condvar)
     }
 }
 
-fn heard_point(ear: &mut horbm_ear::Ear, frame: &[f32]) -> Option<horbm::Heard> {
-    let horbm_ear::FrameOut::Heard(heard) = ear.push(frame) else {
+fn heard_point(out: horbm_ear::FrameOut) -> Option<horbm::Heard> {
+    let horbm_ear::FrameOut::Heard(heard) = out else {
         return None;
     };
     let (valence, arousal, strength) = heard.offer.heard_axes()?;
