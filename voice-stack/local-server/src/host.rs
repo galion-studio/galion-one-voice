@@ -313,8 +313,9 @@ impl HostSession {
     }
 
     /// One finished heard line. Notes the seal when learn is granted and
-    /// appends `heard` and `reply` off the turn path. A denied seal is not
-    /// given the text.
+    /// appends `heard` and `reply` off the turn path. After `reply`, a gap
+    /// this turn left and any research follow-up that has already finished
+    /// are logged. Neither is spoken. A denied seal is not given the text.
     pub fn on_turn(&self, heard: &str, out: &TurnOut) {
         if self.finished.load(Ordering::SeqCst) {
             return;
@@ -361,6 +362,26 @@ impl HostSession {
                 "sources": out.sources,
             }),
         ));
+        let (gap, follow) = {
+            let mut mind = self.mind.lock().unwrap_or_else(|err| err.into_inner());
+            let gap = mind.take_gap_for(heard);
+            let follow = mind.research_follow_up();
+            (gap, follow)
+        };
+        if let Some(gap) = gap {
+            self.log.record(event_line(
+                &at,
+                &self.session_id,
+                &gap_fields(turn_id, &gap),
+            ));
+        }
+        if let Some(follow) = follow {
+            self.log.record(event_line(
+                &at,
+                &self.session_id,
+                &follow_up_fields(turn_id, &follow),
+            ));
+        }
     }
 
     pub fn on_inner(&self, verb: &str, lean: &str, surprise: f32, learned: bool, slots: &[String]) {
@@ -447,6 +468,50 @@ fn public_text(text: &str) -> String {
         "withheld".into()
     } else {
         text.to_string()
+    }
+}
+
+fn gap_fields(turn: u64, gap: &horbm::Gap) -> serde_json::Value {
+    serde_json::json!({
+        "kind": "gap",
+        "turn": turn,
+        "heard": public_text(&gap.heard),
+        "reason": gap_reason(gap.reason),
+        "advice": gap.advice,
+    })
+}
+
+/// Log token for a gap. The match is exhaustive so a `Debug` string cannot land.
+fn gap_reason(reason: horbm::GapReason) -> &'static str {
+    match reason {
+        horbm::GapReason::NoCard => "no_card",
+        horbm::GapReason::CardUnspeakable => "card_unspeakable",
+        horbm::GapReason::ResearchOff => "research_off",
+        horbm::GapReason::ResearchMiss => "research_miss",
+        horbm::GapReason::ResearchTimeout => "research_timeout",
+        horbm::GapReason::ResearchUnreachable => "research_unreachable",
+        horbm::GapReason::ResearchAnswered => "research_answered",
+    }
+}
+
+fn follow_up_fields(turn: u64, follow: &horbm::ResearchFollowUp) -> serde_json::Value {
+    let spoken = follow.spoken.as_deref().unwrap_or("");
+    serde_json::json!({
+        "kind": "follow_up",
+        "turn": turn,
+        "outcome": outcome_class(&follow.outcome),
+        "sources": follow.sources,
+        "text": public_text(spoken),
+    })
+}
+
+/// Outcome class only. The answer body stays out of this field.
+fn outcome_class(outcome: &horbm::AskOutcome) -> &'static str {
+    match outcome {
+        horbm::AskOutcome::Answer { .. } => "answer",
+        horbm::AskOutcome::Miss => "miss",
+        horbm::AskOutcome::Timeout => "timeout",
+        horbm::AskOutcome::Unreachable => "unreachable",
     }
 }
 
@@ -838,6 +903,7 @@ pub(crate) fn offer_drops_when_full() -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::reply::ReplyEngine;
 
     #[test]
     fn unix_epoch_formats_as_utc() {
@@ -857,5 +923,233 @@ mod tests {
         let dotted = format!("{}.{}.{}.{}", octets[0], octets[1], octets[2], octets[3]);
         assert!(has_ipv4(&format!("see {dotted} now")));
         assert!(!has_ipv4("the kettle is on the stove"));
+    }
+
+    #[test]
+    fn a_miss_logs_one_gap_line_with_a_reason() {
+        let (root, host) = deny_host("miss");
+        let heard = "who won the match";
+        let out = turn(&host, heard);
+        host.on_turn(heard, &out);
+        host.on_turn(heard, &out);
+        let lines = finish_lines(&host, &root);
+        let gaps: Vec<_> = lines.iter().filter(|line| line["kind"] == "gap").collect();
+        assert_eq!(gaps.len(), 1, "{lines:?}");
+        assert_eq!(gaps[0]["turn"].as_u64(), Some(1));
+        assert_eq!(gaps[0]["heard"], heard);
+        assert_eq!(gaps[0]["reason"], "no_card");
+        assert_eq!(gaps[0]["advice"], horbm::GAP_ADVICE);
+        assert_eq!(
+            lines.iter().filter(|line| line["kind"] == "reply").count(),
+            2
+        );
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn a_hit_logs_no_gap() {
+        let (root, host) = deny_host("hit");
+        let heard = "where is the kettle";
+        let out = turn(&host, heard);
+        assert_eq!(out.reply, "The kettle is on the stove.");
+        host.on_turn(heard, &out);
+        let lines = finish_lines(&host, &root);
+        assert!(lines.iter().all(|line| line["kind"] != "gap"), "{lines:?}");
+        assert_eq!(
+            lines.iter().find(|line| line["kind"] == "reply").unwrap()["text"],
+            "The kettle is on the stove."
+        );
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn a_withheld_line_stays_withheld_in_the_gap() {
+        let (root, host) = deny_host("secret");
+        let heard = "what is the password";
+        let out = turn(&host, heard);
+        host.on_turn(heard, &out);
+        host.finish();
+        let raw = std::fs::read_to_string(root.join("logs").join("turns.jsonl")).unwrap();
+        assert!(!raw.to_ascii_lowercase().contains("password"), "{raw}");
+        let lines = parse_lines(&raw);
+        let gap = lines.iter().find(|line| line["kind"] == "gap").unwrap();
+        assert_eq!(gap["heard"], "withheld");
+        assert_eq!(gap["reason"], "no_card");
+        assert!(!gap.to_string().contains("password"));
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn a_granted_miss_logs_no_gap() {
+        let (root, host) = grant_host("grant-miss");
+        let kettle = turn(&host, "where is the kettle");
+        assert_eq!(kettle.reply, "The kettle is on the stove.");
+        host.on_turn("where is the kettle", &kettle);
+        let miss = turn(&host, "who won the match");
+        assert_eq!(miss.reply, "I don't know.");
+        host.on_turn("who won the match", &miss);
+        let lines = finish_lines(&host, &root);
+        assert!(lines.iter().all(|line| line["kind"] != "gap"), "{lines:?}");
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn a_follow_up_is_logged_and_not_returned_as_a_reply() {
+        // `HorbmMind` opens a `CardEngine`. That engine has no `ResearchAsk`
+        // hook, so the live mind cannot carry this fake port. The line below
+        // is the one `on_turn` writes. The spoken reply stays the local miss.
+        let question = "why is the spare fuse missing from the drawer?";
+        let research_line = "The spare fuse is in the drawer.";
+        let calls = Arc::new(std::sync::atomic::AtomicU32::new(0));
+        let mut brain = horbm::Brain::with_cards(
+            NoCards,
+            Some(Box::new(Once {
+                calls: Arc::clone(&calls),
+                answer: horbm::AskOutcome::Answer {
+                    text: research_line.into(),
+                    source: "notes".into(),
+                },
+            })),
+        );
+        let out = brain.turn(question);
+        assert_eq!(out.reply, "I don't know.");
+        assert!(!out.reply.contains("spare"));
+        assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 0);
+        drop(out);
+        let follow = wait_follow(&mut brain);
+        assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 1);
+        assert_eq!(follow.spoken.as_deref(), Some(research_line));
+        let root = std::env::temp_dir().join(format!(
+            "galion-gap-follow-{}-{}",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let path = root.join("turns.jsonl");
+        let log = TurnLog::open(&path, 4096, 1).unwrap();
+        log.record_blocking(event_line("t", "s", &follow_up_fields(2, &follow)));
+        log.close();
+        let raw = std::fs::read_to_string(&path).unwrap();
+        let line: serde_json::Value = serde_json::from_str(raw.lines().next().unwrap()).unwrap();
+        assert_eq!(line["kind"], "follow_up");
+        assert_eq!(line["outcome"], "answer");
+        assert_eq!(line["sources"], serde_json::json!(["research:notes"]));
+        assert_eq!(line["text"], research_line);
+        assert_ne!(line["kind"], "reply");
+        assert_ne!(line["text"].as_str(), Some("I don't know."));
+        let _ = std::fs::remove_dir_all(&root);
+
+        let (host_root, host) = deny_host("follow-live");
+        let live = turn(&host, question);
+        assert_eq!(live.reply, "I don't know.");
+        assert!(host
+            .mind()
+            .lock()
+            .unwrap_or_else(|err| err.into_inner())
+            .research_follow_up()
+            .is_none());
+        host.on_turn(question, &live);
+        let lines = finish_lines(&host, &host_root);
+        assert!(lines.iter().all(|item| item["kind"] != "follow_up"));
+        let gap = lines.iter().find(|item| item["kind"] == "gap").unwrap();
+        assert_eq!(gap["reason"], "research_off");
+        assert_eq!(gap["heard"], question);
+        assert!(lines
+            .iter()
+            .filter(|item| item["kind"] == "reply")
+            .all(|item| { item["text"] == "I don't know." }));
+        let _ = std::fs::remove_dir_all(&host_root);
+    }
+
+    fn deny_host(label: &str) -> (PathBuf, Arc<HostSession>) {
+        let root = gap_root(label);
+        let host = HostSession::boot(
+            HostConfig::deny_under(&root),
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("knowledge"),
+        )
+        .unwrap();
+        (root, host)
+    }
+
+    fn grant_host(label: &str) -> (PathBuf, Arc<HostSession>) {
+        let root = gap_root(label);
+        let mut cfg = HostConfig::deny_under(&root);
+        cfg.remember.word = "grant".into();
+        cfg.remember.granted = true;
+        cfg.retrieval.remember = true;
+        let host = HostSession::boot(
+            cfg,
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("knowledge"),
+        )
+        .unwrap();
+        (root, host)
+    }
+
+    fn gap_root(label: &str) -> PathBuf {
+        std::env::temp_dir().join(format!(
+            "galion-gap-{label}-{}-{}",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos()
+        ))
+    }
+
+    fn turn(host: &HostSession, heard: &str) -> TurnOut {
+        host.mind()
+            .lock()
+            .unwrap_or_else(|err| err.into_inner())
+            .turn(heard)
+            .unwrap()
+    }
+
+    fn finish_lines(host: &HostSession, root: &Path) -> Vec<serde_json::Value> {
+        host.finish();
+        let raw = std::fs::read_to_string(root.join("logs").join("turns.jsonl")).unwrap();
+        parse_lines(&raw)
+    }
+
+    fn parse_lines(raw: &str) -> Vec<serde_json::Value> {
+        raw.lines()
+            .filter(|line| !line.is_empty())
+            .map(|line| serde_json::from_str(line).unwrap())
+            .collect()
+    }
+
+    fn wait_follow(brain: &mut horbm::Brain) -> horbm::ResearchFollowUp {
+        let started = std::time::Instant::now();
+        loop {
+            if let Some(follow) = brain.research_follow_up() {
+                return follow;
+            }
+            if started.elapsed() > std::time::Duration::from_secs(2) {
+                panic!("research follow-up did not arrive");
+            }
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+    }
+
+    struct NoCards;
+
+    impl horbm::CardLookup for NoCards {
+        fn lookup(&self, _query: &str) -> Option<horbm::CardHit> {
+            None
+        }
+    }
+
+    struct Once {
+        calls: Arc<std::sync::atomic::AtomicU32>,
+        answer: horbm::AskOutcome,
+    }
+
+    impl horbm::ResearchAsk for Once {
+        fn ask(&mut self, _question: &str, _cap: std::time::Duration) -> horbm::AskOutcome {
+            self.calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            self.answer.clone()
+        }
     }
 }

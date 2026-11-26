@@ -7,6 +7,8 @@
 //! retrieval miss is `I don't know.` until the engine speaks a loaded card.
 //! That card read does not take the retrieval cell lock again. A deep miss
 //! on the idle path may ask the research gateway.
+//! [`HorbmMind::take_gap_for`] and [`HorbmMind::research_follow_up`] are what
+//! the turn log reads after the reply. A follow-up is not spoken.
 //!
 //! Remember and learn are the words in [`crate::host::HostConfig`]. This
 //! process does not call [`std::env::set_var`]. `grant` opens the person
@@ -94,6 +96,9 @@ impl EarTrace {
 pub struct HorbmMind {
     engine: CardEngine,
     trace: Option<Arc<EarTrace>>,
+    /// Gap queue already offered to a turn. The next take returns only a
+    /// newer entry, so one miss is logged once.
+    seen_gaps: Vec<horbm::Gap>,
 }
 
 impl HorbmMind {
@@ -116,6 +121,7 @@ impl HorbmMind {
                 Some(config.remember.word.as_str()),
             ),
             trace: None,
+            seen_gaps: Vec::new(),
         }
     }
 
@@ -179,6 +185,50 @@ impl HorbmMind {
     pub fn knowledge_path(&self) -> &Path {
         self.engine.knowledge_dir()
     }
+
+    /// Newest gap whose `heard` equals `heard` trimmed, at most once.
+    ///
+    /// The queue is [`horbm::Brain::gaps`]. A second call returns [`None`]
+    /// until a later turn records another gap for that same line. This does
+    /// not remove the brain's copy and it does not block.
+    pub fn take_gap_for(&mut self, heard: &str) -> Option<horbm::Gap> {
+        let query = heard.trim();
+        if query.is_empty() {
+            return None;
+        }
+        let current = self.engine.brain().gaps().to_vec();
+        let start = fresh_gap_index(&self.seen_gaps, &current);
+        let found = current[start..]
+            .iter()
+            .rev()
+            .find(|gap| gap.heard == query)
+            .cloned();
+        self.seen_gaps = current;
+        found
+    }
+
+    /// Research result that has finished since the last take.
+    ///
+    /// Pass-through to [`horbm::Brain::research_follow_up`]. It does not
+    /// block, and it does not change the reply already returned.
+    pub fn research_follow_up(&mut self) -> Option<horbm::ResearchFollowUp> {
+        self.engine.brain_mut().research_follow_up()
+    }
+}
+
+/// Index in `current` where entries newer than `seen` begin.
+///
+/// The brain drops the oldest gap at the cap and may replace one in place
+/// when a follow-up finishes. The longest suffix of `seen` that is a prefix
+/// of `current` is the part already offered.
+fn fresh_gap_index(seen: &[horbm::Gap], current: &[horbm::Gap]) -> usize {
+    let max = seen.len().min(current.len());
+    for kept in (0..=max).rev() {
+        if seen[seen.len() - kept..] == current[..kept] {
+            return kept;
+        }
+    }
+    0
 }
 
 pub fn knowledge_dir() -> PathBuf {
