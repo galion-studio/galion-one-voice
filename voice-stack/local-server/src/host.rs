@@ -260,8 +260,11 @@ pub struct HostSession {
     log: TurnLog,
     session_id: String,
     turns: AtomicU64,
-    /// Rows handed to the brain at boot. Count only. The text stays in the pack.
+    /// Rows handed to the brain. Count only. The text stays in the pack.
     learned_rows: AtomicUsize,
+    /// True after a non-empty attach. An empty audit clears the thread only
+    /// when this is set; the first empty audit leaves the spawn diary alone.
+    pack_attached: AtomicBool,
     finished: AtomicBool,
 }
 
@@ -297,6 +300,7 @@ impl HostSession {
             session_id: new_session_id(),
             turns: AtomicU64::new(0),
             learned_rows: AtomicUsize::new(0),
+            pack_attached: AtomicBool::new(false),
             finished: AtomicBool::new(false),
         });
         session.attach_pack();
@@ -306,27 +310,24 @@ impl HostSession {
     /// The one attach path. R11 S158 re-attaches after a retract through this same helper.
     ///
     /// Both grants: [`LearnPass::audit`] once, then [`HorbmMind::attach_learned`]
-    /// with those rows. Otherwise attach nothing and open nothing. An audit
-    /// or attach error is printed once and the count stays zero. The startup
-    /// line prints the count, never the text.
+    /// with those rows. Otherwise attach nothing and open nothing. An empty
+    /// audit does not call `attach_learned` until a previous attach put rows
+    /// in the thread. `set_learned([])` drops the diary the card engine just
+    /// opened and builds a second in-memory store; turns then fault that
+    /// store's page cache in, and the replaced store's pages stay in RSS.
+    /// The spawn diary already has no learned rows. After a real attach, an
+    /// empty audit still forwards `[]` so a retract clears the thread.
+    ///
+    /// An audit or attach error is printed once and the count stays zero.
+    /// The startup line prints the count, never the text. Shutdown does not
+    /// call this; [`Self::finish`] only seals.
     fn attach_pack(&self) -> usize {
+        if self.finished.load(Ordering::SeqCst) {
+            return self.learned_rows.load(Ordering::Relaxed);
+        }
         let count = if self.config.learn.granted && self.config.remember.granted {
             match LearnPass::open(self.config.learn_config.clone()).audit() {
-                Ok(audit) => {
-                    let rows = audit.rows;
-                    let count = rows.len();
-                    let attached = {
-                        let mut mind = self.mind.lock().unwrap_or_else(|err| err.into_inner());
-                        mind.attach_learned(rows)
-                    };
-                    match attached {
-                        Ok(()) => count,
-                        Err(err) => {
-                            eprintln!("horbm learn: {err}");
-                            0
-                        }
-                    }
-                }
+                Ok(audit) => self.hand_learned(audit.rows),
                 Err(err) => {
                     eprintln!("horbm learn: {err}");
                     0
@@ -337,6 +338,28 @@ impl HostSession {
         };
         self.learned_rows.store(count, Ordering::Relaxed);
         count
+    }
+
+    /// Forward `rows` unless this is the first attach and the list is empty.
+    fn hand_learned(&self, rows: Vec<horbm::LearnedRow>) -> usize {
+        let count = rows.len();
+        if count == 0 && !self.pack_attached.load(Ordering::Relaxed) {
+            return 0;
+        }
+        let attached = {
+            let mut mind = self.mind.lock().unwrap_or_else(|err| err.into_inner());
+            mind.attach_learned(rows)
+        };
+        match attached {
+            Ok(()) => {
+                self.pack_attached.store(count > 0, Ordering::Relaxed);
+                count
+            }
+            Err(err) => {
+                eprintln!("horbm learn: {err}");
+                0
+            }
+        }
     }
 
     pub fn config(&self) -> &HostConfig {
@@ -501,6 +524,11 @@ impl HostSession {
 
     /// Diary `end_session`, then [`SessionSeal::seal`]. Both are no-ops when
     /// that consent is denied. Not called from [`Drop`]. A crash writes nothing.
+    ///
+    /// This does not audit the pack and does not call [`Self::attach_pack`].
+    /// The seal is one write of the clause already held in RAM. The signal
+    /// handler only wakes the runtime; this runs after that, on the blocking
+    /// pool.
     pub fn finish(&self) {
         if self.finished.swap(true, Ordering::SeqCst) {
             return;
