@@ -9,10 +9,10 @@
 //! write the turn log.
 //!
 //! `list` opens the memory file with `SQLITE_OPEN_READ_ONLY` and only after
-//! the file exists. It does not create the file or its parent. `PRAGMA
-//! user_version` and the named columns are the pinned `horbm-memory` schema
-//! at rev `974e594444448597741372fef578142c46d28566` (`user_version` 5). A
-//! difference exits 3. This program does not guess a newer or older shape.
+//! the file exists. It does not create that file or its parent. `PRAGMA
+//! user_version` and the named columns are compared with the `CREATE TABLE`
+//! statements `horbm-memory` installs. A difference exits 3. This program
+//! does not guess a newer or older shape.
 //!
 //! `forget` archives one row through `EpisodicStore` with remember granted.
 //! Exit 0 is `Archived`. Any other outcome exits 1. A missing file exits 2
@@ -35,76 +35,27 @@
 
 use std::env;
 use std::ffi::OsString;
+use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
-use std::time::Duration;
+use std::sync::OnceLock;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use horbm::{EpisodicStore, LearnConfig, LearnPass, PersonMemory, WriteOutcome};
 use rusqlite::{params, Connection, OpenFlags};
-
-/// `horbm_memory::SCHEMA_VERSION` at rev 974e594444448597741372fef578142c46d28566.
-const EXPECTED_USER_VERSION: i32 = 5;
-const PINNED_REV: &str = "974e594444448597741372fef578142c46d28566";
 
 const EXIT_OK: u8 = 0;
 const EXIT_FAIL: u8 = 1;
 const EXIT_USAGE: u8 = 2;
 const EXIT_SCHEMA: u8 = 3;
 
-/// `items` columns declared by the pinned `SCHEMA` string.
-const ITEMS_COLUMNS: &[(&str, &str)] = &[
-    ("item_id", "TEXT"),
-    ("layer", "TEXT"),
-    ("section", "TEXT"),
-    ("category", "TEXT"),
-    ("title", "TEXT"),
-    ("body", "TEXT"),
-    ("summary", "TEXT"),
-    ("claim_type", "TEXT"),
-    ("said_by", "TEXT"),
-    ("source_date", "TEXT"),
-    ("source", "TEXT"),
-    ("evidence_strength", "TEXT"),
-    ("status", "TEXT"),
-    ("marked", "INTEGER"),
-    ("emb", "BLOB"),
-    ("emb_scale", "REAL"),
-    ("emb_norm", "REAL"),
-    ("document", "TEXT"),
-    ("content_hash", "TEXT"),
-    ("pinned", "INTEGER"),
-    ("importance", "REAL"),
-    ("kind", "TEXT"),
-    ("session_id", "TEXT"),
-    ("current", "INTEGER"),
-    ("extractor", "TEXT"),
-    ("subject_key", "TEXT"),
-    ("object_value", "TEXT"),
-    ("last_access", "TEXT"),
-];
-
-/// `archive` columns declared by the pinned `SCHEMA` string.
-const ARCHIVE_COLUMNS: &[(&str, &str)] = &[
-    ("item_id", "TEXT"),
-    ("layer", "TEXT"),
-    ("section", "TEXT"),
-    ("category", "TEXT"),
-    ("title", "TEXT"),
-    ("body", "TEXT"),
-    ("summary", "TEXT"),
-    ("claim_type", "TEXT"),
-    ("said_by", "TEXT"),
-    ("source_date", "TEXT"),
-    ("source", "TEXT"),
-    ("evidence_strength", "TEXT"),
-    ("status", "TEXT"),
-    ("reason", "TEXT"),
-    ("emb", "BLOB"),
-    ("emb_scale", "REAL"),
-    ("emb_norm", "REAL"),
-    ("document", "TEXT"),
-    ("content_hash", "TEXT"),
-];
+/// Columns and `user_version` taken from the `CREATE TABLE` statements
+/// `horbm-memory` installs. Not a copy of that list.
+struct DeclaredSchema {
+    user_version: i32,
+    items: Vec<(String, String)>,
+    archive: Vec<(String, String)>,
+}
 
 enum Stop {
     Usage(String),
@@ -257,37 +208,237 @@ fn open_readonly(path: &Path) -> Result<Connection, Stop> {
 }
 
 fn check_schema(conn: &Connection) -> Result<(), Stop> {
+    let declared = declared_schema()?;
     let version: i32 = conn
         .pragma_query_value(None, "user_version", |row| row.get(0))
         .map_err(|err| Stop::Fail(err.to_string()))?;
-    if version != EXPECTED_USER_VERSION {
+    if version != declared.user_version {
         return Err(Stop::Schema(format!(
-            "schema mismatch: PRAGMA user_version is {version}, horbm-memory {PINNED_REV} expects {EXPECTED_USER_VERSION}"
+            "schema mismatch: PRAGMA user_version is {version}, horbm-memory's schema declares {}",
+            declared.user_version
         )));
     }
-    expect_columns(conn, "items", ITEMS_COLUMNS)?;
-    expect_columns(conn, "archive", ARCHIVE_COLUMNS)?;
+    expect_columns(conn, "items", &declared.items)?;
+    expect_columns(conn, "archive", &declared.archive)?;
     Ok(())
 }
 
-fn expect_columns(conn: &Connection, table: &str, expected: &[(&str, &str)]) -> Result<(), Stop> {
+fn declared_schema() -> Result<&'static DeclaredSchema, Stop> {
+    static CELL: OnceLock<Result<DeclaredSchema, String>> = OnceLock::new();
+    match CELL.get_or_init(load_declared_schema) {
+        Ok(schema) => Ok(schema),
+        Err(message) => Err(Stop::Fail(message.clone())),
+    }
+}
+
+/// Open a throwaway database with `horbm_memory::Store` and read the
+/// `CREATE TABLE` text that crate installed. The caller's file is not used.
+fn load_declared_schema() -> Result<DeclaredSchema, String> {
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|elapsed| elapsed.as_nanos())
+        .unwrap_or(0);
+    let dir = env::temp_dir().join(format!(
+        "horbm-memory-audit-schema-{}-{nanos}",
+        std::process::id()
+    ));
+    let guard = RemoveDir(dir);
+    fs::create_dir_all(guard.path()).map_err(|err| err.to_string())?;
+    let path = guard.path().join("reference.sqlite");
+    {
+        let store = horbm_memory::Store::open(&path).map_err(|err| err.to_string())?;
+        drop(store);
+    }
+    let conn = Connection::open_with_flags(&path, OpenFlags::SQLITE_OPEN_READ_ONLY)
+        .map_err(|err| err.to_string())?;
+    let user_version: i32 = conn
+        .pragma_query_value(None, "user_version", |row| row.get(0))
+        .map_err(|err| err.to_string())?;
+    let items = columns_from_create(&create_sql(&conn, "items")?)?;
+    let archive = columns_from_create(&create_sql(&conn, "archive")?)?;
+    drop(conn);
+    Ok(DeclaredSchema {
+        user_version,
+        items,
+        archive,
+    })
+}
+
+fn create_sql(conn: &Connection, table: &str) -> Result<String, String> {
+    conn.query_row(
+        "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?1",
+        params![table],
+        |row| row.get(0),
+    )
+    .map_err(|err| format!("horbm-memory installed no CREATE TABLE for {table}: {err}"))
+}
+
+fn columns_from_create(sql: &str) -> Result<Vec<(String, String)>, String> {
+    let body = table_body(sql)?;
+    let mut columns = Vec::new();
+    for clause in split_clauses(body) {
+        if let Some(column) = column_from_clause(clause)? {
+            columns.push(column);
+        }
+    }
+    if columns.is_empty() {
+        return Err(format!(
+            "horbm-memory CREATE TABLE declares no columns: {sql}"
+        ));
+    }
+    Ok(columns)
+}
+
+fn table_body(sql: &str) -> Result<&str, String> {
+    let Some(start) = sql.find('(') else {
+        return Err(format!(
+            "horbm-memory CREATE TABLE has no column list: {sql}"
+        ));
+    };
+    let bytes = sql.as_bytes();
+    let mut depth = 0;
+    let mut quote: Option<u8> = None;
+    let mut i = start;
+    while i < bytes.len() {
+        let byte = bytes[i];
+        if let Some(mark) = quote {
+            if byte == mark {
+                if mark == b'\'' && bytes.get(i + 1) == Some(&b'\'') {
+                    i += 2;
+                    continue;
+                }
+                quote = None;
+            }
+            i += 1;
+            continue;
+        }
+        match byte {
+            b'\'' | b'"' | b'`' => quote = Some(byte),
+            b'(' => depth += 1,
+            b')' => {
+                depth -= 1;
+                if depth == 0 {
+                    return Ok(&sql[start + 1..i]);
+                }
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+    Err(format!(
+        "horbm-memory CREATE TABLE column list is not closed: {sql}"
+    ))
+}
+
+fn split_clauses(body: &str) -> Vec<&str> {
+    let bytes = body.as_bytes();
+    let mut out = Vec::new();
+    let mut start = 0;
+    let mut depth = 0;
+    let mut quote: Option<u8> = None;
+    let mut i = 0;
+    while i < bytes.len() {
+        let byte = bytes[i];
+        if let Some(mark) = quote {
+            if byte == mark {
+                if mark == b'\'' && bytes.get(i + 1) == Some(&b'\'') {
+                    i += 2;
+                    continue;
+                }
+                quote = None;
+            }
+            i += 1;
+            continue;
+        }
+        match byte {
+            b'\'' | b'"' | b'`' => quote = Some(byte),
+            b'(' => depth += 1,
+            b')' if depth > 0 => depth -= 1,
+            b',' if depth == 0 => {
+                out.push(&body[start..i]);
+                start = i + 1;
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+    out.push(&body[start..]);
+    out
+}
+
+fn column_from_clause(clause: &str) -> Result<Option<(String, String)>, String> {
+    let clause = clause.trim();
+    if clause.is_empty() {
+        return Ok(None);
+    }
+    let Some((name, rest)) = take_ident(clause) else {
+        return Err(format!(
+            "horbm-memory schema has an unreadable declaration: {clause}"
+        ));
+    };
+    if is_table_constraint(name) {
+        return Ok(None);
+    }
+    let Some((ty, _)) = take_ident(rest) else {
+        return Err(format!(
+            "horbm-memory schema column {name} has no declared type"
+        ));
+    };
+    Ok(Some((name.to_string(), ty.to_string())))
+}
+
+fn take_ident(text: &str) -> Option<(&str, &str)> {
+    let text = text.trim_start();
+    let mut chars = text.char_indices();
+    let (_, first) = chars.next()?;
+    if first == '"' || first == '`' || first == '[' {
+        let end = if first == '[' { ']' } else { first };
+        let close = text[1..].find(end)?;
+        return Some((&text[1..1 + close], &text[1 + close + 1..]));
+    }
+    if !first.is_ascii_alphabetic() && first != '_' {
+        return None;
+    }
+    let mut end = first.len_utf8();
+    for (index, ch) in chars {
+        if ch.is_ascii_alphanumeric() || ch == '_' {
+            end = index + ch.len_utf8();
+        } else {
+            break;
+        }
+    }
+    Some((&text[..end], &text[end..]))
+}
+
+fn is_table_constraint(name: &str) -> bool {
+    matches!(
+        name.to_ascii_uppercase().as_str(),
+        "PRIMARY" | "UNIQUE" | "CHECK" | "FOREIGN" | "CONSTRAINT"
+    )
+}
+
+fn expect_columns(
+    conn: &Connection,
+    table: &str,
+    expected: &[(String, String)],
+) -> Result<(), Stop> {
     let found = table_columns(conn, table)?;
     if found.is_empty() {
         return Err(Stop::Schema(format!(
-            "schema mismatch: table {table} is missing; horbm-memory {PINNED_REV} declares it"
+            "schema mismatch: table {table} is missing; horbm-memory's schema declares it"
         )));
     }
     let mut matched = vec![false; expected.len()];
     for (name, ty) in &found {
-        let Some(index) = expected.iter().position(|(want, _)| *want == name) else {
+        let Some(index) = expected.iter().position(|(want, _)| want == name) else {
             return Err(Stop::Schema(format!(
-                "schema mismatch: table {table} has column {name} ({ty}), which horbm-memory {PINNED_REV} does not declare"
+                "schema mismatch: table {table} has column {name} ({ty}), which horbm-memory's schema does not declare"
             )));
         };
-        let want_ty = expected[index].1;
+        let want_ty = &expected[index].1;
         if !ty.eq_ignore_ascii_case(want_ty) {
             return Err(Stop::Schema(format!(
-                "schema mismatch: {table}.{name} type is {ty}, horbm-memory {PINNED_REV} declares {want_ty}"
+                "schema mismatch: {table}.{name} type is {ty}, horbm-memory's schema declares {want_ty}"
             )));
         }
         if matched[index] {
@@ -299,13 +450,27 @@ fn expect_columns(conn: &Connection, table: &str, expected: &[(&str, &str)]) -> 
     }
     for (index, seen) in matched.iter().enumerate() {
         if !seen {
-            let (name, ty) = expected[index];
+            let (name, ty) = &expected[index];
             return Err(Stop::Schema(format!(
-                "schema mismatch: table {table} has no column {name}; horbm-memory {PINNED_REV} declares {name} {ty}"
+                "schema mismatch: table {table} has no column {name}; horbm-memory's schema declares {name} {ty}"
             )));
         }
     }
     Ok(())
+}
+
+struct RemoveDir(PathBuf);
+
+impl RemoveDir {
+    fn path(&self) -> &Path {
+        &self.0
+    }
+}
+
+impl Drop for RemoveDir {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.0);
+    }
 }
 
 fn table_columns(conn: &Connection, table: &str) -> Result<Vec<(String, String)>, Stop> {

@@ -356,6 +356,29 @@ fn list_never_writes() {
     let _ = fs::remove_dir_all(&root);
 }
 
+#[test]
+fn unknown_column_is_rejected() {
+    let root = scratch("schema");
+    let db = root.join("person.sqlite");
+    grant_pin(&db, PERSON, PIN_TEXT, PIN_AT);
+    {
+        let conn = rusqlite::Connection::open(&db).expect("open db");
+        conn.execute_batch("ALTER TABLE items ADD COLUMN not_in_horbm_schema TEXT")
+            .expect("add column");
+    }
+    let out = run(&["list", "--memory", db.to_str().expect("utf-8 path")]);
+    assert_eq!(out.status.code(), Some(3), "stderr: {}", stderr(&out));
+    let err = stderr(&out);
+    assert!(err.contains("schema mismatch"), "{err}");
+    assert!(err.contains("not_in_horbm_schema"), "{err}");
+    assert!(
+        err.contains("does not declare"),
+        "unknown column was not rejected: {err}"
+    );
+    assert!(out.stdout.is_empty(), "stdout: {:?}", out.stdout);
+    let _ = fs::remove_dir_all(&root);
+}
+
 fn stderr(output: &Output) -> String {
     String::from_utf8_lossy(&output.stderr).into_owned()
 }
