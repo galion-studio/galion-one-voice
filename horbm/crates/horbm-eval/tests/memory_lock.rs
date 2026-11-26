@@ -315,7 +315,7 @@ fn retract_clause_is_true_once_then_false_and_the_audit_shrinks() {
     let before = learn.audit().expect("audit");
     assert_eq!(before.rows.len(), 2, "{:?}", before.rows);
 
-    assert_eq!(learn.retract_clause(PERSON, HOB).expect("once"), true);
+    assert!(learn.retract_clause(PERSON, HOB).expect("once"));
     let after = learn.audit().expect("audit after retract");
     assert!(after.rows.len() < before.rows.len(), "{:?}", after.rows);
     assert_eq!(after.rows.len(), 1, "{:?}", after.rows);
@@ -325,7 +325,7 @@ fn retract_clause_is_true_once_then_false_and_the_audit_shrinks() {
         .iter()
         .any(|row| row.text == OAR && row.said_by == PERSON));
 
-    assert_eq!(learn.retract_clause(PERSON, HOB).expect("again"), false);
+    assert!(!learn.retract_clause(PERSON, HOB).expect("again"));
     let still = learn.audit().expect("audit stayed");
     assert_eq!(still.rows.len(), after.rows.len());
     assert!(still.rows.iter().all(|row| row.text != HOB));
