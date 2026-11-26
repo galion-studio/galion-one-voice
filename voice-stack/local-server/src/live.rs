@@ -1148,8 +1148,8 @@ impl Drop for ProsodyEar {
 }
 
 fn prosody_loop(mut ear: horbm_ear::Ear, slot: Arc<(Mutex<ProsodySlot>, Condvar)>) {
-    // One scorer for the life of the thread. 7881 has no streaming ASR
-    // partial on this path, so the partial is empty.
+    // One scorer for the life of the thread. 7881 has no ASR partial here.
+    // That is prosody-only, not an empty transcript.
     let mut scorer = horbm_ear::Scorer::bundled();
     let (lock, wake) = &*slot;
     loop {
@@ -1162,7 +1162,7 @@ fn prosody_loop(mut ear: horbm_ear::Ear, slot: Arc<(Mutex<ProsodySlot>, Condvar)
             ProsodyState::Push => {
                 let frame = guard.frame;
                 let out = ear.push(&frame);
-                guard.turn = scorer.push(out, "");
+                guard.turn = scorer.push_prosody(out);
                 guard.kept = heard_point(out);
                 guard.state = ProsodyState::Idle;
                 wake.notify_one();

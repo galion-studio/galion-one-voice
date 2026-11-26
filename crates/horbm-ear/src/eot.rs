@@ -16,6 +16,12 @@
 //! the floor through a short pause, and a finished word yields on a falling
 //! contour with an energy drop, or on a rising question contour.
 //!
+//! [`Scorer::push_prosody`] is the path with no transcript. That is not an
+//! empty partial: an empty string passed to [`Scorer::push`] is still a
+//! supplied partial and holds. With no partial, a clear fall yields once the
+//! pause reaches the mild threshold. A flat contour, a rise, or a fall whose
+//! energy stays up holds.
+//!
 //! [`ListenCue`] is the listening slot beside that decision. A mild
 //! clause-final fall with a short pause is still [`TurnMsg::Hold`]: the
 //! user has not given the floor away. A strong fall, a long pause, and a
@@ -243,8 +249,22 @@ impl Scorer {
     /// One ear result plus the latest ASR partial.
     ///
     /// [`FrameOut::Denied`] clears the contour and returns [`TurnMsg::PauseOnly`].
-    /// A rejected buffer holds and leaves the contour as it was.
+    /// A rejected buffer holds and leaves the contour as it was. An empty
+    /// `partial` is a supplied transcript and holds. No transcript at all is
+    /// [`Self::push_prosody`].
     pub fn push(&mut self, frame: FrameOut, partial: &str) -> TurnMsg {
+        self.push_turn(frame, Some(partial))
+    }
+
+    /// One ear result and no transcript. Prosody decides.
+    ///
+    /// A denied frame is still [`TurnMsg::PauseOnly`]. A clear fall yields at
+    /// the mild pause. A flat contour, a rise, or sustained energy holds.
+    pub fn push_prosody(&mut self, frame: FrameOut) -> TurnMsg {
+        self.push_turn(frame, None)
+    }
+
+    fn push_turn(&mut self, frame: FrameOut, partial: Option<&str>) -> TurnMsg {
         match frame {
             FrameOut::Denied => {
                 self.tail.clear();
@@ -256,13 +276,23 @@ impl Scorer {
                 self.listen = ListenCue::None;
                 TurnMsg::Hold
             }
-            FrameOut::Heard(frame) => self.push_cue(ProsodyCue::from(&frame), partial),
+            FrameOut::Heard(frame) => self.cue_turn(ProsodyCue::from(&frame), partial),
         }
     }
 
     /// Same rules as [`Self::push`] for a cue the host already measured.
     /// Sensing is on. A denied ear never reaches here.
     pub fn push_cue(&mut self, cue: ProsodyCue, partial: &str) -> TurnMsg {
+        self.cue_turn(cue, Some(partial))
+    }
+
+    /// [`Self::push_cue`] with no transcript. Same contour rules as
+    /// [`Self::push_prosody`].
+    pub fn push_cue_prosody(&mut self, cue: ProsodyCue) -> TurnMsg {
+        self.cue_turn(cue, None)
+    }
+
+    fn cue_turn(&mut self, cue: ProsodyCue, partial: Option<&str>) -> TurnMsg {
         if cue.voiced {
             if cue.f0_hz.is_finite() && cue.f0_hz > 0.0 && cue.energy.is_finite() {
                 if self.gap_ms >= self.cfg.yield_pause_ms {
@@ -287,8 +317,14 @@ impl Scorer {
             return TurnMsg::Hold;
         }
         self.gap_ms = cue.pause_ms;
-        let turn = self.decide(partial, cue.pause_ms);
-        self.listen = self.classify_listen(partial, cue.pause_ms, turn);
+        let turn = match partial {
+            Some(partial) => self.decide(partial, cue.pause_ms),
+            None => self.decide_prosody(cue.pause_ms),
+        };
+        self.listen = match partial {
+            Some(partial) => self.classify_listen(partial, cue.pause_ms, turn),
+            None => ListenCue::None,
+        };
         turn
     }
 
@@ -325,6 +361,23 @@ impl Scorer {
             return TurnMsg::Yield { question: false };
         }
         if pause_ms >= self.cfg.hold_pause_ms {
+            return TurnMsg::Yield { question: false };
+        }
+        TurnMsg::Hold
+    }
+
+    /// No transcript. The same fall the word path uses, and nothing else.
+    ///
+    /// A strong fall or a mild fall yields once the pause reaches
+    /// [`EotConfig::mild_pause_ms`]. A flat contour, a rise, a short tail, or
+    /// a fall whose energy stays up holds. The caller caps that hold.
+    fn decide_prosody(&self, pause_ms: u32) -> TurnMsg {
+        let Some((semis, energy_drop, pace_drop)) = self.contour() else {
+            return TurnMsg::Hold;
+        };
+        let strong = semis <= -self.cfg.strong_fall_semitones && energy_drop;
+        let mild = semis <= -self.cfg.fall_semitones && energy_drop && !pace_drop;
+        if (strong || mild) && pause_ms >= self.cfg.mild_pause_ms {
             return TurnMsg::Yield { question: false };
         }
         TurnMsg::Hold
@@ -601,5 +654,57 @@ mod tests {
         }
         assert_eq!(filler.push_cue(quiet(80), um), TurnMsg::Hold);
         assert_eq!(filler.listen(), ListenCue::Filler);
+    }
+
+    #[test]
+    fn no_partial_yields_a_clear_fall_and_holds_a_rise_a_flat_or_sustained_energy() {
+        let mut fall = Scorer::bundled();
+        for (f0, energy) in [(240.0, 0.30), (200.0, 0.24), (160.0, 0.18), (130.0, 0.12)] {
+            assert_eq!(
+                fall.push_cue_prosody(cue(true, f0, energy, 3.0, 0)),
+                TurnMsg::Hold
+            );
+        }
+        assert_eq!(fall.push_cue_prosody(quiet(80)), TurnMsg::Hold);
+        assert_eq!(fall.listen(), ListenCue::None);
+        assert_eq!(
+            fall.push_cue_prosody(quiet(160)),
+            TurnMsg::Yield { question: false }
+        );
+
+        let mut rise = Scorer::bundled();
+        for (f0, energy) in [(140.0, 0.22), (165.0, 0.22), (195.0, 0.22), (230.0, 0.22)] {
+            rise.push_cue_prosody(cue(true, f0, energy, 3.0, 0));
+        }
+        for pause in [80, 160, 640, 720] {
+            assert_eq!(
+                rise.push_cue_prosody(quiet(pause)),
+                TurnMsg::Hold,
+                "{pause}"
+            );
+        }
+
+        let mut flat = Scorer::bundled();
+        for _ in 0..4 {
+            flat.push_cue_prosody(cue(true, 180.0, 0.20, 3.0, 0));
+        }
+        assert_eq!(flat.push_cue_prosody(quiet(160)), TurnMsg::Hold);
+        assert_eq!(flat.push_cue_prosody(quiet(720)), TurnMsg::Hold);
+
+        let mut sustained = Scorer::bundled();
+        for f0 in [240.0, 200.0, 160.0, 130.0] {
+            sustained.push_cue_prosody(cue(true, f0, 0.20, 3.0, 0));
+        }
+        assert_eq!(sustained.push_cue_prosody(quiet(160)), TurnMsg::Hold);
+        assert_eq!(sustained.push_cue_prosody(quiet(720)), TurnMsg::Hold);
+
+        let mut empty = Scorer::bundled();
+        for (f0, energy) in [(240.0, 0.30), (200.0, 0.24), (160.0, 0.18), (130.0, 0.12)] {
+            assert_eq!(
+                empty.push_cue(cue(true, f0, energy, 3.0, 0), ""),
+                TurnMsg::Hold
+            );
+        }
+        assert_eq!(empty.push_cue(quiet(160), ""), TurnMsg::Hold);
     }
 }

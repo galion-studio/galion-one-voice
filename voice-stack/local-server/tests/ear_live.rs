@@ -160,14 +160,17 @@ fn silence_until_end(label: &str, sense_on: bool, speech: &[i16]) -> u32 {
     panic!("{label} did not end after {silence_ms} ms");
 }
 
+/// Four 80 ms sines, rising in pitch at a steady level. No audio file.
+fn rising_contour() -> Vec<i16> {
+    stepped_contour([(140.0, 0.22), (165.0, 0.22), (195.0, 0.22), (230.0, 0.22)])
+}
+
 /// Four 80 ms sines, falling in pitch and level. No audio file.
 fn falling_contour() -> Vec<i16> {
-    let steps = [
-        (240.0f32, 0.30f32),
-        (200.0, 0.24),
-        (160.0, 0.18),
-        (130.0, 0.12),
-    ];
+    stepped_contour([(240.0, 0.30), (200.0, 0.24), (160.0, 0.18), (130.0, 0.12)])
+}
+
+fn stepped_contour(steps: [(f32, f32); 4]) -> Vec<i16> {
     let rate = 16_000u32;
     let n = rate as usize * 80 / 1000;
     let mut out = Vec::with_capacity(n * steps.len());
@@ -209,13 +212,25 @@ fn hold_never_exceeds_hang_plus_80() {
     assert_eq!(silence_ms, 720);
 }
 
-/// Falling contour, then silence. The scorer is fed an empty partial, and it
-/// holds when that partial is empty, so a terminal fall does not yield. The
-/// take ends at the hold cap, after the 640 ms hang and inside the +80 ms cap.
+/// Falling contour, then silence. No transcript: the mild pause ends the take
+/// before the 640 ms hang.
 #[test]
 fn clear_fall_then_pause_ends_before_hang() {
     let silence_ms = silence_until_end("clear_fall", true, &falling_contour());
-    assert!(silence_ms <= 640 + 80, "clear_fall silence_ms={silence_ms}");
+    assert!(silence_ms < 640, "clear_fall silence_ms={silence_ms}");
+    assert!(
+        (160..=240).contains(&silence_ms),
+        "clear_fall silence_ms={silence_ms}, mild pause is 160"
+    );
+}
+
+/// Rising contour, steady level. No transcript, so the rise holds past the
+/// hang and stops at the cap.
+#[test]
+fn rise_holds_past_the_hang_and_stops_at_the_cap() {
+    let silence_ms = silence_until_end("rise", true, &rising_contour());
+    assert!(silence_ms > 640, "rise silence_ms={silence_ms}");
+    assert!(silence_ms <= 640 + 80, "rise silence_ms={silence_ms}");
     assert_eq!(silence_ms, 720);
 }
 

@@ -299,3 +299,20 @@ fn sensing_off_is_pause_only_for_deny_and_the_env_value() {
     assert_eq!(cfg.yield_pause_ms, FRAME_MS);
     println!("eot measure: sensing_off=PauseOnly deny=PauseOnly env=0|off|deny result=pass");
 }
+
+#[test]
+fn no_partial_yields_a_falling_sine_at_the_mild_pause() {
+    let mut ear = Ear::new();
+    let mut scorer = Scorer::bundled();
+    for (hz, amp) in [(240.0, 0.30), (200.0, 0.24), (160.0, 0.18), (130.0, 0.12)] {
+        let frame = ear.push(&sine(hz, amp));
+        assert_eq!(scorer.push_prosody(frame), TurnMsg::Hold, "{hz}");
+    }
+    let first = ear.push(&sine(0.0, 0.0));
+    assert_eq!(scorer.push_prosody(first), TurnMsg::Hold);
+    let second = ear.push(&sine(0.0, 0.0));
+    assert_eq!(
+        scorer.push_prosody(second),
+        TurnMsg::Yield { question: false }
+    );
+}
