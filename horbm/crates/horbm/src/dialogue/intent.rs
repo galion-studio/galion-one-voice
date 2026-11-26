@@ -165,6 +165,91 @@ pub(crate) fn recall_clause(heard: &str) -> &str {
     }
 }
 
+/// What a forget line is asking to drop. The topic borrows `heard`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum ForgetAsk<'a> {
+    /// "forget that", "don't remember that", or "stop remembering".
+    That,
+    /// Words after "forget what i said about", "forget what i told you about",
+    /// or "please forget". Edge punctuation is already removed.
+    About(&'a str),
+}
+
+/// The forget this line asks for.
+///
+/// `None` unless [`TurnIntent::read`] of `heard` as chat is
+/// [`TurnIntent::Forget`]. A correction wins that read, and so does a
+/// negation sitting against the phrase. The topic is a slice of `heard`.
+pub(crate) fn forget_clause(heard: &str) -> Option<ForgetAsk<'_>> {
+    if TurnIntent::read(heard, "chat") != TurnIntent::Forget {
+        return None;
+    }
+    let Some((at, phrase)) = earliest_unnegated(heard, FORGET) else {
+        return Some(ForgetAsk::About(""));
+    };
+    if is_that_phrase(phrase) {
+        return Some(ForgetAsk::That);
+    }
+    let rest = topic_after(phrase, &heard[at + phrase.len()..]);
+    Some(ForgetAsk::About(trim_topic(rest)))
+}
+
+fn is_that_phrase(phrase: &str) -> bool {
+    matches!(
+        phrase,
+        "forget that" | "don't remember that" | "stop remembering"
+    )
+}
+
+/// "forget what i said" and "forget what i told you" take the words after
+/// a following "about". "please forget" takes the words after the phrase.
+fn topic_after<'a>(phrase: &str, rest: &'a str) -> &'a str {
+    if phrase == "forget what i said" || phrase == "forget what i told you" {
+        skip_leading_about(rest)
+    } else {
+        rest
+    }
+}
+
+fn skip_leading_about(rest: &str) -> &str {
+    let Some(at) = first_phrase_at(rest.as_bytes(), b"about", 0) else {
+        return rest;
+    };
+    if rest[..at].bytes().all(|byte| byte.is_ascii_whitespace()) {
+        &rest[at + b"about".len()..]
+    } else {
+        rest
+    }
+}
+
+fn trim_topic(text: &str) -> &str {
+    text.trim_matches(|ch: char| ch.is_ascii_whitespace() || ch.is_ascii_punctuation())
+}
+
+/// Earliest unnegated phrase. A longer phrase at the same byte wins.
+fn earliest_unnegated<'a>(hay: &str, phrases: &[&'a str]) -> Option<(usize, &'a str)> {
+    let bytes = hay.as_bytes();
+    let mut best_at = usize::MAX;
+    let mut best: Option<&'a str> = None;
+    for phrase in phrases {
+        let needle = phrase.as_bytes();
+        let mut from = 0;
+        while let Some(at) = first_phrase_at(bytes, needle, from) {
+            if negated_before(bytes, at) {
+                from = at.saturating_add(1);
+                continue;
+            }
+            let longer = best.is_some_and(|prev| at == best_at && phrase.len() > prev.len());
+            if at < best_at || longer {
+                best_at = at;
+                best = Some(phrase);
+            }
+            break;
+        }
+    }
+    best.map(|phrase| (best_at, phrase))
+}
+
 fn first_phrase_at(hay: &[u8], phrase: &[u8], from: usize) -> Option<usize> {
     if phrase.is_empty() || from >= hay.len() || hay.len() - from < phrase.len() {
         return None;
@@ -454,6 +539,98 @@ mod tests {
     }
 
     #[test]
+    fn forget_clause_is_that_or_the_topic_after_the_phrase() {
+        for heard in [
+            "forget that",
+            "Forget that.",
+            "don't remember that",
+            "Don't Remember That",
+            "please don't remember that",
+            "stop remembering",
+            "STOP REMEMBERING",
+            "stop remembering my sister",
+            "forget that, do you remember the blue bowl",
+        ] {
+            assert_eq!(forget_clause(heard), Some(ForgetAsk::That), "{heard}");
+        }
+        assert_eq!(
+            forget_clause("please forget my sister"),
+            Some(ForgetAsk::About("my sister"))
+        );
+        assert_eq!(
+            forget_clause("Please forget my sister."),
+            Some(ForgetAsk::About("my sister"))
+        );
+        assert_eq!(
+            forget_clause("please forget, my sister!"),
+            Some(ForgetAsk::About("my sister"))
+        );
+        assert_eq!(
+            forget_clause("forget what i said about the bowl"),
+            Some(ForgetAsk::About("the bowl"))
+        );
+        assert_eq!(
+            forget_clause("Forget what I said about the bowl."),
+            Some(ForgetAsk::About("the bowl"))
+        );
+        assert_eq!(
+            forget_clause("forget what i told you about my sister"),
+            Some(ForgetAsk::About("my sister"))
+        );
+        assert_eq!(
+            forget_clause("Forget what I told you about my sister!"),
+            Some(ForgetAsk::About("my sister"))
+        );
+        assert_eq!(
+            forget_clause("don't forget that, but please forget the bowl"),
+            Some(ForgetAsk::About("the bowl"))
+        );
+        assert_eq!(
+            forget_clause("please forget that"),
+            Some(ForgetAsk::About("that"))
+        );
+        assert_eq!(forget_clause("please forget"), Some(ForgetAsk::About("")));
+        assert_eq!(forget_clause("please forget."), Some(ForgetAsk::About("")));
+        assert_eq!(
+            forget_clause("forget what i said"),
+            Some(ForgetAsk::About(""))
+        );
+        assert_eq!(
+            forget_clause("Forget what I told you"),
+            Some(ForgetAsk::About(""))
+        );
+        assert_eq!(
+            forget_clause("forget what i said yesterday"),
+            Some(ForgetAsk::About("yesterday"))
+        );
+    }
+
+    #[test]
+    fn forget_clause_is_none_unless_the_line_is_forget() {
+        for heard in [
+            "",
+            "hello",
+            "where is the kettle",
+            "do you remember the blue bowl",
+            "what did I tell you about the bowl",
+            "I forgot my keys",
+            "forget-me-not",
+            "forget",
+            "please don't forget that",
+            "never forget that",
+            "do not forget that",
+            "dont forget that",
+            "please dont forget what i said",
+            "never stop remembering",
+            "no, that's wrong, forget that",
+            "actually it's blue, please forget",
+            "please don't forget that, do you remember",
+        ] {
+            assert_eq!(forget_clause(heard), None, "{heard}");
+        }
+    }
+
+    #[test]
     fn forget_scan_does_not_allocate() {
         let src = include_str!("intent.rs");
         let head = src.split("#[cfg(test)]").next().expect("module head");
@@ -488,6 +665,7 @@ mod tests {
             "don't forget that, but please forget",
         ] {
             black_box(TurnIntent::read(black_box(heard), black_box("chat")));
+            black_box(forget_clause(black_box(heard)));
         }
     }
 

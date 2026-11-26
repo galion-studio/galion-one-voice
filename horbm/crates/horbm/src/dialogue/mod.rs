@@ -20,7 +20,8 @@
 //! vent, and goodbye keep this heuristic. Recall speaks a person-memory
 //! source (`memory:<id>` or `learned:<id>`), or the honest miss when the
 //! gathered sources are not one. A correction or a forget becomes that
-//! same miss and does not repeat the last sourced clause.
+//! same miss and does not repeat the last sourced clause. A kept
+//! `memory:<id>` or `learned:<id>` is stored on the snap.
 
 mod cues;
 mod filter;
@@ -36,8 +37,8 @@ use crate::research_style::ResearchHit;
 pub use moves::{flag_granted, DialogueConsent, Move, TurnSnap, RING_CAP};
 pub use policy::{OfflineBandit, ReplyPlan};
 
-pub(crate) use intent::recall_clause;
 use intent::TurnIntent;
+pub(crate) use intent::{forget_clause, recall_clause, ForgetAsk};
 use moves::TurnRing;
 use policy::Choice;
 use topic::TopicManager;
@@ -224,8 +225,8 @@ impl Dialogue {
             ReplyPlan::Replace { reply, .. } => reply.clone(),
         };
         let source = match &plan {
-            ReplyPlan::Keep => filter::real_source(input.sources).map(str::to_string),
-            ReplyPlan::Replace { sources, .. } => filter::real_source(sources).map(str::to_string),
+            ReplyPlan::Keep => snap_source(input.sources),
+            ReplyPlan::Replace { sources, .. } => snap_source(sources),
         };
         self.ring.push(TurnSnap {
             arousal: input.arousal,
@@ -249,6 +250,32 @@ impl Dialogue {
             propensity,
         }
     }
+}
+
+// A card or fixture source stays the snap source. When the turn kept only a
+// person diary row or a taught row, that id is the snap source. A later
+// "forget that" reads it. memory:callback is not a diary row.
+fn snap_source(sources: &[String]) -> Option<String> {
+    if let Some(source) = filter::real_source(sources) {
+        return Some(source.to_string());
+    }
+    sources
+        .iter()
+        .find_map(|source| person_snap(source).map(str::to_string))
+}
+
+fn person_snap(source: &str) -> Option<&str> {
+    if let Some(id) = source.strip_prefix("memory:") {
+        if !id.is_empty() && id != "callback" {
+            return Some(source);
+        }
+    }
+    if let Some(id) = source.strip_prefix("learned:") {
+        if !id.is_empty() {
+            return Some(source);
+        }
+    }
+    None
 }
 
 #[cfg(test)]
@@ -734,6 +761,31 @@ mod tests {
             }
             ReplyPlan::Keep => panic!("a card was kept as a memory"),
         }
+        let snap = dialogue.ring_get(0).expect("the recall is the first snap");
+        assert_eq!(snap.source.as_deref(), Some("memory:pin-1"));
+    }
+
+    #[test]
+    fn a_kept_learned_source_is_on_the_newest_snap() {
+        let mut dialogue = fresh(false);
+        let learned = vec!["learned:diary-9".to_string()];
+        let _kept = dialogue.decide(input(
+            "do you remember the spare oar",
+            "ask",
+            "the spare oar is in the locker",
+            &learned,
+            &[],
+        ));
+        let snap = dialogue
+            .ring_get(dialogue.ring_len() - 1)
+            .expect("learned snap");
+        assert_eq!(snap.source.as_deref(), Some("learned:diary-9"));
+        let callback = vec!["memory:callback".to_string()];
+        let _offer = dialogue.decide(input("hello", "chat", "call me later", &callback, &[]));
+        let offered = dialogue
+            .ring_get(dialogue.ring_len() - 1)
+            .expect("callback snap");
+        assert_eq!(offered.source, None);
     }
 
     #[test]
