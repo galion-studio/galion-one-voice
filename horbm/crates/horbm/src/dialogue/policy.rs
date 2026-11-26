@@ -65,18 +65,22 @@ fn honest_unknown() -> ReplyPlan {
     }
 }
 
-/// Recall speaks a person diary hit (`memory:` plus an id). A callback offer
-/// is `memory:callback` and is not that hit. A card is not a memory.
+/// Recall speaks a person diary hit. `memory:<id>` is one, and
+/// `memory:callback` is not. `learned:<id>` is a taught line when the id is
+/// non-empty. A card is not a memory.
 fn recall_without_memory(choice: &Choice<'_>) -> bool {
     choice.intent == TurnIntent::Recall
         && !choice.sources.iter().any(|source| is_person_memory(source))
 }
 
 fn is_person_memory(source: &str) -> bool {
-    match source.strip_prefix("memory:") {
-        Some(id) => !id.is_empty() && id != "callback",
-        None => false,
+    if let Some(id) = source.strip_prefix("memory:") {
+        return !id.is_empty() && id != "callback";
     }
+    if let Some(id) = source.strip_prefix("learned:") {
+        return !id.is_empty();
+    }
+    false
 }
 
 enum Offer<'a> {
@@ -93,10 +97,13 @@ pub fn choose(choice: &Choice<'_>) -> (Move, ReplyPlan, f32) {
 /// [`choose`] when `hold_topic` is false. A hold that selected
 /// [`Move::OfferTopic`] becomes [`Move::Ask`] before the offer line is built.
 pub(super) fn choose_held(choice: &Choice<'_>, hold_topic: bool) -> (Move, ReplyPlan, f32) {
-    // A correction is never an argument, and a recall with no person-memory
-    // source is never a card. Both use the ask miss. The old labels do not
-    // enter this branch.
-    if choice.intent == TurnIntent::Correct || recall_without_memory(choice) {
+    // A correction or a forget is never an argument, and a recall with no
+    // person-memory source is never a card. All three use the ask miss. The
+    // old labels do not enter this branch.
+    if choice.intent == TurnIntent::Correct
+        || choice.intent == TurnIntent::Forget
+        || recall_without_memory(choice)
+    {
         return (Move::Ask, honest_unknown(), propensity(Move::Ask));
     }
     let sourced = filter::is_sourced_truth(choice.reply, choice.sources, choice.research);
@@ -558,6 +565,81 @@ mod tests {
             spoken(&plan, "The kettle is on the hob."),
             wrong.ring_clause.unwrap()
         );
+    }
+
+    #[test]
+    fn learned_source_counts_as_person_memory_for_recall() {
+        let taught = "the blue bowl is the one you use";
+        let learned = vec!["learned:diary-9".to_string()];
+        let (asked, plan, _) = choose(&choice(
+            "do you remember the blue bowl",
+            "ask",
+            taught,
+            &learned,
+        ));
+        assert_eq!(asked, Move::Ask);
+        assert_eq!(spoken(&plan, taught), taught);
+        assert!(matches!(plan, ReplyPlan::Keep));
+
+        let mixed = vec!["card:kettle".to_string(), "learned:diary-9".to_string()];
+        let (asked, plan, _) = choose(&choice(
+            "do you remember the blue bowl",
+            "ask",
+            taught,
+            &mixed,
+        ));
+        // The card is sourced truth, so the arm is answer. The taught line
+        // stays. Recall does not replace it with the miss.
+        assert_eq!(asked, Move::Answer);
+        assert_eq!(spoken(&plan, taught), taught);
+        assert!(matches!(plan, ReplyPlan::Keep));
+
+        let empty = vec!["learned:".to_string()];
+        let (asked, plan, _) = choose(&choice(
+            "do you remember the blue bowl",
+            "ask",
+            taught,
+            &empty,
+        ));
+        assert_eq!(asked, Move::Ask);
+        assert_eq!(spoken(&plan, taught), UNKNOWN_REPLY);
+        match plan {
+            ReplyPlan::Replace {
+                sources, evidence, ..
+            } => {
+                assert_eq!(sources, vec!["honest:unknown".to_string()]);
+                assert!(evidence.is_empty());
+            }
+            ReplyPlan::Keep => panic!("an empty learned id was kept"),
+        }
+
+        // A non-empty id counts, including this token. Only memory:callback
+        // is the offer source that recall refuses.
+        let learned_callback = vec!["learned:callback".to_string()];
+        let (_, plan, _) = choose(&choice(
+            "do you remember the blue bowl",
+            "chat",
+            taught,
+            &learned_callback,
+        ));
+        assert_eq!(spoken(&plan, taught), taught);
+        assert!(matches!(plan, ReplyPlan::Keep));
+
+        let memory_callback = vec!["memory:callback".to_string()];
+        let (_, plan, _) = choose(&choice("do you remember", "chat", taught, &memory_callback));
+        assert_eq!(spoken(&plan, taught), UNKNOWN_REPLY);
+
+        let (_, plan, _) = choose(&choice("forget that", "ask", taught, &learned));
+        assert_eq!(spoken(&plan, taught), UNKNOWN_REPLY);
+        match plan {
+            ReplyPlan::Replace {
+                sources, evidence, ..
+            } => {
+                assert_eq!(sources, vec!["honest:unknown".to_string()]);
+                assert!(evidence.is_empty());
+            }
+            ReplyPlan::Keep => panic!("forget kept a taught line"),
+        }
     }
 
     #[test]

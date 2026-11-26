@@ -4,9 +4,9 @@
 //!
 //! Empathy has already named the line `chat`, `ask`, `task`, `vent`, or
 //! `goodbye`. This layer keeps that label, then refines it with a fixed
-//! English phrase table for recall and correction. The scan is the empathy
-//! crate's word-boundary scan. That helper is private there, so the same
-//! byte loop lives here. No model, no network, no heap.
+//! English phrase table for recall, forget, and correction. The scan is the
+//! empathy crate's word-boundary scan. That helper is private there, so the
+//! same byte loop lives here. No model, no network, no heap.
 
 /// What this turn is asking the dialogue manager to do.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -18,6 +18,7 @@ pub(crate) enum TurnIntent {
     Goodbye,
     Recall,
     Correct,
+    Forget,
 }
 
 impl TurnIntent {
@@ -32,16 +33,21 @@ impl TurnIntent {
             Self::Goodbye => "goodbye",
             Self::Recall => "recall",
             Self::Correct => "correct",
+            Self::Forget => "forget",
         }
     }
 
-    /// Empathy label first. A recall or correction phrase on `heard` wins.
-    /// A correction phrase wins when both tables match. An unknown label is
-    /// chat, which is empathy's label for an empty line.
+    /// Empathy label first. A recall, forget, or correction phrase on
+    /// `heard` wins. Precedence is correction, then forget, then recall.
+    /// A forget phrase sitting against "don't", "dont", "do not", or "never"
+    /// does not count. An unknown label is chat, which is empathy's label
+    /// for an empty line.
     pub(crate) fn read(heard: &str, label: &str) -> Self {
         let base = from_label(label);
         if contains_any(heard, CORRECT) {
             Self::Correct
+        } else if contains_forget(heard) {
+            Self::Forget
         } else if contains_any(heard, RECALL) {
             Self::Recall
         } else {
@@ -68,6 +74,18 @@ const CORRECT: &[&str] = &[
     "actually, it is",
 ];
 
+/// The person takes a fact back. "I forgot" and "forget-me-not" are not
+/// rows here. A hit with "don't", "dont", "do not", or "never" immediately
+/// before it is not this intent: "don't forget that" stays chat.
+const FORGET: &[&str] = &[
+    "forget that",
+    "forget what i said",
+    "forget what i told you",
+    "please forget",
+    "don't remember that",
+    "stop remembering",
+];
+
 fn from_label(label: &str) -> TurnIntent {
     let label = label.trim();
     if label.eq_ignore_ascii_case("ask") {
@@ -82,6 +100,8 @@ fn from_label(label: &str) -> TurnIntent {
         TurnIntent::Recall
     } else if label.eq_ignore_ascii_case("correct") {
         TurnIntent::Correct
+    } else if label.eq_ignore_ascii_case("forget") {
+        TurnIntent::Forget
     } else {
         TurnIntent::Chat
     }
@@ -91,8 +111,16 @@ fn contains_any(hay: &str, phrases: &[&str]) -> bool {
     phrases.iter().any(|phrase| contains_phrase(hay, phrase))
 }
 
+fn contains_forget(hay: &str) -> bool {
+    FORGET.iter().any(|phrase| contains_unnegated(hay, phrase))
+}
+
 fn is_word_byte(b: u8) -> bool {
     b.is_ascii_alphanumeric()
+}
+
+fn is_token_byte(b: u8) -> bool {
+    is_word_byte(b) || b == b'\''
 }
 
 fn boundary_before(hay: &[u8], at: usize) -> bool {
@@ -114,19 +142,93 @@ fn eq_ci(hay: &[u8], needle: &[u8]) -> bool {
 /// `phrase` is a whole token sequence, case-insensitive. Same rule as
 /// `galion_sam_empathy`'s phrase scan.
 fn contains_phrase(hay: &str, phrase: &str) -> bool {
-    let h = hay.as_bytes();
-    let p = phrase.as_bytes();
-    if p.is_empty() || h.len() < p.len() {
-        return false;
+    first_phrase_at(hay.as_bytes(), phrase.as_bytes(), 0).is_some()
+}
+
+/// Words from the earliest recall cue, when this line is a recall.
+/// A correction or a forget keeps `heard` whole.
+pub(crate) fn recall_clause(heard: &str) -> &str {
+    if TurnIntent::read(heard, "chat") != TurnIntent::Recall {
+        return heard;
     }
-    let mut i = 0;
-    while i + p.len() <= h.len() {
-        if boundary_before(h, i) && eq_ci(&h[i..], p) && boundary_after(h, i + p.len()) {
-            return true;
+    let bytes = heard.as_bytes();
+    let mut at: Option<usize> = None;
+    for phrase in RECALL {
+        let Some(hit) = first_phrase_at(bytes, phrase.as_bytes(), 0) else {
+            continue;
+        };
+        at = Some(at.map_or(hit, |prev| prev.min(hit)));
+    }
+    match at {
+        Some(at) => &heard[at..],
+        None => heard,
+    }
+}
+
+fn first_phrase_at(hay: &[u8], phrase: &[u8], from: usize) -> Option<usize> {
+    if phrase.is_empty() || from >= hay.len() || hay.len() - from < phrase.len() {
+        return None;
+    }
+    let mut i = from;
+    while i + phrase.len() <= hay.len() {
+        if boundary_before(hay, i)
+            && eq_ci(&hay[i..], phrase)
+            && boundary_after(hay, i + phrase.len())
+        {
+            return Some(i);
         }
         i += 1;
     }
+    None
+}
+
+/// Same scan as `contains_phrase`. A hit with a negation word against its
+/// first byte does not count, and the scan keeps looking.
+fn contains_unnegated(hay: &str, phrase: &str) -> bool {
+    let bytes = hay.as_bytes();
+    let needle = phrase.as_bytes();
+    let mut from = 0;
+    while let Some(at) = first_phrase_at(bytes, needle, from) {
+        if !negated_before(bytes, at) {
+            return true;
+        }
+        from = at.saturating_add(1);
+    }
     false
+}
+
+/// Byte look-back, no heap. The token against `at` is "don't", "dont", or
+/// "never", or the two tokens "do not".
+fn negated_before(hay: &[u8], at: usize) -> bool {
+    let Some((word, start)) = prev_token(hay, at) else {
+        return false;
+    };
+    if token_is(word, b"don't") || token_is(word, b"dont") || token_is(word, b"never") {
+        return true;
+    }
+    if !token_is(word, b"not") {
+        return false;
+    }
+    prev_token(hay, start).is_some_and(|(earlier, _)| token_is(earlier, b"do"))
+}
+
+fn prev_token(hay: &[u8], at: usize) -> Option<(&[u8], usize)> {
+    let mut end = at;
+    while end > 0 && hay[end - 1].is_ascii_whitespace() {
+        end -= 1;
+    }
+    if end == 0 || !is_token_byte(hay[end - 1]) {
+        return None;
+    }
+    let mut start = end;
+    while start > 0 && is_token_byte(hay[start - 1]) {
+        start -= 1;
+    }
+    Some((&hay[start..end], start))
+}
+
+fn token_is(word: &[u8], lit: &[u8]) -> bool {
+    word.len() == lit.len() && eq_ci(word, lit)
 }
 
 #[cfg(test)]
@@ -151,6 +253,8 @@ mod tests {
         assert_eq!(TurnIntent::read("", ""), TurnIntent::Chat);
         assert_eq!(TurnIntent::read("thanks", "recall"), TurnIntent::Recall);
         assert_eq!(TurnIntent::read("thanks", "correct"), TurnIntent::Correct);
+        assert_eq!(TurnIntent::read("thanks", "forget"), TurnIntent::Forget);
+        assert_eq!(TurnIntent::read("thanks", " FORGET "), TurnIntent::Forget);
 
         for heard in [
             "do you remember",
@@ -202,6 +306,189 @@ mod tests {
         assert_eq!(TurnIntent::Chat.as_str(), "chat");
         assert_eq!(TurnIntent::Recall.as_str(), "recall");
         assert_eq!(TurnIntent::Correct.as_str(), "correct");
+        assert_eq!(TurnIntent::Forget.as_str(), "forget");
+    }
+
+    #[test]
+    fn forget_phrases_read_as_forget() {
+        for heard in [
+            "forget that",
+            "Forget that.",
+            "forget what i said",
+            "Forget what I said about the bowl",
+            "forget what i told you",
+            "Forget what I told you",
+            "please forget",
+            "Please forget",
+            "don't remember that",
+            "Don't Remember That",
+            "stop remembering",
+            "STOP REMEMBERING",
+            "don't forget that, but please forget",
+        ] {
+            assert_eq!(
+                TurnIntent::read(heard, "chat"),
+                TurnIntent::Forget,
+                "{heard}"
+            );
+            assert_eq!(TurnIntent::read(heard, "ask").as_str(), "forget", "{heard}");
+        }
+    }
+
+    #[test]
+    fn dont_forget_is_not_forget() {
+        for heard in [
+            "please don't forget that",
+            "never forget that",
+            "Don't forget that",
+            "NEVER forget that",
+            "do not forget that",
+            "Do Not forget that",
+            "dont forget that",
+            "please dont forget what i said",
+            "do  not  forget that",
+        ] {
+            assert_eq!(TurnIntent::read(heard, "chat"), TurnIntent::Chat, "{heard}");
+            assert_ne!(
+                TurnIntent::read(heard, "ask"),
+                TurnIntent::Forget,
+                "{heard}"
+            );
+        }
+        assert_eq!(
+            TurnIntent::read("please don't forget that, do you remember", "chat"),
+            TurnIntent::Recall
+        );
+        assert_eq!(
+            TurnIntent::read("never forget that, what did I tell you", "ask"),
+            TurnIntent::Recall
+        );
+    }
+
+    #[test]
+    fn forgot_and_forget_me_not_are_not_forget() {
+        for heard in ["I forgot my keys", "forget-me-not", "forget"] {
+            assert_eq!(TurnIntent::read(heard, "chat"), TurnIntent::Chat, "{heard}");
+        }
+        assert_eq!(
+            TurnIntent::read("I forgot my keys, do you remember", "chat"),
+            TurnIntent::Recall
+        );
+    }
+
+    #[test]
+    fn correct_beats_forget() {
+        for heard in [
+            "no, that's wrong, forget that",
+            "forget that, no, that's wrong",
+            "actually it's blue, please forget",
+            "please forget, that is wrong",
+            "stop remembering, actually, it's blue",
+            "forget that, do you remember, that's wrong",
+        ] {
+            assert_eq!(
+                TurnIntent::read(heard, "recall"),
+                TurnIntent::Correct,
+                "{heard}"
+            );
+        }
+    }
+
+    #[test]
+    fn forget_beats_recall() {
+        for heard in [
+            "forget that, do you remember",
+            "do you remember, forget that",
+            "what did I tell you, please forget",
+            "stop remembering what did I tell you",
+            "don't remember that, do you remember",
+        ] {
+            assert_eq!(
+                TurnIntent::read(heard, "ask"),
+                TurnIntent::Forget,
+                "{heard}"
+            );
+        }
+    }
+
+    #[test]
+    fn recall_clause_starts_at_the_earliest_cue() {
+        assert_eq!(
+            recall_clause("please don't forget that, do you remember the blue bowl"),
+            "do you remember the blue bowl"
+        );
+        assert_eq!(
+            recall_clause("I forgot my keys, do you remember the blue bowl"),
+            "do you remember the blue bowl"
+        );
+        assert_eq!(
+            recall_clause("forget-me-not, do you remember the blue bowl"),
+            "do you remember the blue bowl"
+        );
+        assert_eq!(
+            recall_clause("Please, Do you remember the bowl"),
+            "Do you remember the bowl"
+        );
+        assert_eq!(
+            recall_clause("hello, what did I tell you, do you remember"),
+            "what did I tell you, do you remember"
+        );
+        assert_eq!(
+            recall_clause("do you remember the blue bowl"),
+            "do you remember the blue bowl"
+        );
+        assert_eq!(
+            recall_clause("forget that, do you remember the blue bowl"),
+            "forget that, do you remember the blue bowl"
+        );
+        assert_eq!(
+            recall_clause("no, that's wrong, do you remember the blue bowl"),
+            "no, that's wrong, do you remember the blue bowl"
+        );
+        assert_eq!(
+            recall_clause("please don't forget that"),
+            "please don't forget that"
+        );
+        assert_eq!(recall_clause("where is the kettle"), "where is the kettle");
+        assert_eq!(recall_clause(""), "");
+    }
+
+    #[test]
+    fn forget_scan_does_not_allocate() {
+        let src = include_str!("intent.rs");
+        let head = src.split("#[cfg(test)]").next().expect("module head");
+        for needle in [
+            "String",
+            "Vec",
+            "format!",
+            "to_string",
+            "to_owned",
+            "Box::",
+            "collect",
+        ] {
+            assert!(
+                !head.contains(needle),
+                "the forget scan must not allocate via {needle}"
+            );
+        }
+        for heard in [
+            "forget that",
+            "Forget what I said yesterday",
+            "please forget what I told you",
+            "don't remember that",
+            "stop remembering",
+            "please don't forget that",
+            "never forget that",
+            "do not forget that",
+            "dont forget that",
+            "I forgot my keys",
+            "forget-me-not",
+            "no, that's wrong, forget that",
+            "forget that, do you remember",
+            "don't forget that, but please forget",
+        ] {
+            black_box(TurnIntent::read(black_box(heard), black_box("chat")));
+        }
     }
 
     /// The library crate forbids unsafe code, so the counting allocator from
@@ -230,6 +517,10 @@ mod tests {
             ("what did I tell you", "chat"),
             ("no, that's wrong", "ask"),
             ("actually, it's blue", "chat"),
+            ("forget that", "chat"),
+            ("please don't forget that", "chat"),
+            ("do not forget that", "ask"),
+            ("forget what I told you, do you remember", "ask"),
             ("where is the kettle", "ask"),
             ("I am so tired", "vent"),
             ("goodbye", "goodbye"),

@@ -904,11 +904,12 @@ impl Brain {
         if !self.memory_granted() {
             return None;
         }
-        let recalled = self.recall_person(heard);
-        if !about_the_person(heard) {
+        let query = crate::dialogue::recall_clause(heard);
+        let recalled = self.recall_person(query);
+        if !about_the_person(query) {
             return None;
         }
-        self.memory_spoke(heard, &recalled)
+        self.memory_spoke(query, &recalled)
     }
 
     /// Retrieval, cards, the idle fixture, then the gateway. No reply split.
