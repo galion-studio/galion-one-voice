@@ -17,10 +17,12 @@
 //! grant does not rewrite the file, and it does not set an EmotionWire bit.
 //!
 //! Do not call [`LearnPass::write_clause`], [`LearnPass::withdraw`],
-//! [`LearnPass::audit`], or [`SessionSeal::seal`] from `Heartbeat::step` or
-//! from [`crate::Brain::turn`]. The call never waits on this pass. The pass
-//! does not call Galion Research and it does not read or write audio.
-//! [`SessionSeal`] keeps one clause in RAM. It is not encrypted.
+//! [`LearnPass::audit`], [`SessionSeal::note`], [`SessionSeal::note_taught`],
+//! or [`SessionSeal::seal`] from `Heartbeat::step` or from [`crate::Brain::turn`].
+//! The call never waits on this pass. The pass does not call Galion Research
+//! and it does not read or write audio. [`SessionSeal`] keeps one clause in
+//! RAM. It is not encrypted. The live pack keeps every sourced clause, up to
+//! `LEARN_PACK_CAP`.
 
 use std::fs;
 use std::io;
@@ -38,7 +40,19 @@ pub const LEARN_PACK_RETIRING: &str = "retiring";
 /// SQLite file inside the live or next directory. `horbm-memory` owns the schema.
 pub const LEARN_PACK_DB: &str = "learn-pack.sqlite";
 
-/// Provenance stored on the one learned clause. Every field except `turn_id`
+/// Most rows a learn pack holds.
+///
+/// 256, the same number as S111's `LEARNED_ROW_CAP`. A further distinct clause
+/// is refused. A sourced row is never dropped to make room.
+pub const LEARN_PACK_CAP: usize = 256;
+
+/// First words that mark a question. A word table, not a persona line.
+const QUESTION_WORDS: [&str; 15] = [
+    "what", "where", "who", "when", "why", "how", "is", "are", "do", "does", "can", "could",
+    "would", "will", "did",
+];
+
+/// Provenance stored on each learned clause. Every field except `turn_id`
 /// must be non-empty. `turn_id` may be zero.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ClauseSource {
@@ -100,7 +114,7 @@ impl LearnConfig {
         }
     }
 
-    /// May write one sourced row into `pack_dir`. Still refused when that
+    /// May write a sourced row into `pack_dir`. Still refused when that
     /// path is a card folder.
     pub fn granted(pack_dir: impl AsRef<Path>) -> Self {
         Self {
@@ -214,7 +228,8 @@ impl LearnError {
         self.kind == LearnKind::Invalid
     }
 
-    /// The pack path is empty or is a card folder. Nothing was written.
+    /// The pack path is empty, the path is a card folder, or the pack already
+    /// holds `LEARN_PACK_CAP` rows. Nothing was written.
     pub fn is_refused(&self) -> bool {
         self.kind == LearnKind::Refused
     }
@@ -265,9 +280,17 @@ impl LearnPass {
     }
 
     /// Write one sourced clause into a sibling pack, then swap that directory
-    /// onto `live/`. A second call replaces the live pack, so the live pack
-    /// still holds one row. Fresh consent returns [`LearnError::is_denied`]
-    /// and creates nothing.
+    /// onto `live/`.
+    ///
+    /// Rows already in the live pack are copied into `next/` (text, `said_by`,
+    /// date, and source label), then the new clause is added. The pass checks
+    /// the new pack has one more row than the old pack and that the new row's
+    /// fields match, then swaps as before. An identical clause (the same
+    /// trimmed text and the same trimmed `said_by`) is not added twice: the
+    /// existing row is returned and the pack is not rewritten. At
+    /// `LEARN_PACK_CAP` rows a further distinct clause is refused and the live
+    /// rows stay. Fresh consent returns [`LearnError::is_denied`] and creates
+    /// nothing.
     pub fn write_clause(
         &self,
         said_by: &str,
@@ -291,8 +314,17 @@ impl LearnPass {
         }
         self.refuse_card_folder()?;
         self.prepare()?;
+        let prior = self.live_rows()?;
+        if let Some(existing) = prior.iter().find(|row| same_clause(row, said_by, text)) {
+            return Ok(existing.clone());
+        }
+        if prior.len() >= LEARN_PACK_CAP {
+            return Err(LearnError::refused(format!(
+                "learn pack holds {LEARN_PACK_CAP} rows"
+            )));
+        }
         let next_db = self.child(LEARN_PACK_NEXT).join(LEARN_PACK_DB);
-        let written = match insert_one(&next_db, session, said_by, text, date, &label) {
+        let written = match insert_clause(&next_db, session, &prior, said_by, text, date, &label) {
             Ok(row) => row,
             Err(err) => {
                 let _ = fs::remove_dir_all(self.child(LEARN_PACK_NEXT));
@@ -341,6 +373,15 @@ impl LearnPass {
 
     fn child(&self, name: &str) -> PathBuf {
         self.config.pack_dir.join(name)
+    }
+
+    /// Rows in the live pack. A missing file is an empty list and is not created.
+    fn live_rows(&self) -> Result<Vec<LearnedRow>, LearnError> {
+        let db = self.live_pack();
+        if !db.is_file() {
+            return Ok(Vec::new());
+        }
+        Ok(read_audit(&db)?.rows)
     }
 
     fn refuse_card_folder(&self) -> Result<(), LearnError> {
@@ -421,7 +462,8 @@ struct NotedClause {
 /// One RAM slot in front of [`LearnPass`].
 ///
 /// [`SessionSeal::note`] keeps one clause and replaces it on a second note.
-/// [`SessionSeal::seal`] calls [`LearnPass::write_clause`] once and clears
+/// [`SessionSeal::note_taught`] keeps `heard` only when it teaches the previous
+/// miss. [`SessionSeal::seal`] calls [`LearnPass::write_clause`] once and clears
 /// the slot. A later seal, with the slot empty, writes nothing. A denied
 /// pass writes nothing and creates no file. The slot is plain text. This
 /// type does not encrypt. Not called from [`crate::Brain::turn`].
@@ -452,6 +494,34 @@ impl SessionSeal {
         });
     }
 
+    /// Keep `heard` when it teaches the missed turn, and return whether the slot kept it.
+    ///
+    /// The slot keeps `heard` only when all three hold. `missed` is non-empty, so the
+    /// previous turn was a miss. `heard` is not a question: it contains no `?`, and its
+    /// first word is not in the fixed English table `what`, `where`, `who`, `when`,
+    /// `why`, `how`, `is`, `are`, `do`, `does`, `can`, `could`, `would`, `will`, `did`.
+    /// That table is a word list, not a persona line. The first word is the first
+    /// whitespace-separated token, with non-letters trimmed off its ends, compared
+    /// without regard to ASCII case. `crate::retrieve::covers` is true for `heard`
+    /// against [`horbm_memory::index_tokens`] of `missed`, the same rule recall uses,
+    /// so the kept line is a row that question will later find.
+    ///
+    /// A kept line replaces the one clause in the slot. A line that is not kept leaves
+    /// the slot as it was. Nothing is written. Not called from [`crate::Brain::turn`].
+    pub fn note_taught(
+        &mut self,
+        missed: &str,
+        said_by: &str,
+        heard: &str,
+        source: &ClauseSource,
+    ) -> bool {
+        if !taught_line(missed, heard) {
+            return false;
+        }
+        self.note(said_by, heard, source);
+        true
+    }
+
     /// Write the held clause once and clear the slot.
     ///
     /// An empty slot returns `Ok(None)` and does not open the pack. A full
@@ -468,9 +538,10 @@ impl SessionSeal {
     }
 }
 
-fn insert_one(
+fn insert_clause(
     db: &Path,
     session: &str,
+    prior: &[LearnedRow],
     said_by: &str,
     text: &str,
     date: &str,
@@ -480,10 +551,20 @@ fn insert_one(
     store.pause_worker();
     let result = (|| {
         store.set_session(session).map_err(LearnError::store)?;
+        for row in prior {
+            store
+                .diary_add(
+                    row.text.as_str(),
+                    row.date.as_str(),
+                    row.said_by.as_str(),
+                    row.source.as_str(),
+                )
+                .map_err(LearnError::store)?;
+        }
         store
             .diary_add(text, date, said_by, label)
             .map_err(LearnError::store)?;
-        checked_row(&store, said_by, text, date, label)
+        checked_row(&store, prior, said_by, text, date, label)
     })();
     drop(store);
     result
@@ -506,13 +587,15 @@ fn read_audit(db: &Path) -> Result<LearnAudit, LearnError> {
 
 fn checked_row(
     store: &horbm_memory::Store,
+    prior: &[LearnedRow],
     said_by: &str,
     text: &str,
     date: &str,
     label: &str,
 ) -> Result<LearnedRow, LearnError> {
     let rows = store.diary_list().map_err(LearnError::store)?;
-    if rows.len() != 1 {
+    let expected = prior.len() + 1;
+    if rows.len() != expected {
         return Err(LearnError::store_msg(format!(
             "learn pack has {} diary rows",
             rows.len()
@@ -525,10 +608,27 @@ fn checked_row(
             archived.len()
         )));
     }
-    let Some(entry) = rows.into_iter().next() else {
+    let rows: Vec<LearnedRow> = rows.into_iter().map(learned_row).collect();
+    let mut used = vec![false; rows.len()];
+    for old in prior {
+        let Some(idx) = rows.iter().enumerate().position(|(i, row)| {
+            !used[i]
+                && !row.item_id.is_empty()
+                && row.text == old.text
+                && row.said_by == old.said_by
+                && row.date == old.date
+                && row.source == old.source
+        }) else {
+            return Err(LearnError::store_msg(
+                "stored row does not match the sourced clause",
+            ));
+        };
+        used[idx] = true;
+    }
+    let Some(idx) = used.iter().position(|flag| !*flag) else {
         return Err(LearnError::store_msg("learn pack diary row missing"));
     };
-    let row = learned_row(entry);
+    let row = &rows[idx];
     if row.item_id.is_empty()
         || row.source != label
         || row.text != text
@@ -539,7 +639,46 @@ fn checked_row(
             "stored row does not match the sourced clause",
         ));
     }
-    Ok(row)
+    Ok(row.clone())
+}
+
+/// Trimmed text and trimmed speaker. That is the clause identity.
+fn same_clause(row: &LearnedRow, said_by: &str, text: &str) -> bool {
+    row.said_by.trim() == said_by && row.text.trim() == text
+}
+
+/// `missed` names a previous miss, and `heard` is a non-question line that covers it.
+fn taught_line(missed: &str, heard: &str) -> bool {
+    if missed.trim().is_empty() {
+        return false;
+    }
+    if is_question(heard) {
+        return false;
+    }
+    crate::retrieve::covers(heard, &horbm_memory::index_tokens(missed))
+}
+
+fn is_question(heard: &str) -> bool {
+    if heard.contains('?') {
+        return true;
+    }
+    let Some(word) = first_word(heard) else {
+        return false;
+    };
+    QUESTION_WORDS
+        .iter()
+        .any(|question| word.eq_ignore_ascii_case(question))
+}
+
+/// First whitespace-separated token, with non-letters trimmed off its ends.
+fn first_word(heard: &str) -> Option<&str> {
+    let token = heard.split_whitespace().next()?;
+    let word = token.trim_matches(|ch: char| !ch.is_ascii_alphabetic());
+    if word.is_empty() {
+        None
+    } else {
+        Some(word)
+    }
 }
 
 fn learned_row(entry: horbm_memory::DiaryEntry) -> LearnedRow {
@@ -733,6 +872,48 @@ mod tests {
         assert!(seal.seal().expect("empty after deny").is_none());
         assert!(!pack.exists());
         assert!(sqlite_under(&root).is_empty());
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn learn_pack_cap_is_the_same_number_as_learned_row_cap() {
+        assert_eq!(LEARN_PACK_CAP, 256);
+    }
+
+    #[test]
+    fn question_words_are_the_fixed_english_table() {
+        assert!(!is_question("the kettle is on the stove"));
+        assert!(is_question("the kettle is on the stove?"));
+        assert!(is_question("Where is the kettle"));
+        for word in QUESTION_WORDS {
+            assert!(is_question(word), "{word}");
+            let line = format!("{word} the kettle is on the stove");
+            assert!(is_question(&line), "{word}");
+            assert!(!taught_line("where is the kettle", &line), "{word}");
+        }
+    }
+
+    #[test]
+    fn note_taught_keeps_a_covering_line_and_leaves_the_slot_on_a_miss() {
+        let root = scratch("taught");
+        let pack = root.join("pack");
+        let missed = "where is the kettle";
+        let heard = "the kettle is on the stove";
+        let mut seal = SessionSeal::open(LearnConfig::granted(&pack));
+        assert!(seal.note_taught(missed, "user", heard, &source()));
+        assert_eq!(seal.slot.as_ref().expect("kept").text, heard);
+        assert!(!pack.exists(), "note_taught created {}", pack.display());
+
+        assert!(!seal.note_taught(missed, "user", "where is the kettle", &source()));
+        assert!(!seal.note_taught("", "user", heard, &source()));
+        assert!(!seal.note_taught("   ", "user", heard, &source()));
+        assert!(!seal.note_taught(missed, "user", "the window is open", &source()));
+        assert!(!seal.note_taught(missed, "user", "the kettle is on the stove?", &source()));
+        assert_eq!(seal.slot.as_ref().expect("still kept").text, heard);
+
+        let row = seal.seal().expect("seal").expect("taught row");
+        assert_eq!(row.text, heard);
+        assert_eq!(seal.pass.audit().expect("audit").rows.len(), 1);
         let _ = fs::remove_dir_all(&root);
     }
 }

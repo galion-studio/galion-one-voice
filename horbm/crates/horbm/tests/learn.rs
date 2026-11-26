@@ -230,26 +230,37 @@ fn empty_source_writes_nothing() {
 }
 
 #[test]
-fn pack_swap_replaces_the_live_row() {
+fn pack_swap_keeps_both_sourced_rows() {
     let _guard = disk_lock();
     let root = scratch("swap");
     let pack = root.join("pack");
     let learn = LearnPass::open(LearnConfig::granted(&pack));
+    let first_source = source(4);
+    let second_source = source(5);
+    let alpha = "alpha-token the kettle is on the hob.";
+    let beta = "beta-token the kettle is off the hob.";
     let first = learn
-        .write_clause("user", "alpha-token the kettle is on the hob.", &source(4))
+        .write_clause("user", alpha, &first_source)
         .expect("first");
     assert!(first.source.contains("turn=4"));
     let second = learn
-        .write_clause("user", "beta-token the kettle is off the hob.", &source(5))
+        .write_clause("user", beta, &second_source)
         .expect("second");
-    // The swap publishes a new sqlite file, so the diary id may start again.
+    // The swap rebuilds the sqlite file, so the first row's diary id may change.
+    // The text, speaker, date, and source label of that row stay.
     assert_ne!(first.text, second.text);
     assert!(second.source.contains("turn=5"));
     let audit = learn.audit().expect("audit");
-    assert_eq!(audit.rows.len(), 1);
+    assert_eq!(audit.rows.len(), 2);
     assert_eq!(audit.archived, 0);
-    assert_eq!(audit.rows[0].text, "beta-token the kettle is off the hob.");
-    assert!(!audit.rows[0].text.contains("alpha-token"));
+    let first_label = first_source.label().expect("first label");
+    assert!(audit.rows.iter().any(|row| {
+        row.text == alpha
+            && row.said_by == "user"
+            && row.date == first_source.time
+            && row.source == first_label
+    }));
+    assert!(audit.rows.iter().any(|row| row == &second));
     assert!(!pack.join(LEARN_PACK_NEXT).exists());
     assert!(!pack.join(LEARN_PACK_RETIRING).exists());
     assert!(pack.join(LEARN_PACK_LIVE).join(LEARN_PACK_DB).is_file());
