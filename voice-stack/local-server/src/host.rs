@@ -12,7 +12,7 @@ use std::collections::HashMap;
 use std::fs::{self, File, OpenOptions};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc::{sync_channel, Receiver, SyncSender, TrySendError};
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
@@ -251,10 +251,16 @@ pub struct HostSession {
     knowledge: PathBuf,
     mind: Arc<Mutex<HorbmMind>>,
     seal: Mutex<SessionSeal>,
+    /// The miss `take_gap_for` returned on the previous turn. The next line
+    /// teaches it or the window closes. Not a diary row.
+    missed: Mutex<Option<String>>,
+    /// Set once a line has taught a miss. `note` does not run again, so
+    /// small talk cannot replace that clause.
+    taught: AtomicBool,
     log: TurnLog,
     session_id: String,
     turns: AtomicU64,
-    finished: std::sync::atomic::AtomicBool,
+    finished: AtomicBool,
 }
 
 impl HostSession {
@@ -282,10 +288,12 @@ impl HostSession {
             knowledge,
             mind,
             seal,
+            missed: Mutex::new(None),
+            taught: AtomicBool::new(false),
             log,
             session_id: new_session_id(),
             turns: AtomicU64::new(0),
-            finished: std::sync::atomic::AtomicBool::new(false),
+            finished: AtomicBool::new(false),
         }))
     }
 
@@ -313,9 +321,14 @@ impl HostSession {
     }
 
     /// One finished heard line. Notes the seal when learn is granted and
-    /// appends `heard` and `reply` off the turn path. After `reply`, a gap
-    /// this turn left and any research follow-up that has already finished
-    /// are logged. Neither is spoken. A denied seal is not given the text.
+    /// appends `heard` and `reply` off the turn path.
+    ///
+    /// The note uses the miss kept from the previous turn. A line that
+    /// teaches it stays in the slot, and later small talk does not replace
+    /// it. With no teaching, the slot stays the last noted clause, as before.
+    /// After `reply`, a gap this turn left and any research follow-up that
+    /// has already finished are logged. Neither is spoken. A denied seal
+    /// is not given the text.
     pub fn on_turn(&self, heard: &str, out: &TurnOut) {
         if self.finished.load(Ordering::SeqCst) {
             return;
@@ -338,10 +351,23 @@ impl HostSession {
                 time: at.clone(),
                 consent_record: self.config.learn.source.clone(),
             };
-            self.seal
+            // Dropped before the log write. The miss is the previous turn's
+            // gap; this line teaches it or falls through to today's note.
+            let missed = self
+                .missed
                 .lock()
                 .unwrap_or_else(|err| err.into_inner())
-                .note(&person, heard, &source);
+                .clone();
+            let mut seal = self.seal.lock().unwrap_or_else(|err| err.into_inner());
+            let kept = match missed.as_deref() {
+                Some(prior) => seal.note_taught(prior, &person, heard, &source),
+                None => false,
+            };
+            if kept {
+                self.taught.store(true, Ordering::Relaxed);
+            } else if !self.taught.load(Ordering::Relaxed) {
+                seal.note(&person, heard, &source);
+            }
         }
         self.log.record(event_line(
             &at,
@@ -368,6 +394,16 @@ impl HostSession {
             let follow = mind.research_follow_up();
             (gap, follow)
         };
+        // One miss is the window. The next line teaches it, or this turn
+        // replaces the window with its own gap, or closes it.
+        {
+            let mut missed = self.missed.lock().unwrap_or_else(|err| err.into_inner());
+            *missed = if gap.is_some() {
+                Some(heard.to_string())
+            } else {
+                None
+            };
+        }
         if let Some(gap) = gap {
             self.log.record(event_line(
                 &at,
@@ -1064,6 +1100,74 @@ mod tests {
         let _ = std::fs::remove_dir_all(&host_root);
     }
 
+    #[test]
+    fn miss_then_teaching_line_seals_the_teaching_line() {
+        let (root, host) = learn_host("taught", false);
+        let miss = "who won the match";
+        let teaching = "Northwind won the match";
+        for line in [miss, teaching, "thanks"] {
+            let out = turn(&host, line);
+            host.on_turn(line, &out);
+        }
+        let rows = sealed_rows(&host, &root);
+        assert_eq!(rows.len(), 1, "{rows:?}");
+        assert_eq!(rows[0].text, teaching);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn question_after_miss_is_not_taught() {
+        // The question covers the miss tokens. It is still a question, so
+        // `note_taught` leaves the slot and the next line replaces it.
+        let (root, host) = learn_host("question", false);
+        let question = "Northwind won the match?";
+        for line in ["who won the match", question, "thanks"] {
+            let out = turn(&host, line);
+            host.on_turn(line, &out);
+        }
+        let rows = sealed_rows(&host, &root);
+        assert_eq!(rows.len(), 1, "{rows:?}");
+        assert_eq!(rows[0].text, "thanks");
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn no_miss_keeps_last_line() {
+        // Remember is granted, so a retrieval miss never enters `Brain::gaps`.
+        // The window stays shut and each heard line replaces the slot.
+        let (root, host) = learn_host("last-line", true);
+        let last = "thanks";
+        for line in ["where is the kettle", "my name is Northwind", last] {
+            let out = turn(&host, line);
+            host.on_turn(line, &out);
+        }
+        let rows = sealed_rows(&host, &root);
+        assert_eq!(rows.len(), 1, "{rows:?}");
+        assert_eq!(rows[0].text, last);
+        assert!(
+            rows[0].source.contains(";turn=3;"),
+            "the last note replaces the earlier ones: {}",
+            rows[0].source
+        );
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn denied_learn_notes_nothing() {
+        let (root, host) = deny_host("denied-learn");
+        for line in ["who won the match", "Northwind won the match", "thanks"] {
+            let out = turn(&host, line);
+            host.on_turn(line, &out);
+        }
+        host.finish();
+        assert!(
+            !root.join("memory").exists(),
+            "denied learn created {}",
+            root.join("memory").display()
+        );
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
     fn deny_host(label: &str) -> (PathBuf, Arc<HostSession>) {
         let root = gap_root(label);
         let host = HostSession::boot(
@@ -1086,6 +1190,37 @@ mod tests {
         )
         .unwrap();
         (root, host)
+    }
+
+    /// Learn writes. `remember` stays off unless asked, so a card miss enters
+    /// `Brain::gaps` and opens the teaching window.
+    fn learn_host(label: &str, remember: bool) -> (PathBuf, Arc<HostSession>) {
+        let root = gap_root(label);
+        let mut cfg = HostConfig::deny_under(&root);
+        cfg.learn.word = "grant".into();
+        cfg.learn.granted = true;
+        cfg.learn.source = "GALION_HORBM_LEARN=grant (operator)".into();
+        cfg.learn_config.granted = true;
+        if remember {
+            cfg.remember.word = "grant".into();
+            cfg.remember.granted = true;
+            cfg.retrieval.remember = true;
+        }
+        let host = HostSession::boot(
+            cfg,
+            PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("knowledge"),
+        )
+        .unwrap();
+        (root, host)
+    }
+
+    fn sealed_rows(host: &HostSession, root: &Path) -> Vec<horbm::LearnedRow> {
+        host.finish();
+        let pack = root.join("memory").join("learn");
+        horbm::LearnPass::open(horbm::LearnConfig::granted(&pack))
+            .audit()
+            .expect("learn audit")
+            .rows
     }
 
     fn gap_root(label: &str) -> PathBuf {
