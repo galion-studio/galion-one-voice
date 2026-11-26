@@ -130,10 +130,11 @@ impl HorbmMind {
         self
     }
 
-    /// `GALION_HORBM_KNOWLEDGE` when that directory already exists. On the
-    /// laptop, `G:\galion\horbm\knowledge` is next. Then `var/knowledge` when
-    /// it already holds a card. Otherwise the tracked example card. Nothing
-    /// is created. Grants stay deny; the live process uses [`Self::open_configured`].
+    /// `GALION_HORBM_KNOWLEDGE` when that directory already exists. On Windows,
+    /// `G:\galion\horbm\knowledge` is next when that directory exists. Then
+    /// `var/knowledge` when it already holds a card. Otherwise the tracked
+    /// example card. Nothing is created. Grants stay deny; the live process
+    /// uses [`Self::open_configured`].
     pub fn from_env() -> Self {
         Self::open(&knowledge_dir())
     }
@@ -186,6 +187,16 @@ impl HorbmMind {
         self.engine.knowledge_dir()
     }
 
+    /// [`horbm::Brain::attach_learned`]. The host decides consent and maps the
+    /// error to a string. With no retrieval thread the brain returns `Ok(())`
+    /// and stores nothing.
+    pub fn attach_learned(&mut self, rows: Vec<horbm::LearnedRow>) -> Result<(), String> {
+        self.engine
+            .brain_mut()
+            .attach_learned(rows)
+            .map_err(|err| err.to_string())
+    }
+
     /// Newest gap whose `heard` equals `heard` trimmed, at most once.
     ///
     /// The queue is [`horbm::Brain::gaps`]. A second call returns [`None`]
@@ -234,10 +245,18 @@ fn fresh_gap_index(seen: &[horbm::Gap], current: &[horbm::Gap]) -> usize {
 pub fn knowledge_dir() -> PathBuf {
     let example = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("knowledge");
     let var_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../var/knowledge");
-    let windows = PathBuf::from(galion_sam_horbm::WINDOWS_KNOWLEDGE_DIR);
+    // `WINDOWS_KNOWLEDGE_DIR` is a drive path. Probe it only on Windows.
+    // Other targets pass `Path::new("")`, which is never a directory, so
+    // [`select_knowledge_dir`] does not select it.
+    #[cfg(windows)]
+    let windows_owned = PathBuf::from(galion_sam_horbm::WINDOWS_KNOWLEDGE_DIR);
+    #[cfg(windows)]
+    let windows = windows_owned.as_path();
+    #[cfg(not(windows))]
+    let windows = Path::new("");
     select_knowledge_dir(
         std::env::var("GALION_HORBM_KNOWLEDGE").ok().as_deref(),
-        &windows,
+        windows,
         &var_dir,
         &example,
     )
@@ -484,6 +503,22 @@ mod tests {
         );
         assert_eq!(picked, env_dir);
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    /// The Windows drive path is not a candidate off Windows. Skipped when
+    /// `GALION_HORBM_KNOWLEDGE` is already set; this test does not write the
+    /// environment.
+    #[cfg(not(windows))]
+    #[test]
+    fn knowledge_dir_skips_the_windows_drive_off_windows() {
+        if std::env::var_os("GALION_HORBM_KNOWLEDGE").is_some() {
+            return;
+        }
+        let picked = knowledge_dir();
+        assert_ne!(
+            picked,
+            PathBuf::from(galion_sam_horbm::WINDOWS_KNOWLEDGE_DIR)
+        );
     }
 
     fn names(dir: &Path) -> Vec<String> {

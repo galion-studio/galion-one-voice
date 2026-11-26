@@ -12,13 +12,13 @@ use std::collections::HashMap;
 use std::fs::{self, File, OpenOptions};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::mpsc::{sync_channel, Receiver, SyncSender, TrySendError};
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use horbm::{ClauseSource, LearnConfig, RetrievalConfig, SessionSeal};
+use horbm::{ClauseSource, LearnConfig, LearnPass, RetrievalConfig, SessionSeal};
 
 use crate::brain::HorbmMind;
 use crate::reply::TurnOut;
@@ -260,12 +260,15 @@ pub struct HostSession {
     log: TurnLog,
     session_id: String,
     turns: AtomicU64,
+    /// Rows handed to the brain at boot. Count only. The text stays in the pack.
+    learned_rows: AtomicUsize,
     finished: AtomicBool,
 }
 
 impl HostSession {
     /// Create the memory directory only when remember or learn is granted.
-    /// Opens the mind, the seal, and the log thread. Does not listen.
+    /// Opens the mind, the seal, and the log thread, then attaches the sealed
+    /// pack when both grants are on. Does not listen.
     pub fn boot(config: HostConfig, knowledge: PathBuf) -> Result<Arc<Self>, String> {
         if config.remember.granted || config.learn.granted {
             fs::create_dir_all(&config.memory_dir)
@@ -283,7 +286,7 @@ impl HostSession {
         let mind = Arc::new(Mutex::new(HorbmMind::open_configured(&knowledge, &config)));
         let seal = Mutex::new(SessionSeal::open(config.learn_config.clone()));
         let log = TurnLog::open(&config.turn_log, config.turn_log_cap, config.turn_log_keep)?;
-        Ok(Arc::new(Self {
+        let session = Arc::new(Self {
             config,
             knowledge,
             mind,
@@ -293,8 +296,47 @@ impl HostSession {
             log,
             session_id: new_session_id(),
             turns: AtomicU64::new(0),
+            learned_rows: AtomicUsize::new(0),
             finished: AtomicBool::new(false),
-        }))
+        });
+        session.attach_pack();
+        Ok(session)
+    }
+
+    /// The one attach path. R11 S158 re-attaches after a retract through this same helper.
+    ///
+    /// Both grants: [`LearnPass::audit`] once, then [`HorbmMind::attach_learned`]
+    /// with those rows. Otherwise attach nothing and open nothing. An audit
+    /// or attach error is printed once and the count stays zero. The startup
+    /// line prints the count, never the text.
+    fn attach_pack(&self) -> usize {
+        let count = if self.config.learn.granted && self.config.remember.granted {
+            match LearnPass::open(self.config.learn_config.clone()).audit() {
+                Ok(audit) => {
+                    let rows = audit.rows;
+                    let count = rows.len();
+                    let attached = {
+                        let mut mind = self.mind.lock().unwrap_or_else(|err| err.into_inner());
+                        mind.attach_learned(rows)
+                    };
+                    match attached {
+                        Ok(()) => count,
+                        Err(err) => {
+                            eprintln!("horbm learn: {err}");
+                            0
+                        }
+                    }
+                }
+                Err(err) => {
+                    eprintln!("horbm learn: {err}");
+                    0
+                }
+            }
+        } else {
+            0
+        };
+        self.learned_rows.store(count, Ordering::Relaxed);
+        count
     }
 
     pub fn config(&self) -> &HostConfig {
@@ -312,11 +354,12 @@ impl HostSession {
     pub fn startup_line(&self) -> String {
         let mind = self.mind.lock().unwrap_or_else(|err| err.into_inner());
         format!(
-            "{} persona={} knowledge_cards={} knowledge_dir={}",
+            "{} persona={} knowledge_cards={} knowledge_dir={} learned_rows={}",
             self.config.startup_line(),
             mind.persona_id(),
             mind.knowledge_cards(),
-            self.knowledge.display()
+            self.knowledge.display(),
+            self.learned_rows.load(Ordering::Relaxed)
         )
     }
 

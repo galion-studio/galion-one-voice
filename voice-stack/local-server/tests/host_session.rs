@@ -10,10 +10,11 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use futures_util::{SinkExt, StreamExt};
-use horbm::{EpisodicStore, LearnConfig, LearnPass, PersonMemory};
+use horbm::{ClauseSource, EpisodicStore, LearnConfig, LearnPass, PersonMemory};
 use samantha_local_server::protocol::{SCHEMA, WS_PATH};
 use samantha_local_server::{
     start_with_host, HostConfig, HostSession, HostSources, RefState, ReplyEngine, Stop, TurnLog,
+    TurnOut,
 };
 use serde_json::Value;
 use tokio_tungstenite::tungstenite::Message;
@@ -24,6 +25,11 @@ type Sock = WebSocketStream<MaybeTlsStream<tokio::net::TcpStream>>;
 const PERSON_LINE: &str = "my name is Northwind";
 const MISS_LINE: &str = "who won the match";
 const HIT_LINE: &str = "where is the kettle";
+// Content words `spare` and `oar` are not in the shipped kettle card.
+// The same clause is what `learned_turn.rs` `teach` writes.
+const TAUGHT_LINE: &str = "You remember the spare oar is in the locker.";
+// Both tokens sit in `TAUGHT_LINE` and in no shipped card.
+const RECALL_ASK: &str = "spare oar";
 
 fn scratch(label: &str) -> PathBuf {
     static N: AtomicU64 = AtomicU64::new(0);
@@ -439,6 +445,166 @@ fn miss_then_teaching_line_is_the_audit_row() {
     assert_eq!(audit.rows.len(), 1, "{:?}", audit.rows);
     assert_eq!(audit.rows[0].text, teaching);
     let _ = fs::remove_dir_all(&root);
+}
+
+#[test]
+fn a_sealed_pack_is_spoken_after_boot() {
+    let root = scratch("sealed");
+    let pack = root.join("memory").join("learn");
+    write_taught(&pack, TAUGHT_LINE);
+    let profile = shipped_profile();
+    let host = HostSession::boot(dev_under(&root, &profile), shipped_knowledge()).unwrap();
+    let line = host.startup_line();
+    assert!(line.ends_with("learned_rows=1"), "{line}");
+    let out = ask(&host, RECALL_ASK);
+    assert_eq!(out.reply, TAUGHT_LINE);
+    assert!(!out.sources.is_empty(), "{:?}", out.sources);
+    assert!(out.sources[0].starts_with("learned:"), "{:?}", out.sources);
+    host.finish();
+    let _ = fs::remove_dir_all(&root);
+}
+
+#[test]
+fn learn_denied_attaches_nothing() {
+    let root = scratch("learn-deny");
+    let pack = root.join("memory").join("learn");
+    write_taught(&pack, TAUGHT_LINE);
+    let before = pack_snapshot(&pack);
+    assert!(!before.is_empty(), "the pack has bytes to compare");
+    let cfg = resolve(
+        false,
+        Some("deny"),
+        Some("grant"),
+        None,
+        Some(root.to_str().unwrap()),
+        None,
+        None,
+        None,
+        None,
+        None,
+    )
+    .unwrap();
+    assert!(!cfg.learn.granted);
+    assert!(cfg.remember.granted);
+    let host = HostSession::boot(cfg, shipped_knowledge()).unwrap();
+    let line = host.startup_line();
+    assert!(line.ends_with("learned_rows=0"), "{line}");
+    let out = ask(&host, RECALL_ASK);
+    assert_eq!(out.reply, "I don't know.");
+    host.finish();
+    assert_eq!(pack_snapshot(&pack), before);
+    let _ = fs::remove_dir_all(&root);
+}
+
+#[test]
+fn remember_denied_attaches_nothing() {
+    let root = scratch("remember-deny");
+    let pack = root.join("memory").join("learn");
+    write_taught(&pack, TAUGHT_LINE);
+    let cfg = resolve(
+        false,
+        Some("grant"),
+        Some("deny"),
+        None,
+        Some(root.to_str().unwrap()),
+        None,
+        None,
+        None,
+        None,
+        None,
+    )
+    .unwrap();
+    assert!(cfg.learn.granted);
+    assert!(!cfg.remember.granted);
+    let host = HostSession::boot(cfg, shipped_knowledge()).unwrap();
+    let line = host.startup_line();
+    assert!(line.ends_with("learned_rows=0"), "{line}");
+    let out = ask(&host, RECALL_ASK);
+    assert_eq!(out.reply, "I don't know.");
+    host.finish();
+    let _ = fs::remove_dir_all(&root);
+}
+
+#[test]
+fn two_sessions_recall_the_taught_line() {
+    let root = scratch("two");
+    let profile = shipped_profile();
+    let host = HostSession::boot(dev_under(&root, &profile), shipped_knowledge()).unwrap();
+    for line in [MISS_LINE, TAUGHT_LINE] {
+        let out = ask(&host, line);
+        host.on_turn(line, &out);
+    }
+    host.finish();
+    let pack = root.join("memory").join("learn");
+    let audit = LearnPass::open(LearnConfig::granted(&pack))
+        .audit()
+        .expect("learn audit");
+    assert_eq!(audit.rows.len(), 1, "{:?}", audit.rows);
+    // Remember is granted, so the miss window stays shut. The sealed row is
+    // the last noted clause. The reply below is this audit text.
+    let sealed = audit.rows[0].text.clone();
+    assert_eq!(sealed, TAUGHT_LINE);
+    let host = HostSession::boot(dev_under(&root, &profile), shipped_knowledge()).unwrap();
+    let line = host.startup_line();
+    assert!(line.ends_with("learned_rows=1"), "{line}");
+    // `spare` and `oar` are content tokens of the sealed clause. They are
+    // not in the shipped kettle card, and the ask is not about the person,
+    // so the learned row is what the turn speaks.
+    let lower = sealed.to_ascii_lowercase();
+    assert!(lower.contains("spare") && lower.contains("oar"), "{sealed}");
+    let out = ask(&host, RECALL_ASK);
+    assert_eq!(out.reply, sealed);
+    assert!(!out.sources.is_empty(), "{:?}", out.sources);
+    assert!(out.sources[0].starts_with("learned:"), "{:?}", out.sources);
+    host.finish();
+    let _ = fs::remove_dir_all(&root);
+}
+
+fn write_taught(pack: &Path, text: &str) {
+    let learn = LearnPass::open(LearnConfig::granted(pack));
+    let source = ClauseSource {
+        session: "sess-learn".to_string(),
+        turn_id: 4,
+        time: "2026-11-26T00:00:00Z".to_string(),
+        consent_record: "learn-v1".to_string(),
+    };
+    learn
+        .write_clause("user", text, &source)
+        .expect("write clause");
+}
+
+fn ask(host: &HostSession, heard: &str) -> TurnOut {
+    host.mind()
+        .lock()
+        .unwrap_or_else(|err| err.into_inner())
+        .turn(heard)
+        .unwrap()
+}
+
+fn pack_snapshot(pack: &Path) -> Vec<(String, Vec<u8>)> {
+    let mut out = Vec::new();
+    let mut stack = vec![pack.to_path_buf()];
+    while let Some(dir) = stack.pop() {
+        let Ok(entries) = fs::read_dir(&dir) else {
+            continue;
+        };
+        for entry in entries {
+            let entry = entry.unwrap();
+            let path = entry.path();
+            if path.is_dir() {
+                stack.push(path);
+                continue;
+            }
+            let rel = path
+                .strip_prefix(pack)
+                .unwrap()
+                .to_string_lossy()
+                .into_owned();
+            out.push((rel, fs::read(&path).unwrap()));
+        }
+    }
+    out.sort();
+    out
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
