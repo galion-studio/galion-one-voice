@@ -8,8 +8,8 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use horbm::{
-    AskOutcome, Brain, CardHit, CardLookup, GapReason, ResearchAsk, ResearchFollowUp, RESEARCH_CAP,
-    UNKNOWN_REPLY,
+    AskOutcome, Brain, CardHit, CardLookup, DialogueConsent, GapReason, Persona, ResearchAsk,
+    ResearchFollowUp, RESEARCH_CAP, UNKNOWN_REPLY,
 };
 
 struct Cards;
@@ -230,6 +230,90 @@ fn only_the_grant_word_opens_the_person_file_at_open() {
     let _ = brain.turn("hello");
     assert!(path.is_file(), "grant opens the person file on a turn");
     let _ = std::fs::remove_dir_all(&dir);
+}
+
+const NORTHWIND: &str = r#"
+schema = "galion-horbm-persona/1"
+version = 1
+id = "northwind"
+voice = "northwind"
+
+[traits]
+warmth = 0.61
+
+[honesty]
+never_fabricate = true
+unknown = "I don't know."
+
+[boundaries]
+forbid = ["fake-sympathy", "unsourced-fact"]
+
+[style]
+brevity = 0.5
+warmth = 0.62
+max_sentences = 2
+
+[baseline]
+valence = 0.1
+arousal = 0.31
+dominance = 0.4
+approach = 0.0
+pitch_centre_hz = 216.0
+
+[inner]
+care = "heard"
+want = "answer"
+expect = "pause"
+"#;
+
+const LONG_CARD: &str = "The kettle is on the hob. The hob is hot. The lid is shut.";
+
+struct LongCards;
+
+impl CardLookup for LongCards {
+    fn lookup(&self, query: &str) -> Option<CardHit> {
+        if query.to_ascii_lowercase().contains("kettle") {
+            Some(CardHit {
+                id: "kettle".into(),
+                gist: LONG_CARD.into(),
+            })
+        } else {
+            None
+        }
+    }
+}
+
+/// A fixture persona with `max_sentences = 2`. An unpicked reply is cut.
+/// A card clause is a picked answer and keeps every sentence.
+#[test]
+fn long_plain_reply_is_capped_and_card_text_is_not() {
+    let persona = Persona::parse(NORTHWIND).expect("northwind persona");
+    assert_eq!(persona.id(), "northwind");
+    assert_eq!(persona.style().max_sentences, 2);
+    let mut brain = Brain::with_persona(LongCards, None, persona);
+    brain.set_dialogue_consent(DialogueConsent {
+        remember: true,
+        learn: false,
+        check_ins: true,
+    });
+    assert!(brain.note_callback("Alpha stays. Bravo stays. Charlie goes."));
+
+    let plain = brain.turn("hello");
+    assert_eq!(plain.arm, "offer_topic");
+    assert_eq!(plain.reply, "Alpha stays. Bravo stays.");
+    assert!(!plain.reply.contains("Charlie"));
+    assert_eq!(plain.sources, vec!["memory:callback".to_string()]);
+
+    let missed = brain.turn("zzznomatchtoken");
+    assert_eq!(missed.reply, UNKNOWN_REPLY);
+    assert_eq!(missed.reply, "I don't know.");
+    assert_eq!(missed.first_clause, UNKNOWN_REPLY);
+
+    let card = brain.turn("where is the kettle");
+    assert_eq!(card.reply, LONG_CARD);
+    assert!(card.reply.contains("The lid is shut."));
+    assert_eq!(card.sources, vec!["card:kettle".to_string()]);
+    assert_eq!(card.first_clause, "The kettle");
 }
 
 fn scratch(name: &str) -> std::path::PathBuf {

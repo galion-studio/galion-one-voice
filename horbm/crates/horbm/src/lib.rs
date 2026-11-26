@@ -132,11 +132,12 @@ pub use horbm_inner::{
 };
 pub use horbm_keys::StringKeyArena;
 pub use horbm_persona::{
-    LegalMovePort, MoveClaim, MoveVerdict, Persona, PersonaError, StyleHook, UNKNOWN_LINE,
+    LegalMovePort, MoveClaim, MoveVerdict, Persona, PersonaError, PersonaLine, StyleHook,
+    LINE_BYTES, UNKNOWN_LINE,
 };
 pub use learn::{
     ClauseSource, LearnAudit, LearnConfig, LearnError, LearnPass, LearnedRow, SessionSeal,
-    LEARN_PACK_DB, LEARN_PACK_LIVE, LEARN_PACK_NEXT, LEARN_PACK_RETIRING,
+    LEARN_PACK_CAP, LEARN_PACK_DB, LEARN_PACK_LIVE, LEARN_PACK_NEXT, LEARN_PACK_RETIRING,
 };
 pub use memory::{about_the_person, pin_command, EpisodicStore, TranscriptFile, TranscriptTurn};
 pub use research_style::{
@@ -145,7 +146,8 @@ pub use research_style::{
 };
 pub use retrieve::{
     search_person_lexical, CellState, HitPool, Int8Scorer, MemoryHit, MemoryHitCell,
-    RetrievalConfig, RetrievalThread, RetrieveError, RetrievedCells, MEMORY_HIT_CAP,
+    RetrievalConfig, RetrievalThread, RetrieveError, RetrievedCells, LEARNED_ROW_CAP,
+    MEMORY_HIT_CAP,
 };
 pub use route::{
     is_deep_question, route_heard, AskOutcome, CardHit, CardLookup, Gap, GapReason, ResearchAsk,

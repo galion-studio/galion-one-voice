@@ -24,9 +24,10 @@ use horbm_inner::{
 use galion_emotion_core::standins::memory::{PersonMemory, PersonState, TrackedName};
 
 use crate::dialogue::{DecideIn, Decision, Dialogue, DialogueConsent, Move, ReplyPlan, TurnSnap};
+use crate::learn::LearnedRow;
 use crate::memory::{about_the_person, pin_command};
 use crate::research_style::{ResearchHit, ResearchRoot, StylePersona};
-use crate::retrieve::{CellState, MemoryHitCell, RetrievalThread, RetrievedCells};
+use crate::retrieve::{CellState, MemoryHitCell, RetrievalThread, RetrieveError, RetrievedCells};
 use crate::route::{
     accept_line, classify_ask, route_heard, AskOutcome, CardLookup, Gap, GapReason, ResearchAsk,
     Speakable,
@@ -391,6 +392,21 @@ impl Brain {
         self
     }
 
+    /// Hand learned rows to the attached retrieval thread.
+    ///
+    /// Forwards to [`RetrievalThread::set_learned`]. With no thread this
+    /// returns `Ok(())` and stores nothing. [`Self::turn`] does not call it.
+    ///
+    /// The caller decides consent. Pass `rows` only while learn and remember
+    /// are both granted, and pass an empty list on withdraw. This method
+    /// does not read those grants. The host caller is R9 S132.
+    pub fn attach_learned(&mut self, rows: Vec<LearnedRow>) -> Result<(), RetrieveError> {
+        match self.retrieval.as_ref() {
+            Some(thread) => thread.set_learned(rows),
+            None => Ok(()),
+        }
+    }
+
     /// Latest cell, if a thread is attached. Waits on the cell lock.
     pub fn retrieval_cell(&self) -> Option<std::sync::Arc<MemoryHitCell>> {
         self.retrieval.as_ref().map(|thread| thread.cell())
@@ -723,7 +739,9 @@ impl Brain {
     /// Empathy mood, then the person diary when `remember` is granted, then
     /// the retrieval cell when a thread is attached, then cards, then the
     /// fixture on an idle cell. Layer 4 then picks the move. The private
-    /// finish step splits the clause and returns it. Galion Research is not
+    /// finish step cuts an unpicked reply to the persona sentence budget,
+    /// leaves the unknown line and an empty reply alone, and then splits
+    /// the clause. A picked clause keeps its text. Galion Research is not
     /// asked here.
     /// A deep miss arms [`ResearchAsk`] so the ask starts when the returned
     /// value is dropped. [`Self::research_follow_up`] reads that result.
@@ -1063,11 +1081,23 @@ impl Brain {
             return miss_spoke(cell.took_us);
         }
         let (first, rest) = split_clause(&spoken, false);
-        let source = format!("retrieve:{}", hit.item_id);
+        // A learned cell source is `learned;<label>`. The spoken source is
+        // `learned:<diary id>`. Every other hit stays `retrieve:<item id>`.
+        let learned = hit.source.starts_with("learned;");
+        let source = if learned {
+            format!("learned:{}", hit.item_id)
+        } else {
+            format!("retrieve:{}", hit.item_id)
+        };
+        let evidence = if learned {
+            vec![source.clone(), hit.source.clone()]
+        } else {
+            vec![source.clone()]
+        };
         Spoke {
             reply: String::new(),
-            sources: vec![source.clone()],
-            evidence: vec![source],
+            sources: vec![source],
+            evidence,
             lookup_us: cell.took_us,
             picked: Some(Answer {
                 id: hit.item_id.clone(),
@@ -1101,6 +1131,17 @@ impl Brain {
         let (reply, first_clause, rest, sideband) = match picked {
             Some(answer) => (answer.clause, answer.first, answer.rest, answer.mark),
             None => {
+                // Picked clauses are the other arm and keep their text.
+                // The unknown line and an empty reply are not cut.
+                let reply = if reply == UNKNOWN_REPLY || reply.is_empty() {
+                    reply
+                } else {
+                    self.persona
+                        .style()
+                        .cap_sentences(&reply)
+                        .trim_end()
+                        .to_string()
+                };
                 let atomic = reply == UNKNOWN_REPLY || reply.is_empty();
                 let (first, rest) = split_clause(&reply, atomic);
                 let mark = if reply.is_empty() {
@@ -1332,7 +1373,7 @@ fn fact_backed(reply: &str, sources: &[String]) -> bool {
         return false;
     }
     sources.iter().any(|source| {
-        ["card:", "retrieve:", "fixture:", "research:"]
+        ["card:", "retrieve:", "fixture:", "research:", "learned:"]
             .iter()
             .any(|prefix| source.starts_with(prefix) && source.len() > prefix.len())
     })
@@ -1784,5 +1825,23 @@ mod tests {
         assert!(cell.is_empty());
         assert!(cell.hits.iter().all(|hit| hit.item_id != "bowl"));
         let _ = std::fs::remove_dir_all(cards.parent().unwrap());
+    }
+
+    #[test]
+    fn a_learned_source_is_fact_backed_when_the_id_is_present() {
+        let taught = "You remember the spare oar is in the locker.";
+        let learned = vec!["learned:diary-1".to_string()];
+        assert!(fact_backed(taught, &learned));
+        assert!(!fact_backed(taught, &["learned:".to_string()]));
+        assert!(!fact_backed(UNKNOWN_REPLY, &learned));
+        assert!(!fact_backed("", &learned));
+        assert!(fact_backed(
+            "The kettle is on the hob.",
+            &["retrieve:kettle".to_string()]
+        ));
+        assert!(fact_backed(
+            "The kettle is on the hob.",
+            &["card:kettle".to_string()]
+        ));
     }
 }
