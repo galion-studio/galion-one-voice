@@ -46,7 +46,7 @@ Frame counts are the gate. The 60 ms compute budget inside a frame is a wall-clo
 The measured line is printed by `full_duplex_samantha_both_bands`. It has counts only. This run printed:
 
 ```text
-duplex s26 frame_ms=80 clock=virtual persona=samantha ear_frames=0 recognizer_frames=0 brain_frames=0 conductor_frames=1 commit_frames=1 reaction_frames=0 voice_ms=160 affect_frames=2 barge_ms=160 barge_frames=2 backchannel_frames=6 backchannel_cancels=0 overlap_live_frames=8 you_frames=20 me_audible_frames=10 first_clause_words=2 research_frames=0 result=pass
+duplex s26 frame_ms=80 clock=virtual persona=<configured id> ear_frames=0 recognizer_frames=0 brain_frames=0 conductor_frames=1 commit_frames=1 reaction_frames=0 voice_ms=160 affect_frames=2 barge_ms=160 barge_frames=2 backchannel_frames=6 backchannel_cancels=0 overlap_live_frames=8 you_frames=20 me_audible_frames=10 first_clause_words=2 research_frames=0 result=pass
 ```
 
 ## Left where it was

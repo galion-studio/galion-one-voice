@@ -153,6 +153,8 @@ where
         let style = accept_configured(&parts.persona)?;
         let brain = BrainHandle::with_cards(cards);
         let conductor = Conductor::with_reaction(brain.clone(), ReactionKind::Silence);
+        // Copied once from the port. `tick` does not write `report.persona_id`.
+        let report = LatencyReport::fresh(parts.persona.id());
         Ok(Self {
             recognizer: parts.recognizer,
             emotion: parts.emotion,
@@ -176,7 +178,7 @@ where
             sense: ProsodyEar::new(),
             last_cue: ProsodyCue::disabled(),
             echo: PlaybackEcho::new(),
-            report: LatencyReport::fresh(),
+            report,
             moment: None,
         })
     }

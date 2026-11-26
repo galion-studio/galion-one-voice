@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Galion Labs
-//! One Linux smoke of Samantha's live loop.
+//! One Linux smoke of the configured development persona's live loop.
 //!
 //! Ear, brain, emotion, mouth, and an output sink. Playback is the in-process
 //! loopback unless this crate is built with `alsa` on Linux and a device
