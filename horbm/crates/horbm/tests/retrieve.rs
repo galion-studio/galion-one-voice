@@ -5,10 +5,20 @@
 
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
+use std::sync::{mpsc, Mutex};
+use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
+#[cfg(target_os = "linux")]
+use std::fs::OpenOptions;
+#[cfg(target_os = "linux")]
+use std::io::Write;
+#[cfg(target_os = "linux")]
+use std::sync::Arc;
+
 use horbm::{CellState, RetrievalConfig, RetrievalThread, RetrievedCells, MEMORY_HIT_CAP};
+#[cfg(target_os = "linux")]
+use horbm::{HitPool, LearnedRow};
 
 fn disk_lock() -> std::sync::MutexGuard<'static, ()> {
     static LOCK: Mutex<()> = Mutex::new(());
@@ -240,6 +250,48 @@ fn unset_keys_path_stays_lexical() {
     let _ = fs::remove_dir_all(&dir);
 }
 
+/// The lexical grant, one ask, and drop, many times. A missed stop wakeup
+/// leaves `Drop` joined to `horbm-retrieval` and `horbm-memory` parked.
+/// The watchdog bounds that hang.
+#[test]
+fn unset_keys_path_ask_and_drop_does_not_wedge() {
+    let dir = scratch("lexical-drop");
+    let cards = dir.join("cards");
+    fs::create_dir(&cards).expect("cards");
+    fs::write(
+        cards.join("kettle.json"),
+        r#"{"id":"kettle","title":"The kettle is on the hob.","section":"horbm","category":"fixture","summary":"The kettle is on the hob.","body":"The kettle is on the hob.","claim_type":"fact","sources":[],"evidence_strength":"strong","said_by":"horbm","as_of_date":"2026-11-25","status":"draft","contested_views":[],"related":[]}"#,
+    )
+    .expect("card");
+    let (done_tx, done_rx) = mpsc::channel();
+    let stress = thread::spawn(move || {
+        for n in 0..32u64 {
+            let thread = RetrievalThread::spawn(RetrievalConfig {
+                remember: true,
+                knowledge_dir: Some(cards.clone()),
+                fixture_rows: 0,
+                keys_path: None,
+            })
+            .expect("spawn");
+            thread.ask_wait("where is the kettle", n, n).expect("ask");
+            assert_eq!(thread.cell().state, CellState::Hits);
+            drop(thread);
+        }
+        let _ = done_tx.send(());
+    });
+    match done_rx.recv_timeout(Duration::from_secs(60)) {
+        Ok(()) => stress.join().expect("stress"),
+        Err(mpsc::RecvTimeoutError::Disconnected) => {
+            stress.join().expect("stress");
+        }
+        Err(mpsc::RecvTimeoutError::Timeout) => {
+            eprintln!("lexical ask and drop wedged");
+            std::process::exit(1);
+        }
+    }
+    let _ = fs::remove_dir_all(&dir);
+}
+
 /// A granted key file publishes at most four hits. Deny does not open the file.
 #[test]
 fn granted_key_file_publishes_at_most_four_hits() {
@@ -379,6 +431,219 @@ fn a_missing_key_file_fails_the_grant() {
     assert!(!err.message().contains("blue bowl"));
     assert!(!missing.exists());
     let _ = fs::remove_dir_all(missing.parent().unwrap());
+}
+
+/// One-line card the fifo stall turns into a regular file before the
+/// learned rebuild reads the directory again.
+#[cfg(target_os = "linux")]
+const PENDING_CARD: &str = r#"{"id":"kettle","title":"The kettle is on the hob.","section":"horbm","category":"fixture","summary":"The kettle is on the hob.","body":"The kettle is on the hob.","claim_type":"fact","sources":[],"evidence_strength":"strong","said_by":"northwind","as_of_date":"2026-11-25","status":"draft","contested_views":[],"related":[]}"#;
+
+#[cfg(target_os = "linux")]
+fn pending_marker() -> LearnedRow {
+    LearnedRow {
+        item_id: "pack-1".to_string(),
+        text: "The pending token is marigold".to_string(),
+        said_by: "northwind".to_string(),
+        date: "2026-11-26T00:00:00Z".to_string(),
+        source: "session=sess;turn=1;time=2026-11-26T00:00:00Z;consent=learn-v1".to_string(),
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn task_wchan(tid: &str) -> String {
+    fs::read_to_string(format!("/proc/self/task/{tid}/wchan")).unwrap_or_default()
+}
+
+#[cfg(target_os = "linux")]
+fn retrieval_wchan() -> String {
+    let Ok(tasks) = fs::read_dir("/proc/self/task") else {
+        return "no task dir".to_string();
+    };
+    for task in tasks.flatten() {
+        let comm = fs::read_to_string(task.path().join("comm")).unwrap_or_default();
+        if comm.trim() == "horbm-retrieval" {
+            return fs::read_to_string(task.path().join("wchan"))
+                .unwrap_or_default()
+                .trim()
+                .to_string();
+        }
+    }
+    "horbm-retrieval missing".to_string()
+}
+
+#[cfg(target_os = "linux")]
+fn wait_wchan(read: impl Fn() -> String, want: &str, what: &str) {
+    let started = Instant::now();
+    let mut seen = String::new();
+    while started.elapsed() < Duration::from_secs(10) {
+        seen = read();
+        if seen.trim() == want {
+            return;
+        }
+        thread::sleep(Duration::from_millis(5));
+    }
+    panic!("{what}; last wchan {seen:?}");
+}
+
+/// Opens the write side if the test unwinds while the worker is blocked.
+#[cfg(target_os = "linux")]
+struct FifoRelease {
+    path: PathBuf,
+    writer: Option<std::fs::File>,
+    done: bool,
+}
+
+#[cfg(target_os = "linux")]
+impl FifoRelease {
+    fn finish(&mut self, bytes: &[u8]) {
+        if self.writer.is_none() {
+            self.writer = Some(
+                OpenOptions::new()
+                    .write(true)
+                    .open(&self.path)
+                    .expect("fifo writer"),
+            );
+        }
+        fs::remove_file(&self.path).expect("unlink fifo");
+        fs::write(&self.path, bytes).expect("regular card");
+        if let Some(writer) = self.writer.as_mut() {
+            writer.write_all(bytes).expect("fifo body");
+        }
+        self.writer.take();
+        self.done = true;
+    }
+}
+
+#[cfg(target_os = "linux")]
+impl Drop for FifoRelease {
+    fn drop(&mut self) {
+        if self.done {
+            return;
+        }
+        if let Some(mut writer) = self.writer.take() {
+            let _ = writer.write_all(b"{}");
+            return;
+        }
+        // Linux O_NONBLOCK. Retry briefly so a reader that arrives during
+        // unwind is released, and a missing reader does not stall exit.
+        use std::os::unix::fs::OpenOptionsExt;
+        let started = Instant::now();
+        while started.elapsed() < Duration::from_secs(2) {
+            if let Ok(mut writer) = OpenOptions::new()
+                .write(true)
+                .custom_flags(0o4000)
+                .open(&self.path)
+            {
+                let _ = writer.write_all(b"{}");
+                return;
+            }
+            thread::sleep(Duration::from_millis(10));
+        }
+    }
+}
+
+/// The worker is stuck reading a fifo card, so `set_learned` sits in the
+/// one slot. Asks fired then must leave that command in place.
+#[cfg(target_os = "linux")]
+#[test]
+fn set_learned_is_not_replaced_by_a_pending_ask() {
+    let _guard = disk_lock();
+    let dir = scratch("pending-ask");
+    let cards = dir.join("cards");
+    fs::create_dir(&cards).expect("cards");
+    let fifo = cards.join("kettle.json");
+    let made = std::process::Command::new("mkfifo")
+        .arg(&fifo)
+        .status()
+        .expect("mkfifo");
+    assert!(made.success(), "mkfifo {}", fifo.display());
+
+    let thread = Arc::new(
+        RetrievalThread::spawn(RetrievalConfig {
+            remember: false,
+            knowledge_dir: Some(cards),
+            fixture_rows: 0,
+            keys_path: None,
+        })
+        .expect("spawn denied"),
+    );
+    let mut release = FifoRelease {
+        path: fifo,
+        writer: None,
+        done: false,
+    };
+
+    let granting = Arc::clone(&thread);
+    let grant = thread::spawn(move || granting.set_remember(true));
+    wait_wchan(
+        retrieval_wchan,
+        "wait_for_partner",
+        "retrieval thread did not block opening the card fifo",
+    );
+
+    let (tid_tx, tid_rx) = mpsc::channel();
+    let learning = Arc::clone(&thread);
+    let pending = thread::spawn(move || {
+        tid_tx.send(linux_tid()).expect("tid");
+        learning
+            .set_learned(vec![pending_marker()])
+            .expect("set learned");
+    });
+    let tid = tid_rx.recv().expect("tid");
+    wait_wchan(
+        || task_wchan(&tid),
+        "futex_wait_queue",
+        "set_learned did not wait with the command still pending",
+    );
+
+    thread.ask("unrelated noise", 1, 1);
+    thread.ask("another noise", 2, 2);
+    assert_eq!(
+        retrieval_wchan(),
+        "wait_for_partner",
+        "the worker left the fifo while the learned command was pending"
+    );
+    assert_eq!(
+        task_wchan(&tid).trim(),
+        "futex_wait_queue",
+        "an ask replaced the pending learned command"
+    );
+
+    release.finish(PENDING_CARD.as_bytes());
+    grant.join().expect("grant thread").expect("grant");
+    pending.join().expect("learned thread");
+    assert!(
+        thread.cell().is_empty(),
+        "a discarded ask published {:?}",
+        thread.cell()
+    );
+    assert!(thread.last_error().is_none(), "{:?}", thread.last_error());
+
+    thread.ask_wait("marigold", 3, 3).expect("ask");
+    let cell = thread.cell();
+    assert_eq!(cell.state, CellState::Hits, "{:?}", cell);
+    assert!(
+        cell.hits.iter().any(|hit| {
+            hit.pool == HitPool::Memory
+                && hit.source.starts_with("learned;")
+                && hit.text.contains("marigold")
+        }),
+        "{:?}",
+        cell.hits
+    );
+    assert!(cell.hits.len() <= MEMORY_HIT_CAP);
+    drop(thread);
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[cfg(target_os = "linux")]
+fn linux_tid() -> String {
+    fs::read_link("/proc/thread-self")
+        .expect("thread-self")
+        .file_name()
+        .expect("tid")
+        .to_string_lossy()
+        .into_owned()
 }
 
 #[test]
