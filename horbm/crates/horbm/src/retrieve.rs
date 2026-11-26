@@ -10,8 +10,8 @@
 //! [`RetrievalConfig::keys_path`] unset keeps the lexical ask:
 //! `search_lexical`, then [`covers`], then the blocked-id filter. No key
 //! file is opened and no scan is built. When the path is set and `remember`
-//! is granted, setup builds [`horbm_brain::DiaryScan`] with
-//! [`DiaryScan::open_capped`] once. A query calls
+//! is granted, setup and [`RetrievalThread::reload`] build
+//! [`horbm_brain::DiaryScan`] with [`DiaryScan::open_capped`]. A query calls
 //! [`DiaryScan::scan_selected_into`] into a `[ScanHit; MEMORY_HIT_CAP]` the
 //! worker allocates once. That call does not allocate. A hit is published
 //! only when the open store can already resolve its id. The clause is that
@@ -28,7 +28,10 @@
 //! thread inserts each one and rebuilds the scan when a key file is set.
 //! The stored source starts with `learned;`. Withdraw keeps the rows and
 //! drops the diary. The next grant inserts them again. Deny keeps the rows
-//! and opens nothing.
+//! and opens nothing. [`RetrievalThread::reload`] re-reads the card
+//! directory through that same rebuild, with the rows the worker already
+//! holds. A denied reload opens nothing. A failed reload keeps the open
+//! diary.
 //!
 //! `LOCKS.toml` `[consent] remember = "deny"`. `[horbm] remember_grant` names
 //! the only grant string. This module does not read the lock file. The
@@ -37,9 +40,9 @@
 //! the HKB1 file, opened only while that grant holds.
 //!
 //! Do not call [`RetrievalThread::ask`], [`RetrievalThread::ask_wait`],
-//! [`RetrievalThread::set_remember`], [`RetrievalThread::set_learned`], or
-//! [`RetrievalThread::cell`] from `Heartbeat::step`. That step does not
-//! allocate and does not block.
+//! [`RetrievalThread::set_remember`], [`RetrievalThread::set_learned`],
+//! [`RetrievalThread::reload`], or [`RetrievalThread::cell`] from
+//! `Heartbeat::step`. That step does not allocate and does not block.
 //! [`RetrievalThread::try_cell`] is the non-waiting read for a conductor
 //! thread between frames. A `None` means the lock was busy, not that the
 //! cell is empty.
@@ -232,8 +235,9 @@ pub struct RetrievalConfig {
     /// Synthetic cards loaded into the RAM diary. Ignored when `remember`
     /// is false. When this is non-zero the card directory is not opened.
     pub fixture_rows: usize,
-    /// HKB1 file. Opened only while `remember` is granted, once at setup.
-    /// Not created. `None` keeps lexical search and does not build a scan.
+    /// HKB1 file. Opened only while `remember` is granted, at setup and on
+    /// [`RetrievalThread::reload`]. Not created. `None` keeps lexical search
+    /// and does not build a scan.
     pub keys_path: Option<PathBuf>,
 }
 
@@ -351,6 +355,10 @@ enum Command {
         rows: Vec<LearnedRow>,
         done: Option<Sender<()>>,
     },
+    // Sent through `wait`, so an ask that is still queued does not replace it.
+    Reload {
+        done: Option<Sender<()>>,
+    },
 }
 
 impl Command {
@@ -358,7 +366,8 @@ impl Command {
         match self {
             Command::Ask { done, .. }
             | Command::Consent { done, .. }
-            | Command::Learned { done, .. } => done,
+            | Command::Learned { done, .. }
+            | Command::Reload { done } => done,
         }
     }
 }
@@ -418,9 +427,10 @@ impl RetrievalThread {
         }
     }
 
-    /// Queue an ask. Does not wait. A newer ask, a consent change, or
-    /// [`RetrievalThread::set_learned`] replaces an ask that has not started.
-    /// An ask leaves a learned command sitting in the slot.
+    /// Queue an ask. Does not wait. A newer ask, a consent change,
+    /// [`RetrievalThread::set_learned`], or [`RetrievalThread::reload`]
+    /// replaces an ask that has not started. An ask leaves a learned command
+    /// or a reload sitting in the slot.
     pub fn ask(&self, text: impl Into<String>, turn_id: u64, epoch: u64) {
         self.enqueue(Command::Ask {
             text: text.into(),
@@ -466,9 +476,23 @@ impl RetrievalThread {
         self.wait(Command::Learned { rows, done: None })
     }
 
-    /// Last diary error. Cleared on a successful grant, on withdraw, and when
-    /// a learned update drops nothing. A list over `LEARNED_ROW_CAP` sets
-    /// `dropped N learned rows`.
+    /// Re-read the card directory on the worker.
+    ///
+    /// The command is sent through `wait`, so an ask does not take its slot.
+    /// The worker calls the same `rebuild` as spawn, grant, and
+    /// [`RetrievalThread::set_learned`], passing the learned rows it already
+    /// holds. A denied thread returns `Ok(())` and opens nothing. A failed
+    /// rebuild keeps the open diary and records the diary error in
+    /// [`RetrievalThread::last_error`].
+    pub fn reload(&self) -> Result<(), RetrieveError> {
+        self.wait(Command::Reload { done: None })
+    }
+
+    /// Last diary error. Cleared on a successful grant, on withdraw, when a
+    /// learned update drops nothing, and when a reload rebuilds. A list over
+    /// `LEARNED_ROW_CAP` sets `dropped N learned rows`. A failed reload sets
+    /// the diary error and keeps the previous diary. A denied reload leaves
+    /// this value unchanged.
     pub fn last_error(&self) -> Option<String> {
         self.shared
             .last_error
@@ -482,7 +506,8 @@ impl RetrievalThread {
         match &mut cmd {
             Command::Ask { done, .. }
             | Command::Consent { done, .. }
-            | Command::Learned { done, .. } => *done = Some(tx),
+            | Command::Learned { done, .. }
+            | Command::Reload { done } => *done = Some(tx),
         }
         self.enqueue(cmd);
         rx.recv()
@@ -491,10 +516,13 @@ impl RetrievalThread {
 
     fn enqueue(&self, cmd: Command) {
         let mut slot = self.shared.slot.lock().expect("retrieval mailbox");
-        // The learned command was sent through `wait`. An ask must not take
-        // its slot, or `set_learned` would return before the rows were stored.
+        // Learned and reload were sent through `wait`. An ask must not take
+        // their slot, or the waiter would return before the worker ran them.
         if matches!(cmd, Command::Ask { .. })
-            && matches!(slot.as_ref(), Some(Command::Learned { .. }))
+            && matches!(
+                slot.as_ref(),
+                Some(Command::Learned { .. } | Command::Reload { .. })
+            )
         {
             signal(cmd.take_done());
             return;
@@ -569,6 +597,7 @@ fn thread_main(
 fn worker(mut store: Option<Opened>, config: RetrievalConfig, shared: &Shared) {
     // One hit buffer for the life of the worker. A query reuses it.
     // Learned rows live here, not on `Shared`. An ask does not read them.
+    // Reload passes this vec into `rebuild` and does not replace it.
     let mut learned: Vec<LearnedRow> = Vec::new();
     let mut hit_buf = [ScanHit::default(); MEMORY_HIT_CAP];
     while let Some(cmd) = recv(shared) {
@@ -590,6 +619,10 @@ fn worker(mut store: Option<Opened>, config: RetrievalConfig, shared: &Shared) {
             }
             Command::Learned { rows, done } => {
                 apply_learned(shared, &mut store, &config, &mut learned, rows);
+                signal(done);
+            }
+            Command::Reload { done } => {
+                apply_reload(shared, &mut store, &config, &learned);
                 signal(done);
             }
         }
@@ -668,6 +701,27 @@ fn apply_learned(
     }
 }
 
+/// Re-read the card directory into a new diary. The learned rows stay as they
+/// are. Deny leaves the closed diary closed. A failed rebuild leaves the
+/// previous diary in place.
+fn apply_reload(
+    shared: &Shared,
+    store: &mut Option<Opened>,
+    config: &RetrievalConfig,
+    learned: &[LearnedRow],
+) {
+    if store.is_none() {
+        return;
+    }
+    match rebuild(config, learned) {
+        Ok(opened) => {
+            *store = Some(opened);
+            set_last_error(shared, None);
+        }
+        Err(err) => set_last_error(shared, Some(err.message)),
+    }
+}
+
 /// Keep at most [`LEARNED_ROW_CAP`] rows. Newest [`crate::LearnedRow::date`] wins.
 /// Equal dates keep the later input rows: the sort is stable, and the
 /// oldest prefix is what gets dropped. Does not panic.
@@ -736,8 +790,9 @@ fn open_store(config: &RetrievalConfig) -> Result<Opened, RetrieveError> {
 }
 
 /// Open the diary, insert `learned`, then build the scan once when a key
-/// file is set. Spawn, a grant, and [`RetrievalThread::set_learned`] share
-/// this. `open_store` is not copied. The scan is built after the inserts so
+/// file is set. Spawn, a grant, [`RetrievalThread::set_learned`], and
+/// [`RetrievalThread::reload`] share this. `open_store` is not copied. A
+/// denied reload does not call it. The scan is built after the inserts so
 /// a learned row is in the arena. This does not run on an ask.
 fn rebuild(config: &RetrievalConfig, learned: &[LearnedRow]) -> Result<Opened, RetrieveError> {
     let mut opened = open_store(config)?;
@@ -1078,7 +1133,7 @@ fn superseded(shared: &Shared, epoch: u64) -> bool {
     let slot = shared.slot.lock().expect("retrieval mailbox");
     match slot.as_ref() {
         Some(Command::Ask { epoch: newer, .. }) => *newer > epoch,
-        Some(Command::Consent { .. } | Command::Learned { .. }) => true,
+        Some(Command::Consent { .. } | Command::Learned { .. } | Command::Reload { .. }) => true,
         None => false,
     }
 }
