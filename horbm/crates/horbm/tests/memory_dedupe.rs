@@ -201,7 +201,7 @@ fn extractor_only_facts_stay() {
     assert!(!kept.is_empty(), "{hits:?}");
     assert!(
         kept.iter()
-            .all(|hit| hit.kind != MemoryKind::Name && !hit.pinned && hit.kind == MemoryKind::Pin),
+            .all(|hit| hit.kind == MemoryKind::Fact && !hit.pinned),
         "{kept:?}"
     );
     let _ = fs::remove_dir_all(&dir);

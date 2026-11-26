@@ -35,6 +35,8 @@ pub enum MemoryKind {
     Summary,
     Name,
     Mood,
+    /// An extracted, unpinned statement.
+    Fact,
 }
 
 /// One live row. `person_id` is who it is about. `at` is the caller clock.
@@ -88,6 +90,26 @@ pub trait PersonMemory: Send {
     fn note_turn(&mut self, person_id: &str, said_by: &str, text: &str, at: &str) -> WriteOutcome;
     fn end_session(&mut self, person_id: &str, at: &str) -> WriteOutcome;
     fn forget(&mut self, person_id: &str, item_id: &str) -> WriteOutcome;
+
+    /// Archive each row [`Self::recall`] returns for this person and query.
+    ///
+    /// Returns the ids whose outcome was [`WriteOutcome::Archived`]. Denied
+    /// memory returns an empty list and does not recall. A twin already
+    /// archived comes back [`WriteOutcome::Skipped`] and is not included.
+    /// The recall cap bounds the list. Rows are archived, never deleted.
+    fn forget_matching(&mut self, person_id: &str, query: &str) -> Vec<String> {
+        if !self.remember_granted() {
+            return Vec::new();
+        }
+        let hits = self.recall(person_id, query);
+        let mut archived = Vec::new();
+        for item in hits {
+            if let WriteOutcome::Archived { id } = self.forget(person_id, &item.id) {
+                archived.push(id);
+            }
+        }
+        archived
+    }
     fn recall(&mut self, person_id: &str, query: &str) -> Vec<MemoryItem>;
     fn tombstone(&self, item_id: &str) -> Option<Tombstone>;
 }
