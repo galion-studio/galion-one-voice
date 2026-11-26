@@ -151,6 +151,17 @@ fn warning_text(new_name: &str, old_name: &str, warning: AliasWarning) -> String
     }
 }
 
+const HELP: &str = "\
+samantha-dot serve [--addr 127.0.0.1:7881] [--mock]
+samantha-dot check
+
+Loopback only. GALION_VOICE_WS overrides the bind. GALION_SAMANTHA_WS is a
+deprecated fallback and logs one warning. The page is one violet dot for the
+configured persona.
+--mock answers the preview line on galion-samantha-ws/1. Without it the socket
+keeps the 80 ms resting mood and does not invent a reply.
+";
+
 #[cfg(test)]
 mod tests {
     use super::{resolve, warning_text, AliasWarning};
@@ -182,14 +193,3 @@ mod tests {
         assert!(choice.warning.is_none());
     }
 }
-
-const HELP: &str = "\
-samantha-dot serve [--addr 127.0.0.1:7881] [--mock]
-samantha-dot check
-
-Loopback only. GALION_VOICE_WS overrides the bind. GALION_SAMANTHA_WS is a
-deprecated fallback and logs one warning. The page is one violet dot for the
-configured persona.
---mock answers the preview line on galion-samantha-ws/1. Without it the socket
-keeps the 80 ms resting mood and does not invent a reply.
-";
