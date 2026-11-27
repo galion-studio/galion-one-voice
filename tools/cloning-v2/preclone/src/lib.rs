@@ -7,6 +7,9 @@
 //!
 //! The measurement is CPU DSP. No model, no embedding of a person, no clone.
 //! Real reference audio stays on the owner's machine. Tests synthesize the signal.
+//!
+//! `blend` designs the synthetic voice Aria from two of these profiles. It
+//! writes `galion-voice-design/1`. It does not render, and it does not clone.
 
 #![forbid(unsafe_code)]
 
@@ -19,6 +22,7 @@ mod vad;
 mod voice;
 mod wav;
 
+pub mod blend;
 pub mod device;
 pub mod synth;
 
@@ -26,7 +30,9 @@ pub use emotion::{
     parse_moments, MomentAxis, MomentFrame, MOMENT_HOOK, MOMENT_SCHEMA, MOMENT_TICK_MS,
 };
 pub use environment::{estimate_rt60_s, estimate_snr_db};
-pub use profile::{profile_bytes, Profile, Request, Segment, SegmentKind, SCHEMA, STAGE};
+pub use profile::{
+    profile_bytes, Profile, Request, Segment, SegmentKind, VoiceProfile, SCHEMA, STAGE,
+};
 pub use vad::{EnergyVad, VAD_CLAMP_DBFS, VAD_FLOOR_DBFS, VAD_FRAME_MS, VAD_ON_DB};
 pub use wav::read_wav;
 
