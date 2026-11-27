@@ -1677,6 +1677,7 @@ dependencies = [
  "horbm-voice",
  "hyper",
  "hyper-util",
+ "libc",
  "samantha-voice-clone",
  "serde",
  "serde_json",

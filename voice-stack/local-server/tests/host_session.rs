@@ -6,15 +6,15 @@ use std::fs;
 use std::net::{Ipv4Addr, SocketAddr};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicI32, AtomicU64, Ordering};
+use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use futures_util::{SinkExt, StreamExt};
 use horbm::{ClauseSource, EpisodicStore, LearnConfig, LearnPass, PersonMemory};
 use samantha_local_server::protocol::{SCHEMA, WS_PATH};
 use samantha_local_server::{
-    start_with_host, HostConfig, HostSession, HostSources, RefState, ReplyEngine, Stop, TurnLog,
-    TurnOut,
+    start_with_host, HostConfig, HostSession, HostSources, RefState, ReplyEngine, TurnLog, TurnOut,
 };
 use serde_json::Value;
 use tokio_tungstenite::tungstenite::Message;
@@ -676,6 +676,13 @@ async fn run_sigterm_child() {
     let config = HostConfig::resolve_process(false).expect("child profile");
     println!("{}", config.startup_line());
     let host = HostSession::boot(config, shipped_knowledge()).unwrap();
+    // SIGTERM is caught on a thread of its own. The parent's 20 s wait has
+    // already fired while both runtime workers were inside synchronous work,
+    // so `tokio::signal` never got polled and a watchdog armed after that
+    // wait never started. The handler only writes one byte. The thread seals,
+    // then leaves. `Running` stays alive until that exit so its drop cannot
+    // abort the session first.
+    arm_sigterm_seal(Arc::clone(&host));
     let running = start_with_host(
         SocketAddr::from((Ipv4Addr::LOCALHOST, 0)),
         ui_dir(),
@@ -686,18 +693,64 @@ async fn run_sigterm_child() {
     )
     .await
     .unwrap();
-    let stop = Stop::install().unwrap();
     let ready = std::env::var("GALION_HORBM_READY_FILE").unwrap();
     fs::write(&ready, running.addr.to_string()).unwrap();
-    stop.wait().await;
-    // The seal runs in `shutdown`. A runtime worker can still be parked
-    // after that, and the parent only waits 20 s. Leave once the seal has
-    // had this long, so a parked worker cannot hold the process open.
-    std::thread::spawn(|| {
-        std::thread::sleep(Duration::from_secs(15));
-        std::process::exit(0);
+    std::future::pending::<()>().await;
+    drop(running);
+}
+
+#[cfg(unix)]
+static SIGTERM_WRITE: AtomicI32 = AtomicI32::new(-1);
+
+#[cfg(unix)]
+extern "C" fn on_sigterm(_: i32) {
+    let fd = SIGTERM_WRITE.load(Ordering::Relaxed);
+    if fd >= 0 {
+        let byte = [1u8];
+        unsafe {
+            libc::write(fd, byte.as_ptr().cast(), 1);
+        }
+    }
+}
+
+/// Catch SIGTERM outside the runtime. Seal, then `_exit`. A second thread
+/// leaves after 12 s if the seal is still parked. 12 s is inside the parent's
+/// 20 s wait. `_exit` does not flush stdio, so a full pipe cannot hold it.
+#[cfg(unix)]
+fn arm_sigterm_seal(host: Arc<HostSession>) {
+    let mut pipe = [0; 2];
+    let opened = unsafe { libc::pipe2(pipe.as_mut_ptr(), libc::O_CLOEXEC | libc::O_NONBLOCK) };
+    assert_eq!(opened, 0, "sigterm pipe");
+    let read_fd = pipe[0];
+    let write_fd = pipe[1];
+    let flags = unsafe { libc::fcntl(read_fd, libc::F_GETFL) };
+    assert!(flags >= 0, "sigterm pipe flags");
+    let blocking = unsafe { libc::fcntl(read_fd, libc::F_SETFL, flags & !libc::O_NONBLOCK) };
+    assert_eq!(blocking, 0, "sigterm pipe blocking read");
+    SIGTERM_WRITE.store(write_fd, Ordering::SeqCst);
+    unsafe {
+        let mut action: libc::sigaction = std::mem::zeroed();
+        action.sa_sigaction = on_sigterm as usize;
+        libc::sigemptyset(&mut action.sa_mask);
+        let installed = libc::sigaction(libc::SIGTERM, &action, std::ptr::null_mut());
+        assert_eq!(installed, 0, "SIGTERM handler");
+    }
+    std::thread::spawn(move || {
+        let mut byte = [0u8; 1];
+        loop {
+            let n = unsafe { libc::read(read_fd, byte.as_mut_ptr().cast(), 1) };
+            if n == 1 {
+                break;
+            }
+        }
+        host.begin_shutdown();
+        std::thread::spawn(|| {
+            std::thread::sleep(Duration::from_secs(12));
+            unsafe { libc::_exit(0) };
+        });
+        host.finish();
+        unsafe { libc::_exit(0) };
     });
-    running.shutdown().await;
 }
 
 #[cfg(unix)]
