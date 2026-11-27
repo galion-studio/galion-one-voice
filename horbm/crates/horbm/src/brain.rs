@@ -1363,11 +1363,18 @@ impl Brain {
 
     fn list_person_rows(&mut self) -> Vec<MemoryItem> {
         let n = usize::from(self.persona.style().max_sentences.max(1));
+        // `note_state` keeps one live mood row (`i am feeling …`). That row
+        // is the emotion trace, not a pin. Read one past the sentence cap
+        // so it cannot take a pin's place. The emotion core still steps.
+        let fetch = n.saturating_add(1);
         let person = self.person_id.clone();
         let Some(memory) = self.memory.as_mut() else {
             return Vec::new();
         };
-        memory.list_person(&person, n)
+        let mut rows = memory.list_person(&person, fetch);
+        rows.retain(|item| item.kind != crate::MemoryKind::Mood);
+        rows.truncate(n);
+        rows
     }
 
     // Newest speakable rows, one sentence each, cut to the style cap.
