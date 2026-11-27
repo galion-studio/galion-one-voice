@@ -325,13 +325,18 @@ fn retrieval_wchan() -> String {
     "horbm-retrieval missing".to_string()
 }
 
+/// Kernel names for a thread parked in a futex wait. Linux 6.17 renamed
+/// `futex_wait_queue` to `futex_do_wait`; both mean the same sleep.
 #[cfg(target_os = "linux")]
-fn wait_wchan(read: impl Fn() -> String, want: &str, what: &str) {
+const FUTEX_WAIT: &[&str] = &["futex_wait_queue", "futex_do_wait"];
+
+#[cfg(target_os = "linux")]
+fn wait_wchan(read: impl Fn() -> String, want: &[&str], what: &str) {
     let started = Instant::now();
     let mut seen = String::new();
     while started.elapsed() < Duration::from_secs(10) {
         seen = read();
-        if seen.trim() == want {
+        if want.contains(&seen.trim()) {
             return;
         }
         thread::sleep(Duration::from_millis(5));
@@ -431,7 +436,7 @@ fn a_pending_ask_does_not_replace_a_reload() {
     let grant = thread::spawn(move || granting.set_remember(true));
     wait_wchan(
         retrieval_wchan,
-        "wait_for_partner",
+        &["wait_for_partner"],
         "retrieval thread did not block opening the card fifo",
     );
 
@@ -444,7 +449,7 @@ fn a_pending_ask_does_not_replace_a_reload() {
     let tid = tid_rx.recv().expect("tid");
     wait_wchan(
         || task_wchan(&tid),
-        "futex_wait_queue",
+        FUTEX_WAIT,
         "reload did not wait with the command still pending",
     );
 
@@ -455,10 +460,10 @@ fn a_pending_ask_does_not_replace_a_reload() {
         "wait_for_partner",
         "the worker left the fifo while the reload command was pending"
     );
-    assert_eq!(
-        task_wchan(&tid).trim(),
-        "futex_wait_queue",
-        "an ask replaced the pending reload"
+    let reload_wchan = task_wchan(&tid);
+    assert!(
+        FUTEX_WAIT.contains(&reload_wchan.trim()),
+        "an ask replaced the pending reload; wchan {reload_wchan:?}"
     );
 
     release.finish(PENDING_CARD.as_bytes());

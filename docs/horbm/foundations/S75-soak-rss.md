@@ -6,7 +6,7 @@ Perpetual Open MIT License. (c) 2026 Galion Labs.
 |---|---|
 | Swarm | HORBM S75. Intermittent resident-set growth in `samantha_duplex_long_call`. |
 | Crate | `horbm/crates/horbm-soak` only. No new dependency. |
-| Gate | Still 128 KiB, growth and peak growth, warm to end. Not raised. |
+| Gate | 128 KiB of `VmRSS`, growth and peak growth, warm to end. Not raised. S186 moved the gate to live heap bytes, end minus the warmup sample. The limit stayed 128 KiB. `VmRSS` is printed and is not gated. |
 | Clock | Virtual 80 ms. Five minutes is 3,750 ticks. Warm sample stays at tick 250. |
 
 ## What was growing

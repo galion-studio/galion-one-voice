@@ -30,7 +30,7 @@ use tower_http::services::ServeDir;
 
 use crate::audio::{self, FRAME_MS};
 use crate::bind::{origin_allowed, require_loopback, NotLoopback};
-use crate::pipeline::{AudioFeed, FeedMsg, Pipeline, TurnProduct};
+use crate::pipeline::{AudioFeed, ClosedTake, FeedMsg, MicStep, Pipeline, TurnProduct};
 use crate::protocol::{
     self, decode_pcm, encode_pcm, error_json, mood_json, parse_client, pong_json,
     query_carries_token, welcome_json, AudioDir, ClientControl, RateCode, SCHEMA, WS_PATH,
@@ -728,6 +728,29 @@ async fn push_text_off_worker(
     }
 }
 
+/// `finish_take` is the brain turn for a closed mic take. Same shape as
+/// [`push_text_off_worker`]: the session awaits the join, so this socket's
+/// turns stay in order, and a panicked turn drops the socket.
+async fn finish_take_off_worker(
+    pipe: &mut Box<dyn Pipeline>,
+    take: ClosedTake,
+) -> Option<TurnProduct> {
+    let placeholder: Box<dyn Pipeline> = Box::new(crate::pipeline::FakePipeline::unlinked());
+    let mut owned = std::mem::replace(pipe, placeholder);
+    let joined = tokio::task::spawn_blocking(move || {
+        let product = owned.finish_take(take);
+        (owned, product)
+    })
+    .await;
+    match joined {
+        Ok((owned, product)) => {
+            *pipe = owned;
+            Some(product)
+        }
+        Err(_) => None,
+    }
+}
+
 async fn handle_binary(
     bytes: &[u8],
     pipe: &mut Box<dyn Pipeline>,
@@ -742,9 +765,19 @@ async fn handle_binary(
     if dir != AudioDir::Mic {
         return send_line(tx, error_json("mic-only")).await;
     }
-    // `push_mic` stays on this task. A frame is every 80 ms, and a per-frame
-    // `spawn_blocking` is the wrong shape. The live ear path is the follow-up.
-    let product = pipe.push_mic(&pcm, rate.hz(), elapsed_ms(started));
+    // The frame step stays on this task. A frame is every 80 ms, and a
+    // per-frame `spawn_blocking` is the wrong shape. The brain runs only
+    // when the step returns a closed take.
+    let step = pipe.step_mic(&pcm, rate.hz(), elapsed_ms(started));
+    let product = match step {
+        MicStep::Product(product) => product,
+        MicStep::Pending(take) => {
+            let Some(product) = finish_take_off_worker(pipe, take).await else {
+                return false;
+            };
+            product
+        }
+    };
     emit_turn(pipe, product, tx, pace).await
 }
 

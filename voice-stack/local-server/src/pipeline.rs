@@ -106,8 +106,69 @@ impl TurnProduct {
     }
 }
 
+/// What one mic frame did. The brain has not run for [`MicStep::Pending`].
+#[derive(Debug)]
+pub enum MicStep {
+    /// Meters, gate events, and dot. The take is still open.
+    Product(TurnProduct),
+    /// The take closed. [`Pipeline::finish_take`] runs the brain.
+    Pending(ClosedTake),
+}
+
+/// A closed take the frame step did not send to the brain.
+///
+/// `text` is the heard line when the ear is already scripted. `pcm` is the
+/// 16 kHz utterance when recognition is still to do. The other is empty.
+#[derive(Debug)]
+pub struct ClosedTake {
+    pub(crate) events: Vec<String>,
+    pub(crate) t_ms: u64,
+    pub(crate) text: String,
+    pub(crate) pcm: Vec<i16>,
+}
+
+impl ClosedTake {
+    pub(crate) fn line(events: Vec<String>, text: String, t_ms: u64) -> Self {
+        Self {
+            events,
+            t_ms,
+            text,
+            pcm: Vec::new(),
+        }
+    }
+
+    pub(crate) fn speech(events: Vec<String>, pcm: Vec<i16>, t_ms: u64) -> Self {
+        Self {
+            events,
+            t_ms,
+            text: String::new(),
+            pcm,
+        }
+    }
+}
+
 pub trait Pipeline: Send {
+    /// Frame step and, when a take closes, the brain. Callers already off
+    /// the worker (a test, `commit_pcm`) use this. The socket uses
+    /// [`Pipeline::step_mic`] and [`Pipeline::finish_take`] instead, so a
+    /// frame does not run the brain.
     fn push_mic(&mut self, pcm: &[i16], rate: u32, t_ms: u64) -> TurnProduct;
+    /// Cheap frame step. [`MicStep::Product`] is meters and gate events.
+    /// [`MicStep::Pending`] means the take closed and the brain has not run.
+    ///
+    /// The default calls [`Pipeline::push_mic`], so a pipe that does not
+    /// split the turn still compiles. That call includes the brain. A pipe
+    /// that can close a take overrides this and [`Pipeline::finish_take`].
+    /// On a frame that leaves the take open, the override adds no allocation,
+    /// lock, or I/O beyond the gate step it already ran.
+    fn step_mic(&mut self, pcm: &[i16], rate: u32, t_ms: u64) -> MicStep {
+        MicStep::Product(self.push_mic(pcm, rate, t_ms))
+    }
+    /// Brain turn for a take [`Pipeline::step_mic`] closed. The default
+    /// returns the gate events and does not call a brain.
+    fn finish_take(&mut self, take: ClosedTake) -> TurnProduct {
+        TurnProduct::events(take.events)
+    }
     fn push_text(&mut self, text: &str, t_ms: u64) -> TurnProduct;
     /// One finished take. The default ear still needs a quiet tail to close.
     fn commit_pcm(&mut self, pcm: &[i16], rate: u32, t_ms: u64) -> TurnProduct {
@@ -292,8 +353,15 @@ impl<R: ReplyEngine> FakePipeline<R> {
 
 impl<R: ReplyEngine> Pipeline for FakePipeline<R> {
     fn push_mic(&mut self, pcm: &[i16], rate: u32, t_ms: u64) -> TurnProduct {
+        match self.step_mic(pcm, rate, t_ms) {
+            MicStep::Product(product) => product,
+            MicStep::Pending(take) => self.finish_take(take),
+        }
+    }
+
+    fn step_mic(&mut self, pcm: &[i16], rate: u32, t_ms: u64) -> MicStep {
         if rate != 16_000 && rate != 24_000 {
-            return TurnProduct::events(vec![error_json("bad-rate")]);
+            return MicStep::Product(TurnProduct::events(vec![error_json("bad-rate")]));
         }
         if self.vad.rate != rate {
             self.vad.carry.clear();
@@ -302,13 +370,13 @@ impl<R: ReplyEngine> Pipeline for FakePipeline<R> {
         if pcm.len() > MAX_CARRY {
             self.vad.reset();
             self.phase = "idle";
-            return TurnProduct::events(vec![error_json("bad-frame")]);
+            return MicStep::Product(TurnProduct::events(vec![error_json("bad-frame")]));
         }
         self.vad.carry.extend_from_slice(pcm);
         if self.vad.carry.len() > MAX_CARRY {
             self.vad.reset();
             self.phase = "idle";
-            return TurnProduct::events(vec![error_json("bad-frame")]);
+            return MicStep::Product(TurnProduct::events(vec![error_json("bad-frame")]));
         }
         let frame_n = audio::samples_per_frame(rate, 20);
         let mut events = Vec::new();
@@ -326,7 +394,7 @@ impl<R: ReplyEngine> Pipeline for FakePipeline<R> {
             }
         }
         if !ended {
-            return TurnProduct::events(events);
+            return MicStep::Product(TurnProduct::events(events));
         }
         events.push(vad_json("end", t_ms));
         let text = match &self.ear {
@@ -336,8 +404,15 @@ impl<R: ReplyEngine> Pipeline for FakePipeline<R> {
         if text.is_empty() {
             self.phase = "idle";
             events.push(dot_json("idle", self.vad.level));
-            return TurnProduct::events(events);
+            return MicStep::Product(TurnProduct::events(events));
         }
+        MicStep::Pending(ClosedTake::line(events, text, t_ms))
+    }
+
+    fn finish_take(&mut self, take: ClosedTake) -> TurnProduct {
+        let ClosedTake {
+            mut events, text, ..
+        } = take;
         let mut produced = self.speak(&text);
         events.append(&mut produced.events);
         produced.events = events;

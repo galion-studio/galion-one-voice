@@ -18,6 +18,14 @@ jobs:
       - uses: actions/checkout@v4
       - name: shellcheck
         run: |
+          # The Ubuntu runner image ships Microsoft apt sources. When
+          # packages.microsoft.com answers 403, apt-get update exits 100
+          # before shellcheck is installed. Nothing in this job uses them.
+          sudo rm -f \
+            /etc/apt/sources.list.d/microsoft-prod.list \
+            /etc/apt/sources.list.d/microsoft-prod.sources \
+            /etc/apt/sources.list.d/azure-cli.list \
+            /etc/apt/sources.list.d/azure-cli.sources
           sudo apt-get update
           sudo apt-get install -y shellcheck
           voice-stack/linux-package/ci/shellcheck.sh
