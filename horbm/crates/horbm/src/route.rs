@@ -3,7 +3,9 @@
 //! Cards, then a deep-question research ask, then an honest miss.
 //!
 //! The spoken miss is [`UNKNOWN_REPLY`] and nothing else. A gap is recorded.
-//! It is not turned into a sentence.
+//! It is not turned into a sentence. A payment phrase is not a research
+//! question. The list is [`is_money_action`], the same four phrases as
+//! `is_money_action` in `crates/galion-conductor/src/research.rs`.
 //!
 //! [`crate::Brain::turn`] does not pass its port into [`route_heard`]. The
 //! turn returns the local clause first and asks only after that value is
@@ -137,6 +139,11 @@ pub fn route_heard(
         }
         return finish_miss(trimmed, GapReason::CardUnspeakable, lookup_us, started);
     }
+    // A payment is not a research question. A question mark skips the list
+    // and falls through to `is_deep_question`, matching the conductor.
+    if is_money_action(trimmed) {
+        return finish_miss(trimmed, GapReason::NoCard, lookup_us, started);
+    }
     if !is_deep_question(trimmed) {
         return finish_miss(trimmed, GapReason::NoCard, lookup_us, started);
     }
@@ -224,6 +231,27 @@ fn finish_miss(heard: &str, reason: GapReason, lookup_us: u32, started: Instant)
         lookup_us,
         took_us: elapsed_us(started.elapsed()),
     }
+}
+
+/// The four payment phrases. The other copy is `is_money_action` in
+/// `crates/galion-conductor/src/research.rs`. The crates are separate
+/// workspaces and are not linked.
+const MONEY_PHRASES: &[&str] = &[
+    "send money",
+    "wire money",
+    "transfer money",
+    "make a payment",
+];
+
+/// An imperative payment. The other copy is `is_money_action` in
+/// `crates/galion-conductor/src/research.rs`. A question mark skips this
+/// list and leaves [`is_deep_question`] in charge, matching the conductor.
+pub fn is_money_action(text: &str) -> bool {
+    if text.contains('?') {
+        return false;
+    }
+    let norm = text.to_ascii_lowercase();
+    MONEY_PHRASES.iter().any(|marker| norm.contains(marker))
 }
 
 /// A question mark, and either eight words or the word why, how, or explain.
@@ -384,5 +412,66 @@ mod tests {
         assert_eq!(out.spoken, "I don't know.");
         assert_eq!(out.gap.unwrap().reason, GapReason::ResearchTimeout);
         assert!(out.evidence.is_empty());
+    }
+
+    #[test]
+    fn a_payment_is_not_a_research_question_and_a_question_mark_keeps_the_deep_rule() {
+        for line in [
+            "send money to pat today",
+            "wire money to the account",
+            "transfer money now",
+            "make a payment for the invoice",
+            "Make A Payment now",
+        ] {
+            assert!(is_money_action(line), "phrase rule fired: {line}");
+            assert!(!is_deep_question(line), "{line}");
+        }
+        assert!(
+            !is_money_action("send money?"),
+            "question-mark rule fired: `?` skips the phrase list"
+        );
+        assert!(
+            !is_deep_question("send money?"),
+            "deep-question rule fired: two words, no why/how/explain"
+        );
+        assert!(
+            !is_money_action("how do I send money safely?"),
+            "question-mark rule fired: `?` skips the phrase list"
+        );
+        assert!(
+            is_deep_question("how do I send money safely?"),
+            "deep-question rule fired: the word how"
+        );
+
+        let calls = Arc::new(AtomicU32::new(0));
+        let mut research = Rec {
+            calls: Arc::clone(&calls),
+            caps: Arc::new(std::sync::Mutex::new(Vec::new())),
+            answer: AskOutcome::Answer {
+                text: "Shorter wavelengths scatter more.".into(),
+                source: "local".into(),
+            },
+        };
+        let paid = route_heard(
+            "make a payment for the invoice",
+            &Cards { hit: None },
+            Some(&mut research),
+            accept_line,
+        );
+        assert_eq!(paid.spoken, UNKNOWN_REPLY);
+        assert!(!paid.spoken.to_ascii_lowercase().contains("payment"));
+        assert!(!paid.spoken.to_ascii_lowercase().contains("sent"));
+        assert_eq!(paid.gap.unwrap().reason, GapReason::NoCard);
+        assert_eq!(calls.load(Ordering::SeqCst), 0);
+
+        let asked = route_heard(
+            "how do I send money safely?",
+            &Cards { hit: None },
+            Some(&mut research),
+            accept_line,
+        );
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+        assert_eq!(asked.spoken, "Shorter wavelengths scatter more.");
+        assert_eq!(asked.gap.unwrap().reason, GapReason::ResearchAnswered);
     }
 }

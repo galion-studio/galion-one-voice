@@ -31,8 +31,8 @@ use crate::memory::{about_the_person, pin_command};
 use crate::research_style::{ResearchHit, ResearchRoot, StylePersona};
 use crate::retrieve::{CellState, MemoryHitCell, RetrievalThread, RetrieveError, RetrievedCells};
 use crate::route::{
-    accept_line, classify_ask, route_heard, AskOutcome, CardLookup, Gap, GapReason, ResearchAsk,
-    Speakable,
+    accept_line, classify_ask, is_money_action, route_heard, AskOutcome, CardLookup, Gap,
+    GapReason, ResearchAsk, Speakable,
 };
 use crate::{MemoryItem, Pad, TurnOut, RESEARCH_CAP, UNKNOWN_REPLY};
 
@@ -999,11 +999,16 @@ impl Brain {
             }
         }
         // Comfort stays with them. The research ask does not open.
+        // A payment is not a task and is not armed. The four phrases are
+        // `is_money_action`, the same list as
+        // `crates/galion-conductor/src/research.rs`. A question mark skips
+        // that list and leaves `is_deep_question` in charge.
         // Every other miss stays local too. A deep miss is armed after the clause.
         let comfort = self.dialogue_lean().verb == Verb::Comfort;
         let routed = route_heard(query, self.cards.as_ref(), None, self.speakable);
         let research_later = self.research.is_some()
             && !comfort
+            && !is_money_action(query)
             && routed
                 .gap
                 .as_ref()
