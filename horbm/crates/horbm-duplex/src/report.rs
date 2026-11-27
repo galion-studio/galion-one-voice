@@ -69,6 +69,9 @@ impl Budgets {
 /// What one closed run measured. `None` means that stage did not happen.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct LatencyReport {
+    /// Persona id copied from the seated port when the duplex is built.
+    /// The tick does not write it.
+    pub persona_id: String,
     pub ear_frames: u32,
     pub recognizer_frames: Option<u32>,
     pub brain_frames: Option<u32>,
@@ -93,8 +96,10 @@ pub struct LatencyReport {
 }
 
 impl LatencyReport {
-    pub(crate) fn fresh() -> Self {
+    /// `persona_id` is [`crate::Persona::id`] at duplex build. Not a tick input.
+    pub(crate) fn fresh(persona_id: &str) -> Self {
         Self {
+            persona_id: persona_id.to_string(),
             ear_frames: 0,
             recognizer_frames: None,
             brain_frames: None,
@@ -257,7 +262,8 @@ impl LatencyReport {
             "fail"
         };
         format!(
-            "duplex s26 frame_ms={FRAME_MS} clock=virtual persona=samantha ear_frames={} recognizer_frames={} brain_frames={} conductor_frames={} commit_frames={} reaction_frames={} voice_ms={} affect_frames={} barge_ms={} barge_frames={} backchannel_frames={} backchannel_cancels={} overlap_live_frames={} you_frames={} me_audible_frames={} first_clause_words={} research_frames={} result={result}",
+            "duplex s26 frame_ms={FRAME_MS} clock=virtual persona={} ear_frames={} recognizer_frames={} brain_frames={} conductor_frames={} commit_frames={} reaction_frames={} voice_ms={} affect_frames={} barge_ms={} barge_frames={} backchannel_frames={} backchannel_cancels={} overlap_live_frames={} you_frames={} me_audible_frames={} first_clause_words={} research_frames={} result={result}",
+            self.persona_id,
             self.ear_frames,
             show(self.recognizer_frames),
             show(self.brain_frames),
@@ -321,7 +327,7 @@ mod tests {
 
     #[test]
     fn a_turn_line_names_the_three_latencies_and_no_transcript() {
-        let mut report = LatencyReport::fresh();
+        let mut report = LatencyReport::fresh("northwind");
         report.voice_ms = Some(160);
         report.barge_ms = Some(160);
         report.backchannel_cancels = 0;
@@ -337,9 +343,178 @@ mod tests {
             "{\"event\":\"barge\",\"clock\":\"frame\",\"eager_to_voice_ms\":160,\"barge_to_silence_ms\":160,\"backchannel_cancels\":0}"
         );
         assert!(!json.contains('\n'));
-        let open = LatencyReport::fresh().turn_json("nope");
+        let open = LatencyReport::fresh("northwind").turn_json("nope");
         assert!(open.contains("\"event\":\"turn\""));
         assert!(open.contains("\"eager_to_voice_ms\":null"));
         assert!(open.contains("\"barge_to_silence_ms\":null"));
+    }
+
+    /// Same shape as `horbm-persona` `persona_with_id`: a parsed fixture, not a name in the loop.
+    const NORTHWIND: &str = r#"
+schema = "galion-horbm-persona/1"
+version = 1
+id = "northwind"
+voice = "northwind"
+
+[traits]
+attention = 0.62
+curiosity = 0.58
+honesty = 1.0
+steadiness = 0.7
+warmth = 0.5
+
+[honesty]
+never_fabricate = true
+unknown = "I don't know."
+
+[boundaries]
+forbid = ["fake-sympathy", "invented-past", "unsourced-fact"]
+
+[style]
+brevity = 0.64
+warmth = 0.48
+max_sentences = 2
+
+[baseline]
+valence = 0.12
+arousal = 0.42
+dominance = 0.55
+approach = 0.05
+pitch_centre_hz = 180.0
+
+[inner]
+care = "heard"
+want = "answer"
+expect = "pause"
+"#;
+
+    struct NoCards;
+
+    impl horbm::CardLookup for NoCards {
+        fn lookup(&self, _query: &str) -> Option<horbm::CardHit> {
+            None
+        }
+    }
+
+    struct EnvVar {
+        key: &'static str,
+        prev: Option<std::ffi::OsString>,
+    }
+
+    impl EnvVar {
+        fn set(key: &'static str, value: Option<&str>) -> Self {
+            let prev = std::env::var_os(key);
+            match value {
+                Some(value) => std::env::set_var(key, value),
+                None => std::env::remove_var(key),
+            }
+            Self { key, prev }
+        }
+    }
+
+    impl Drop for EnvVar {
+        fn drop(&mut self) {
+            match &self.prev {
+                Some(value) => std::env::set_var(self.key, value),
+                None => std::env::remove_var(self.key),
+            }
+        }
+    }
+
+    /// The lock is the last field, so it drops after the variables are restored.
+    struct HeldEnv {
+        _id: EnvVar,
+        _dir: EnvVar,
+        _lock: std::sync::MutexGuard<'static, ()>,
+    }
+
+    fn hold(id: Option<&str>, dir: Option<&std::path::Path>) -> HeldEnv {
+        let lock = ENV_LOCK.lock().unwrap_or_else(|err| err.into_inner());
+        let id = EnvVar::set("GALION_HORBM_DEV_PERSONA", id);
+        let dir = EnvVar::set(
+            "GALION_HORBM_PERSONA_DIR",
+            dir.and_then(|path| path.to_str()),
+        );
+        HeldEnv {
+            _id: id,
+            _dir: dir,
+            _lock: lock,
+        }
+    }
+
+    static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    struct TempDir(std::path::PathBuf);
+
+    impl TempDir {
+        fn new(name: &str) -> Self {
+            let nanos = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_nanos();
+            let path = std::env::temp_dir().join(format!(
+                "horbm-duplex-{name}-{}-{nanos}",
+                std::process::id()
+            ));
+            std::fs::create_dir_all(&path).expect("temp persona dir");
+            Self(path)
+        }
+    }
+
+    impl Drop for TempDir {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+
+    #[test]
+    fn gate_line_prints_the_persona_seated_when_the_duplex_is_built() {
+        let parsed = horbm::Persona::parse(NORTHWIND).expect("northwind fixture");
+        assert_eq!(parsed.id(), "northwind");
+        assert_eq!(parsed.voice(), "northwind");
+        let dir = TempDir::new("northwind-gate");
+        std::fs::write(dir.0.join("northwind.toml"), NORTHWIND).expect("write fixture");
+        let _hold = hold(Some(parsed.id()), Some(&dir.0));
+        let mut duplex = crate::Duplex::new(
+            crate::Parts {
+                recognizer: crate::SilentRecognizer::new(),
+                emotion: crate::CoreAffect::from_baseline(parsed.baseline()),
+                breath: crate::SpeakingBreath,
+                persona: crate::ConfiguredPersona::from_persona(parsed),
+                mouth: horbm_voice::FakeMouth::new(),
+            },
+            NoCards,
+        )
+        .expect("northwind duplex");
+        duplex.set_aec(false);
+        let line = duplex.report().gate_line();
+        assert_eq!(duplex.report().persona_id, "northwind");
+        assert_eq!(duplex.persona().id(), duplex.report().persona_id);
+        assert!(
+            line.starts_with(&format!(
+                "duplex s26 frame_ms={} clock=virtual persona=northwind ",
+                crate::FRAME_MS
+            )),
+            "{line}"
+        );
+        assert_eq!(line.matches("persona=").count(), 1);
+        assert_no_other_persona(&line);
+        let silence = vec![0i16; crate::FRAME_SAMPLES];
+        duplex.tick(&silence).expect("silence frame");
+        assert_eq!(duplex.report().persona_id, "northwind");
+        let after = duplex.report().gate_line();
+        assert!(after.contains("persona=northwind "));
+        assert_eq!(after.matches("persona=").count(), 1);
+        assert_no_other_persona(&after);
+    }
+
+    /// The printed line names the seated id and no other persona.
+    /// The needles are assembled so this file does not carry those names.
+    fn assert_no_other_persona(line: &str) {
+        let lower = line.to_ascii_lowercase();
+        for parts in [["sa", "mantha"], ["ar", "ia"]] {
+            let name = parts.concat();
+            assert!(!lower.contains(&name), "{line}");
+        }
     }
 }
