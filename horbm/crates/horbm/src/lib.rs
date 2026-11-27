@@ -25,7 +25,10 @@
 //!    then the rest. Lookup and Action turns are marked for Galion Research
 //!    and are not posted. [`KnowledgeCards`] reads a directory of
 //!    galion-knowledge cards, checks the card-bundle manifest when one is
-//!    present, and builds the covering lookup index. It does not write a card
+//!    present, and builds the covering lookup index. The spoken card is the
+//!    shortest covering haystack only when it leads the next covering card by
+//!    [`RANK_MARGIN`] haystack tokens. A tie, a smaller lead, or no cover is
+//!    [`UNKNOWN_REPLY`]. It does not write a card
 //!    and does not bind a socket. There is no knowledge-ro server in this
 //!    repository. Port 7900 is not used here. The 7881 bridge calls this loader
 //!    and attaches the retrieval thread.
@@ -109,6 +112,7 @@ mod dialogue;
 mod keys;
 mod learn;
 mod memory;
+mod rank;
 mod research_style;
 mod retrieve;
 mod route;
@@ -147,6 +151,7 @@ pub use learn::{
 pub use memory::{
     about_the_person, pin_command, EpisodicStore, TranscriptFile, TranscriptTurn, SOURCE_MILESTONE,
 };
+pub use rank::RANK_MARGIN;
 pub use research_style::{
     MemoryExample, ResearchHit, ResearchRoot, StyleHint, StylePersona, StyleSearch,
     MAX_RESEARCH_BUNDLE_BYTES, STYLE_HIT_CAP,
