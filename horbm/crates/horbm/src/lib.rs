@@ -46,6 +46,9 @@
 //! [`Brain::inner_turn`] updates cares, wants, and expects and emits one
 //! GEMI intent. [`Brain::inner_nudge`] steps that message through the moment
 //! core. Neither call rewrites the empathy mood or the voice baseline.
+//! Those inner-life slots are not the caller's want list.
+//! [`Brain::want_counts`] reads that list (open, met, dropped) from empathy.
+//! It does not speak the counts and does not write the diary.
 //! Learning a new care stays off while `LOCKS.toml` `[consent] learn` is deny.
 //!
 //! [`Brain::boot`], [`Brain::try_open`], and [`Brain::try_with_cards`] load
@@ -108,7 +111,7 @@ mod research_style;
 mod retrieve;
 mod route;
 
-pub use brain::{Brain, MoodMeta, ResearchFollowUp};
+pub use brain::{Brain, MoodMeta, ResearchFollowUp, WantCounts};
 pub use cards::{
     blocks_answer, knowledge_dir_from_env, CardError, KnowledgeCards, LoadReport, LoadedPack,
     WINDOWS_KNOWLEDGE_DIR,

@@ -51,6 +51,18 @@ pub struct MoodMeta {
     pub named: Option<&'static str>,
 }
 
+/// Open, met, and dropped wants after the turns so far. Counts only.
+///
+/// The list is the in-tree `WantList` (Galion Labs, MIT,
+/// `voice-stack/empathy/src/wants.rs`). This copy does not hold the
+/// caller's words.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct WantCounts {
+    pub open: u32,
+    pub met: u32,
+    pub dropped: u32,
+}
+
 impl MoodMeta {
     pub const RESTING: MoodMeta = MoodMeta {
         arousal: Pad::RESTING.arousal,
@@ -721,6 +733,20 @@ impl Brain {
     /// Snapshot for the conductor. The conductor does not own this state.
     pub fn conductor_cue(&self) -> ConductorCue {
         self.emotion.conductor_cue()
+    }
+
+    /// Open, met, and dropped counts from the caller's want list.
+    ///
+    /// Reads [`galion_sam_empathy::Empathy::view`]. Does not speak the counts
+    /// and does not write the diary. A dropped want is closed and is not met.
+    /// [`Self::inner_turn`] keeps a different store and is not included.
+    pub fn want_counts(&self) -> WantCounts {
+        let view = self.empathy.view();
+        WantCounts {
+            open: view.open,
+            met: view.met,
+            dropped: view.dropped,
+        }
     }
 
     /// One 80 ms frame with no new words. Does not speak. Does not step the moment.
