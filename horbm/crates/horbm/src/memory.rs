@@ -62,6 +62,8 @@ const SOURCE_PIN: &str = "pin";
 const SOURCE_SUMMARY: &str = "session-summary";
 const SOURCE_STATE: &str = "state-tracker";
 const SOURCE_RING: &str = "session-ring";
+/// A moment the person asked to keep. Same grant as a pin. Stored once.
+pub const SOURCE_MILESTONE: &str = "milestone";
 
 /// Heard lines kept in RAM until [`EpisodicStore::end_session`].
 ///

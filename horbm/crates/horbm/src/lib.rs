@@ -139,7 +139,9 @@ pub use learn::{
     ClauseSource, LearnAudit, LearnConfig, LearnError, LearnPass, LearnedRow, SessionSeal,
     LEARN_PACK_CAP, LEARN_PACK_DB, LEARN_PACK_LIVE, LEARN_PACK_NEXT, LEARN_PACK_RETIRING,
 };
-pub use memory::{about_the_person, pin_command, EpisodicStore, TranscriptFile, TranscriptTurn};
+pub use memory::{
+    about_the_person, pin_command, EpisodicStore, TranscriptFile, TranscriptTurn, SOURCE_MILESTONE,
+};
 pub use research_style::{
     MemoryExample, ResearchHit, ResearchRoot, StyleHint, StylePersona, StyleSearch,
     MAX_RESEARCH_BUNDLE_BYTES, STYLE_HIT_CAP,
