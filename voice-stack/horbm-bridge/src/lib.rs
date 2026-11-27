@@ -10,8 +10,9 @@
 //! between turns and does not start a turn. [`CardEngine`] steps one empathy
 //! frame with no new words. [`FakeEngine`] holds its pad.
 //!
-//! Crate `horbm` is linked. One turn is empathy, then cards, then the
-//! research gateway, then `I don't know.` `Brain::open` in `galion-sam-orch`
+//! Crate `horbm` is linked. One router turn is HORBM first, then Research
+//! within 3 seconds, otherwise exactly `I don't know.` There is no S0 guess.
+//! `Brain::open` in `galion-sam-orch`
 //! still returns `horbm is not linked; Brain::open stays in crate horbm`.
 //! That function is not the 7881 path. [`FakeEngine`] is the test double.
 //! Feature `horbm` compiles [`HorbmEngine`] against crate `horbm`.
