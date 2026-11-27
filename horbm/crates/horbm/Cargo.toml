@@ -28,3 +28,4 @@ tantivy = "0.22"
 
 [dev-dependencies]
 horbm-brain = { path = "../horbm-brain" }
+rusqlite = { version = "0.32.1", features = ["bundled"] }

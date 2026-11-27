@@ -31,6 +31,14 @@
 //! Forget copies the row into the diary archive and drops it from search.
 //! The archive is the tombstone. This module has no delete of that table.
 //!
+//! After a granted [`EpisodicStore::end_session`] writes the summary, a live
+//! `state-tracker` or `session-ring` row whose civil `source_date` is more
+//! than 180 days before that session clock is copied through
+//! [`horbm_memory::Store::forget`] and the archive reason is stamped `fade`.
+//! The text stays in the archive. Pins, session summaries, milestones, pinned
+//! rows, and rows with no civil date stay in live recall. 180 days is the
+//! owner decision of 27 Nov 2026.
+//!
 //! `push_turn` also writes a `session-ring` candidate beside that diary row.
 //! Recall drops a name candidate when a live or forgotten state-tracker line
 //! names the same person, and drops a candidate whose normalised text matches
@@ -69,6 +77,13 @@ const SOURCE_STATE: &str = "state-tracker";
 const SOURCE_RING: &str = "session-ring";
 /// A moment the person asked to keep. Same grant as a pin. Stored once.
 pub const SOURCE_MILESTONE: &str = "milestone";
+
+/// Tombstone reason written by [`horbm_memory::Store::forget`].
+const REASON_FORGET: &str = "forget";
+/// Tombstone reason for a row that left live recall by age.
+const REASON_FADE: &str = "fade";
+/// Owner decision 27 Nov 2026. Older than this many civil days leaves live recall.
+const FADE_AFTER_DAYS: i64 = 180;
 
 /// Heard lines kept in RAM until [`EpisodicStore::end_session`].
 ///
@@ -647,6 +662,88 @@ impl EpisodicStore {
         }
         Ok(out)
     }
+
+    /// Archive live chatter older than [`FADE_AFTER_DAYS`] for this person.
+    ///
+    /// [`horbm_memory::Store::forget`] copies the row into `archive` with
+    /// reason `forget` and drops it from search. This stamps that copy's
+    /// reason to `fade` and does not change the archived text. A session
+    /// clock with no civil date archives nothing.
+    fn fade_old_chatter(&mut self, person_id: &str, at: &str) -> bool {
+        if civil_days(at).is_none() {
+            return true;
+        }
+        if !self.path.is_file() {
+            return true;
+        }
+        let Ok(conn) = Self::open_readonly(&self.path) else {
+            return false;
+        };
+        let Ok(rows) = Self::read_items(&conn, Some(person_id)) else {
+            return false;
+        };
+        drop(conn);
+        let doomed: Vec<(String, String)> = rows
+            .into_iter()
+            .filter(|row| row.current && !row.marked && !row.pinned)
+            .filter(|row| fade_source(&row.source))
+            .filter(|row| older_than_fade_window(at, &row.date))
+            .map(|row| (row.item_id, row.text))
+            .collect();
+        for (item_id, text) in doomed {
+            if !self.archive_faded(&item_id, &text) {
+                return false;
+            }
+        }
+        true
+    }
+
+    /// Copy one live row through [`horbm_memory::Store::forget`], then stamp
+    /// the archive reason. The body is left as the copy wrote it.
+    fn archive_faded(&mut self, item_id: &str, text: &str) -> bool {
+        let forgotten = {
+            let Some(store) = self.store.as_mut() else {
+                return false;
+            };
+            store.forget(item_id)
+        };
+        if let Some(store) = self.store.as_mut() {
+            store.pause_worker();
+        }
+        if forgotten.is_err() {
+            return false;
+        }
+        if !self.stamp_archive_reason(item_id, REASON_FADE) {
+            return false;
+        }
+        match self.tombstone(item_id) {
+            Some(stone) if stone.reason == REASON_FADE && stone.text == text => {
+                self.issued.remove(item_id);
+                self.name_row.retain(|_, (id, _)| id != item_id);
+                self.mood_row.retain(|_, (id, _)| id != item_id);
+                self.summary_row.retain(|_, id| id != item_id);
+                true
+            }
+            _ => false,
+        }
+    }
+
+    /// `Store::forget` has no reason argument. This updates only `reason`.
+    fn stamp_archive_reason(&self, item_id: &str, reason: &str) -> bool {
+        let Ok(conn) = Connection::open(&self.path) else {
+            return false;
+        };
+        if conn.busy_timeout(Duration::from_millis(2_000)).is_err() {
+            return false;
+        }
+        matches!(
+            conn.execute(
+                "UPDATE archive SET reason = ?1 WHERE item_id = ?2 AND reason = ?3",
+                params![reason, item_id, REASON_FORGET],
+            ),
+            Ok(1)
+        )
+    }
 }
 
 impl PersonMemory for EpisodicStore {
@@ -953,6 +1050,9 @@ impl PersonMemory for EpisodicStore {
             false,
         );
         self.emit(&item);
+        if !self.fade_old_chatter(person_id, at) {
+            return WriteOutcome::Failed;
+        }
         WriteOutcome::Stored { id }
     }
 
@@ -992,7 +1092,8 @@ impl PersonMemory for EpisodicStore {
         let Some(stone) = self.tombstone(item_id) else {
             return WriteOutcome::Failed;
         };
-        if stone.reason != "forget" {
+        // Fade uses its own call. A `fade` tombstone is not a granted forget.
+        if stone.reason != REASON_FORGET {
             return WriteOutcome::Failed;
         }
         self.issued.remove(item_id);
@@ -1877,6 +1978,86 @@ fn looks_like_secret(text: &str) -> bool {
     .any(|marker| lower.contains(marker))
 }
 
+/// `state-tracker` and `session-ring` age out. Pins, summaries, and milestones do not.
+fn fade_source(source: &str) -> bool {
+    if source == SOURCE_PIN || source == SOURCE_SUMMARY || source == SOURCE_MILESTONE {
+        return false;
+    }
+    source == SOURCE_STATE || source == SOURCE_RING
+}
+
+/// True when both stamps are civil dates and the row is older than [`FADE_AFTER_DAYS`].
+fn older_than_fade_window(session_stamp: &str, row_stamp: &str) -> bool {
+    let Some(session_day) = civil_days(session_stamp) else {
+        return false;
+    };
+    let Some(row_day) = civil_days(row_stamp) else {
+        return false;
+    };
+    match session_day.checked_sub(row_day) {
+        Some(age) => age > FADE_AFTER_DAYS,
+        None => false,
+    }
+}
+
+/// Days since 1970-01-01 for a `YYYY-MM-DD` prefix. A time, when present, starts with `T`.
+///
+/// The day count is Howard Hinnant's `days_from_civil` (public domain):
+/// <https://howardhinnant.github.io/date_algorithms.html>
+fn civil_days(stamp: &str) -> Option<i64> {
+    let stamp = stamp.trim();
+    let bytes = stamp.as_bytes();
+    if bytes.len() < 10 {
+        return None;
+    }
+    if bytes.len() > 10 && bytes[10] != b'T' {
+        return None;
+    }
+    if bytes[4] != b'-' || bytes[7] != b'-' {
+        return None;
+    }
+    let year: i32 = stamp.get(0..4)?.parse().ok()?;
+    let month: u32 = stamp.get(5..7)?.parse().ok()?;
+    let day: u32 = stamp.get(8..10)?.parse().ok()?;
+    if !(1..=9999).contains(&year) {
+        return None;
+    }
+    let max = days_in_month(year, month)?;
+    if day == 0 || day > max {
+        return None;
+    }
+    Some(days_from_civil(year, month, day))
+}
+
+fn days_in_month(year: i32, month: u32) -> Option<u32> {
+    let days = match month {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        4 | 6 | 9 | 11 => 30,
+        2 if is_leap(year) => 29,
+        2 => 28,
+        _ => return None,
+    };
+    Some(days)
+}
+
+fn is_leap(year: i32) -> bool {
+    year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)
+}
+
+fn days_from_civil(year: i32, month: u32, day: u32) -> i64 {
+    let mut y = i64::from(year);
+    let m = i64::from(month);
+    if m <= 2 {
+        y -= 1;
+    }
+    let era = if y >= 0 { y } else { y - 399 } / 400;
+    let yoe = (y - era * 400) as u64;
+    let mp = if m > 2 { m - 3 } else { m + 9 };
+    let doy = (153 * mp as u64 + 2) / 5 + u64::from(day) - 1;
+    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    era * 146097 + doe as i64 - 719468
+}
+
 fn fmt3(value: f32) -> String {
     if !value.is_finite() {
         return "0.000".to_string();
@@ -1902,6 +2083,40 @@ fn fmt3(value: f32) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn fade_window_is_older_than_180_civil_days() {
+        assert_eq!(civil_days("1970-01-01"), Some(0));
+        assert_eq!(civil_days("2026-11-27"), Some(20_784));
+        assert_eq!(
+            civil_days("2026-11-27T08:00:00.000Z"),
+            civil_days("2026-11-27")
+        );
+        assert!(older_than_fade_window(
+            "2026-11-27T08:00:00Z",
+            "2026-05-30T08:00:00Z"
+        ));
+        assert!(!older_than_fade_window(
+            "2026-11-27T08:00:00Z",
+            "2026-05-31T08:00:00Z"
+        ));
+        assert!(!older_than_fade_window(
+            "2026-11-27T08:00:00Z",
+            "2026-06-01T00:00:00.000Z"
+        ));
+        assert!(!older_than_fade_window("2026-11-27T08:00:00Z", "undated"));
+        assert!(!older_than_fade_window("2026-11-27T08:00:00Z", ""));
+        assert!(!older_than_fade_window("t000099", "2026-05-30"));
+        assert!(civil_days("2024-02-29").is_some());
+        assert!(civil_days("2023-02-29").is_none());
+        assert!(civil_days("2026-11-27x").is_none());
+        assert!(civil_days("  2026-11-27T08:00:00Z").is_some());
+        assert!(!fade_source(SOURCE_PIN));
+        assert!(!fade_source(SOURCE_SUMMARY));
+        assert!(!fade_source(SOURCE_MILESTONE));
+        assert!(fade_source(SOURCE_STATE));
+        assert!(fade_source(SOURCE_RING));
+    }
 
     #[test]
     fn person_questions_are_not_world_questions() {
