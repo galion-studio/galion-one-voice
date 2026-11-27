@@ -21,7 +21,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use horbm::{ClauseSource, LearnConfig, LearnPass, RetrievalConfig, SessionSeal};
 
 use crate::brain::HorbmMind;
-use crate::reply::TurnOut;
+use crate::reply::{ReplyEngine, TurnOut};
 
 /// Shipped development profile. Parsed only when development mode is selected.
 const SHIPPED_PROFILE: &str = include_str!("../dev.env");
@@ -304,7 +304,17 @@ impl HostSession {
             finished: AtomicBool::new(false),
         });
         session.attach_pack();
+        // The socket's first turn is held to 8s, and that turn is the shipped
+        // kettle question. Open the diary and the retrieval path here, before
+        // anything listens, and drop the reply. The seal and the turn log are
+        // not touched.
+        session.warm_reply_path();
         Ok(session)
+    }
+
+    fn warm_reply_path(&self) {
+        let mut mind = self.mind.lock().unwrap_or_else(|err| err.into_inner());
+        let _ = mind.turn("where is the kettle");
     }
 
     /// The one attach path. R11 S158 re-attaches after a retract through this same helper.
