@@ -91,6 +91,25 @@ const EAR_SENSE_ENV: &str = "GALION_EAR_SENSE";
 /// Person diary. Only the word `grant` opens the file.
 const REMEMBER_ENV: &str = "GALION_HORBM_REMEMBER";
 
+/// One taught clause the host may take back.
+///
+/// [`Brain::take_retraction`] returns this after a `learned:` answer was
+/// forgotten or corrected, and only while [`Brain::allow_learn_retract`] is
+/// on. `said_by` and `text` are the clause [`crate::LearnPass::retract_clause`]
+/// matches. The turn does not call that method.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Retraction {
+    pub said_by: String,
+    pub text: String,
+}
+
+/// The learned hit just spoken. One slot, replaced by the next learned hit.
+struct LearnedRef {
+    item_id: String,
+    said_by: String,
+    text: String,
+}
+
 /// The linked brain. `open` reads the knowledge directory when it already
 /// exists and does not create it. The person-diary path is kept and is not
 /// opened: `remember` is denied. The live server passes the same read-only
@@ -122,6 +141,13 @@ pub struct Brain {
     /// In-flight follow-up. The port lives in the worker until this yields.
     follow_rx: Option<Receiver<FollowDone>>,
     pending_follow: Option<ResearchFollowUp>,
+    /// Spoken learned hit. Allocated only when a learned hit is spoken.
+    /// A card or a `memory:` answer does not fill it.
+    last_learned: Option<LearnedRef>,
+    /// One queued retraction. The host takes it. The turn does not retract.
+    pending_retract: Option<Retraction>,
+    /// Default off. The host turns this on when learn is granted.
+    learn_retract: bool,
 }
 
 /// A Galion Research result that arrived after the local clause.
@@ -324,6 +350,9 @@ impl Brain {
             memory_tick: 0,
             follow_rx: None,
             pending_follow: None,
+            last_learned: None,
+            pending_retract: None,
+            learn_retract: false,
         }
     }
 
@@ -405,6 +434,33 @@ impl Brain {
     pub fn attach_learned(&mut self, rows: Vec<LearnedRow>) -> Result<(), RetrieveError> {
         match self.retrieval.as_ref() {
             Some(thread) => thread.set_learned(rows),
+            None => Ok(()),
+        }
+    }
+
+    /// Arm the learned-retraction slot. Default off.
+    ///
+    /// When this is on, "forget that" or a correction right after a
+    /// `learned:` answer queues one [`Retraction`]. The turn does not call
+    /// [`crate::LearnPass::retract_clause`]. Off leaves that answer as the
+    /// honest miss and queues nothing. A card or a `memory:` answer queues
+    /// nothing either way.
+    pub fn allow_learn_retract(&mut self, on: bool) {
+        self.learn_retract = on;
+    }
+
+    /// Take the queued retraction. One slot, then empty.
+    pub fn take_retraction(&mut self) -> Option<Retraction> {
+        self.pending_retract.take()
+    }
+
+    /// Re-read the card directory on the attached retrieval thread.
+    ///
+    /// Forwards to [`RetrievalThread::reload`]. With no thread this returns
+    /// `Ok(())`. An ask does not take the reload's slot.
+    pub fn reload_knowledge(&mut self) -> Result<(), RetrieveError> {
+        match self.retrieval.as_ref() {
+            Some(thread) => thread.reload(),
             None => Ok(()),
         }
     }
@@ -786,6 +842,9 @@ impl Brain {
             sense: self.ear_sense,
         });
         self.apply_prosody(note.lean());
+        // List before this turn is noted. A person-wide recall would otherwise
+        // recite the mood row the question itself just wrote.
+        let listed = self.prefetch_person_list(heard);
         // A forget is not a fact. Archive before this turn is pushed, and
         // do not note the request into the diary.
         let forgotten = if self.memory_granted() && !heard.is_empty() {
@@ -816,15 +875,11 @@ impl Brain {
             return self.record_inner(heard, out);
         }
         let query_owned = query.to_string();
-        let memory_hit = self.person_hit(heard);
-        let gathered = match memory_hit {
-            Some(spoke) => Gathered {
-                spoke,
-                gap: None,
-                research_later: false,
-            },
-            None => self.gather(&query_owned),
-        };
+        // Before retrieval speaks, so a learned hit on this line cannot
+        // replace the slot the previous answer filled.
+        let speak_learned_forget = self.note_retract(heard);
+        let (memory_hit, nothing_remembered) = self.person_hit(heard, listed);
+        let gathered = self.gather_turn(&query_owned, memory_hit, nothing_remembered);
         let reply = effective_reply(&gathered.spoke).to_string();
         let sources = gathered.spoke.sources.clone();
         // An unset research root does not enter the index. The duplex soak
@@ -895,9 +950,12 @@ impl Brain {
         if let Some(id) = style_mark(decision.chosen, &style.hits) {
             spoke.evidence.push(format!("style:{id}"));
         }
-        if forgotten > 0 {
-            self.speak_forgotten(&mut spoke, forgotten);
-        }
+        self.speak_override(
+            &mut spoke,
+            speak_learned_forget,
+            forgotten,
+            nothing_remembered,
+        );
         let mut out = self.finish(&query_owned, started, spoke, &decision, FollowHook::idle());
         if research_later {
             // The clause is already in `out`. The worker blocks until `out` is dropped.
@@ -913,20 +971,84 @@ impl Brain {
         self.pending_follow.take()
     }
 
+    fn prefetch_person_list(&mut self, heard: &str) -> Option<Vec<MemoryItem>> {
+        if self.memory_granted()
+            && !heard.is_empty()
+            && crate::dialogue::recall_names_the_person(heard)
+        {
+            Some(self.list_person_rows())
+        } else {
+            None
+        }
+    }
+
+    fn gather_turn(
+        &mut self,
+        query: &str,
+        memory_hit: Option<Spoke>,
+        nothing_remembered: bool,
+    ) -> Gathered {
+        if nothing_remembered {
+            return Gathered {
+                spoke: Spoke::empty(),
+                gap: None,
+                research_later: false,
+            };
+        }
+        match memory_hit {
+            Some(spoke) => Gathered {
+                spoke,
+                gap: None,
+                research_later: false,
+            },
+            None => self.gather(query),
+        }
+    }
+
+    fn speak_override(
+        &self,
+        spoke: &mut Spoke,
+        speak_learned_forget: bool,
+        forgotten: usize,
+        nothing_remembered: bool,
+    ) {
+        if speak_learned_forget {
+            self.speak_forgotten(spoke, "forget:learned");
+        } else if forgotten > 0 {
+            let source = format!("forget:{forgotten}");
+            self.speak_forgotten(spoke, &source);
+        } else if nothing_remembered {
+            self.speak_nothing_remembered(spoke);
+        }
+    }
+
     /// Person diary hit, only when the line is about the person. A world
     /// question still reads the diary and then drops the hits.
-    fn person_hit(&mut self, heard: &str) -> Option<Spoke> {
+    ///
+    /// `listed` is the person-wide recall, already read. `Some` speaks those
+    /// rows, or reports an empty list so the caller can say nothing was
+    /// remembered. `None` keeps the query-driven recall.
+    fn person_hit(
+        &mut self,
+        heard: &str,
+        listed: Option<Vec<MemoryItem>>,
+    ) -> (Option<Spoke>, bool) {
+        if let Some(rows) = listed {
+            let spoke = self.list_spoke(rows);
+            let empty = spoke.is_none();
+            return (spoke, empty);
+        }
         if !self.memory_granted() {
-            return None;
+            return (None, false);
         }
         let query = crate::dialogue::recall_clause(heard);
         // Search the words after the cue. "do you remember my sister" would
         // otherwise require "you" and "remember" to be in the stored fact.
         let recalled = self.recall_person(crate::dialogue::recall_topic(query));
         if !about_the_person(query) {
-            return None;
+            return (None, false);
         }
-        self.memory_spoke(query, &recalled)
+        (self.memory_spoke(query, &recalled), false)
     }
 
     /// Retrieval, cards, the idle fixture, then the gateway. No reply split.
@@ -1008,7 +1130,8 @@ impl Brain {
     }
 
     // Drop what `ask` names. The count is how many rows were archived.
-    // A taught `learned:<id>` snap is left for LearnPass::retract_clause.
+    // A taught `learned:<id>` snap is not a diary row. The host takes it
+    // from `pending_retract` when retract is allowed.
     fn archive_forgotten(&mut self, ask: ForgetAsk<'_>) -> usize {
         match ask {
             ForgetAsk::About(topic) => {
@@ -1057,15 +1180,28 @@ impl Brain {
         }
     }
 
-    // The move stays the ask the policy already chose. The source names
-    // the count only: not the text, and not an id.
-    fn speak_forgotten(&self, spoke: &mut Spoke, archived: usize) {
+    // The move stays the ask the policy already chose. `source` is
+    // `forget:<count>` or `forget:learned`. Not the text, and not an id.
+    fn speak_forgotten(&self, spoke: &mut Spoke, source: &str) {
         let line = self
             .persona
             .line(horbm_persona::PersonaLine::Forgot)
             .unwrap_or(UNKNOWN_REPLY);
         spoke.reply = line.to_string();
-        spoke.sources = vec![format!("forget:{archived}")];
+        spoke.sources = vec![source.to_string()];
+        spoke.evidence.clear();
+        spoke.picked = None;
+    }
+
+    // No rows passed `speakable`. The policy's honest ask is replaced.
+    // An unset line stays [`UNKNOWN_REPLY`].
+    fn speak_nothing_remembered(&self, spoke: &mut Spoke) {
+        let line = self
+            .persona
+            .line(horbm_persona::PersonaLine::NothingRemembered)
+            .unwrap_or(UNKNOWN_REPLY);
+        spoke.reply = line.to_string();
+        spoke.sources = vec!["honest:unknown".to_string()];
         spoke.evidence.clear();
         spoke.picked = None;
     }
@@ -1141,8 +1277,148 @@ impl Brain {
         match cell.state {
             CellState::Idle => None,
             CellState::Miss => Some(miss_spoke(cell.took_us)),
-            CellState::Hits => Some(self.hit_spoke(query, cell.as_ref())),
+            CellState::Hits => {
+                let spoke = self.hit_spoke(query, cell.as_ref());
+                self.keep_learned(cell.as_ref(), &spoke);
+                Some(spoke)
+            }
         }
+    }
+
+    // One slot, and only when this spoke is the learned hit. A miss, a card,
+    // or a row that did not pass `speakable` leaves the slot as it was.
+    fn keep_learned(&mut self, cell: &MemoryHitCell, spoke: &Spoke) {
+        let Some(hit) = cell.hits.first() else {
+            return;
+        };
+        if !hit.source.starts_with("learned;") {
+            return;
+        }
+        let Some(source) = spoke.sources.first() else {
+            return;
+        };
+        let Some(id) = source.strip_prefix("learned:") else {
+            return;
+        };
+        if id.is_empty() || id != hit.item_id {
+            return;
+        }
+        self.last_learned = Some(LearnedRef {
+            item_id: hit.item_id.clone(),
+            said_by: hit.said_by.clone(),
+            text: hit.text.clone(),
+        });
+    }
+
+    // "forget that" speaks the forgot line. A correction queues the same
+    // retraction and leaves the policy's honest ask in place.
+    fn note_retract(&mut self, heard: &str) -> bool {
+        if heard.is_empty() {
+            return false;
+        }
+        let forget_that = matches!(crate::dialogue::forget_clause(heard), Some(ForgetAsk::That));
+        if !forget_that && !crate::dialogue::is_correction(heard) {
+            return false;
+        }
+        self.queue_learned_retract() && forget_that
+    }
+
+    // Move the matching learned slot into the one pending retraction.
+    // Not allowed, or a snap that is not that slot, queues nothing.
+    fn queue_learned_retract(&mut self) -> bool {
+        if !self.learn_retract || !self.learned_snap_matches() {
+            return false;
+        }
+        let Some(slot) = self.last_learned.take() else {
+            return false;
+        };
+        self.pending_retract = Some(Retraction {
+            said_by: slot.said_by,
+            text: slot.text,
+        });
+        true
+    }
+
+    fn learned_snap_matches(&self) -> bool {
+        let len = self.ring_len();
+        if len == 0 {
+            return false;
+        }
+        let Some(source) = self
+            .ring_get(len - 1)
+            .and_then(|snap| snap.source.as_deref())
+        else {
+            return false;
+        };
+        let Some(id) = source.strip_prefix("learned:") else {
+            return false;
+        };
+        if id.is_empty() {
+            return false;
+        }
+        self.last_learned
+            .as_ref()
+            .is_some_and(|slot| slot.item_id == id)
+    }
+
+    fn list_person_rows(&mut self) -> Vec<MemoryItem> {
+        let n = usize::from(self.persona.style().max_sentences.max(1));
+        // `note_state` keeps one live mood row (`i am feeling …`). That row
+        // is the emotion trace, not a pin. Read one past the sentence cap
+        // so it cannot take a pin's place. The emotion core still steps.
+        let fetch = n.saturating_add(1);
+        let person = self.person_id.clone();
+        let Some(memory) = self.memory.as_mut() else {
+            return Vec::new();
+        };
+        let mut rows = memory.list_person(&person, fetch);
+        rows.retain(|item| item.kind != crate::MemoryKind::Mood);
+        rows.truncate(n);
+        rows
+    }
+
+    // Newest speakable rows, one sentence each, cut to the style cap.
+    // `None` is an empty list: the caller speaks nothing remembered.
+    fn list_spoke(&self, rows: Vec<MemoryItem>) -> Option<Spoke> {
+        let mut sentences = Vec::new();
+        let mut sources = Vec::new();
+        for item in rows {
+            if item.id.is_empty() {
+                continue;
+            }
+            let Some(spoken) = (self.speakable)(item.text.trim()) else {
+                continue;
+            };
+            let spoken = spoken.trim();
+            if spoken.is_empty() {
+                continue;
+            }
+            sentences.push(as_sentence(spoken));
+            sources.push(format!("memory:{}", item.id));
+        }
+        if sentences.is_empty() {
+            return None;
+        }
+        let joined = sentences.join(" ");
+        let capped = self.persona.style().cap_sentences(&joined);
+        let mut kept = Vec::new();
+        let mut cursor = 0usize;
+        for (sentence, source) in sentences.iter().zip(sources) {
+            if capped.len() > cursor {
+                kept.push(source);
+            }
+            cursor = cursor.saturating_add(sentence.len()).saturating_add(1);
+        }
+        if kept.is_empty() {
+            return None;
+        }
+        Some(Spoke {
+            reply: capped.trim_end().to_string(),
+            sources: kept.clone(),
+            evidence: kept,
+            lookup_us: 0,
+            picked: None,
+        })
     }
 
     fn hit_spoke(&self, query: &str, cell: &MemoryHitCell) -> Spoke {
@@ -1476,6 +1752,24 @@ fn sympathy_script(reply: &str) -> bool {
 
 fn elapsed_us(elapsed: std::time::Duration) -> u32 {
     u32::try_from(elapsed.as_micros()).unwrap_or(u32::MAX)
+}
+
+/// One sentence. A row that already ends at `.`, `!`, or `?` stays as it is.
+fn as_sentence(text: &str) -> String {
+    if ends_sentence(text) {
+        text.to_string()
+    } else {
+        format!("{text}.")
+    }
+}
+
+fn ends_sentence(text: &str) -> bool {
+    let bytes = text.as_bytes();
+    let mut end = bytes.len();
+    while end > 0 && matches!(bytes[end - 1], b'"' | b'\'' | b')' | b']' | b'}') {
+        end -= 1;
+    }
+    end > 0 && matches!(bytes[end - 1], b'.' | b'!' | b'?')
 }
 
 #[cfg(test)]

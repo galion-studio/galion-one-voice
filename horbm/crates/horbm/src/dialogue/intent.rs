@@ -57,6 +57,11 @@ impl TurnIntent {
 }
 
 /// Charter recall: "do you remember…", "what did I tell you…".
+///
+/// "what do you remember about me" is already the first cue. The words left
+/// are "about me", which is the person as a whole. "what do you know about me"
+/// is not a cue: a phrase that is the whole line leaves an empty rest, and
+/// [`recall_topic`] then returns the line, which is not "me" or "about me".
 const RECALL: &[&str] = &["do you remember", "what did i tell you"];
 
 /// Charter correction: "no, that's wrong", "actually it's…".
@@ -196,6 +201,29 @@ pub(crate) fn recall_topic(heard: &str) -> &str {
     } else {
         rest
     }
+}
+
+/// The recall is about the person as a whole.
+///
+/// After [`recall_topic`], nothing is left but "me" or "about me". A line
+/// that is not a recall is not this, even when those words appear in it.
+pub(crate) fn recall_names_the_person(heard: &str) -> bool {
+    if TurnIntent::read(heard, "chat") != TurnIntent::Recall {
+        return false;
+    }
+    let topic = recall_topic(recall_clause(heard));
+    same_words(topic, "me") || same_words(topic, "about me")
+}
+
+/// A correction phrase, with the same precedence as [`TurnIntent::read`].
+pub(crate) fn is_correction(heard: &str) -> bool {
+    TurnIntent::read(heard, "chat") == TurnIntent::Correct
+}
+
+fn same_words(text: &str, phrase: &str) -> bool {
+    let text = text.as_bytes();
+    let phrase = phrase.as_bytes();
+    text.len() == phrase.len() && eq_ci(text, phrase)
 }
 
 /// What a forget line is asking to drop. The topic borrows `heard`.
@@ -569,6 +597,28 @@ mod tests {
         );
         assert_eq!(recall_clause("where is the kettle"), "where is the kettle");
         assert_eq!(recall_clause(""), "");
+    }
+
+    #[test]
+    fn recall_about_me_leaves_only_the_person() {
+        assert!(recall_names_the_person("what do you remember about me"));
+        assert!(recall_names_the_person("What do you remember about me?"));
+        assert!(recall_names_the_person("do you remember me"));
+        assert!(recall_names_the_person("do you remember about me"));
+        assert!(recall_names_the_person("what did I tell you about me"));
+        assert_eq!(
+            recall_topic(recall_clause("what do you remember about me")),
+            "about me"
+        );
+        assert_eq!(recall_topic(recall_clause("do you remember me")), "me");
+        assert!(!recall_names_the_person("do you remember my sister"));
+        assert!(!recall_names_the_person("do you remember the blue bowl"));
+        assert!(!recall_names_the_person("what do you know about me"));
+        assert!(!recall_names_the_person("where is the kettle"));
+        assert!(!recall_names_the_person("about me"));
+        assert!(is_correction("no, that's wrong"));
+        assert!(!is_correction("forget that"));
+        assert!(!is_correction("do you remember me"));
     }
 
     #[test]
