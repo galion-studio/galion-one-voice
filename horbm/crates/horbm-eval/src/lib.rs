@@ -134,7 +134,7 @@ pub fn run_stand_in_for(persona_file: Option<&std::path::Path>) -> TurnReport {
 
 #[cfg(test)]
 mod tests {
-    use horbm_duplex::{open_persona, Persona};
+    use horbm_duplex::open_persona;
 
     #[test]
     fn another_id_is_refused() {

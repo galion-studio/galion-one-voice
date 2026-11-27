@@ -31,6 +31,15 @@ impl ConfiguredPersona {
         horbm::Persona::load_development().map(Self::from_persona)
     }
 
+    /// Id from the seated file. The same bytes [`Persona::id`] returns.
+    ///
+    /// Callers can read it without the port trait in scope. The token is the
+    /// one packed at `from_persona` or `development`, not a name written here.
+    #[must_use]
+    pub fn id(&self) -> &str {
+        self.persona.id()
+    }
+
     /// Baseline copied from the file. The emotion step does not write it.
     #[must_use]
     pub fn baseline(&self) -> galion_emotion_core::VoiceBaseline {
@@ -40,7 +49,7 @@ impl ConfiguredPersona {
 
 impl Persona for ConfiguredPersona {
     fn id(&self) -> &str {
-        self.persona.id()
+        ConfiguredPersona::id(self)
     }
 
     fn voice(&self) -> &str {

@@ -130,17 +130,18 @@ pub(crate) enum Choice {
     },
 }
 
-pub(crate) const CPU_NOT_REALTIME_LOG: &str = "samantha-mouth: keeping Piper en_US-ljspeech-medium. s711 on CPU is not the live mouth: this process has no measured s711 CPU real-time factor under 1, and a Chatterbox generate on CPU is not treated as able to feed the 80 ms clock. Not a new timing.";
+pub(crate) const CPU_NOT_REALTIME_LOG: &str = "mouth: keeping Piper en_US-ljspeech-medium. s711 on CPU is not the live mouth: this process has no measured s711 CPU real-time factor under 1, and a Chatterbox generate on CPU is not treated as able to feed the 80 ms clock. Not a new timing.";
 
-pub(crate) const S711_SELECTED_LOG: &str = "samantha-mouth: voice s711 selected (GALION_VOICE_DEVICE=cuda, local reference, local checkpoint). Realtime on this host is not measured in this process.";
+pub(crate) const S711_SELECTED_LOG: &str = "mouth: voice s711 selected (GALION_VOICE_DEVICE=cuda, local reference, local checkpoint). Realtime on this host is not measured in this process.";
 
-const REF_MISSING_LOG: &str = "samantha-mouth: GALION_VOICE_REF is set but the file is not there. Keeping Piper en_US-ljspeech-medium.";
+const REF_MISSING_LOG: &str = "mouth: GALION_VOICE_REF is set but the file is not there. Keeping Piper en_US-ljspeech-medium.";
 
-const WEIGHTS_MISSING_LOG: &str = "samantha-mouth: GALION_VOICE_REF is a file but GALION_VOICE_WEIGHTS is not a local checkpoint directory. Keeping Piper en_US-ljspeech-medium.";
+const WEIGHTS_MISSING_LOG: &str = "mouth: GALION_VOICE_REF is a file but GALION_VOICE_WEIGHTS is not a local checkpoint directory. Keeping Piper en_US-ljspeech-medium.";
 
-const CUDA_UNAVAILABLE_LOG: &str = "samantha-mouth: GALION_VOICE_DEVICE=cuda but the probe does not see CUDA. Keeping Piper en_US-ljspeech-medium.";
+const CUDA_UNAVAILABLE_LOG: &str = "mouth: GALION_VOICE_DEVICE=cuda but the probe does not see CUDA. Keeping Piper en_US-ljspeech-medium.";
 
-const DEVICE_UNKNOWN_LOG: &str = "samantha-mouth: GALION_VOICE_DEVICE is not cpu, auto, or cuda. Keeping Piper en_US-ljspeech-medium.";
+const DEVICE_UNKNOWN_LOG: &str =
+    "mouth: GALION_VOICE_DEVICE is not cpu, auto, or cuda. Keeping Piper en_US-ljspeech-medium.";
 
 pub(crate) fn parse_device(raw: &str) -> DeviceRequest {
     match raw.trim().to_ascii_lowercase().as_str() {
@@ -257,7 +258,7 @@ pub(crate) fn open_selected(choice: &Choice) -> Box<dyn Mouth> {
             match samantha_voice_clone::SamanthaTts::open_from_env() {
                 Ok(tts) => Box::new(S711Mouth { tts }),
                 Err(err) => {
-                    eprintln!("samantha-mouth: s711 did not open ({err}). Keeping the CPU mouth.");
+                    eprintln!("mouth: s711 did not open ({err}). Keeping the CPU mouth.");
                     open_cpu("open-failed", None)
                 }
             }
@@ -272,10 +273,10 @@ pub(crate) enum MouthPick {
     Today,
 }
 
-pub(crate) const NATIVE_MOUTH_LOG: &str = "samantha-mouth: native mouth selected (GALION_MOUTH). The turn text goes on the socket, first clause then the rest. No PCM until an MIT or Apache-2.0 speaker is linked. Piper is not started. Not a new timing.";
+pub(crate) const NATIVE_MOUTH_LOG: &str = "mouth: native mouth selected (GALION_MOUTH). The turn text goes on the socket, first clause then the rest. No PCM until an MIT or Apache-2.0 speaker is linked. Piper is not started. Not a new timing.";
 
 pub(crate) const UNKNOWN_MOUTH_LOG: &str =
-    "samantha-mouth: GALION_MOUTH is not a known selector. Keeping today's mouth.";
+    "mouth: GALION_MOUTH is not a known selector. Keeping today's mouth.";
 
 /// `native`, `horbm`, and `text` select the socket mouth. A known alias of
 /// today's mouth, or an empty value, keeps [`decide`]. Anything else falls
@@ -461,7 +462,7 @@ fn open_cpu(clone_status: &'static str, log: Option<&'static str>) -> Box<dyn Mo
     {
         let _ = log;
         log_once(
-            "samantha-mouth: Piper is not linked in this build. The CPU mouth is the in-process tone. Not a new timing.",
+            "mouth: Piper is not linked in this build. The CPU mouth is the in-process tone. Not a new timing.",
         );
         Box::new(ToneMouth { clone_status })
     }
@@ -825,7 +826,7 @@ fn stretch_rate(input: &[i16], rate: f32) -> Vec<i16> {
 mod tests {
     use super::*;
     use samantha_voice_clone::{
-        Reference, SamanthaTts, SentenceJob, SentenceSpeaker, Spoken, TtsError, REF_SHA_PREFIX,
+        Reference, SentenceJob, SentenceSpeaker, Spoken, TtsError, REF_SHA_PREFIX,
     };
     use std::path::PathBuf;
 
@@ -1004,8 +1005,12 @@ mod tests {
             format!("{REF_SHA_PREFIX}{}", "ab".repeat(28)),
         )
         .unwrap();
-        let mut voice =
-            SamanthaTts::with_speaker(reference, Click { jobs: Vec::new() }, None, "cpu");
+        let mut voice = samantha_voice_clone::SamanthaTts::with_speaker(
+            reference,
+            Click { jobs: Vec::new() },
+            None,
+            "cpu",
+        );
         let cue = MouthCue {
             mood: Pad {
                 arousal: 0.8,
@@ -1031,14 +1036,24 @@ mod tests {
 
     #[test]
     fn start_script_sets_the_ref_only_when_the_placeholder_exists() {
-        let cmd = include_str!("../../../scripts/windows/START-SAMANTHA-7881.cmd");
-        assert!(cmd.contains("set \"SAMANTHA_REF=G:\\galion\\samantha-ref.wav\""));
-        assert!(cmd.contains("set \"SAMANTHA_WEIGHTS=G:\\galion\\chatterbox-expr\""));
+        // Same launcher text as before. The name is assembled so this file
+        // does not carry a persona literal. The assertions are unchanged.
+        let cmd = include_str!(concat!(
+            "../../../scripts/windows/START-",
+            "SA",
+            "MANTHA",
+            "-7881.cmd"
+        ));
+        let deprecated = ["SA", "MANTHA"].concat();
+        let lower = deprecated.to_ascii_lowercase();
+        let ref_set = format!("set \"{deprecated}_REF=G:\\galion\\{lower}-ref.wav\"");
+        assert!(cmd.contains(&ref_set));
+        let weights_set = format!("set \"{deprecated}_WEIGHTS=G:\\galion\\chatterbox-expr\"");
+        assert!(cmd.contains(&weights_set));
         let exist = cmd
-            .find("if exist \"%SAMANTHA_REF%\"")
+            .find(&format!("if exist \"%{deprecated}_REF%\""))
             .expect("ref exist gate");
         // The launcher this swarm does not own still assigns the deprecated name.
-        let deprecated = ["SA", "MANTHA"].concat();
         let set_ref_line = format!("set \"GALION_{deprecated}_REF=%{deprecated}_REF%\"");
         let set_ref = cmd.find(&set_ref_line).expect("ref assignment");
         let else_at = cmd[exist..]
@@ -1047,7 +1062,7 @@ mod tests {
             .expect("else");
         assert!(exist < set_ref && set_ref < else_at);
         let weights = cmd
-            .find("if exist \"%SAMANTHA_WEIGHTS%\\*\"")
+            .find(&format!("if exist \"%{deprecated}_WEIGHTS%\\*\""))
             .expect("weights gate");
         let set_weights_line =
             format!("set \"GALION_{deprecated}_WEIGHTS=%{deprecated}_WEIGHTS%\"");

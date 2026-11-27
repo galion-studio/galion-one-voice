@@ -13,7 +13,7 @@ use galion_emotion_core::{MomentState, AROUSAL, AXES, DOMINANCE, VEL_LIMIT};
 use horbm::{CardHit, CardLookup};
 use horbm_duplex::{
     ConfiguredPersona, CoreAffect, Duplex, EarSense, Emotion, Floor, FrameOut, LoopEvent, Parts,
-    Persona, PlaybackEcho, ProsodyEar, SpeakingBreath, FRAME_SAMPLES, SAMPLE_RATE,
+    PlaybackEcho, ProsodyEar, SpeakingBreath, FRAME_SAMPLES, SAMPLE_RATE,
 };
 use horbm_voice::Mouth;
 
