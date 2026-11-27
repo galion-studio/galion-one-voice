@@ -9,9 +9,11 @@
 //!    metadata. It is not spoken.
 //! 2. Person memory, when a diary is attached and `remember` is granted.
 //!    The diary is a second file, kept apart from the truth cards. A pin, a name or mood
-//!    line, and the session buffer are written there. The turn then reads
-//!    that file. A stored line is spoken only when the utterance is about
-//!    the person. A world question drops those hits and does not cite them.
+//!    line, and the session buffer are written there. A milestone is stored
+//!    once, under [`SOURCE_MILESTONE`]. The turn then reads that file. A
+//!    stored line is spoken only when the utterance is about the person, or
+//!    when it asks for the relationship timeline. A world question drops
+//!    those hits and does not cite them.
 //!    Denied `remember` does not open the file.
 //! 3. When a [`RetrievalThread`] is attached, [`Brain::turn`] asks it and
 //!    reads the [`MemoryHitCell`]. `Hits` speaks [`MemoryHit::clause`]. `Miss`
@@ -142,7 +144,9 @@ pub use learn::{
     ClauseSource, LearnAudit, LearnConfig, LearnError, LearnPass, LearnedRow, SessionSeal,
     LEARN_PACK_CAP, LEARN_PACK_DB, LEARN_PACK_LIVE, LEARN_PACK_NEXT, LEARN_PACK_RETIRING,
 };
-pub use memory::{about_the_person, pin_command, EpisodicStore, TranscriptFile, TranscriptTurn};
+pub use memory::{
+    about_the_person, pin_command, EpisodicStore, TranscriptFile, TranscriptTurn, SOURCE_MILESTONE,
+};
 pub use research_style::{
     MemoryExample, ResearchHit, ResearchRoot, StyleHint, StylePersona, StyleSearch,
     MAX_RESEARCH_BUNDLE_BYTES, STYLE_HIT_CAP,

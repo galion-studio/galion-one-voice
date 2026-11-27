@@ -130,6 +130,22 @@ pub trait PersonMemory: Send {
     fn set_remember(&mut self, grant: bool);
     fn set_sink(&mut self, sink: Box<dyn MemorySink + Send>);
     fn pin(&mut self, person_id: &str, text: &str, at: &str) -> WriteOutcome;
+
+    /// A moment the person asked to keep. Same grant as [`Self::pin`].
+    ///
+    /// The diary stores it once, under the milestone source. There is no
+    /// edit. The default writes nothing: denied memory returns
+    /// [`WriteOutcome::Refused`], and a stand-in that is granted returns
+    /// [`WriteOutcome::Skipped`].
+    fn milestone(&mut self, person_id: &str, text: &str, at: &str) -> WriteOutcome {
+        let _ = (person_id, text, at);
+        if self.remember_granted() {
+            WriteOutcome::Skipped
+        } else {
+            WriteOutcome::Refused
+        }
+    }
+
     fn note_state(&mut self, person_id: &str, state: &PersonState, at: &str) -> WriteOutcome;
     fn note_turn(&mut self, person_id: &str, said_by: &str, text: &str, at: &str) -> WriteOutcome;
     fn end_session(&mut self, person_id: &str, at: &str) -> WriteOutcome;

@@ -27,7 +27,9 @@ use crate::dialogue::{
     DecideIn, Decision, Dialogue, DialogueConsent, ForgetAsk, Move, ReplyPlan, TurnSnap,
 };
 use crate::learn::LearnedRow;
-use crate::memory::{about_the_person, pin_command};
+use crate::memory::{
+    about_the_person, milestone_command, milestone_line, pin_command, timeline_ask,
+};
 use crate::research_style::{ResearchHit, ResearchRoot, StylePersona};
 use crate::retrieve::{CellState, MemoryHitCell, RetrievalThread, RetrieveError, RetrievedCells};
 use crate::route::{
@@ -945,6 +947,9 @@ impl Brain {
         if !self.memory_granted() {
             return None;
         }
+        if timeline_ask(heard) {
+            return self.timeline_spoke(heard);
+        }
         let query = crate::dialogue::recall_clause(heard);
         // Search the words after the cue. "do you remember my sister" would
         // otherwise require "you" and "remember" to be in the stored fact.
@@ -1111,7 +1116,11 @@ impl Brain {
             return;
         };
         memory.note_turn(&person, &person, heard, at);
-        if let Some(text) = pin_command(heard) {
+        if milestone_line(heard) {
+            if let Some(text) = milestone_command(heard) {
+                memory.milestone(&person, text, at);
+            }
+        } else if let Some(text) = pin_command(heard) {
             memory.pin(&person, text, at);
         }
         memory.note_state(&person, &state, at);
@@ -1126,6 +1135,52 @@ impl Brain {
             return Vec::new();
         };
         memory.recall(&person, heard)
+    }
+
+    /// Session summaries and milestones, oldest date first. A world question
+    /// never reaches this. An empty list is not a memory hit.
+    fn timeline_spoke(&mut self, heard: &str) -> Option<Spoke> {
+        let person = self.person_id.clone();
+        let memory = self.memory.as_deref_mut()?;
+        let items = crate::memory::relationship_timeline(memory, &person);
+        let parts: Vec<&str> = items
+            .iter()
+            .map(|item| item.text.trim())
+            .filter(|text| !text.is_empty())
+            .collect();
+        if parts.is_empty() {
+            return None;
+        }
+        let joined = parts.join(" ");
+        let spoken = (self.speakable)(&joined)?;
+        if spoken.trim().is_empty() {
+            return None;
+        }
+        let hit = items.first()?;
+        let (first, rest) = split_clause(&spoken, false);
+        let sources: Vec<String> = items
+            .iter()
+            .filter(|item| !item.id.is_empty())
+            .map(|item| format!("memory:{}", item.id))
+            .collect();
+        let id = hit.id.clone();
+        Some(Spoke {
+            reply: String::new(),
+            sources: sources.clone(),
+            evidence: sources,
+            lookup_us: 0,
+            picked: Some(Answer {
+                id,
+                clause: spoken,
+                first,
+                rest,
+                hit: true,
+                mark: classify(heard).map(|kind| SidebandMark {
+                    kind,
+                    posted: false,
+                }),
+            }),
+        })
     }
 
     /// Spoken only when `query` is about the person. The caller drops `hits`
