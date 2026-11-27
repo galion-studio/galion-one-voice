@@ -266,6 +266,8 @@ pub struct HostSession {
     /// when this is set; the first empty audit leaves the spawn diary alone.
     pack_attached: AtomicBool,
     finished: AtomicBool,
+    /// Set before shutdown seals. Mood and idle work skip the mind lock.
+    stopping: AtomicBool,
 }
 
 impl HostSession {
@@ -302,6 +304,7 @@ impl HostSession {
             learned_rows: AtomicUsize::new(0),
             pack_attached: AtomicBool::new(false),
             finished: AtomicBool::new(false),
+            stopping: AtomicBool::new(false),
         });
         session.attach_pack();
         // The socket's first turn is held to 8s, and that turn is the shipped
@@ -555,7 +558,17 @@ impl HostSession {
     /// The seal is one write of the clause already held in RAM. The signal
     /// handler only wakes the runtime; this runs after that, on the blocking
     /// pool.
+    /// Mood ticks and idle thoughts must not take the mind lock after this.
+    pub fn begin_shutdown(&self) {
+        self.stopping.store(true, Ordering::SeqCst);
+    }
+
+    pub fn is_stopping(&self) -> bool {
+        self.stopping.load(Ordering::SeqCst)
+    }
+
     pub fn finish(&self) {
+        self.begin_shutdown();
         if self.finished.swap(true, Ordering::SeqCst) {
             return;
         }
