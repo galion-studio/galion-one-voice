@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 Galion Labs
-//! `route` keeps cards, then the localhost research gateway.
-//! `ReplyEngine::turn` speaks the brain's local clause. A deep card miss
-//! is `I don't know.` The gateway answer is a follow-up, not that reply.
+//! `route` and `ReplyEngine::turn` share one order: HORBM cards, then
+//! Research within 3 seconds, otherwise exactly `I don't know.`
+//! There is no S0 guess. A line that arrives after the cap is not spoken.
 
 use std::sync::atomic::{AtomicU32, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
@@ -147,20 +147,37 @@ fn gateway_answer() -> ResearchAnswer {
 }
 
 #[test]
-fn router_turn_speaks_i_dont_know_on_a_deep_card_miss() {
-    let (mut router, _) = scripted(gateway_answer());
+fn router_turn_speaks_research_when_the_card_misses_within_the_cap() {
+    let (mut router, calls) = scripted(gateway_answer());
     let reply = router.turn(DEEP);
-    assert_eq!(reply.text, "I don't know.");
-    assert_eq!(reply.text, UNKNOWN_REPLY);
-    assert_ne!(reply.text, GATEWAY);
-    assert!(reply
-        .sources
-        .iter()
-        .all(|source| !source.contains("research:")));
+    assert_eq!(reply.text, GATEWAY);
+    assert_ne!(reply.text, "I don't know.");
+    assert_eq!(reply.sources, vec!["research:local".to_string()]);
+    assert_eq!(calls.load(Ordering::SeqCst), 1);
+    let same = router.route(DEEP);
+    assert_eq!(same.kind, RouteKind::Research);
+    assert_eq!(same.spoken, reply.text);
+    assert_eq!(calls.load(Ordering::SeqCst), 2);
 }
 
 #[test]
-fn router_turn_does_not_ask_research_before_the_reply_exists() {
+fn router_turn_says_i_dont_know_when_research_does_not_answer() {
+    let (mut missed, calls) = scripted(ResearchAnswer::Miss);
+    let reply = missed.turn(DEEP);
+    assert_eq!(reply.text, "I don't know.");
+    assert_eq!(reply.text, UNKNOWN_REPLY);
+    assert_ne!(reply.text, GATEWAY);
+    assert_eq!(reply.sources, vec!["honest:unknown".to_string()]);
+    assert_eq!(calls.load(Ordering::SeqCst), 1);
+
+    let (mut quiet, calls) = scripted(gateway_answer());
+    let shallow = quiet.turn("where is the spare fuse?");
+    assert_eq!(shallow.text, "I don't know.");
+    assert_eq!(calls.load(Ordering::SeqCst), 0);
+}
+
+#[test]
+fn a_research_body_after_the_cap_is_not_the_turn() {
     let calls = Arc::new(AtomicU32::new(0));
     let caps = Arc::new(Mutex::new(Vec::new()));
     let (release_tx, release_rx) = std::sync::mpsc::channel();
@@ -174,33 +191,34 @@ fn router_turn_does_not_ask_research_before_the_reply_exists() {
         })),
     );
 
+    let started = Instant::now();
     let reply = router.turn(DEEP);
-    assert_eq!(calls.load(Ordering::SeqCst), 0);
+    let elapsed = started.elapsed();
     assert_eq!(reply.text, "I don't know.");
     assert_ne!(reply.text, GATEWAY);
-    thread::sleep(Duration::from_millis(40));
-    assert_eq!(
-        calls.load(Ordering::SeqCst),
-        0,
-        "the stand-in recorded an ask before it was released"
+    assert!(
+        elapsed >= Duration::from_millis(2_900),
+        "the turn did not keep the 3 second cap: {elapsed:?}"
+    );
+    assert!(
+        elapsed < Duration::from_secs(5),
+        "the turn waited past the cap: {elapsed:?}"
     );
 
     release_tx.send(()).expect("release");
-    let started = Instant::now();
     let follow = loop {
         if let Some(follow) = router.research_follow_up() {
             break follow;
         }
-        if started.elapsed() > Duration::from_secs(3) {
+        if started.elapsed() > Duration::from_secs(8) {
             panic!("research follow-up did not arrive");
         }
         thread::sleep(Duration::from_millis(5));
     };
+    assert_eq!(follow.spoken.as_deref(), Some(GATEWAY));
+    assert_eq!(reply.text, "I don't know.");
     assert_eq!(calls.load(Ordering::SeqCst), 1);
     assert_eq!(caps.lock().expect("caps").as_slice(), &[RESEARCH_CAP]);
-    assert_eq!(reply.text, "I don't know.");
-    assert_eq!(follow.spoken.as_deref(), Some(GATEWAY));
-    assert_eq!(follow.sources, vec!["research:local".to_string()]);
     assert!(follow.heard.contains("fuse"));
 }
 

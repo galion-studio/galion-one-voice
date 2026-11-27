@@ -2,25 +2,24 @@
 // Copyright (c) 2026 Galion Labs
 //! HORBM layer 5, the reasoning router.
 //!
-//! [`ReasoningRouter::route`] is the path the pipeline orchestrator calls.
-//! Its order stays fixed:
+//! [`ReasoningRouter::route`] and [`ReplyEngine::turn`] share one order:
 //!
-//! 1. HORBM cards answer first.
-//! 2. When no card matches there is no gap filler. No S0, no LLM, no Ollama.
-//! 3. The spoken line is [`crate::UNKNOWN_REPLY`] and the miss joins the gap queue.
-//! 4. A deep question may then go to the Galion Research gateway, with
-//!    [`galion_research_gateway::RESEARCH_CAP`] (3 seconds). On timeout the
-//!    spoken line is still [`crate::UNKNOWN_REPLY`].
+//! 1. HORBM cards answer first. A hit is spoken and Research is not asked.
+//! 2. There is no S0, no student, no LLM, and no Ollama between the card and
+//!    Research. A miss is not a guess.
+//! 3. A deep card miss may ask the Galion Research gateway, with
+//!    [`galion_research_gateway::RESEARCH_CAP`] (3 seconds). A speakable
+//!    answer that arrives inside that cap is the spoken line.
+//! 4. Otherwise the spoken line is exactly [`crate::UNKNOWN_REPLY`].
 //!
-//! [`ReplyEngine::turn`] is not that path. It is one [`horbm::Brain::turn`],
-//! built once when the router is constructed. The in-call reply is the local
-//! clause. A deep question whose cards miss speaks [`crate::UNKNOWN_REPLY`]
-//! and never the gateway body. The gateway runs only after that turn value
-//! is dropped. [`ReasoningRouter::research_follow_up`] reads the result and
-//! does not speak it.
+//! [`ReplyEngine::turn`] is one [`horbm::Brain::turn`]. Comfort does not open
+//! Research. A deep miss drops the turn value, which starts the ask, and
+//! then waits only until the cap. A line that arrives later is not spoken.
+//! [`ReasoningRouter::research_follow_up`] can still read that late result.
 
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::thread;
+use std::time::{Duration, Instant};
 
 use galion_research_gateway::{ClientReply, ResearchClient};
 
@@ -100,9 +99,9 @@ pub struct RouteOutcome {
 
 /// Layer 5.
 ///
-/// `route` is the orchestrator's path: cards, then the gateway, then an
-/// honest miss. [`ReplyEngine::turn`] is one brain turn: the local clause
-/// is spoken, and the gateway is a follow-up.
+/// `route` and [`ReplyEngine::turn`] both speak HORBM, then Research inside
+/// 3 seconds, otherwise exactly [`crate::UNKNOWN_REPLY`]. Neither path
+/// invents a line.
 ///
 /// The card loader and the research port are each one value. `route` and
 /// the brain share them. `CardLoader` is `Send` and not `Sync`, so the share
@@ -172,18 +171,19 @@ impl ReasoningRouter {
         &self.gaps
     }
 
-    /// Gateway result for the last in-call turn, once the worker has finished.
+    /// Gateway result the last turn did not speak.
     ///
-    /// Does not block. Does not change the reply [`ReplyEngine::turn`] already
-    /// returned. `None` means nothing is waiting.
+    /// Does not block. A research line already returned by
+    /// [`ReplyEngine::turn`] is consumed there. A body that arrives after the
+    /// 3 second cap stays here and is not that reply. `None` means nothing
+    /// is waiting.
     pub fn research_follow_up(&mut self) -> Option<horbm::ResearchFollowUp> {
         self.brain.research_follow_up()
     }
 
-    /// Orchestrator path. Cards, then a deep-question gateway ask, then a miss.
-    ///
-    /// This still calls [`horbm::route_heard`] with the research port. The
-    /// in-call [`ReplyEngine::turn`] does not speak that answer.
+    /// Orchestrator path. HORBM cards, then a deep-question Research ask
+    /// inside [`galion_research_gateway::RESEARCH_CAP`], otherwise exactly
+    /// [`crate::UNKNOWN_REPLY`]. No S0 guess.
     pub fn route(&mut self, heard: &str) -> RouteOutcome {
         let cards = SharedCards {
             cards: Arc::clone(&self.cards),
@@ -207,21 +207,36 @@ impl ReasoningRouter {
 
 impl ReplyEngine for ReasoningRouter {
     fn turn(&mut self, text: &str) -> Reply {
+        let gaps_before = self.brain.gaps().len();
         let out = self.brain.turn(text);
-        let reply = Reply {
-            text: out.reply.clone(),
-            mood: self.mood,
-            sources: out.sources.clone(),
-            evidence: out.evidence.clone(),
-            propensity: 0.0,
-            violations: 0,
-            lookup_us: out.lookup_us,
-            took_us: out.took_us,
-        };
-        // The local clause is already in `reply`. Dropping the turn value
-        // is what lets a deep-miss follow-up start. The follow hook is not
-        // public, so the whole value is dropped while it is still intact.
+        let mut reply = reply_of(self.mood, &out);
+        let wait = self.miss_asks_research(&out.reply, gaps_before);
+        // Dropping the turn value is what lets a deep-miss ask start.
+        // The follow hook is not public, so the whole value is dropped.
         drop(out);
+        if !wait {
+            return reply;
+        }
+        let waited = Instant::now();
+        let cap = galion_research_gateway::RESEARCH_CAP;
+        if let Some(follow) = self.wait_research(cap) {
+            if let Some(spoken) = research_line(&follow) {
+                return Reply {
+                    text: spoken,
+                    mood: self.mood,
+                    sources: follow.sources,
+                    evidence: follow.evidence,
+                    propensity: 0.0,
+                    violations: 0,
+                    lookup_us: reply.lookup_us,
+                    took_us: add_us(reply.took_us, waited.elapsed()),
+                };
+            }
+        }
+        reply.text = crate::UNKNOWN_REPLY.to_string();
+        reply.sources = vec!["honest:unknown".to_string()];
+        reply.evidence.clear();
+        reply.took_us = add_us(reply.took_us, waited.elapsed());
         reply
     }
 
@@ -311,6 +326,67 @@ fn build_brain(
     let mut brain = horbm::Brain::with_cards(lookup, ask);
     brain.set_speakable(speakable_line);
     brain
+}
+
+fn reply_of(mood: Pad, out: &horbm::TurnOut) -> Reply {
+    Reply {
+        text: out.reply.clone(),
+        mood,
+        sources: out.sources.clone(),
+        evidence: out.evidence.clone(),
+        propensity: 0.0,
+        violations: 0,
+        lookup_us: out.lookup_us,
+        took_us: out.took_us,
+    }
+}
+
+impl ReasoningRouter {
+    /// A deep card miss armed Research. Comfort, a card hit, a shallow miss,
+    /// and a missing port do not.
+    fn miss_asks_research(&self, reply: &str, gaps_before: usize) -> bool {
+        if reply != crate::UNKNOWN_REPLY || self.research.is_none() {
+            return false;
+        }
+        if self.brain.dialogue_lean().verb == horbm::Verb::Comfort {
+            return false;
+        }
+        let gaps = self.brain.gaps();
+        gaps.len() > gaps_before
+            && gaps
+                .last()
+                .is_some_and(|gap| gap.reason == horbm::GapReason::ResearchOff)
+    }
+
+    /// Block until the worker speaks, or until `cap`. A late body stays on
+    /// the follow-up slot and is not returned here.
+    fn wait_research(&mut self, cap: Duration) -> Option<horbm::ResearchFollowUp> {
+        let started = Instant::now();
+        loop {
+            if let Some(follow) = self.research_follow_up() {
+                return Some(follow);
+            }
+            if started.elapsed() >= cap {
+                return None;
+            }
+            let left = cap.saturating_sub(started.elapsed());
+            thread::sleep(Duration::from_millis(5).min(left));
+        }
+    }
+}
+
+fn research_line(follow: &horbm::ResearchFollowUp) -> Option<String> {
+    let line = follow.spoken.as_ref()?.trim();
+    if line.is_empty() {
+        None
+    } else {
+        Some(line.to_string())
+    }
+}
+
+fn add_us(base: u32, extra: Duration) -> u32 {
+    let extra_us = u32::try_from(extra.as_micros()).unwrap_or(u32::MAX);
+    base.saturating_add(extra_us)
 }
 
 fn map_route(out: horbm::RouteOut) -> RouteOutcome {
@@ -551,5 +627,167 @@ mod tests {
         assert!(is_deep_question(
             "what sits on the left side of the old garden gate?"
         ));
+    }
+
+    fn assert_no_student_guess(text: &str, sources: &[String]) {
+        let blob = format!("{text} {}", sources.join(" ")).to_ascii_lowercase();
+        assert!(!blob.contains("s0"), "{blob}");
+        assert!(!blob.contains("ollama"), "{blob}");
+        assert!(!blob.contains("llm"), "{blob}");
+    }
+
+    #[test]
+    fn turn_card_hit_is_the_horbm_line_and_does_not_ask() {
+        let (mut router, calls, caps) = router(ResearchAnswer::Answer {
+            text: "A model guess.".into(),
+            source: "local".into(),
+        });
+        let reply = router.turn("why kettle?");
+        assert_eq!(reply.text, "The kettle is on the hob.");
+        assert_eq!(reply.sources, vec!["card:kettle".to_string()]);
+        assert_eq!(calls.load(Ordering::SeqCst), 0);
+        assert!(caps.lock().unwrap().is_empty());
+        assert_no_student_guess(&reply.text, &reply.sources);
+        assert!(!reply.text.to_ascii_lowercase().contains("guess"));
+    }
+
+    #[test]
+    fn turn_speaks_research_when_a_card_miss_answers_within_the_cap() {
+        let (mut router, calls, caps) = router(ResearchAnswer::Answer {
+            text: "The hob is warm.".into(),
+            source: "local".into(),
+        });
+        let heard = "why is the spare fuse warm?";
+        let started = std::time::Instant::now();
+        let reply = router.turn(heard);
+        assert!(
+            started.elapsed() < Duration::from_secs(3),
+            "a ready research answer waited out the cap: {:?}",
+            started.elapsed()
+        );
+        assert_eq!(reply.text, "The hob is warm.");
+        assert_eq!(reply.sources, vec!["research:local".to_string()]);
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+        assert_eq!(caps.lock().unwrap().as_slice(), &[RESEARCH_CAP]);
+        assert_eq!(RESEARCH_CAP, Duration::from_secs(3));
+        assert_no_student_guess(&reply.text, &reply.sources);
+        let same = router.route(heard);
+        assert_eq!(same.kind, RouteKind::Research);
+        assert_eq!(same.spoken, reply.text);
+    }
+
+    #[test]
+    fn turn_says_i_dont_know_when_neither_card_nor_research_answers() {
+        for answer in [
+            ResearchAnswer::Miss,
+            ResearchAnswer::Timeout,
+            ResearchAnswer::Unreachable,
+        ] {
+            let (mut router, calls, _) = router(answer);
+            let reply = router.turn("why is the spare fuse missing from the drawer?");
+            assert_eq!(reply.text, "I don't know.");
+            assert_eq!(reply.text, UNKNOWN_REPLY);
+            assert_eq!(reply.sources, vec!["honest:unknown".to_string()]);
+            assert!(reply.evidence.is_empty());
+            assert_eq!(calls.load(Ordering::SeqCst), 1);
+            assert_no_student_guess(&reply.text, &reply.sources);
+        }
+
+        let (mut quiet, calls, _) = router(ResearchAnswer::Answer {
+            text: "Maybe forty two.".into(),
+            source: "local".into(),
+        });
+        let shallow = quiet.turn("where is the spare fuse?");
+        assert_eq!(shallow.text, "I don't know.");
+        assert_eq!(calls.load(Ordering::SeqCst), 0);
+        assert_no_student_guess(&shallow.text, &shallow.sources);
+
+        let mut bare = ReasoningRouter::new(MemoryCards::from_cards(vec![kettle()]), None);
+        let off = bare.turn("why is the spare fuse missing from the drawer?");
+        assert_eq!(off.text, "I don't know.");
+        assert_eq!(off.sources, vec!["honest:unknown".to_string()]);
+    }
+
+    #[test]
+    fn comfort_does_not_ask_research_or_invent_a_line() {
+        let (mut router, calls, _) = router(ResearchAnswer::Answer {
+            text: "A model guess.".into(),
+            source: "local".into(),
+        });
+        let started = std::time::Instant::now();
+        let reply = router.turn("why am I so sad?");
+        assert!(
+            started.elapsed() < Duration::from_millis(500),
+            "comfort waited on research: {:?}",
+            started.elapsed()
+        );
+        assert_eq!(reply.text, "I don't know.");
+        assert_eq!(calls.load(Ordering::SeqCst), 0);
+        assert_no_student_guess(&reply.text, &reply.sources);
+        for banned in ["i hear you", "that sounds", "sorry", "guess"] {
+            assert!(!reply.text.to_ascii_lowercase().contains(banned));
+        }
+    }
+
+    /// The port ignores the cap on purpose. The turn still stops at 3 seconds
+    /// and does not speak the late body.
+    #[test]
+    fn a_research_line_after_the_cap_is_not_spoken() {
+        struct Hold {
+            calls: Arc<AtomicU32>,
+            caps: Arc<std::sync::Mutex<Vec<Duration>>>,
+            release: std::sync::mpsc::Receiver<()>,
+        }
+        impl ResearchPort for Hold {
+            fn ask(&mut self, _question: &str, cap: Duration) -> ResearchAnswer {
+                self.caps.lock().expect("caps").push(cap);
+                self.calls.fetch_add(1, Ordering::SeqCst);
+                let _ = self.release.recv();
+                ResearchAnswer::Answer {
+                    text: "Too late to speak.".into(),
+                    source: "local".into(),
+                }
+            }
+        }
+        let calls = Arc::new(AtomicU32::new(0));
+        let caps = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let (release_tx, release_rx) = std::sync::mpsc::channel();
+        let mut router = ReasoningRouter::new(
+            MemoryCards::from_cards(vec![kettle()]),
+            Some(Box::new(Hold {
+                calls: Arc::clone(&calls),
+                caps: Arc::clone(&caps),
+                release: release_rx,
+            })),
+        );
+        let started = std::time::Instant::now();
+        let reply = router.turn("why is the spare fuse missing from the drawer?");
+        let elapsed = started.elapsed();
+        assert_eq!(reply.text, "I don't know.");
+        assert_ne!(reply.text, "Too late to speak.");
+        assert_eq!(reply.sources, vec!["honest:unknown".to_string()]);
+        assert!(
+            elapsed >= Duration::from_millis(2_900),
+            "the turn did not keep the 3 second cap: {elapsed:?}"
+        );
+        assert!(
+            elapsed < Duration::from_secs(5),
+            "the turn waited past the cap: {elapsed:?}"
+        );
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+        assert_eq!(caps.lock().unwrap().as_slice(), &[RESEARCH_CAP]);
+        release_tx.send(()).expect("release");
+        let late = std::time::Instant::now();
+        let follow = loop {
+            if let Some(follow) = router.research_follow_up() {
+                break follow;
+            }
+            if late.elapsed() > Duration::from_secs(2) {
+                panic!("the late research body did not arrive");
+            }
+            thread::sleep(Duration::from_millis(5));
+        };
+        assert_eq!(follow.spoken.as_deref(), Some("Too late to speak."));
+        assert_eq!(reply.text, "I don't know.");
     }
 }
