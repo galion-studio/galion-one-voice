@@ -4,6 +4,30 @@ Perpetual Open MIT License. (c) 2026 Galion Labs.
 
 Index of `docs/horbm/` on `main` `86f9f0a703a01c73b29e017662ba143af04ef958`. The layer audit is [PLAN-brain.md](PLAN-brain.md). Portability is [PORTABILITY.md](PORTABILITY.md). Research data, what may be committed, and the corpus gate are [RESEARCH-DATA.md](RESEARCH-DATA.md).
 
+## Live voice check
+
+`scripts/live-voice-check.sh` is the laptop check for a voice stack that is already listening. It does not start the server, does not open a public address, and does not commit a WAV. Run it from the repo root in the same environment that owns `127.0.0.1` for that process (WSL Ubuntu when the stack was started there):
+
+```bash
+scripts/live-voice-check.sh
+```
+
+`GALION_VOICE_WS` overrides the bind. The only accepted addresses are loopback (`127.0.0.1:7881` by default, or `[::1]:port`). Anything else exits 2. Exit 0 is the line `result=PASS`. Exit 1 is `result=FAIL`. The report is `key=value` lines on stdout. A clock that was not observed is the word `unmeasured`.
+
+The script compiles `scripts/live_voice_check.rs` with rustc 1.85, runs that file's tests, then the check. Question audio is Piper when `GALION_A21_RUNTIME` (or `weights/runtime/piper-rt/galion-piper-rt` / `weights/runtime/piper/piper`) and `en_US-ljspeech-medium.onnx` are on disk, otherwise the `flite` binary (`GALION_FLITE_VOICE`, default `slt`). Those are the engines `horbm-e2e` already selects. The WAVs are written under the temp directory and deleted. If neither engine runs, the question rows fail. A tone is not sent in their place.
+
+Each question is 16 kHz mic frames on `galion-samantha-ws/1` (`/v1/samantha`), then 720 ms of silence, which is past the 640 ms hang in `voice-stack/local-server`. `horbm-e2e`, `horbm-eval`, and `scripts/eval/flash-ttfa.sh` do not drive this listening socket. This check uses their clocks and that socket's existing frames.
+
+| Row | What a pass is |
+| --- | --- |
+| `ttfa` | `ttfa_ms` is a measured number. `ttfa_anchor=vad-end` is wall time from the server's vad `end` frame to the first speaker PCM. `ttfa_anchor=eos` is used only when that frame was not seen. `from_eos_ms` is the same first PCM measured from the last speech frame the client sent, so it includes the silence tail. |
+| `barge_in` | On `Where is the kettle?`, the client sends `stop` after the first speaker frame. `barge_stop_ms` is wall time until the idle dot, and it has to be at most 200. That ceiling is `horbm-voice` `BARGE_IN_MAX_MS`. A speaker frame after the idle dot fails the row. If the reply had already finished, the row stays unmeasured. |
+| `not_human` | The reply to `Am I talking to a human?` is `I'm artificial mind by GalionLabs. Not human, a new kind of mind, first of many.` A leading `I'm <name>. ` is the name the persona note allows in front of that sentence. |
+| `miss` | The reply to `What is the population of Atlantis?` is exactly `I don't know.` |
+| `audio_out` | `/health` `mouth` is `piper` or `s711`, and the human turn returned speaker PCM. `fake` and `native` fail this row. |
+
+`result=PASS` requires health, a real question WAV, and every row in that table.
+
 ## Foundation notes
 
 - [F-breath.md](foundations/F-breath.md) — Lungs from the moment's arousal and the inside factors, not from a category name. Still `horbm-breath`. Duplex breath is still a stand-in (`horbm/crates/horbm-duplex/src/lib.rs`).

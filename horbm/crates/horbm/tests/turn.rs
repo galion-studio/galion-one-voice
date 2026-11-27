@@ -8,8 +8,8 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use horbm::{
-    AskOutcome, Brain, CardHit, CardLookup, DialogueConsent, GapReason, Persona, ResearchAsk,
-    ResearchFollowUp, RESEARCH_CAP, UNKNOWN_REPLY,
+    is_deep_question, is_money_action, AskOutcome, Brain, CardHit, CardLookup, DialogueConsent,
+    GapReason, Persona, ResearchAsk, ResearchFollowUp, RESEARCH_CAP, UNKNOWN_REPLY,
 };
 
 struct Cards;
@@ -131,6 +131,127 @@ fn gateway_timeout_at_three_seconds_falls_back() {
         brain.gaps().last().unwrap().reason,
         GapReason::ResearchTimeout
     );
+}
+
+#[test]
+fn a_payment_is_not_armed_and_a_question_mark_keeps_the_deep_rule() {
+    let calls = Arc::new(AtomicU32::new(0));
+    let caps = Arc::new(Mutex::new(Vec::new()));
+    let mut brain = Brain::with_cards(
+        Cards,
+        Some(Box::new(Gateway {
+            calls: Arc::clone(&calls),
+            caps: Arc::clone(&caps),
+            sleep_cap: false,
+            answer: AskOutcome::Miss,
+        })),
+    );
+
+    for line in [
+        "send money to pat today",
+        "wire money to the account",
+        "transfer money now",
+        "make a payment for the invoice",
+    ] {
+        assert!(
+            is_money_action(line),
+            "phrase rule fired: one of the four conductor phrases: {line}"
+        );
+        let out = brain.turn(line);
+        assert_eq!(out.reply, UNKNOWN_REPLY, "{line}");
+        assert_eq!(out.first_clause, UNKNOWN_REPLY, "{line}");
+        let spoken = out.reply.to_ascii_lowercase();
+        assert!(!spoken.contains("sent"), "payment confirmation: {line}");
+        assert!(!spoken.contains("paid"), "payment confirmation: {line}");
+        assert!(!spoken.contains("payment"), "payment confirmation: {line}");
+        assert!(!spoken.contains("transfer"), "payment confirmation: {line}");
+        if let Some(mark) = &out.sideband {
+            assert!(!mark.posted, "a payment was posted: {line}");
+        }
+        assert_eq!(
+            brain.gaps().last().unwrap().reason,
+            GapReason::NoCard,
+            "{line} was treated as a research question"
+        );
+        drop(out);
+    }
+    thread::sleep(Duration::from_millis(40));
+    assert_eq!(calls.load(Ordering::SeqCst), 0);
+    assert!(brain.research_follow_up().is_none());
+
+    // Question-mark rule, same as `is_money_action` in
+    // `crates/galion-conductor/src/research.rs`: a `?` skips the four phrases.
+    // The deep-question rule then runs. `send money?` is two words and has
+    // no why, how, or explain, so research stays off.
+    assert!(
+        !is_money_action("send money?"),
+        "question-mark rule fired: `?` skips the phrase list"
+    );
+    assert!(
+        !is_deep_question("send money?"),
+        "deep-question rule fired: two words, no why/how/explain"
+    );
+    let questioned = brain.turn("send money?");
+    assert_eq!(questioned.reply, UNKNOWN_REPLY);
+    assert_eq!(questioned.first_clause, UNKNOWN_REPLY);
+    assert!(!questioned.reply.to_ascii_lowercase().contains("sent"));
+    if let Some(mark) = &questioned.sideband {
+        assert!(!mark.posted);
+    }
+    assert_eq!(brain.gaps().last().unwrap().reason, GapReason::NoCard);
+    drop(questioned);
+    thread::sleep(Duration::from_millis(40));
+    assert_eq!(calls.load(Ordering::SeqCst), 0);
+    assert!(brain.research_follow_up().is_none());
+
+    let deep = brain.turn("why is the spare fuse missing from the drawer?");
+    assert_eq!(deep.reply, UNKNOWN_REPLY);
+    assert_eq!(deep.first_clause, UNKNOWN_REPLY);
+    assert_eq!(
+        calls.load(Ordering::SeqCst),
+        0,
+        "research ran inside the turn"
+    );
+    assert_eq!(brain.gaps().last().unwrap().reason, GapReason::ResearchOff);
+    drop(deep);
+    let follow = wait_follow(&mut brain);
+    assert_eq!(calls.load(Ordering::SeqCst), 1);
+    assert_eq!(caps.lock().unwrap().as_slice(), &[RESEARCH_CAP]);
+    assert_eq!(RESEARCH_CAP, Duration::from_secs(3));
+    assert!(follow.spoken.is_none());
+    assert_eq!(follow.gap.reason, GapReason::ResearchMiss);
+
+    // The question-mark rule leaves a deep question armed, including one
+    // that contains a payment phrase. The conductor classifies this line
+    // as a lookup, not a payment order.
+    assert!(
+        !is_money_action("how do I send money safely?"),
+        "question-mark rule fired: `?` skips the phrase list"
+    );
+    assert!(
+        is_deep_question("how do I send money safely?"),
+        "deep-question rule fired: the word how"
+    );
+    let lookup = brain.turn("how do I send money safely?");
+    assert_eq!(lookup.reply, UNKNOWN_REPLY);
+    assert_eq!(lookup.first_clause, UNKNOWN_REPLY);
+    assert!(!lookup.reply.to_ascii_lowercase().contains("sent"));
+    assert!(!lookup.reply.to_ascii_lowercase().contains("payment"));
+    assert_eq!(
+        calls.load(Ordering::SeqCst),
+        1,
+        "research ran inside the turn"
+    );
+    drop(lookup);
+    let follow = wait_follow(&mut brain);
+    assert_eq!(calls.load(Ordering::SeqCst), 2);
+    assert_eq!(
+        caps.lock().unwrap().as_slice(),
+        &[RESEARCH_CAP, RESEARCH_CAP]
+    );
+    assert_eq!(follow.heard, "how do I send money safely?");
+    assert!(follow.spoken.is_none());
+    assert_eq!(follow.gap.reason, GapReason::ResearchMiss);
 }
 
 #[test]
