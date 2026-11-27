@@ -2,7 +2,7 @@
 
 Perpetual Open MIT License. (c) 2026 Galion Labs.
 
-Index of `docs/horbm/` on `main` `021e4d170d60977752456d45c5782d49088db1f8`. The layer audit is [PLAN-brain.md](PLAN-brain.md). Portability is [PORTABILITY.md](PORTABILITY.md). Research data, what may be committed, and the corpus gate are [RESEARCH-DATA.md](RESEARCH-DATA.md).
+Index of `docs/horbm/` on `main` `86f9f0a703a01c73b29e017662ba143af04ef958`. The layer audit is [PLAN-brain.md](PLAN-brain.md). Portability is [PORTABILITY.md](PORTABILITY.md). Research data, what may be committed, and the corpus gate are [RESEARCH-DATA.md](RESEARCH-DATA.md).
 
 ## Foundation notes
 
@@ -18,7 +18,7 @@ Index of `docs/horbm/` on `main` `021e4d170d60977752456d45c5782d49088db1f8`. The
 - [F-mouth-source-filter.md](foundations/F-mouth-source-filter.md) — Shape PCM after Piper or flite, on the 80 ms frame. Still `crates/galion-source-filter`. The brain plan does not retune it.
 - [F-persona.md](foundations/F-persona.md) — The character stays put while the moment moves. Honesty is `never_fabricate` and `I don't know.` Boot is now `Persona::load_development` ([S76-universal-persona-boot.md](foundations/S76-universal-persona-boot.md)). `PersonaLine` and `StyleHook::cap_sentences` came after this note.
 - [F-pre-clone-analysis.md](foundations/F-pre-clone-analysis.md) — One JSON profile before a clone (schema galion-preclone, version 1). Still `tools/cloning-v2/preclone`. Not a brain turn.
-- [F-soak.md](foundations/F-soak.md) — Duplex soak on a generated sine, prosody on, echo on. [S75-soak-rss.md](foundations/S75-soak-rss.md) locks growth at `RSS_GROWTH_KIB` 128 (`horbm/crates/horbm-soak/src/lib.rs`). The gate is not raised.
+- [F-soak.md](foundations/F-soak.md) — Duplex soak on a generated sine, prosody on, echo on. [S75-soak-rss.md](foundations/S75-soak-rss.md) locks growth at `HEAP_GROWTH_KIB` 128 (`horbm/crates/horbm-soak/src/lib.rs`), live heap bytes, end minus the warmup sample. `VmRSS` is printed and is not gated. The gate is not raised.
 - [F-turn-eval-s43.md](foundations/F-turn-eval-s43.md) — Pause takeover, turn latency, and backchannel shape against Full-Duplex-Bench. Still `horbm-eval` `run_stand_in` (`horbm/crates/horbm-eval/src/lib.rs`).
 - [F-voice-native-path.md](foundations/F-voice-native-path.md) — `VoiceLoop` on the virtual 80 ms clock. Piper and Vosk stay feature-gated. The live host's ear point is the later path in `voice-stack/local-server/src/live.rs`.
 - [F1-cascade-audit.md](foundations/F1-cascade-audit.md) — Cascade timestamps and domain 04 stamps. `crates/galion-cascade` is still a workspace member. The `horbm` crates do not call it.
@@ -48,7 +48,7 @@ Index of `docs/horbm/` on `main` `021e4d170d60977752456d45c5782d49088db1f8`. The
 - [S72-person-file-grant.md](foundations/S72-person-file-grant.md) — `EpisodicStore::open_from_flag` opens the file only for the trimmed word `grant`. Still that function. `Brain::open` calls it (`horbm/crates/horbm/src/brain.rs`).
 - [S73-hold-topic.md](foundations/S73-hold-topic.md) — `decide` calls `decide_held` with the hold flag clear. A hold turns `OfferTopic` into `Ask`. `Brain::turn_with_ear` passes `DialogueLean.hold_topic`.
 - [S74-session-seal.md](foundations/S74-session-seal.md) — One RAM clause, `seal` writes once, and `Brain::turn` does not call it. Still true. `note_taught` and `HostSession::finish` seal at session finish (`voice-stack/local-server/src/host.rs`).
-- [S75-soak-rss.md](foundations/S75-soak-rss.md) — Soak RSS growth is gated, and the gate stays 128 KiB. `RSS_GROWTH_KIB` is 128 (`horbm/crates/horbm-soak/src/lib.rs`). A later granted host soak uses that same gate.
+- [S75-soak-rss.md](foundations/S75-soak-rss.md) — Soak growth is live heap bytes, and the gate stays 128 KiB. `HEAP_GROWTH_KIB` is 128 (`horbm/crates/horbm-soak/src/lib.rs`). `VmRSS` is printed and is not gated. A later granted host soak uses that same gate.
 - [S76-universal-persona-boot.md](foundations/S76-universal-persona-boot.md) — Development boot is `Persona::load_development` and `BootConfig`, not a loader named for one persona. Still `horbm/crates/horbm-persona/development.toml`. The note's remark that this plan names one persona is out of date: the audit follows this note. `PersonaLine` and the sentence cap came after it.
 - [phase4-brain-deep-dive.md](foundations/phase4-brain-deep-dive.md) — Phase 4 picks one stored clause. Still `horbm-brain`. The turn in crate `horbm` is the later brain. [PLAN-brain.md](PLAN-brain.md) is the current layer audit.
 
@@ -64,7 +64,7 @@ Each line is the opening of that crate's `lib.rs`, in this tree's words where th
 - `horbm-eval` (`horbm/crates/horbm-eval/src/lib.rs`) — Closed evaluation gate for the HORBM layers that are on main.
 - `horbm-inner` (`horbm/crates/horbm-inner/src/lib.rs`) — Inner life for whatever persona the host configured.
 - `horbm-persona` (`horbm/crates/horbm-persona/src/lib.rs`) — The steady character. A persona file is TOML, read once at boot.
-- `horbm-soak` (`horbm/crates/horbm-soak/src/lib.rs`) — Long-call soak for the configured development persona's duplex loop. `RSS_GROWTH_KIB` is 128.
+- `horbm-soak` (`horbm/crates/horbm-soak/src/lib.rs`) — Long-call soak for the configured development persona's duplex loop. `HEAP_GROWTH_KIB` is 128.
 - `horbm-voice` (`horbm/crates/horbm-voice/src/lib.rs`) — HORBM-native voice turn. One tick is one 80 ms conductor frame.
 - `horbm-ear` (`crates/horbm-ear/src/lib.rs`) — Ear-side prosody. One call is one 80 ms frame, 16 kHz, 1280 samples. Sensing starts on. Member of the root workspace.
 - `horbm-keys` (`crates/horbm-keys/src/lib.rs`) — Mapped int8 key arena. Member of the root workspace.

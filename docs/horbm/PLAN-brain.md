@@ -4,7 +4,7 @@ Perpetual Open MIT License. (c) 2026 Galion Labs.
 
 | Field | Value |
 |---|---|
-| Base | `main` `021e4d170d60977752456d45c5782d49088db1f8` (includes #382, #384, and #385). The layer audit below is this commit. The rounds further down are the S66 assignment from `b8f33bb7` and are not a second spec. |
+| Base | `main` `86f9f0a703a01c73b29e017662ba143af04ef958` (includes #382, #384, #385, #387, #391, #392, and #393). #386 is open and is not this commit. The layer audit below is this commit. The rounds further down are the S66 assignment from `b8f33bb7` and are not a second spec. |
 | Kind | Research and build plan. This file does not change code, manifests, or locks. |
 | Persona | Boot loads the configured development persona (`GALION_HORBM_DEV_PERSONA`, else `horbm/crates/horbm-persona/development.toml`, through `Persona::load_development` / `is_configured_boot`). There is no `allows_development_boot`. `horbm/crates/horbm-persona/personas/aria.toml` stays in the tree and is not selected unless that config names it. |
 | Ear | Prosody sensing starts on. `LOCKS.toml` `[consent.ear_prosody] sense = "allow"`. `GALION_EAR_SENSE=0\|off\|deny` is the off switch. |
@@ -17,7 +17,7 @@ Claim marks: **Found** means the file and symbol cited here show it on this base
 
 ## Gates
 
-Every brain PR runs these on rustc 1.85, Linux, next to the test, clippy, and soak commands. The 128 KiB soak RSS gate is never raised.
+Every brain PR runs these on rustc 1.85, Linux, next to the test, clippy, and soak commands. The 128 KiB soak gate is live heap bytes, end minus the warmup sample. It is never raised. `VmRSS` is printed and is not gated.
 
 - Test: `cargo test --manifest-path horbm/Cargo.toml --workspace`
 - Clippy: `cargo clippy --manifest-path horbm/Cargo.toml --workspace --all-targets -- -D warnings`
@@ -25,7 +25,7 @@ Every brain PR runs these on rustc 1.85, Linux, next to the test, clippy, and so
 - Rustdoc, required for every brain PR: `RUSTDOCFLAGS='-D warnings' cargo doc --manifest-path horbm/Cargo.toml -p horbm --no-deps`
 - Voice-stack lock: `cargo metadata --locked --manifest-path voice-stack/Cargo.toml`
 
-`scripts/check-locks.sh` and `scripts/check-research-boundary.sh` stay required. The root workspace test and clippy, and the voice-stack package test and clippy in the laptop gate, stay required too. `.github/workflows/voice-stack-horbm-router.yml` runs that rustdoc command as the `cargo doc` step. `Brain::turn` describes the private finish step in prose and does not link `Self::finish`. **Found** (`horbm/crates/horbm/src/brain.rs` `turn`, the workflow file). `horbm-soak` `RSS_GROWTH_KIB` is 128. **Found** (`horbm/crates/horbm-soak/src/lib.rs`).
+`scripts/check-locks.sh` and `scripts/check-research-boundary.sh` stay required. The root workspace test and clippy, and the voice-stack package test and clippy in the laptop gate, stay required too. `.github/workflows/voice-stack-horbm-router.yml` runs that rustdoc command as the `cargo doc` step. `Brain::turn` describes the private finish step in prose and does not link `Self::finish`. **Found** (`horbm/crates/horbm/src/brain.rs` `turn`, the workflow file). `horbm-soak` `HEAP_GROWTH_KIB` is 128. **Found** (`horbm/crates/horbm-soak/src/lib.rs`).
 
 ## The model
 
@@ -155,7 +155,7 @@ The live host pushes PCM until `FRAME_SAMPLES`, then `heard_point` calls `heard_
 
 **On main.** `turn` calls `turn_with_ear(text, None)`. That function reaps a previous follow-up, ticks empathy, steps `PersonaInner`, archives a forget or notes person memory, takes `person_hit` or `gather`, searches style when a research root is set, calls `decide` or `decide_held`, runs `admit_move`, applies `speak_forgotten` when rows were archived, then `finish`, then `record_inner`. `research_later` is true only when a port exists, the lean is not comfort, and the gap reason is `ResearchOff`. `gather` calls `route_heard` with the research port `None`. **Found** (`brain.rs` `turn_with_ear`, `gather`). `GAP_CAP` is 32. **Found** (`brain.rs`).
 
-`ReasoningRouter::turn` calls `Brain::turn` and drops the `TurnOut`. `ReasoningRouter::route` still calls `route_heard` with a research port. The in-call `ReplyEngine::turn` does not speak that route. **Found** (`voice-stack/horbm-bridge/src/router.rs` `turn`, `route`). `CardEngine::turn_with_ear` is what the live host calls. **Found** (`voice-stack/local-server/src/brain.rs` `turn_heard`).
+`ReasoningRouter::turn` calls `Brain::turn` and drops the `TurnOut`. `ReasoningRouter::route` still calls `route_heard` with a research port. The in-call `ReplyEngine::turn` does not speak that route. **Found** (`voice-stack/horbm-bridge/src/router.rs` `turn`, `route`). `CardEngine::turn_with_ear` is what the live host calls. **Found** (`voice-stack/local-server/src/brain.rs` `turn_heard`). A closed mic take runs that call off the tokio worker, in `finish_take_off_worker`. The 80 ms frame step stays on the task. **Found** (`voice-stack/local-server/src/server.rs` `handle_binary`, `finish_take_off_worker`).
 
 **Evidence.** `horbm/crates/horbm/tests/turn.rs`, `horbm/crates/horbm/tests/clause_first.rs`. **Found** (those files exist).
 
@@ -171,7 +171,7 @@ The live host pushes PCM until `FRAME_SAMPLES`, then `heard_point` calls `heard_
 
 ## S66 rounds
 
-The sections below are the S66 assignment, written against `b8f33bb7`. They are not a second spec. The layer audit above is `main` `021e4d170d60977752456d45c5782d49088db1f8`. A symbol the audit names is on main.
+The sections below are the S66 assignment, written against `b8f33bb7`. They are not a second spec. The layer audit above is `main` `86f9f0a703a01c73b29e017662ba143af04ef958`. A symbol the audit names is on main.
 
 
 ## Shared files
@@ -185,11 +185,11 @@ Every swarm leaves these untouched. They are not assigned to a swarm in any roun
 | `LOCKS.toml`, `scripts/check-locks.sh` | The ear, learn, remember, and research defaults are already recorded. |
 | (no soul file) | Not in this tree. Do not create one. |
 | `docs/horbm/PLAN-brain.md` | This plan. |
-| `docs/horbm/README.md`, `docs/horbm/RESEARCH-DATA.md`, `docs/horbm/PORTABILITY.md`, `docs/horbm/foundations/**` | Index and notes, not the build. |
+| `docs/horbm/README.md`, `docs/horbm/RESEARCH-DATA.md`, `docs/horbm/PORTABILITY.md`, `docs/horbm/foundations` | Index and notes, not the build. |
 | `scripts/check-research-boundary.sh` | The corpus gate. |
 | `voice-stack/Cargo.toml`, `voice-stack/Cargo.lock` | Voice workspace. |
 | `voice-stack/horbm-bridge/Cargo.toml`, `voice-stack/horbm-bridge/Cargo.lock` | Bridge manifest. No new dependency. |
-| `voice-stack/local-server/**` | S82, the live host, including `PiperMouth`. Other swarms leave it. Speech stays as it is. Do not restart the process on 7881. |
+| `voice-stack/local-server` | S82, the live host, including `PiperMouth`. Other swarms leave it. Speech stays as it is. Do not restart the process on 7881. |
 | `horbm/Cargo.lock` | Assigned in round 4 only, to swarm R4-A. Rounds 1–3 leave it untouched. |
 
 A swarm edits a crate manifest only when the table below names that manifest. No swarm adds a dependency except R4-A, and that dependency is the existing `horbm-ear` crate by path.
@@ -204,7 +204,7 @@ No swarm edits `horbm/crates/horbm`. No swarm edits a workspace manifest.
 
 **Goal.** Add `DiaryScan::open_capped(keys, diary, remember)` that calls the existing `open` with `SCAN_CAP`, so the thread cannot pick a second cap.
 
-**Owns.** `horbm/crates/horbm-brain/**` (that crate's `Cargo.toml` included; do not add a dependency).
+**Owns.** `horbm/crates/horbm-brain` (that crate's `Cargo.toml` included; do not add a dependency).
 
 **Acceptance.** `cargo test --manifest-path horbm/Cargo.toml -p horbm-brain --lib open_capped_uses_scan_cap` and the existing `cargo test --manifest-path horbm/Cargo.toml -p horbm-brain --test scan_alloc`. `k()` equals `SCAN_CAP`. `scan_selected_into` is unchanged.
 
@@ -216,7 +216,7 @@ No swarm edits `horbm/crates/horbm`. No swarm edits a workspace manifest.
 
 **Goal.** Add `Heard::from_axes(valence, arousal, confidence) -> Option<Heard>`. Return `None` when any value is non-finite or when `confidence < EAR_CONFIDENCE`. Do not change `apply_turn`.
 
-**Owns.** `horbm/crates/horbm-inner/**`
+**Owns.** `horbm/crates/horbm-inner`
 
 **Acceptance.** `cargo test --manifest-path horbm/Cargo.toml -p horbm-inner --test dev_persona --test persona_inner`. The low-confidence ear is no claim. Words still count when the ear is off.
 
@@ -228,7 +228,7 @@ No swarm edits `horbm/crates/horbm`. No swarm edits a workspace manifest.
 
 **Goal.** Add `ListenerOffer::heard_axes(self) -> Option<(f32, f32, f32)>` as `(valence, arousal, strength)`, or `None` when any of the three is non-finite. Sensing stays on by default. The new function does not call `EmotionCore::step`.
 
-**Owns.** `crates/horbm-ear/**` (that crate's `Cargo.toml` included; do not add a dependency). The root `Cargo.toml` stays untouched.
+**Owns.** `crates/horbm-ear` (that crate's `Cargo.toml` included; do not add a dependency). The root `Cargo.toml` stays untouched.
 
 **Acceptance.** `cargo test -p horbm-ear --test frames a_heard_frame_exposes_axes_and_a_denied_frame_does_not`. `default_is_on_and_only_the_off_switch_closes_it` still passes.
 
@@ -240,7 +240,7 @@ No swarm edits `horbm/crates/horbm`. No swarm edits a workspace manifest.
 
 **Goal.** Superseded. Do not add `Persona::allows_development_boot`. `Persona::load` of `horbm/crates/horbm-persona/personas/aria.toml` still succeeds. Do not delete that file. Development boot loads the configured development persona (`Persona::load_development`, `Persona::is_configured_boot`).
 
-**Owns.** `horbm/crates/horbm-persona/**`
+**Owns.** `horbm/crates/horbm-persona`
 
 **Acceptance.** `cargo test --manifest-path horbm/Cargo.toml -p horbm-persona --test persona`. `horbm/crates/horbm-persona/personas/aria.toml` still loads. It is a development boot only when the config names its id.
 
@@ -252,10 +252,10 @@ No swarm edits `horbm/crates/horbm`. No swarm edits a workspace manifest.
 
 | Path | R1-A | R1-B | R1-C | R1-D |
 |---|---|---|---|---|
-| `horbm/crates/horbm-brain/**` | yes | | | |
-| `horbm/crates/horbm-inner/**` | | yes | | |
-| `crates/horbm-ear/**` | | | yes | |
-| `horbm/crates/horbm-persona/**` | | | | yes |
+| `horbm/crates/horbm-brain` | yes | | | |
+| `horbm/crates/horbm-inner` | | yes | | |
+| `crates/horbm-ear` | | | yes | |
+| `horbm/crates/horbm-persona` | | | | yes |
 | Root `Cargo.toml`, root `Cargo.lock`, `horbm/Cargo.toml`, `horbm/Cargo.lock`, `LOCKS.toml` | | | | |
 
 The four owned trees are different directories. Their intersection is empty.
@@ -292,7 +292,7 @@ No swarm edits `brain.rs` or `lib.rs`. Adding a struct field is done with `Defau
 
 **Goal.** Add `Dialogue::decide_held(&mut self, input, hold_topic: bool)`. `hold_topic == false` returns the same `Decision` as `decide`. `hold_topic == true` with `Move::OfferTopic` selected becomes `Move::Ask` and does not build `Back to {topic}?`. `decide` itself stays. The bandit still does not change the move. A research hit still cannot be an answer or a citation.
 
-**Owns.** `horbm/crates/horbm/src/dialogue/**`, `horbm/crates/horbm/tests/dialogue.rs`
+**Owns.** `horbm/crates/horbm/src/dialogue`, `horbm/crates/horbm/tests/dialogue.rs`
 
 **Acceptance.** `cargo test --manifest-path horbm/Cargo.toml -p horbm --test dialogue`. New test `hold_false_matches_decide_and_hold_true_blocks_offer_topic`.
 
@@ -321,7 +321,7 @@ No swarm edits `brain.rs` or `lib.rs`. Adding a struct field is done with `Defau
 | `horbm/crates/horbm-brain/src/scan.rs` (module comment only) | yes | | | |
 | `horbm/crates/horbm/src/memory.rs` | | yes | | |
 | `horbm/crates/horbm/tests/memory.rs` | | yes | | |
-| `horbm/crates/horbm/src/dialogue/**` | | | yes | |
+| `horbm/crates/horbm/src/dialogue` | | | yes | |
 | `horbm/crates/horbm/tests/dialogue.rs` | | | yes | |
 | `horbm/crates/horbm/src/learn.rs` | | | | yes |
 | `horbm/crates/horbm/tests/learn.rs` | | | | yes |
@@ -407,7 +407,7 @@ Boot does not use `allows_development_boot` and does not load one named persona.
 | `horbm/crates/horbm/tests/moment_split.rs` | | | yes | |
 | `horbm/crates/horbm/src/lib.rs` | | | | yes |
 | `horbm/crates/horbm/tests/session.rs` | | | | yes |
-| `cards.rs` in the bridge, `chunks.rs`, `local-server/**`, `horbm/Cargo.lock`, root manifests, `LOCKS.toml` | | | | |
+| `cards.rs` in the bridge, `chunks.rs`, `voice-stack/local-server`, `horbm/Cargo.lock`, root manifests, `LOCKS.toml` | | | | |
 
 `horbm/crates/horbm/tests/moment.rs` and `horbm/crates/horbm/tests/moment_split.rs` are different files. `horbm/crates/horbm/src/brain.rs` and `horbm/crates/horbm/src/lib.rs` are different files.
 
@@ -490,7 +490,7 @@ S82 (`voice-stack/local-server`) is the live host. Swarms R4-A through R4-D do n
 | `horbm/crates/horbm-eval/tests/brain_lock.rs` | | | yes | |
 | `voice-stack/horbm-bridge/src/cards.rs` | | | | yes |
 | `voice-stack/horbm-bridge/tests/diary.rs` | | | | yes |
-| `piper_mouth.rs`, `mouth.rs`, `local-server/**`, root `Cargo.lock`, `voice-stack/Cargo.lock`, bridge `Cargo.lock`, `LOCKS.toml` | | | | |
+| `piper_mouth.rs`, `mouth.rs`, `voice-stack/local-server`, root `Cargo.lock`, `voice-stack/Cargo.lock`, bridge `Cargo.lock`, `LOCKS.toml` | | | | |
 
 `horbm/crates/horbm-duplex/src/brain.rs` and `horbm/crates/horbm-voice/src/brain.rs` are different files. `horbm/Cargo.lock` appears in one column.
 
