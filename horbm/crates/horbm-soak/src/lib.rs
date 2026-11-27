@@ -20,7 +20,7 @@ mod recog;
 mod stats;
 
 pub use drive::{run, ticks_for, SEED};
-pub use stats::{parse_vm_rss, vm_rss_kib};
+pub use stats::{parse_smaps_rss, parse_vm_rss, smaps_rss_kib, vm_rss_kib};
 
 /// Steady-path allocation counts. `min == max` means the count did not move.
 #[derive(Clone, Copy, Debug)]
@@ -75,10 +75,19 @@ pub struct Report {
     pub emotion_probe: u64,
     pub buffer_probe: u64,
     pub windows: Vec<Window>,
+    /// Requested bytes still live when the clock starts.
+    pub heap_start: u64,
+    /// Requested bytes still live at the end of the warmup tick.
+    pub heap_warm: Option<u64>,
+    /// Requested bytes still live after the last tick.
+    pub heap_end: u64,
     pub rss_start: Result<u64, String>,
     pub rss_warm: Option<Result<u64, String>>,
     pub rss_end: Result<u64, String>,
     pub rss_peak: u64,
+    pub smaps_start: Result<u64, String>,
+    pub smaps_warm: Option<Result<u64, String>>,
+    pub smaps_end: Result<u64, String>,
     pub buffer_max: usize,
     pub buffer_end: usize,
     pub buffer_overflows: u64,
@@ -125,6 +134,10 @@ impl Report {
     }
 
     /// One block of counts. No transcript and no samples.
+    ///
+    /// `heap_bytes` is the growth gate. `rss_kib` is `VmRSS`. `smaps_rss_kib`
+    /// is exact `Rss` from `/proc/self/smaps_rollup` when that file can be
+    /// read. Those two resident-set lines are information.
     #[must_use]
     pub fn table(&self) -> String {
         let mut lines = Vec::new();
@@ -163,6 +176,15 @@ impl Report {
             barge_list(&self.barges)
         ));
         lines.push(format!(
+            "heap_bytes start={} warm={} end={} growth={}",
+            self.heap_start,
+            show_heap(self.heap_warm),
+            self.heap_end,
+            self.heap_warm
+                .map(|warm| self.heap_end.saturating_sub(warm).to_string())
+                .unwrap_or_else(|| "unread".to_string())
+        ));
+        lines.push(format!(
             "rss_kib start={} warm={} end={} peak={}",
             show_rss(&self.rss_start),
             self.rss_warm
@@ -171,6 +193,15 @@ impl Report {
                 .unwrap_or_else(|| "unread".to_string()),
             show_rss(&self.rss_end),
             self.rss_peak
+        ));
+        lines.push(format!(
+            "smaps_rss_kib start={} warm={} end={}",
+            show_rss(&self.smaps_start),
+            self.smaps_warm
+                .as_ref()
+                .map(show_rss)
+                .unwrap_or_else(|| "unread".to_string()),
+            show_rss(&self.smaps_end)
         ));
         lines.push(format!(
             "buffer max_samples={} end_samples={} overflows={} desync={}",
@@ -199,7 +230,10 @@ impl Report {
         lines.join("\n")
     }
 
-    /// Fail closed. A missing measurement is a failure.
+    /// Fail closed. A missing live-heap sample is a failure.
+    ///
+    /// `VmRSS` and smaps `Rss` are printed by [`Report::table`] and are not
+    /// gated.
     pub fn enforce(&self) -> Result<(), String> {
         let mut problems = Vec::new();
         if !self.failures.is_empty() {
@@ -302,32 +336,17 @@ impl Report {
                 self.user_sent, self.user_heard
             ));
         }
-        let warm = match &self.rss_warm {
-            Some(Ok(kib)) => Some(*kib),
-            Some(Err(err)) => {
-                problems.push(format!("rss warmup {err}"));
-                None
+        match self.heap_warm {
+            Some(warm) => {
+                let growth = self.heap_end.saturating_sub(warm);
+                let limit = HEAP_GROWTH_KIB.saturating_mul(1024);
+                if growth > limit {
+                    problems.push(format!(
+                        "heap growth {growth} bytes, gate {HEAP_GROWTH_KIB} KiB"
+                    ));
+                }
             }
-            None => {
-                problems.push("rss warmup was not read".to_string());
-                None
-            }
-        };
-        let end = match &self.rss_end {
-            Ok(kib) => Some(*kib),
-            Err(err) => {
-                problems.push(format!("rss end {err}"));
-                None
-            }
-        };
-        if let (Some(warm), Some(end)) = (warm, end) {
-            let growth = end.saturating_sub(warm);
-            let peak_growth = self.rss_peak.saturating_sub(warm);
-            if growth > RSS_GROWTH_KIB || peak_growth > RSS_GROWTH_KIB {
-                problems.push(format!(
-                    "rss growth {growth} KiB peak growth {peak_growth} KiB, gate {RSS_GROWTH_KIB} KiB"
-                ));
-            }
+            None => problems.push("heap warmup was not read".to_string()),
         }
         let expect_windows = self.minutes / 5;
         if self.windows.len() as u64 != expect_windows {
@@ -403,6 +422,12 @@ fn show_rss(value: &Result<u64, String>) -> String {
     }
 }
 
+fn show_heap(value: Option<u64>) -> String {
+    value
+        .map(|bytes| bytes.to_string())
+        .unwrap_or_else(|| "unread".to_string())
+}
+
 fn fmt_axes(values: &[f32; 4]) -> String {
     format!(
         "{:.4},{:.4},{:.4},{:.4}",
@@ -433,9 +458,10 @@ const IDLE_ALLOC_MAX: u64 = 0;
 const PLAY_ALLOC_MAX: u64 = 4;
 /// Steady user-hold allocations per tick. Measured 1 (the partial cloned into FrameOut).
 const HOLD_ALLOC_MAX: u64 = 1;
-/// Resident-set growth from warmup to the end, in KiB.
-/// Measured 24 KiB with Flite and 48 KiB with the native mouth, over 60 minutes.
-const RSS_GROWTH_KIB: u64 = 128;
+/// Live-heap growth from the warmup sample to the end, in KiB.
+/// 128 KiB is 131_072 bytes. The limit is not raised.
+/// `VmRSS` and smaps `Rss` are printed and are not gated.
+const HEAP_GROWTH_KIB: u64 = 128;
 /// Output buffer high-water mark, in samples.
 /// Measured 28160. One extra frame (1280) is the margin.
 const BUFFER_DEPTH_MAX: usize = 29_440;

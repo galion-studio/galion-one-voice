@@ -58,13 +58,13 @@ Covered:
 
 Nothing added here is Linux-only. `StoredKeys::open` goes through `MappedBytes`, which already shipped that split. The tests ran on Linux, rustc 1.85.
 
-## Soak RSS
+## Soak gate
 
-`horbm-soak` `samantha_duplex_long_call` reads `VmRSS` at warmup tick 250 and at the end. The gate is growth and peak growth of 128 KiB. The duplex brain is `Brain::with_cards`, which leaves `retrieval` as `None`. `retrieval_spoke` returns before `ask_wait`. The long call does not spawn the retrieval thread, does not open the store, does not build a `DiaryScan`, and does not map a key file.
+`horbm-soak` `samantha_duplex_long_call` samples live heap at warmup tick 250 and at the end. The gate is end minus that warmup sample, 128 KiB. `VmRSS` and, when readable, exact `Rss` from `/proc/self/smaps_rollup` are printed and are not gated. The duplex brain is `Brain::with_cards`, which leaves `retrieval` as `None`. `retrieval_spoke` returns before `ask_wait`. The long call does not spawn the retrieval thread, does not open the store, does not build a `DiaryScan`, and does not map a key file.
 
 The soak test binary does not contain `DiaryScan`, `scan_selected_into`, or `open_store`. `nm` on the debug `horbm-soak` test shows `RetrievalThread::ask_wait` only because `Brain::turn` mentions it. That call is not taken. Steady allocation counts stay put: idle 0, playback 4, hold 1, on every run below. A structure that grew after warmup would move those counts.
 
-Eight runs on this branch after merging `main` `b8f33bb7`, and eight runs on that main, debug profile, five virtual minutes, rustc 1.85.0. Growth is `end - warm`, and peak equalled end.
+Eight runs on this branch after merging `main` `b8f33bb7`, and eight runs on that main, debug profile, five virtual minutes, rustc 1.85.0. Those numbers are `VmRSS` from when that was the gate. Growth is `end - warm`, and peak equalled end.
 
 | Tree | Growth, KiB |
 |---|---|

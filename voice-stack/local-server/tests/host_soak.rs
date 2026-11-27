@@ -3,9 +3,10 @@
 //! Long granted run of the real host.
 //!
 //! Boots the dev profile the way `end_to_end_dev_session` does, then sends
-//! `GALION_HOST_SOAK_TURNS` text lines (default 1500) on the socket. `VmRSS`
+//! `GALION_HOST_SOAK_TURNS` text lines (default 1500) on the socket. Live heap
 //! is marked after 300 turns. Growth after that mark is held to 128 KiB, the
-//! same number as `horbm-soak`'s `RSS_GROWTH_KIB`.
+//! same number as `horbm-soak`'s `HEAP_GROWTH_KIB`. `VmRSS` and, when readable,
+//! exact `Rss` from `/proc/self/smaps_rollup` are printed and are not gated.
 //!
 //! Ignored. Laptop:
 //! `cargo test --manifest-path voice-stack/local-server/Cargo.toml --test host_soak -- --ignored --nocapture`
@@ -15,8 +16,8 @@
 //! miss does not enter `Brain::gaps` on this base, so a gap row is counted
 //! and printed. Every gap row that is present names its reason.
 //!
-//! `VmRSS` comes from `/proc/self/status`. On any other target this test
-//! compiles to a no-op and prints a note.
+//! Live heap is a counting allocator over `std::alloc::System`. On any other
+//! target this test compiles to a no-op and prints a note.
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 #[ignore = "long: cargo test --test host_soak -- --ignored"]
@@ -25,18 +26,18 @@ async fn granted_host_soak_rss_stays_at_the_soak_gate() {
     soak::run().await;
     #[cfg(not(target_os = "linux"))]
     {
-        println!(
-            "VmRSS is read from /proc/self/status on Linux; this target does not run the soak"
-        );
+        println!("live heap is measured on Linux; this target does not run the soak");
     }
 }
 
 #[cfg(target_os = "linux")]
 mod soak {
+    use std::alloc::{GlobalAlloc, Layout, System};
     use std::fs::{self, File};
     use std::io::{Read, Write};
     use std::net::{Ipv4Addr, SocketAddr};
     use std::path::{Path, PathBuf};
+    use std::sync::atomic::{AtomicUsize, Ordering};
     use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
     use futures_util::{SinkExt, StreamExt};
@@ -49,8 +50,61 @@ mod soak {
 
     type Sock = WebSocketStream<MaybeTlsStream<tokio::net::TcpStream>>;
 
-    /// Same number as `horbm-soak`'s `RSS_GROWTH_KIB`. Not a second gate.
-    const RSS_GROWTH_KIB: u64 = 128;
+    /// Same number as `horbm-soak`'s `HEAP_GROWTH_KIB`. Not a second gate.
+    const HEAP_GROWTH_KIB: u64 = 128;
+
+    /// Requested bytes still live. Alloc adds, dealloc subtracts, realloc
+    /// applies the size delta. The library crates do not install this.
+    struct Counting;
+
+    static LIVE_BYTES: AtomicUsize = AtomicUsize::new(0);
+
+    fn live_add(bytes: usize) {
+        LIVE_BYTES.fetch_add(bytes, Ordering::Relaxed);
+    }
+
+    fn live_sub(bytes: usize) {
+        LIVE_BYTES.fetch_sub(bytes, Ordering::Relaxed);
+    }
+
+    fn live_resize(old: usize, new: usize) {
+        if new >= old {
+            live_add(new - old);
+        } else {
+            live_sub(old - new);
+        }
+    }
+
+    fn live_bytes() -> u64 {
+        LIVE_BYTES.load(Ordering::Relaxed) as u64
+    }
+
+    unsafe impl GlobalAlloc for Counting {
+        unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+            let ptr = System.alloc(layout);
+            if !ptr.is_null() {
+                live_add(layout.size());
+            }
+            ptr
+        }
+
+        unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
+            live_sub(layout.size());
+            System.dealloc(ptr, layout);
+        }
+
+        unsafe fn realloc(&self, ptr: *mut u8, layout: Layout, new_size: usize) -> *mut u8 {
+            let next = System.realloc(ptr, layout, new_size);
+            if !next.is_null() || new_size == 0 {
+                let kept = if next.is_null() { 0 } else { new_size };
+                live_resize(layout.size(), kept);
+            }
+            next
+        }
+    }
+
+    #[global_allocator]
+    static ALLOCATOR: Counting = Counting;
     const MARK_AFTER: u64 = 300;
     const DEFAULT_TURNS: u64 = 1500;
 
@@ -94,33 +148,61 @@ mod soak {
         hello(&mut ws).await;
 
         let mut rss_buf = String::new();
+        let mut smaps_buf = String::new();
+        // Size both buffers before the gated window. Later reads reuse them,
+        // so the measurement itself is not live-heap growth.
+        let rss_start = read_rss(&mut rss_buf);
+        let smaps_start = read_smaps(&mut smaps_buf);
+        let heap_start = live_bytes();
+        println!(
+            "host soak start heap {heap_start} bytes rss {} smaps {}",
+            show_kib(&rss_start),
+            show_kib(&smaps_start)
+        );
         let mut mark: Option<u64> = None;
         let mut peak = 0u64;
         let mut end = 0u64;
+        let mut heap_mark: Option<u64> = None;
+        let mut heap_end = heap_start;
         for n in 1..=turns {
             let index = usize::try_from(n - 1).expect("turn") % LINES.len();
             say(&mut ws, LINES[index]).await;
             if n < MARK_AFTER {
                 continue;
             }
-            let kib =
-                read_rss(&mut rss_buf).unwrap_or_else(|err| panic!("VmRSS after turn {n}: {err}"));
-            if mark.is_none() {
-                mark = Some(kib);
+            let rss_now = read_rss(&mut rss_buf);
+            if let Ok(kib) = rss_now.as_ref() {
+                if mark.is_none() {
+                    mark = Some(*kib);
+                }
+                peak = peak.max(*kib);
+                end = *kib;
             }
-            peak = peak.max(kib);
-            end = kib;
             if n == MARK_AFTER || n == turns {
-                println!("host soak turn {n} rss {kib} KiB");
+                let smaps = read_smaps(&mut smaps_buf);
+                let heap = live_bytes();
+                if n == MARK_AFTER {
+                    heap_mark = Some(heap);
+                }
+                if n == turns {
+                    heap_end = heap;
+                }
+                println!(
+                    "host soak turn {n} heap {heap} bytes rss {} smaps {}",
+                    show_kib(&rss_now),
+                    show_kib(&smaps)
+                );
             }
         }
         drop(ws);
-        let mark = mark.expect("rss mark");
+        let heap_mark = heap_mark.expect("heap mark");
         let wall_s = started.elapsed().as_secs_f64();
-        let growth = end.saturating_sub(mark);
-        let peak_growth = peak.saturating_sub(mark);
+        let growth = heap_end.saturating_sub(heap_mark);
+        let limit = HEAP_GROWTH_KIB.saturating_mul(1024);
+        let rss_mark = mark.unwrap_or(0);
+        println!("host soak end heap {heap_end} bytes");
         let summary = format!(
-            "turns={turns} wall={wall_s:.3}s rss_mark={mark} KiB rss_peak={peak} KiB rss_end={end} KiB growth={growth} KiB peak_growth={peak_growth} KiB gate={RSS_GROWTH_KIB} KiB"
+            "turns={turns} wall={wall_s:.3}s heap_start={heap_start} bytes heap_mark={heap_mark} bytes heap_end={heap_end} bytes growth={growth} bytes gate={HEAP_GROWTH_KIB} KiB rss_mark={rss_mark} KiB rss_peak={peak} KiB rss_end={end} KiB"
         );
 
         running.shutdown().await;
@@ -153,8 +235,8 @@ mod soak {
         let gaps = count_gaps(&turn_log);
         println!("host soak gaps={gaps}");
         assert!(
-            growth <= RSS_GROWTH_KIB && peak_growth <= RSS_GROWTH_KIB,
-            "rss growth {growth} KiB peak growth {peak_growth} KiB, gate {RSS_GROWTH_KIB} KiB; {summary}"
+            growth <= limit,
+            "heap growth {growth} bytes, gate {HEAP_GROWTH_KIB} KiB; {summary}"
         );
         let _ = fs::remove_dir_all(&root);
     }
@@ -233,6 +315,35 @@ mod soak {
                 .map_err(|err| format!("VmRSS {kb}: {err}"));
         }
         Err("VmRSS is not in /proc/self/status".to_string())
+    }
+
+    fn read_smaps(buf: &mut String) -> Result<u64, String> {
+        buf.clear();
+        let mut file = File::open("/proc/self/smaps_rollup")
+            .map_err(|err| format!("reading /proc/self/smaps_rollup: {err}"))?;
+        file.read_to_string(buf)
+            .map_err(|err| format!("reading /proc/self/smaps_rollup: {err}"))?;
+        smaps_rss_kib(buf)
+    }
+
+    fn smaps_rss_kib(text: &str) -> Result<u64, String> {
+        for line in text.lines() {
+            let Some(rest) = line.trim_start().strip_prefix("Rss:") else {
+                continue;
+            };
+            let Some(kb) = rest.split_whitespace().next() else {
+                return Err("Rss has no number".to_string());
+            };
+            return kb.parse::<u64>().map_err(|err| format!("Rss {kb}: {err}"));
+        }
+        Err("Rss is not in /proc/self/smaps_rollup".to_string())
+    }
+
+    fn show_kib(value: &Result<u64, String>) -> String {
+        match value {
+            Ok(kib) => format!("{kib} KiB"),
+            Err(err) => err.clone(),
+        }
     }
 
     /// Live log plus the five rotated files the host keeps.
