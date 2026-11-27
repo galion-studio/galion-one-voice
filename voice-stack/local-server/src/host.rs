@@ -12,16 +12,16 @@ use std::collections::HashMap;
 use std::fs::{self, File, OpenOptions};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::mpsc::{sync_channel, Receiver, SyncSender, TrySendError};
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use horbm::{ClauseSource, LearnConfig, RetrievalConfig, SessionSeal};
+use horbm::{ClauseSource, LearnConfig, LearnPass, RetrievalConfig, SessionSeal};
 
 use crate::brain::HorbmMind;
-use crate::reply::TurnOut;
+use crate::reply::{ReplyEngine, TurnOut};
 
 /// Shipped development profile. Parsed only when development mode is selected.
 const SHIPPED_PROFILE: &str = include_str!("../dev.env");
@@ -260,12 +260,20 @@ pub struct HostSession {
     log: TurnLog,
     session_id: String,
     turns: AtomicU64,
+    /// Rows handed to the brain. Count only. The text stays in the pack.
+    learned_rows: AtomicUsize,
+    /// True after a non-empty attach. An empty audit clears the thread only
+    /// when this is set; the first empty audit leaves the spawn diary alone.
+    pack_attached: AtomicBool,
     finished: AtomicBool,
+    /// Set before shutdown seals. Mood and idle work skip the mind lock.
+    stopping: AtomicBool,
 }
 
 impl HostSession {
     /// Create the memory directory only when remember or learn is granted.
-    /// Opens the mind, the seal, and the log thread. Does not listen.
+    /// Opens the mind, the seal, and the log thread, then attaches the sealed
+    /// pack when both grants are on. Does not listen.
     pub fn boot(config: HostConfig, knowledge: PathBuf) -> Result<Arc<Self>, String> {
         if config.remember.granted || config.learn.granted {
             fs::create_dir_all(&config.memory_dir)
@@ -283,7 +291,7 @@ impl HostSession {
         let mind = Arc::new(Mutex::new(HorbmMind::open_configured(&knowledge, &config)));
         let seal = Mutex::new(SessionSeal::open(config.learn_config.clone()));
         let log = TurnLog::open(&config.turn_log, config.turn_log_cap, config.turn_log_keep)?;
-        Ok(Arc::new(Self {
+        let session = Arc::new(Self {
             config,
             knowledge,
             mind,
@@ -293,8 +301,94 @@ impl HostSession {
             log,
             session_id: new_session_id(),
             turns: AtomicU64::new(0),
+            learned_rows: AtomicUsize::new(0),
+            pack_attached: AtomicBool::new(false),
             finished: AtomicBool::new(false),
-        }))
+            stopping: AtomicBool::new(false),
+        });
+        session.attach_pack();
+        // The socket's first turn is held to 8s, and that turn is the shipped
+        // kettle question. Open the diary and the retrieval path here, before
+        // anything listens, and drop the reply. The seal and the turn log are
+        // not touched.
+        session.warm_reply_path();
+        Ok(session)
+    }
+
+    fn warm_reply_path(&self) {
+        let mut mind = self.mind.lock().unwrap_or_else(|err| err.into_inner());
+        let _ = mind.turn("where is the kettle");
+    }
+
+    /// The one attach path. R11 S158 re-attaches after a retract through this same helper.
+    ///
+    /// Both grants and a live pack file: [`LearnPass::audit`] once, then
+    /// [`HorbmMind::attach_learned`] with those rows. No grants, or no live
+    /// file and nothing previously attached: return without constructing
+    /// [`LearnPass`] and without calling `attach_learned`. `LearnPass::audit`
+    /// on a missing file does not open SQLite, but constructing the pass is
+    /// still boot work, and `set_learned([])` would replace the diary the
+    /// card engine just opened. The spawn diary already has no learned rows,
+    /// so an empty pack leaves it untouched. After a real attach, a missing
+    /// or empty pack still forwards `[]` so a retract clears the thread.
+    ///
+    /// An audit or attach error is printed once and the count stays zero.
+    /// The startup line prints the count, never the text. Not used on a turn.
+    /// `finish` only seals.
+    fn attach_pack(&self) -> usize {
+        if self.finished.load(Ordering::SeqCst) {
+            return self.learned_rows.load(Ordering::Relaxed);
+        }
+        let count = if self.config.learn.granted && self.config.remember.granted {
+            self.attach_if_pack_exists()
+        } else {
+            0
+        };
+        self.learned_rows.store(count, Ordering::Relaxed);
+        count
+    }
+
+    /// Stat the live file. Open the pack only when that file is present, or
+    /// when a previous attach has to be cleared.
+    fn attach_if_pack_exists(&self) -> usize {
+        let live = self
+            .config
+            .learn_config
+            .pack_dir
+            .join(horbm::LEARN_PACK_LIVE)
+            .join(horbm::LEARN_PACK_DB);
+        if !live.is_file() && !self.pack_attached.load(Ordering::Relaxed) {
+            return 0;
+        }
+        match LearnPass::open(self.config.learn_config.clone()).audit() {
+            Ok(audit) => self.hand_learned(audit.rows),
+            Err(err) => {
+                eprintln!("horbm learn: {err}");
+                0
+            }
+        }
+    }
+
+    /// Forward `rows` unless this is the first attach and the list is empty.
+    fn hand_learned(&self, rows: Vec<horbm::LearnedRow>) -> usize {
+        let count = rows.len();
+        if count == 0 && !self.pack_attached.load(Ordering::Relaxed) {
+            return 0;
+        }
+        let attached = {
+            let mut mind = self.mind.lock().unwrap_or_else(|err| err.into_inner());
+            mind.attach_learned(rows)
+        };
+        match attached {
+            Ok(()) => {
+                self.pack_attached.store(count > 0, Ordering::Relaxed);
+                count
+            }
+            Err(err) => {
+                eprintln!("horbm learn: {err}");
+                0
+            }
+        }
     }
 
     pub fn config(&self) -> &HostConfig {
@@ -312,11 +406,12 @@ impl HostSession {
     pub fn startup_line(&self) -> String {
         let mind = self.mind.lock().unwrap_or_else(|err| err.into_inner());
         format!(
-            "{} persona={} knowledge_cards={} knowledge_dir={}",
+            "{} persona={} knowledge_cards={} knowledge_dir={} learned_rows={}",
             self.config.startup_line(),
             mind.persona_id(),
             mind.knowledge_cards(),
-            self.knowledge.display()
+            self.knowledge.display(),
+            self.learned_rows.load(Ordering::Relaxed)
         )
     }
 
@@ -458,7 +553,22 @@ impl HostSession {
 
     /// Diary `end_session`, then [`SessionSeal::seal`]. Both are no-ops when
     /// that consent is denied. Not called from [`Drop`]. A crash writes nothing.
+    ///
+    /// This does not audit the pack and does not call `attach_pack`.
+    /// The seal is one write of the clause already held in RAM. The signal
+    /// handler only wakes the runtime; this runs after that, on the blocking
+    /// pool.
+    /// Mood ticks and idle thoughts must not take the mind lock after this.
+    pub fn begin_shutdown(&self) {
+        self.stopping.store(true, Ordering::SeqCst);
+    }
+
+    pub fn is_stopping(&self) -> bool {
+        self.stopping.load(Ordering::SeqCst)
+    }
+
     pub fn finish(&self) {
+        self.begin_shutdown();
         if self.finished.swap(true, Ordering::SeqCst) {
             return;
         }

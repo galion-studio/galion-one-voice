@@ -204,9 +204,11 @@ impl Drop for SpeakWorker {
     fn drop(&mut self) {
         self.cancel();
         let _ = self.tx.send(MouthJob::Shutdown);
-        if let Some(join) = self.join.take() {
-            let _ = join.join();
-        }
+        // Detach. Joining here runs on the thread that drops the pipeline.
+        // During SIGTERM that thread is a runtime worker, and a mouth still
+        // inside one sentence would hold shutdown past the 20 s budget.
+        // The mouth thread exits on Shutdown, or when the process does.
+        drop(self.join.take());
     }
 }
 
@@ -827,6 +829,13 @@ impl Pipeline for LivePipeline {
     }
 
     fn tick_mood(&mut self) -> (crate::reply::Pad, &'static str) {
+        if self
+            .host
+            .as_ref()
+            .is_some_and(|host| host.is_stopping())
+        {
+            return (crate::reply::Pad::RESTING, "resting");
+        }
         let (pad, source) = match self
             .mind
             .lock()
@@ -852,6 +861,14 @@ impl Pipeline for LivePipeline {
 
     fn poll_inner(&mut self) -> Option<String> {
         // Quiet after a heard line, on the existing mood tick. Not inside a turn.
+        // Shutdown seals on the same mind lock. Do not start another inner then.
+        if self
+            .host
+            .as_ref()
+            .is_some_and(|host| host.is_stopping())
+        {
+            return None;
+        }
         if self.phase != "idle" {
             return None;
         }

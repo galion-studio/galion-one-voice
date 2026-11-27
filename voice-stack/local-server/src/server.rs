@@ -194,14 +194,24 @@ impl Running {
     /// The seal runs on the blocking pool. `finish` closes the turn log in
     /// that same call, so a stalled seal does not pin a runtime worker.
     pub async fn shutdown(mut self) {
+        if let Some(host) = &self.host {
+            host.begin_shutdown();
+        }
         if let Some(stop) = self.stop.take() {
             stop.notify_one();
         }
         if let Some(join) = self.join.take() {
-            let _ = tokio::time::timeout(Duration::from_secs(5), join).await;
+            join.abort();
+            let _ = tokio::time::timeout(Duration::from_secs(2), join).await;
         }
         if let Some(host) = self.host.take() {
-            let joined = tokio::task::spawn_blocking(move || host.finish()).await;
+            let joined = tokio::task::spawn_blocking(move || {
+                host.finish();
+                // The seal and the diary write are done. Joining the retrieval
+                // and memory workers can park past the SIGTERM budget.
+                std::mem::forget(host);
+            })
+            .await;
             if let Err(err) = joined {
                 if err.is_panic() {
                     std::panic::resume_unwind(err.into_panic());
