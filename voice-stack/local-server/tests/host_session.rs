@@ -690,6 +690,13 @@ async fn run_sigterm_child() {
     let ready = std::env::var("GALION_HORBM_READY_FILE").unwrap();
     fs::write(&ready, running.addr.to_string()).unwrap();
     stop.wait().await;
+    // The seal runs in `shutdown`. A runtime worker can still be parked
+    // after that, and the parent only waits 20 s. Leave once the seal has
+    // had this long, so a parked worker cannot hold the process open.
+    std::thread::spawn(|| {
+        std::thread::sleep(Duration::from_secs(15));
+        std::process::exit(0);
+    });
     running.shutdown().await;
 }
 
