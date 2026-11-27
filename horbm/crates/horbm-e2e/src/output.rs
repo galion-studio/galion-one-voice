@@ -104,7 +104,8 @@ impl Output {
     }
 
     /// Drop whatever is still queued and time that drop through one silent
-    /// render. `None` when nothing was queued.
+    /// render. `None` when nothing was queued or the device callback did not
+    /// honor the flush. For ALSA the number is the callback's honor delta.
     pub fn barge(&mut self) -> Option<u64> {
         match &mut self.kind {
             Kind::Loopback(loopback) => loopback.barge(),
@@ -194,17 +195,21 @@ impl AlsaOut {
         if wrote == 0 {
             return None;
         }
-        let started = Instant::now();
         self.session.playback().barge_in();
-        let deadline = started + std::time::Duration::from_millis(100);
+        // The honor is recorded on the ALSA callback thread. A tight
+        // `sched_yield` loop does not reliably switch to that thread on the
+        // GitHub runner kernel (7.0.0-1020), so the wait slept out the
+        // deadline and the flush looked ignored. A short sleep does switch.
+        // The returned value is the callback's own delta, so the sleep
+        // quantum is not added to the measurement.
+        let deadline = Instant::now() + std::time::Duration::from_millis(100);
         while self.session.playback().flush_honor_ns().is_none() {
             if Instant::now() >= deadline {
                 break;
             }
-            std::thread::yield_now();
+            std::thread::sleep(std::time::Duration::from_micros(200));
         }
-        self.session.playback().flush_honor_ns()?;
-        Some(u64::try_from(started.elapsed().as_nanos()).unwrap_or(u64::MAX))
+        self.session.playback().flush_honor_ns()
     }
 }
 
@@ -278,8 +283,14 @@ mod tests {
     #[cfg(all(feature = "alsa", target_os = "linux"))]
     #[test]
     fn alsa_flush_is_under_a_millisecond() {
+        let _asound = force_null_pcm();
         let mut output = Output::open_alsa().expect("alsa output");
         assert_eq!(output.name(), "alsa");
+        // Open returns before the callback thread has rendered. On the
+        // 2026-11-22 runner image that gap was longer than the old 50 ms
+        // pause plus the 100 ms honor wait, so the flush looked ignored.
+        // Give the thread a turn while this test is off-CPU, then measure.
+        wait_until_alsa_thread_runs();
         output.push(&vec![1_000; 4_800]).expect("push");
         let queued_now = output.queued();
         std::thread::sleep(std::time::Duration::from_millis(50));
@@ -288,10 +299,107 @@ mod tests {
             queued_now,
             "the queue must still be there when barge-in arrives"
         );
-        let ns = output.barge().expect("alsa flush was not honored");
+        let ns = output.barge().unwrap_or_else(|| {
+            panic!(
+                "alsa flush was not honored; device {:?} wchan {}",
+                output.device(),
+                alsa_thread_wchan()
+            )
+        });
         assert!(
             ns < BARGE_BUDGET_NS,
-            "alsa barge_in_stop_ns {ns} is not under 1 ms"
+            "alsa barge_in_stop_ns {ns} is not under 1 ms; device {:?} wchan {}",
+            output.device(),
+            alsa_thread_wchan()
         );
+    }
+
+    /// Point this process at ALSA's null PCM. A runner can export another
+    /// `ALSA_CONFIG_PATH` whose device does not call back inside the flush
+    /// wait. The file has to outlive `open`.
+    #[cfg(all(feature = "alsa", target_os = "linux"))]
+    fn force_null_pcm() -> std::path::PathBuf {
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_nanos())
+            .unwrap_or(0);
+        let dir = std::env::temp_dir().join(format!(
+            "horbm-e2e-asound-test-{}-{nanos}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&dir).expect("asound dir");
+        let path = dir.join("asoundrc");
+        std::fs::write(
+            &path,
+            "pcm.!default {\n    type null\n}\nctl.!default {\n    type null\n}\n",
+        )
+        .expect("asoundrc");
+        std::env::set_var("ALSA_CONFIG_PATH", &path);
+        path
+    }
+
+    #[cfg(all(feature = "alsa", target_os = "linux"))]
+    fn wait_until_alsa_thread_runs() {
+        let started = std::time::Instant::now();
+        while started.elapsed() < std::time::Duration::from_secs(1) {
+            if alsa_thread_cpu() > 0 {
+                return;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+    }
+
+    #[cfg(all(feature = "alsa", target_os = "linux"))]
+    fn alsa_thread_cpu() -> u64 {
+        alsa_thread_field(11).saturating_add(alsa_thread_field(12))
+    }
+
+    #[cfg(all(feature = "alsa", target_os = "linux"))]
+    fn alsa_thread_wchan() -> String {
+        let Ok(tasks) = std::fs::read_dir("/proc/self/task") else {
+            return "no task dir".to_string();
+        };
+        for task in tasks.flatten() {
+            let Ok(comm) = std::fs::read_to_string(task.path().join("comm")) else {
+                continue;
+            };
+            if comm.trim() != "cpal_alsa_out" {
+                continue;
+            }
+            return std::fs::read_to_string(task.path().join("wchan"))
+                .unwrap_or_default()
+                .trim()
+                .to_string();
+        }
+        "cpal_alsa_out missing".to_string()
+    }
+
+    /// `utime` is field 14 of `/proc/<tid>/stat` (index 11 after the comm
+    /// paren). `stime` is the next field.
+    #[cfg(all(feature = "alsa", target_os = "linux"))]
+    fn alsa_thread_field(index: usize) -> u64 {
+        let Ok(tasks) = std::fs::read_dir("/proc/self/task") else {
+            return 0;
+        };
+        let mut total = 0u64;
+        for task in tasks.flatten() {
+            let Ok(comm) = std::fs::read_to_string(task.path().join("comm")) else {
+                continue;
+            };
+            if comm.trim() != "cpal_alsa_out" {
+                continue;
+            }
+            let Ok(stat) = std::fs::read_to_string(task.path().join("stat")) else {
+                continue;
+            };
+            let Some((_, after)) = stat.split_once(')') else {
+                continue;
+            };
+            let mut fields = after.split_whitespace();
+            if let Some(value) = fields.nth(index).and_then(|text| text.parse().ok()) {
+                total = total.saturating_add(value);
+            }
+        }
+        total
     }
 }
