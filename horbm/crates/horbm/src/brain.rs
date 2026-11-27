@@ -27,12 +27,14 @@ use crate::dialogue::{
     DecideIn, Decision, Dialogue, DialogueConsent, ForgetAsk, Move, ReplyPlan, TurnSnap,
 };
 use crate::learn::LearnedRow;
-use crate::memory::{about_the_person, pin_command};
+use crate::memory::{
+    about_the_person, milestone_command, milestone_line, pin_command, timeline_ask,
+};
 use crate::research_style::{ResearchHit, ResearchRoot, StylePersona};
 use crate::retrieve::{CellState, MemoryHitCell, RetrievalThread, RetrieveError, RetrievedCells};
 use crate::route::{
-    accept_line, classify_ask, route_heard, AskOutcome, CardLookup, Gap, GapReason, ResearchAsk,
-    Speakable,
+    accept_line, classify_ask, is_money_action, route_heard, AskOutcome, CardLookup, Gap,
+    GapReason, ResearchAsk, Speakable,
 };
 use crate::{MemoryItem, Pad, TurnOut, RESEARCH_CAP, UNKNOWN_REPLY};
 
@@ -49,6 +51,18 @@ pub struct MoodMeta {
     pub pitch_st: f32,
     pub pause_ms: f32,
     pub named: Option<&'static str>,
+}
+
+/// Open, met, and dropped wants after the turns so far. Counts only.
+///
+/// The list is the in-tree `WantList` (Galion Labs, MIT,
+/// `voice-stack/empathy/src/wants.rs`). This copy does not hold the
+/// caller's words.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct WantCounts {
+    pub open: u32,
+    pub met: u32,
+    pub dropped: u32,
 }
 
 impl MoodMeta {
@@ -723,6 +737,20 @@ impl Brain {
         self.emotion.conductor_cue()
     }
 
+    /// Open, met, and dropped counts from the caller's want list.
+    ///
+    /// Reads [`galion_sam_empathy::Empathy::view`]. Does not speak the counts
+    /// and does not write the diary. A dropped want is closed and is not met.
+    /// [`Self::inner_turn`] keeps a different store and is not included.
+    pub fn want_counts(&self) -> WantCounts {
+        let view = self.empathy.view();
+        WantCounts {
+            open: view.open,
+            met: view.met,
+            dropped: view.dropped,
+        }
+    }
+
     /// One 80 ms frame with no new words. Does not speak. Does not step the moment.
     pub fn tick_frame(&mut self) -> MoodMeta {
         let tick = self.empathy.tick(TickIn {
@@ -919,6 +947,9 @@ impl Brain {
         if !self.memory_granted() {
             return None;
         }
+        if timeline_ask(heard) {
+            return self.timeline_spoke(heard);
+        }
         let query = crate::dialogue::recall_clause(heard);
         // Search the words after the cue. "do you remember my sister" would
         // otherwise require "you" and "remember" to be in the stored fact.
@@ -973,11 +1004,16 @@ impl Brain {
             }
         }
         // Comfort stays with them. The research ask does not open.
+        // A payment is not a task and is not armed. The four phrases are
+        // `is_money_action`, the same list as
+        // `crates/galion-conductor/src/research.rs`. A question mark skips
+        // that list and leaves `is_deep_question` in charge.
         // Every other miss stays local too. A deep miss is armed after the clause.
         let comfort = self.dialogue_lean().verb == Verb::Comfort;
         let routed = route_heard(query, self.cards.as_ref(), None, self.speakable);
         let research_later = self.research.is_some()
             && !comfort
+            && !is_money_action(query)
             && routed
                 .gap
                 .as_ref()
@@ -1080,7 +1116,11 @@ impl Brain {
             return;
         };
         memory.note_turn(&person, &person, heard, at);
-        if let Some(text) = pin_command(heard) {
+        if milestone_line(heard) {
+            if let Some(text) = milestone_command(heard) {
+                memory.milestone(&person, text, at);
+            }
+        } else if let Some(text) = pin_command(heard) {
             memory.pin(&person, text, at);
         }
         memory.note_state(&person, &state, at);
@@ -1095,6 +1135,52 @@ impl Brain {
             return Vec::new();
         };
         memory.recall(&person, heard)
+    }
+
+    /// Session summaries and milestones, oldest date first. A world question
+    /// never reaches this. An empty list is not a memory hit.
+    fn timeline_spoke(&mut self, heard: &str) -> Option<Spoke> {
+        let person = self.person_id.clone();
+        let memory = self.memory.as_deref_mut()?;
+        let items = crate::memory::relationship_timeline(memory, &person);
+        let parts: Vec<&str> = items
+            .iter()
+            .map(|item| item.text.trim())
+            .filter(|text| !text.is_empty())
+            .collect();
+        if parts.is_empty() {
+            return None;
+        }
+        let joined = parts.join(" ");
+        let spoken = (self.speakable)(&joined)?;
+        if spoken.trim().is_empty() {
+            return None;
+        }
+        let hit = items.first()?;
+        let (first, rest) = split_clause(&spoken, false);
+        let sources: Vec<String> = items
+            .iter()
+            .filter(|item| !item.id.is_empty())
+            .map(|item| format!("memory:{}", item.id))
+            .collect();
+        let id = hit.id.clone();
+        Some(Spoke {
+            reply: String::new(),
+            sources: sources.clone(),
+            evidence: sources,
+            lookup_us: 0,
+            picked: Some(Answer {
+                id,
+                clause: spoken,
+                first,
+                rest,
+                hit: true,
+                mark: classify(heard).map(|kind| SidebandMark {
+                    kind,
+                    posted: false,
+                }),
+            }),
+        })
     }
 
     /// Spoken only when `query` is about the person. The caller drops `hits`

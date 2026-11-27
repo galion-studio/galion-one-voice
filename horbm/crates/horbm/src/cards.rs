@@ -6,9 +6,11 @@
 //! card, create a directory, or open `horbm-memory`. That crate's
 //! `Stack::open` creates `revisions.sqlite`. The spoken match is the covering
 //! lookup already used on the 7881 path: every content token of the query is
-//! in the card, and the smallest unique haystack wins. A tie is not a guess.
-//! That is the coverage gate `Stack::query` applies after its FTS5 leg. This
-//! loader does not build that sqlite file.
+//! in the card, and the smallest haystack ranks first. That card is spoken
+//! only when it leads the next covering card by [`crate::RANK_MARGIN`]
+//! haystack tokens. A tie, a smaller lead, or no cover is not a guess.
+//! That coverage gate is the one `Stack::query` applies after its FTS5 leg.
+//! This loader does not build that sqlite file.
 //!
 //! This directory is the truth root. A card with `research_only: true`, or
 //! `not_for` containing `answer`, is not indexed and cannot be spoken as a
@@ -231,20 +233,28 @@ impl CardLookup for KnowledgeCards {
                 .cmp(&right.n_tokens)
                 .then_with(|| left.id.cmp(&right.id))
         });
-        if hits.len() >= 2 {
-            let left = &self.cards[hits[0] as usize];
-            let right = &self.cards[hits[1] as usize];
-            if left.n_tokens == right.n_tokens {
-                return None;
-            }
+        // The ranker reads the shortest four. It does not walk the pack again.
+        let mut scored = [crate::rank::ScoredCandidate {
+            id: "",
+            gist: "",
+            haystack_tokens: 0,
+            covers: false,
+        }; crate::MEMORY_HIT_CAP];
+        let mut n = 0;
+        for &idx in hits.iter().take(crate::MEMORY_HIT_CAP) {
+            let card = &self.cards[idx as usize];
+            scored[n] = crate::rank::ScoredCandidate {
+                id: card.id.as_str(),
+                gist: card.gist.as_str(),
+                haystack_tokens: card.n_tokens,
+                covers: true,
+            };
+            n += 1;
         }
-        let card = &self.cards[hits[0] as usize];
-        if card.gist.is_empty() {
-            return None;
-        }
+        let chosen = crate::rank::rank_by_margin(&scored[..n])?;
         Some(CardHit {
-            id: card.id.clone(),
-            gist: card.gist.clone(),
+            id: chosen.id.to_string(),
+            gist: chosen.gist.to_string(),
         })
     }
 }

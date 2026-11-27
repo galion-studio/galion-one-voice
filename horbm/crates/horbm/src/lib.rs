@@ -9,9 +9,11 @@
 //!    metadata. It is not spoken.
 //! 2. Person memory, when a diary is attached and `remember` is granted.
 //!    The diary is a second file, kept apart from the truth cards. A pin, a name or mood
-//!    line, and the session buffer are written there. The turn then reads
-//!    that file. A stored line is spoken only when the utterance is about
-//!    the person. A world question drops those hits and does not cite them.
+//!    line, and the session buffer are written there. A milestone is stored
+//!    once, under [`SOURCE_MILESTONE`]. The turn then reads that file. A
+//!    stored line is spoken only when the utterance is about the person, or
+//!    when it asks for the relationship timeline. A world question drops
+//!    those hits and does not cite them.
 //!    Denied `remember` does not open the file.
 //! 3. When a [`RetrievalThread`] is attached, [`Brain::turn`] asks it and
 //!    reads the [`MemoryHitCell`]. `Hits` speaks [`MemoryHit::clause`]. `Miss`
@@ -23,7 +25,10 @@
 //!    then the rest. Lookup and Action turns are marked for Galion Research
 //!    and are not posted. [`KnowledgeCards`] reads a directory of
 //!    galion-knowledge cards, checks the card-bundle manifest when one is
-//!    present, and builds the covering lookup index. It does not write a card
+//!    present, and builds the covering lookup index. The spoken card is the
+//!    shortest covering haystack only when it leads the next covering card by
+//!    [`RANK_MARGIN`] haystack tokens. A tie, a smaller lead, or no cover is
+//!    [`UNKNOWN_REPLY`]. It does not write a card
 //!    and does not bind a socket. There is no knowledge-ro server in this
 //!    repository. Port 7900 is not used here. The 7881 bridge calls this loader
 //!    and attaches the retrieval thread.
@@ -33,8 +38,8 @@
 //!    starts only after that [`TurnOut`] is dropped. [`Brain::research_follow_up`]
 //!    is the later result. It does not rewrite `reply` or `first_clause`.
 //!    The caller passes [`RESEARCH_CAP`] (3 seconds). This crate dials nothing
-//!    itself. A retrieval `Miss`, a card hit, comfort, and a missing port do not
-//!    arm an ask.
+//!    itself. A retrieval `Miss`, a card hit, comfort, a payment phrase, and a
+//!    missing port do not arm an ask. A question mark is not a payment phrase.
 //! 5. Anything still unanswered on this turn is exactly [`UNKNOWN_REPLY`].
 //!    No gap filler.
 //!
@@ -46,6 +51,9 @@
 //! [`Brain::inner_turn`] updates cares, wants, and expects and emits one
 //! GEMI intent. [`Brain::inner_nudge`] steps that message through the moment
 //! core. Neither call rewrites the empathy mood or the voice baseline.
+//! Those inner-life slots are not the caller's want list.
+//! [`Brain::want_counts`] reads that list (open, met, dropped) from empathy.
+//! It does not speak the counts and does not write the diary.
 //! Learning a new care stays off while `LOCKS.toml` `[consent] learn` is deny.
 //!
 //! [`Brain::boot`], [`Brain::try_open`], and [`Brain::try_with_cards`] load
@@ -104,11 +112,12 @@ mod dialogue;
 mod keys;
 mod learn;
 mod memory;
+mod rank;
 mod research_style;
 mod retrieve;
 mod route;
 
-pub use brain::{Brain, MoodMeta, ResearchFollowUp};
+pub use brain::{Brain, MoodMeta, ResearchFollowUp, WantCounts};
 pub use cards::{
     blocks_answer, knowledge_dir_from_env, CardError, KnowledgeCards, LoadReport, LoadedPack,
     WINDOWS_KNOWLEDGE_DIR,
@@ -139,7 +148,10 @@ pub use learn::{
     ClauseSource, LearnAudit, LearnConfig, LearnError, LearnPass, LearnedRow, SessionSeal,
     LEARN_PACK_CAP, LEARN_PACK_DB, LEARN_PACK_LIVE, LEARN_PACK_NEXT, LEARN_PACK_RETIRING,
 };
-pub use memory::{about_the_person, pin_command, EpisodicStore, TranscriptFile, TranscriptTurn};
+pub use memory::{
+    about_the_person, pin_command, EpisodicStore, TranscriptFile, TranscriptTurn, SOURCE_MILESTONE,
+};
+pub use rank::RANK_MARGIN;
 pub use research_style::{
     MemoryExample, ResearchHit, ResearchRoot, StyleHint, StylePersona, StyleSearch,
     MAX_RESEARCH_BUNDLE_BYTES, STYLE_HIT_CAP,
@@ -150,8 +162,8 @@ pub use retrieve::{
     MEMORY_HIT_CAP,
 };
 pub use route::{
-    is_deep_question, route_heard, AskOutcome, CardHit, CardLookup, Gap, GapReason, ResearchAsk,
-    RouteKind, RouteOut, Speakable, GAP_ADVICE, UNKNOWN_REPLY,
+    is_deep_question, is_money_action, route_heard, AskOutcome, CardHit, CardLookup, Gap,
+    GapReason, ResearchAsk, RouteKind, RouteOut, Speakable, GAP_ADVICE, UNKNOWN_REPLY,
 };
 
 /// Pleasure-arousal-dominance. Rest is arousal 0.3, valence 0.25, dominance 0.5.
