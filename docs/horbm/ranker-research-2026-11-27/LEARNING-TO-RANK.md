@@ -17,7 +17,7 @@ Every number below is copied from a named paper, a library document, or a crate 
 
 Part (41) has to pick one sourced card, or say exactly `I don't know.` The current card idea, taken from XiaoIce, is a boosted-tree ranker in the LambdaMART family, with features for local cohesion, global coherence, empathy, and retrieval match, plus a score threshold when nothing clears the bar.
 
-HORBM has to do that on a laptop CPU (8 cores), in Rust on the rustc 1.85 pin, offline, inside a live voice turn. The ranking slice of that turn wants tens of milliseconds. There is little or no labelled training data today. The spoken line stays a stored clause, and the card id stays on the answer.
+HORBM has to do that on a laptop CPU (8 cores), in Rust on the rustc 1.85 pin, offline, inside a live voice turn. The owner set the ranking budget on 2026-11-27: well under 5 ms per query on that CPU. A ranker at 13 ms per query is too slow and is out. There is little or no labelled training data today. The spoken line stays a stored clause, and the card id stays on the answer.
 
 ## What the code does today
 
@@ -115,11 +115,33 @@ The speed section says the ranking sets were trained with the regression objecti
 
 Those times are training. I don't know the inference time of this 500-tree model. Peak training RSS for MS LTR, LightGBM column-wise, is 0.940 GB. That is the training process, not the model file. I don't know the model file bytes.
 
-### Inference time on a CPU
+### The 5 ms gate
 
-Microsoft's [LightGBM inferencing bench](https://microsoft.github.io/lightgbm-benchmark/results/inferencing/) times one prediction, batch size 1, one thread, Linux x86_64, 16 CPUs. LightGBM C API 3.3.0, 100 trees, 31 leaves, 10 columns: 12.7087 microseconds. The same shape with 1,000 trees: 95.4644 microseconds. Treelite 1.3.0 on the 100-tree shape: 5.27241 microseconds. The page header says the report is work in progress and says not to trust the numbers until that header is gone. This note records them with that warning. I don't know a trusted millisecond, and I don't know the time for four HORBM candidates.
+The ranking call has to finish well under 5 ms on a laptop CPU. 13 ms per query fails. A published time counts only when the page prints the milliseconds, the machine, and what was scored. A chart without numbers in the text is **I don't know.**
 
-A Delivery Hero write-up times LambdaMART on MSLR-WEB10K through JVM bindings, one thread (`OMP_NUM_THREADS`), on an AMD Ryzen 7 2700. At 300 trees, single-thread CatBoost prediction is 12 to 15 times faster than LightGBM and XGBoost. With 16 threads, single-thread CatBoost is still about 3 times faster than 16-thread LightGBM. [Source](https://deliveryhero.jobs/blog/is-catboost-faster-than-lightgbm-and-xgboost/). Absolute milliseconds are in the charts. I don't know them from the text.
+| What was timed | Machine | Time | Against 5 ms |
+|---|---|---|---|
+| LightGBM C API 3.3.0, one row, one thread. 100 trees, 31 leaves, 10 columns. [Bench](https://microsoft.github.io/lightgbm-benchmark/results/inferencing/), header says do not trust yet. | Linux x86_64, 16 CPUs | 12.7087 μs | Well under, if the number holds. One row, not four cards. |
+| Same bench, 1,000 trees, 10 columns | same | 95.4644 μs | Well under, same warning. |
+| Same bench, 5,000 trees, 31 leaves, 1,000 columns | same | 580.791 μs | Still under 1 ms for one row. Same warning. |
+| Treelite 1.3.0, 100 trees, 31 leaves, 10 columns, one row | same bench | 5.27241 μs | Well under, same warning. |
+| LightGBM classifier, 500 trees, depth 8, 63 leaves, 50 features, one row, native Python. Not a ranker. [onnx_et_al](https://github.com/srepho/onnx_et_al), training shape in [train_models.py](https://github.com/srepho/onnx_et_al/blob/main/models/train_models.py) | Intel i7-8559U, 4 cores / 8 threads | median 1.535 ms, p95 2.073 ms | Under 5 ms. The call is Python. |
+| Same LightGBM model through ONNX Runtime | same laptop CPU | median 0.059 ms, p95 0.081 ms | Well under. |
+| XGBoost classifier, 500 trees, depth 8, 50 features, one row, native Python | same | median 8.196 ms, p95 9.664 ms | Fails. The write-up blames per-call overhead. |
+| Same XGBoost model through ONNX Runtime | same | median 0.054 ms, p95 0.076 ms | Well under. |
+| CatBoost classifier, 500 trees, depth 8, one row, native Python | same | median 3.407 ms, p95 4.407 ms | Median is under 5 ms. The p95 is not well under 5 ms. |
+| Same CatBoost model through ONNX Runtime | same | median 0.037 ms, p95 0.069 ms | Well under. |
+| ColumnTransformer plus the same LightGBM, one row, native and ONNX | same | median 10.187 ms native, 9.936 ms ONNX | Fails. Feature preparation is the time. |
+| ONNX LightGBM behind a small feature encode, one prediction, including that encode | same project, MCP server note | about 150 μs (one printed sample is 152.3 μs) | Well under. Not a ranker. |
+| LambdaMART, list of 150 items, then 300 items. [Metarank talk slide](https://metarank.github.io/datatalks-ltr-talk/) | I don't know the CPU or the tree count | 10 ms, then 20 ms | Fails at that list length. HORBM holds 4 hits. I don't know the 4-hit time. |
+
+Delivery Hero timed LambdaMART on MSLR-WEB10K through JVM bindings, one thread, AMD Ryzen 7 2700, 300 trees. Single-thread CatBoost was 12 to 15 times faster than LightGBM and XGBoost, and still about 3 times faster than 16-thread LightGBM. [Source](https://deliveryhero.jobs/blog/is-catboost-faster-than-lightgbm-and-xgboost/). The milliseconds are in the charts. I don't know them, so that comparison does not enter the gate.
+
+A 2025 cascade that puts LightGBM LambdaMART after a dense retriever prints end-to-end query time on two Xeon Silver 4314 CPUs, not the tree call alone ([arXiv:2510.16393](https://arxiv.org/abs/2510.16393)). I don't know the ranker slice. It is not used for the gate.
+
+No CPU millisecond for allRank, DASALC, SetRank, DLCM, or TF-Ranking turned up. They are not in the under-5 ms set. I don't know their latency.
+
+What the gate keeps: an in-process tree walk (C API, Treelite, ONNX, or a Rust loader) over a few hundred to a few thousand trees, scoring rows that are already numeric. The sourced one-row times for that shape are microseconds to about 1.5 ms. What it cuts: a Python `predict` that costs 8 ms before the trees matter, a feature pipeline that costs about 10 ms, a CatBoost Python p95 of 4.4 ms, a 10 ms list of 150 items, and a 13 ms call. Four HORBM candidates were not the thing those benches scored. I don't know that exact time.
 
 ### Clicks, without a judged label
 
@@ -154,16 +176,21 @@ TF-Ranking and allRank are Python. I don't know a Rust port of either.
 
 Five is a good fit for that column. One fights the constraint. The covering rule is the code that already runs. It is the bar a learned ranker has to clear.
 
+Latency here is only the 5 ms gate. An option with no sourced time is not eligible, even if it is probably fast.
+
 | Option | CPU latency | Data needed | Abstention | Source stays on the answer | Complexity |
 |---|---|---|---|---|---|
-| Covering rule, already in the crate | 5 | 5 | 4 | 5 | 5 |
-| LightGBM LambdaMART | 5 on the untrusted microsecond bench, for one row | 2 | 2 | 5 | 3 |
-| XGBoost `rank:ndcg` | 4. Slower than CatBoost in the JVM bench. Absolute ms unknown | 2 | 2 | 5 | 3 |
-| CatBoost YetiRank | 4. Fastest of the three in that one JVM bench. Absolute ms unknown | 2 | 2 | 5 | 2 |
-| Neural listwise (allRank, DASALC, TF-Ranking) | 2. Wide nets or O(n²). No CPU ms published | 1 | 2 | 5 | 1 |
-| Propensity SVM-Rank, offline on logs | 4. A linear SVM on a few features should be cheap. I don't know a measured ms | 2 | 2 | 5 | 3 |
-| PDGD, online | 2. The shown list is a sample | 2 | 1 | 4 | 2 |
-| `gbdt` inference of `rank:pairwise` | 4. Pure Rust, no measured microsecond | 2 | 2 | 5 | 4 |
+| Covering rule, already in the crate | 5. No added model. I don't know a measured millisecond | 5 | 4 | 5 | 5 |
+| LightGBM, in-process C API or ONNX, hundreds to a few thousand trees | 5. Sourced one-row times 0.013–1.5 ms. The C API page is marked untrusted. The 1.5 ms figure is a classifier, not LambdaMART | 2 | 2 | 5 | 3 |
+| XGBoost in-process or ONNX | 5 on the 0.054 ms ONNX row. That model is a classifier | 2 | 2 | 5 | 3 |
+| XGBoost native Python `predict` | 1. Median 8.196 ms on the laptop-class CPU. Fails | 2 | 2 | 5 | 3 |
+| CatBoost native Python, 500 trees | 2. p95 4.407 ms is under 5 ms and not well under | 2 | 2 | 5 | 2 |
+| CatBoost through ONNX | 5. Median 0.037 ms. Classifier, not YetiRank | 2 | 2 | 5 | 2 |
+| Feature pipeline wrapped around the trees | 1. About 10 ms in the same bench. Fails | 2 | 2 | 5 | 2 |
+| Neural listwise (allRank, DASALC, TF-Ranking) | 1. No sourced CPU time under 5 ms, so not eligible | 1 | 2 | 5 | 1 |
+| Propensity SVM-Rank | I don't know a millisecond. Not eligible until timed | 2 | 2 | 5 | 3 |
+| PDGD, online | 1. The shown list is a sample. No inference millisecond | 2 | 1 | 4 | 2 |
+| `gbdt` inference of `rank:pairwise` | I don't know a microsecond. Not eligible until timed | 2 | 2 | 5 | 4 |
 
 Why the middle columns are low for every learned option:
 
@@ -179,17 +206,17 @@ The one place a tree can still help later is inside those four hits, when more t
 
 **Now.** Leave the ranker unlearned. The covering rule already picks one stored clause or says `I don't know.`, and it does that with no labels and no score to mis-calibrate. Keep `OfflineBandit` as a counter. Do not let `choose_steered` pick a card. Do not copy XiaoIce's sample-above-threshold step, and do not copy the editorial line that avoids "I don't know." Both of those exist to raise CPS.
 
-**Later, once a judged set exists.** Train LightGBM `lambdarank`, or XGBoost `rank:ndcg` if the pure-Rust `gbdt` loader can be shown to read that file, on hand features the process already has: token cover, haystack length, the lexical or RRF score, which pool the hit came from, and the card's claim type. Fit it offline. Ship the trees. Score the four hits in process. Speak the chosen clause unchanged, with its existing source id. Abstain, with the exact miss line, when the top two scores tie or the top score is below a cut fit on a held-out slice of the same judgements. Do not sample.
+**Later, once a judged set exists, and only on a runtime that already has a sourced time well under 5 ms.** Train LightGBM `lambdarank` and score the four hits in process, through the C API, Treelite, or ONNX. The features stay the ones the turn already computed: token cover, haystack length, the lexical or RRF score, which pool the hit came from, and the card's claim type. Do not add a second feature pipeline inside the ranker call. The insurance bench spent about 10 ms on that kind of pipeline and missed the gate, while the tree alone stayed under 2 ms. Speak the chosen clause unchanged, with its existing source id. Abstain, with the exact miss line, when the top two scores tie or the top score is below a cut fit on a held-out slice of the same judgements. Do not sample.
 
-CatBoost YetiRank is the alternative if that judged set is small and ordered boosting wins the held-out slice. The cost is the C++ runtime. The `catboost-rust` crate that downloads binaries at runtime does not belong in the voice process.
+XGBoost `rank:ndcg` is the same shape of model if it is scored in process or through ONNX. The native Python `predict` on a 500-tree model took 8.2 ms median on a 4-core laptop CPU and fails the gate. CatBoost YetiRank is in the same boat: use it only through a runtime whose printed time is well under 5 ms. The native Python p95 of 4.4 ms on a 500-tree classifier is not that. The `catboost-rust` crate that downloads binaries at runtime does not belong in the voice process.
 
-Neural listwise rankers are a research result on web-search feature matrices with millions of graded pairs. On Qin's split they tie or slightly beat a strong LightGBM baseline only as an ensemble of wide networks, and they lose to that baseline in the 2018–2020 papers that compared against RankLib. They are the wrong next dependency for four candidates and no labels.
+Neural listwise rankers stay off the list until a CPU timing of that model, at four candidates, is well under 5 ms. None of the papers in this lane print that time. On Qin's split they tie or slightly beat LightGBM only as an ensemble of wide networks.
 
 Online bandits are the wrong teacher. The reward they have published results for is a click or a continued session. HORBM's reward is "this clause is the true one, or say you do not know." If a real correctness signal is ever logged, train offline with inverse-propensity weights on those logs, and keep the live turn greedy.
 
 ## What would change this
 
-- A judged HORBM set, truth grades rather than "did the chat continue", where a neural listwise model beats LightGBM LambdaMART on a frozen slice, and a CPU timing of that model at the real candidate count stays inside the tens-of-milliseconds budget on 8 cores.
+- A judged HORBM set, truth grades rather than "did the chat continue", where a neural listwise model beats LightGBM LambdaMART on a frozen slice, and a CPU timing of that model at four candidates is well under 5 ms on a laptop.
 - A count, on the real card pack, of how often two covering cards tie or the shortest haystack is the wrong fact. If that count is zero, a ranker has nothing to do.
 - A correctness log large enough that an offline propensity-weighted ranker beats the covering rule on a frozen slice, with exploration left out of the voice turn.
 - A pure-Rust LambdaMART, or a tested load of a current XGBoost `rank:ndcg` model in `gbdt`, whose held-out NDCG is close to LightGBM on a public set and whose inference time is measured. Until that load is tested, "close to LightGBM" is **I don't know.**
@@ -200,6 +227,9 @@ Online bandits are the wrong teacher. The reward they have published results for
 - Burges. From RankNet to LambdaRank to LambdaMART: An Overview. Microsoft Research, MSR-TR-2010-82. https://www.microsoft.com/en-us/research/publication/from-ranknet-to-lambdarank-to-lambdamart-an-overview/
 - LightGBM, MIT. https://github.com/lightgbm-org/LightGBM and https://lightgbm.readthedocs.io/en/latest/Parameters.html and https://github.com/microsoft/LightGBM/blob/master/docs/Experiments.rst
 - LightGBM inferencing bench, marked work in progress. https://microsoft.github.io/lightgbm-benchmark/results/inferencing/
+- srepho, onnx_et_al, single-row CPU timings on an Intel i7-8559U. https://github.com/srepho/onnx_et_al and https://github.com/srepho/onnx_et_al/blob/main/models/train_models.py
+- Metarank, LambdaMART latency slide. https://metarank.github.io/datatalks-ltr-talk/
+- Cascade that reports end-to-end time with a LightGBM LambdaMART second stage. The tree time is not isolated, so it is not a gate number. https://arxiv.org/abs/2510.16393
 - XGBoost, Apache-2.0. https://github.com/dmlc/xgboost and https://xgboost.readthedocs.io/en/stable/tutorials/learning_to_rank.html
 - CatBoost, Apache-2.0. https://github.com/catboost/catboost and https://catboost.ai/docs/en/concepts/loss-functions-ranking and https://catboost.ai/docs/en/references/training-parameters/common and https://catboost.ai/docs/en/concepts/speed-up-training
 - Delivery Hero, CatBoost versus LightGBM versus XGBoost prediction latency. https://deliveryhero.jobs/blog/is-catboost-faster-than-lightgbm-and-xgboost/
