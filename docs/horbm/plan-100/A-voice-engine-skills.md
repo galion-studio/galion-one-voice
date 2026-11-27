@@ -7,12 +7,12 @@ Perpetual Open MIT License. (c) 2026 Galion Labs.
 | Agent | A of the 3-agent planning swarm |
 | Base | `main` `9fa188d551eef902428dd006b07f6c45480340b7` (merge of #389) |
 | Kind | Plan only. This file does not change a crate, a manifest, a lock, or a gate. |
-| Checked | 27 Nov 2026. Licence lines below were read from the named repositories that day. |
+| Checked | 27 Nov 2026. Licence lines below were read from the named repositories that day. Owner decision on (44) and (49): 27 Nov 2026, 17:07 CET. |
 | Rust | `horbm/Cargo.toml` sets `rust-version = "1.85"`. |
 
 Claim marks: **Found** means this pass read the file or the repository text it names. **I don't know** means this pass did not see it. No laptop gate was run. No test binary was run. A merged pull request is not a measurement.
 
-Eleven parts are in this share. Four can become Built with a small Rust change and a laptop-gate test: (5), (35) without the S0 clause, (50), (51). Three cannot become Built while the current locks and the weight licences stand, and are marked **Drop? (owner decides)**: (12), (44), (49). Four are real work and are not required for a great CPU conversationalist now: (41), (42), (47), (48). Those four stay **Later**. They remain in the count until they are built or the owner marks them Dropped.
+Eleven parts are in this share. Four can become Built with a small Rust change and a laptop-gate test: (5), (35) without the S0 clause, (50), (51). **Drop? (owner decides)** remains on (12) and on the S0 clause inside (35): a student on the turn fights `student_on_tick = false`, and the Moshi and PersonaPlex weights sit outside MIT / Apache-2.0. Owner decision 27 Nov 2026, 17:07 CET, keeps (44) and (49) as one engine, later, size L. (41), (42), (47), and (48) stay Later on their own. Later stays in the count until the part is built or the owner marks it Dropped.
 
 A GitHub code search for `sync-progress.mjs` under `galion-studio` returned no file. **I don't know** the counter's source. This plan still uses the owner's rule for the count: only a Dropped chip leaves the denominator. Accepted, Recommended, and If needed stay in the count. Later in this file is a recommendation, not a Dropped chip.
 
@@ -229,33 +229,31 @@ None until the owner says Keep. If they do, one agent, its own PR, after A1, tou
 
 ## (44) Eureka Moment Pipelines: prepare, incubate, illuminate, verify
 
-**Recommendation: Drop? (owner decides).** The name has no input, no output, and no measure. It is not a lock conflict. It cannot be called Built without inventing a second brain. It stays in the count until the owner drops it or writes a spec this plan does not invent.
+**Recommendation: Keep, one engine, later (L).** Same engine as (49). Swarm A4, not in this round. Owner decision 27 Nov 2026, 17:07 CET. The stages, the reuse list, and the gate are in [One creative engine](#one-creative-engine-44-and-49) below.
 
 ### 1. First principles
 
-A retrieval turn is lookup, then one legal move, then the clause. An insight pipeline with four stages would sit beside that turn and produce a line the cards did not store. The conversationalist does not need that to be good at conversation. The stages, as a name, do not say what is stored between them, what may be spoken, or what a failure looks like.
+Retrieval speaks a card. It does not make a new claim. The owner wants a goal, such as discovering a new stable element, to be worked through four stages that use only sourced cards and shards. Incubation runs off the turn. `LOCKS.toml` `[horbm]` `student_on_tick = false` stays. A candidate that fails verification is not spoken and not stored. The miss line stays `I don't know.`
 
 ### 2. Reuse search
 
-GitHub repository search for `eureka incubate rust` returned no repository. A search of this tree for `incubate` and `illuminate` in Rust and Markdown returned no pipeline. **Nothing found.**
-
-The word Eureka is already used here for a different artifact. `docs/galion-voice-v2/symphony/EUREKA.md` is the 80 ms heartbeat standard: one clock, three bands, harness before weights. It does not define prepare, incubate, illuminate, and verify as a reply pipeline.
+The list is in the creative-engine section. Combination and a boolean checker exist under MIT or Apache-2.0. **Nothing found** that turns a prose goal into a new hypothesis.
 
 ### 3. What exists already
 
-**Found.** `EUREKA.md`, the heartbeat crate it points at, and the self-eval notes. **Found** no Rust type for those four stages. `docs/swarm-10/2026-11-15/brain-eureka/brain.md` exists. This pass did not read it as a spec for this part. **I don't know** whether an older note used the same four words. The current `horbm` crates do not implement them.
+**Found.** Card and shard lookup is the prepare reader (`horbm/crates/horbm/src/cards.rs`, and the shard note in that file's header). `docs/galion-voice-v2/symphony/EUREKA.md` is the 80 ms heartbeat standard. It is a different artifact. A search of this tree for `incubate` and `illuminate` found no pipeline. No Rust type in `horbm` implements the four stages. `docs/swarm-10/2026-11-15/brain-eureka/brain.md` exists. This pass did not read it as the spec. **I don't know** whether an older note used Wallas's four words.
 
 ### 4. Smallest build left
 
-None. A stub that logs the four names would be a false Built. This plan will not invent the stage contracts.
+Not this round. When A4 starts, the first slice is offline: a goal, the card ids prepare gathered, candidate records that cite only those ids, and a verify function that drops a candidate with a missing id. `Brain::turn` does not call it. The element goal is the aim. The first fixture can be three sourced cards and one candidate that links two of them.
 
 ### 5. Acceptance gate
 
-None, until the owner replaces the title with a behavior a test can fail. A passing heartbeat test does not prove this part.
+Later, on the laptop, rustc 1.85. Incubate runs off `Brain::turn`. A candidate with a missing card id is dropped. A verified candidate keeps every card id it used. An empty verify result is not spoken and not stored, and the voice miss stays `I don't know.` `scripts/check-locks.sh` still sees `student_on_tick = false`. This pass did not run that test. It does not exist yet.
 
 ### 6. Swarm
 
-None.
+A4, with (49). One PR, three agents, after A1 and A2, and only when the owner pulls the engine forward.
 
 ## (47) Agentic sandboxes: every tool runs isolated
 
@@ -328,31 +326,69 @@ None. Do not put it in A2 with the image-frame refusal. That refusal is done whe
 
 ## (49) Creative: stories, poems, songs
 
-**Recommendation: Drop? (owner decides).** A generator on the turn cannot become Built under `never_fabricate` and `student_on_tick = false`. Stays in the count until the owner drops it or changes those locks.
+**Recommendation: Keep, one engine, later (L).** Same engine as (44), aimed at a story, a poem, or a song. The material is credited cards and a template. Swarm A4.
 
 ### 1. First principles
 
-A story, a poem, or a song that the brain composes is text the cards did not store. `check_honesty` refuses a persona file unless `never_fabricate` is true. The hot path is retrieval. The miss line is `I don't know.` Reciting a poem that is already a sourced card is ordinary retrieval, and it does not need a creative skill. The skill in the title is the composition. That skill is the student the lock keeps off the turn.
+A poem is a goal for the same four stages, not a second brain and not a student on the turn. Slots fill from credited spans. An empty slot fails closed. `never_fabricate` stays true (`horbm/crates/horbm-persona/src/load.rs` `check_honesty`). The miss line stays `I don't know.`
 
 ### 2. Reuse search
 
-A MIT or Apache-2.0 story model would still be a student on the turn. **Nothing found** that this plan should link. This pass did not survey generation crates, because the lock ends the search.
+Templates: `write!` in `std`, or [mitsuhiko/minijinja](https://github.com/mitsuhiko/minijinja) crate `minijinja`, `license = "Apache-2.0"`, `rust-version = "1.70"` in that crate's `Cargo.toml` (read 27 Nov 2026). Prefer `write!` until a template has more fields than a handful of named slots. **Nothing found** that writes a story, a poem, or a song from credited spans. A generative story model would be a student on the turn, which the lock forbids.
 
 ### 3. What exists already
 
-**Found.** `never_fabricate` as above. `UNKNOWN_REPLY` in `route.rs`. No poem, story, or song generator under `horbm`. The word `song` in `horbm/crates/horbm/src/memory.rs` is a test string for the remember parser (`remembering the song`), not a composition. `story_steps` in `horbm/crates/horbm-voice/tests/backchannel.rs` is a scripted listener fixture for nods. It does not write a story.
+**Found.** `UNKNOWN_REPLY` in `horbm/crates/horbm/src/route.rs`. No poem, story, or song writer under `horbm`. The word `song` in `horbm/crates/horbm/src/memory.rs` is a remember-parser fixture (`remembering the song`). `story_steps` in `horbm/crates/horbm-voice/tests/backchannel.rs` is a listener script for nods.
 
 ### 4. Smallest build left
 
-None under the current locks. This plan assigns no generator, no rhyme table, and no "creative mode" prompt.
+A4's creative slice, after verify already drops a missing card id. One template, one credited span, spoken only when verify keeps the card id. A poem request with no credited material speaks `I don't know.` and stores nothing.
 
 ### 5. Acceptance gate
 
-None that would show Built. A test that a request for a poem still returns a sourced card or `I don't know.` would lock the retrieval rule. It would prove the opposite of a creative skill, so it must not be used to flip this chip to Built.
+The same laptop run as (44), plus that template case. Off `Brain::turn`. This pass did not run it.
 
 ### 6. Swarm
 
-None.
+A4, with (44). One agent of that swarm owns the template slice. It uses the same candidate type as verify.
+
+## One creative engine (44) and (49)
+
+Owner decision, Maciej Grajczyk, 27 Nov 2026, 17:07 CET. (44) and (49) are one engine, the creative core of HORBM, later, size L. This pass did not read Graham Wallas, *The Art of Thought* (1926). The four stage names and the purpose below are the owner's decision, which names that book.
+
+Purpose, in the owner's words: retrieval alone can't create something new; HORBM must one day take a goal like "discover a new stable element" and strive toward it through the Eureka pipeline, and it is real because it only uses pure, true, sourced knowledge from our cards and shards.
+
+`student_on_tick = false` stays. Incubate is background work, off the turn and off the 80 ms tick. The voice turn still returns the local clause. A verified candidate may be spoken only after verify. It is stored only under the learn grant that already exists (`GALION_HORBM_LEARN=grant`, default deny). This plan adds no consent bit.
+
+| Stage | Wallas, as the owner named it | What the engine does |
+|---|---|---|
+| Prepare | preparation | Gather sourced cards and shards for the goal. Every row keeps its card id. |
+| Incubate | incubation | Combine those facts into candidate hypotheses, off the turn. No generative model on the turn. |
+| Illuminate | illumination | Pick the candidate that links the facts. |
+| Verify | verification | Check the candidate against its sources and the rules before anything is spoken or stored. Every step traces to card ids. A failed check is a miss: `I don't know.` |
+
+(49) is this table with the goal set to a story, a poem, or a song, and with templates whose slots copy credited spans.
+
+### Reuse search (27 Nov 2026)
+
+Licences below were read from the repository files named. Nothing here is a Wallas pipeline, and nothing proposes a new element.
+
+**Hypothesis generation.** GitHub repository search for `eureka incubate rust` returned no repository. A search of this tree for `incubate` and `illuminate` found no pipeline. **Nothing found** that takes a prose goal and emits a new hypothesis from sourced cards.
+
+**Combination search.**
+
+- [ekzhang/crepe](https://github.com/ekzhang/crepe). `LICENSE-MIT` (copyright 2021 Eric Zhang) and `LICENSE-APACHE` (Apache-2.0) are both in the repository. `Cargo.toml` says `license = "MIT OR Apache-2.0"` and `edition = "2018"`. Crepe is a Datalog compiler: rules derive facts from facts. That fits incubate when the atoms are structured card ids. It does not read prose and it does not discover an element. This pass did not compile it on rustc 1.85. Credit Eric Zhang. This is the combination pick if the atoms are structured.
+- [egraphs-good/egg](https://github.com/egraphs-good/egg). `LICENSE` is the MIT grant, copyright 2019 Max Willsey. `Cargo.toml` says `license = "MIT"` and `edition = "2024"`. No `rust-version` key in the lines this pass read. Equality saturation combines terms under rewrite rules the caller writes. Heavier than crepe, and edition 2024 is the edge of the 1.85 pin. Not the pick. This pass did not compile it. Credit Max Willsey.
+- [remykarem/apriori-rs](https://github.com/remykarem/apriori-rs). The `LICENSE` file is the MIT license, copyright 2021 Raimi bin Karim. `Cargo.toml` does not set `license`. The package is a `cdylib` with `pyo3`, so it is a Python binding, not an rlib to drop into `horbm`. Association rules say which items co-occur. They do not state a new fact. Not the pick. Credit Raimi bin Karim.
+
+**Verification.**
+
+- [jix/varisat](https://github.com/jix/varisat). `LICENSE-MIT` (copyright 2017–2019 Jannis Harder) and `LICENSE-APACHE` (Apache-2.0) are both in the repository. Varisat is a CDCL SAT solver: a boolean formula is satisfiable or it is not. That can check a constraint we have already encoded. It does not check a sentence against a card id. Credit Jannis Harder. Use it only if a later rule is genuinely boolean. This pass did not compile it.
+- [chrjabs/rustsat](https://github.com/chrjabs/rustsat). `Cargo.toml` says `license = "MIT"` and `rust-version = "1.87.0"`. The tree pin is rustc 1.85. Ruled out on that pin.
+
+**Nothing found** for the check this engine actually needs: every step of a candidate traces to a card id, and a missing id drops the candidate. That check is a few comparisons in our crate. Do not add a solver for it.
+
+**Templates for (49).** `write!`, or minijinja as cited under (49). No story model.
 
 ## (50) Comfort: stays with hard moments
 
@@ -448,10 +484,11 @@ Swarm A1, with (35). Two agents. (51) owns the new phrase check and its test und
 | 1 | A1 | One PR. Router returns the local clause. Voice refuses the four payment phrases. | 2 | (35) without S0, (51) | Nothing. Do not edit `LOCKS.toml`. |
 | 2 | A2 | One PR. Image is not a turn. Two distress turns stay comfort. | 2 | (5), (50) | Nothing. Can start when A1's files are known not to overlap, which they do not. Land it after A1 so the laptop gate sees one brain PR at a time. |
 | — | A3 | Not scheduled. | 2, when scheduled | (47) | A process tool the owner has asked for, and a rustc 1.85 build of `openmind-sandbox`. |
-| — | none | — | — | (12), (44), (49) | Owner decision. No code. |
+| later | A4 | Not scheduled. One PR. One engine, off the turn. | 3 | (44), (49) | A1 and A2 have landed. `student_on_tick` stays false. The owner pulls the engine forward. |
+| — | none | — | — | (12), and the S0 clause of (35) | Owner decision. No code. |
 | — | none | — | — | (41), (42), (48) | Owner pulls the part forward. Each is its own later PR. |
 
-A1 and A2 are the only swarms that move a chip toward Built. Three Drop? chips and four Later chips stay in the 11 until the owner drops them or a later round builds them. This plan does not treat Later as Dropped.
+A1 and A2 are the swarms that move a chip toward Built in this round. A4 is the creative engine, later. **Drop? (owner decides)** remains on (12) and on the S0 clause. Later parts stay in the count. This plan does not treat Later as Dropped.
 
 Laptop gate for A1 and A2, after the new tests, is the command list in `docs/horbm/PLAN-brain.md`: `horbm` workspace test and clippy, `horbm-soak`, `horbm` rustdoc, the voice-stack package tests named in that file, `cargo metadata --locked` on `voice-stack/Cargo.toml`, `scripts/check-locks.sh`, and `scripts/check-research-boundary.sh`. GitHub checks are not that gate. This pass did not run the gate.
 
@@ -464,10 +501,10 @@ Laptop gate for A1 and A2, after the new tests, is the command list in `docs/hor
 | (35) Reasoning router | Keep; S0 clause is Drop? (owner decides) | the in-tree router and gateway | S | A1 |
 | (41) Ranker, boosted tree, then a threshold | Later | `gbdt` (Apache-2.0, mesalock-linux) if ever built | L | none |
 | (42) Reply builder, slots from sourced spans | Later | `write!`; minijinja is Apache-2.0 and unused | S | none |
-| (44) Eureka moment pipelines | Drop? (owner decides) | nothing found | — | none |
+| (44) Eureka moment pipelines | Keep, one engine, later (L) | crepe (MIT OR Apache-2.0) for structured combination; card-id verify is ours | L | A4, with (49) |
 | (47) Agentic sandboxes | Later | `openmind-sandbox` (MIT, Galion) | M | A3, not scheduled |
 | (48) Image talk | Later | pinned `ort` (Apache-2.0) if a weight ever qualifies; no weight verified | L | none |
-| (49) Creative: stories, poems, songs | Drop? (owner decides) | nothing to link | — | none |
+| (49) Creative: stories, poems, songs | Keep, one engine, later (L) | same engine as (44); `write!` or minijinja (Apache-2.0) for templates | L | A4, with (44) |
 | (50) Comfort | Keep | in-tree dialogue move | S | A2 |
 | (51) Tasks, no money by voice | Keep | conductor phrase list, already in this repo | S | A1 |
 
@@ -485,5 +522,12 @@ Licence and repository text read on 27 Nov 2026:
 - [galion-studio/obsidian-open-mind crates/openmind-sandbox](https://github.com/galion-studio/obsidian-open-mind)
 - [containers/bubblewrap COPYING](https://github.com/containers/bubblewrap) (LGPL-2.1)
 - [phylum-dev/birdcage](https://github.com/phylum-dev/birdcage) (GitHub SPDX GPL-3.0)
+- [ekzhang/crepe LICENSE-MIT and LICENSE-APACHE](https://github.com/ekzhang/crepe) (MIT OR Apache-2.0; Eric Zhang)
+- [egraphs-good/egg LICENSE](https://github.com/egraphs-good/egg) (MIT; Max Willsey)
+- [remykarem/apriori-rs LICENSE](https://github.com/remykarem/apriori-rs) (MIT file; Raimi bin Karim; `Cargo.toml` sets no `license` key)
+- [jix/varisat LICENSE-MIT and LICENSE-APACHE](https://github.com/jix/varisat) (Jannis Harder)
+- [chrjabs/rustsat Cargo.toml](https://github.com/chrjabs/rustsat) (MIT; `rust-version = "1.87.0"`, above this tree's pin)
+
+The purpose and the four stage names for (44) and (49) are the owner decision of 27 Nov 2026, 17:07 CET, which names Graham Wallas, *The Art of Thought* (1926). This pass did not read that book.
 
 In-tree files this pass read are cited in the part sections. Pull request titles were read from GitHub for #239, #302, #313, #341, #383, and #391.
