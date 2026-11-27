@@ -33,8 +33,8 @@
 //!    starts only after that [`TurnOut`] is dropped. [`Brain::research_follow_up`]
 //!    is the later result. It does not rewrite `reply` or `first_clause`.
 //!    The caller passes [`RESEARCH_CAP`] (3 seconds). This crate dials nothing
-//!    itself. A retrieval `Miss`, a card hit, comfort, and a missing port do not
-//!    arm an ask.
+//!    itself. A retrieval `Miss`, a card hit, comfort, a payment phrase, and a
+//!    missing port do not arm an ask. A question mark is not a payment phrase.
 //! 5. Anything still unanswered on this turn is exactly [`UNKNOWN_REPLY`].
 //!    No gap filler.
 //!
@@ -150,8 +150,8 @@ pub use retrieve::{
     MEMORY_HIT_CAP,
 };
 pub use route::{
-    is_deep_question, route_heard, AskOutcome, CardHit, CardLookup, Gap, GapReason, ResearchAsk,
-    RouteKind, RouteOut, Speakable, GAP_ADVICE, UNKNOWN_REPLY,
+    is_deep_question, is_money_action, route_heard, AskOutcome, CardHit, CardLookup, Gap,
+    GapReason, ResearchAsk, RouteKind, RouteOut, Speakable, GAP_ADVICE, UNKNOWN_REPLY,
 };
 
 /// Pleasure-arousal-dominance. Rest is arousal 0.3, valence 0.25, dominance 0.5.

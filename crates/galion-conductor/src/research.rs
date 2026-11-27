@@ -22,8 +22,10 @@ pub enum SideIntent {
 }
 
 /// Same lexical rule as `horbm::is_deep_question`: a question mark, and either
-/// eight words or the word why, how, or explain. The `horbm` crate is a
-/// separate workspace (and a newer rustc) and is not linked here.
+/// eight words or the word why, how, or explain. The payment list is the same
+/// four phrases as `horbm::is_money_action` in `horbm/crates/horbm/src/route.rs`.
+/// The `horbm` crate is a separate workspace (and a newer rustc) and is not
+/// linked here.
 pub fn classify(text: &str) -> SideIntent {
     if is_money_action(text) {
         return SideIntent::MoneyDenied;
@@ -34,6 +36,7 @@ pub fn classify(text: &str) -> SideIntent {
     SideIntent::None
 }
 
+/// The other copy is `horbm::is_money_action` in `horbm/crates/horbm/src/route.rs`.
 fn is_money_action(text: &str) -> bool {
     if text.contains('?') {
         return false;
