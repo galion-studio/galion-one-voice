@@ -29,7 +29,16 @@ jobs:
         with:
           components: clippy
       - name: ALSA headers
-        run: sudo apt-get update && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y libasound2-dev pkg-config libflite1 g++
+        run: |
+          # Same Microsoft apt sources as the package job. A 403 there fails
+          # this step before the router tests run.
+          sudo rm -f \
+            /etc/apt/sources.list.d/microsoft-prod.list \
+            /etc/apt/sources.list.d/microsoft-prod.sources \
+            /etc/apt/sources.list.d/azure-cli.list \
+            /etc/apt/sources.list.d/azure-cli.sources
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y libasound2-dev pkg-config libflite1 g++
       - name: cargo build
         run: |
           cargo build --manifest-path horbm/Cargo.toml -p horbm -p horbm-eval

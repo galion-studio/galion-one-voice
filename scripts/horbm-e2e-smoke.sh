@@ -61,9 +61,10 @@ if [[ "${HORBM_E2E_NO_SILERO:-}" != "1" ]]; then
 fi
 
 # ALSA null PCM for the flush measurement. A listed card can still be a
-# device that never calls back. snd-dummy is not required. An asoundrc the
-# caller already exported is left alone.
-if [[ "$(uname -s)" == "Linux" && -z "${ALSA_CONFIG_PATH:-}" ]]; then
+# device that never calls back. snd-dummy is not required. A runner image
+# can export ALSA_CONFIG_PATH for a device whose callback misses the flush
+# wait, so this replaces it. HORBM_E2E_KEEP_ALSA=1 leaves a caller's path.
+if [[ "$(uname -s)" == "Linux" && -z "${HORBM_E2E_KEEP_ALSA:-}" ]]; then
   asound_dir=$(mktemp -d "${TMPDIR:-/tmp}/horbm-e2e-asound.XXXXXX")
   cat > "$asound_dir/asoundrc" << 'EOF'
 pcm.!default {

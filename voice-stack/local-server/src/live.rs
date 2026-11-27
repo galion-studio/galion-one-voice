@@ -38,7 +38,7 @@ use crate::brain::HorbmMind;
 use crate::host::HostSession;
 use crate::mouth::{self, Mouth, MouthCue};
 use crate::native::{self, MindBrain, QueueEar, Stored};
-use crate::pipeline::{AudioFeed, FeedMsg, PipeInfo, Pipeline, TurnProduct};
+use crate::pipeline::{AudioFeed, ClosedTake, FeedMsg, MicStep, PipeInfo, Pipeline, TurnProduct};
 use crate::protocol::{dot_json, error_json, spoken_text_json, turn_json, vad_json};
 use crate::reply::{may_speak_piper, Pad, ReplyEngine, TurnOut};
 
@@ -658,12 +658,19 @@ fn gate_quiet(frame: &[i16]) -> bool {
 
 impl Pipeline for LivePipeline {
     fn push_mic(&mut self, pcm: &[i16], rate: u32, t_ms: u64) -> TurnProduct {
+        match self.step_mic(pcm, rate, t_ms) {
+            MicStep::Product(product) => product,
+            MicStep::Pending(take) => self.finish_take(take),
+        }
+    }
+
+    fn step_mic(&mut self, pcm: &[i16], rate: u32, t_ms: u64) -> MicStep {
         if rate != 16_000 && rate != 24_000 {
-            return self.fail("bad-rate");
+            return MicStep::Product(self.fail("bad-rate"));
         }
         let frame_n = audio::samples_per_frame(rate, 20);
         if frame_n == 0 {
-            return self.fail("bad-frame");
+            return MicStep::Product(self.fail("bad-frame"));
         }
         self.speech.extend_from_slice(pcm);
         let mut events = Vec::new();
@@ -696,19 +703,11 @@ impl Pipeline for LivePipeline {
                         let _ = self.take_ear_point();
                         self.phase = "idle";
                         events.push(dot_json("idle", self.level));
-                        return TurnProduct::events(events);
+                        return MicStep::Product(TurnProduct::events(events));
                     }
-                    let point = self.take_ear_point();
-                    let heard = match self.recognise(&heard_pcm) {
-                        Ok(text) => text,
-                        Err(code) => {
-                            let mut fail = self.fail(&code);
-                            events.append(&mut fail.events);
-                            fail.events = events;
-                            return fail;
-                        }
-                    };
-                    return self.hear(&heard, point, t_ms, events);
+                    // Recognition and the brain run in `finish_take`. The
+                    // listener point stays on this pipe until then.
+                    return MicStep::Pending(ClosedTake::speech(events, heard_pcm, t_ms));
                 }
                 _ => {
                     if self.in_speech {
@@ -723,7 +722,27 @@ impl Pipeline for LivePipeline {
             }
         }
         self.speech = buf;
-        TurnProduct::events(events)
+        MicStep::Product(TurnProduct::events(events))
+    }
+
+    fn finish_take(&mut self, take: ClosedTake) -> TurnProduct {
+        let ClosedTake {
+            mut events,
+            t_ms,
+            pcm,
+            ..
+        } = take;
+        let point = self.take_ear_point();
+        let heard = match self.recognise(&pcm) {
+            Ok(text) => text,
+            Err(code) => {
+                let mut fail = self.fail(&code);
+                events.append(&mut fail.events);
+                fail.events = events;
+                return fail;
+            }
+        };
+        self.hear(&heard, point, t_ms, events)
     }
 
     fn commit_pcm(&mut self, pcm: &[i16], rate: u32, t_ms: u64) -> TurnProduct {
