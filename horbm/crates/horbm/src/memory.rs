@@ -23,7 +23,10 @@
 //! A mood line is one diary row per feeling word. A later trace that only
 //! moves the three decimals does not insert another row, hide the old one,
 //! or reload the embedding arena. A pin whose normalised text is already
-//! live is not written again.
+//! live is not written again. A milestone is that same grant with source
+//! [`SOURCE_MILESTONE`]: `milestone …` or `please remember this moment …`.
+//! The text is stored once. There is no edit. A later session summary does
+//! not mark the earlier one, so every call stays on the timeline.
 //!
 //! Forget copies the row into the diary archive and drops it from search.
 //! The archive is the tombstone. This module has no delete of that table.
@@ -41,8 +44,10 @@
 //! one person, newest `source_date` first. The length is at most `limit`
 //! and at most four times [`crate::MEMORY_HIT_CAP`]. It is not a search.
 //! Forgotten rows, and the session-ring twins recall already hides, stay
-//! out. The read-only schema check and the `items` / `archive` readers live
-//! here. The audit binary only maps those rows to JSON.
+//! out. [`relationship_timeline`] filters that list to session summaries
+//! and milestones and returns them oldest date first. The read-only schema
+//! check and the `items` / `archive` readers live here. The audit binary
+//! only maps those rows to JSON.
 
 use std::collections::{HashMap, HashSet};
 use std::fs;
@@ -89,6 +94,8 @@ pub struct EpisodicStore {
     hidden_pins: HashMap<String, HashSet<String>>,
     /// Live pin text, normalised, to the diary id. A repeat does not insert.
     pinned_norms: HashMap<String, HashMap<String, String>>,
+    /// Live milestone text, normalised, to the diary id. A repeat does not insert.
+    milestone_norms: HashMap<String, HashMap<String, String>>,
     writes: u64,
     extractions: u64,
 }
@@ -142,6 +149,7 @@ impl EpisodicStore {
             hidden_names: HashMap::new(),
             hidden_pins: HashMap::new(),
             pinned_norms: HashMap::new(),
+            milestone_norms: HashMap::new(),
             writes: 0,
             extractions: 0,
         }
@@ -660,6 +668,7 @@ impl PersonMemory for EpisodicStore {
             self.hidden_names.clear();
             self.hidden_pins.clear();
             self.pinned_norms.clear();
+            self.milestone_norms.clear();
             self.remember = false;
             return;
         }
@@ -717,6 +726,66 @@ impl PersonMemory for EpisodicStore {
         );
         self.emit(&item);
         self.pinned_norms
+            .entry(person_id.to_string())
+            .or_default()
+            .insert(norm, id.clone());
+        WriteOutcome::Stored { id }
+    }
+
+    fn milestone(&mut self, person_id: &str, text: &str, at: &str) -> WriteOutcome {
+        if !self.remember {
+            return WriteOutcome::Refused;
+        }
+        let Some((person_id, text, at)) = required(person_id, text, at) else {
+            return WriteOutcome::Skipped;
+        };
+        let text = milestone_body(text);
+        if text.is_empty() {
+            return WriteOutcome::Skipped;
+        }
+        if looks_like_secret(text) {
+            return WriteOutcome::Skipped;
+        }
+        let norm = normalise_fact(text);
+        if norm.is_empty() {
+            return WriteOutcome::Skipped;
+        }
+        if let Some(id) = self
+            .milestone_norms
+            .get(person_id)
+            .and_then(|norms| norms.get(&norm))
+            .cloned()
+        {
+            return WriteOutcome::Stored { id };
+        }
+        if !self.connect(true) {
+            return WriteOutcome::Failed;
+        }
+        self.arm_session(person_id);
+        let id = match self.store.as_mut().expect("connected").remember(
+            text,
+            person_id,
+            at,
+            SOURCE_MILESTONE,
+        ) {
+            Ok(id) => id,
+            Err(_) => return WriteOutcome::Failed,
+        };
+        if !self.settle() {
+            return WriteOutcome::Failed;
+        }
+        self.issued.insert(id.clone(), person_id.to_string());
+        let item = item_from(
+            id.clone(),
+            person_id,
+            MemoryKind::Pin,
+            text,
+            at,
+            SOURCE_MILESTONE,
+            true,
+        );
+        self.emit(&item);
+        self.milestone_norms
             .entry(person_id.to_string())
             .or_default()
             .insert(norm, id.clone());
@@ -865,11 +934,7 @@ impl PersonMemory for EpisodicStore {
         }
         let summary = horbm_memory::summarise_session(person_id, &turns);
         self.extractions = self.extractions.saturating_add(1);
-        if let Some(old) = self.summary_row.get(person_id).cloned() {
-            if !self.hide(&old) {
-                return WriteOutcome::Failed;
-            }
-        }
+        // The previous summary stays live. The timeline lists every call.
         let Some(id) = self.write_diary(&summary, person_id, at, SOURCE_SUMMARY) else {
             return WriteOutcome::Failed;
         };
@@ -934,6 +999,12 @@ impl PersonMemory for EpisodicStore {
         if stone.source == SOURCE_PIN {
             let norm = normalise_fact(&stone.text);
             if let Some(norms) = self.pinned_norms.get_mut(person_id) {
+                norms.remove(&norm);
+            }
+        }
+        if stone.source == SOURCE_MILESTONE {
+            let norm = normalise_fact(&stone.text);
+            if let Some(norms) = self.milestone_norms.get_mut(person_id) {
                 norms.remove(&norm);
             }
         }
@@ -1400,6 +1471,65 @@ pub fn pin_command(line: &str) -> Option<&str> {
     }
 }
 
+/// Text after `milestone …` or `please remember this moment …`.
+/// `None` is not a milestone. A longer word such as `milestones` is not one.
+pub(crate) fn milestone_command(line: &str) -> Option<&str> {
+    let (_line, after) = milestone_tail(line)?;
+    let rest = trim_separators(after.trim_start()).trim();
+    if rest.is_empty() {
+        None
+    } else {
+        Some(rest)
+    }
+}
+
+/// The line is a milestone command, including one with no moment text.
+pub(crate) fn milestone_line(line: &str) -> bool {
+    milestone_tail(line).is_some()
+}
+
+fn milestone_body(text: &str) -> &str {
+    milestone_command(text).unwrap_or(text)
+}
+
+/// Borrow the caller's line and the bytes after the milestone prefix.
+fn milestone_tail(line: &str) -> Option<(&str, &str)> {
+    let line = line.trim();
+    let lower = line.to_ascii_lowercase();
+    let (prefix, rest) = if let Some(rest) = lower.strip_prefix("please remember this moment") {
+        ("please remember this moment", rest)
+    } else if let Some(rest) = lower.strip_prefix("milestone") {
+        ("milestone", rest)
+    } else {
+        return None;
+    };
+    if starts_with_ident(rest) {
+        return None;
+    }
+    Some((line, &line[prefix.len()..]))
+}
+
+/// "what have we been through" or "our timeline". Other lines stay on recall.
+pub(crate) fn timeline_ask(line: &str) -> bool {
+    let lower = line.trim().to_ascii_lowercase();
+    lower.contains("what have we been through") || lower.contains("our timeline")
+}
+
+/// Session summaries and milestones for one person, oldest date first.
+///
+/// A filter of [`PersonMemory::list_person`], so the cap is that list's cap.
+/// Other diary rows stay on ordinary recall. Date order is the stored
+/// `source_date` string, the same order `list_person` already uses.
+pub(crate) fn relationship_timeline(
+    memory: &mut dyn PersonMemory,
+    person_id: &str,
+) -> Vec<MemoryItem> {
+    let mut items = memory.list_person(person_id, usize::MAX);
+    items.retain(|item| item.source == SOURCE_SUMMARY || item.source == SOURCE_MILESTONE);
+    items.sort_by(|left, right| left.at.cmp(&right.at).then_with(|| left.id.cmp(&right.id)));
+    items
+}
+
 fn starts_with_ident(rest: &str) -> bool {
     rest.starts_with(|ch: char| ch.is_ascii_alphanumeric())
 }
@@ -1472,6 +1602,7 @@ fn item_from_hit(hit: MemoryHit) -> MemoryItem {
 fn kind_of(source: &str, text: &str, said_by: &str, date: &str) -> MemoryKind {
     match source {
         SOURCE_SUMMARY => MemoryKind::Summary,
+        SOURCE_MILESTONE => MemoryKind::Pin,
         SOURCE_STATE if text.starts_with("my name is") => MemoryKind::Name,
         SOURCE_STATE => MemoryKind::Mood,
         // A name slot stays Name. Any other kept session-ring candidate is
@@ -1587,7 +1718,13 @@ fn trim_ascii_punctuation(text: &str) -> &str {
 }
 
 fn strip_remember_prefix(text: &str) -> String {
-    const PREFIXES: &[&str] = &["please remember", "remember this", "remember"];
+    const PREFIXES: &[&str] = &[
+        "please remember this moment",
+        "milestone",
+        "please remember",
+        "remember this",
+        "remember",
+    ];
     for prefix in PREFIXES {
         let Some(rest) = text.strip_prefix(prefix) else {
             continue;
@@ -1790,6 +1927,37 @@ mod tests {
         );
         assert_eq!(pin_command("remembering the song"), None);
         assert_eq!(pin_command("where is the kettle"), None);
+    }
+
+    #[test]
+    fn milestone_commands_keep_the_callers_words() {
+        assert_eq!(
+            milestone_command("milestone the oak we planted"),
+            Some("the oak we planted")
+        );
+        assert_eq!(
+            milestone_command("Please remember this moment: the oak we planted"),
+            Some("the oak we planted")
+        );
+        assert_eq!(milestone_command("milestones are not this"), None);
+        assert_eq!(
+            milestone_command("please remember this momentary pause"),
+            None
+        );
+        assert_eq!(milestone_command("milestone"), None);
+        assert!(milestone_line("milestone"));
+        assert!(!milestone_line("please remember the oak we planted"));
+        assert!(timeline_ask("what have we been through"));
+        assert!(timeline_ask("What is our timeline?"));
+        assert!(!timeline_ask("where is the kettle"));
+        assert_eq!(
+            normalise_fact("milestone the oak we planted"),
+            normalise_fact("the oak we planted")
+        );
+        assert_eq!(
+            normalise_fact("please remember this moment the oak we planted"),
+            normalise_fact("the oak we planted")
+        );
     }
 
     #[test]
