@@ -114,7 +114,7 @@ Related, not Moshi itself: [kyutai-labs/delayed-streams-modeling](https://github
 |---|---|
 | Dia | [nari-labs/dia](https://github.com/nari-labs/dia). 19431 stars, Apache-2.0, Python, last push 2025-11-19. |
 | Dia2 | [nari-labs/dia2](https://github.com/nari-labs/dia2). 1192 stars, Apache-2.0, Python, last push 2025-11-29. |
-| Tags | Parentheses, not brackets. The Dia README lists `(laughs)`, `(sighs)`, `(inhales)`, `(exhales)`, `(coughs)`, `(gasp)` and others, inside `[S1]` / `[S2]` dialogue. |
+| Tags | Parentheses, not brackets. The Dia README lists `(laughs)`, `(sighs)`, `(gasps)`, `(inhales)`, `(exhales)`, `(coughs)` and others, inside `[S1]` / `[S2]` dialogue. |
 | GPU | Dia README, RTX 4090: float16 with compile is ×2.2 real time, about 4.4 GB. “CPU support is to be added soon.” |
 | CPU | Dia: not supported in that README. Dia2’s CLI “auto-selects CUDA when available (otherwise CPU)” ([README](https://github.com/nari-labs/dia2)). No CPU RTF was found. Treat Dia2-on-CPU speed as **unknown**, and do not assume it is faster than real time. |
 | Mobile | **Unknown.** The public demo named in the Dia README is a Hugging Face ZeroGPU space. |
